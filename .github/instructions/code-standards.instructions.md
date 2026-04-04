@@ -1,0 +1,70 @@
+---
+applyTo: "src/**/*.py,tests/**/*.py"
+---
+
+# Code Standards
+
+> **Most style rules are enforced by ruff (pyproject.toml).** This file covers only what ruff cannot check: naming, architecture patterns, and deprecation protocol.
+
+---
+
+## What ruff Enforces (see pyproject.toml)
+
+- **I**: Import ordering (stdlib → third-party → local)
+- **UP**: `List`→`list`, `Optional[X]`→`X | None`, deprecated stdlib usage
+- **D**: Google-style docstrings on public classes and functions
+- **G**: `%`-formatting in logging (no f-strings)
+- **S/B**: Security and common bugs
+- **SIM/C4**: Simplification and comprehension style
+
+Run `uv run ruff check src/ tests/` — zero violations required before commit.
+
+---
+
+## Naming Conventions (not ruff-enforceable)
+
+- **Classes**: `PascalCase` — `RagBuilder`, `QueryConfig`
+- **Functions/methods**: `snake_case` — `build_async`, `query_system`
+- **Async variants**: `_async` suffix when sync version exists
+- **Private**: `_leading_underscore`
+- **Constants**: `UPPER_SNAKE_CASE`
+
+---
+
+## Architecture Patterns
+
+- **Config-first**: dataclasses in `src/configs/` with `__post_init__` validation before feature code
+- **Builder pattern**: `from_config(cfg)` factory method on consuming classes
+- **Composition over inheritance**
+- **`pathlib.Path`** for all file ops (never `os.path`)
+- **Context managers** (`with`) for all resources
+- **`ClassVar`** for dataclass class-level constants (prevent `__init__` override attacks)
+- **`from __future__ import annotations`** NEVER — breaks Hydra dataclass introspection in Python 3.12+
+
+---
+
+## Error Handling
+
+```python
+try:
+    result = create_pipeline(config)
+except ValueError as e:
+    logger.error("Invalid config: %s", e)
+    raise RuntimeError("Pipeline creation failed") from e
+```
+
+Always chain exceptions with `from e`. Use specific exception types.
+
+---
+
+## Deprecation Protocol
+
+**Never ignore deprecation warnings. Stop and fix immediately.**
+
+1. Identify deprecated API from warning message
+2. Find replacement in library docs/changelog
+3. Update imports and usage
+4. Run `uv run pytest tests/ -q` — verify no new warnings
+5. Add `[LEARN:deprecation]` entry to `.github/MEMORY.md`
+
+Common sources: `datetime.utcnow()` → `datetime.now(UTC)`, Pydantic v1 validators → `field_validator`, `typing.Optional` → `X | None`.
