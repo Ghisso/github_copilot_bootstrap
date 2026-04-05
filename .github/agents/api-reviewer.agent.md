@@ -72,4 +72,13 @@ You are the API Reviewer. Ensure APIs are well-designed and production-ready.
 
 ### Issues
 - [severity] [endpoint] -- [issue] -- [recommendation]
+
+### Generated Test Cases
+For each reviewed endpoint, generate test cases:
+1. Happy path (valid input → expected response)
+2. Invalid input (validation error response)
+3. Missing required field (422 response)
+4. Boundary value test
+
+[test code snippets]
 ```

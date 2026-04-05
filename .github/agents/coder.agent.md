@@ -14,6 +14,8 @@ tools:
   - todos
   - vscode
   - web
+agents:
+  - code-simplifier
 user-invocable: false
 ---
 
@@ -47,3 +49,14 @@ Never implement first and check skills later.
   - `uv run mypy src/ --ignore-missing-imports --explicit-package-bases`
   - `uv run ruff check src/ tests/`
 - If checks fail, fix and re-run before returning.
+
+## Code Simplification (Mandatory)
+
+After all edits pass verification, you MUST delegate to the `code-simplifier` agent before returning to the calling agent:
+
+1. Pass the list of modified files to `code-simplifier`.
+2. Let it apply clarity and consistency refinements.
+3. Re-run verification commands after simplification.
+4. If verification fails after simplification, fix and re-verify.
+
+Only return to the calling agent after simplification is complete and verification passes.

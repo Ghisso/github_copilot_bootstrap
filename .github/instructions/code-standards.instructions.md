@@ -41,6 +41,12 @@ Run `uv run ruff check src/ tests/` — zero violations required before commit.
 - **`ClassVar`** for dataclass class-level constants (prevent `__init__` override attacks)
 - **`from __future__ import annotations`** NEVER — breaks Hydra dataclass introspection in Python 3.12+
 
+## Anti-Patterns (prohibited)
+
+- **`import argparse`** — forbidden in `src/` and `gradio_app/`; use Hydra ConfigStore CLI overrides for all production entrypoints. Test harnesses (`tests/`) are the only allowed exception.
+- **YAML config files** — all config variants as Python dataclasses only (pure ConfigStore)
+- **Ad-hoc `os.getenv()` arg parsing** — use Hydra config fields with env-var defaults only at system boundaries (service.py / BentoML)
+
 ---
 
 ## Error Handling

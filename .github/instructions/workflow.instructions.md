@@ -11,8 +11,8 @@ description: "Always-on: Workflow protocol — plan-first, orchestrator loop, se
 **For any non-trivial task (>1 file or >30 min), plan before coding.**
 
 1. Check `.github/MEMORY.md` for relevant `[LEARN]` entries
-2. For ambiguous/complex tasks: clarify with user (max 3-5 questions)
-3. Draft plan → save to `.github/plans/YYYY-MM-DD_short-description.md`
+2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.github/quality_reports/specs/`
+3. Draft plan → save to `.github/plans/YYYY-MM-DD_short-description.md` (for concrete implementation plans) or `.github/explorations/YYYY-MM-DD_description/` (for exploratory/PoC plans)
 4. Present to user → wait for approval
 5. After approval: create session log, then implement via Orchestrator Loop
 
@@ -67,6 +67,8 @@ uv run ruff check src/ tests/
 
 **Frequency:** Every 30 responses or at session end (whichever comes first).
 
+Merge-time review reports should be stored in `.github/quality_reports/merges/`.
+
 ---
 
 ## Context Management
@@ -78,7 +80,7 @@ uv run ruff check src/ tests/
 4. Document open questions
 
 **Starting a new session:**
-1. Read `copilot-instructions.md` + most recent plan in `.github/plans/`
+1. Read `copilot-instructions.md` + most recent plan in `.github/plans/` or exploration in `.github/explorations/`
 2. Check `git log --oneline -10` and `git diff`
 3. State understood task and next step
 
@@ -87,7 +89,7 @@ uv run ruff check src/ tests/
 ## Recovery Checklist
 
 ```
-[ ] Plan saved to .github/plans/
+[ ] Plan saved to .github/plans/ or .github/explorations/
 [ ] Session log created/updated
 [ ] MEMORY.md has all [LEARN] entries
 [ ] Verification passed (pytest + mypy + ruff)
@@ -110,7 +112,6 @@ Also blocked in pre-tool hooks:
 
 When asked to edit protected files or run blocked git commands, stop and explain why it's protected.
 
----
 
 ## Automatic Reminders
 
@@ -137,7 +138,7 @@ Some behaviors are automated by hooks. Others are still manual.
 
 **When the conversation is long / context is filling up:**
 ```
-→ Save plan to .github/plans/
+→ Save plan to .github/plans/ (implementation) or .github/explorations/ (research/PoC)
 → Update MEMORY.md with all [LEARN] entries
 → Write session log with open questions and next steps
 ```

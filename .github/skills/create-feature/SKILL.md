@@ -31,10 +31,9 @@ class FeatureConfig:
             raise ValueError("param cannot be empty")
 
 
-def register_feature_configs() -> None:
-    """Register feature config variants with ConfigStore."""
-    cs = ConfigStore.instance()
-    cs.store(group="feature", name="default", node=FeatureConfig)
+# Module-level registration — triggered on import
+cs = ConfigStore.instance()
+cs.store(group="feature", name="default", node=FeatureConfig)
 ```
 
 ## Phase 2: Implementation Module
@@ -66,8 +65,8 @@ class TestFeature:
 
 ## Phase 4: Wire Up
 
-1. Call `register_feature_configs()` before Hydra init in entry point
-2. Add `FeatureConfig` field to `MainConfig` with defaults entry
+1. Ensure the new config module is imported during app startup so its module-level `cs.store()` calls execute before `@hydra.main`
+2. Add `FeatureConfig` field to the entrypoint-specific top-level config class (for example `TrainingConfig`, `PdfIngestionConfig`) with a defaults entry
 3. Update project state in `copilot-instructions.md`
 
 ## Phase 5: Verify

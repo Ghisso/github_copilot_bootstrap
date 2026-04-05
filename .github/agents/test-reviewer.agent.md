@@ -31,25 +31,30 @@ You are the Test Reviewer. Ensure tests are meaningful and thorough.
 - [ ] Both success and failure paths tested
 - [ ] Edge cases covered (empty input, None, boundary values)
 - [ ] Regression test exists for known bugs
+- [ ] Test case enumeration covers all four categories: happy path, boundary, error, state
 
 ### Assertion Quality
 - [ ] Tests have meaningful assertions (not just `assert True`)
 - [ ] Error messages checked with `match=` parameter
 - [ ] Return values verified, not just "no exception"
 - [ ] Multiple related assertions grouped logically
+- [ ] Concrete test data used (not abstract placeholders)
 
 ### Mock Appropriateness
 - [ ] External APIs/services are mocked
 - [ ] Lightweight framework objects use real instances
 - [ ] Mock return values are realistic
 - [ ] `assert_called_once()` or similar verify mock usage
+- [ ] Mocks patched at the import boundary of the module under test
+- [ ] Every mock has at least one assertion (no unasserted mocks)
 
 ### Test Design
 - [ ] Test names describe what is being tested
-- [ ] `@pytest.mark.parametrize` for multiple inputs
+- [ ] `@pytest.mark.parametrize` for multiple inputs (with `ids`)
 - [ ] Fixtures used for shared setup (in conftest.py)
 - [ ] Async tests marked with `@pytest.mark.asyncio`
 - [ ] Tests are independent (no ordering dependency)
+- [ ] One assertion focus per test (multiple aspects of same behavior OK)
 
 ## Severity Levels
 

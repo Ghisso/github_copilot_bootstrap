@@ -4,6 +4,20 @@ applyTo: "tests/**/*.py"
 
 # Testing Standards
 
+## Test Generation Workflow
+
+Before writing tests, follow the reconnaissance protocol:
+
+1. **Identify scope** — functions, classes, or modules to test.
+2. **Read signatures** — parameters, types, return types. Every parameter is a test dimension.
+3. **Map dependencies** — external calls (API, DB, filesystem) are mock candidates.
+4. **Enumerate cases** across four categories:
+   - **Happy path:** expected inputs → expected outputs
+   - **Boundary:** edge values (empty, zero, max, single element)
+   - **Error:** invalid inputs → proper exceptions
+   - **State:** transitions produce correct side effects
+5. **Check existing tests** — extend, don't duplicate.
+
 ## Test File Structure
 
 ```python
@@ -50,6 +64,9 @@ def mock_external_api() -> MagicMock:
 
 **Mock external services:** HTTP clients, LLM APIs, embedding models, databases.
 **Use real objects for:** dataclasses, configs, pure functions, lightweight framework components.
+**Patch at the import boundary:** `@patch("src.module.ExternalAPI")`, not `@patch("external_lib.API")`.
+**Assert every mock:** every mock must have at least one assertion on call count/args.
+**Use concrete values:** `"alice@example.com"` not `"test_email"`. Concrete values catch type mismatches.
 
 ```python
 # Good: mock external LLM call
@@ -91,3 +108,7 @@ asyncio_mode = auto
 - Mocking what you own (testing mock behavior, not real behavior)
 - Tests that depend on execution order
 - No `match=` parameter on `pytest.raises` — always verify error message
+- Unasserted mocks (mock exists but no `assert_called_*` check)
+- Abstract test data (`"test_value"`) instead of concrete data (`"S/RES/1234"`)
+- Duplicated test logic instead of `@pytest.mark.parametrize`
+- `scope="session"` for mutable fixtures — use `function` scope to avoid state leakage

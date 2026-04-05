@@ -21,11 +21,9 @@ uv run ruff check src/ tests/              # Lint (0 violations required)
 
 ## Mock vs Real Objects
 
-**Use mocks for:** external API calls, model loading, non-deterministic behavior (time, random, network).
+See `tests.instructions.md` for detailed mocking rules.
 
-**Use real objects for:** dataclasses/configs, lightweight framework components, pure functions, in-memory stores.
-
-> If the framework validates types at construction, use real objects so tests catch type mismatches.
+> Quick guideline: Mock external services (API, DB, LLM). Use real objects for configs, dataclasses, pure functions.
 
 ---
 

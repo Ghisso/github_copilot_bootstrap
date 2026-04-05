@@ -9,6 +9,13 @@ argument-hint: "[path or test pattern]"
 
 # run-tests — Test Orchestration
 
+## Step 0: Reconnaissance (for test generation)
+If generating new tests, follow the reconnaissance workflow from `testing-patterns/SKILL.md`:
+1. Identify scope and read function signatures.
+2. Map dependencies (mock candidates).
+3. Enumerate test cases: happy path, boundary, error, state.
+4. Choose scope mode: `quick` (single function), `standard` (file/class), `comprehensive` (module/package).
+
 ## Step 1: Quick Run
 ```bash
 uv run pytest tests/ -q --tb=short

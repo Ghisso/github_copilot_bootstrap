@@ -33,11 +33,13 @@ You are the Config Reviewer. Ensure configs are complete and validated.
 - [ ] Sensible defaults that work out of the box
 
 ### ConfigStore Registration
-- [ ] All variants registered with `register_*_configs()` function
+- [ ] `cs = ConfigStore.instance()` + `cs.store()` directly after each dataclass (no wrapper functions)
 - [ ] Group names match logical structure
 - [ ] Top-level config has `defaults` list with `_self_` first
 - [ ] `"mode": "RUN"` in hydra dict (prevents AssertionError)
 - [ ] No YAML files — all variants in Python dataclasses
+- [ ] Config module import path is wired so module-level `cs.store()` executes before `@hydra.main`
+- [ ] Top-level config contains ONLY composed dataclass fields (no bare primitives)
 
 ### Environment & Secrets
 - [ ] Secrets loaded from env vars (never in dataclass defaults)
@@ -52,7 +54,7 @@ You are the Config Reviewer. Ensure configs are complete and validated.
 ## Severity Levels
 
 - **Critical**: Hardcoded secrets, missing validation, broken ConfigStore registration
-- **Major**: Missing `__post_init__`, no `register_*_configs()`, partial field passing
+- **Major**: Missing `__post_init__`, partial field passing
 - **Minor**: Missing field descriptions, suboptimal defaults
 
 ## Report Format

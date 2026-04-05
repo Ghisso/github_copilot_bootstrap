@@ -6,41 +6,43 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 INPUT=$(cat)
-LOG_DIR=".github/session_logs"
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+LOG_DIR="$REPO_ROOT/.github/session_logs"
 LOG_FILE="$LOG_DIR/hooks-sessions.log"
 mkdir -p "$LOG_DIR"
 
-TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-SOURCE=$(printf '%s' "$INPUT" | python3 -c 'import json, sys
+LINE=$(printf '%s' "$INPUT" | python3 -c 'import json, sys
 try:
   data = json.load(sys.stdin)
-  print(data.get("source") or "")
 except Exception:
-  print("")' 2>/dev/null || true)
-REASON=$(printf '%s' "$INPUT" | python3 -c 'import json, sys
-try:
-  data = json.load(sys.stdin)
-  print(data.get("reason") or "")
-except Exception:
-  print("")' 2>/dev/null || true)
-INITIAL_PROMPT=$(printf '%s' "$INPUT" | python3 -c 'import json, sys
-try:
-  data = json.load(sys.stdin)
-  print((data.get("initialPrompt") or "").replace("\n", " "))
-except Exception:
-  print("")' 2>/dev/null || true)
+  sys.exit(0)
 
-if [[ -n "$SOURCE" ]]; then
-  printf '%s,event=sessionStart,source=%s' "$TIMESTAMP" "$SOURCE" >> "$LOG_FILE"
-  if [[ -n "$INITIAL_PROMPT" ]]; then
-    printf ',initialPrompt=%s' "$(printf '%s' "$INITIAL_PROMPT" | tr '\n' ' ' | sed 's/,/ /g')" >> "$LOG_FILE"
-  fi
-  printf '\n' >> "$LOG_FILE"
-  exit 0
-fi
+def sanitize(value: object) -> str:
+  text = str(value or "")
+  return text.replace("\n", " ").replace(",", " ").strip()
 
-if [[ -n "$REASON" ]]; then
-  printf '%s,event=sessionEnd,reason=%s\n' "$TIMESTAMP" "$REASON" >> "$LOG_FILE"
+timestamp = sanitize(data.get("timestamp"))
+event = sanitize(data.get("hookEventName"))
+session_id = sanitize(data.get("sessionId"))
+source = sanitize(data.get("source"))
+prompt = sanitize(data.get("prompt") or data.get("initialPrompt"))
+stop_hook_active = sanitize(data.get("stop_hook_active"))
+event_value = event or "unknown"
+
+parts = [timestamp or "unknown-timestamp", f"event={event_value}"]
+if session_id:
+  parts.append(f"sessionId={session_id}")
+if source:
+  parts.append(f"source={source}")
+if prompt:
+  parts.append(f"prompt={prompt}")
+if stop_hook_active:
+  parts.append(f"stop_hook_active={stop_hook_active}")
+
+print(",".join(parts))' 2>/dev/null || true)
+
+if [[ -n "$LINE" ]]; then
+  printf '%s\n' "$LINE" >> "$LOG_FILE"
 fi
 
 exit 0

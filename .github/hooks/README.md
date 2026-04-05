@@ -8,31 +8,40 @@ GitHub Copilot supports repository hooks via `hooks.json` in `.github/hooks/`.
 
 Configuration file: `.github/hooks/hooks.json`
 
-### preToolUse
+### `PreToolUse`
 
 - `scripts/protect-files.sh`
-- Blocks edits/creates for protected files: `.env`, `.env.*`, `.env.local`, `*.pem`, `*.key`, `*secret*`, `credentials*`, `uv.lock`.
+- Denies writes to protected files: `.env`, `.env.*`, `.env.local`, `*.pem`, `*.key`, `*secret*`, `credentials*`, `uv.lock`.
+- Requires approval (`ask`) before editing `.github/hooks/**` so agents cannot silently rewrite their own enforcement.
 - `scripts/git-protection.sh`
-- Blocks dangerous git commands in bash tool calls: `git push --force`, `git push -f`, `git reset --hard`, `git branch -D main`, `git branch -D master`, and `git clean -fd` (including equivalent flag combinations).
+- Denies destructive git commands in terminal-style tool calls, including force-push, `git reset --hard`, `git checkout --`, `git restore --source`, deleting `main`/`master`, and `git clean -fd` variants.
 
-### sessionStart / sessionEnd
+### `SessionStart` / `Stop`
 
 - `scripts/session-log.sh`
 - Appends lifecycle entries to `.github/session_logs/hooks-sessions.log`
 
-### errorOccurred
+## Native VS Code Hook Contract
 
-- `scripts/error-log.sh`
-- Appends errors to `.github/session_logs/hooks-errors.log`
+These hooks use VS Code's native workspace hook contract:
+
+- PascalCase event names (`SessionStart`, `PreToolUse`, `Stop`)
+- `command` and `timeout` fields in `hooks.json`
+- `hookSpecificOutput.permissionDecision` for `PreToolUse` allow/ask/deny decisions
+
+The previous Claude/Copilot-CLI-compatible shape mostly loaded, but it was too brittle
+for reliable enforcement in VS Code.
 
 ## Behavior Notes
 
-- `preToolUse` can deny tool execution by returning JSON with `permissionDecision: "deny"`.
-- `postToolUse`, `sessionStart`, `sessionEnd`, and `errorOccurred` are best used for logging and observability.
+- `PreToolUse` can deny or require approval for a single tool call.
+- `SessionStart` and `Stop` are used only for lightweight logging.
+- There is intentionally no `PostToolUse` hook here.
 
 ## Hook Gaps vs Claude Code
 
-Copilot currently does not expose Claude-specific hook events like `PreCompact`, `Stop`, or `Notification`.
-Because of that, reminders like verification nudges, context warnings, and session-log cadence are still handled in always-on instructions:
+Not every Claude/Copilot CLI pattern maps cleanly to VS Code hooks, and some
+older examples use different payload field names. For repo policy and workflow nudges,
+always-on instructions still carry most of the guidance:
 
 - `.github/instructions/workflow.instructions.md`

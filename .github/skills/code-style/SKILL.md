@@ -109,7 +109,7 @@ import bentoml
 from pydantic import BaseModel
 
 # Local application
-from src.configs.main_config import MainConfig
+from src.configs.training_config import TrainingConfig
 ```
 
 ---
