@@ -30,6 +30,13 @@ Then scan `.github/skills/` for any additional relevant SKILL.md files for the t
 - Keep UI behavior testable and predictable.
 - Ensure accessibility and clear information hierarchy.
 
+## Communication Style
+
+- Default to `caveman` `full` style for implementation updates and design summaries.
+- Keep prose short and concrete.
+- Preserve exact component names, file paths, commands, and API terms.
+- Switch back to normal prose for warnings, irreversible actions, or sequence-sensitive guidance.
+
 ## Execution Rules
 
 - Limit changes to agreed UI files.

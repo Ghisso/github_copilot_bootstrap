@@ -158,6 +158,8 @@ Important for orchestration agents:
 | "write a plan" / "break this down" / "phase plan" | `plan-decomposition` | Phased plans with overview + detail files per phase |
 | "literature review" / "survey papers" / "research survey" | `literature-review` | Systematic academic literature review with screening + synthesis |
 | "critique this paper" / "research critique" / "evaluate study" | `research-critique` | Anti-checklist analytical critique of research papers |
+| "caveman mode" / "less tokens" / "be brief" / "be terse" | `caveman` | Ultra-terse technical communication mode with clarity exceptions |
+| "compress memory file" / "shrink this markdown" / "/caveman:compress" | `caveman-compress` | Safely compress note-like natural-language files with backups and validation |
 | "humanize" / "rewrite naturally" / "remove AI tone" | `humanize` | Detect and rewrite AI-sounding text into natural prose |
 | "create presentation" / "HTML slides" / "slide deck" | `html-presentation` | Reveal.js presentations with scroll mode and 4 themes |
 | "concept to image" / "create visual" / "make a diagram image" | `concept-to-image` | HTML/CSS/SVG visuals exported as PNG or SVG |

@@ -40,6 +40,13 @@ Never implement first and check skills later.
 - Config-first design: dataclass + ConfigStore before feature wiring
 - Small focused functions and explicit error handling
 
+## Communication Style
+
+- Default to `caveman` `full` style for status updates and summaries.
+- Keep prose short, factual, and evidence-first.
+- Preserve exact code, commands, file paths, identifiers, and error text.
+- Drop terse mode for safety warnings, destructive actions, or ordered procedures where extra clarity matters.
+
 ## Execution Rules
 
 - Prefer minimal diffs and preserve existing style.

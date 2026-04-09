@@ -31,6 +31,8 @@ Return only normalized findings:
 ```
 
 Rules:
+- Use terse, evidence-first wording. One finding, one line.
 - Keep findings evidence-based and tied to file locations.
 - Do not synthesize with other model outputs.
 - Do not remove uncertain findings; mark uncertainty explicitly.
+- Do not drop safety-critical detail for brevity.

@@ -155,6 +155,11 @@ Quality and architecture:
 - [text-to-sql-safety](.github/skills/text-to-sql-safety/SKILL.md)
 - [debug-investigator](.github/skills/debug-investigator/SKILL.md)
 
+Communication and context control:
+
+- [caveman](.github/skills/caveman/SKILL.md)
+- [caveman-compress](.github/skills/caveman-compress/SKILL.md)
+
 Project acceleration:
 
 - [setup-project](.github/skills/setup-project/SKILL.md)
@@ -238,3 +243,4 @@ If you customize it, prioritize:
 - preserving the plan/verify/review/score loop
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
+- treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
