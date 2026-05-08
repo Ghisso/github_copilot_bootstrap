@@ -53,6 +53,16 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 ```
 **Pass criteria:** Zero deprecation warnings.
 
+### 5. Quality Score (when available)
+```bash
+if [[ -f ".github/scripts/quality_score.py" ]]; then
+  uv run python .github/scripts/quality_score.py src/ --json
+else
+  echo "quality_score.py not found — skipping score (ruff+mypy+pytest gates still apply)"
+fi
+```
+**Pass criteria:** Score ≥ 80 for commit, ≥ 90 for PR. If the script is absent, skip without failing.
+
 ## Report Format
 
 ```markdown
@@ -65,6 +75,7 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 | Tests | PASS/FAIL | X/Y passed |
 | Imports | PASS/FAIL | all clean or failures |
 | Deprecations | PASS/WARN | count or clean |
+| Quality score | PASS/FAIL/SKIP | N/100 or not available |
 
 ### Blocking Issues
 [List FAIL items that must be fixed]

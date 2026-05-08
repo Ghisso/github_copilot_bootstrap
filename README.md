@@ -126,7 +126,7 @@ These are the files that matter most in day-to-day use:
   - Naming, architecture patterns, deprecation protocol
 - [tests.instructions.md](.github/instructions/tests.instructions.md)
   - Fixture design, mocking boundaries, async testing patterns
-- [config-first-design.instructions.md](.github/instructions/config-first-design.instructions.md) + [configs.instructions.md](.github/instructions/configs.instructions.md)
+- [config-first-design.instructions.md](.github/instructions/config-first-design.instructions.md)
   - Pure ConfigStore approach (no YAML)
   - Dataclass validation and registration patterns
 - [api-service-standards.instructions.md](.github/instructions/api-service-standards.instructions.md)
@@ -135,6 +135,8 @@ These are the files that matter most in day-to-day use:
   - Pre-deploy checks, Bento build/container workflow, health checks
 
 ## Most Important Skills
+
+Skills have two visibility levels: **public** skills appear in the `/` slash menu; **background** skills are hidden from the menu but auto-load when the model's description matches the task context. Both types are documented in the skills table in `copilot-instructions.md`.
 
 There are many skills; these are the high-leverage ones I rely on most:
 
@@ -189,7 +191,21 @@ Key reviewer agents:
 - [performance-reviewer](.github/agents/performance-reviewer.agent.md)
 - [documentation-reviewer](.github/agents/documentation-reviewer.agent.md)
 
-Reviewer agents run adversarial dual-pass review through model-specific reviewer passes and synthesize findings into one report.
+Reviewer agents run adversarial dual-pass review through two model-specific sub-agents (`review-pass-codex` and `review-pass-sonnet`) and synthesize findings into one report. When only one sub-agent is available, reviewers fall back to single-pass mode and label findings as `[single-pass, unconfirmed]`.
+
+Orchestrator routing:
+
+- The orchestrator does a shallow exploration pass, then decides between `--mode micro-plan` (small, well-scoped changes) and `--mode full-plan` (new features, cross-cutting changes) before delegating to the planner.
+- The planner does NOT self-classify; routing ownership stays with the orchestrator.
+- Planner micro-plan mode: load skills → draft → done (no interview required).
+- Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
+- Control-plane files (`.github/agents/`, `.github/instructions/`, `.github/hooks/`, `copilot-instructions.md`) always use full-plan and always trigger dual adversarial review.
+
+Coder skill loading:
+
+- Tier 1 (always): `code-style/SKILL.md`, `testing-patterns/SKILL.md`
+- Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
+- Coder pauses and asks the user before modifying any control-plane file.
 
 ## Hooks
 
@@ -197,13 +213,11 @@ Hooks provide guardrails and lightweight observability.
 
 Configured events:
 
-- preToolUse
-  - [protect-files.sh](.github/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles)
-  - [git-protection.sh](.github/hooks/scripts/git-protection.sh) blocks dangerous git commands
-- sessionStart/sessionEnd
-  - [session-log.sh](.github/hooks/scripts/session-log.sh) appends lifecycle entries
-- errorOccurred
-  - [error-log.sh](.github/hooks/scripts/error-log.sh) records hook/runtime errors
+- PreToolUse
+  - [protect-files.sh](.github/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
+  - [git-protection.sh](.github/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
+- SessionStart / Stop
+  - [session-log.sh](.github/hooks/scripts/session-log.sh) appends lifecycle entries to `.github/session_logs/hooks-sessions.log`
 
 Core hook config: [hooks.json](.github/hooks/hooks.json)
 
@@ -220,6 +234,8 @@ Expected verification commands after implementation:
 - uv run pytest tests/ -q --tb=short
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
+- uv run ruff format src/ tests/
+- uv run python .github/scripts/quality_score.py src/ --json  (when available)
 
 Quality gates:
 

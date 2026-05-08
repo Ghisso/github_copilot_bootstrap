@@ -5,6 +5,7 @@ description: |
   mutable at construction time. Trigger: a field like `_MAX_TOP_K = 500` or
   `MAX_RESULTS: int = 1000` in a dataclass that should be a class-level ceiling,
   not an instance attribute that callers can override.
+user-invocable: false
 ---
 
 ## Problem

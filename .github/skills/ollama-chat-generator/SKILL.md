@@ -6,6 +6,7 @@ description: |
   - format="json" has no effect on output
   - 30-60s startup timeouts
   - warm_up() method missing in newer versions
+user-invocable: false
 ---
 
 ## Problem

@@ -5,8 +5,14 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 0
 fi
 
+# Compute repo root (three levels up from this script: hooks/scripts/ -> hooks/ -> .github/ -> repo)
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+export REPO_ROOT
+
 INPUT=$(cat)
-OUTPUT=$(printf '%s' "$INPUT" | python3 -c 'import json, posixpath, sys
+OUTPUT=$(printf '%s' "$INPUT" | python3 -c 'import json, os, posixpath, sys
+
+repo_root = os.environ.get("REPO_ROOT", "").rstrip("/")
 
 try:
   data = json.load(sys.stdin)
@@ -76,10 +82,9 @@ def normalize(path: str) -> str:
   candidate = path.replace("\\", "/")
   if candidate.startswith("file://"):
     candidate = candidate[7:]
-  if "/workspaces/RAG/" in candidate:
-    candidate = candidate.split("/workspaces/RAG/", 1)[1]
-  elif candidate.startswith("/workspaces/RAG"):
-    candidate = candidate[len("/workspaces/RAG/"):]
+  # Strip repo-root prefix so absolute paths compare correctly against relative hook paths
+  if repo_root and candidate.startswith(repo_root + "/"):
+    candidate = candidate[len(repo_root) + 1:]
   candidate = posixpath.normpath(candidate)
   if candidate.startswith("./"):
     candidate = candidate[2:]

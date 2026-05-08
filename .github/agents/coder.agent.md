@@ -25,10 +25,21 @@ You implement planned changes safely and efficiently.
 
 ## Mandatory Skills-First Rule
 
-Before implementing any code, you MUST do both:
+Before implementing any code, load skills in two tiers:
 
-1. Scan `.github/skills/` and load all relevant SKILL.md files for the task.
-2. If planner provided `Required Skills`, load every listed SKILL.md before editing.
+**Tier 1 — always load (every task):**
+1. `code-style/SKILL.md`
+2. `testing-patterns/SKILL.md`
+
+**Tier 2 — load by task type:**
+- New modules or features → `create-feature/SKILL.md`
+- Config or dataclass work → `hydra-config/SKILL.md`
+- BentoML service work → `bentoml-service/SKILL.md`
+- Domain-specific bugs (Haystack, pandas, graphs, etc.) → scan `.github/skills/` for a matching domain skill
+
+If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
+
+**Control-plane route:** If any target file is under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md` — treat as high-risk. Pause and ask the user to confirm the change before applying. These files affect every session in every project that uses this bootstrap.
 
 Never implement first and check skills later.
 
@@ -42,7 +53,7 @@ Never implement first and check skills later.
 
 ## Communication Style
 
-- Default to `caveman` `full` style for status updates and summaries.
+- Default to `caveman` `full` style for status updates and summaries. When using terse mode, load `caveman/SKILL.md` before applying.
 - Keep prose short, factual, and evidence-first.
 - Preserve exact code, commands, file paths, identifiers, and error text.
 - Drop terse mode for safety warnings, destructive actions, or ordered procedures where extra clarity matters.

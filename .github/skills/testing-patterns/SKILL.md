@@ -5,6 +5,8 @@ description: |
   unit tests, integration tests, async tests, mocking dependencies, or setting
   up test fixtures. Covers pytest-asyncio, mocking, parametrization, Hydra
   config testing, and coverage.
+  scope: test case authoring, enumeration, and structure
+user-invocable: false
 ---
 
 ## Test Generation Workflow

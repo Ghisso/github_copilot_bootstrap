@@ -24,6 +24,24 @@ You are the Test Reviewer. Ensure tests are meaningful and thorough.
 - Resolve severity conflicts by selecting the stricter severity and note disagreement.
 4. Output one consolidated report in this agent's report format.
 
+## Degraded Mode Fallback
+
+If a review-pass sub-agent model is unavailable, run a single-pass review with the current model.
+
+**Degraded mode format:**
+- Add header: `⚠ Degraded review — single model only — do not treat as PR gate`
+- Label all findings `[single-pass, unconfirmed]`
+- Omit the shared/disputed taxonomy (no confidence distinction)
+- Do not mark this review as passing a pre-PR gate
+
+## Supplementary Rules (from `testing-patterns` skill)
+
+Include these rules in the checklist passed to review-pass sub-agents:
+- [ ] `from __future__ import annotations` must NOT appear in test files that use Hydra configs (breaks dataclass introspection)
+- [ ] File I/O in tests uses `tmp_path` fixture (not `tempfile` module)
+- [ ] Context manager tests: `with obj: pass` only verifies no exception — must add a mock assertion to verify `close()` or the cleanup method was actually called
+- [ ] Async tests use `@pytest.mark.asyncio`; if `asyncio_mode = "auto"` is NOT set in config, the marker is mandatory
+
 ## Review Checklist
 
 ### Coverage

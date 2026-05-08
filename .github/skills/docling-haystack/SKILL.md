@@ -5,6 +5,7 @@ description: |
   - TypeError when passing pipeline_options= directly to DoclingConverter
   - OCR performance issues (60s/PDF vs 2-5s without OCR)
   - Configuring Docling's DocumentConverter format options from Haystack
+user-invocable: false
 ---
 
 ## Problem

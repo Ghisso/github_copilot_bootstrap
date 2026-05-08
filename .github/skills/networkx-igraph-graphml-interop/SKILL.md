@@ -6,6 +6,7 @@ description: |
   1. edge_recall=0 despite visually correct output (opaque vs semantic node IDs)
   2. GraphML export fails with XML parse errors (illegal control characters from OCR)
 version: 1.0.0
+user-invocable: false
 ---
 
 ## Problem 1: Cross-Format Node ID Comparison Gives 0% Recall

@@ -24,7 +24,23 @@ You are the Code Reviewer. Focus on code quality and maintainability.
 - Resolve severity conflicts by selecting the stricter severity and note disagreement.
 4. Output one consolidated report in this agent's report format.
 
-## Review Checklist
+### Supplementary Rules (from `code-style` skill)
+
+Include these rules in the checklist passed to review-pass sub-agents:
+- [ ] No `from __future__ import annotations` — breaks Hydra dataclass introspection in Python 3.12+
+- [ ] `ClassVar` used for class-level constants in dataclasses (not a regular field)
+- [ ] Logging format uses `%` style: `logger.info("msg %s", var)` — never f-strings
+- [ ] File I/O uses `pathlib.Path` — never `os.path` or raw string concatenation
+
+## Degraded Mode Fallback
+
+If a review-pass sub-agent model is unavailable, run a single-pass review with the current model.
+
+**Degraded mode format:**
+- Add header: `⚠ Degraded review — single model only — do not treat as PR gate`
+- Label all findings `[single-pass, unconfirmed]`
+- Omit the shared/disputed taxonomy (no confidence distinction)
+- Do not mark this review as passing a pre-PR gate
 
 ### Structure & Design
 - [ ] Functions < 50 lines; single responsibility

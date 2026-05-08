@@ -26,8 +26,7 @@
 | `workflow.instructions.md` | Always-on | Plan-first, orchestrator loop, session logging |
 | `code-standards.instructions.md` | `src/**`, `tests/**` | Naming, architecture, deprecation protocol |
 | `quality-and-testing.instructions.md` | Always-on | Verification commands, score rubric, gates |
-| `configs.instructions.md` | `src/configs/**` | Pure ConfigStore design, no YAML files |
-| `config-first-design.instructions.md` | `src/configs/**` | Dataclass + ConfigStore patterns, anti-patterns, checklist |
+| `config-first-design.instructions.md` | `src/configs/**` | Pure ConfigStore design, no YAML files, dataclass patterns |
 | `api-service-standards.instructions.md` | `service.py`, `src/api/**` | BentoML service patterns, Pydantic |
 | `tests.instructions.md` | `tests/**` | Testing patterns, mocking, coverage |
 | `deployment.instructions.md` | `service.py`, `bentofile.yaml` | Deployment, Docker, health checks |
@@ -69,9 +68,9 @@ uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 
 # Quality scoring (combines all three):
-python .github/scripts/quality_score.py src/
-python .github/scripts/quality_score.py src/ --json        # machine-readable
-python .github/scripts/quality_score.py src/ --skip-tests  # ruff + mypy only
+uv run python .github/scripts/quality_score.py src/
+uv run python .github/scripts/quality_score.py src/ --json        # machine-readable
+uv run python .github/scripts/quality_score.py src/ --skip-tests  # ruff + mypy only
 ```
 
 ---
@@ -113,60 +112,63 @@ Reviewer behavior:
 Important for orchestration agents:
 
 - `planner` must always load planning skills first (`plan-decomposition`, `iterative-plan-review`, and `create-feature` when applicable).
-- `coder` must always scan available skills and load relevant SKILL.md files before implementation, plus all planner-requested skills.
+- `coder` must always load Tier 1 skills (`code-style`, `testing-patterns`) plus Tier 2 skills by task type before editing.
+- Orchestrator owns the `--mode micro-plan` / `--mode full-plan` routing decision before delegating to `planner`.
 
-| Trigger | Skill | What it does |
-|---|---|---|
-| "commit" / "stage changes" | `commit` | Git workflow: stage, commit, PR, merge |
-| "run tests" / "test this" | `run-tests` | Pytest orchestration with coverage |
-| "review the code" | `code-review` | Multi-agent parallel review |
-| "review the API" | `review-api` | API + security + test review |
-| "add dependency" | `add-dependency` | uv add with validation |
-| "refactor" | `refactor` | Safe refactoring with test gate |
-| "create feature" | `create-feature` | Config-first scaffolding |
-| "deploy" | `deploy-service` | BentoML/Docker deployment workflow |
-| "setup project" | `setup-project` | Initialize new project from scaffold |
-| "data analysis" | `data-analysis` | Load → explore → clean → analyze → report |
-| "audit the repo" | `deep-audit` | Repository-wide consistency audit |
-| "challenge this design" | `devils-advocate` | Structured critique before committing |
-| "review the plan" | `iterative-plan-review` | Architecture + code review on plans |
-| "I learned something" | `learn` | Extract discovery into reusable skill |
-| "session status" | `context-status` | Show context health, plans, git status |
-| "create BentoML service" / "deploy ML model" | `bentoml-service` | Production BentoML service with lifecycle, Pydantic, CORS |
-| "code style" / "style review" | `code-style` | Python type hints, docstrings, logging, naming conventions |
-| "integration tests" / "CSV tests" / "classifier tests" | `csv-driven-integration-tests` | CSV fixture datasets + pytest parametrize for classifiers/SQL |
-| "classvar" / "constant field in dataclass" | `dataclass-classvar-constant` | Fix mutable instance fields that should be ClassVar constants |
-| "docling" / "PDF with Haystack" | `docling-haystack` | Docling + Haystack PDF ingestion, OCR config, pipeline options |
-| "write docs" / "add docstrings" | `documentation` | Google-style docstrings, README structure, docs/ layout |
-| "gradio" / "streamlit" / "build UI" | `gradio-streamlit` | Gradio/Streamlit decision framework, lazy-loading, async wrapping |
-| "conditional router" / "multi-branch pipeline" | `haystack-conditional-router` | Haystack ConditionalRouter wiring for semantic/SQL/hybrid pipelines |
-| "hydra config" / "ConfigStore" | `hydra-config` | Pure ConfigStore, no YAML, config groups, runtime composition |
-| "networkx" / "igraph" / "graphml" | `networkx-igraph-graphml-interop` | Fix edge_recall=0, opaque node IDs, GraphML export control chars |
-| "ollama" / "OllamaChatGenerator" | `ollama-chat-generator` | Fix system prompt ignored, format=json ignored, warm_up() missing |
-| "NaN" / "bool coercion" / "pandas dtype" | `pandas-nan-bool-coercion` | Fix silent NaN/bool coercion bugs in pandas DataFrames |
-| "PDF" / "read PDF" / "extract text" | `pdf` | Read, merge, split, OCR, extract tables from PDFs |
-| "Haystack pipeline" / "pipeline patterns" | `pipeline-patterns` | Haystack pipeline construction, component ordering, query inputs |
-| "pyvis" / "XSS" / "HTML escaping test" | `pyvis-xss-testing` | Correctly assert HTML escaping in pyvis output (double-encoding) |
-| "test helper" / "public API coverage" | `test-helper-public-api` | Prevent helpers bypassing public API and hiding bugs |
-| "testing patterns" / "pytest patterns" | `testing-patterns` | Async tests, mocking, parametrize, Hydra config testing, coverage |
-| "text-to-SQL" / "SQL safety" | `text-to-sql-safety` | Defense-in-depth safety layers for LLM-generated SQL execution |
-| "context manager test" / "test __exit__" | `context-manager-testing` | Correctly test context manager cleanup (close, flush, etc.) |
-| "metadata extraction" / "curated metadata" / "CSV extraction bottleneck" | `extraction-metadata-sourcing` | Separate in-text extraction from externally sourced curated metadata |
-| "graph schema migration" / "entity_type" / "relation_type" | `graph-schema-compat-migration` | Migrate graph key names safely with dual-write and dual-read compatibility |
-| "shared type" / "layer violation" / "cross-layer import" | `domain-type-placement` | Place shared types in src/domain/ to avoid layer coupling |
-| "integration spike" / "unknown API contract" / "external contract validation" | `integration-gate-spike` | Gate uncertain external integrations before adapter implementation |
-| "write a plan" / "break this down" / "phase plan" | `plan-decomposition` | Phased plans with overview + detail files per phase |
-| "literature review" / "survey papers" / "research survey" | `literature-review` | Systematic academic literature review with screening + synthesis |
-| "critique this paper" / "research critique" / "evaluate study" | `research-critique` | Anti-checklist analytical critique of research papers |
-| "caveman mode" / "less tokens" / "be brief" / "be terse" | `caveman` | Ultra-terse technical communication mode with clarity exceptions |
-| "compress memory file" / "shrink this markdown" / "/caveman:compress" | `caveman-compress` | Safely compress note-like natural-language files with backups and validation |
-| "humanize" / "rewrite naturally" / "remove AI tone" | `humanize` | Detect and rewrite AI-sounding text into natural prose |
-| "create presentation" / "HTML slides" / "slide deck" | `html-presentation` | Reveal.js presentations with scroll mode and 4 themes |
-| "concept to image" / "create visual" / "make a diagram image" | `concept-to-image` | HTML/CSS/SVG visuals exported as PNG or SVG |
-| "prompt engineering" / "prompt lab" / "optimize prompt" | `prompt-lab` | Systematic prompt design with variants, rubrics, and test cases |
-| "audit RAG" / "RAG quality" / "retrieval evaluation" | `rag-auditor` | RAG pipeline evaluation: retrieval metrics + generation quality |
-| "debug systematically" / "root cause analysis" / "bisect bug" | `debug-investigator` | Hypothesis-driven debugging with bisection and instrumentation |
-| "markdown to PDF" / "convert md to pdf" / "export as PDF" | `md-to-pdf` | Markdown → styled PDF with Mermaid, KaTeX, and code highlighting |
+**Skill visibility:** Skills marked `background` are auto-loaded by the model on description match but hidden from the `/` slash menu. Skills marked `public` appear in the slash menu.
+
+| Trigger | Skill | Visibility | What it does |
+|---|---|---|---|
+| "commit" / "stage changes" | `commit` | public | Git workflow: stage, commit, PR, merge |
+| "run tests" / "test this" | `run-tests` | public | Pytest orchestration with coverage |
+| "review the code" | `code-review` | public | Multi-agent parallel review |
+| "review the API" | `review-api` | public | API + security + test review |
+| "add dependency" | `add-dependency` | public | uv add with validation |
+| "refactor" | `refactor` | public | Safe refactoring with test gate |
+| "create feature" | `create-feature` | public | Config-first scaffolding |
+| "deploy" | `deploy-service` | public | BentoML/Docker deployment workflow |
+| "setup project" | `setup-project` | public | Initialize new project from scaffold |
+| "data analysis" | `data-analysis` | public | Load → explore → clean → analyze → report |
+| "audit the repo" | `deep-audit` | public | Repository-wide consistency audit |
+| "challenge this design" | `devils-advocate` | public | Structured critique before committing |
+| "review the plan" | `iterative-plan-review` | background | Architecture review on plans (arch-reviewer only) |
+| "I learned something" | `learn` | public | Extract discovery into reusable skill |
+| "session status" | `context-status` | public | Show context health, plans, git status |
+| "create BentoML service" / "deploy ML model" | `bentoml-service` | public | Production BentoML service with lifecycle, Pydantic, CORS |
+| "code style" / "style review" | `code-style` | public | Python type hints, docstrings, logging, naming conventions |
+| "integration tests" / "CSV tests" / "classifier tests" | `csv-driven-integration-tests` | public | CSV fixture datasets + pytest parametrize for classifiers/SQL |
+| "classvar" / "constant field in dataclass" | `dataclass-classvar-constant` | background | Fix mutable instance fields that should be ClassVar constants |
+| "docling" / "PDF with Haystack" | `docling-haystack` | background | Docling + Haystack PDF ingestion, OCR config, pipeline options |
+| "write docs" / "add docstrings" | `documentation` | public | Google-style docstrings, README structure, docs/ layout |
+| "gradio" / "streamlit" / "build UI" | `gradio-streamlit` | public | Gradio/Streamlit decision framework, lazy-loading, async wrapping |
+| "conditional router" / "multi-branch pipeline" | `haystack-conditional-router` | background | Haystack ConditionalRouter wiring for semantic/SQL/hybrid pipelines |
+| "hydra config" / "ConfigStore" | `hydra-config` | public | Pure ConfigStore, no YAML, config groups, runtime composition |
+| "networkx" / "igraph" / "graphml" | `networkx-igraph-graphml-interop` | background | Fix edge_recall=0, opaque node IDs, GraphML export control chars |
+| "ollama" / "OllamaChatGenerator" | `ollama-chat-generator` | background | Fix system prompt ignored, format=json ignored, warm_up() missing |
+| "NaN" / "bool coercion" / "pandas dtype" | `pandas-nan-bool-coercion` | background | Fix silent NaN/bool coercion bugs in pandas DataFrames |
+| "PDF" / "read PDF" / "extract text" | `pdf` | public | Read, merge, split, OCR, extract tables from PDFs |
+| "Haystack pipeline" / "pipeline patterns" | `pipeline-patterns` | public | Haystack pipeline construction, component ordering, query inputs |
+| "pyvis" / "XSS" / "HTML escaping test" | `pyvis-xss-testing` | background | Correctly assert HTML escaping in pyvis output (double-encoding) |
+| "test helper" / "public API coverage" | `test-helper-public-api` | background | Prevent helpers bypassing public API and hiding bugs |
+| "testing patterns" / "pytest patterns" | `testing-patterns` | background | scope: test case authoring, enumeration, and structure |
+| "text-to-SQL" / "SQL safety" | `text-to-sql-safety` | public | Defense-in-depth safety layers for LLM-generated SQL execution |
+| "context manager test" / "test __exit__" | `context-manager-testing` | background | Correctly test context manager cleanup (close, flush, etc.) |
+| "metadata extraction" / "curated metadata" / "CSV extraction bottleneck" | `extraction-metadata-sourcing` | background | Separate in-text extraction from externally sourced curated metadata |
+| "graph schema migration" / "entity_type" / "relation_type" | `graph-schema-compat-migration` | background | Migrate graph key names safely with dual-write and dual-read compatibility |
+| "shared type" / "layer violation" / "cross-layer import" | `domain-type-placement` | background | Place shared types in src/domain/ to avoid layer coupling |
+| "integration spike" / "unknown API contract" / "external contract validation" | `integration-gate-spike` | background | Gate uncertain external integrations before adapter implementation |
+| "write a plan" / "break this down" / "phase plan" | `plan-decomposition` | public | Phased plans with overview + detail files per phase |
+| "literature review" / "survey papers" / "research survey" | `literature-review` | public | Systematic academic literature review with screening + synthesis |
+| "critique this paper" / "research critique" / "evaluate study" | `research-critique` | public | Anti-checklist analytical critique of research papers |
+| "caveman mode" / "less tokens" / "be brief" / "be terse" | `caveman` | public | Ultra-terse technical communication mode with clarity exceptions |
+| "compress memory file" / "shrink this markdown" / "/caveman:compress" | `caveman-compress` | public | Safely compress note-like natural-language files with backups and validation |
+| "humanize" / "rewrite naturally" / "remove AI tone" | `humanize` | public | Detect and rewrite AI-sounding text into natural prose |
+| "create presentation" / "HTML slides" / "slide deck" | `html-presentation` | public | Reveal.js presentations with scroll mode and 4 themes |
+| "concept to image" / "create visual" / "make a diagram image" | `concept-to-image` | public | HTML/CSS/SVG visuals exported as PNG or SVG |
+| "prompt engineering" / "prompt lab" / "optimize prompt" | `prompt-lab` | public | Systematic prompt design with variants, rubrics, and test cases |
+| "audit RAG" / "RAG quality" / "retrieval evaluation" | `rag-auditor` | public | RAG pipeline evaluation: retrieval metrics + generation quality |
+| "debug systematically" / "root cause analysis" / "bisect bug" | `debug-investigator` | public | Hypothesis-driven debugging with bisection and instrumentation |
+| "markdown to PDF" / "convert md to pdf" / "export as PDF" | `md-to-pdf` | public | Markdown → styled PDF with Mermaid, KaTeX, and code highlighting |
 
 ---
 

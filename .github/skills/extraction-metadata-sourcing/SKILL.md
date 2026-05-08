@@ -14,6 +14,7 @@ description: |
   - "Trying to extract curated taxonomy mappings from unstructured text"
   - "Wondering why vote counts, topics, or metadata can't be extracted from resolution text"
   - Graph/CSV extraction pipeline is bottlenecked on low-confidence fields
+user-invocable: false
 ---
 
 ## Problem

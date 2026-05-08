@@ -13,6 +13,7 @@ description: |
   - "Rate limits and timeout behavior not documented"
   - "Plan mentions external service but can't verify the endpoint exists"
   - Planning adapter code where contract uncertainty blocks implementation decision-making
+user-invocable: false
 ---
 
 ## Problem

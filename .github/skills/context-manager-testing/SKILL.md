@@ -6,6 +6,7 @@ description: |
   - Writing `with obj: pass` followed by a comment like "just verify no exception"
   - Test reviewer scores a context manager test as zero-assertion (-20)
   - Wanting to verify that __exit__ calls close(), flush(), or similar
+user-invocable: false
 ---
 
 # Context Manager Testing

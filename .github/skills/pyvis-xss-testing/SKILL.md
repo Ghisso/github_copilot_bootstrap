@@ -6,6 +6,7 @@ description: |
   - XSS escaping tests that pass in unit tests but fail against real pyvis output
   - pyvis double-encodes HTML entities via JSON serialization
 version: 1.0.0
+user-invocable: false
 ---
 
 ## Problem

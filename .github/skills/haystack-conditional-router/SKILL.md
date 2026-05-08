@@ -4,6 +4,7 @@ description: |
   Wire Haystack ConditionalRouter correctly for multi-branch pipelines (semantic,
   SQL, hybrid). Triggers: output names causing silent skips, wrong route definitions
   per retriever mode, DocumentJoiner merging branches, SQL source metadata tagging.
+user-invocable: false
 ---
 
 ## Rule 1: Output Names Must Exactly Match Downstream Input Names

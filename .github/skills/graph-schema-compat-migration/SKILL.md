@@ -7,6 +7,7 @@ description: |
   - `KeyError: 'type'`
   - `KeyError: 'relation'`
   - Traversal/retriever logic silently missing relations after key rename
+user-invocable: false
 ---
 
 ## Problem

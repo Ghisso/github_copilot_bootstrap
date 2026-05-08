@@ -5,6 +5,7 @@ description: |
   Trigger: A test helper directly calls _build_nodes(), _extract_foo(), etc.
   instead of the public method. Symptom: Tests pass even when a bug is introduced
   in the public method (wrong step order, missing state update, etc.).
+user-invocable: false
 ---
 
 ## Problem

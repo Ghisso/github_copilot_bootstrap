@@ -7,6 +7,7 @@ description: |
   - A reviewer flags a layer violation (e.g., eval → retrieval import)
   - Deciding where a new shared type should live
   - Refactoring to remove cross-layer coupling
+user-invocable: false
 ---
 
 # Domain Type Placement

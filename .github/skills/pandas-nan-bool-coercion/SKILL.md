@@ -6,6 +6,7 @@ description: |
   - `numpy.bool_(True) is True` returns False (identity comparison fails)
   - CSV boolean columns read as float64 with NaN values
   - Vote counts treated as truthy when they should be zero/missing
+user-invocable: false
 ---
 
 ## Problem

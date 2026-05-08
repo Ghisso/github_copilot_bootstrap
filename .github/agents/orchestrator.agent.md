@@ -30,12 +30,37 @@ The todo list must be visible and up-to-date at all times.
 
 1. Clarify scope, constraints, and success criteria.
 2. Create initial todo list with all planned steps.
-3. Delegate planning to `planner`.
-4. Execute the plan by delegating implementation to `coder` and `designer`.
-5. Run targeted reviewers based on changed areas.
-6. Run `verifier` as final gate.
-7. Run learn and wrap-up (see Completion Protocol below).
-8. Return a concise status report with risks and follow-ups.
+3. **Shallow exploration:** Read key files to understand scope (2-5 minutes max). Do NOT deep-dive yet.
+4. **Routing decision:** Based on exploration, classify the task and pass the decision to `planner`:
+   - `--mode micro-plan`: single-phase, obviously scoped, no new modules or architecture decisions
+   - `--mode full-plan`: multi-phase, ambiguous, new module, or architecture decision required
+   - **Always full-plan if any control-plane file is touched** (`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)
+5. Delegate planning to `planner` with the routing decision.
+6. Execute the plan by delegating implementation to `coder` and `designer`.
+7. Run targeted reviewers based on changed areas (see Reviewer Routing below).
+8. Run `verifier` as final gate.
+9. Run learn and wrap-up (see Completion Protocol below).
+10. Return a concise status report with risks and follow-ups.
+
+## Reviewer Routing
+
+Select reviewers based on the surface area changed. Run in parallel when file ownership does not overlap.
+
+| Changed surface | Reviewers to run |
+|---|---|
+| Python source code | `code-reviewer` |
+| New modules / refactoring | `architecture-reviewer` |
+| API endpoints | `api-reviewer` + `security-reviewer` |
+| Test files | `test-reviewer` |
+| Config / dataclasses | `config-reviewer` |
+| Any pre-PR gate | `code-reviewer` + `security-reviewer` (minimum) |
+
+**Complexity gate:**
+- **Control-plane files** (`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`): always non-trivial, always run full reviewer set regardless of diff size
+- **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): skip dual adversarial pass, run single `code-reviewer` pass only
+- **Standard changes**: run dual adversarial review through `review-pass-codex` + `review-pass-sonnet`
+
+**Degraded review:** If a review-pass sub-agent reports degraded mode, do **not** mark the pre-PR gate as passed.
 
 ## Delegation Rules
 

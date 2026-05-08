@@ -1,10 +1,11 @@
 ---
 name: iterative-plan-review
 description: |
-  Run architecture-reviewer and code-reviewer agents in parallel on plan files,
-  fix findings by severity (CRITICAL > MAJOR > minor), and iterate until both
-  score 90+. Use when reviewing implementation plans before coding begins,
+  Run architecture-reviewer on plan files, fix findings by severity
+  (CRITICAL > MAJOR > minor), and iterate until the score reaches 90+.
+  Use when reviewing implementation plans before coding begins,
   or when user says "review the plan" or "run reviewers until they pass".
+user-invocable: false
 ---
 
 # iterative-plan-review — Plan Quality Gate
@@ -17,18 +18,19 @@ only surface after fixes shift the design.
 
 ## Solution
 
-### Step 1: Run dual reviewers in parallel
+### Step 1: Run architecture-reviewer
 
-Launch `architecture-reviewer` and `code-reviewer` agents simultaneously on each
-plan file in `.github/plans/`:
+Launch `architecture-reviewer` on each plan file in `.github/plans/`:
 
 ```
 architecture-reviewer: Review [plan file] for separation of concerns, coupling,
   dependency direction, and design pattern correctness. Score out of 100.
-
-code-reviewer: Review [plan file] for Python code quality in all code blocks:
-  type hints, naming, imports, error handling, patterns. Score out of 100.
 ```
+
+> Note: `code-reviewer` is intentionally excluded here. It is optimised for Python
+> source code; running it on prose-heavy plan markdown produces noise in the form
+> of false positives on non-code sections. Architecture concerns are the only signal
+> that matters at planning time.
 
 ### Step 2: Triage findings by severity
 
@@ -45,7 +47,7 @@ Sort all findings across both reviewers:
 
 ### Step 4: Convergence check
 
-- Target: both reviewers score 90+ on all files
+- Target: architecture-reviewer scores 90+ on all files
 - Typical convergence: 3 rounds (R1: 72-82, R2: 86-92, R3: 91-94)
 - Cap at 5 rounds to avoid infinite loops
 
@@ -57,17 +59,17 @@ Sort all findings across both reviewers:
 
 ## Verification
 
-- Both architecture-reviewer and code-reviewer score 90+ on all plan files
+- Architecture-reviewer scores 90+ on all plan files
 - No CRITICAL or MAJOR items remain
 - Cross-file references are consistent
 
 ## Example
 
 ```
-Round 1: Arch 78/100, Code 72/100
+Round 1: Arch 78/100
   -> Fixed: missing task-type grouping, dead code, leaky abstractions
-Round 2: Arch 88/100, Code 86/100
+Round 2: Arch 88/100
   -> Fixed: stale references, missing validation
-Round 3: Arch 92/100, Code 94/100
-  -> DONE: all plans pass 90+ threshold
+Round 3: Arch 92/100
+  -> DONE: plan passes 90+ threshold
 ```
