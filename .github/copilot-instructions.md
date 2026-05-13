@@ -26,6 +26,7 @@
 | `workflow.instructions.md` | Always-on | Plan-first, orchestrator loop, session logging |
 | `code-standards.instructions.md` | `src/**`, `tests/**` | Naming, architecture, deprecation protocol |
 | `quality-and-testing.instructions.md` | Always-on | Verification commands, score rubric, gates |
+| `tool-routing.instructions.md` | Retrieval decisions | Semble, context-mode, grep, and direct file routing |
 | `config-first-design.instructions.md` | `src/configs/**` | Pure ConfigStore design, no YAML files, dataclass patterns |
 | `api-service-standards.instructions.md` | `service.py`, `src/api/**` | BentoML service patterns, Pydantic |
 | `tests.instructions.md` | `tests/**` | Testing patterns, mocking, coverage |
@@ -114,6 +115,7 @@ Important for orchestration agents:
 - `planner` must always load planning skills first (`plan-decomposition`, `iterative-plan-review`, and `create-feature` when applicable).
 - `coder` must always load Tier 1 skills (`code-style`, `testing-patterns`) plus Tier 2 skills by task type before editing.
 - Orchestrator owns the `--mode micro-plan` / `--mode full-plan` routing decision before delegating to `planner`.
+- Retrieval helper selection is centralized in `.github/instructions/tool-routing.instructions.md`; keep Semble/context-mode guidance there and avoid duplicating long routing policy in skills or agent files.
 
 **Skill visibility:** Skills marked `background` are auto-loaded by the model on description match but hidden from the `/` slash menu. Skills marked `public` appear in the slash menu.
 
@@ -169,6 +171,7 @@ Important for orchestration agents:
 | "audit RAG" / "RAG quality" / "retrieval evaluation" | `rag-auditor` | public | RAG pipeline evaluation: retrieval metrics + generation quality |
 | "debug systematically" / "root cause analysis" / "bisect bug" | `debug-investigator` | public | Hypothesis-driven debugging with bisection and instrumentation |
 | "markdown to PDF" / "convert md to pdf" / "export as PDF" | `md-to-pdf` | public | Markdown → styled PDF with Mermaid, KaTeX, and code highlighting |
+| "retrieval routing" / "Semble" / "context-mode" | `retrieval-routing` | background | Thin pointer to `.github/instructions/tool-routing.instructions.md` |
 
 ---
 

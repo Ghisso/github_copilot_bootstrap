@@ -7,6 +7,13 @@
         "command": ".github/hooks/scripts/session-log.sh",
         "cwd": ".",
         "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["vscode-copilot", "sessionstart"],
+        "cwd": ".",
+        "timeout": 10
       }
     ],
     "Stop": [
@@ -27,6 +34,31 @@
       {
         "type": "command",
         "command": ".github/hooks/scripts/git-protection.sh",
+        "cwd": ".",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["vscode-copilot", "pretooluse"],
+        "cwd": ".",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["vscode-copilot", "posttooluse"],
+        "cwd": ".",
+        "timeout": 10
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["vscode-copilot", "precompact"],
         "cwd": ".",
         "timeout": 10
       }

@@ -52,13 +52,18 @@ TARGET_REPO="/absolute/path/to/your-project"
 mkdir -p "$TARGET_REPO/.github"
 rsync -av "$BOOTSTRAP_REPO/.github/" "$TARGET_REPO/.github/"
 
-# 3) Ensure hook scripts are executable
+# 3) Optional but recommended root/workspace surfaces
+mkdir -p "$TARGET_REPO/.vscode"
+cp "$BOOTSTRAP_REPO/.vscode/mcp.json" "$TARGET_REPO/.vscode/mcp.json"
+cp "$BOOTSTRAP_REPO/AGENTS.md" "$TARGET_REPO/AGENTS.md"
+
+# 4) Ensure hook scripts are executable
 chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
 
-# 4) Optional: commit in target repo
+# 5) Optional: commit in target repo
 cd "$TARGET_REPO"
-git add .github
-git commit -m "chore: add Copilot bootstrap (.github)"
+git add .github .vscode/mcp.json AGENTS.md
+git commit -m "chore: add Copilot bootstrap"
 ```
 
 If you are already inside this bootstrap repo and only need to set the target path:
@@ -69,8 +74,13 @@ set -euo pipefail
 TARGET_REPO="/absolute/path/to/your-project"
 mkdir -p "$TARGET_REPO/.github"
 rsync -av .github/ "$TARGET_REPO/.github/"
+mkdir -p "$TARGET_REPO/.vscode"
+cp .vscode/mcp.json "$TARGET_REPO/.vscode/mcp.json"
+cp AGENTS.md "$TARGET_REPO/AGENTS.md"
 chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
 ```
+
+`.github/` is the main scaffold. `.vscode/mcp.json` and `AGENTS.md` are optional but recommended add-ons: `.vscode/mcp.json` enables VS Code MCP servers for Semble and context-mode, while `AGENTS.md` gives CLI and sub-agent tools a root-level compatibility entry point. Target repositories can skip either file and still keep the bootstrap workflow functional.
 
 ## Architecture Flow
 
@@ -109,6 +119,7 @@ Interpretation:
 - Agents: specialized implementation and review agents in [.github/agents/](.github/agents/)
 - Skills: reusable workflows in [.github/skills/](.github/skills/)
 - Hooks: policy and observability scripts in [.github/hooks/](.github/hooks/)
+- Optional workspace/root surfaces: [.vscode/mcp.json](.vscode/mcp.json) and [AGENTS.md](AGENTS.md)
 - Templates and scripts: planning, session logs, quality scoring
 
 ## Most Important Instructions
@@ -133,6 +144,8 @@ These are the files that matter most in day-to-day use:
   - BentoML service design, async endpoints, Pydantic validation
 - [deployment.instructions.md](.github/instructions/deployment.instructions.md)
   - Pre-deploy checks, Bento build/container workflow, health checks
+- [tool-routing.instructions.md](.github/instructions/tool-routing.instructions.md)
+  - Routing between direct reads, `rg`, Semble, and context-mode
 
 ## Most Important Skills
 
@@ -216,8 +229,12 @@ Configured events:
 - PreToolUse
   - [protect-files.sh](.github/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
   - [git-protection.sh](.github/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
+  - [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
+- PostToolUse / PreCompact
+  - [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
   - [session-log.sh](.github/hooks/scripts/session-log.sh) appends lifecycle entries to `.github/session_logs/hooks-sessions.log`
+  - SessionStart also calls [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) when available
 
 Core hook config: [hooks.json](.github/hooks/hooks.json)
 
@@ -242,13 +259,57 @@ Quality gates:
 - >= 80: commit-ready
 - >= 90: PR-ready
 
+## Optional Retrieval Helpers
+
+VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.json):
+
+- `semble` uses `uvx --from "semble[mcp]" semble`.
+- `context-mode` uses the portable bare `context-mode` command.
+
+For machines without a global `context-mode` binary, install it globally or adapt local setup to use `npx -y context-mode`. Hook events already go through `.github/hooks/scripts/context-mode-dispatch.sh`, which calls `context-mode hook vscode-copilot ...`, falls back to `npx -y context-mode hook vscode-copilot ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
+
+Install `context-mode` with npm when Node.js is already available:
+
+```bash
+npm install -g context-mode
+context-mode --help
+```
+
+If Node.js is not installed and you do not want to use `sudo`, install the official Node.js LTS binary under `~/.local` and expose it through `~/.local/bin`:
+
+```bash
+NODE_VERSION="v24.15.0"
+NODE_DIST="node-${NODE_VERSION}-linux-x64"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/nodejs"
+curl -L -o "/tmp/${NODE_DIST}.tar.xz" "https://nodejs.org/dist/${NODE_VERSION}/${NODE_DIST}.tar.xz"
+tar -xJf "/tmp/${NODE_DIST}.tar.xz" -C "$HOME/.local/nodejs"
+ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/node" "$HOME/.local/bin/node"
+ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npm" "$HOME/.local/bin/npm"
+ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npx" "$HOME/.local/bin/npx"
+"$HOME/.local/bin/npm" install -g context-mode
+ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/context-mode" "$HOME/.local/bin/context-mode"
+```
+
+Make sure `~/.local/bin` is on `PATH` before starting VS Code:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Run the bootstrap runtime check after copying optional surfaces:
+
+```bash
+python .github/scripts/check_agent_runtime.py
+```
+
 ## How To Use This Bootstrap In Another Project
 
-1. Copy the .github directory from this repo into your target project (or use Quick Copy above).
-2. Review and adjust copilot-instructions.md for project-specific stack details.
-3. Keep hooks enabled and ensure scripts are executable in your environment.
-4. Update instruction apply scopes to match your project paths.
-5. Add or remove skills and agents according to your domain.
+1. Copy the `.github` directory from this repo into your target project (or use Quick Copy above).
+2. Optionally copy `.vscode/mcp.json` for VS Code MCP integration and `AGENTS.md` for root-level agent compatibility.
+3. Review and adjust `copilot-instructions.md` for project-specific stack details.
+4. Keep hooks enabled and ensure scripts are executable in your environment.
+5. Update instruction apply scopes to match your project paths.
+6. Add or remove skills and agents according to your domain.
 
 ## Customization Notes
 

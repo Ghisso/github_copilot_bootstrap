@@ -3,6 +3,9 @@
     "semble": {
       "command": "uvx",
       "args": ["--from", "semble[mcp]", "semble"]
+    },
+    "context-mode": {
+      "command": "context-mode"
     }
   }
 }
