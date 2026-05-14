@@ -1,8 +1,8 @@
-# GitHub Copilot Bootstrap
+# Multi-Agent Bootstrap
 
-A reusable .github bootstrap I drop into my other projects.
+A reusable multi-target agent bootstrap I drop into my other projects.
 
-This repository is my personal starter kit for opinionated Copilot workflows in Python AI engineering repos. It packages the hooks, agents, skills, and instruction files I want available everywhere so I can keep quality and execution style consistent.
+This repository is my personal starter kit for opinionated agent workflows in Python AI engineering repos. It packages the hooks, agents, skills, and instruction files I want available everywhere so I can keep quality and execution style consistent across GitHub Copilot, Claude Code, and OpenAI Codex.
 
 Inspired and adapted from:
 
@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a reusable automation + guidance layer under .github/ that I copy into new repos.
+It is a source-of-truth plus generated-target bootstrap. The editable sources live in `shared/` and the generated installable targets live in `dist/`.
 
 Main goals:
 
@@ -39,7 +39,7 @@ Core principles:
 
 ## Quick Copy
 
-Use these exact commands to copy this bootstrap into another repo.
+Regenerate first, then copy the target you actually use.
 
 ```bash
 set -euo pipefail
@@ -47,23 +47,26 @@ set -euo pipefail
 # 1) Set paths
 BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
 TARGET_REPO="/absolute/path/to/your-project"
+BOOTSTRAP_TARGET="github-copilot"   # github-copilot | claude-code | openai-codex
 
-# 2) Copy .github scaffold
-mkdir -p "$TARGET_REPO/.github"
-rsync -av "$BOOTSTRAP_REPO/.github/" "$TARGET_REPO/.github/"
+# 2) Regenerate installable outputs
+cd "$BOOTSTRAP_REPO"
+python3 scripts/generate_targets.py --all
 
-# 3) Optional but recommended root/workspace surfaces
-mkdir -p "$TARGET_REPO/.vscode"
-cp "$BOOTSTRAP_REPO/.vscode/mcp.json" "$TARGET_REPO/.vscode/mcp.json"
-cp "$BOOTSTRAP_REPO/AGENTS.md" "$TARGET_REPO/AGENTS.md"
+# 3) Copy one generated target into the project root
+rsync -av "$BOOTSTRAP_REPO/dist/$BOOTSTRAP_TARGET/" "$TARGET_REPO/"
 
 # 4) Ensure hook scripts are executable
-chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
+case "$BOOTSTRAP_TARGET" in
+  github-copilot) chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh ;;
+  claude-code) chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh ;;
+  openai-codex) chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh ;;
+esac
 
 # 5) Optional: commit in target repo
 cd "$TARGET_REPO"
-git add .github .vscode/mcp.json AGENTS.md
-git commit -m "chore: add Copilot bootstrap"
+git add -A
+git commit -m "chore: add agent bootstrap"
 ```
 
 If you are already inside this bootstrap repo and only need to set the target path:
@@ -72,15 +75,60 @@ If you are already inside this bootstrap repo and only need to set the target pa
 set -euo pipefail
 
 TARGET_REPO="/absolute/path/to/your-project"
-mkdir -p "$TARGET_REPO/.github"
-rsync -av .github/ "$TARGET_REPO/.github/"
-mkdir -p "$TARGET_REPO/.vscode"
-cp .vscode/mcp.json "$TARGET_REPO/.vscode/mcp.json"
-cp AGENTS.md "$TARGET_REPO/AGENTS.md"
-chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
+BOOTSTRAP_TARGET="github-copilot"   # github-copilot | claude-code | openai-codex
+python3 scripts/generate_targets.py --all
+rsync -av "dist/$BOOTSTRAP_TARGET/" "$TARGET_REPO/"
+case "$BOOTSTRAP_TARGET" in
+  github-copilot) chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh ;;
+  claude-code) chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh ;;
+  openai-codex) chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh ;;
+esac
 ```
 
-`.github/` is the main scaffold. `.vscode/mcp.json` and `AGENTS.md` are optional but recommended add-ons: `.vscode/mcp.json` enables VS Code MCP servers for Semble and context-mode, while `AGENTS.md` gives CLI and sub-agent tools a root-level compatibility entry point. Target repositories can skip either file and still keep the bootstrap workflow functional.
+Target layouts:
+
+- `github-copilot`: `.github/`, `.vscode/mcp.json`
+- `claude-code`: `CLAUDE.md`, `.claude/`, `.mcp.json`
+- `openai-codex`: `AGENTS.md`, `.codex/`, `.agents/skills/`
+
+## Copy All Targets
+
+If you use GitHub Copilot, Claude Code, and OpenAI Codex interchangeably, copy all generated targets into the same project. Each tool will read its native entrypoint while sharing the same generated workflow philosophy from `shared/`.
+
+```bash
+set -euo pipefail
+
+# 1) Set paths
+BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
+TARGET_REPO="/absolute/path/to/your-project"
+
+# 2) Regenerate installable outputs
+cd "$BOOTSTRAP_REPO"
+python3 scripts/generate_targets.py --all
+
+# 3) Copy every generated target into the project root
+rsync -av "$BOOTSTRAP_REPO/dist/github-copilot/" "$TARGET_REPO/"
+rsync -av "$BOOTSTRAP_REPO/dist/claude-code/" "$TARGET_REPO/"
+rsync -av "$BOOTSTRAP_REPO/dist/openai-codex/" "$TARGET_REPO/"
+
+# 4) Ensure hook scripts are executable
+chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
+chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh
+chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh
+
+# 5) Optional: commit in target repo
+cd "$TARGET_REPO"
+git add -A
+git commit -m "chore: add multi-agent bootstrap"
+```
+
+This creates parallel native entrypoints:
+
+- GitHub Copilot reads `.github/copilot-instructions.md`
+- Claude Code reads `CLAUDE.md`
+- OpenAI Codex reads `AGENTS.md`
+
+When switching systems mid-task, point the next tool at the current `git diff` plus the latest relevant plan or session log from the previous tool namespace.
 
 ## Architecture Flow
 
@@ -115,11 +163,12 @@ Interpretation:
 
 ## What Is Included
 
-- Instructions: always-on and path-scoped rules in [.github/instructions/](.github/instructions/)
-- Agents: specialized implementation and review agents in [.github/agents/](.github/agents/)
-- Skills: reusable workflows in [.github/skills/](.github/skills/)
-- Hooks: policy and observability scripts in [.github/hooks/](.github/hooks/)
-- Optional workspace/root surfaces: [.vscode/mcp.json](.vscode/mcp.json) and [AGENTS.md](AGENTS.md)
+- Generated targets: installable outputs in [dist/](dist/)
+- Source policies: reusable instruction files in [shared/policies/](shared/policies/)
+- Agents: canonical metadata and target forks in [shared/agents/](shared/agents/)
+- Skills: reusable workflows in [shared/skills/](shared/skills/)
+- Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
+- MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
 - Templates and scripts: planning, session logs, quality scoring
 
 ## Most Important Instructions
@@ -304,12 +353,12 @@ python .github/scripts/check_agent_runtime.py
 
 ## How To Use This Bootstrap In Another Project
 
-1. Copy the `.github` directory from this repo into your target project (or use Quick Copy above).
-2. Optionally copy `.vscode/mcp.json` for VS Code MCP integration and `AGENTS.md` for root-level agent compatibility.
-3. Review and adjust `copilot-instructions.md` for project-specific stack details.
+1. Regenerate targets with `python3 scripts/generate_targets.py --all`.
+2. Copy exactly one `dist/<target>/` directory into your target project.
+3. Review and adjust the generated root guidance for project-specific stack details.
 4. Keep hooks enabled and ensure scripts are executable in your environment.
 5. Update instruction apply scopes to match your project paths.
-6. Add or remove skills and agents according to your domain.
+6. Add or remove skills and agents in `shared/`, then regenerate instead of hand-editing `dist/`.
 
 ## Customization Notes
 

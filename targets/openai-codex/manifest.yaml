@@ -1,0 +1,7 @@
+{
+  "target": "openai-codex",
+  "description": "OpenAI Codex VS Code extension target generated from shared bootstrap sources.",
+  "agent_model_policy": "target-native-codex-custom-agents",
+  "agent_output": ".codex/agents/*.toml",
+  "skills_output": ".agents/skills/**/SKILL.md"
+}

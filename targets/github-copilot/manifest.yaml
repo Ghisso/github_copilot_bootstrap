@@ -1,0 +1,7 @@
+{
+  "target": "github-copilot",
+  "description": "GitHub Copilot in VS Code target generated from shared bootstrap sources.",
+  "agent_model_policy": "single-string-supported-copilot-model-names",
+  "agent_output": ".github/agents/*.agent.md",
+  "skills_output": ".github/skills/**/SKILL.md"
+}

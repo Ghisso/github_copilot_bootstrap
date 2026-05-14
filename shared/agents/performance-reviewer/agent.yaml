@@ -1,0 +1,25 @@
+{
+  "id": "performance-reviewer",
+  "description": "Reviews code for performance issues including async patterns, memory usage, N+1 queries, unnecessary copies, caching opportunities, and batch processing. Especially relevant for ML inference paths and data pipelines. Use for I/O-heavy or ML-heavy code.",
+  "role_type": "reviewer",
+  "visibility": "public",
+  "capabilities": [
+    "delegate",
+    "read",
+    "search"
+  ],
+  "delegates": [
+    "review-pass-codex",
+    "review-pass-sonnet"
+  ],
+  "model_intent": {
+    "github-copilot": "target-default",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}

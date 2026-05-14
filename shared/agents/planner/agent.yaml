@@ -1,0 +1,26 @@
+{
+  "id": "planner",
+  "description": "Planning specialist for implementation work. Produces phased plans with file ownership, risk analysis, verification commands, and required skills per step. Use before coding on non-trivial tasks.",
+  "role_type": "planner",
+  "visibility": "public",
+  "capabilities": [
+    "delegate",
+    "execute",
+    "read",
+    "search",
+    "todo",
+    "vscode",
+    "web"
+  ],
+  "delegates": [],
+  "model_intent": {
+    "github-copilot": "Claude Opus 4.6",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}

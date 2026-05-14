@@ -1,0 +1,25 @@
+{
+  "id": "orchestrator",
+  "description": "Workflow orchestrator for complex implementation tasks. Delegates planning, coding, design, and review work to specialist agents, prefers parallel execution when file ownership does not overlap, and enforces quality gates before completion. Use for multi-step features, refactors, and cross-file changes.",
+  "role_type": "orchestrator",
+  "visibility": "public",
+  "capabilities": [
+    "delegate",
+    "read",
+    "search",
+    "todo"
+  ],
+  "delegates": [
+    "*"
+  ],
+  "model_intent": {
+    "github-copilot": "Claude Opus 4.6",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}

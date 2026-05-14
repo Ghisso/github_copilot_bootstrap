@@ -1,0 +1,25 @@
+{
+  "id": "config-reviewer",
+  "description": "Reviews configuration for completeness, validation, environment variable usage, and ConfigStore registration patterns. Enforces pure ConfigStore approach (no YAML files) and proper dataclass design. Use when adding or changing configs.",
+  "role_type": "reviewer",
+  "visibility": "public",
+  "capabilities": [
+    "delegate",
+    "read",
+    "search"
+  ],
+  "delegates": [
+    "review-pass-codex",
+    "review-pass-sonnet"
+  ],
+  "model_intent": {
+    "github-copilot": "target-default",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}

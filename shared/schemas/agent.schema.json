@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shared bootstrap agent",
+  "type": "object",
+  "required": ["id", "description", "role_type", "visibility", "capabilities", "targets"],
+  "properties": {
+    "id": {"type": "string"},
+    "description": {"type": "string"},
+    "role_type": {"type": "string"},
+    "visibility": {"type": "string", "enum": ["public", "hidden"]},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["read", "search", "edit", "execute", "delegate", "todo", "web", "vscode"]
+      }
+    },
+    "delegates": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "model_intent": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "targets": {
+      "type": "object",
+      "required": ["github-copilot", "claude-code", "openai-codex"],
+      "additionalProperties": true
+    }
+  }
+}

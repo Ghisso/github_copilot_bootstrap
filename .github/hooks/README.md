@@ -12,6 +12,7 @@ Configuration file: `.github/hooks/hooks.json`
 
 - `scripts/protect-files.sh`
 - Denies writes to protected files: `.env`, `.env.*`, `.env.local`, `*.pem`, `*.key`, `*secret*`, `credentials*`, `uv.lock`.
+- Detects protected paths in structured write tools, patches, and Bash write commands such as redirection or `touch`.
 - Requires approval (`ask`) before editing `.github/hooks/**` so agents cannot silently rewrite their own enforcement.
 - `scripts/git-protection.sh`
 - Denies destructive git commands in terminal-style tool calls, including force-push, `git reset --hard`, `git checkout --`, `git restore --source`, deleting `main`/`master`, and `git clean -fd` variants.

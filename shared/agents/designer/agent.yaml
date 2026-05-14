@@ -1,0 +1,23 @@
+{
+  "id": "designer",
+  "description": "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces clear, usable, and maintainable UI updates aligned with project conventions. Invoked by orchestrator for UI-focused tasks.",
+  "role_type": "designer",
+  "visibility": "hidden",
+  "capabilities": [
+    "edit",
+    "execute",
+    "read",
+    "search"
+  ],
+  "delegates": [],
+  "model_intent": {
+    "github-copilot": "Claude Sonnet 4.6",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}

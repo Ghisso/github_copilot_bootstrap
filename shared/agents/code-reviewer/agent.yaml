@@ -1,0 +1,25 @@
+{
+  "id": "code-reviewer",
+  "description": "Reviews Python source code for quality, patterns, and maintainability. Checks SOLID principles, DRY, readability, function length, Pythonic patterns, type hints, docstrings, import organization, and error handling. Use after implementing new features or before PRs.",
+  "role_type": "reviewer",
+  "visibility": "public",
+  "capabilities": [
+    "delegate",
+    "read",
+    "search"
+  ],
+  "delegates": [
+    "review-pass-codex",
+    "review-pass-sonnet"
+  ],
+  "model_intent": {
+    "github-copilot": "target-default",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  },
+  "targets": {
+    "github-copilot": "targets/github-copilot.md",
+    "claude-code": "targets/claude-code.md",
+    "openai-codex": "targets/openai-codex.md"
+  }
+}
