@@ -22,8 +22,8 @@ Answer these questions:
 
 ## Phase 2: Check Existing Skills
 ```bash
-ls .github/skills/
-grep -r -i "KEYWORD" .github/skills/
+ls .claude/skills/
+grep -r -i "KEYWORD" .claude/skills/
 ```
 - Nothing related → create new skill
 - Same trigger & fix → update existing skill
@@ -31,7 +31,7 @@ grep -r -i "KEYWORD" .github/skills/
 
 ## Phase 3: Create Skill
 
-Create `.github/skills/[skill-name]/SKILL.md`:
+Create `.claude/skills/[skill-name]/SKILL.md`:
 
 ```markdown
 ---
@@ -65,15 +65,15 @@ description: |
 - [ ] Content is actionable AND reusable
 - [ ] No sensitive information
 
-## Phase 5: Update .github/MEMORY.md
+## Phase 5: Update .claude/MEMORY.md
 ```markdown
-[LEARN:category] Brief description -> see .github/skills/[name]/SKILL.md
+[LEARN:category] Brief description -> see .claude/skills/[name]/SKILL.md
 ```
 
 ## Output
 ```
-Skill created: .github/skills/[name]/SKILL.md
+Skill created: .claude/skills/[name]/SKILL.md
   Trigger: [when to use]
   Problem: [what it solves]
-  .github/MEMORY.md: Updated
+  .claude/MEMORY.md: Updated
 ```

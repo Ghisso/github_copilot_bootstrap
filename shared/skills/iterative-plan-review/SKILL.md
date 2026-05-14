@@ -20,7 +20,7 @@ only surface after fixes shift the design.
 
 ### Step 1: Run architecture-reviewer
 
-Launch `architecture-reviewer` on each plan file in `.github/plans/`:
+Launch `architecture-reviewer` on each plan file in `.claude/plans/`:
 
 ```
 architecture-reviewer: Review [plan file] for separation of concerns, coupling,

@@ -104,7 +104,7 @@ PNG options: `-s 2` (2x scale), `-t` (transparent), `-x` (export mode)
 ### Helper Script
 
 ```bash
-bash .github/skills/draw-io/scripts/export-drawio.sh docs/drawio/name.drawio
+bash .claude/skills/draw-io/scripts/export-drawio.sh docs/drawio/name.drawio
 ```
 
 This script checks for CLI availability and provides manual export instructions if needed.
@@ -412,4 +412,4 @@ This reduces layout distortion for exported diagram images.
 
 - `references/layout-guidelines.md`
 - `references/aws-icons.md`
-- `.github/skills/draw-io/scripts/export-drawio.sh`
+- `.claude/skills/draw-io/scripts/export-drawio.sh`

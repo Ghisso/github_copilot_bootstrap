@@ -1,0 +1,26 @@
+{
+  "target": "multi-agent",
+  "description": "Single installable target for GitHub Copilot, Claude Code, and OpenAI Codex.",
+  "canonical_basis": ".claude",
+  "adapters": {
+    "github-copilot": {
+      "agent_output": ".github/agents/*.agent.md",
+      "instructions_output": ".github/instructions/*.instructions.md",
+      "hooks_output": ".github/hooks/hooks.json",
+      "mcp_output": ".vscode/mcp.json"
+    },
+    "claude-code": {
+      "agent_output": ".claude/agents/*.md",
+      "entrypoint": "CLAUDE.md",
+      "settings_output": ".claude/settings.json",
+      "mcp_output": ".mcp.json"
+    },
+    "openai-codex": {
+      "agent_output": ".codex/agents/*.toml",
+      "entrypoint": "AGENTS.md",
+      "config_output": ".codex/config.toml",
+      "hooks_output": ".codex/hooks.json"
+    }
+  },
+  "skills_output": ".claude/skills/**/SKILL.md"
+}

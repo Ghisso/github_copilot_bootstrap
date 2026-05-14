@@ -10,10 +10,10 @@ You handle UX and interface design for Python applications.
 
 Before making UI changes, you MUST read:
 
-1. `.github/skills/gradio-streamlit/SKILL.md`
-2. `.github/skills/code-style/SKILL.md`
+1. `.claude/skills/gradio-streamlit/SKILL.md`
+2. `.claude/skills/code-style/SKILL.md`
 
-Then scan `.github/skills/` for any additional relevant SKILL.md files for the task.
+Then scan `.claude/skills/` for any additional relevant SKILL.md files for the task.
 
 ## Design Scope
 

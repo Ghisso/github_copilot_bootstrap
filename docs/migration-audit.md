@@ -25,10 +25,12 @@ Inventory before migration:
 ## Decisions
 
 - `shared/` is the source of truth.
-- `dist/` is generated only by `scripts/generate_targets.py`.
+- `dist/multi-agent/` is the only generated installable output.
 - Existing root runtime files stay active in the first pass.
-- GitHub Copilot preserves current custom agent files exactly after normalizing model frontmatter to GitHub's single-string custom-agent shape.
-- Claude Code and OpenAI Codex receive target-native agent forks instead of copied Copilot model pins.
-- OpenAI Codex now renders project-scoped custom agents under `.codex/agents/*.toml`, matching the current Codex custom-agent format.
-- OpenAI Codex renders repository skills under `.agents/skills/`, matching Codex skill discovery.
+- `.claude/` is now the canonical generated shared basis for skills, instructions, agent bodies, prompts, plans, logs, reports, memory, templates, scoring, and hook scripts.
+- GitHub Copilot preserves native custom-agent frontmatter while generating thin adapters that point to `.claude/agents/`.
+- Claude Code uses `.claude/agents/` and `.claude/skills/` natively.
+- OpenAI Codex now renders project-scoped custom-agent adapters under `.codex/agents/*.toml`, matching the current Codex custom-agent format.
+- OpenAI Codex uses `[[skills.config]]` entries in `.codex/config.toml` to point at `.claude/skills/<name>`.
+- Separate generated target directories for GitHub Copilot, Claude Code, and OpenAI Codex are obsolete; the single generated directory includes all three native adapter surfaces.
 - Codex `.codex/rules/*.rules` output is deprecated and should fail validation if regenerated.

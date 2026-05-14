@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Validate generated target outputs."""
+"""Validate the generated bootstrap target."""
 
 from __future__ import annotations
 
 import filecmp
 import json
 import py_compile
+import re
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
-TARGETS = ("github-copilot", "claude-code", "openai-codex")
+TARGETS = ("multi-agent",)
+OBSOLETE_TARGET_ROOTS = ("github-copilot", "claude-code", "openai-codex")
+TARGET_ROOT = DIST_ROOT / "multi-agent"
+SOURCE_AGENT_TARGETS = ("github-copilot", "claude-code", "openai-codex")
 COPILOT_MODEL_PINS = (
     "GPT-5.4",
     "Claude Opus 4.6",
@@ -68,7 +72,24 @@ NON_COPILOT_PATH_LEAKS = (
     "CLAUDE.md**",
     "AGENTS.mdtool",
     "CLAUDE.mdtool",
-    ".instructions.md",
+)
+OBSOLETE_GENERATED_DIRS = (
+    ".github/skills",
+    ".github/scripts",
+    ".github/templates",
+    ".github/session_logs",
+    ".github/quality_reports",
+    ".github/explorations",
+    ".github/plans",
+    ".agents/skills",
+    ".codex/skills",
+    ".codex/scripts",
+    ".codex/templates",
+    ".codex/session_logs",
+    ".codex/quality_reports",
+    ".codex/explorations",
+    ".codex/plans",
+    ".codex/hooks/scripts",
 )
 CODEX_REVIEW_NAME_MAP = {
     "review-pass-codex": "review-pass-codex-primary",
@@ -104,21 +125,15 @@ def count_skills(root: Path) -> int:
 
 
 def target_support_root(target: str) -> Path:
-    if target == "github-copilot":
-        return DIST_ROOT / target / ".github"
-    if target == "claude-code":
-        return DIST_ROOT / target / ".claude"
-    if target == "openai-codex":
-        return DIST_ROOT / target / ".codex"
-    raise ValueError(f"unknown target: {target}")
+    if target not in TARGETS:
+        raise ValueError(f"unknown target: {target}")
+    return TARGET_ROOT / ".claude"
 
 
 def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
     comparison = filecmp.dircmp(left, right)
     if comparison.left_only or comparison.right_only or comparison.diff_files or comparison.funny_files:
-        errors.append(
-            "generated dist is not deterministic; rerun scripts/generate_targets.py --all"
-        )
+        errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
         return
     for name in comparison.common_dirs:
         compare_dirs(left / name, right / name, errors)
@@ -132,7 +147,7 @@ def validate_agents(errors: list[str]) -> None:
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
-        for target in TARGETS:
+        for target in SOURCE_AGENT_TARGETS:
             check(
                 target in data.get("targets", {}),
                 f"{agent_id} missing target metadata for {target}",
@@ -148,22 +163,38 @@ def validate_agents(errors: list[str]) -> None:
                 )
 
     for legacy_path in legacy_agents:
-        generated = DIST_ROOT / "github-copilot" / ".github" / "agents" / legacy_path.name
+        generated = TARGET_ROOT / ".github" / "agents" / legacy_path.name
         check(generated.exists(), f"missing generated GitHub agent: {legacy_path.name}", errors)
-        if generated.exists() and read(generated) != read(legacy_path):
-            errors.append(f"GitHub agent metadata/body changed unexpectedly: {legacy_path.name}")
+        if generated.exists():
+            text = read(generated)
+            check(
+                ".claude/agents/" in text,
+                f"GitHub agent adapter must point at canonical .claude agent: {generated}",
+                errors,
+            )
+            for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", text):
+                check(
+                    (TARGET_ROOT / reference).exists(),
+                    f"GitHub agent adapter points at missing canonical agent: {generated}: {reference}",
+                    errors,
+                )
+            check(
+                "This file is the GitHub Copilot native adapter" in text,
+                f"GitHub agent should be a thin native adapter: {generated}",
+                errors,
+            )
 
-    claude_agents = sorted((DIST_ROOT / "claude-code" / ".claude" / "agents").glob("*.md"))
-    check(len(claude_agents) == 17, "expected 17 Claude Code subagent files", errors)
+    claude_agents = sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md"))
+    check(len(claude_agents) == 17, "expected 17 canonical .claude agent files", errors)
     for path in claude_agents:
         text = read(path)
         check(text.startswith("---\n"), f"Claude agent missing frontmatter: {path}", errors)
         check("\nname: " in text and "\ndescription: " in text, f"Claude agent missing required fields: {path}", errors)
 
-    codex_agents = sorted((DIST_ROOT / "openai-codex" / ".codex" / "agents").glob("*.toml"))
+    codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
     check(len(codex_agents) == 17, "expected 17 Codex custom agent TOML files", errors)
     check(
-        not (DIST_ROOT / "openai-codex" / ".codex" / "rules").exists(),
+        not (TARGET_ROOT / ".codex" / "rules").exists(),
         "Codex target must not generate deprecated .codex/rules output",
         errors,
     )
@@ -188,13 +219,27 @@ def validate_agents(errors: list[str]) -> None:
         for field in ("name", "description", "developer_instructions"):
             check(isinstance(data.get(field), str) and bool(data.get(field)), f"Codex agent missing required field {field}: {path}", errors)
         check(data.get("name") == path.stem, f"Codex agent name must match filename stem: {path}", errors)
+        instructions = str(data.get("developer_instructions", ""))
+        check(
+            ".claude/agents/" in instructions,
+            f"Codex agent adapter must point at canonical .claude agent: {path}",
+            errors,
+        )
+        check(
+            "OpenAI Codex custom-agent adapter" in instructions,
+            f"Codex agent should be a thin native adapter: {path}",
+            errors,
+        )
+        for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", instructions):
+            check(
+                (TARGET_ROOT / reference).exists(),
+                f"Codex agent adapter points at missing canonical agent: {path}: {reference}",
+                errors,
+            )
         for helper_name in CODEX_BAD_REVIEW_HELPERS:
             check(helper_name not in text, f"invalid Codex review helper name in {path}: {helper_name}", errors)
 
-    for root in (
-        DIST_ROOT / "claude-code" / ".claude" / "agents",
-        DIST_ROOT / "openai-codex" / ".codex" / "agents",
-    ):
+    for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
         for path in text_files(root):
             text = read(path)
             for label in NON_COPILOT_REVIEW_LABEL_LEAKS:
@@ -204,7 +249,7 @@ def validate_agents(errors: list[str]) -> None:
 
 
 def validate_github_agent_models(errors: list[str]) -> None:
-    agent_root = DIST_ROOT / "github-copilot" / ".github" / "agents"
+    agent_root = TARGET_ROOT / ".github" / "agents"
     for path in sorted(agent_root.glob("*.agent.md")):
         text = read(path)
         if not text.startswith("---\n"):
@@ -236,25 +281,32 @@ def validate_github_agent_models(errors: list[str]) -> None:
 
 
 def validate_model_leaks(errors: list[str]) -> None:
-    for target in ("claude-code", "openai-codex"):
-        for path in text_files(DIST_ROOT / target):
+    non_github_roots = (
+        TARGET_ROOT / "CLAUDE.md",
+        TARGET_ROOT / "AGENTS.md",
+        TARGET_ROOT / ".claude",
+        TARGET_ROOT / ".codex",
+    )
+    for root in non_github_roots:
+        paths = [root] if root.is_file() else text_files(root)
+        for path in paths:
             text = read(path)
             for pin in COPILOT_MODEL_PINS:
                 if pin in text:
-                    errors.append(f"Copilot model pin leaked into {target}: {path} contains {pin}")
+                    errors.append(f"Copilot model pin leaked into non-GitHub output: {path} contains {pin}")
 
 
 def validate_mcp_and_hooks(errors: list[str]) -> None:
-    github_mcp = json.loads(read(DIST_ROOT / "github-copilot" / ".vscode" / "mcp.json"))
-    claude_mcp = json.loads(read(DIST_ROOT / "claude-code" / ".mcp.json"))
+    github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
+    claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
     for server in ("semble", "context-mode"):
         check(server in github_mcp.get("servers", {}), f"github missing MCP server: {server}", errors)
         check(server in claude_mcp.get("mcpServers", {}), f"claude missing MCP server: {server}", errors)
     check("servers" not in claude_mcp, "Claude .mcp.json must use mcpServers, not servers", errors)
 
-    codex_config = read(DIST_ROOT / "openai-codex" / ".codex" / "config.toml")
+    codex_config = read(TARGET_ROOT / ".codex" / "config.toml")
     try:
-        read_toml(DIST_ROOT / "openai-codex" / ".codex" / "config.toml")
+        read_toml(TARGET_ROOT / ".codex" / "config.toml")
     except tomllib.TOMLDecodeError as error:
         errors.append(f"invalid Codex config TOML: {error}")
     check("[features]" in codex_config, "Codex config missing features section", errors)
@@ -263,8 +315,9 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
+    check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
 
-    codex_hooks = json.loads(read(DIST_ROOT / "openai-codex" / ".codex" / "hooks.json"))
+    codex_hooks = json.loads(read(TARGET_ROOT / ".codex" / "hooks.json"))
     check(set(codex_hooks) == {"hooks"}, "Codex hooks.json should only contain the top-level hooks object", errors)
     check("PreCompact" not in codex_hooks.get("hooks", {}), "Codex hooks must not use unsupported PreCompact event", errors)
     for event_name, groups in codex_hooks.get("hooks", {}).items():
@@ -279,25 +332,42 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                     f"Codex repo-local hook should resolve from git root: {event_name}",
                     errors,
                 )
+                check(
+                    ".claude/hooks/scripts/" in command,
+                    f"Codex hooks should invoke shared .claude hook scripts: {event_name}",
+                    errors,
+                )
+                if "session-log.sh" in command or "protect-files.sh" in command:
+                    check(
+                        "openai-codex" in command,
+                        f"Codex hook command should pass target id: {event_name}",
+                        errors,
+                    )
 
-    hook_roots = (
-        DIST_ROOT / "github-copilot" / ".github" / "hooks" / "scripts",
-        DIST_ROOT / "claude-code" / ".claude" / "hooks" / "scripts",
-        DIST_ROOT / "openai-codex" / ".codex" / "hooks" / "scripts",
-    )
+    hook_roots = (TARGET_ROOT / ".claude" / "hooks" / "scripts",)
     for hook_root in hook_roots:
         for script in REQUIRED_HOOK_SCRIPTS:
             path = hook_root / script
             check(path.exists(), f"missing hook script: {path}", errors)
             check(path.exists() and path.stat().st_mode & 0o111, f"hook script is not executable: {path}", errors)
 
+    github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
+    github_hook_text = json.dumps(github_hooks)
+    check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
+    check("github-copilot" in github_hook_text, "GitHub hooks should pass target id", errors)
+
+    claude_settings = json.loads(read(TARGET_ROOT / ".claude" / "settings.json"))
+    claude_settings_text = json.dumps(claude_settings)
+    check(".claude/hooks/scripts/" in claude_settings_text, "Claude settings should invoke shared .claude hook scripts", errors)
+    check("claude-code" in claude_settings_text, "Claude hooks should pass target id", errors)
+
     validate_hook_guardrails(errors)
     validate_generated_scripts(errors)
 
 
-def run_hook(script: Path, payload: dict[str, object]) -> tuple[int, str, str]:
+def run_hook(script: Path, payload: dict[str, object], *args: str) -> tuple[int, str, str]:
     result = subprocess.run(
-        [str(script)],
+        [str(script), *args],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
@@ -309,26 +379,30 @@ def run_hook(script: Path, payload: dict[str, object]) -> tuple[int, str, str]:
 def validate_hook_guardrails(errors: list[str]) -> None:
     hook_cases = (
         (
-            DIST_ROOT / "github-copilot" / ".github" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             ".github/hooks/hooks.json",
             "ask",
+            "github-copilot",
         ),
         (
-            DIST_ROOT / "claude-code" / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             ".claude/settings.json",
             "ask",
+            "claude-code",
         ),
         (
-            DIST_ROOT / "openai-codex" / ".codex" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             ".codex/hooks.json",
             "deny",
+            "openai-codex",
         ),
     )
-    for script, protected_path, expected_decision in hook_cases:
+    for script, protected_path, expected_decision, target_id in hook_cases:
         patch = f"*** Begin Patch\n*** Update File: {protected_path}\n@@\n x\n*** End Patch\n"
         returncode, stdout, stderr = run_hook(
             script,
             {"tool_name": "apply_patch", "tool_input": {"command": patch}},
+            target_id,
         )
         check(returncode == 0, f"hook guardrail failed to run: {script}: {stderr}", errors)
         check(
@@ -337,14 +411,15 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             errors,
         )
 
-    for hook_root in (
-        DIST_ROOT / "github-copilot" / ".github" / "hooks" / "scripts",
-        DIST_ROOT / "claude-code" / ".claude" / "hooks" / "scripts",
-        DIST_ROOT / "openai-codex" / ".codex" / "hooks" / "scripts",
+    for target_id, hook_root in (
+        ("github-copilot", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("claude-code", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("openai-codex", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
     ):
         returncode, stdout, stderr = run_hook(
             hook_root / "protect-files.sh",
             {"tool_name": "Write", "tool_input": {"path": ".env"}},
+            target_id,
         )
         check(returncode == 0, f"protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
@@ -356,6 +431,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         returncode, stdout, stderr = run_hook(
             hook_root / "protect-files.sh",
             {"tool_name": "Bash", "tool_input": {"command": "touch .env"}},
+            target_id,
         )
         check(returncode == 0, f"Bash protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
@@ -377,25 +453,29 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
     bash_hook_cases = (
         (
-            DIST_ROOT / "github-copilot" / ".github" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             "cat > .github/hooks/hooks.json",
             "ask",
+            "github-copilot",
         ),
         (
-            DIST_ROOT / "claude-code" / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             "cat > .claude/settings.json",
             "ask",
+            "claude-code",
         ),
         (
-            DIST_ROOT / "openai-codex" / ".codex" / "hooks" / "scripts" / "protect-files.sh",
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             "cat > .codex/hooks.json",
             "deny",
+            "openai-codex",
         ),
     )
-    for script, command, expected_decision in bash_hook_cases:
+    for script, command, expected_decision, target_id in bash_hook_cases:
         returncode, stdout, stderr = run_hook(
             script,
             {"tool_name": "Bash", "tool_input": {"command": command}},
+            target_id,
         )
         check(returncode == 0, f"Bash hook-file guardrail failed to run: {script}: {stderr}", errors)
         check(
@@ -434,46 +514,67 @@ def validate_generated_scripts(errors: list[str]) -> None:
 def validate_skills_and_paths(errors: list[str]) -> None:
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
     check(shared_skill_count == 52, f"expected 52 shared skills, found {shared_skill_count}", errors)
-    for target, skill_root in (
-        ("github-copilot", DIST_ROOT / "github-copilot" / ".github" / "skills"),
-        ("claude-code", DIST_ROOT / "claude-code" / ".claude" / "skills"),
-        ("openai-codex", DIST_ROOT / "openai-codex" / ".agents" / "skills"),
-    ):
-        count = count_skills(skill_root)
-        check(count == shared_skill_count, f"{target} skill count mismatch: {count}", errors)
-    check(
-        not (DIST_ROOT / "openai-codex" / ".codex" / "skills").exists(),
-        "Codex skills must be generated under .agents/skills, not .codex/skills",
-        errors,
-    )
+    skill_root = TARGET_ROOT / ".claude" / "skills"
+    count = count_skills(skill_root)
+    check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
 
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
-    generated_prompts = sorted((DIST_ROOT / "github-copilot" / ".github" / "prompts").glob("*.prompt.md"))
+    generated_prompts = sorted((TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md"))
     check(
         [path.name for path in generated_prompts] == [path.name for path in shared_prompts],
-        "GitHub prompt output must mirror shared/prompts",
+        ".claude prompt output must mirror shared/prompts",
         errors,
     )
     for source in shared_prompts:
-        generated = DIST_ROOT / "github-copilot" / ".github" / "prompts" / source.name
+        generated = TARGET_ROOT / ".claude" / "prompts" / source.name
         check(generated.exists() and read(generated) == read(source), f"generated prompt differs from source: {source.name}", errors)
 
-    forbidden_fragments = ("/home/ghisso", "/Users/", "BEGIN OPENSSH", "PRIVATE KEY")
-    for target in TARGETS:
-        for path in text_files(DIST_ROOT / target):
-            text = read(path)
-            for fragment in forbidden_fragments:
-                if fragment in text:
-                    errors.append(f"forbidden fragment in generated file: {path} contains {fragment}")
+    codex_config = read_toml(TARGET_ROOT / ".codex" / "config.toml")
+    skill_entries = codex_config.get("skills", {})
+    if isinstance(skill_entries, dict):
+        skill_config = skill_entries.get("config", [])
+    else:
+        skill_config = []
+    configured_skill_paths = {
+        entry.get("path")
+        for entry in skill_config
+        if isinstance(entry, dict) and entry.get("enabled") is True
+    }
+    expected_skill_paths = {f"../.claude/skills/{path.parent.name}" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    check(
+        configured_skill_paths == expected_skill_paths,
+        "Codex config must enable every shared .claude skill by relative path",
+        errors,
+    )
 
-    for target in ("claude-code", "openai-codex"):
-        for path in text_files(DIST_ROOT / target):
+    forbidden_fragments = ("/home/ghisso", "/Users/", "BEGIN OPENSSH", "PRIVATE KEY")
+    for relative_path in OBSOLETE_GENERATED_DIRS:
+        check(
+            not (TARGET_ROOT / relative_path).exists(),
+            f"multi-agent must not generate obsolete target-local path: {relative_path}",
+            errors,
+        )
+    for obsolete_target in OBSOLETE_TARGET_ROOTS:
+        check(
+            not (DIST_ROOT / obsolete_target).exists(),
+            f"obsolete generated target directory must not exist: dist/{obsolete_target}",
+            errors,
+        )
+    for path in text_files(TARGET_ROOT):
+        text = read(path)
+        for fragment in forbidden_fragments:
+            if fragment in text:
+                errors.append(f"forbidden fragment in generated file: {path} contains {fragment}")
+
+    for root in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md", TARGET_ROOT / ".claude", TARGET_ROOT / ".codex"):
+        paths = [root] if root.is_file() else text_files(root)
+        for path in paths:
             if "hooks" in path.parts and "scripts" in path.parts:
                 continue
             text = read(path)
             for fragment in NON_COPILOT_PATH_LEAKS:
                 if fragment in text:
-                    errors.append(f"Copilot path leaked into {target}: {path} contains {fragment}")
+                    errors.append(f"Copilot path leaked into non-GitHub output: {path} contains {fragment}")
 
     validate_support_files(errors)
     validate_generated_hygiene(errors)
@@ -491,12 +592,22 @@ def validate_support_files(errors: list[str]) -> None:
         "quality_reports/README.md",
         "session_logs/README.md",
         "explorations/README.md",
+        "instructions/workflow.instructions.md",
+        "instructions/quality-and-testing.instructions.md",
+        "instructions/tool-routing.instructions.md",
+        "instructions/workspace.md",
+        "prompts/README.prompt.md",
+        "hooks/scripts/protect-files.sh",
+        "hooks/scripts/git-protection.sh",
+        "hooks/scripts/context-mode-dispatch.sh",
+        "hooks/scripts/session-log.sh",
     )
     for target in TARGETS:
         support_root = target_support_root(target)
         for relative_path in required_files:
             path = support_root / relative_path
             check(path.exists(), f"{target} missing generated support file: {path}", errors)
+
 
 def validate_generated_hygiene(errors: list[str]) -> None:
     for path in DIST_ROOT.rglob("*"):
@@ -524,6 +635,8 @@ def main() -> int:
     errors: list[str] = []
     for target in TARGETS:
         check((DIST_ROOT / target).exists(), f"missing generated target: {target}", errors)
+    for target in OBSOLETE_TARGET_ROOTS:
+        check(not (DIST_ROOT / target).exists(), f"obsolete generated target still exists: {target}", errors)
 
     if not errors:
         validate_agents(errors)
@@ -537,7 +650,7 @@ def main() -> int:
             print(f"FAIL {error}", file=sys.stderr)
         return 1
 
-    print("PASS generated targets are structurally valid")
+    print("PASS generated target is structurally valid")
     return 0
 
 

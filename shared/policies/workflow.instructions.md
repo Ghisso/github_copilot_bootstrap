@@ -10,9 +10,9 @@ description: "Always-on: Workflow protocol — plan-first, orchestrator loop, se
 
 **For any non-trivial task (>1 file or >30 min), plan before coding.**
 
-1. Check `.github/MEMORY.md` for relevant `[LEARN]` entries
-2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.github/quality_reports/specs/`
-3. Draft plan → save to `.github/plans/YYYY-MM-DD_short-description.md` (for concrete implementation plans) or `.github/explorations/YYYY-MM-DD_description/` (for exploratory/PoC plans)
+1. Check `.claude/MEMORY.md` for relevant `[LEARN]` entries
+2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.claude/quality_reports/specs/`
+3. Draft plan → save to `.claude/plans/YYYY-MM-DD_short-description.md` (for concrete implementation plans) or `.claude/explorations/YYYY-MM-DD_description/` (for exploratory/PoC plans)
 4. Present to user → wait for approval
 5. After approval: create session log, then implement via Orchestrator Loop
 
@@ -58,7 +58,7 @@ uv run ruff check src/ tests/
 
 ## Session Logging
 
-**Log location:** `.github/session_logs/YYYY-MM-DD_description.md`
+**Log location:** `.claude/session_logs/YYYY-MM-DD_description.md`
 
 **Log when:**
 - After plan approval (goal, approach, rationale)
@@ -67,20 +67,20 @@ uv run ruff check src/ tests/
 
 **Frequency:** Every 30 responses or at session end (whichever comes first).
 
-Merge-time review reports should be stored in `.github/quality_reports/merges/`.
+Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 
 ---
 
 ## Context Management
 
 **Before finishing or when context is getting large:**
-1. Save `[LEARN]` entries to `.github/MEMORY.md`
+1. Save `[LEARN]` entries to `.claude/MEMORY.md`
 2. Update session log
 3. Ensure plan is saved to disk
 4. Document open questions
 
 **Starting a new session:**
-1. Read `copilot-instructions.md` + most recent plan in `.github/plans/` or exploration in `.github/explorations/`
+1. Read `copilot-instructions.md` + most recent plan in `.claude/plans/` or exploration in `.claude/explorations/`
 2. Check `git log --oneline -10` and `git diff`
 3. State understood task and next step
 
@@ -89,7 +89,7 @@ Merge-time review reports should be stored in `.github/quality_reports/merges/`.
 ## Recovery Checklist
 
 ```
-[ ] Plan saved to .github/plans/ or .github/explorations/
+[ ] Plan saved to .claude/plans/ or .claude/explorations/
 [ ] Session log created/updated
 [ ] MEMORY.md has all [LEARN] entries
 [ ] Verification passed (pytest + mypy + ruff)
@@ -120,8 +120,8 @@ Some behaviors are automated by hooks. Others are still manual.
 **Automated via hooks:**
 - Protected file edits are denied
 - Dangerous git commands are denied
-- Session start/end events are logged to `.github/session_logs/hooks-sessions.log`
-- Runtime hook errors are logged to `.github/session_logs/hooks-errors.log`
+- Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`
+- Runtime hook errors are logged to `.claude/session_logs/hooks-errors.log`
 
 **Manual reminders still required:**
 
@@ -132,13 +132,13 @@ Some behaviors are automated by hooks. Others are still manual.
 
 **Every ~30 responses or before stopping:**
 ```
-→ Update session log in .github/session_logs/
-→ Flush [LEARN] entries to .github/MEMORY.md
+→ Update session log in .claude/session_logs/
+→ Flush [LEARN] entries to .claude/MEMORY.md
 ```
 
 **When the conversation is long / context is filling up:**
 ```
-→ Save plan to .github/plans/ (implementation) or .github/explorations/ (research/PoC)
+→ Save plan to .claude/plans/ (implementation) or .claude/explorations/ (research/PoC)
 → Update MEMORY.md with all [LEARN] entries
 → Write session log with open questions and next steps
 ```

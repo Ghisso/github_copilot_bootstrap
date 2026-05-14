@@ -12,18 +12,18 @@ description: |
 
 ### 1. Active Plan
 ```bash
-ls -lt .github/plans/*.md 2>/dev/null | grep -v ".gitkeep" | head -3
+ls -lt .claude/plans/*.md 2>/dev/null | grep -v ".gitkeep" | head -3
 ```
 
 ### 2. Session Log Recency
 ```bash
-ls -lt .github/session_logs/*.md 2>/dev/null | grep -v ".gitkeep" | head -3
+ls -lt .claude/session_logs/*.md 2>/dev/null | grep -v ".gitkeep" | head -3
 ```
 
 ### 3. MEMORY.md
 ```bash
-wc -l .github/MEMORY.md
-grep -c "\[LEARN" .github/MEMORY.md
+wc -l .claude/MEMORY.md
+grep -c "\[LEARN" .claude/MEMORY.md
 ```
 
 ### 4. Git Status

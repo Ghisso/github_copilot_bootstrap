@@ -3,13 +3,13 @@
 ## For This Bootstrap Repository
 
 1. Edit source files under `shared/`.
-2. Regenerate targets:
+2. Regenerate the installable output:
 
    ```bash
    python3 scripts/generate_targets.py --all
    ```
 
-3. Validate generated outputs:
+3. Validate generated output:
 
    ```bash
    python3 scripts/validate_targets.py
@@ -23,14 +23,21 @@
 
 ## For Consumer Repositories
 
-Use the generated target that matches the agent environment:
+Copy the single generated target:
 
-- Copy `dist/github-copilot/` for GitHub Copilot in VS Code.
-- Copy `dist/claude-code/` for Claude Code.
-- Copy `dist/openai-codex/` for OpenAI Codex.
+```bash
+rsync -av dist/multi-agent/ /path/to/your-project/
+chmod +x /path/to/your-project/.claude/hooks/scripts/*.sh
+```
 
-Legacy root `.github/`, `.vscode/mcp.json`, and `AGENTS.md` files remain active in this repository during the first migration pass.
+The generated `.claude/` tree is the shared basis for all tools, while `.github/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, and `.vscode/mcp.json` are native adapters/config. If a consumer repo does not use one tool, delete only that tool's native adapter/config files and keep `.claude/`.
+
+Optional pruning:
+
+- No Copilot: delete `.github/` and `.vscode/mcp.json`.
+- No Claude Code: delete `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json`.
+- No Codex: delete `AGENTS.md` and `.codex/`.
 
 ## Deprecation Rule
 
-Do not remove duplicated legacy files until the generated GitHub Copilot target is validated against existing behavior.
+Target-local history/support directories such as `.github/plans/`, `.github/session_logs/`, `.codex/plans/`, `.codex/session_logs/`, and `.agents/skills/` are obsolete for new installs. New projects should write plans, explorations, logs, quality reports, memory, and skills under `.claude/`.

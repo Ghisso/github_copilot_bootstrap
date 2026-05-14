@@ -42,7 +42,7 @@ Do not use this skill on source-of-truth customization files.
 
 - `.github/copilot-instructions.md`
 - `.github/instructions/**`
-- `.github/skills/**/SKILL.md`
+- `.claude/skills/**/SKILL.md`
 - `.github/agents/**/*.agent.md`
 - `*.original.md`
 - code and config files
@@ -52,7 +52,7 @@ Do not use this skill on source-of-truth customization files.
 1. Run the detector first:
 
    ```bash
-   python .github/skills/caveman-compress/scripts/detect.py <filepath>
+   python .claude/skills/caveman-compress/scripts/detect.py <filepath>
    ```
 
 2. If the detector rejects the file, stop and explain why.
@@ -72,7 +72,7 @@ Do not use this skill on source-of-truth customization files.
 8. Validate the result:
 
    ```bash
-   python .github/skills/caveman-compress/scripts/validate.py <original-backup> <compressed-file>
+   python .claude/skills/caveman-compress/scripts/validate.py <original-backup> <compressed-file>
    ```
 
 9. If validation reports errors, patch only the broken sections and rerun validation.
@@ -88,7 +88,7 @@ Do not use this skill on source-of-truth customization files.
 ## Example
 
 ```text
-/caveman:compress .github/session_logs/2026-04-09_caveman-integration.md
+/caveman:compress .claude/session_logs/2026-04-09_caveman-integration.md
 ```
 
 Expected flow:
@@ -100,5 +100,5 @@ Expected flow:
 
 ## References
 
-- `.github/skills/caveman-compress/scripts/detect.py`
-- `.github/skills/caveman-compress/scripts/validate.py`
+- `.claude/skills/caveman-compress/scripts/detect.py`
+- `.claude/skills/caveman-compress/scripts/validate.py`

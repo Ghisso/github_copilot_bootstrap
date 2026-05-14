@@ -55,8 +55,8 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 
 ### 5. Quality Score (when available)
 ```bash
-if [[ -f ".github/scripts/quality_score.py" ]]; then
-  uv run python .github/scripts/quality_score.py src/ --json
+if [[ -f ".claude/scripts/quality_score.py" ]]; then
+  uv run python .claude/scripts/quality_score.py src/ --json
 else
   echo "quality_score.py not found — skipping score (ruff+mypy+pytest gates still apply)"
 fi

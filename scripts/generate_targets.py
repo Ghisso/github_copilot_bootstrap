@@ -13,9 +13,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
-TARGETS = ("github-copilot", "claude-code", "openai-codex")
+TARGETS = ("multi-agent",)
+OBSOLETE_TARGETS = ("github-copilot", "claude-code", "openai-codex")
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
+SHARED_BASIS_NAMESPACE = ".claude"
 
 CLAUDE_REVIEW_NAME_MAP = {
     "review-pass-codex": "review-pass-claude-primary",
@@ -38,28 +40,24 @@ TARGET_PATH_REPLACEMENTS = {
     "claude-code": (
         (
             "under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md`",
-            "under `.claude/agents/`, `.claude/skills/`, `.claude/hooks/`, or is `CLAUDE.md` or `.claude/settings.json`",
+            "under `.claude/agents/`, `.claude/instructions/`, `.claude/hooks/`, or is `CLAUDE.md` or `.claude/settings.json`",
         ),
         (
             "(`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)",
-            "(`.claude/agents/**`, `.claude/skills/**`, `.claude/hooks/**`, `.claude/settings.json`, `CLAUDE.md`)",
+            "(`.claude/agents/**`, `.claude/instructions/**`, `.claude/hooks/**`, `.claude/settings.json`, `CLAUDE.md`)",
         ),
         ("Copy `copilot-instructions.md` to new project's `.github/`", "Copy `CLAUDE.md` to the new project's root"),
-        ("See `quality-and-testing.instructions.md` rubric.", "See the Quality Gates & Testing Protocol section below."),
-        ("quality-and-testing.instructions.md", "Quality Gates & Testing Protocol"),
-        ("See `tests.instructions.md` for detailed mocking rules.", "Follow the testing guidance in this file for detailed mocking rules."),
         (
             "Load `.github/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-            "Use the Tool Routing section in `CLAUDE.md` before choosing a retrieval helper. That section is the authority; this skill is only a short trigger and reminder.",
+            "Load `.claude/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
         ),
-        ("Apply `quality-and-testing.instructions.md` rubric.", "Apply the Quality Gates & Testing Protocol rubric."),
         (".github/copilot-instructions.md", "CLAUDE.md"),
-        (".github/instructions/quality-and-testing.instructions.md", "CLAUDE.md"),
-        (".github/instructions/tool-routing.instructions.md", "CLAUDE.md"),
-        (".github/instructions/**", "CLAUDE.md"),
+        (".github/instructions/quality-and-testing.instructions.md", ".claude/instructions/quality-and-testing.instructions.md"),
+        (".github/instructions/tool-routing.instructions.md", ".claude/instructions/tool-routing.instructions.md"),
+        (".github/instructions/**", ".claude/instructions/**"),
         (".github/agents/**/*.agent.md", ".claude/agents/**/*.md"),
         ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/CLAUDE.md")'),
-        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', 'normalized.endswith("/CLAUDE.md")'),
+        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', '"/.claude/instructions/" in normalized and normalized.endswith(".md")'),
         ('"/.github/skills/" in normalized', '"/.claude/skills/" in normalized'),
         ('"/.github/agents/" in normalized and normalized.endswith(".agent.md")', '"/.claude/agents/" in normalized and normalized.endswith(".md")'),
         (".github/hooks/hooks.json", ".claude/settings.json"),
@@ -72,8 +70,8 @@ TARGET_PATH_REPLACEMENTS = {
         (".github/templates", ".claude/templates"),
         (".github/agents", ".claude/agents"),
         (".github/hooks", ".claude/hooks"),
-        (".github/instructions/", "CLAUDE.md"),
-        (".github/instructions", "CLAUDE.md"),
+        (".github/instructions/", ".claude/instructions/"),
+        (".github/instructions", ".claude/instructions"),
         (".github/MEMORY.md", ".claude/MEMORY.md"),
         ("Copy `.github/` directory", "Copy `.claude/` directory"),
         ("git add .github/", "git add .claude/"),
@@ -82,45 +80,41 @@ TARGET_PATH_REPLACEMENTS = {
     "openai-codex": (
         (
             "under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md`",
-            "under `.codex/agents/`, `.agents/skills/`, `.codex/hooks/`, or is `AGENTS.md`, `.codex/config.toml`, or `.codex/hooks.json`",
+            "under `.codex/agents/`, `.claude/agents/`, `.claude/instructions/`, `.claude/hooks/`, or is `AGENTS.md`, `.codex/config.toml`, or `.codex/hooks.json`",
         ),
         (
             "(`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)",
-            "(`.codex/agents/**`, `.agents/skills/**`, `.codex/hooks/**`, `.codex/config.toml`, `.codex/hooks.json`, `AGENTS.md`)",
+            "(`.codex/agents/**`, `.claude/agents/**`, `.claude/instructions/**`, `.claude/hooks/**`, `.codex/config.toml`, `.codex/hooks.json`, `AGENTS.md`)",
         ),
         ("Copy `copilot-instructions.md` to new project's `.github/`", "Copy `AGENTS.md` to the new project's root"),
-        ("See `quality-and-testing.instructions.md` rubric.", "See the Quality Gates & Testing Protocol section below."),
-        ("quality-and-testing.instructions.md", "Quality Gates & Testing Protocol"),
-        ("See `tests.instructions.md` for detailed mocking rules.", "Follow the testing guidance in this file for detailed mocking rules."),
         (
             "Load `.github/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-            "Use the Tool Routing section in `AGENTS.md` before choosing a retrieval helper. That section is the authority; this skill is only a short trigger and reminder.",
+            "Load `.claude/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
         ),
-        ("Apply `quality-and-testing.instructions.md` rubric.", "Apply the Quality Gates & Testing Protocol rubric."),
         (".github/copilot-instructions.md", "AGENTS.md"),
-        (".github/instructions/quality-and-testing.instructions.md", "AGENTS.md"),
-        (".github/instructions/tool-routing.instructions.md", "AGENTS.md"),
-        (".github/instructions/**", "AGENTS.md"),
+        (".github/instructions/quality-and-testing.instructions.md", ".claude/instructions/quality-and-testing.instructions.md"),
+        (".github/instructions/tool-routing.instructions.md", ".claude/instructions/tool-routing.instructions.md"),
+        (".github/instructions/**", ".claude/instructions/**"),
         (".github/agents/**/*.agent.md", ".codex/agents/**/*.toml"),
         ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/AGENTS.md")'),
-        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', 'normalized.endswith("/AGENTS.md")'),
-        ('"/.github/skills/" in normalized', '"/.agents/skills/" in normalized'),
-        ('"/.github/agents/" in normalized and normalized.endswith(".agent.md")', '"/.codex/agents/" in normalized and normalized.endswith(".toml")'),
+        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', '"/.claude/instructions/" in normalized and normalized.endswith(".md")'),
+        ('"/.github/skills/" in normalized', '"/.claude/skills/" in normalized'),
+        ('"/.github/agents/" in normalized and normalized.endswith(".agent.md")', '"/.claude/agents/" in normalized and normalized.endswith(".md")'),
         (".github/hooks/hooks.json", ".codex/hooks.json"),
-        (".github/session_logs", ".codex/session_logs"),
-        (".github/quality_reports", ".codex/quality_reports"),
-        (".github/explorations", ".codex/explorations"),
-        (".github/plans", ".codex/plans"),
-        (".github/skills", ".agents/skills"),
-        (".github/scripts", ".codex/scripts"),
-        (".github/templates", ".codex/templates"),
-        (".github/agents", ".codex/agents"),
-        (".github/hooks", ".codex/hooks"),
-        (".github/instructions/", "AGENTS.md"),
-        (".github/instructions", "AGENTS.md"),
-        (".github/MEMORY.md", ".codex/MEMORY.md"),
-        ("Copy `.github/` directory", "Copy `.codex/` directory"),
-        ("git add .github/", "git add .codex/"),
+        (".github/session_logs", ".claude/session_logs"),
+        (".github/quality_reports", ".claude/quality_reports"),
+        (".github/explorations", ".claude/explorations"),
+        (".github/plans", ".claude/plans"),
+        (".github/skills", ".claude/skills"),
+        (".github/scripts", ".claude/scripts"),
+        (".github/templates", ".claude/templates"),
+        (".github/agents", ".claude/agents"),
+        (".github/hooks", ".claude/hooks"),
+        (".github/instructions/", ".claude/instructions/"),
+        (".github/instructions", ".claude/instructions"),
+        (".github/MEMORY.md", ".claude/MEMORY.md"),
+        ("Copy `.github/` directory", "Copy `.claude/` directory"),
+        ("git add .github/", "git add .claude/"),
         ("copilot-instructions.md", "AGENTS.md"),
     ),
 }
@@ -192,36 +186,26 @@ def copy_tree_transformed(source: Path, destination: Path, target: str) -> None:
             copy_file(path, target_path)
 
 
-def support_namespace(target: str) -> str:
-    if target == "github-copilot":
-        return ".github"
-    if target == "claude-code":
-        return ".claude"
-    if target == "openai-codex":
-        return ".codex"
-    raise ValueError(f"unknown target: {target}")
-
-
-def render_support_files(target_root: Path, target: str) -> None:
-    namespace = support_namespace(target)
-    support_root = target_root / namespace
+def render_shared_basis(target_root: Path, target: str) -> None:
+    support_root = target_root / SHARED_BASIS_NAMESPACE
     target_label = {
         "github-copilot": "GitHub Copilot",
         "claude-code": "Claude Code",
         "openai-codex": "OpenAI Codex",
+        "multi-agent": "multi-agent",
     }[target]
 
-    copy_text_transformed(REPO_ROOT / ".github" / "MEMORY.md", support_root / "MEMORY.md", target)
-    copy_tree_transformed(REPO_ROOT / ".github" / "templates", support_root / "templates", target)
+    copy_text_transformed(REPO_ROOT / ".github" / "MEMORY.md", support_root / "MEMORY.md", "claude-code")
+    copy_tree_transformed(REPO_ROOT / ".github" / "templates", support_root / "templates", "claude-code")
     copy_text_transformed(
         REPO_ROOT / ".github" / "scripts" / "quality_score.py",
         support_root / "scripts" / "quality_score.py",
-        target,
+        "claude-code",
     )
 
     for name in ("plans", "quality_reports", "session_logs"):
         source = REPO_ROOT / ".github" / name / "README.md"
-        copy_text_transformed(source, support_root / name / "README.md", target)
+        copy_text_transformed(source, support_root / name / "README.md", "claude-code")
 
     write_text(
         support_root / "explorations" / "README.md",
@@ -231,6 +215,25 @@ def render_support_files(target_root: Path, target: str) -> None:
         "research, feasibility checks, or throwaway prototypes.\n",
     )
 
+    instructions_root = support_root / "instructions"
+    instructions_root.mkdir(parents=True, exist_ok=True)
+    for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
+        copy_text_transformed(source, instructions_root / source.name, "claude-code")
+    write_text(
+        instructions_root / "workspace.md",
+        transform_agent_text(
+            (REPO_ROOT / "shared" / "policies" / "copilot-instructions.md").read_text(
+                encoding="utf-8"
+            ),
+            "claude-code",
+        ),
+    )
+
+    copy_skills(REPO_ROOT / "shared" / "skills", support_root / "skills", "claude-code")
+    copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
+    copy_tree(REPO_ROOT / "shared" / "prompts", support_root / "prompts")
+    render_claude_agents(target_root)
+
 
 def reset_target(output_root: Path, target: str) -> Path:
     target_root = output_root / target
@@ -238,6 +241,13 @@ def reset_target(output_root: Path, target: str) -> Path:
         shutil.rmtree(target_root)
     target_root.mkdir(parents=True)
     return target_root
+
+
+def remove_obsolete_targets(output_root: Path) -> None:
+    for target in OBSOLETE_TARGETS:
+        target_root = output_root / target
+        if target_root.exists():
+            shutil.rmtree(target_root)
 
 
 def shared_agents() -> list[tuple[dict[str, Any], Path]]:
@@ -321,6 +331,10 @@ def shared_mcp_servers() -> dict[str, Any]:
     return data["servers"]
 
 
+def shared_skill_names() -> list[str]:
+    return sorted(path.parent.name for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md"))
+
+
 def render_vscode_mcp_json(path: Path) -> None:
     write_json(path, {"servers": shared_mcp_servers()})
 
@@ -332,6 +346,7 @@ def render_claude_mcp_json(path: Path) -> None:
 def render_codex_config(path: Path) -> None:
     lines = [
         "# Generated from shared/mcp/servers.yaml.",
+        "# Skills are sourced from the shared .claude basis; project trust is required.",
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
         "",
         "[features]",
@@ -348,6 +363,11 @@ def render_codex_config(path: Path) -> None:
         if "args" in server:
             args = ", ".join(json.dumps(arg) for arg in server["args"])
             lines.append(f"args = [{args}]")
+        lines.append("")
+    for skill_name in shared_skill_names():
+        lines.append("[[skills.config]]")
+        lines.append(f"path = {toml_string(f'../.claude/skills/{skill_name}')}")
+        lines.append("enabled = true")
         lines.append("")
     write_text(path, "\n".join(lines))
 
@@ -368,7 +388,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
                             "timeout": 10,
                         },
                         {
@@ -385,7 +405,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/protect-files.sh",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/protect-files.sh claude-code",
                             "timeout": 10,
                         },
                         {
@@ -429,7 +449,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
                             "timeout": 10,
                         }
                     ]
@@ -443,7 +463,7 @@ def render_claude_settings(path: Path) -> None:
 def render_codex_hooks(path: Path) -> None:
     def command(script: str, *args: str) -> str:
         suffix = " ".join(args)
-        executable = f'"$(git rev-parse --show-toplevel)/.codex/hooks/scripts/{script}"'
+        executable = f'"$(git rev-parse --show-toplevel)/.claude/hooks/scripts/{script}"'
         return f"{executable} {suffix}".rstrip()
 
     hooks = {
@@ -452,7 +472,7 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "startup|resume|clear",
                     "hooks": [
-                        {"type": "command", "command": command("session-log.sh"), "timeout": 10},
+                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10},
                         {
                             "type": "command",
                             "command": command("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
@@ -465,7 +485,7 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "*",
                     "hooks": [
-                        {"type": "command", "command": command("protect-files.sh"), "timeout": 10},
+                        {"type": "command", "command": command("protect-files.sh", "openai-codex"), "timeout": 10},
                         {"type": "command", "command": command("git-protection.sh"), "timeout": 10},
                         {
                             "type": "command",
@@ -490,7 +510,7 @@ def render_codex_hooks(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        {"type": "command", "command": command("session-log.sh"), "timeout": 10}
+                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10}
                     ]
                 }
             ],
@@ -512,16 +532,18 @@ def render_root_guidance(target: str) -> str:
     if target == "claude-code":
         title = "Claude Code Bootstrap Guidance"
         agent_note = (
-            "Custom agents are rendered as Claude Code project subagents in `.claude/agents/`. "
-            "Copilot model pins are intentionally omitted; review helpers use Claude-native "
-            "primary/adversarial passes."
+            "`.claude/` is the canonical shared project space. Custom agents are rendered as "
+            "Claude Code project subagents in `.claude/agents/`; skills, plans, session logs, "
+            "quality reports, memory, templates, and hook scripts also live under `.claude/`."
         )
     else:
         title = "OpenAI Codex Bootstrap Guidance"
         agent_note = (
-            "Custom agents are rendered as Codex project custom agents in `.codex/agents/*.toml`. "
-            "Copilot and Claude model pins are intentionally omitted; review helpers use "
-            "Codex-native primary/adversarial agents."
+            "`.claude/` is the canonical shared project space for skills, plans, session logs, "
+            "quality reports, memory, templates, and hook scripts. Codex discovers those skills "
+            "through `.codex/config.toml`, so trust this project before expecting project skill "
+            "wiring and hooks to load. Custom agents stay as thin Codex adapters in "
+            "`.codex/agents/*.toml` and point back to `.claude/agents/`."
         )
     return (
         f"# {title}\n\n"
@@ -553,40 +575,82 @@ def section_body(text: str) -> str:
     return body
 
 
-def render_github(target_root: Path) -> None:
-    render_support_files(target_root, "github-copilot")
-    copy_file(
-        REPO_ROOT / "shared" / "policies" / "copilot-instructions.md",
-        target_root / ".github" / "copilot-instructions.md",
+def split_frontmatter(text: str) -> tuple[str | None, str]:
+    if not text.startswith("---\n"):
+        return None, text
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return None, text
+    return parts[1].strip(), parts[2].lstrip()
+
+
+def canonical_agent_name(agent_id: str) -> str:
+    return mapped_agent_name(agent_id, "claude-code")
+
+
+def canonical_agent_path(agent_id: str) -> str:
+    return f".claude/agents/{canonical_agent_name(agent_id)}.md"
+
+
+def render_copilot_instructions() -> str:
+    return """# GitHub Copilot Workspace Adapter
+
+This target is generated from `shared/`. Do not edit generated files manually.
+
+`.claude/` is the canonical shared project space for all AI systems in this repo. Use it for skills, plans, explorations, session logs, quality reports, memory, templates, prompts, shared agent bodies, and hook scripts.
+
+Native Copilot files under `.github/` are adapters:
+
+- `.github/instructions/*.instructions.md` preserves Copilot discovery and points to `.claude/instructions/`.
+- `.github/agents/*.agent.md` preserves Copilot agent metadata and points to `.claude/agents/`.
+- `.github/hooks/hooks.json` invokes shared hook scripts in `.claude/hooks/scripts/`.
+
+Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
+
+Preserve the plan -> implement -> verify -> review -> score workflow. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+"""
+
+
+def render_github_instruction_adapter(source: Path) -> str:
+    frontmatter, body = split_frontmatter(source.read_text(encoding="utf-8"))
+    title = source.stem.replace(".instructions", "").replace("-", " ").title()
+    for line in body.splitlines():
+        if line.startswith("# "):
+            title = line[2:].strip()
+            break
+    adapter = (
+        f"# {title} Adapter\n\n"
+        f"This Copilot instruction file is a native discovery adapter. "
+        f"Read and follow the canonical shared instruction at `.claude/instructions/{source.name}`.\n\n"
+        "Critical shared-state rule: plans, explorations, session logs, memory, and quality reports "
+        "belong under `.claude/` for every AI target.\n"
     )
-    instructions_root = target_root / ".github" / "instructions"
-    instructions_root.mkdir(parents=True, exist_ok=True)
-    for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
-        copy_file(source, instructions_root / source.name)
+    if frontmatter:
+        return f"---\n{frontmatter}\n---\n\n{adapter}"
+    return adapter
 
-    copy_skills(REPO_ROOT / "shared" / "skills", target_root / ".github" / "skills", "github-copilot")
-    copy_file(REPO_ROOT / "shared" / "hooks" / "hooks.json", target_root / ".github" / "hooks" / "hooks.json")
-    copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", target_root / ".github" / "hooks" / "scripts")
-    render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
 
-    prompts_root = target_root / ".github" / "prompts"
-    copy_tree(REPO_ROOT / "shared" / "prompts", prompts_root)
+def render_github_agent_adapter(agent: dict[str, Any], agent_dir: Path) -> str:
+    source = agent_dir / "targets" / "github-copilot.md"
+    frontmatter, _ = split_frontmatter(source.read_text(encoding="utf-8"))
+    if not frontmatter:
+        raise ValueError(f"GitHub agent missing frontmatter: {source}")
+    canonical_path = canonical_agent_path(agent["id"])
+    body = (
+        f"# {agent['id']} Copilot Adapter\n\n"
+        "This file is the GitHub Copilot native adapter for the shared agent body.\n\n"
+        f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
+        "Use the Copilot model, tools, delegation, and visibility metadata in this file when it "
+        "conflicts with Claude-specific frontmatter in the canonical file.\n\n"
+        "Shared skills, memory, plans, explorations, session logs, quality reports, templates, "
+        "prompts, and hook scripts live under `.claude/`.\n"
+    )
+    return f"---\n{frontmatter}\n---\n\n{body}"
 
+
+def render_claude_agents(target_root: Path) -> None:
     for agent, agent_dir in shared_agents():
-        source = agent_dir / "targets" / "github-copilot.md"
-        copy_file(source, target_root / ".github" / "agents" / f"{agent['id']}.agent.md")
-
-
-def render_claude(target_root: Path) -> None:
-    render_support_files(target_root, "claude-code")
-    write_text(target_root / "CLAUDE.md", render_root_guidance("claude-code"))
-    render_claude_mcp_json(target_root / ".mcp.json")
-    render_claude_settings(target_root / ".claude" / "settings.json")
-    copy_skills(REPO_ROOT / "shared" / "skills", target_root / ".claude" / "skills", "claude-code")
-    copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", target_root / ".claude" / "hooks" / "scripts")
-
-    for agent, agent_dir in shared_agents():
-        target_name = mapped_agent_name(agent["id"], "claude-code")
+        target_name = canonical_agent_name(agent["id"])
         body = (agent_dir / "targets" / "claude-code.md").read_text(encoding="utf-8")
         body = transform_agent_text(body, "claude-code")
         tools = render_claude_tools(agent.get("capabilities", []))
@@ -604,56 +668,92 @@ def render_claude(target_root: Path) -> None:
         )
 
 
+def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
+    codex_name = mapped_agent_name(agent["id"], "openai-codex")
+    canonical_path = canonical_agent_path(agent["id"])
+    capabilities = agent.get("capabilities", [])
+    instructions = (
+        "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
+        f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
+        "Use the Codex TOML name, description, sandbox, and runtime behavior from this adapter "
+        "when they conflict with Claude-specific frontmatter in the canonical file.\n\n"
+        "Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when "
+        "the project is trusted. Shared memory, plans, explorations, session logs, quality reports, "
+        "templates, prompts, and hook scripts also live under `.claude/`.\n\n"
+        "If the canonical role mentions Claude-native review helpers, use the Codex-native helpers "
+        "`review-pass-codex-primary` and `review-pass-codex-adversarial` instead.\n\n"
+        f"Role type: {agent.get('role_type', 'unspecified')}\n"
+        f"Visibility: {agent.get('visibility', 'public')}\n"
+        f"Capability intents: {', '.join(capabilities) or 'target default'}"
+    )
+    agent_lines = [
+        f"name = {toml_string(codex_name)}",
+        f"description = {toml_string(transform_agent_text(agent['description'], 'openai-codex'))}",
+    ]
+    sandbox_mode = codex_sandbox_mode(capabilities)
+    if sandbox_mode:
+        agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
+    agent_lines.append(f"developer_instructions = {toml_multiline_literal(instructions)}")
+    return "\n".join(agent_lines) + "\n"
+
+
+def render_github(target_root: Path) -> None:
+    write_text(target_root / ".github" / "copilot-instructions.md", render_copilot_instructions())
+    instructions_root = target_root / ".github" / "instructions"
+    instructions_root.mkdir(parents=True, exist_ok=True)
+    for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
+        write_text(instructions_root / source.name, render_github_instruction_adapter(source))
+
+    copy_file(REPO_ROOT / "shared" / "hooks" / "hooks.json", target_root / ".github" / "hooks" / "hooks.json")
+    render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
+
+    for agent, agent_dir in shared_agents():
+        write_text(
+            target_root / ".github" / "agents" / f"{agent['id']}.agent.md",
+            render_github_agent_adapter(agent, agent_dir),
+        )
+
+
+def render_claude(target_root: Path) -> None:
+    write_text(target_root / "CLAUDE.md", render_root_guidance("claude-code"))
+    render_claude_mcp_json(target_root / ".mcp.json")
+    render_claude_settings(target_root / ".claude" / "settings.json")
+
+
 def render_codex(target_root: Path) -> None:
-    render_support_files(target_root, "openai-codex")
     write_text(target_root / "AGENTS.md", render_root_guidance("openai-codex"))
     render_codex_config(target_root / ".codex" / "config.toml")
     render_codex_hooks(target_root / ".codex" / "hooks.json")
-    copy_skills(REPO_ROOT / "shared" / "skills", target_root / ".agents" / "skills", "openai-codex")
-    copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", target_root / ".codex" / "hooks" / "scripts")
 
-    for agent, agent_dir in shared_agents():
+    for agent, _agent_dir in shared_agents():
         target_name = mapped_agent_name(agent["id"], "openai-codex")
-        body = (agent_dir / agent["targets"]["openai-codex"]).read_text(encoding="utf-8")
-        body = transform_agent_text(body, "openai-codex")
-        capabilities = agent.get("capabilities", [])
-        instructions = (
-            "This project custom agent was generated from shared agent metadata.\n\n"
-            f"Role type: {agent.get('role_type', 'unspecified')}\n"
-            f"Visibility: {agent.get('visibility', 'public')}\n"
-            f"Capability intents: {', '.join(capabilities) or 'target default'}\n\n"
-            f"{body.strip()}"
-        )
-        agent_lines = [
-            f"name = {toml_string(target_name)}",
-            f"description = {toml_string(transform_agent_text(agent['description'], 'openai-codex'))}",
-        ]
-        sandbox_mode = codex_sandbox_mode(capabilities)
-        if sandbox_mode:
-            agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
-        agent_lines.append(f"developer_instructions = {toml_multiline_literal(instructions)}")
         write_text(
             target_root / ".codex" / "agents" / f"{target_name}.toml",
-            "\n".join(agent_lines) + "\n",
+            render_codex_agent_adapter(agent),
         )
+
+
+def render_multi_agent(target_root: Path) -> None:
+    render_shared_basis(target_root, "multi-agent")
+    render_github(target_root)
+    render_claude(target_root)
+    render_codex(target_root)
 
 
 def generate(targets: list[str], output_root: Path) -> None:
+    if "multi-agent" in targets:
+        remove_obsolete_targets(output_root)
     for target in targets:
         target_root = reset_target(output_root, target)
-        if target == "github-copilot":
-            render_github(target_root)
-        elif target == "claude-code":
-            render_claude(target_root)
-        elif target == "openai-codex":
-            render_codex(target_root)
+        if target == "multi-agent":
+            render_multi_agent(target_root)
         else:
             raise ValueError(f"unknown target: {target}")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--all", action="store_true", help="Generate all targets.")
+    parser.add_argument("--all", action="store_true", help="Generate the installable target.")
     parser.add_argument("--target", action="append", choices=TARGETS, help="Target to generate.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Output root.")
     return parser.parse_args()

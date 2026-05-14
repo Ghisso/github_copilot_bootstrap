@@ -156,7 +156,7 @@ def protected_reason(filepath: Path) -> str | None:
         return "Workspace instructions are source-of-truth and must stay human-authored."
     if "/.github/instructions/" in normalized and normalized.endswith(".md"):
         return "Instruction files are source-of-truth and must keep exact structure."
-    if "/.github/skills/" in normalized and normalized.endswith("/SKILL.md"):
+    if "/.claude/skills/" in normalized and normalized.endswith("/SKILL.md"):
         return "Skill files must keep exact frontmatter and trigger phrases."
     if "/.github/agents/" in normalized and normalized.endswith(".agent.md"):
         return "Agent files must keep exact instructions and output contracts."

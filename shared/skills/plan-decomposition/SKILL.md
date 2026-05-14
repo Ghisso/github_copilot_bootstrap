@@ -69,11 +69,11 @@ Plans that ignore project conventions waste implementation time on rework.
 
 **Filename pattern:** `YYYY-MM-DD_<project>-phase<X>-<slug>-overview.md`
 **Location:** Depends on plan type:
-- `.github/plans/` — concrete implementation plans that a coding agent will execute immediately
-- `.github/explorations/YYYY-MM-DD_<project>/` — exploratory/PoC plans, feasibility analysis, research designs
+- `.claude/plans/` — concrete implementation plans that a coding agent will execute immediately
+- `.claude/explorations/YYYY-MM-DD_<project>/` — exploratory/PoC plans, feasibility analysis, research designs
 
-Use `.github/explorations/` when the plan is exploratory (proof-of-concept, feasibility study, research design).
-Use `.github/plans/` only when the plan is a direct coding spec ready for agent execution.
+Use `.claude/explorations/` when the plan is exploratory (proof-of-concept, feasibility study, research design).
+Use `.claude/plans/` only when the plan is a direct coding spec ready for agent execution.
 
 Structure:
 

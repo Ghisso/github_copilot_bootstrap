@@ -9,7 +9,7 @@ python3 scripts/validate_targets.py
 
 Expected:
 
-- Validator prints `PASS generated targets are structurally valid`.
+- Validator prints `PASS generated target is structurally valid`.
 - Re-running generation does not change generated output.
 
 ## Custom Agent Portability
@@ -17,12 +17,15 @@ Expected:
 Expected:
 
 - GitHub Copilot has 17 `.github/agents/*.agent.md` files.
-- Claude Code has 17 `.claude/agents/*.md` files.
+- The generated output has 17 canonical `.claude/agents/*.md` files.
 - OpenAI Codex has 17 `.codex/agents/*.toml` files.
-- OpenAI Codex has 52 repository skills under `.agents/skills/` and no `.codex/skills/` directory.
+- The generated output has 52 repository skills under `.claude/skills/`.
+- OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
+- `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
+- The generated output has no obsolete `.github/skills/`, `.agents/skills/`, `.codex/skills/`, or target-local state directories.
 - Claude and Codex outputs do not contain Copilot model pins.
 - Codex does not generate deprecated `.codex/rules/` output.
-- Generated targets contain `MEMORY.md`, workflow directories, templates, and `quality_score.py` in the target-native namespace.
+- Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
 
 ## MCP Routing
 
@@ -41,8 +44,9 @@ Expected:
 
 Expected:
 
-- Guardrail scripts exist for all targets.
+- Guardrail scripts exist under `.claude/hooks/scripts/`.
 - `protect-files.sh` denies protected files through structured write tools and Bash writes such as `touch .env`.
 - Hook config edits through Bash redirection are protected, with Codex denying and GitHub/Claude asking for approval.
+- Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
-- Existing GitHub Copilot hook config is preserved in generated output.
+- GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.

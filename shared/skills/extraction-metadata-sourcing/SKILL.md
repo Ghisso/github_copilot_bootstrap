@@ -302,6 +302,6 @@ for source, count in source_distribution.items():
 
 ## Related Patterns
 
-- `.github/skills/integration-gate-spike/SKILL.md` — How to validate external metadata API contracts
-- `.github/skills/csv-driven-integration-tests/SKILL.md` — Integration test datasets with field source tracking
-- `.github/skills/testing-patterns/SKILL.md` — Mocking external metadata providers in tests
+- `.claude/skills/integration-gate-spike/SKILL.md` — How to validate external metadata API contracts
+- `.claude/skills/csv-driven-integration-tests/SKILL.md` — Integration test datasets with field source tracking
+- `.claude/skills/testing-patterns/SKILL.md` — Mocking external metadata providers in tests

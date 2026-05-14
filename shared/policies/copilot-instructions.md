@@ -6,7 +6,7 @@
 
 ## Core Principles
 
-- **Plan first** — for non-trivial tasks, produce a plan and save it to `.github/plans/` before writing code
+- **Plan first** — for non-trivial tasks, produce a plan and save it to `.claude/plans/` before writing code
 - **Verify after** — run pytest, mypy, ruff at the end of every task
 - **Config-first design** — create dataclasses + ConfigStore before implementing features
 - **Quality gates** — nothing ships below 90/100 (see `.github/instructions/quality-and-testing.instructions.md`)
@@ -42,7 +42,7 @@ PLAN → IMPLEMENT → VERIFY → REVIEW → FIX → SCORE
   └─────── loop (max 5 rounds) ←─────────────┘
 ```
 
-1. **Plan** — For ambiguous/large tasks: save plan to `.github/plans/YYYY-MM-DD_description.md`
+1. **Plan** — For ambiguous/large tasks: save plan to `.claude/plans/YYYY-MM-DD_description.md`
 2. **Implement** — Config-first; test as you go
 3. **Verify** — `uv run pytest tests/ -q` + mypy + ruff (see verification commands below)
 4. **Review** — Run appropriate agents (see agents table)
@@ -69,9 +69,9 @@ uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 
 # Quality scoring (combines all three):
-uv run python .github/scripts/quality_score.py src/
-uv run python .github/scripts/quality_score.py src/ --json        # machine-readable
-uv run python .github/scripts/quality_score.py src/ --skip-tests  # ruff + mypy only
+uv run python .claude/scripts/quality_score.py src/
+uv run python .claude/scripts/quality_score.py src/ --json        # machine-readable
+uv run python .claude/scripts/quality_score.py src/ --skip-tests  # ruff + mypy only
 ```
 
 ---
@@ -108,7 +108,7 @@ Reviewer behavior:
 
 ---
 
-## Skills (`.github/skills/` — load SKILL.md before proceeding)
+## Skills (`.claude/skills/` — load SKILL.md before proceeding)
 
 Important for orchestration agents:
 
@@ -200,4 +200,4 @@ Important for orchestration agents:
 
 ### Active Work
 <!-- Update when starting a new task -->
-_No active plan. Check `.github/plans/` for recent plans._
+_No active plan. Check `.claude/plans/` for recent plans._

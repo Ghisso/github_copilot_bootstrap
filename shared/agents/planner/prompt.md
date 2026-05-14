@@ -22,7 +22,7 @@ For single-phase, obviously scoped tasks (e.g., rename a field, add a config key
 
 1. Load mandatory planning skills (see above).
 2. Draft the plan directly — one phase, ordered steps, owner + files + verification per step.
-3. If the change touches any architecture decision: run one devil's advocate round via `.github/skills/devils-advocate/SKILL.md`.
+3. If the change touches any architecture decision: run one devil's advocate round via `.claude/skills/devils-advocate/SKILL.md`.
 4. Output the plan. No interview loop.
 
 ### Full-Plan Mode (`--mode full-plan`)
@@ -54,7 +54,7 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 
 **Phase 5 — Devil's Advocate (conditional)**
 - Run if: 3+ phases, new module, or architecture decision.
-- Read `.github/skills/devils-advocate/SKILL.md`.
+- Read `.claude/skills/devils-advocate/SKILL.md`.
 - Apply the structured critique to your own plan.
 - Present findings and ask specific questions about HIGH-risk items.
 - Iterate at least once based on user responses.

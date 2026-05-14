@@ -1,7 +1,0 @@
-{
-  "target": "claude-code",
-  "description": "Claude Code official VS Code extension target generated from shared bootstrap sources.",
-  "agent_model_policy": "target-native-claude-subagents",
-  "agent_output": ".claude/agents/*.md",
-  "skills_output": ".claude/skills/**/SKILL.md"
-}

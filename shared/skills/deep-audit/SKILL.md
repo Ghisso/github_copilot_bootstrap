@@ -18,7 +18,7 @@ description: |
 
 ### Audit 2: Instruction/Agent Quality
 - All agents referenced in `copilot-instructions.md` exist in `.github/agents/`
-- All skills referenced in `copilot-instructions.md` exist in `.github/skills/`
+- All skills referenced in `copilot-instructions.md` exist in `.claude/skills/`
 - Cross-references are accurate
 - Naming conventions are consistent
 

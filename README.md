@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated-target bootstrap. The editable sources live in `shared/` and the generated installable targets live in `dist/`.
+It is a source-of-truth plus generated bootstrap. The editable sources live in `shared/` and the generated installable output lives in `dist/multi-agent/`.
 
 Main goals:
 
@@ -39,7 +39,7 @@ Core principles:
 
 ## Quick Copy
 
-Regenerate first, then copy the target you actually use.
+Regenerate first, then copy the single generated bootstrap.
 
 ```bash
 set -euo pipefail
@@ -47,21 +47,16 @@ set -euo pipefail
 # 1) Set paths
 BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
 TARGET_REPO="/absolute/path/to/your-project"
-BOOTSTRAP_TARGET="github-copilot"   # github-copilot | claude-code | openai-codex
 
-# 2) Regenerate installable outputs
+# 2) Regenerate installable output
 cd "$BOOTSTRAP_REPO"
 python3 scripts/generate_targets.py --all
 
-# 3) Copy one generated target into the project root
-rsync -av "$BOOTSTRAP_REPO/dist/$BOOTSTRAP_TARGET/" "$TARGET_REPO/"
+# 3) Copy the generated bootstrap into the project root
+rsync -av "$BOOTSTRAP_REPO/dist/multi-agent/" "$TARGET_REPO/"
 
-# 4) Ensure hook scripts are executable
-case "$BOOTSTRAP_TARGET" in
-  github-copilot) chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh ;;
-  claude-code) chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh ;;
-  openai-codex) chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh ;;
-esac
+# 4) Ensure shared hook scripts are executable
+chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh
 
 # 5) Optional: commit in target repo
 cd "$TARGET_REPO"
@@ -75,60 +70,25 @@ If you are already inside this bootstrap repo and only need to set the target pa
 set -euo pipefail
 
 TARGET_REPO="/absolute/path/to/your-project"
-BOOTSTRAP_TARGET="github-copilot"   # github-copilot | claude-code | openai-codex
 python3 scripts/generate_targets.py --all
-rsync -av "dist/$BOOTSTRAP_TARGET/" "$TARGET_REPO/"
-case "$BOOTSTRAP_TARGET" in
-  github-copilot) chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh ;;
-  claude-code) chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh ;;
-  openai-codex) chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh ;;
-esac
-```
-
-Target layouts:
-
-- `github-copilot`: `.github/`, `.vscode/mcp.json`
-- `claude-code`: `CLAUDE.md`, `.claude/`, `.mcp.json`
-- `openai-codex`: `AGENTS.md`, `.codex/`, `.agents/skills/`
-
-## Copy All Targets
-
-If you use GitHub Copilot, Claude Code, and OpenAI Codex interchangeably, copy all generated targets into the same project. Each tool will read its native entrypoint while sharing the same generated workflow philosophy from `shared/`.
-
-```bash
-set -euo pipefail
-
-# 1) Set paths
-BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
-TARGET_REPO="/absolute/path/to/your-project"
-
-# 2) Regenerate installable outputs
-cd "$BOOTSTRAP_REPO"
-python3 scripts/generate_targets.py --all
-
-# 3) Copy every generated target into the project root
-rsync -av "$BOOTSTRAP_REPO/dist/github-copilot/" "$TARGET_REPO/"
-rsync -av "$BOOTSTRAP_REPO/dist/claude-code/" "$TARGET_REPO/"
-rsync -av "$BOOTSTRAP_REPO/dist/openai-codex/" "$TARGET_REPO/"
-
-# 4) Ensure hook scripts are executable
-chmod +x "$TARGET_REPO/.github/hooks/scripts/"*.sh
+rsync -av "dist/multi-agent/" "$TARGET_REPO/"
 chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh
-chmod +x "$TARGET_REPO/.codex/hooks/scripts/"*.sh
-
-# 5) Optional: commit in target repo
-cd "$TARGET_REPO"
-git add -A
-git commit -m "chore: add multi-agent bootstrap"
 ```
 
-This creates parallel native entrypoints:
+Generated layout:
 
-- GitHub Copilot reads `.github/copilot-instructions.md`
-- Claude Code reads `CLAUDE.md`
-- OpenAI Codex reads `AGENTS.md`
+- `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings
+- `.github/`, `.vscode/mcp.json`: GitHub Copilot native adapters/config
+- `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
+- `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
 
-When switching systems mid-task, point the next tool at the current `git diff` plus the latest relevant plan or session log from the previous tool namespace.
+If you do not use one of the tools, delete only that tool's native adapter/config files after copying. Keep `.claude/` unless you are intentionally removing the shared basis.
+
+Optional pruning after copy:
+
+- No Copilot: delete `.github/` and `.vscode/mcp.json`.
+- No Claude Code: delete `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json`.
+- No Codex: delete `AGENTS.md` and `.codex/`.
 
 ## Architecture Flow
 
@@ -163,37 +123,37 @@ Interpretation:
 
 ## What Is Included
 
-- Generated targets: installable outputs in [dist/](dist/)
+- Generated bootstrap: installable output in [dist/multi-agent/](dist/multi-agent/)
 - Source policies: reusable instruction files in [shared/policies/](shared/policies/)
 - Agents: canonical metadata and target forks in [shared/agents/](shared/agents/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
-- Templates and scripts: planning, session logs, quality scoring
+- Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
 
-These are the files that matter most in day-to-day use:
+These are the source files that render into `.claude/instructions/` in every generated target:
 
-- [workflow.instructions.md](.github/instructions/workflow.instructions.md)
+- [workflow.instructions.md](shared/policies/workflow.instructions.md)
   - Plan-first protocol
   - Orchestrator loop and review order
   - Session logging and context management
-- [quality-and-testing.instructions.md](.github/instructions/quality-and-testing.instructions.md)
+- [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
   - Quality scoring rubric and gates
-- [code-standards.instructions.md](.github/instructions/code-standards.instructions.md)
+- [code-standards.instructions.md](shared/policies/code-standards.instructions.md)
   - Naming, architecture patterns, deprecation protocol
-- [tests.instructions.md](.github/instructions/tests.instructions.md)
+- [tests.instructions.md](shared/policies/tests.instructions.md)
   - Fixture design, mocking boundaries, async testing patterns
-- [config-first-design.instructions.md](.github/instructions/config-first-design.instructions.md)
+- [config-first-design.instructions.md](shared/policies/config-first-design.instructions.md)
   - Pure ConfigStore approach (no YAML)
   - Dataclass validation and registration patterns
-- [api-service-standards.instructions.md](.github/instructions/api-service-standards.instructions.md)
+- [api-service-standards.instructions.md](shared/policies/api-service-standards.instructions.md)
   - BentoML service design, async endpoints, Pydantic validation
-- [deployment.instructions.md](.github/instructions/deployment.instructions.md)
+- [deployment.instructions.md](shared/policies/deployment.instructions.md)
   - Pre-deploy checks, Bento build/container workflow, health checks
-- [tool-routing.instructions.md](.github/instructions/tool-routing.instructions.md)
+- [tool-routing.instructions.md](shared/policies/tool-routing.instructions.md)
   - Routing between direct reads, `rg`, Semble, and context-mode
 
 ## Most Important Skills
@@ -204,54 +164,54 @@ There are many skills; these are the high-leverage ones I rely on most:
 
 Core workflow:
 
-- [plan-decomposition](.github/skills/plan-decomposition/SKILL.md)
-- [iterative-plan-review](.github/skills/iterative-plan-review/SKILL.md)
-- [create-feature](.github/skills/create-feature/SKILL.md)
-- [run-tests](.github/skills/run-tests/SKILL.md)
-- [refactor](.github/skills/refactor/SKILL.md)
-- [code-review](.github/skills/code-review/SKILL.md)
+- [plan-decomposition](shared/skills/plan-decomposition/SKILL.md)
+- [iterative-plan-review](shared/skills/iterative-plan-review/SKILL.md)
+- [create-feature](shared/skills/create-feature/SKILL.md)
+- [run-tests](shared/skills/run-tests/SKILL.md)
+- [refactor](shared/skills/refactor/SKILL.md)
+- [code-review](shared/skills/code-review/SKILL.md)
 
 Quality and architecture:
 
-- [code-style](.github/skills/code-style/SKILL.md)
-- [testing-patterns](.github/skills/testing-patterns/SKILL.md)
-- [review-api](.github/skills/review-api/SKILL.md)
-- [text-to-sql-safety](.github/skills/text-to-sql-safety/SKILL.md)
-- [debug-investigator](.github/skills/debug-investigator/SKILL.md)
+- [code-style](shared/skills/code-style/SKILL.md)
+- [testing-patterns](shared/skills/testing-patterns/SKILL.md)
+- [review-api](shared/skills/review-api/SKILL.md)
+- [text-to-sql-safety](shared/skills/text-to-sql-safety/SKILL.md)
+- [debug-investigator](shared/skills/debug-investigator/SKILL.md)
 
 Communication and context control:
 
-- [caveman](.github/skills/caveman/SKILL.md)
-- [caveman-compress](.github/skills/caveman-compress/SKILL.md)
+- [caveman](shared/skills/caveman/SKILL.md)
+- [caveman-compress](shared/skills/caveman-compress/SKILL.md)
 
 Project acceleration:
 
-- [setup-project](.github/skills/setup-project/SKILL.md)
-- [add-dependency](.github/skills/add-dependency/SKILL.md)
-- [deploy-service](.github/skills/deploy-service/SKILL.md)
-- [hydra-config](.github/skills/hydra-config/SKILL.md)
-- [bentoml-service](.github/skills/bentoml-service/SKILL.md)
+- [setup-project](shared/skills/setup-project/SKILL.md)
+- [add-dependency](shared/skills/add-dependency/SKILL.md)
+- [deploy-service](shared/skills/deploy-service/SKILL.md)
+- [hydra-config](shared/skills/hydra-config/SKILL.md)
+- [bentoml-service](shared/skills/bentoml-service/SKILL.md)
 
 These skills encode battle-tested workflows and reduce ad-hoc execution.
 
 ## Agent System
 
-The agent layer gives me orchestration plus specialist reviews.
+The agent layer gives me orchestration plus specialist reviews. Full shared agent bodies render into `.claude/agents/`; Copilot and Codex keep thin native wrappers in `.github/agents/` and `.codex/agents/`.
 
 Primary flow for complex work:
 
-- [orchestrator](.github/agents/orchestrator.agent.md) -> [planner](.github/agents/planner.agent.md) -> [coder](.github/agents/coder.agent.md)/[designer](.github/agents/designer.agent.md) -> reviewers -> [verifier](.github/agents/verifier.agent.md)
+- orchestrator -> planner -> coder/designer -> reviewers -> verifier
 
 Key reviewer agents:
 
-- [code-reviewer](.github/agents/code-reviewer.agent.md)
-- [security-reviewer](.github/agents/security-reviewer.agent.md)
-- [architecture-reviewer](.github/agents/architecture-reviewer.agent.md)
-- [test-reviewer](.github/agents/test-reviewer.agent.md)
-- [api-reviewer](.github/agents/api-reviewer.agent.md)
-- [config-reviewer](.github/agents/config-reviewer.agent.md)
-- [performance-reviewer](.github/agents/performance-reviewer.agent.md)
-- [documentation-reviewer](.github/agents/documentation-reviewer.agent.md)
+- code-reviewer
+- security-reviewer
+- architecture-reviewer
+- test-reviewer
+- api-reviewer
+- config-reviewer
+- performance-reviewer
+- documentation-reviewer
 
 Reviewer agents run adversarial dual-pass review through two model-specific sub-agents (`review-pass-codex` and `review-pass-sonnet`) and synthesize findings into one report. When only one sub-agent is available, reviewers fall back to single-pass mode and label findings as `[single-pass, unconfirmed]`.
 
@@ -261,7 +221,7 @@ Orchestrator routing:
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`.github/agents/`, `.github/instructions/`, `.github/hooks/`, `copilot-instructions.md`) always use full-plan and always trigger dual adversarial review.
+- Control-plane files (`.claude/`, `.github/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) always use full-plan and always trigger dual adversarial review.
 
 Coder skill loading:
 
@@ -276,16 +236,16 @@ Hooks provide guardrails and lightweight observability.
 Configured events:
 
 - PreToolUse
-  - [protect-files.sh](.github/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
-  - [git-protection.sh](.github/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
-  - [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
+  - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
+  - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
+  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
 - PostToolUse / PreCompact
-  - [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
+  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
-  - [session-log.sh](.github/hooks/scripts/session-log.sh) appends lifecycle entries to `.github/session_logs/hooks-sessions.log`
-  - SessionStart also calls [context-mode-dispatch.sh](.github/hooks/scripts/context-mode-dispatch.sh) when available
+  - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`
+  - SessionStart also calls [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) when available
 
-Core hook config: [hooks.json](.github/hooks/hooks.json)
+Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
 Design intent:
 
@@ -301,7 +261,7 @@ Expected verification commands after implementation:
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
-- uv run python .github/scripts/quality_score.py src/ --json  (when available)
+- uv run python .claude/scripts/quality_score.py src/ --json  (when available)
 
 Quality gates:
 
@@ -315,7 +275,7 @@ VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.
 - `semble` uses `uvx --from "semble[mcp]" semble`.
 - `context-mode` uses the portable bare `context-mode` command.
 
-For machines without a global `context-mode` binary, install it globally or adapt local setup to use `npx -y context-mode`. Hook events already go through `.github/hooks/scripts/context-mode-dispatch.sh`, which calls `context-mode hook vscode-copilot ...`, falls back to `npx -y context-mode hook vscode-copilot ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
+For machines without a global `context-mode` binary, install it globally or adapt local setup to use `npx -y context-mode`. Hook events already go through `.claude/hooks/scripts/context-mode-dispatch.sh`, which maps the calling target id to the context-mode target name, falls back to `npx -y context-mode hook ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
 
 Install `context-mode` with npm when Node.js is already available:
 
@@ -348,15 +308,15 @@ export PATH="$HOME/.local/bin:$PATH"
 Run the bootstrap runtime check after copying optional surfaces:
 
 ```bash
-python .github/scripts/check_agent_runtime.py
+python3 scripts/check_runtime.py
 ```
 
 ## How To Use This Bootstrap In Another Project
 
-1. Regenerate targets with `python3 scripts/generate_targets.py --all`.
-2. Copy exactly one `dist/<target>/` directory into your target project.
+1. Regenerate the installable output with `python3 scripts/generate_targets.py --all`.
+2. Copy `dist/multi-agent/` into your target project.
 3. Review and adjust the generated root guidance for project-specific stack details.
-4. Keep hooks enabled and ensure scripts are executable in your environment.
+4. Keep hooks enabled and ensure `.claude/hooks/scripts/*.sh` is executable in your environment.
 5. Update instruction apply scopes to match your project paths.
 6. Add or remove skills and agents in `shared/`, then regenerate instead of hand-editing `dist/`.
 

@@ -66,9 +66,9 @@ Select reviewers based on the surface area changed. Run in parallel when file ow
 
 Before returning the final status report, you MUST complete these steps:
 
-1. **Run learn skill:** Read `.github/skills/learn/SKILL.md` and extract any non-obvious discoveries from the session into reusable skills or `[LEARN]` entries.
-2. **Update memories:** Save any `[LEARN]` entries to `.github/MEMORY.md`.
-3. **Update session log:** Create or update the session log in `.github/session_logs/YYYY-MM-DD_description.md` with:
+1. **Run learn skill:** Read `.claude/skills/learn/SKILL.md` and extract any non-obvious discoveries from the session into reusable skills or `[LEARN]` entries.
+2. **Update memories:** Save any `[LEARN]` entries to `.claude/MEMORY.md`.
+3. **Update session log:** Create or update the session log in `.claude/session_logs/YYYY-MM-DD_description.md` with:
    - Summary of what was done
    - Design decisions and rationale
    - Verification results and scores

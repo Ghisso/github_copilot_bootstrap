@@ -221,7 +221,7 @@ def enrich_with_metadata(extraction: ResolutionExtraction,
 
 After implementation completes, verify:
 
-1. ✅ Integration gate step (N.0) executed and documented in `.github/quality_reports/` or `docs/INTEGRATION_GATE_RESULTS.md`
+1. ✅ Integration gate step (N.0) executed and documented in `.claude/quality_reports/` or `docs/INTEGRATION_GATE_RESULTS.md`
 2. ✅ Gate pass/fail criteria met before adapter coding started
 3. ✅ Adapter isolated behind abstraction (protocol/interface, not direct import)
 4. ✅ Fallback chain matches source priority from gate documentation
@@ -251,6 +251,6 @@ After implementation completes, verify:
 
 ## Related Patterns
 
-- `.github/skills/plan-decomposition/SKILL.md` — Structuring multi-phase plans where gates are needed
-- `.github/skills/iterative-plan-review/SKILL.md` — Design review gates that catch contract uncertainty early
-- `.github/skills/text-to-sql-safety/SKILL.md` — Similar gated defense-in-depth for unknown SQL query shapes
+- `.claude/skills/plan-decomposition/SKILL.md` — Structuring multi-phase plans where gates are needed
+- `.claude/skills/iterative-plan-review/SKILL.md` — Design review gates that catch contract uncertainty early
+- `.claude/skills/text-to-sql-safety/SKILL.md` — Similar gated defense-in-depth for unknown SQL query shapes
