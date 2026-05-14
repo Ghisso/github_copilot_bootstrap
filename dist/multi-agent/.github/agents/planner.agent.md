@@ -1,16 +1,16 @@
 ---
 name: planner
-description: "Planning specialist for implementation work. Produces phased plans with file ownership, risk analysis, verification commands, and required skills per step. Use before coding on non-trivial tasks."
+description: "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles."
 model: Claude Opus 4.6
 tools:
-	- agent
-	- execute
-	- read
-	- search
-	- todo
-	- todos
-	- vscode
-	- web
+  - agent
+  - execute
+  - read
+  - search
+  - todo
+  - todos
+  - vscode
+  - web
 ---
 
 # planner Copilot Adapter

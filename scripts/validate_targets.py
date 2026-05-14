@@ -20,7 +20,6 @@ DIST_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
 OBSOLETE_TARGET_ROOTS = ("github-copilot", "claude-code", "openai-codex")
 TARGET_ROOT = DIST_ROOT / "multi-agent"
-SOURCE_AGENT_TARGETS = ("github-copilot", "claude-code", "openai-codex")
 COPILOT_MODEL_PINS = (
     "GPT-5.4",
     "Claude Opus 4.6",
@@ -37,10 +36,6 @@ REQUIRED_HOOK_SCRIPTS = (
     "git-protection.sh",
     "context-mode-dispatch.sh",
     "session-log.sh",
-)
-CODEX_BAD_REVIEW_HELPERS = (
-    "review-pass-codex-primary-primary",
-    "review-pass-codex-primary-adversarial",
 )
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
@@ -91,12 +86,17 @@ OBSOLETE_GENERATED_DIRS = (
     ".codex/plans",
     ".codex/hooks/scripts",
 )
-CODEX_REVIEW_NAME_MAP = {
-    "review-pass-codex": "review-pass-codex-primary",
-    "review-pass-sonnet": "review-pass-codex-adversarial",
-}
-
-
+OBSOLETE_ROOT_SOURCE_DIRS = (
+    ".github/agents",
+    ".github/instructions",
+    ".github/skills",
+    ".github/scripts",
+    ".github/templates",
+    ".github/plans",
+    ".github/session_logs",
+    ".github/quality_reports",
+    ".github/hooks/scripts",
+)
 def text_files(root: Path) -> list[Path]:
     return [
         path
@@ -141,30 +141,21 @@ def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
 
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
-    legacy_agents = sorted((REPO_ROOT / ".github" / "agents").glob("*.agent.md"))
-    check(len(shared_agents) == len(legacy_agents) == 17, "expected 17 shared and legacy agents", errors)
+    expected_count = len(shared_agents)
+    check(expected_count == 8, f"expected 8 shared agents, found {expected_count}", errors)
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
-        for target in SOURCE_AGENT_TARGETS:
-            check(
-                target in data.get("targets", {}),
-                f"{agent_id} missing target metadata for {target}",
-                errors,
-            )
-            target_file = metadata_path.parent / data["targets"].get(target, "")
-            check(target_file.exists(), f"{agent_id} missing target override: {target}", errors)
-            if target == "openai-codex":
-                check(
-                    target_file.suffix == ".md",
-                    f"{agent_id} Codex target override should be an agent instruction body, not rules: {target_file}",
-                    errors,
-                )
+        check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
+        check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
 
-    for legacy_path in legacy_agents:
-        generated = TARGET_ROOT / ".github" / "agents" / legacy_path.name
-        check(generated.exists(), f"missing generated GitHub agent: {legacy_path.name}", errors)
+    generated_github_agents = sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md"))
+    check(len(generated_github_agents) == expected_count, "GitHub agent count must match shared agents", errors)
+    for metadata_path in shared_agents:
+        agent_id = json.loads(read(metadata_path))["id"]
+        generated = TARGET_ROOT / ".github" / "agents" / f"{agent_id}.agent.md"
+        check(generated.exists(), f"missing generated GitHub agent: {agent_id}", errors)
         if generated.exists():
             text = read(generated)
             check(
@@ -185,24 +176,21 @@ def validate_agents(errors: list[str]) -> None:
             )
 
     claude_agents = sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md"))
-    check(len(claude_agents) == 17, "expected 17 canonical .claude agent files", errors)
+    check(len(claude_agents) == expected_count, "canonical .claude agent count must match shared agents", errors)
     for path in claude_agents:
         text = read(path)
         check(text.startswith("---\n"), f"Claude agent missing frontmatter: {path}", errors)
         check("\nname: " in text and "\ndescription: " in text, f"Claude agent missing required fields: {path}", errors)
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
-    check(len(codex_agents) == 17, "expected 17 Codex custom agent TOML files", errors)
+    check(len(codex_agents) == expected_count, "Codex custom agent count must match shared agents", errors)
     check(
         not (TARGET_ROOT / ".codex" / "rules").exists(),
         "Codex target must not generate deprecated .codex/rules output",
         errors,
     )
 
-    expected_codex_names = {
-        CODEX_REVIEW_NAME_MAP.get(json.loads(read(path))["id"], json.loads(read(path))["id"])
-        for path in shared_agents
-    }
+    expected_codex_names = {json.loads(read(path))["id"] for path in shared_agents}
     check(
         {path.stem for path in codex_agents} == expected_codex_names,
         "Codex custom agent filenames must match mapped shared agent names",
@@ -236,9 +224,6 @@ def validate_agents(errors: list[str]) -> None:
                 f"Codex agent adapter points at missing canonical agent: {path}: {reference}",
                 errors,
             )
-        for helper_name in CODEX_BAD_REVIEW_HELPERS:
-            check(helper_name not in text, f"invalid Codex review helper name in {path}: {helper_name}", errors)
-
     for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
         for path in text_files(root):
             text = read(path)
@@ -513,10 +498,17 @@ def validate_generated_scripts(errors: list[str]) -> None:
 
 def validate_skills_and_paths(errors: list[str]) -> None:
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
-    check(shared_skill_count == 52, f"expected 52 shared skills, found {shared_skill_count}", errors)
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)
     check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
+    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
+        text = read(skill_path)
+        frontmatter = text.split("---\n", 2)[1] if text.startswith("---\n") and len(text.split("---\n", 2)) == 3 else ""
+        check(
+            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
+            f"skill missing visibility metadata: {skill_path}",
+            errors,
+        )
 
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
     generated_prompts = sorted((TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md"))
@@ -528,6 +520,14 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     for source in shared_prompts:
         generated = TARGET_ROOT / ".claude" / "prompts" / source.name
         check(generated.exists() and read(generated) == read(source), f"generated prompt differs from source: {source.name}", errors)
+
+    shared_profiles = sorted((REPO_ROOT / "shared" / "review-profiles").glob("*.md"))
+    generated_profiles = sorted((TARGET_ROOT / ".claude" / "review-profiles").glob("*.md"))
+    check(
+        [path.name for path in generated_profiles] == [path.name for path in shared_profiles],
+        ".claude review profile output must mirror shared/review-profiles",
+        errors,
+    )
 
     codex_config = read_toml(TARGET_ROOT / ".codex" / "config.toml")
     skill_entries = codex_config.get("skills", {})
@@ -558,6 +558,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         check(
             not (DIST_ROOT / obsolete_target).exists(),
             f"obsolete generated target directory must not exist: dist/{obsolete_target}",
+            errors,
+        )
+    for relative_path in OBSOLETE_ROOT_SOURCE_DIRS:
+        check(
+            not (REPO_ROOT / relative_path).exists(),
+            f"root .github must not keep legacy source mirror: {relative_path}",
             errors,
         )
     for path in text_files(TARGET_ROOT):
@@ -597,6 +603,8 @@ def validate_support_files(errors: list[str]) -> None:
         "instructions/tool-routing.instructions.md",
         "instructions/workspace.md",
         "prompts/README.prompt.md",
+        "review-profiles/code.md",
+        "review-profiles/security.md",
         "hooks/scripts/protect-files.sh",
         "hooks/scripts/git-protection.sh",
         "hooks/scripts/context-mode-dispatch.sh",

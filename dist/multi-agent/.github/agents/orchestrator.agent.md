@@ -1,14 +1,19 @@
 ---
 name: orchestrator
-description: "Workflow orchestrator for complex implementation tasks. Delegates planning, coding, design, and review work to specialist agents, prefers parallel execution when file ownership does not overlap, and enforces quality gates before completion. Use for multi-step features, refactors, and cross-file changes."
+description: "Workflow orchestrator for complex implementation tasks. Delegates planning, coding, design, review, and verification while enforcing quality gates before completion."
 model: Claude Opus 4.6
 tools:
   - agent
   - read
   - search
   - todo
+  - todos
 agents:
-  - "*"
+  - planner
+  - coder
+  - designer
+  - reviewer
+  - verifier
 ---
 
 # orchestrator Copilot Adapter

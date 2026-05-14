@@ -1,6 +1,6 @@
 {
   "id": "verifier",
-  "description": "End-to-end verification agent for Python AI projects. Validates that code compiles, tests pass, types check, linting is clean, configs load, and services start. Use as the final gate before any commit or PR.",
+  "description": "End-to-end verification agent for Python AI projects. Validates tests, typing, linting, formatting, imports, deprecations, runtime wiring, and quality gates.",
   "role_type": "verifier",
   "visibility": "public",
   "capabilities": [
@@ -13,10 +13,6 @@
     "github-copilot": "target-default",
     "claude-code": "target-native",
     "openai-codex": "target-native"
-  },
-  "targets": {
-    "github-copilot": "targets/github-copilot.md",
-    "claude-code": "targets/claude-code.md",
-    "openai-codex": "targets/openai-codex.md"
   }
 }
+

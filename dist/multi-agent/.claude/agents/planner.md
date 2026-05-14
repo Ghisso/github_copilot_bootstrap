@@ -1,12 +1,8 @@
 ---
 name: planner
-description: "Planning specialist for implementation work. Produces phased plans with file ownership, risk analysis, verification commands, and required skills per step. Use before coding on non-trivial tasks."
+description: "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles."
 tools: Task, Bash, Read, Grep, Glob, TodoWrite, WebFetch, WebSearch
 ---
-
-## Target Binding
-
-This is the Claude Code fork of the shared agent. Copilot-only model pins are intentionally omitted. Use Claude Code project subagent behavior and the tools granted in this file frontmatter. When this agent refers to review helpers, use Claude-native primary/adversarial review helpers rather than GPT/Copilot helpers.
 
 # Planner Agent
 
@@ -74,6 +70,7 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Output clear phases and ordered steps.
 - For each step, include owner (`coder`, `designer`, or reviewer), target files, and verification commands.
 - For each step, include `Required Skills` listing exact SKILL.md files implementers must read.
+- For each review step, include `Review Profiles` listing exact profiles from `shared/review-profiles/`.
 - Call out assumptions, risks, and dependency ordering.
 - Align with workspace standards: config-first design, test-first verification, quality gates.
 
@@ -83,7 +80,7 @@ Use this structure:
 
 1. Goal and constraints
 2. Phase breakdown
-3. Step table: owner, files, required skills, verification
+3. Step table: owner, files, required skills, review profiles, verification
 4. Risk and fallback paths
 5. Done criteria
 6. Devil's Advocate Report (when applicable) with questions for user

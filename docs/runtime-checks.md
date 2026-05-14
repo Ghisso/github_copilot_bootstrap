@@ -33,6 +33,7 @@ Codex-specific runtime notes:
 - `.codex/config.toml` includes one `[[skills.config]]` entry for each `.claude/skills/<name>` directory.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, and `developer_instructions`.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
+- `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
 - Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.

@@ -1,5 +1,6 @@
 ---
 name: deploy-service
+visibility: public
 description: |
   BentoML/Docker deployment workflow. Pre-checks, local serve, build bento,
   containerize, and health check. Use when deploying an ML service, asked to

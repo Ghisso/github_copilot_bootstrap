@@ -1,5 +1,6 @@
 ---
 name: context-status
+visibility: public
 description: |
   Show session health: active plan status, session log recency, MEMORY.md size,
   and git status. Use when asked for session status, context health, or "what's

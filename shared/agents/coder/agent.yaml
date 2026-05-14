@@ -1,10 +1,9 @@
 {
   "id": "coder",
-  "description": "Implementation specialist for Python AI engineering tasks. Applies workspace coding standards, executes minimal focused edits, and verifies with tests, types, and linting. Invoked by orchestrator for coding steps.",
+  "description": "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting.",
   "role_type": "coder",
   "visibility": "hidden",
   "capabilities": [
-    "delegate",
     "edit",
     "execute",
     "read",
@@ -13,17 +12,11 @@
     "vscode",
     "web"
   ],
-  "delegates": [
-    "code-simplifier"
-  ],
+  "delegates": [],
   "model_intent": {
     "github-copilot": "GPT-5.4",
     "claude-code": "target-native",
     "openai-codex": "target-native"
-  },
-  "targets": {
-    "github-copilot": "targets/github-copilot.md",
-    "claude-code": "targets/claude-code.md",
-    "openai-codex": "targets/openai-codex.md"
   }
 }
+

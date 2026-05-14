@@ -1,5 +1,6 @@
 ---
 name: domain-type-placement
+visibility: background
 description: |
   Where to place shared Python types (dataclasses, TypedDicts, protocols) in a
   layered codebase. Use when:

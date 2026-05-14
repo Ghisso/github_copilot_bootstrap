@@ -1,5 +1,6 @@
 ---
 name: literature-review
+visibility: public
 description: |
   Systematic literature review workflow for surveying, synthesizing, and
   analyzing academic research. Covers the full lifecycle: scope definition,

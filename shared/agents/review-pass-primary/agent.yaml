@@ -1,0 +1,17 @@
+{
+  "id": "review-pass-primary",
+  "description": "Hidden helper agent that runs the primary independent review pass and returns normalized findings for reviewer synthesis.",
+  "role_type": "review-helper",
+  "visibility": "hidden",
+  "capabilities": [
+    "read",
+    "search"
+  ],
+  "delegates": [],
+  "model_intent": {
+    "github-copilot": "GPT-5.4",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  }
+}
+

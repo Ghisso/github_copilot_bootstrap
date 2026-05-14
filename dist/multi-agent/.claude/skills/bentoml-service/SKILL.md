@@ -1,5 +1,6 @@
 ---
 name: bentoml-service
+visibility: public
 description: Create production-ready ML API services with BentoML. Use when deploying ML models, RAG systems, embedding services, or classification APIs. Covers service definition, lifecycle management, endpoint creation, Pydantic validation, and deployment configuration.
 ---
 

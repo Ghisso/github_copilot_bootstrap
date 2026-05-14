@@ -1,5 +1,6 @@
 ---
 name: setup-project
+visibility: public
 description: |
   Initialize a new Python AI project from this scaffold. Creates directory
   structure, copies config files, initializes git and uv.
@@ -19,14 +20,14 @@ touch tests/__init__.py tests/conftest.py
 ```
 
 ## Step 2: Copy Scaffold Files
-- Copy `.github/` directory (instructions, agents, skills, plans, session_logs, MEMORY.md)
+- Regenerate this bootstrap with `python3 scripts/generate_targets.py --all`
+- Copy `dist/multi-agent/` into the new project root
 - Copy `pyproject.toml`, `.gitignore`, `.env.example`
-- Copy `copilot-instructions.md` to new project's `.github/`
 
 ## Step 3: Configure Project
 ```bash
 # Update pyproject.toml with project name
-# Update copilot-instructions.md Project State section
+# Update .claude/instructions/workspace.md Project State section
 # Add required env vars to .env.example
 cp .env.example .env
 ```
@@ -62,6 +63,6 @@ uv run ruff check src/ tests/
 
 ## Step 7: Initial Commit
 ```bash
-git add .github/ pyproject.toml .gitignore .env.example
+git add .claude/ .github/ .codex/ AGENTS.md CLAUDE.md pyproject.toml .gitignore .env.example
 git commit -m "feat: initialize project with AI scaffold"
 ```

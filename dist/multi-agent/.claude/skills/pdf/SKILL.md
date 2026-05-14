@@ -1,5 +1,6 @@
 ---
 name: pdf
+visibility: public
 description: |
   Use when working with PDF files in any way: reading/extracting text or tables,
   merging, splitting, rotating, adding watermarks, creating new PDFs, filling

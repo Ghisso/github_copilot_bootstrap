@@ -1,5 +1,6 @@
 ---
 name: html-presentation
+visibility: public
 description: |
   Convert documents, outlines, or freeform content into polished, self-contained
   HTML slide presentations. Supports two navigation modes: horizontal (Reveal.js)

@@ -1,12 +1,13 @@
 ---
 name: designer
-description: "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces clear, usable, and maintainable UI updates aligned with project conventions. Invoked by orchestrator for UI-focused tasks."
+description: "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces usable UI updates aligned with project conventions."
 model: Claude Sonnet 4.6
 tools:
-	- edit
-	- execute
-	- read
-	- search
+  - edit
+  - execute
+  - read
+  - search
+  - vscode
 user-invocable: false
 ---
 

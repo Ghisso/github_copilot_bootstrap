@@ -1,5 +1,6 @@
 ---
 name: ollama-chat-generator
+visibility: background
 description: |
   Fix common Ollama integration issues in Haystack pipelines. Triggers:
   - System prompt is silently ignored

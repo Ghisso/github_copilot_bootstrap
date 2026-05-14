@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -19,14 +18,6 @@ COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
 
-CLAUDE_REVIEW_NAME_MAP = {
-    "review-pass-codex": "review-pass-claude-primary",
-    "review-pass-sonnet": "review-pass-claude-adversarial",
-}
-CODEX_REVIEW_NAME_MAP = {
-    "review-pass-codex": "review-pass-codex-primary",
-    "review-pass-sonnet": "review-pass-codex-adversarial",
-}
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
     "search": ["Grep", "Glob"],
@@ -36,84 +27,30 @@ CLAUDE_TOOL_MAP = {
     "todo": ["TodoWrite"],
     "web": ["WebFetch", "WebSearch"],
 }
+COPILOT_TOOL_MAP = {
+    "read": ["read"],
+    "search": ["search"],
+    "edit": ["edit"],
+    "execute": ["execute"],
+    "delegate": ["agent"],
+    "todo": ["todo", "todos"],
+    "web": ["web"],
+    "vscode": ["vscode"],
+}
 TARGET_PATH_REPLACEMENTS = {
     "claude-code": (
-        (
-            "under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md`",
-            "under `.claude/agents/`, `.claude/instructions/`, `.claude/hooks/`, or is `CLAUDE.md` or `.claude/settings.json`",
-        ),
-        (
-            "(`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)",
-            "(`.claude/agents/**`, `.claude/instructions/**`, `.claude/hooks/**`, `.claude/settings.json`, `CLAUDE.md`)",
-        ),
-        ("Copy `copilot-instructions.md` to new project's `.github/`", "Copy `CLAUDE.md` to the new project's root"),
-        (
-            "Load `.github/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-            "Load `.claude/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-        ),
         (".github/copilot-instructions.md", "CLAUDE.md"),
-        (".github/instructions/quality-and-testing.instructions.md", ".claude/instructions/quality-and-testing.instructions.md"),
-        (".github/instructions/tool-routing.instructions.md", ".claude/instructions/tool-routing.instructions.md"),
-        (".github/instructions/**", ".claude/instructions/**"),
-        (".github/agents/**/*.agent.md", ".claude/agents/**/*.md"),
         ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/CLAUDE.md")'),
-        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', '"/.claude/instructions/" in normalized and normalized.endswith(".md")'),
-        ('"/.github/skills/" in normalized', '"/.claude/skills/" in normalized'),
-        ('"/.github/agents/" in normalized and normalized.endswith(".agent.md")', '"/.claude/agents/" in normalized and normalized.endswith(".md")'),
         (".github/hooks/hooks.json", ".claude/settings.json"),
-        (".github/session_logs", ".claude/session_logs"),
-        (".github/quality_reports", ".claude/quality_reports"),
-        (".github/explorations", ".claude/explorations"),
-        (".github/plans", ".claude/plans"),
-        (".github/skills", ".claude/skills"),
-        (".github/scripts", ".claude/scripts"),
-        (".github/templates", ".claude/templates"),
-        (".github/agents", ".claude/agents"),
         (".github/hooks", ".claude/hooks"),
-        (".github/instructions/", ".claude/instructions/"),
-        (".github/instructions", ".claude/instructions"),
-        (".github/MEMORY.md", ".claude/MEMORY.md"),
-        ("Copy `.github/` directory", "Copy `.claude/` directory"),
         ("git add .github/", "git add .claude/"),
         ("copilot-instructions.md", "CLAUDE.md"),
     ),
     "openai-codex": (
-        (
-            "under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md`",
-            "under `.codex/agents/`, `.claude/agents/`, `.claude/instructions/`, `.claude/hooks/`, or is `AGENTS.md`, `.codex/config.toml`, or `.codex/hooks.json`",
-        ),
-        (
-            "(`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)",
-            "(`.codex/agents/**`, `.claude/agents/**`, `.claude/instructions/**`, `.claude/hooks/**`, `.codex/config.toml`, `.codex/hooks.json`, `AGENTS.md`)",
-        ),
-        ("Copy `copilot-instructions.md` to new project's `.github/`", "Copy `AGENTS.md` to the new project's root"),
-        (
-            "Load `.github/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-            "Load `.claude/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.",
-        ),
         (".github/copilot-instructions.md", "AGENTS.md"),
-        (".github/instructions/quality-and-testing.instructions.md", ".claude/instructions/quality-and-testing.instructions.md"),
-        (".github/instructions/tool-routing.instructions.md", ".claude/instructions/tool-routing.instructions.md"),
-        (".github/instructions/**", ".claude/instructions/**"),
-        (".github/agents/**/*.agent.md", ".codex/agents/**/*.toml"),
         ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/AGENTS.md")'),
-        ('"/.github/instructions/" in normalized and normalized.endswith(".md")', '"/.claude/instructions/" in normalized and normalized.endswith(".md")'),
-        ('"/.github/skills/" in normalized', '"/.claude/skills/" in normalized'),
-        ('"/.github/agents/" in normalized and normalized.endswith(".agent.md")', '"/.claude/agents/" in normalized and normalized.endswith(".md")'),
         (".github/hooks/hooks.json", ".codex/hooks.json"),
-        (".github/session_logs", ".claude/session_logs"),
-        (".github/quality_reports", ".claude/quality_reports"),
-        (".github/explorations", ".claude/explorations"),
-        (".github/plans", ".claude/plans"),
-        (".github/skills", ".claude/skills"),
-        (".github/scripts", ".claude/scripts"),
-        (".github/templates", ".claude/templates"),
-        (".github/agents", ".claude/agents"),
-        (".github/hooks", ".claude/hooks"),
-        (".github/instructions/", ".claude/instructions/"),
-        (".github/instructions", ".claude/instructions"),
-        (".github/MEMORY.md", ".claude/MEMORY.md"),
-        ("Copy `.github/` directory", "Copy `.claude/` directory"),
+        (".github/hooks", ".codex/hooks"),
         ("git add .github/", "git add .claude/"),
         ("copilot-instructions.md", "AGENTS.md"),
     ),
@@ -195,16 +132,16 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         "multi-agent": "multi-agent",
     }[target]
 
-    copy_text_transformed(REPO_ROOT / ".github" / "MEMORY.md", support_root / "MEMORY.md", "claude-code")
-    copy_tree_transformed(REPO_ROOT / ".github" / "templates", support_root / "templates", "claude-code")
+    copy_text_transformed(REPO_ROOT / "shared" / "MEMORY.md", support_root / "MEMORY.md", "claude-code")
+    copy_tree_transformed(REPO_ROOT / "shared" / "templates", support_root / "templates", "claude-code")
     copy_text_transformed(
-        REPO_ROOT / ".github" / "scripts" / "quality_score.py",
+        REPO_ROOT / "shared" / "scripts" / "quality_score.py",
         support_root / "scripts" / "quality_score.py",
         "claude-code",
     )
 
     for name in ("plans", "quality_reports", "session_logs"):
-        source = REPO_ROOT / ".github" / name / "README.md"
+        source = REPO_ROOT / "shared" / name / "README.md"
         copy_text_transformed(source, support_root / name / "README.md", "claude-code")
 
     write_text(
@@ -222,7 +159,7 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     write_text(
         instructions_root / "workspace.md",
         transform_agent_text(
-            (REPO_ROOT / "shared" / "policies" / "copilot-instructions.md").read_text(
+            (REPO_ROOT / "shared" / "policies" / "workspace.instructions.md").read_text(
                 encoding="utf-8"
             ),
             "claude-code",
@@ -230,6 +167,7 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     )
 
     copy_skills(REPO_ROOT / "shared" / "skills", support_root / "skills", "claude-code")
+    copy_tree_transformed(REPO_ROOT / "shared" / "review-profiles", support_root / "review-profiles", "claude-code")
     copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
     copy_tree(REPO_ROOT / "shared" / "prompts", support_root / "prompts")
     render_claude_agents(target_root)
@@ -259,22 +197,11 @@ def shared_agents() -> list[tuple[dict[str, Any], Path]]:
 
 
 def mapped_agent_name(agent_id: str, target: str) -> str:
-    if target == "claude-code":
-        return CLAUDE_REVIEW_NAME_MAP.get(agent_id, agent_id)
-    if target == "openai-codex":
-        return CODEX_REVIEW_NAME_MAP.get(agent_id, agent_id)
     return agent_id
 
 
 def transform_agent_text(text: str, target: str) -> str:
-    replacements = {
-        "review-pass-codex": mapped_agent_name("review-pass-codex", target),
-        "review-pass-sonnet": mapped_agent_name("review-pass-sonnet", target),
-    }
     transformed = text
-    for old, new in replacements.items():
-        transformed = re.sub(rf"(?<![\w-]){re.escape(old)}(?![\w-])", new, transformed)
-
     if target == "claude-code":
         transformed = transformed.replace("GPT-5.4", "Claude target-native primary review")
         transformed = transformed.replace("Claude Sonnet 4.6", "Claude target-native adversarial review")
@@ -306,6 +233,15 @@ def render_claude_tools(capabilities: list[str]) -> str:
             if tool_name not in tools:
                 tools.append(tool_name)
     return ", ".join(tools)
+
+
+def render_copilot_tools(capabilities: list[str]) -> list[str]:
+    tools: list[str] = []
+    for capability in capabilities:
+        for tool_name in COPILOT_TOOL_MAP.get(capability, []):
+            if tool_name not in tools:
+                tools.append(tool_name)
+    return tools
 
 
 def toml_string(value: str) -> str:
@@ -520,6 +456,9 @@ def render_codex_hooks(path: Path) -> None:
 
 
 def render_root_guidance(target: str) -> str:
+    workspace = (REPO_ROOT / "shared" / "policies" / "workspace.instructions.md").read_text(
+        encoding="utf-8"
+    )
     routing = (REPO_ROOT / "shared" / "policies" / "tool-routing.instructions.md").read_text(
         encoding="utf-8"
     )
@@ -550,6 +489,8 @@ def render_root_guidance(target: str) -> str:
         "This target is generated from `shared/`. Do not edit generated files manually.\n\n"
         "Preserve the plan -> implement -> verify -> review -> score workflow and hook guardrails.\n\n"
         f"{agent_note}\n\n"
+        "## Workspace\n\n"
+        f"{transform_target_paths(section_body(workspace), target)}\n\n"
         "## Tool Routing\n\n"
         f"{transform_target_paths(section_body(routing), target)}\n\n"
         "## Workflow\n\n"
@@ -630,11 +571,26 @@ def render_github_instruction_adapter(source: Path) -> str:
     return adapter
 
 
-def render_github_agent_adapter(agent: dict[str, Any], agent_dir: Path) -> str:
-    source = agent_dir / "targets" / "github-copilot.md"
-    frontmatter, _ = split_frontmatter(source.read_text(encoding="utf-8"))
-    if not frontmatter:
-        raise ValueError(f"GitHub agent missing frontmatter: {source}")
+def render_github_agent_adapter(agent: dict[str, Any]) -> str:
+    frontmatter_lines = [
+        "---",
+        f"name: {agent['id']}",
+        f"description: {json.dumps(agent['description'])}",
+    ]
+    github_model = agent.get("model_intent", {}).get("github-copilot")
+    if github_model and github_model != "target-default":
+        frontmatter_lines.append(f"model: {github_model}")
+    tools = render_copilot_tools(agent.get("capabilities", []))
+    if tools:
+        frontmatter_lines.append("tools:")
+        frontmatter_lines.extend(f"  - {tool}" for tool in tools)
+    delegates = agent.get("delegates", [])
+    if delegates:
+        frontmatter_lines.append("agents:")
+        frontmatter_lines.extend(f"  - {delegate}" for delegate in delegates)
+    if agent.get("visibility") == "hidden":
+        frontmatter_lines.append("user-invocable: false")
+    frontmatter_lines.append("---")
     canonical_path = canonical_agent_path(agent["id"])
     body = (
         f"# {agent['id']} Copilot Adapter\n\n"
@@ -645,13 +601,13 @@ def render_github_agent_adapter(agent: dict[str, Any], agent_dir: Path) -> str:
         "Shared skills, memory, plans, explorations, session logs, quality reports, templates, "
         "prompts, and hook scripts live under `.claude/`.\n"
     )
-    return f"---\n{frontmatter}\n---\n\n{body}"
+    return "\n".join(frontmatter_lines) + "\n\n" + body
 
 
 def render_claude_agents(target_root: Path) -> None:
     for agent, agent_dir in shared_agents():
         target_name = canonical_agent_name(agent["id"])
-        body = (agent_dir / "targets" / "claude-code.md").read_text(encoding="utf-8")
+        body = (agent_dir / "prompt.md").read_text(encoding="utf-8")
         body = transform_agent_text(body, "claude-code")
         tools = render_claude_tools(agent.get("capabilities", []))
         frontmatter = [
@@ -680,8 +636,6 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
         "Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when "
         "the project is trusted. Shared memory, plans, explorations, session logs, quality reports, "
         "templates, prompts, and hook scripts also live under `.claude/`.\n\n"
-        "If the canonical role mentions Claude-native review helpers, use the Codex-native helpers "
-        "`review-pass-codex-primary` and `review-pass-codex-adversarial` instead.\n\n"
         f"Role type: {agent.get('role_type', 'unspecified')}\n"
         f"Visibility: {agent.get('visibility', 'public')}\n"
         f"Capability intents: {', '.join(capabilities) or 'target default'}"
@@ -707,10 +661,10 @@ def render_github(target_root: Path) -> None:
     copy_file(REPO_ROOT / "shared" / "hooks" / "hooks.json", target_root / ".github" / "hooks" / "hooks.json")
     render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
 
-    for agent, agent_dir in shared_agents():
+    for agent, _agent_dir in shared_agents():
         write_text(
             target_root / ".github" / "agents" / f"{agent['id']}.agent.md",
-            render_github_agent_adapter(agent, agent_dir),
+            render_github_agent_adapter(agent),
         )
 
 

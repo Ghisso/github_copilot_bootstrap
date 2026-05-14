@@ -1,5 +1,6 @@
 ---
 name: test-helper-public-api
+visibility: background
 description: |
   Prevent test helpers that chain private methods from hiding bugs in public APIs.
   Trigger: A test helper directly calls _build_nodes(), _extract_foo(), etc.
@@ -96,7 +97,7 @@ def _builder_with_df(df, cfg):
     return builder.build_from_dataframe(df)
 ```
 
-This was caught by the architecture reviewer (not the code reviewer) — it shows
+This was caught by `reviewer` using the `architecture` profile — it shows
 up as "no public seam for injection." The fix also simplified comparison tests
 that were using two different builder instances.
 

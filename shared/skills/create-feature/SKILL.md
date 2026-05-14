@@ -1,5 +1,6 @@
 ---
 name: create-feature
+visibility: public
 description: |
   Config-first feature scaffolding. Creates config dataclass, ConfigStore
   registration, implementation module, tests, and wires everything together.
@@ -67,7 +68,7 @@ class TestFeature:
 
 1. Ensure the new config module is imported during app startup so its module-level `cs.store()` calls execute before `@hydra.main`
 2. Add `FeatureConfig` field to the entrypoint-specific top-level config class (for example `TrainingConfig`, `PdfIngestionConfig`) with a defaults entry
-3. Update project state in `copilot-instructions.md`
+3. Update project state in `.claude/instructions/workspace.md`
 
 ## Phase 5: Verify
 ```bash

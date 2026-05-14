@@ -1,5 +1,6 @@
 ---
 name: pyvis-xss-testing
+visibility: background
 description: |
   Correctly test HTML escaping in pyvis-generated visualizations. Triggers:
   - Writing tests that assert `&lt;script&gt;` appears in pyvis HTML output

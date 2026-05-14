@@ -1,5 +1,6 @@
 ---
 name: pandas-nan-bool-coercion
+visibility: background
 description: |
   Fix silent NaN/bool coercion bugs in pandas DataFrames. Triggers:
   - `bool(float('nan'))` returns True (false positive in boolean checks)

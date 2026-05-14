@@ -24,6 +24,7 @@ REQUIRED_DIRS = (
     "dist/multi-agent/.github/agents",
     "dist/multi-agent/.claude/agents",
     "dist/multi-agent/.claude/skills",
+    "dist/multi-agent/.claude/review-profiles",
     "dist/multi-agent/.claude/hooks/scripts",
 )
 

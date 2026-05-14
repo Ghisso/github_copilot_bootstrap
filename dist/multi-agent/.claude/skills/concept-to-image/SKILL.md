@@ -1,5 +1,6 @@
 ---
 name: concept-to-image
+visibility: public
 description: |
   Turn any concept, idea, or description into a polished static HTML visual,
   then export it as a PNG or SVG image file. Use when:

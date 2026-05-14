@@ -1,10 +1,10 @@
 ---
 name: verifier
-description: "End-to-end verification agent for Python AI projects. Validates that code compiles, tests pass, types check, linting is clean, configs load, and services start. Use as the final gate before any commit or PR."
+description: "End-to-end verification agent for Python AI projects. Validates tests, typing, linting, formatting, imports, deprecations, runtime wiring, and quality gates."
 tools:
-    - execute
-    - read
-    - search
+  - execute
+  - read
+  - search
 ---
 
 # verifier Copilot Adapter

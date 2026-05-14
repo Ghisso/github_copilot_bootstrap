@@ -1,5 +1,6 @@
 ---
 name: prompt-lab
+visibility: public
 description: |
   Systematic LLM prompt engineering: analyzes existing prompts for failure
   modes, generates structured variants (direct, few-shot, chain-of-thought),

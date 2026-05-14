@@ -1,5 +1,6 @@
 ---
 name: learn
+visibility: public
 description: |
   Extract non-obvious discoveries into reusable skills that persist across
   sessions. Use when debugging took significant effort, found misleading errors,

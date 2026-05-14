@@ -1,5 +1,6 @@
 ---
 name: debug-investigator
+visibility: public
 description: |
   Hypothesis-driven debugging methodology: ranked hypotheses with
   confirming/refuting tests, git bisect strategy, log analysis,

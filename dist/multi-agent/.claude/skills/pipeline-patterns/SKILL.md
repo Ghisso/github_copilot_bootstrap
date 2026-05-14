@@ -1,5 +1,6 @@
 ---
 name: pipeline-patterns
+visibility: public
 description: |
   Haystack pipeline construction patterns and component ordering rules. Use when
   building Haystack pipelines, debugging component connection errors, implementing

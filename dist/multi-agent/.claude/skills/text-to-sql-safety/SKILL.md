@@ -1,5 +1,6 @@
 ---
 name: text-to-sql-safety
+visibility: public
 description: |
   Defense-in-depth safety layers for LLM-generated SQL execution. Use when:
   - Building text-to-SQL systems that execute LLM-generated queries

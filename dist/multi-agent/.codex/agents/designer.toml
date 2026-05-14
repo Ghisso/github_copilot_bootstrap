@@ -1,5 +1,5 @@
 name = "designer"
-description = "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces clear, usable, and maintainable UI updates aligned with project conventions. Invoked by orchestrator for UI-focused tasks."
+description = "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces usable UI updates aligned with project conventions."
 developer_instructions = '''
 This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.
 
@@ -7,9 +7,7 @@ Before doing the task, read `.claude/agents/designer.md` and follow that canonic
 
 Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when the project is trusted. Shared memory, plans, explorations, session logs, quality reports, templates, prompts, and hook scripts also live under `.claude/`.
 
-If the canonical role mentions Claude-native review helpers, use the Codex-native helpers `review-pass-codex-primary` and `review-pass-codex-adversarial` instead.
-
 Role type: designer
 Visibility: hidden
-Capability intents: edit, execute, read, search
+Capability intents: edit, execute, read, search, vscode
 '''

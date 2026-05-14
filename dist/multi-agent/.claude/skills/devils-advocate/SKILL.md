@@ -1,5 +1,6 @@
 ---
 name: devils-advocate
+visibility: public
 description: |
   Challenge design decisions with structured critique. Questions architecture
   choices, technology selection, error handling strategy, testing adequacy,

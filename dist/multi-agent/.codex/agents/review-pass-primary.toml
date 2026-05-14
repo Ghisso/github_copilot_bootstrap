@@ -1,0 +1,14 @@
+name = "review-pass-primary"
+description = "Hidden helper agent that runs the primary independent review pass and returns normalized findings for reviewer synthesis."
+sandbox_mode = "read-only"
+developer_instructions = '''
+This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.
+
+Before doing the task, read `.claude/agents/review-pass-primary.md` and follow that canonical role guidance. Use the Codex TOML name, description, sandbox, and runtime behavior from this adapter when they conflict with Claude-specific frontmatter in the canonical file.
+
+Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when the project is trusted. Shared memory, plans, explorations, session logs, quality reports, templates, prompts, and hook scripts also live under `.claude/`.
+
+Role type: review-helper
+Visibility: hidden
+Capability intents: read, search
+'''

@@ -1,5 +1,6 @@
 ---
 name: gradio-streamlit
+visibility: public
 description: |
   Decision framework and patterns for building ML demos with Gradio or Streamlit.
   Use when creating interactive UIs for models, RAG pipelines, or data tools.

@@ -1,5 +1,6 @@
 ---
 name: retrieval-routing
+visibility: background
 description: Use when deciding between direct reads, ripgrep, Semble, and context-mode retrieval.
 ---
 

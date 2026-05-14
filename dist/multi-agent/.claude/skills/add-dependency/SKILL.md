@@ -1,5 +1,6 @@
 ---
 name: add-dependency
+visibility: public
 description: |
   Add a Python dependency with validation. Checks existence, adds with uv,
   updates lockfile, and runs tests to verify compatibility. Use when asked to

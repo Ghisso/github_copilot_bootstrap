@@ -1,5 +1,6 @@
 ---
 name: extraction-metadata-sourcing
+visibility: background
 description: |
   Distinguish between in-text entities (suitable for NER/regex extraction) and
   curated metadata fields (requiring external sources). Use when building CSV

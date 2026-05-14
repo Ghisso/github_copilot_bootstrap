@@ -37,14 +37,15 @@ uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 uv run ruff check src/ tests/
 ```
 
-**REVIEW agents by file type:**
+**Review profiles by file type:**
 
-| Pattern | Agents |
+| Pattern | `reviewer` profiles |
 |---|---|
-| `src/**/*.py` | code-reviewer, security-reviewer, architecture-reviewer |
-| `tests/**/*.py` | test-reviewer |
-| `service.py`, `src/api/**` | api-reviewer, security-reviewer |
-| `src/configs/**` | config-reviewer |
+| `src/**/*.py` | `code`, `security`; add `architecture` for new modules/refactors |
+| `tests/**/*.py` | `tests` |
+| `service.py`, `src/api/**` | `api`, `security`, `tests` |
+| `src/configs/**` | `config` |
+| docs/user-facing behavior | `documentation` |
 
 **FIX:** Critical → Major → Minor order.
 
@@ -80,7 +81,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 4. Document open questions
 
 **Starting a new session:**
-1. Read `copilot-instructions.md` + most recent plan in `.claude/plans/` or exploration in `.claude/explorations/`
+1. Read `.claude/instructions/workspace.md` + most recent plan in `.claude/plans/` or exploration in `.claude/explorations/`
 2. Check `git log --oneline -10` and `git diff`
 3. State understood task and next step
 
@@ -100,7 +101,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 
 ## File Protection Rules
 
-These protections are enforced by hooks in `.github/hooks/hooks.json`.
+These protections are enforced by target-native hook adapters that call shared scripts in `.claude/hooks/scripts/`.
 
 **Never modify these files directly** (edit manually only):
 - `.env`, `.env.*`, `.env.local`

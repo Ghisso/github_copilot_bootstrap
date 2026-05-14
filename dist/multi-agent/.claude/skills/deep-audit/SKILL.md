@@ -1,5 +1,6 @@
 ---
 name: deep-audit
+visibility: public
 description: |
   Repository-wide consistency audit. Runs 4 parallel checks: documentation
   accuracy, skill/rule consistency, and code-config alignment.
@@ -17,8 +18,9 @@ description: |
 - Version numbers consistent across files
 
 ### Audit 2: Instruction/Agent Quality
-- All agents referenced in `CLAUDE.md` exist in `.claude/agents/`
-- All skills referenced in `CLAUDE.md` exist in `.claude/skills/`
+- All agents referenced in workspace guidance exist in `shared/agents/`
+- Generated adapters point to canonical `.claude/agents/`
+- All skills referenced in workspace guidance exist in `.claude/skills/`
 - Cross-references are accurate
 - Naming conventions are consistent
 

@@ -21,40 +21,43 @@ The todo list must be visible and up-to-date at all times.
 4. **Routing decision:** Based on exploration, classify the task and pass the decision to `planner`:
    - `--mode micro-plan`: single-phase, obviously scoped, no new modules or architecture decisions
    - `--mode full-plan`: multi-phase, ambiguous, new module, or architecture decision required
-   - **Always full-plan if any control-plane file is touched** (`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`)
+   - **Always full-plan if any control-plane file is touched** (`shared/**`, target-native hook/agent/config adapters, generated adapters/config, root guidance files)
 5. Delegate planning to `planner` with the routing decision.
 6. Execute the plan by delegating implementation to `coder` and `designer`.
-7. Run targeted reviewers based on changed areas (see Reviewer Routing below).
+7. Run `reviewer` with targeted profiles based on changed areas (see Reviewer Routing below).
 8. Run `verifier` as final gate.
 9. Run learn and wrap-up (see Completion Protocol below).
 10. Return a concise status report with risks and follow-ups.
 
 ## Reviewer Routing
 
-Select reviewers based on the surface area changed. Run in parallel when file ownership does not overlap.
+Select reviewer profiles based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
 
-| Changed surface | Reviewers to run |
+| Changed surface | Reviewer profiles |
 |---|---|
-| Python source code | `code-reviewer` |
-| New modules / refactoring | `architecture-reviewer` |
-| API endpoints | `api-reviewer` + `security-reviewer` |
-| Test files | `test-reviewer` |
-| Config / dataclasses | `config-reviewer` |
-| Any pre-PR gate | `code-reviewer` + `security-reviewer` (minimum) |
+| Python source code | `code`, `security` |
+| New modules / refactoring | `architecture` |
+| API endpoints | `api`, `security`, `tests` |
+| Test files | `tests` |
+| Config / dataclasses | `config` |
+| I/O-heavy or ML-heavy paths | `performance` |
+| Docs or user-facing behavior | `documentation` |
+| Domain-specific correctness | `domain` |
+| Any pre-PR gate | `code`, `security`, `tests` minimum |
 
 **Complexity gate:**
-- **Control-plane files** (`.github/agents/**`, `.github/instructions/**`, `.github/hooks/**`, `copilot-instructions.md`): always non-trivial, always run full reviewer set regardless of diff size
-- **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): skip dual adversarial pass, run single `code-reviewer` pass only
-- **Standard changes**: run dual adversarial review through `review-pass-codex` + `review-pass-sonnet`
+- **Control-plane files** (`shared/**`, target-native hook/agent/config adapters, generated adapter/config surfaces, root guidance files): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
+- **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
+- **Standard changes**: use `reviewer` dual-pass mode through `review-pass-primary` + `review-pass-adversarial`.
 
-**Degraded review:** If a review-pass sub-agent reports degraded mode, do **not** mark the pre-PR gate as passed.
+**Degraded review:** If `reviewer` reports degraded mode, do **not** mark the pre-PR gate as passed.
 
 ## Delegation Rules
 
 - Prefer parallel delegation only when tasks touch disjoint files.
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.
-- If the planner specifies required skills per step, pass that list to the implementing agent.
+- If the planner specifies required skills or review profiles per step, pass that list to the implementing or reviewing agent.
 
 ## Quality Gates
 

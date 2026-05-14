@@ -1,5 +1,5 @@
 name = "coder"
-description = "Implementation specialist for Python AI engineering tasks. Applies workspace coding standards, executes minimal focused edits, and verifies with tests, types, and linting. Invoked by orchestrator for coding steps."
+description = "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting."
 developer_instructions = '''
 This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.
 
@@ -7,9 +7,7 @@ Before doing the task, read `.claude/agents/coder.md` and follow that canonical 
 
 Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when the project is trusted. Shared memory, plans, explorations, session logs, quality reports, templates, prompts, and hook scripts also live under `.claude/`.
 
-If the canonical role mentions Claude-native review helpers, use the Codex-native helpers `review-pass-codex-primary` and `review-pass-codex-adversarial` instead.
-
 Role type: coder
 Visibility: hidden
-Capability intents: delegate, edit, execute, read, search, todo, vscode, web
+Capability intents: edit, execute, read, search, todo, vscode, web
 '''

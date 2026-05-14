@@ -7,6 +7,7 @@ The repo generates one installable output: `dist/multi-agent/`.
 The shared basis lives under `.claude/`:
 
 - `.claude/skills/**/SKILL.md`
+- `.claude/review-profiles/*.md`
 - `.claude/instructions/*.instructions.md`
 - `.claude/agents/*.md`
 - `.claude/prompts/*.prompt.md`

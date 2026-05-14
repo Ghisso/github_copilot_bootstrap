@@ -1,5 +1,6 @@
 ---
 name: draw-io
+visibility: public
 description: |
   Create, edit, and polish draw.io or diagrams.net diagrams with a `.drawio`-first
   workflow. Use when:

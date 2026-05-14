@@ -1,5 +1,6 @@
 ---
 name: caveman
+visibility: public
 description: |
   Ultra-terse communication mode for token-efficient technical work. Use when:
   - User asks for "caveman mode", "less tokens", "be brief", "be terse",

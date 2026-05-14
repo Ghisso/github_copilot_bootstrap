@@ -64,6 +64,7 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Output clear phases and ordered steps.
 - For each step, include owner (`coder`, `designer`, or reviewer), target files, and verification commands.
 - For each step, include `Required Skills` listing exact SKILL.md files implementers must read.
+- For each review step, include `Review Profiles` listing exact profiles from `shared/review-profiles/`.
 - Call out assumptions, risks, and dependency ordering.
 - Align with workspace standards: config-first design, test-first verification, quality gates.
 
@@ -73,7 +74,7 @@ Use this structure:
 
 1. Goal and constraints
 2. Phase breakdown
-3. Step table: owner, files, required skills, verification
+3. Step table: owner, files, required skills, review profiles, verification
 4. Risk and fallback paths
 5. Done criteria
 6. Devil's Advocate Report (when applicable) with questions for user

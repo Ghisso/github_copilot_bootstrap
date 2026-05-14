@@ -1,5 +1,6 @@
 ---
 name: documentation
+visibility: public
 description: |
   Apply consistent documentation standards: Google-style docstrings for all
   public classes and functions, structured README.md, and docs/ directory

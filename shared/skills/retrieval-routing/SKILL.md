@@ -1,11 +1,12 @@
 ---
 name: retrieval-routing
+visibility: background
 description: Use when deciding between direct reads, ripgrep, Semble, and context-mode retrieval.
 ---
 
 # Retrieval Routing
 
-Load `.github/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.
+Load `.claude/instructions/tool-routing.instructions.md` before choosing a retrieval helper. That instruction file is the authority; this skill is only a short trigger and reminder.
 
 Quick dispatch:
 

@@ -1,12 +1,8 @@
 ---
 name: verifier
-description: "End-to-end verification agent for Python AI projects. Validates that code compiles, tests pass, types check, linting is clean, configs load, and services start. Use as the final gate before any commit or PR."
+description: "End-to-end verification agent for Python AI projects. Validates tests, typing, linting, formatting, imports, deprecations, runtime wiring, and quality gates."
 tools: Bash, Read, Grep, Glob
 ---
-
-## Target Binding
-
-This is the Claude Code fork of the shared agent. Copilot-only model pins are intentionally omitted. Use Claude Code project subagent behavior and the tools granted in this file frontmatter. When this agent refers to review helpers, use Claude-native primary/adversarial review helpers rather than GPT/Copilot helpers.
 
 # Verification Agent
 
@@ -59,10 +55,10 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 if [[ -f ".claude/scripts/quality_score.py" ]]; then
   uv run python .claude/scripts/quality_score.py src/ --json
 else
-  echo "quality_score.py not found; score manually from pytest, mypy, ruff, and review findings."
+  echo "quality_score.py not found — skipping score (ruff+mypy+pytest gates still apply)"
 fi
 ```
-**Pass criteria:** Score ≥ 80 for commit, ≥ 90 for PR.
+**Pass criteria:** Score ≥ 80 for commit, ≥ 90 for PR. If the script is absent, skip without failing.
 
 ## Report Format
 

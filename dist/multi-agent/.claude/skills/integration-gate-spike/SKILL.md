@@ -1,5 +1,6 @@
 ---
 name: integration-gate-spike
+visibility: background
 description: |
   Design and gate unknown external contract validation before adapter implementation.
   Use when integrating with APIs, external services, or third-party systems where the

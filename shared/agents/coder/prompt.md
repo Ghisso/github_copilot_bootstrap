@@ -18,7 +18,7 @@ Before implementing any code, load skills in two tiers:
 
 If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
 
-**Control-plane route:** If any target file is under `.github/agents/`, `.github/instructions/`, `.github/hooks/`, or is `copilot-instructions.md` — treat as high-risk. Pause and ask the user to confirm the change before applying. These files affect every session in every project that uses this bootstrap.
+**Control-plane route:** If any target file is under `shared/`, target-native hook/agent/config adapters, `dist/`, or root guidance files — treat as high-risk. Pause and ask the user to confirm the change before applying. These files affect every session in every project that uses this bootstrap.
 
 Never implement first and check skills later.
 
@@ -49,11 +49,12 @@ Never implement first and check skills later.
 
 ## Code Simplification (Mandatory)
 
-After all edits pass verification, you MUST delegate to the `code-simplifier` agent before returning to the calling agent:
+After all edits pass verification, you MUST simplify the changed code before returning to the calling agent:
 
-1. Pass the list of modified files to `code-simplifier`.
-2. Let it apply clarity and consistency refinements.
-3. Re-run verification commands after simplification.
-4. If verification fails after simplification, fix and re-verify.
+1. Re-read the modified files.
+2. Apply local clarity and consistency refinements using `code-style/SKILL.md` and `refactor/SKILL.md` where relevant.
+3. Keep behavior unchanged and avoid unrelated refactors.
+4. Re-run verification commands after simplification.
+5. If verification fails after simplification, fix and re-verify.
 
 Only return to the calling agent after simplification is complete and verification passes.

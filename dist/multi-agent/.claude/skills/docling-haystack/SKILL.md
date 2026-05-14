@@ -1,5 +1,6 @@
 ---
 name: docling-haystack
+visibility: background
 description: |
   Integrate Docling with Haystack for PDF ingestion. Triggers:
   - TypeError when passing pipeline_options= directly to DoclingConverter

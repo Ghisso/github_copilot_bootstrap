@@ -1,9 +1,8 @@
 ---
 name: coder
-description: "Implementation specialist for Python AI engineering tasks. Applies workspace coding standards, executes minimal focused edits, and verifies with tests, types, and linting. Invoked by orchestrator for coding steps."
+description: "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting."
 model: GPT-5.4
 tools:
-  - agent
   - edit
   - execute
   - read
@@ -12,8 +11,6 @@ tools:
   - todos
   - vscode
   - web
-agents:
-  - code-simplifier
 user-invocable: false
 ---
 

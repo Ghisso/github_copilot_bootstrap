@@ -1,5 +1,6 @@
 ---
 name: commit
+visibility: public
 description: |
   Git workflow for staging, committing, branching, PR creation, and merging.
   Use when ready to commit changes, create a PR, or merge a branch.

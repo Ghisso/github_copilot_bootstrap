@@ -1,12 +1,8 @@
 ---
 name: designer
-description: "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces clear, usable, and maintainable UI updates aligned with project conventions. Invoked by orchestrator for UI-focused tasks."
+description: "Design and UX specialist for Python interfaces, with focus on Gradio and Streamlit apps. Produces usable UI updates aligned with project conventions."
 tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob
 ---
-
-## Target Binding
-
-This is the Claude Code fork of the shared agent. Copilot-only model pins are intentionally omitted. Use Claude Code project subagent behavior and the tools granted in this file frontmatter. When this agent refers to review helpers, use Claude-native primary/adversarial review helpers rather than GPT/Copilot helpers.
 
 # Designer Agent
 

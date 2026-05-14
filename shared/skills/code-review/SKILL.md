@@ -1,55 +1,38 @@
 ---
 name: code-review
+visibility: public
 description: |
-  Multi-agent code review workflow. Runs 6+ specialized reviewers in parallel
-  and synthesizes findings into a scored report. Use before PRs, after
-  completing features, or for periodic quality audits.
+  Unified review workflow. Runs the `reviewer` agent with one or more
+  profiles from `shared/review-profiles/` and synthesizes findings into a gate result.
 argument-hint: "[file-or-directory]"
 ---
 
-# code-review — Multi-Agent Code Review
+# Code Review
 
-## Phase 1: Identify Scope
+Use the unified `reviewer` agent instead of separate specialist reviewer agents.
 
-- File path given: review that file
-- Directory: review all `.py` files
-- No argument: review all uncommitted changes (`git diff --name-only`)
+## Profile Routing
 
-## Phase 2: Parallel Review Agents
+| Scope | Profiles |
+|---|---|
+| Python source | `code`, `security` |
+| New modules or refactors | `architecture` |
+| Tests | `tests` |
+| API or service files | `api`, `security`, `tests` |
+| Config dataclasses | `config` |
+| I/O-heavy or ML-heavy paths | `performance` |
+| Docs or user-facing behavior | `documentation` |
+| Domain-specific correctness | `domain` |
 
-| Agent | Target Files | Focus |
-|-------|-------------|-------|
-| code-reviewer | `src/**/*.py` | SOLID, patterns, readability |
-| security-reviewer | All `.py` files | Secrets, injection, unsafe ops |
-| test-reviewer | `tests/**/*.py` | Coverage, assertions, edge cases |
-| architecture-reviewer | `src/**/*.py` | Coupling, SoC, dependencies |
-| config-reviewer | `src/configs/**` | Completeness, validation |
-| documentation-reviewer | All files | Docstrings, README |
+## Workflow
 
-## Phase 3: Synthesis
+1. Identify scope:
+   - Argument path: review that path.
+   - No argument: review uncommitted changes.
+2. Select review profiles from the table.
+3. Ask `reviewer` to run a dual-pass review with the selected profiles.
+4. Fix findings by severity: critical, then major, then minor.
+5. Re-run verification and review until the target gate passes.
 
-| Severity | Code | Security | Tests | Architecture | Config | Docs |
-|----------|------|----------|-------|--------------|--------|------|
-| Critical | N | N | N | N | N | N |
-| Major | N | N | N | N | N | N |
-| Minor | N | N | N | N | N | N |
+Save reports to `.claude/quality_reports/YYYY-MM-DD_review_[scope].md`.
 
-## Phase 4: Score
-
-Apply `quality-and-testing.instructions.md` rubric. Start at 100, deduct per tables.
-
-```
-Score: [N]/100
-Gate: [Commit (≥80) / PR (≥90) / Excellence (≥95)]
-Recommendation: [SHIP / FIX-THEN-SHIP / BLOCK]
-```
-
-## Phase 5: Fix Cycle (if score < threshold)
-
-1. List critical issues (must fix)
-2. List major issues (should fix)
-3. Fix: critical → major → minor
-4. Re-verify (pytest, mypy, ruff)
-5. Re-score. Max 3 rounds.
-
-Save report to `.claude/quality_reports/YYYY-MM-DD_code-review_[scope].md`.

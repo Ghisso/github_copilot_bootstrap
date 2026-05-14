@@ -6,6 +6,117 @@ Preserve the plan -> implement -> verify -> review -> score workflow and hook gu
 
 `.claude/` is the canonical shared project space. Custom agents are rendered as Claude Code project subagents in `.claude/agents/`; skills, plans, session logs, quality reports, memory, templates, and hook scripts also live under `.claude/`.
 
+## Workspace
+
+**Python:** 3.12+ | **Package Manager:** uv | **Common frameworks:** Hydra, BentoML, Haystack, Gradio
+
+This file is target-neutral source guidance. Generated Copilot, Claude Code, and Codex adapters point back to the shared `.claude/` basis.
+
+## Core Principles
+
+- Plan first for non-trivial work.
+- Search before writing new code.
+- Prefer config-first design for new features.
+- Verify every change with tests, typing, and linting.
+- Review with profile-driven checks before commit or PR.
+- Keep hook guardrails enabled.
+- Capture reusable lessons in `.claude/MEMORY.md`.
+
+## Instructions
+
+Always consult the relevant files under `.claude/instructions/`:
+
+| File | Covers |
+|---|---|
+| `workflow.instructions.md` | Plan -> implement -> verify -> review -> score loop |
+| `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
+| `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
+| `code-standards.instructions.md` | Python architecture and style rules |
+| `tests.instructions.md` | Test authoring and mocking boundaries |
+| `config-first-design.instructions.md` | Hydra ConfigStore and dataclass config patterns |
+| `api-service-standards.instructions.md` | BentoML and API service expectations |
+| `deployment.instructions.md` | Deployment and runtime checks |
+
+## Workflow
+
+```text
+PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE
+```
+
+Use the orchestrated path for ambiguous, multi-file, or control-plane work:
+
+```text
+orchestrator -> planner -> coder/designer -> reviewer -> verifier
+```
+
+Control-plane files include `shared/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
+
+## Agents
+
+| Agent | Purpose |
+|---|---|
+| `orchestrator` | Coordinates complex workflows and delegates work |
+| `planner` | Creates implementation plans with required skills and review profiles |
+| `coder` | Implements backend/code changes and performs local simplification |
+| `designer` | Implements Gradio/Streamlit UI changes |
+| `reviewer` | Runs profile-driven dual-pass reviews |
+| `review-pass-primary` | Hidden primary review helper |
+| `review-pass-adversarial` | Hidden adversarial review helper |
+| `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
+
+## Review Profiles
+
+The unified `reviewer` loads checklists from `.claude/review-profiles/`:
+
+| Surface | Profiles |
+|---|---|
+| Python source | `code`, `security` |
+| New modules/refactors | `architecture` |
+| Tests | `tests` |
+| APIs/services | `api`, `security`, `tests` |
+| Configs | `config` |
+| I/O-heavy or ML-heavy paths | `performance` |
+| Docs/user-facing behavior | `documentation` |
+| Domain-specific correctness | `domain` |
+
+## Skills
+
+Skills live under `.claude/skills/`. Each `SKILL.md` has machine-readable `visibility: public|background` metadata:
+
+- `public` skills are intended for direct slash-menu or user-triggered use.
+- `background` skills are hidden helpers loaded by description match or by agents.
+
+High-leverage public skills include `create-feature`, `refactor`, `run-tests`, `code-review`, `review-api`, `hydra-config`, `bentoml-service`, `debug-investigator`, `deep-audit`, `commit`, and `context-status`.
+
+## Verification
+
+```bash
+uv run pytest tests/ -q --tb=short
+uv run mypy src/ --ignore-missing-imports --explicit-package-bases
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+```
+
+When available, run:
+
+```bash
+uv run python .claude/scripts/quality_score.py src/ --json
+```
+
+Quality gates:
+
+| Score | Gate |
+|---|---|
+| >= 90 | PR-ready |
+| >= 80 | Commit-ready |
+| < 80 | Blocked |
+
+## Project State
+
+**Project:** [TODO: project name and one-liner description]
+**Stack:** Python 3.12+ with uv; adapt framework guidance to the target repo.
+**Active work:** Check `.claude/plans/` and `.claude/explorations/`.
+
 ## Tool Routing
 
 This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble and context-mode are optional helpers; they do not replace the plan, verify, review, score loop, hook guardrails, or project-specific instructions.
@@ -67,14 +178,15 @@ uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 uv run ruff check src/ tests/
 ```
 
-**REVIEW agents by file type:**
+**Review profiles by file type:**
 
-| Pattern | Agents |
+| Pattern | `reviewer` profiles |
 |---|---|
-| `src/**/*.py` | code-reviewer, security-reviewer, architecture-reviewer |
-| `tests/**/*.py` | test-reviewer |
-| `service.py`, `src/api/**` | api-reviewer, security-reviewer |
-| `src/configs/**` | config-reviewer |
+| `src/**/*.py` | `code`, `security`; add `architecture` for new modules/refactors |
+| `tests/**/*.py` | `tests` |
+| `service.py`, `src/api/**` | `api`, `security`, `tests` |
+| `src/configs/**` | `config` |
+| docs/user-facing behavior | `documentation` |
 
 **FIX:** Critical → Major → Minor order.
 
@@ -110,7 +222,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 4. Document open questions
 
 **Starting a new session:**
-1. Read `CLAUDE.md` + most recent plan in `.claude/plans/` or exploration in `.claude/explorations/`
+1. Read `.claude/instructions/workspace.md` + most recent plan in `.claude/plans/` or exploration in `.claude/explorations/`
 2. Check `git log --oneline -10` and `git diff`
 3. State understood task and next step
 
@@ -130,7 +242,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 
 ## File Protection Rules
 
-These protections are enforced by hooks in `.claude/settings.json`.
+These protections are enforced by target-native hook adapters that call shared scripts in `.claude/hooks/scripts/`.
 
 **Never modify these files directly** (edit manually only):
 - `.env`, `.env.*`, `.env.local`

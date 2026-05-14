@@ -1,5 +1,6 @@
 ---
 name: humanize
+visibility: public
 description: |
   Detect and remove AI-generated writing patterns from text while preserving
   semantic meaning and factual accuracy. Rewrites text to sound natural, varied,

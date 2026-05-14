@@ -1,5 +1,6 @@
 ---
 name: plan-decomposition
+visibility: public
 description: |
   Decompose large implementation plans into phased sub-plans, each with two files:
   an overview (plain language + Mermaid diagrams for stakeholders) and a detail

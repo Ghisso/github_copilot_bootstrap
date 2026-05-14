@@ -41,3 +41,21 @@ Optional pruning:
 ## Deprecation Rule
 
 Target-local history/support directories such as `.github/plans/`, `.github/session_logs/`, `.codex/plans/`, `.codex/session_logs/`, and `.agents/skills/` are obsolete for new installs. New projects should write plans, explorations, logs, quality reports, memory, and skills under `.claude/`.
+
+## Reviewer Agent Migration
+
+Specialized reviewer agent names were retired in favor of one profile-driven `reviewer` agent.
+
+| Old agent name | New reviewer profiles |
+|---|---|
+| `code-reviewer` | `code` |
+| `security-reviewer` | `security` |
+| `architecture-reviewer` | `architecture` |
+| `test-reviewer` | `tests` |
+| `api-reviewer` | `api`, `security`, `tests` |
+| `config-reviewer` | `config` |
+| `performance-reviewer` | `performance` |
+| `documentation-reviewer` | `documentation` |
+| `domain-reviewer` | `domain` |
+
+Review helper names also changed from model-specific names to `review-pass-primary` and `review-pass-adversarial`.

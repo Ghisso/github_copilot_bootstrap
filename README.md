@@ -33,7 +33,7 @@ Core principles:
 - Plan first for non-trivial work.
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
-- Use reviewer agents to challenge implementation quality.
+- Use the unified reviewer to challenge implementation quality.
 - Ship only when quality gates are met.
 - Preserve lessons learned in memory and session logs.
 
@@ -125,7 +125,8 @@ Interpretation:
 
 - Generated bootstrap: installable output in [dist/multi-agent/](dist/multi-agent/)
 - Source policies: reusable instruction files in [shared/policies/](shared/policies/)
-- Agents: canonical metadata and target forks in [shared/agents/](shared/agents/)
+- Agents: canonical metadata and prompts in [shared/agents/](shared/agents/)
+- Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
@@ -135,6 +136,10 @@ Interpretation:
 
 These are the source files that render into `.claude/instructions/` in every generated target:
 
+- [workspace.instructions.md](shared/policies/workspace.instructions.md)
+  - Shared workspace guidance
+  - Agent and review-profile overview
+  - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
   - Plan-first protocol
   - Orchestrator loop and review order
@@ -158,7 +163,7 @@ These are the source files that render into `.claude/instructions/` in every gen
 
 ## Most Important Skills
 
-Skills have two visibility levels: **public** skills appear in the `/` slash menu; **background** skills are hidden from the menu but auto-load when the model's description matches the task context. Both types are documented in the skills table in `copilot-instructions.md`.
+Skills have machine-readable `visibility: public|background` frontmatter. **Public** skills are intended for direct use; **background** skills are hidden helpers loaded by description match or by agents.
 
 There are many skills; these are the high-leverage ones I rely on most:
 
@@ -196,24 +201,24 @@ These skills encode battle-tested workflows and reduce ad-hoc execution.
 
 ## Agent System
 
-The agent layer gives me orchestration plus specialist reviews. Full shared agent bodies render into `.claude/agents/`; Copilot and Codex keep thin native wrappers in `.github/agents/` and `.codex/agents/`.
+The agent layer gives me orchestration plus profile-driven reviews. Full shared agent bodies render into `.claude/agents/`; Copilot and Codex keep thin native wrappers in `.github/agents/` and `.codex/agents/`.
 
 Primary flow for complex work:
 
-- orchestrator -> planner -> coder/designer -> reviewers -> verifier
+- orchestrator -> planner -> coder/designer -> reviewer -> verifier
 
-Key reviewer agents:
+Current agents:
 
-- code-reviewer
-- security-reviewer
-- architecture-reviewer
-- test-reviewer
-- api-reviewer
-- config-reviewer
-- performance-reviewer
-- documentation-reviewer
+- orchestrator
+- planner
+- coder
+- designer
+- reviewer
+- review-pass-primary
+- review-pass-adversarial
+- verifier
 
-Reviewer agents run adversarial dual-pass review through two model-specific sub-agents (`review-pass-codex` and `review-pass-sonnet`) and synthesize findings into one report. When only one sub-agent is available, reviewers fall back to single-pass mode and label findings as `[single-pass, unconfirmed]`.
+The unified `reviewer` loads one or more profiles from `shared/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`). It runs dual-pass review through `review-pass-primary` and `review-pass-adversarial`, then synthesizes findings into one report. When only one helper is available, review falls back to single-pass mode and labels findings as `[single-pass, unconfirmed]`.
 
 Orchestrator routing:
 
@@ -221,7 +226,7 @@ Orchestrator routing:
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`.claude/`, `.github/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) always use full-plan and always trigger dual adversarial review.
+- Control-plane files (`shared/`, `.github/hooks/`, `.codex/`, generated adapters/config, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) always use full-plan and always trigger profile-driven dual review.
 
 Coder skill loading:
 

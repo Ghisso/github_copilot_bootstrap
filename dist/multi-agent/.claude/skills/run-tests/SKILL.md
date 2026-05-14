@@ -1,5 +1,6 @@
 ---
 name: run-tests
+visibility: public
 description: |
   Pytest orchestration with coverage reporting. Runs unit tests, backward
   compatibility checks, and E2E validation in sequence. Use when asked to

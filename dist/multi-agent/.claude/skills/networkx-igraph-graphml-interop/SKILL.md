@@ -1,5 +1,6 @@
 ---
 name: networkx-igraph-graphml-interop
+visibility: background
 description: |
   Fix two related problems when comparing NetworkX graphs against igraph/R-exported
   GraphML files, or when exporting NetworkX graphs to GraphML:

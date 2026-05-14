@@ -154,12 +154,14 @@ def protected_reason(filepath: Path) -> str | None:
         return "Backup files are never compressed."
     if normalized.endswith("/.github/copilot-instructions.md"):
         return "Workspace instructions are source-of-truth and must stay human-authored."
-    if "/.github/instructions/" in normalized and normalized.endswith(".md"):
+    if "/shared/policies/" in normalized and normalized.endswith(".md"):
         return "Instruction files are source-of-truth and must keep exact structure."
     if "/.claude/skills/" in normalized and normalized.endswith("/SKILL.md"):
         return "Skill files must keep exact frontmatter and trigger phrases."
-    if "/.github/agents/" in normalized and normalized.endswith(".agent.md"):
+    if "/shared/agents/" in normalized and normalized.endswith((".md", ".yaml")):
         return "Agent files must keep exact instructions and output contracts."
+    if "/shared/review-profiles/" in normalized and normalized.endswith(".md"):
+        return "Review profiles are source-of-truth and must keep exact checklists."
     return None
 
 

@@ -1,5 +1,6 @@
 ---
 name: graph-schema-compat-migration
+visibility: background
 description: |
   Safely migrate graph node/edge attribute keys without breaking existing retrieval/tests.
   Trigger when refactoring graph schema keys (for example `type` -> `entity_type` or

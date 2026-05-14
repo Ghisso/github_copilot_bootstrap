@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Shared bootstrap agent",
   "type": "object",
-  "required": ["id", "description", "role_type", "visibility", "capabilities", "targets"],
+  "required": ["id", "description", "role_type", "visibility", "capabilities"],
   "properties": {
     "id": {"type": "string"},
     "description": {"type": "string"},
@@ -25,7 +25,7 @@
     },
     "targets": {
       "type": "object",
-      "required": ["github-copilot", "claude-code", "openai-codex"],
+      "deprecated": true,
       "additionalProperties": true
     }
   }

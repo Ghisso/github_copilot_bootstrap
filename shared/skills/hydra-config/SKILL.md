@@ -1,5 +1,6 @@
 ---
 name: hydra-config
+visibility: public
 description: |
   Master Hydra-based hierarchical configuration management. Pure ConfigStore
   approach — all config variants as Python dataclasses, NO YAML files. Use

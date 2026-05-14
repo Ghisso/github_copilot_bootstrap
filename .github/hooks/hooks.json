@@ -4,14 +4,15 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": ".github/hooks/scripts/session-log.sh",
+        "command": "shared/hooks/scripts/session-log.sh",
+        "args": ["github-copilot"],
         "cwd": ".",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["vscode-copilot", "sessionstart"],
+        "command": "shared/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["github-copilot", "sessionstart"],
         "cwd": ".",
         "timeout": 10
       }
@@ -19,7 +20,8 @@
     "Stop": [
       {
         "type": "command",
-        "command": ".github/hooks/scripts/session-log.sh",
+        "command": "shared/hooks/scripts/session-log.sh",
+        "args": ["github-copilot"],
         "cwd": ".",
         "timeout": 10
       }
@@ -27,20 +29,21 @@
     "PreToolUse": [
       {
         "type": "command",
-        "command": ".github/hooks/scripts/protect-files.sh",
+        "command": "shared/hooks/scripts/protect-files.sh",
+        "args": ["github-copilot"],
         "cwd": ".",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".github/hooks/scripts/git-protection.sh",
+        "command": "shared/hooks/scripts/git-protection.sh",
         "cwd": ".",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["vscode-copilot", "pretooluse"],
+        "command": "shared/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["github-copilot", "pretooluse"],
         "cwd": ".",
         "timeout": 10
       }
@@ -48,8 +51,8 @@
     "PostToolUse": [
       {
         "type": "command",
-        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["vscode-copilot", "posttooluse"],
+        "command": "shared/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["github-copilot", "posttooluse"],
         "cwd": ".",
         "timeout": 10
       }
@@ -57,8 +60,8 @@
     "PreCompact": [
       {
         "type": "command",
-        "command": ".github/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["vscode-copilot", "precompact"],
+        "command": "shared/hooks/scripts/context-mode-dispatch.sh",
+        "args": ["github-copilot", "precompact"],
         "cwd": ".",
         "timeout": 10
       }

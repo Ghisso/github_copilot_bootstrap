@@ -1,64 +1,20 @@
 ---
 name: review-api
+visibility: public
 description: |
-  API-specific review combining api-reviewer, security-reviewer, and test-reviewer.
-  Checks endpoints, validation, error handling, and generates test cases.
-  Use when asked to review the API or review an endpoint.
+  Thin API-review alias. Use when asked to review an API or endpoint; routes
+  to the unified `reviewer` agent with `api`, `security`, and `tests` profiles.
 argument-hint: "[endpoint or service file]"
 ---
 
-# review-api — API Endpoint Review
+# Review API
 
-## Review Checklist
+Run:
 
-### Endpoints
-- [ ] RESTful naming conventions
-- [ ] Correct HTTP methods
-- [ ] Consistent URL patterns
-- [ ] Versioned if public-facing
-
-### Validation
-- [ ] Pydantic models for all inputs
-- [ ] Field constraints (min/max, patterns, enums)
-- [ ] Custom validators for complex rules
-- [ ] Meaningful validation error messages
-
-### Error Handling
-- [ ] Structured error responses (consistent format)
-- [ ] Correct HTTP status codes
-- [ ] No internal details in error responses
-- [ ] All exceptions caught and logged
-
-### Security
-- [ ] Input sanitization
-- [ ] No injection vulnerabilities
-- [ ] Auth/authz if needed
-- [ ] No secrets in responses
-
-### Testing
-- [ ] Each endpoint has tests
-- [ ] Valid and invalid inputs tested
-- [ ] Error responses verified
-- [ ] Edge cases covered
-
-## Generated Test Cases
-
-For each endpoint, generate:
-1. Happy path (valid input → expected response)
-2. Invalid input test (validation error response)
-3. Missing required field (422 response)
-4. Boundary value test
-
-## Output
-
+```text
+reviewer: Review [endpoint or service file] with profiles api, security, tests.
 ```
-API Review: [service]
 
-Endpoints: N reviewed
-Issues: N critical, N major, N minor
+The authoritative API checklist lives in `.claude/review-profiles/api.md`.
+Security and test coverage concerns come from `.claude/review-profiles/security.md` and `.claude/review-profiles/tests.md`.
 
-[Detailed findings per endpoint]
-
-Generated Test Cases:
-  [test code for each endpoint]
-```

@@ -1,5 +1,6 @@
 ---
 name: research-critique
+visibility: public
 description: |
   Critical analysis of research papers, academic manuscripts, preprints,
   and technical studies. Evaluates methodology, claims-evidence alignment,

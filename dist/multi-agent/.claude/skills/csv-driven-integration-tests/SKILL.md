@@ -1,5 +1,6 @@
 ---
 name: csv-driven-integration-tests
+visibility: public
 description: |
   Build integration test datasets as CSV files with expected outputs, then use
   pytest parametrize to run them against real (or mock) components. Especially

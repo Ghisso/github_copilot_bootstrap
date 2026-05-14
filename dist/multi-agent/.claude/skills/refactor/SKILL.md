@@ -1,5 +1,6 @@
 ---
 name: refactor
+visibility: public
 description: |
   Safe refactoring with test verification at every step. Establishes baseline,
   applies one change at a time, verifies after each, then scores the result.

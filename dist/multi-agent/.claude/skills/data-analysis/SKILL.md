@@ -1,5 +1,6 @@
 ---
 name: data-analysis
+visibility: public
 description: |
   End-to-end Python data analysis workflow. Load, explore, clean, transform,
   analyze, visualize, and report findings. Use when asked to analyze data,

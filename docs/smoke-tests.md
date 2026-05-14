@@ -16,10 +16,11 @@ Expected:
 
 Expected:
 
-- GitHub Copilot has 17 `.github/agents/*.agent.md` files.
-- The generated output has 17 canonical `.claude/agents/*.md` files.
-- OpenAI Codex has 17 `.codex/agents/*.toml` files.
-- The generated output has 52 repository skills under `.claude/skills/`.
+- GitHub Copilot has 8 `.github/agents/*.agent.md` files.
+- The generated output has 8 canonical `.claude/agents/*.md` files.
+- OpenAI Codex has 8 `.codex/agents/*.toml` files.
+- The generated output mirrors every repository skill under `.claude/skills/`.
+- The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
 - `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
 - The generated output has no obsolete `.github/skills/`, `.agents/skills/`, `.codex/skills/`, or target-local state directories.

@@ -1,5 +1,6 @@
 ---
 name: caveman-compress
+visibility: public
 description: |
   Safely compress note-like natural-language files into terse form while
   preserving code and structure. Use when:
@@ -41,9 +42,10 @@ Do not use this skill on source-of-truth customization files.
 ### Hard-blocked targets
 
 - `.github/copilot-instructions.md`
-- `.github/instructions/**`
+- `shared/policies/**`
 - `.claude/skills/**/SKILL.md`
-- `.github/agents/**/*.agent.md`
+- `shared/agents/**`
+- `shared/review-profiles/**`
 - `*.original.md`
 - code and config files
 

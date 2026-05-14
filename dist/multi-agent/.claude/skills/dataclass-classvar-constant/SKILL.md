@@ -1,5 +1,6 @@
 ---
 name: dataclass-classvar-constant
+visibility: background
 description: |
   Fix dataclass fields intended as immutable constants that are accidentally
   mutable at construction time. Trigger: a field like `_MAX_TOP_K = 500` or
