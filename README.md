@@ -99,7 +99,7 @@ Generated layout:
 
 - `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating
 - `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings
-- `.github/`, `.vscode/mcp.json`: GitHub Copilot native adapters/config
+- `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
 
@@ -293,6 +293,7 @@ Configured events:
 - Stop
   - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully
   - `hf-ai-sync.sh upload-bootstrap` also re-uploads the bootstrap bundle on every Stop so fresh clones can pull it without running the installer again
+- `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 

@@ -305,6 +305,34 @@ def sync_bucket(
     return True
 
 
+STATE_BACKUP_DIR = ".state_backups"
+
+
+def backup_state_files(claude_root: Path) -> None:
+    backup_root = claude_root / STATE_BACKUP_DIR
+    for pattern in STATE_INCLUDES:
+        for path in sorted(claude_root.glob(pattern)):
+            if path.is_file():
+                dest = backup_root / path.relative_to(claude_root)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, dest)
+
+
+def cleanup_unchanged_backups(claude_root: Path) -> None:
+    backup_root = claude_root / STATE_BACKUP_DIR
+    if not backup_root.exists():
+        return
+    for backup in sorted(backup_root.rglob("*")):
+        if not backup.is_file():
+            continue
+        live = claude_root / backup.relative_to(backup_root)
+        if live.exists() and live.read_bytes() == backup.read_bytes():
+            backup.unlink()
+    for dirpath in sorted(backup_root.rglob("*"), reverse=True):
+        if dirpath.is_dir() and not any(dirpath.iterdir()):
+            dirpath.rmdir()
+
+
 def chmod_runtime_scripts(repo_root: Path) -> None:
     for pattern in (".claude/hooks/scripts/*.sh", ".devcontainer/*.sh"):
         for path in repo_root.glob(pattern):
@@ -361,6 +389,7 @@ def pull_state(args: argparse.Namespace, repo_root: Path, bucket_id: str, prefix
     claude_root = repo_root / ".claude"
     if not should_mock(args) and token:
         claude_root.mkdir(parents=True, exist_ok=True)
+    backup_state_files(claude_root)
     ok = sync_bucket(
         args,
         label="pull-state",
@@ -370,6 +399,7 @@ def pull_state(args: argparse.Namespace, repo_root: Path, bucket_id: str, prefix
         delete=False,
         include=STATE_INCLUDES,
     )
+    cleanup_unchanged_backups(claude_root)
     chmod_runtime_scripts(repo_root)
     return ok
 

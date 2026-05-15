@@ -279,6 +279,11 @@ def render_vscode_mcp_json(path: Path) -> None:
     write_json(path, {"servers": shared_mcp_servers()})
 
 
+def render_vscode_tasks_json(path: Path) -> None:
+    src = REPO_ROOT / "shared" / "vscode" / "tasks.json"
+    write_json(path, json.loads(src.read_text()))
+
+
 def render_claude_mcp_json(path: Path) -> None:
     write_json(path, {"mcpServers": shared_mcp_servers()})
 
@@ -631,6 +636,7 @@ def render_github(target_root: Path) -> None:
 
     copy_file(REPO_ROOT / "shared" / "hooks" / "hooks.json", target_root / ".github" / "hooks" / "hooks.json")
     render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
+    render_vscode_tasks_json(target_root / ".vscode" / "tasks.json")
 
     for agent, _agent_dir in shared_agents():
         write_text(

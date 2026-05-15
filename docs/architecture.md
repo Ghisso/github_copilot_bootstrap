@@ -9,6 +9,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/hooks/`: hook config and guardrail scripts.
 - `shared/devcontainer/`: GPU devcontainer bootloader and Hugging Face AI state sync helper. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container.
 - `shared/mcp/servers.yaml`: single MCP server definition for Semble and context-mode.
+- `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `hf-ai-sync.sh pull-state` silently when the workspace opens) and a manual push task for non-AI sessions.
 - `shared/agents/`: canonical custom-agent metadata and neutral prompts.
 - `shared/review-profiles/`: checklists consumed by the unified `reviewer` agent.
 - `shared/prompts/`: reusable prompt templates.
@@ -19,7 +20,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts. Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts. Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native HF state sync that works independently of any AI tool session.
 
 Do not edit `dist/` manually. Regenerate it with:
 
@@ -47,6 +48,23 @@ REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script>
 ```
 
 Hook errors (from `hf-ai-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact.
+
+## HF State Sync and Pull Safety
+
+`hf-ai-sync.py pull-state` snapshots all current state files (`MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, `quality_reports/**`) into `.claude/.state_backups/` before overwriting them. After the pull completes, backups whose content is identical to the pulled version are deleted. Only files that were actually overwritten by the pull retain a backup, so the developer can compare and recover any local changes that were not yet pushed to the bucket.
+
+This runs on every `pull-state` invocation — whether triggered by the VS Code `folderOpen` task, an AI tool `SessionStart` hook, or manually.
+
+`.state_backups/` is excluded from `push-state` (it does not match `STATE_INCLUDES` patterns) and should be added to `.gitignore`.
+
+## VS Code Tasks
+
+`.vscode/tasks.json` (source: `shared/vscode/tasks.json`) provides HF state sync that works without an active AI tool session:
+
+- **AI state: pull from HF bucket** — runs automatically on `folderOpen` (VS Code prompts once to allow automatic tasks). Pulls state silently in the background.
+- **AI state: push to HF bucket** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. Shows output so the developer can confirm the push succeeded.
+
+These complement the AI Stop hooks (which already push on every session end) for workflows where VS Code is open without an active AI session.
 
 ## Custom Agents
 
