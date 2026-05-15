@@ -87,14 +87,17 @@ uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket Ghisso/vscode
 
 and stores files under `hf://buckets/Ghisso/vscode_mounts/img-classification/`.
 
-Hugging Face auth is resolved in this order: `HF_TOKEN`, then
-`HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
-`huggingface-cli login`. Missing auth, missing bucket access, or network failures
-produce warnings and leave local files in place.
+Hugging Face auth is resolved in this order: `HF_TOKEN` env var, then
+`HUGGING_FACE_HUB_TOKEN`, then the cached token at `~/.cache/huggingface/token`.
+Inside the devcontainer the host HF cache is bind-mounted at
+`/home/vscode/.cache/huggingface`, so any token saved by `huggingface-cli login`
+or `hf auth login` on the host is automatically available — no env var needed.
+Missing auth, missing bucket access, or network failures produce warnings and leave
+local files in place.
 
 Generated layout:
 
-- `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos
+- `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating
 - `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings
 - `.github/`, `.vscode/mcp.json`: GitHub Copilot native adapters/config
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
@@ -164,7 +167,7 @@ Interpretation:
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
-- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/)
+- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
@@ -274,6 +277,8 @@ Coder skill loading:
 
 Hooks provide guardrails and lightweight observability.
 
+All hook commands route through [run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the repo root robustly — via `BASH_SOURCE`, environment variable fallbacks (`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`. This avoids the broken-path failures that occur when `$CLAUDE_PROJECT_DIR` is empty or when `git rev-parse` runs from the wrong directory.
+
 Configured events:
 
 - PreToolUse
@@ -283,10 +288,11 @@ Configured events:
 - PostToolUse / PreCompact
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
-  - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`
+  - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
   - SessionStart also calls [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) when available
 - Stop
-  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; missing HF auth or network access warns and exits successfully
+  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully
+  - `hf-ai-sync.sh upload-bootstrap` also re-uploads the bootstrap bundle on every Stop so fresh clones can pull it without running the installer again
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
@@ -318,7 +324,9 @@ VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.
 - `semble` uses `uvx --from "semble[mcp]" semble`.
 - `context-mode` uses the portable bare `context-mode` command.
 
-For machines without a global `context-mode` binary, install it globally or adapt local setup to use `npx -y context-mode`. Hook events already go through `.claude/hooks/scripts/context-mode-dispatch.sh`, which maps the calling target id to the context-mode target name, falls back to `npx -y context-mode hook ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
+**Inside the devcontainer**, Node.js 22 and `context-mode` are pre-installed — no extra setup needed.
+
+**Outside the devcontainer**, hook events go through `.claude/hooks/scripts/context-mode-dispatch.sh`, which maps the calling target id to the context-mode target name, falls back to `npx -y context-mode hook ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
 
 Install `context-mode` with npm when Node.js is already available:
 

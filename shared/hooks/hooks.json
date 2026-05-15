@@ -4,73 +4,81 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/session-log.sh",
-        "args": ["github-copilot"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["session-log.sh", "github-copilot"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["github-copilot", "sessionstart"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["context-mode-dispatch.sh", "github-copilot", "sessionstart"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
-      }
-    ],
-    "Stop": [
-      {
-        "type": "command",
-        "command": ".claude/hooks/scripts/session-log.sh",
-        "args": ["github-copilot"],
-        "cwd": ".",
-        "timeout": 10
-      },
-      {
-        "type": "command",
-        "command": ".claude/hooks/scripts/hf-ai-sync.sh",
-        "args": ["push-state"],
-        "cwd": ".",
-        "timeout": 30
       }
     ],
     "PreToolUse": [
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/protect-files.sh",
-        "args": ["github-copilot"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["protect-files.sh", "github-copilot"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/git-protection.sh",
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["git-protection.sh"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
       },
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["github-copilot", "pretooluse"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["context-mode-dispatch.sh", "github-copilot", "pretooluse"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
       }
     ],
     "PostToolUse": [
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["github-copilot", "posttooluse"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["context-mode-dispatch.sh", "github-copilot", "posttooluse"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
       }
     ],
     "PreCompact": [
       {
         "type": "command",
-        "command": ".claude/hooks/scripts/context-mode-dispatch.sh",
-        "args": ["github-copilot", "precompact"],
-        "cwd": ".",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["context-mode-dispatch.sh", "github-copilot", "precompact"],
+        "cwd": "${workspaceFolder}",
         "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["session-log.sh", "github-copilot"],
+        "cwd": "${workspaceFolder}",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["hf-ai-sync.sh", "push-state"],
+        "cwd": "${workspaceFolder}",
+        "timeout": 180
+      },
+      {
+        "type": "command",
+        "command": ".claude/hooks/scripts/run-hook.sh",
+        "args": ["hf-ai-sync.sh", "upload-bootstrap"],
+        "cwd": "${workspaceFolder}",
+        "timeout": 180
       }
     ]
   }

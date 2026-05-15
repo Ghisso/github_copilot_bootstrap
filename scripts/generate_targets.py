@@ -312,8 +312,20 @@ def render_codex_config(path: Path) -> None:
     write_text(path, "\n".join(lines))
 
 
+def _claude_hook_cmd(script: str, *args: str) -> str:
+    root_expr = '${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}'
+    parts = [f'REPO_ROOT="{root_expr}"', '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"', script, *args]
+    return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
+
+
 def render_claude_settings(path: Path) -> None:
-    settings = {
+    def cmd(script: str, *args: str) -> dict[str, Any]:
+        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 10}
+
+    def cmd_stop(script: str, *args: str) -> dict[str, Any]:
+        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 180}
+
+    settings: dict[str, Any] = {
         "permissions": {
             "deny": [
                 "Read(./.env)",
@@ -326,16 +338,8 @@ def render_claude_settings(path: Path) -> None:
             "SessionStart": [
                 {
                     "hooks": [
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
-                            "timeout": 10,
-                        },
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/context-mode-dispatch.sh claude-code sessionstart",
-                            "timeout": 10,
-                        },
+                        cmd("session-log.sh", "claude-code"),
+                        cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
                     ]
                 }
             ],
@@ -343,60 +347,27 @@ def render_claude_settings(path: Path) -> None:
                 {
                     "matcher": "Edit|MultiEdit|Write|Bash",
                     "hooks": [
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/protect-files.sh claude-code",
-                            "timeout": 10,
-                        },
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/git-protection.sh",
-                            "timeout": 10,
-                        },
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/context-mode-dispatch.sh claude-code pretooluse",
-                            "timeout": 10,
-                        },
+                        cmd("protect-files.sh", "claude-code"),
+                        cmd("git-protection.sh"),
+                        cmd("context-mode-dispatch.sh", "claude-code", "pretooluse"),
                     ],
                 }
             ],
             "PostToolUse": [
                 {
                     "matcher": "*",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/context-mode-dispatch.sh claude-code posttooluse",
-                            "timeout": 10,
-                        }
-                    ],
+                    "hooks": [cmd("context-mode-dispatch.sh", "claude-code", "posttooluse")],
                 }
             ],
             "PreCompact": [
-                {
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/context-mode-dispatch.sh claude-code precompact",
-                            "timeout": 10,
-                        }
-                    ]
-                }
+                {"hooks": [cmd("context-mode-dispatch.sh", "claude-code", "precompact")]}
             ],
             "Stop": [
                 {
                     "hooks": [
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
-                            "timeout": 10,
-                        },
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/hf-ai-sync.sh push-state",
-                            "timeout": 30,
-                        }
+                        cmd("session-log.sh", "claude-code"),
+                        cmd_stop("hf-ai-sync.sh", "push-state"),
+                        cmd_stop("hf-ai-sync.sh", "upload-bootstrap"),
                     ]
                 }
             ],
@@ -407,22 +378,21 @@ def render_claude_settings(path: Path) -> None:
 
 def render_codex_hooks(path: Path) -> None:
     def command(script: str, *args: str) -> str:
-        suffix = " ".join(args)
-        executable = f'"$(git rev-parse --show-toplevel)/.claude/hooks/scripts/{script}"'
-        return f"{executable} {suffix}".rstrip()
+        root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+        parts = [f'REPO_ROOT="{root_expr}"', '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"', script, *args]
+        return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
 
-    hooks = {
+    def cmd(script: str, *args: str, timeout: int = 10) -> dict[str, Any]:
+        return {"type": "command", "command": command(script, *args), "timeout": timeout}
+
+    hooks: dict[str, Any] = {
         "hooks": {
             "SessionStart": [
                 {
                     "matcher": "startup|resume|clear",
                     "hooks": [
-                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10},
-                        {
-                            "type": "command",
-                            "command": command("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
-                            "timeout": 10,
-                        },
+                        cmd("session-log.sh", "openai-codex"),
+                        cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
                     ],
                 }
             ],
@@ -430,33 +400,24 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "*",
                     "hooks": [
-                        {"type": "command", "command": command("protect-files.sh", "openai-codex"), "timeout": 10},
-                        {"type": "command", "command": command("git-protection.sh"), "timeout": 10},
-                        {
-                            "type": "command",
-                            "command": command("context-mode-dispatch.sh", "openai-codex", "pretooluse"),
-                            "timeout": 10,
-                        },
+                        cmd("protect-files.sh", "openai-codex"),
+                        cmd("git-protection.sh"),
+                        cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse"),
                     ],
                 }
             ],
             "PostToolUse": [
                 {
                     "matcher": "*",
-                    "hooks": [
-                        {
-                            "type": "command",
-                            "command": command("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
-                            "timeout": 10,
-                        }
-                    ],
+                    "hooks": [cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse")],
                 }
             ],
             "Stop": [
                 {
                     "hooks": [
-                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10},
-                        {"type": "command", "command": command("hf-ai-sync.sh", "push-state"), "timeout": 30},
+                        cmd("session-log.sh", "openai-codex"),
+                        cmd("hf-ai-sync.sh", "push-state", timeout=180),
+                        cmd("hf-ai-sync.sh", "upload-bootstrap", timeout=180),
                     ]
                 }
             ],

@@ -12,6 +12,21 @@ Preserve the plan -> implement -> verify -> review -> score workflow and hook gu
 
 This file is target-neutral source guidance. Generated Copilot, Claude Code, and Codex adapters point back to the shared `.claude/` basis.
 
+## Package Manager: uv
+
+Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
+
+| Instead of | Use |
+|---|---|
+| `python script.py` | `uv run python script.py` |
+| `python -m pytest` | `uv run pytest` |
+| `pip install foo` | `uv add foo` |
+| `pip install -r requirements.txt` | `uv sync` |
+| `python -m mypy src/` | `uv run mypy src/` |
+| `python -m ruff check` | `uv run ruff check` |
+
+`uv` manages the virtualenv automatically — no manual activation needed.
+
 ## Core Principles
 
 - Plan first for non-trivial work.
@@ -116,6 +131,16 @@ Quality gates:
 **Project:** [TODO: project name and one-liner description]
 **Stack:** Python 3.12+ with uv; adapt framework guidance to the target repo.
 **Active work:** Check `.claude/plans/` and `.claude/explorations/`.
+
+## Command Defaults
+
+- Use `uv` by default for Python execution, scripts, tests, linting, type checks, and dependency management.
+- Prefer `uv run ...` commands over invoking `python`, `python3`, `pip`, or tool entrypoints directly, unless a project instruction or tool limitation explicitly requires otherwise.
+
+## Python Command Policy
+
+- Default to `uv run` for project Python commands, including scripts, module entrypoints, test runs, linters, formatters, and type checkers.
+- Avoid bare `python`, `python3`, `pip`, `pytest`, `ruff`, or `mypy` invocations in normal workflow unless explicitly required by the user or by tooling outside uv's control.
 
 ## Tool Routing
 

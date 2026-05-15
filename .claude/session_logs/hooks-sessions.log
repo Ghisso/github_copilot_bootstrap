@@ -1,0 +1,2 @@
+2026-05-15T16:56:36.000Z,event=Stop,target=claude-code,sessionId=test-123,source=test
+2026-05-15T16:56:58.000Z,event=SessionStart,target=github-copilot,sessionId=sess-456

@@ -21,7 +21,10 @@ LOG_DIR="$REPO_ROOT/.claude/session_logs"
 LOG_FILE="$LOG_DIR/hooks-sessions.log"
 mkdir -p "$LOG_DIR"
 
-LINE=$(printf '%s' "$INPUT" | TARGET_ID="$TARGET_ID" run_python -c 'import json, os, sys
+# Generate timestamp in bash — Claude Code hook payloads do not include a timestamp field.
+NOW="$(date -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || echo "unknown-timestamp")"
+
+LINE=$(printf '%s' "$INPUT" | TARGET_ID="$TARGET_ID" NOW="$NOW" run_python -c 'import json, os, sys
 try:
   data = json.load(sys.stdin)
 except Exception:
@@ -31,9 +34,10 @@ def sanitize(value: object) -> str:
   text = str(value or "")
   return text.replace("\n", " ").replace(",", " ").strip()
 
-timestamp = sanitize(data.get("timestamp"))
-event = sanitize(data.get("hookEventName"))
-session_id = sanitize(data.get("sessionId"))
+timestamp = sanitize(os.environ.get("NOW"))
+# Claude Code uses snake_case (hook_event_name, session_id); Codex uses camelCase (hookEventName, sessionId) or (event, session_id)
+event = sanitize(data.get("hook_event_name") or data.get("hookEventName") or data.get("event"))
+session_id = sanitize(data.get("sessionId") or data.get("session_id"))
 source = sanitize(data.get("source"))
 target = sanitize(os.environ.get("TARGET_ID"))
 prompt = sanitize(data.get("prompt") or data.get("initialPrompt"))

@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT_FOR_LOG="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+ERROR_LOG="$REPO_ROOT_FOR_LOG/.claude/session_logs/hooks-errors.log"
+
 warn() {
-  printf 'WARN hf-ai-sync-hook: %s\n' "$*" >&2
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || echo unknown-timestamp)"
+  local msg="$ts hf-ai-sync: $*"
+  printf 'WARN %s\n' "$msg" >&2
+  mkdir -p "$(dirname "$ERROR_LOG")"
+  printf '%s\n' "$msg" >> "$ERROR_LOG" 2>/dev/null || true
 }
 
 run_python() {
@@ -22,7 +31,6 @@ fi
 cat >/dev/null || true
 
 MODE="${1:-push-state}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 HELPER="$REPO_ROOT/.devcontainer/hf-ai-sync.py"
 
@@ -31,5 +39,8 @@ if [[ ! -f "$HELPER" ]]; then
   exit 0
 fi
 
-run_python "$HELPER" "$MODE" --repo-root "$REPO_ROOT" || warn "Hugging Face AI state sync failed; continuing."
+SYNC_OUT="$(run_python "$HELPER" "$MODE" --repo-root "$REPO_ROOT" 2>&1)" \
+  && printf '%s\n' "$SYNC_OUT" >&2 \
+  || { warn "Hugging Face AI state sync ($MODE) failed: $SYNC_OUT"; }
+printf '{}\n'
 exit 0
