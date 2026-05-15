@@ -67,7 +67,7 @@ Input .md file
 Verify all dependencies are available before starting:
 
 ```bash
-command -v pandoc && command -v mmdc && command -v katex && python3 -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
+command -v pandoc && command -v mmdc && command -v katex && uv run python -c "from playwright.sync_api import sync_playwright; print('playwright OK')"
 ```
 
 ## Pipeline Steps

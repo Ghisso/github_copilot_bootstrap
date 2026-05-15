@@ -76,6 +76,11 @@
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/hf-ai-sync.sh push-state",
+            "timeout": 30
           }
         ]
       }

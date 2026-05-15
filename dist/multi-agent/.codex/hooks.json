@@ -58,6 +58,11 @@
             "type": "command",
             "command": "\"$(git rev-parse --show-toplevel)/.claude/hooks/scripts/session-log.sh\" openai-codex",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)/.claude/hooks/scripts/hf-ai-sync.sh\" push-state",
+            "timeout": 30
           }
         ]
       }

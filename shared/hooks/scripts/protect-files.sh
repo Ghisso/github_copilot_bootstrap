@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v python3 >/dev/null 2>&1; then
+run_python() {
+  if command -v uv >/dev/null 2>&1; then
+    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
+    return $?
+  fi
+  return 127
+}
+
+if ! command -v uv >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -12,7 +20,7 @@ export REPO_ROOT
 export TARGET_ID
 
 INPUT=$(cat)
-OUTPUT=$(printf '%s' "$INPUT" | python3 -c 'import json, os, posixpath, re, shlex, sys
+OUTPUT=$(printf '%s' "$INPUT" | run_python -c 'import json, os, posixpath, re, shlex, sys
 
 repo_root = os.environ.get("REPO_ROOT", "").rstrip("/")
 target_id = os.environ.get("TARGET_ID", "")

@@ -173,6 +173,10 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     render_claude_agents(target_root)
 
 
+def render_devcontainer(target_root: Path) -> None:
+    copy_tree(REPO_ROOT / "shared" / "devcontainer", target_root / ".devcontainer")
+
+
 def reset_target(output_root: Path, target: str) -> Path:
     target_root = output_root / target
     if target_root.exists():
@@ -387,6 +391,11 @@ def render_claude_settings(path: Path) -> None:
                             "type": "command",
                             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/session-log.sh claude-code",
                             "timeout": 10,
+                        },
+                        {
+                            "type": "command",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/scripts/hf-ai-sync.sh push-state",
+                            "timeout": 30,
                         }
                     ]
                 }
@@ -446,7 +455,8 @@ def render_codex_hooks(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10}
+                        {"type": "command", "command": command("session-log.sh", "openai-codex"), "timeout": 10},
+                        {"type": "command", "command": command("hf-ai-sync.sh", "push-state"), "timeout": 30},
                     ]
                 }
             ],
@@ -688,6 +698,7 @@ def render_codex(target_root: Path) -> None:
 
 
 def render_multi_agent(target_root: Path) -> None:
+    render_devcontainer(target_root)
     render_shared_basis(target_root, "multi-agent")
     render_github(target_root)
     render_claude(target_root)

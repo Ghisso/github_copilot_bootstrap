@@ -2,6 +2,7 @@
   "target": "multi-agent",
   "description": "Single installable target for GitHub Copilot, Claude Code, and OpenAI Codex.",
   "canonical_basis": ".claude",
+  "devcontainer_output": ".devcontainer",
   "adapters": {
     "github-copilot": {
       "agent_output": ".github/agents/*.agent.md",

@@ -3,7 +3,7 @@
 Run:
 
 ```bash
-python3 scripts/check_runtime.py
+uv run python scripts/check_runtime.py
 ```
 
 The runtime checker verifies generated runtime files exist and reports optional helper availability.
@@ -12,6 +12,7 @@ Optional helpers:
 
 - `context-mode`
 - `npx`
+- `uv`
 - `uvx`
 - Semble through `uvx --from "semble[mcp]" semble`
 
@@ -23,8 +24,29 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
+- `hf-ai-sync.sh`
 
 The scripts must remain executable in `dist/multi-agent/` and copied consumer repos.
+
+## Devcontainer And HF Sync
+
+Generated output includes `.devcontainer/`:
+
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
+- `Dockerfile` installs Python, uv, git, sudo, and `huggingface_hub[hf_transfer]`.
+- `post-start.sh` calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files.
+
+The default bucket base is `Ghisso/vscode_mounts`, but installed consumer repos should
+store a project-specific bucket path such as `Ghisso/vscode_mounts/img-classification`
+in `.devcontainer/devcontainer.json`. The sync helper resolves settings in this order:
+explicit CLI arguments, `HF_AI_SYNC_*` environment variables, `.devcontainer` config,
+then the default bucket base. Auth resolves in this order: `HF_TOKEN`,
+`HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
+`huggingface-cli login`. Missing auth or bucket access produces warnings and does not
+fail the container start or agent hook.
+
+Prefer CLI sync through `huggingface_hub` over `hf-mount`. The generated devcontainer
+does not require `/dev/fuse`, `SYS_ADMIN`, or apparmor overrides.
 
 Codex-specific runtime notes:
 

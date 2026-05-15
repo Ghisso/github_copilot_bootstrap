@@ -54,7 +54,7 @@ Do not use this skill on source-of-truth customization files.
 1. Run the detector first:
 
    ```bash
-   python .claude/skills/caveman-compress/scripts/detect.py <filepath>
+   uv run python .claude/skills/caveman-compress/scripts/detect.py <filepath>
    ```
 
 2. If the detector rejects the file, stop and explain why.
@@ -74,7 +74,7 @@ Do not use this skill on source-of-truth customization files.
 8. Validate the result:
 
    ```bash
-   python .claude/skills/caveman-compress/scripts/validate.py <original-backup> <compressed-file>
+   uv run python .claude/skills/caveman-compress/scripts/validate.py <original-backup> <compressed-file>
    ```
 
 9. If validation reports errors, patch only the broken sections and rerun validation.

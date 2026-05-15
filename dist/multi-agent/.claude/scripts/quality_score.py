@@ -5,10 +5,10 @@ Runs ruff, mypy, and pytest as subprocesses and aggregates results
 into a single score against the rubric in .claude/instructions/quality-and-testing.instructions.md.
 
 Usage:
-    python .claude/scripts/quality_score.py src/
-    python .claude/scripts/quality_score.py src/retrieval/query_runner.py
-    python .claude/scripts/quality_score.py src/ --json
-    python .claude/scripts/quality_score.py src/ --skip-tests
+    uv run python .claude/scripts/quality_score.py src/
+    uv run python .claude/scripts/quality_score.py src/retrieval/query_runner.py
+    uv run python .claude/scripts/quality_score.py src/ --json
+    uv run python .claude/scripts/quality_score.py src/ --skip-tests
 """
 
 from __future__ import annotations

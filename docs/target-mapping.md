@@ -2,6 +2,12 @@
 
 The repo generates one installable output: `dist/multi-agent/`.
 
+## Devcontainer Bootloader
+
+The generated `.devcontainer/` directory is intended to be committed in consumer
+repos. It provides a GPU-capable sandbox and a post-start sync helper that restores
+ignored AI bootstrap/state files from the configured Hugging Face sync path.
+
 ## Shared Basis
 
 The shared basis lives under `.claude/`:

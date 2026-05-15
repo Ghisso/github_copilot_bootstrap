@@ -45,7 +45,7 @@ Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 orchestrator -> planner -> coder/designer -> reviewer -> verifier
 ```
 
-Control-plane files include `shared/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
+Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
 
 ## Agents
 

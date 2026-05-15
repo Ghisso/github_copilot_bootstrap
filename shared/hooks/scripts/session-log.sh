@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v python3 >/dev/null 2>&1; then
+run_python() {
+  if command -v uv >/dev/null 2>&1; then
+    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
+    return $?
+  fi
+  return 127
+}
+
+if ! command -v uv >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -13,7 +21,7 @@ LOG_DIR="$REPO_ROOT/.claude/session_logs"
 LOG_FILE="$LOG_DIR/hooks-sessions.log"
 mkdir -p "$LOG_DIR"
 
-LINE=$(printf '%s' "$INPUT" | TARGET_ID="$TARGET_ID" python3 -c 'import json, os, sys
+LINE=$(printf '%s' "$INPUT" | TARGET_ID="$TARGET_ID" run_python -c 'import json, os, sys
 try:
   data = json.load(sys.stdin)
 except Exception:

@@ -37,9 +37,13 @@ Core principles:
 - Ship only when quality gates are met.
 - Preserve lessons learned in memory and session logs.
 
-## Quick Copy
+## Quick Install
 
-Regenerate first, then copy the single generated bootstrap.
+Regenerate first, then install the single generated bootstrap into a target repo.
+The installer copies the generated AI files, keeps `.devcontainer/` trackable, adds
+an idempotent `.gitignore` block for generated/private AI content, writes the
+project-specific Hugging Face sync path into the devcontainer config, and uploads the
+bootstrap bundle when auth is available.
 
 ```bash
 set -euo pipefail
@@ -47,21 +51,20 @@ set -euo pipefail
 # 1) Set paths
 BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
 TARGET_REPO="/absolute/path/to/your-project"
+PROJECT_NAME="$(basename "$TARGET_REPO")"
+HF_BUCKET_PATH="Ghisso/vscode_mounts/$PROJECT_NAME"
 
 # 2) Regenerate installable output
 cd "$BOOTSTRAP_REPO"
-python3 scripts/generate_targets.py --all
+uv run python scripts/generate_targets.py --all
 
-# 3) Copy the generated bootstrap into the project root
-rsync -av "$BOOTSTRAP_REPO/dist/multi-agent/" "$TARGET_REPO/"
+# 3) Install into the project root and upload the private AI bootstrap bundle
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket "$HF_BUCKET_PATH"
 
-# 4) Ensure shared hook scripts are executable
-chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh
-
-# 5) Optional: commit in target repo
+# 4) Commit the trackable devcontainer and ignore rule in the target repo
 cd "$TARGET_REPO"
-git add -A
-git commit -m "chore: add agent bootstrap"
+git add .devcontainer .gitignore
+git commit -m "chore: add AI devcontainer bootstrap"
 ```
 
 If you are already inside this bootstrap repo and only need to set the target path:
@@ -70,19 +73,51 @@ If you are already inside this bootstrap repo and only need to set the target pa
 set -euo pipefail
 
 TARGET_REPO="/absolute/path/to/your-project"
-python3 scripts/generate_targets.py --all
-rsync -av "dist/multi-agent/" "$TARGET_REPO/"
-chmod +x "$TARGET_REPO/.claude/hooks/scripts/"*.sh
+PROJECT_NAME="$(basename "$TARGET_REPO")"
+HF_BUCKET_PATH="Ghisso/vscode_mounts/$PROJECT_NAME"
+uv run python scripts/generate_targets.py --all
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket "$HF_BUCKET_PATH"
 ```
+
+For `img-classification`, that expands to:
+
+```bash
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket Ghisso/vscode_mounts/img-classification
+```
+
+and stores files under `hf://buckets/Ghisso/vscode_mounts/img-classification/`.
+
+Hugging Face auth is resolved in this order: `HF_TOKEN`, then
+`HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
+`huggingface-cli login`. Missing auth, missing bucket access, or network failures
+produce warnings and leave local files in place.
 
 Generated layout:
 
+- `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos
 - `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings
 - `.github/`, `.vscode/mcp.json`: GitHub Copilot native adapters/config
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
 
-If you do not use one of the tools, delete only that tool's native adapter/config files after copying. Keep `.claude/` unless you are intentionally removing the shared basis.
+Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
+content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
+and MCP files should stay ignored. A fresh clone can reopen in the devcontainer and
+pull the ignored AI content from:
+
+```text
+hf://buckets/Ghisso/vscode_mounts/<project-name>/bootstrap/
+hf://buckets/Ghisso/vscode_mounts/<project-name>/state/
+```
+
+For example, installing with `--bucket Ghisso/vscode_mounts/img-classification`
+uses `img-classification/` as the project path inside the `Ghisso/vscode_mounts`
+bucket.
+
+If you do not use one of the tools, delete only that tool's native adapter/config
+files after installing and then re-run the installer/upload if you want the pruned
+bundle stored in HF. Keep `.claude/` unless you are intentionally removing the shared
+basis.
 
 Optional pruning after copy:
 
@@ -129,6 +164,7 @@ Interpretation:
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
+- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
@@ -249,6 +285,8 @@ Configured events:
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`
   - SessionStart also calls [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) when available
+- Stop
+  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; missing HF auth or network access warns and exits successfully
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
@@ -313,12 +351,12 @@ export PATH="$HOME/.local/bin:$PATH"
 Run the bootstrap runtime check after copying optional surfaces:
 
 ```bash
-python3 scripts/check_runtime.py
+uv run python scripts/check_runtime.py
 ```
 
 ## How To Use This Bootstrap In Another Project
 
-1. Regenerate the installable output with `python3 scripts/generate_targets.py --all`.
+1. Regenerate the installable output with `uv run python scripts/generate_targets.py --all`.
 2. Copy `dist/multi-agent/` into your target project.
 3. Review and adjust the generated root guidance for project-specific stack details.
 4. Keep hooks enabled and ensure `.claude/hooks/scripts/*.sh` is executable in your environment.

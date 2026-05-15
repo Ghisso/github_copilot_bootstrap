@@ -20,7 +20,7 @@ touch tests/__init__.py tests/conftest.py
 ```
 
 ## Step 2: Copy Scaffold Files
-- Regenerate this bootstrap with `python3 scripts/generate_targets.py --all`
+- Regenerate this bootstrap with `uv run python scripts/generate_targets.py --all`
 - Copy `dist/multi-agent/` into the new project root
 - Copy `pyproject.toml`, `.gitignore`, `.env.example`
 

@@ -7,6 +7,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/policies/`: reusable workflow, quality, code, testing, routing, and deployment guidance.
 - `shared/skills/`: reusable skills with `visibility: public|background` metadata.
 - `shared/hooks/`: hook config and guardrail scripts.
+- `shared/devcontainer/`: GPU devcontainer bootloader and Hugging Face AI state sync helper.
 - `shared/mcp/servers.yaml`: single MCP server definition for Semble and context-mode.
 - `shared/agents/`: canonical custom-agent metadata and neutral prompts.
 - `shared/review-profiles/`: checklists consumed by the unified `reviewer` agent.
@@ -18,12 +19,12 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts. Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts. Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex.
 
 Do not edit `dist/` manually. Regenerate it with:
 
 ```bash
-python3 scripts/generate_targets.py --all
+uv run python scripts/generate_targets.py --all
 ```
 
 ## Custom Agents

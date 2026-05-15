@@ -3,8 +3,8 @@
 ## Deterministic Generation
 
 ```bash
-python3 scripts/generate_targets.py --all
-python3 scripts/validate_targets.py
+uv run python scripts/generate_targets.py --all
+uv run python scripts/validate_targets.py
 ```
 
 Expected:
@@ -27,6 +27,7 @@ Expected:
 - Claude and Codex outputs do not contain Copilot model pins.
 - Codex does not generate deprecated `.codex/rules/` output.
 - Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
+- Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, and `.devcontainer/hf-ai-sync.py`.
 
 ## MCP Routing
 
@@ -49,5 +50,15 @@ Expected:
 - `protect-files.sh` denies protected files through structured write tools and Bash writes such as `touch .env`.
 - Hook config edits through Bash redirection are protected, with Codex denying and GitHub/Claude asking for approval.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
+- Stop hooks invoke `hf-ai-sync.sh` to push mutable AI state to Hugging Face.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
+
+## Devcontainer And HF Sync
+
+Expected:
+
+- `.devcontainer/` is trackable and generated AI content is ignored by the installer.
+- The generated devcontainer forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
+- The generated devcontainer does not require `/dev/fuse`, `SYS_ADMIN`, or apparmor overrides.
+- The HF sync helper reads installed `.devcontainer` sync settings, falls back to `Ghisso/vscode_mounts`, and supports dry-run operation without network access.

@@ -6,31 +6,49 @@
 2. Regenerate the installable output:
 
    ```bash
-   python3 scripts/generate_targets.py --all
+   uv run python scripts/generate_targets.py --all
    ```
 
 3. Validate generated output:
 
    ```bash
-   python3 scripts/validate_targets.py
+   uv run python scripts/validate_targets.py
    ```
 
 4. Check optional runtime wiring:
 
    ```bash
-   python3 scripts/check_runtime.py
+   uv run python scripts/check_runtime.py
    ```
 
 ## For Consumer Repositories
 
-Copy the single generated target:
+Install the single generated target:
 
 ```bash
-rsync -av dist/multi-agent/ /path/to/your-project/
-chmod +x /path/to/your-project/.claude/hooks/scripts/*.sh
+TARGET_REPO="/path/to/your-project"
+HF_BUCKET_PATH="Ghisso/vscode_mounts/$(basename "$TARGET_REPO")"
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket "$HF_BUCKET_PATH"
 ```
 
-The generated `.claude/` tree is the shared basis for all tools, while `.github/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, and `.vscode/mcp.json` are native adapters/config. If a consumer repo does not use one tool, delete only that tool's native adapter/config files and keep `.claude/`.
+For `img-classification`, that is:
+
+```bash
+uv run python scripts/install_bootstrap.py /path/to/your-project/ --bucket Ghisso/vscode_mounts/img-classification
+```
+
+The installer copies the generated bootstrap, keeps `.devcontainer/` trackable, adds
+an idempotent `.gitignore` block for generated/private AI content, and uploads the
+bootstrap bundle to `hf://buckets/Ghisso/vscode_mounts/<project-name>/bootstrap/`
+when Hugging Face auth is available. It also writes the sync path into
+`.devcontainer/devcontainer.json`, so hooks and container startup use the same HF
+prefix.
+
+The generated `.claude/` tree is the shared basis for all tools, while `.github/`,
+`.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, and `.vscode/mcp.json` are native
+adapters/config. In consumer repos those AI files should stay ignored; `.devcontainer/`
+is committed so a fresh clone can reopen in a container and pull the ignored AI bundle
+and state from Hugging Face.
 
 Optional pruning:
 

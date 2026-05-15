@@ -122,6 +122,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Protected file edits are denied
 - Dangerous git commands are denied
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`
+- Session stop pushes mutable AI state to the configured Hugging Face bucket when auth is available
 - Runtime hook errors are logged to `.claude/session_logs/hooks-errors.log`
 
 **Manual reminders still required:**
