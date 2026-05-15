@@ -1,0 +1,18 @@
+{
+  "id": "documenter",
+  "description": "Documentation update agent. Reads git diff, identifies changed public interfaces and flows, then updates README.md and docs/ with accurate prose and Mermaid diagrams.",
+  "role_type": "documenter",
+  "visibility": "hidden",
+  "capabilities": [
+    "edit",
+    "execute",
+    "read",
+    "search"
+  ],
+  "delegates": [],
+  "model_intent": {
+    "github-copilot": "target-default",
+    "claude-code": "target-native",
+    "openai-codex": "target-native"
+  }
+}

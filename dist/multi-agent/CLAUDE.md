@@ -189,9 +189,9 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 ## Orchestrator Loop (After Plan Approval)
 
 ```
-IMPLEMENT → VERIFY → REVIEW → FIX → RE-VERIFY → SCORE
-    ↑                                              |
-    └──────── loop (max 5 rounds) ←────────────────┘
+IMPLEMENT → VERIFY → REVIEW → FIX → RE-VERIFY → SCORE → DOCUMENT
+    ↑                                                         |
+    └──────────────── loop (max 5 rounds) ←───────────────────┘
 ```
 
 **IMPLEMENT:** Config-first: create dataclass + ConfigStore before feature code. Test-as-you-go.
@@ -218,6 +218,12 @@ uv run ruff check src/ tests/
 **SCORE:** See `quality-and-testing.instructions.md` rubric.
 - Score ≥ 80 = commit
 - Score ≥ 90 = PR-ready
+
+**DOCUMENT (after score ≥ 80):**
+- Delegate to `documenter` with the diff range and changed file list.
+- Pass any new public APIs, config keys, or pipeline changes explicitly.
+- Gate: all referenced Mermaid diagrams must render (no syntax errors).
+- Skip only if zero user-facing surfaces changed (pure test/internal refactor).
 
 **"Just do it" mode:** Skip final approval pause, auto-commit if score ≥ 80, still run full loop.
 
@@ -261,6 +267,8 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 [ ] MEMORY.md has all [LEARN] entries
 [ ] Verification passed (pytest + mypy + ruff)
 [ ] Score ≥ threshold before commit/PR
+[ ] Docs updated for all changed public interfaces and flows
+[ ] Mermaid diagrams render without errors
 ```
 
 ---

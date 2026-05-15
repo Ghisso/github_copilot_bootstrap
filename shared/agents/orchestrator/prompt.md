@@ -26,6 +26,7 @@ The todo list must be visible and up-to-date at all times.
 6. Execute the plan by delegating implementation to `coder` and `designer`.
 7. Run `reviewer` with targeted profiles based on changed areas (see Reviewer Routing below).
 8. Run `verifier` as final gate.
+8a. Run `documenter` after verifier passes. Pass: git diff range, list of changed files, and any new public APIs or config keys identified during implementation. Skip only for pure-internal changes (no public interface, no config, no pipeline wiring changed).
 9. Run learn and wrap-up (see Completion Protocol below).
 10. Return a concise status report with risks and follow-ups.
 
