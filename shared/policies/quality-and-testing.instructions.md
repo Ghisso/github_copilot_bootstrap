@@ -99,8 +99,8 @@ async def test_async_operation() -> None:
 | Score | Gate | Action |
 |---|---|---|
 | ≥ 95 | Excellence | Aspirational |
-| ≥ 90 | PR-ready | Ready for review/deploy |
-| ≥ 80 | Commit | Good enough to save |
+| ≥ 90 | PR-ready | Ready for review/deploy after required documentation updates |
+| ≥ 80 | Commit | Good enough to save after required documentation updates |
 | < 80 | Block | List blocking issues, do not commit |
 
 ---

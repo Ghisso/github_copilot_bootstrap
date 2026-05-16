@@ -4,7 +4,7 @@ description: Load when choosing between Semble, context-mode, grep, and direct f
 
 # Tool Routing
 
-This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble and context-mode are optional helpers; they do not replace the plan, verify, review, score loop, hook guardrails, or project-specific instructions.
+This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble and context-mode are retrieval helpers; they do not replace the plan, verify, review, score, document workflow, hook guardrails, or project-specific instructions.
 
 ## Routing Contract
 
@@ -19,7 +19,7 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 1. Prefer the narrowest reliable source: known file, exact search, or local config.
 2. Use Semble when semantic relationships matter more than exact text.
 3. Use context-mode when the task depends on large artifacts, conversational continuity, or content likely to be lost during compaction.
-4. If optional tools are unavailable, continue with direct reads and `rg`; missing optional binaries are warnings, not blockers.
+4. Inside the generated devcontainer, Semble and context-mode are installed as required tools. Outside that managed environment, if retrieval helpers are unavailable, continue with direct reads and `rg`; missing optional binaries are warnings, not blockers.
 
 ## Do Not Use Optional Retrieval For
 

@@ -448,7 +448,8 @@ def render_root_guidance(target: str) -> str:
     return (
         f"# {title}\n\n"
         "This target is generated from `shared/`. Do not edit generated files manually.\n\n"
-        "Preserve the plan -> implement -> verify -> review -> score workflow and hook guardrails.\n\n"
+        "Preserve the plan -> implement -> verify -> review -> score -> document workflow and hook guardrails. "
+        "After score >= 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit or PR.\n\n"
         f"{agent_note}\n\n"
         "## Workspace\n\n"
         f"{transform_target_paths(section_body(workspace), target)}\n\n"
@@ -509,7 +510,7 @@ Native Copilot files under `.github/` are adapters:
 
 Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
 
-Preserve the plan -> implement -> verify -> review -> score workflow. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+Preserve the plan -> implement -> verify -> review -> score -> document workflow. After score >= 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit or PR. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
 """
 
 

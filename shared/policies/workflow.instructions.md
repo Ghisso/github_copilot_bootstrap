@@ -2,7 +2,7 @@
 description: "Always-on: Workflow protocol — plan-first, orchestrator loop, session logging, context management. Load when planning, implementing, or starting a session."
 ---
 
-# Workflow: Plan → Implement → Verify → Review → Score
+# Workflow: Plan → Implement → Verify → Review → Score → Document
 
 ---
 
@@ -50,8 +50,8 @@ uv run ruff check src/ tests/
 **FIX:** Critical → Major → Minor order.
 
 **SCORE:** See `quality-and-testing.instructions.md` rubric.
-- Score ≥ 80 = commit
-- Score ≥ 90 = PR-ready
+- Score ≥ 80 = eligible for commit after required documentation updates
+- Score ≥ 90 = eligible for PR after required documentation updates
 
 **DOCUMENT (after score ≥ 80):**
 - Delegate to `documenter` with the diff range and changed file list.
@@ -59,7 +59,7 @@ uv run ruff check src/ tests/
 - Gate: all referenced Mermaid diagrams must render (no syntax errors).
 - Skip only if zero user-facing surfaces changed (pure test/internal refactor).
 
-**"Just do it" mode:** Skip final approval pause, auto-commit if score ≥ 80, still run full loop.
+**"Just do it" mode:** Skip final approval pause, auto-commit only after score ≥ 80 and the DOCUMENT step is complete or explicitly skipped by the pure-internal rule.
 
 ---
 

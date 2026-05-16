@@ -52,7 +52,7 @@ else
   echo "quality_score.py not found — skipping score (ruff+mypy+pytest gates still apply)"
 fi
 ```
-**Pass criteria:** Score ≥ 80 for commit, ≥ 90 for PR. If the script is absent, skip without failing.
+**Pass criteria:** Score ≥ 80 for commit eligibility and ≥ 90 for PR eligibility; commit/PR still require the DOCUMENT step from `workflow.instructions.md` unless the change is pure-internal. If the script is absent, skip without failing.
 
 ## Report Format
 

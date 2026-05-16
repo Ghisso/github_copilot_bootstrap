@@ -342,6 +342,30 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
     check("github-copilot" in github_hook_text, "GitHub hooks should pass target id", errors)
     check("hf-ai-sync.sh" in github_hook_text, "GitHub stop hooks should push HF AI state", errors)
+    for event_name, hooks in github_hooks.get("hooks", {}).items():
+        check(isinstance(hooks, list), f"GitHub hook event must be a list: {event_name}", errors)
+        for hook in hooks if isinstance(hooks, list) else []:
+            if not isinstance(hook, dict):
+                errors.append(f"GitHub hook must be an object: {event_name}")
+                continue
+            check(hook.get("type") == "command", f"GitHub hook must be command type: {event_name}", errors)
+            check("args" not in hook, f"GitHub hooks must not use unsupported args field: {event_name}", errors)
+            check("bash" in hook, f"GitHub hook must include bash field to avoid /bin/sh fallback: {event_name}", errors)
+            check("timeout" in hook, f"GitHub hook missing VS Code timeout: {event_name}", errors)
+            check("timeoutSec" in hook, f"GitHub hook missing Copilot CLI/cloud timeoutSec: {event_name}", errors)
+            for field in ("bash", "linux", "osx"):
+                command = hook.get(field)
+                if command is not None:
+                    check(
+                        ".claude/hooks/scripts/run-hook.sh" in str(command),
+                        f"GitHub hook {field} should invoke shared dispatcher: {event_name}",
+                        errors,
+                    )
+                    check(
+                        "/bin/sh" not in str(command),
+                        f"GitHub hook {field} must not depend on /bin/sh: {event_name}",
+                        errors,
+                    )
 
     claude_settings = json.loads(read(TARGET_ROOT / ".claude" / "settings.json"))
     claude_settings_text = json.dumps(claude_settings)
@@ -581,6 +605,48 @@ def validate_skills_and_paths(errors: list[str]) -> None:
                 if fragment in text:
                     errors.append(f"Copilot path leaked into non-GitHub output: {path} contains {fragment}")
 
+    for root_guidance in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md"):
+        text = read(root_guidance)
+        check(
+            "plan -> implement -> verify -> review -> score -> document workflow" in text,
+            f"{root_guidance.name} must include the documentation step after score in the root workflow summary",
+            errors,
+        )
+        check(
+            "After score >= 80, update documentation" in text,
+            f"{root_guidance.name} must require documentation updates after passing score",
+            errors,
+        )
+
+    stale_workflow_fragments = (
+        "plan -> implement -> verify -> review -> score workflow",
+        "PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE\n",
+        "plan, verify, review, score loop",
+        "plan/verify/review/score loop",
+        "Score ≥ 80 = commit",
+        "Score ≥ 90 = PR-ready",
+        "auto-commit if score ≥ 80",
+    )
+    for path in (
+        TARGET_ROOT / "AGENTS.md",
+        TARGET_ROOT / "CLAUDE.md",
+        TARGET_ROOT / ".claude" / "instructions" / "workspace.instructions.md",
+        TARGET_ROOT / ".claude" / "instructions" / "workflow.instructions.md",
+        TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md",
+        TARGET_ROOT / ".claude" / "instructions" / "quality-and-testing.instructions.md",
+        TARGET_ROOT / ".claude" / "agents" / "orchestrator.md",
+        TARGET_ROOT / ".claude" / "agents" / "verifier.md",
+    ):
+        text = read(path)
+        for fragment in stale_workflow_fragments:
+            check(fragment not in text, f"{path} contains stale workflow/gate phrase: {fragment}", errors)
+    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md")
+    check(
+        "Inside the generated devcontainer, Semble and context-mode are installed as required tools" in tool_routing_text,
+        "tool-routing instructions must distinguish required devcontainer tooling from outside-devcontainer fallbacks",
+        errors,
+    )
+
     validate_support_files(errors)
     validate_generated_hygiene(errors)
 
@@ -637,12 +703,30 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
 
     if (devcontainer_root / "devcontainer.json").exists():
         data = json.loads(read(devcontainer_root / "devcontainer.json"))
+        build = data.get("build", {})
         run_args = data.get("runArgs", [])
         container_env = data.get("containerEnv", {})
+        settings = data.get("customizations", {}).get("vscode", {}).get("settings", {})
+        post_create = data.get("postCreateCommand", "")
+        check(build.get("context") == ".", "devcontainer build context must stay inside .devcontainer", errors)
         check(data.get("postStartCommand") == "bash .devcontainer/post-start.sh", "devcontainer must run post-start sync script", errors)
         check("--gpus" in run_args and "all" in run_args, "devcontainer must default to GPU sandbox run args", errors)
+        check("HF_HUB_ENABLE_HF_TRANSFER" not in container_env, "devcontainer must not use deprecated HF_HUB_ENABLE_HF_TRANSFER", errors)
+        check(container_env.get("HF_XET_HIGH_PERFORMANCE") == "1", "devcontainer must enable high-performance Hugging Face Xet transfers", errors)
         check("HF_TOKEN" in container_env, "devcontainer must forward HF_TOKEN", errors)
         check("HUGGING_FACE_HUB_TOKEN" in container_env, "devcontainer must forward HUGGING_FACE_HUB_TOKEN", errors)
+        check(
+            container_env.get("UV_PROJECT_ENVIRONMENT") == "/home/vscode/.venv",
+            "devcontainer must not reuse a host-mounted project .venv",
+            errors,
+        )
+        check(container_env.get("UV_LINK_MODE") == "copy", "devcontainer must use uv copy link mode", errors)
+        check(
+            settings.get("python.defaultInterpreterPath") == "/home/vscode/.venv/bin/python",
+            "devcontainer VS Code Python path must use the container-local uv venv",
+            errors,
+        )
+        check("/home/vscode/.venv" in post_create, "devcontainer postCreateCommand must initialize the container-local uv venv", errors)
         forbidden_run_args = ("/dev/fuse", "apparmor:unconfined")
         for fragment in forbidden_run_args:
             check(
@@ -654,8 +738,25 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     if (devcontainer_root / "Dockerfile").exists():
         dockerfile = read(devcontainer_root / "Dockerfile")
         check("cuda-dl-base" in dockerfile, "devcontainer Dockerfile must use the GPU base image", errors)
+        check("npm install -g context-mode" in dockerfile, "devcontainer Dockerfile must install context-mode", errors)
+        check("command -v context-mode" in dockerfile, "devcontainer Dockerfile must verify context-mode is on PATH", errors)
+        check("context-mode --help >/dev/null" in dockerfile, "devcontainer Dockerfile must verify context-mode CLI execution", errors)
         check("huggingface_hub" in dockerfile, "devcontainer Dockerfile must install Hugging Face tooling", errors)
+        check("hf_transfer" not in dockerfile, "devcontainer Dockerfile must not install deprecated hf_transfer tooling", errors)
+        check("\"semble[mcp]\"" in dockerfile, "devcontainer Dockerfile must install Semble MCP tooling", errors)
+        check("python3 -c \"import huggingface_hub, semble\"" in dockerfile, "devcontainer Dockerfile must verify HF hub and Semble imports", errors)
+        check("command -v hf" in dockerfile, "devcontainer Dockerfile must verify the HF CLI is on PATH", errors)
+        check("command -v semble" in dockerfile, "devcontainer Dockerfile must verify the Semble CLI is on PATH", errors)
+        check("optional " not in dockerfile.lower(), "devcontainer tool installs must be required, not optional fallbacks", errors)
+        check("getent passwd \"${USERNAME}\"" in dockerfile, "devcontainer Dockerfile must verify the remote user passwd entry", errors)
+        check("id -gn \"${USERNAME}\"" in dockerfile, "devcontainer Dockerfile must use the remote user's actual primary group", errors)
         check("USER ${USERNAME}" in dockerfile, "devcontainer Dockerfile must switch to the non-host user", errors)
+
+    post_start = devcontainer_root / "post-start.sh"
+    if post_start.exists():
+        post_start_text = read(post_start)
+        check("python3 \"$@\"" in post_start_text, "post-start must run the HF helper with system python3", errors)
+        check("uv run python" not in post_start_text, "post-start must not invoke project uv for HF sync", errors)
 
     helper = devcontainer_root / "hf-ai-sync.py"
     if helper.exists():

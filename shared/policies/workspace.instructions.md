@@ -30,6 +30,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
+- After score ≥ 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior.
 - Keep hook guardrails enabled.
 - Capture reusable lessons in `.claude/MEMORY.md`.
 
@@ -39,7 +40,7 @@ Always consult the relevant files under `.claude/instructions/`:
 
 | File | Covers |
 |---|---|
-| `workflow.instructions.md` | Plan -> implement -> verify -> review -> score loop |
+| `workflow.instructions.md` | Plan -> implement -> verify -> review -> score -> document loop |
 | `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
@@ -51,7 +52,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE
+PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE -> DOCUMENT
 ```
 
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
@@ -118,8 +119,8 @@ Quality gates:
 
 | Score | Gate |
 |---|---|
-| >= 90 | PR-ready |
-| >= 80 | Commit-ready |
+| >= 90 | PR-ready after required documentation updates |
+| >= 80 | Commit-ready after required documentation updates |
 | < 80 | Blocked |
 
 ## Project State

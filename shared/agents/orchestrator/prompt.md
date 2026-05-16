@@ -25,8 +25,8 @@ The todo list must be visible and up-to-date at all times.
 5. Delegate planning to `planner` with the routing decision.
 6. Execute the plan by delegating implementation to `coder` and `designer`.
 7. Run `reviewer` with targeted profiles based on changed areas (see Reviewer Routing below).
-8. Run `verifier` as final gate.
-8a. Run `documenter` after verifier passes. Pass: git diff range, list of changed files, and any new public APIs or config keys identified during implementation. Skip only for pure-internal changes (no public interface, no config, no pipeline wiring changed).
+8. Run `verifier` as final gate, including quality score when available.
+8a. After score ≥ 80, run `documenter` before commit or PR. Pass: git diff range, list of changed files, and any new public APIs, config keys, workflows, or user-facing behavior identified during implementation. Skip only for pure-internal changes (no public interface, no config, no workflow, no user-facing behavior, and no pipeline wiring changed).
 9. Run learn and wrap-up (see Completion Protocol below).
 10. Return a concise status report with risks and follow-ups.
 
@@ -62,7 +62,7 @@ Select reviewer profiles based on the surface area changed. Run `reviewer` once 
 
 ## Quality Gates
 
-- Respect workspace gates: 80+ before commit and 90+ before PR.
+- Respect workspace gates: 80+ plus required documentation updates before commit, and 90+ plus required documentation updates before PR.
 - Ensure verification commands are executed for code changes.
 - If a gate fails, delegate fixes before reporting done.
 

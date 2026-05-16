@@ -60,5 +60,6 @@ Plans should include required skills per implementation step so coding agents kn
 
 - [ ] All tests pass
 - [ ] Score ≥ 80
+- [ ] Documentation updated for changed public interfaces, config, workflows, and user-facing behavior
 - [ ] PR ready
 ```

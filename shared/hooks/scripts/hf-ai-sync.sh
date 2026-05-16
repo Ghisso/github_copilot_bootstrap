@@ -28,7 +28,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 # Drain hook JSON from stdin. The sync helper derives everything from git/env.
-cat >/dev/null || true
+timeout 2 cat >/dev/null 2>/dev/null || true
 
 MODE="${1:-push-state}"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"

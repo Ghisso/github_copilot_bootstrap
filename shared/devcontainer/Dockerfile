@@ -27,30 +27,43 @@ RUN apt-get update \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g context-mode
+RUN npm install -g context-mode \
+    && command -v context-mode \
+    && context-mode --help >/dev/null
 
-RUN if ! getent group "${USER_GID}" >/dev/null; then groupadd --gid "${USER_GID}" "${USERNAME}"; fi \
-    && if ! id -u "${USERNAME}" >/dev/null 2>&1; then \
-        EXISTING=$(id -nu "${USER_UID}" 2>/dev/null); \
-        if [ -n "$EXISTING" ] && [ "$EXISTING" != "${USERNAME}" ]; then \
-            usermod -l "${USERNAME}" "$EXISTING" \
-            && usermod -d "/home/${USERNAME}" -m "${USERNAME}" \
-            && groupmod -n "${USERNAME}" "$EXISTING" 2>/dev/null || true; \
+RUN set -eux; \
+    if id -u "${USERNAME}" >/dev/null 2>&1; then \
+        usermod --shell /bin/bash "${USERNAME}"; \
+    else \
+        existing_user="$(getent passwd "${USER_UID}" | cut -d: -f1 || true)"; \
+        if [ -n "${existing_user}" ]; then \
+            usermod -l "${USERNAME}" "${existing_user}"; \
+            usermod -d "/home/${USERNAME}" -m "${USERNAME}"; \
+            usermod --shell /bin/bash "${USERNAME}"; \
         else \
-            useradd --uid "${USER_UID}" --gid "${USER_GID}" -m "${USERNAME}" --shell /bin/bash; \
+            if ! getent group "${USER_GID}" >/dev/null; then \
+                groupadd --gid "${USER_GID}" "${USERNAME}"; \
+            fi; \
+            useradd --uid "${USER_UID}" --gid "${USER_GID}" -m --shell /bin/bash "${USERNAME}"; \
         fi; \
-    fi \
-    && printf '%s ALL=(ALL) NOPASSWD:ALL\n' "${USERNAME}" > "/etc/sudoers.d/${USERNAME}" \
-    && chmod 0440 "/etc/sudoers.d/${USERNAME}"
+    fi; \
+    mkdir -p "/home/${USERNAME}"; \
+    chown -R "${USERNAME}:$(id -gn "${USERNAME}")" "/home/${USERNAME}"; \
+    getent passwd "${USERNAME}"; \
+    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "${USERNAME}" > "/etc/sudoers.d/${USERNAME}"; \
+    chmod 0440 "/etc/sudoers.d/${USERNAME}"
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 RUN uv pip install --system --no-cache \
-    "huggingface_hub[hf_transfer]" \
-    "semble[mcp]"
+        "huggingface_hub" \
+        "semble[mcp]" \
+    && python3 -c "import huggingface_hub, semble" \
+    && command -v hf \
+    && command -v semble
 
 RUN mkdir -p "/home/${USERNAME}/.cache/huggingface" \
-    && chown -R "${USERNAME}:${USERNAME}" "/home/${USERNAME}/.cache"
+    && chown -R "${USERNAME}:$(id -gn "${USERNAME}")" "/home/${USERNAME}/.cache"
 
 USER ${USERNAME}
 WORKDIR /workspaces

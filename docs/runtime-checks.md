@@ -32,9 +32,9 @@ The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerat
 
 Generated output includes `.devcontainer/`:
 
-- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
-- `Dockerfile` installs Python, uv, git, sudo, and `huggingface_hub[hf_transfer]`.
-- `post-start.sh` calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files.
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers. UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
+- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub` is installed without the deprecated `hf_transfer` extra; Xet transfers are enabled via the environment variable instead.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes). It then calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
 
 The default bucket base is `Ghisso/vscode_mounts`, but installed consumer repos should
 store a project-specific bucket path such as `Ghisso/vscode_mounts/img-classification`
