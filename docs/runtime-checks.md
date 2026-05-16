@@ -26,7 +26,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `session-log.sh`
 - `hf-ai-sync.sh`
 
-The scripts must remain executable in `dist/multi-agent/` and copied consumer repos.
+The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos.
 
 ## Devcontainer And HF Sync
 

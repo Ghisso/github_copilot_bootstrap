@@ -13,6 +13,7 @@ from huggingface_hub import BucketFile, HfApi
 from huggingface_hub.errors import BucketNotFoundError
 
 
+
 BUCKET_PREFIX = "hf://buckets/"
 DEFAULT_SOURCE = "https://huggingface.co/buckets/Ghisso/vscode_mounts/tree/RAG"
 DEFAULT_DEST = Path("./.github")
@@ -121,6 +122,11 @@ def parse_args() -> argparse.Namespace:
 		"--dry-run",
 		action="store_true",
 		help="Show what would be replaced without modifying local files.",
+	)
+	parser.add_argument(
+		"--full",
+		action="store_true",
+		help="Sync the entire bucket path as-is using HF sync_bucket instead of selective directory replacement.",
 	)
 	return parser.parse_args()
 
@@ -301,9 +307,33 @@ def main() -> int:
 		Process exit code.
 	"""
 	args = parse_args()
-	bucket_id, base_prefix = split_bucket_source(args.source)
 	destination = Path(args.dest)
 	token = resolve_token()
+
+	if args.full:
+		source = resolve_bucket_source(args.source)
+		print(f"Source: {source}")
+		print(f"Destination: {destination.resolve()}")
+		api = HfApi()
+		try:
+			plan = api.sync_bucket(source=source, dest=str(destination), dry_run=args.dry_run, token=token)
+		except BucketNotFoundError as error:
+			raise SystemExit(
+				"Bucket not found or access denied. If it is private, run `hf auth login` or export HF_TOKEN."
+			) from error
+		except OSError as error:
+			raise SystemExit(f"Sync failed: {error}") from error
+		summary = plan.summary()
+		print(
+			"Summary: "
+			f"{summary['downloads']} downloads, "
+			f"{summary['skips']} skips, "
+			f"{summary['deletes']} deletes, "
+			f"{summary['total_size']} bytes"
+		)
+		return 0
+
+	bucket_id, base_prefix = split_bucket_source(args.source)
 
 	print(f"Source bucket: {bucket_id}")
 	print(f"Source prefix: {base_prefix or '/'}")

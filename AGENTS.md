@@ -4,7 +4,7 @@ This repository is a reusable multi-agent bootstrap. Preserve the plan -> implem
 
 Use `shared/policies/workspace.instructions.md` for the main workspace guidance. When choosing retrieval tools, treat `shared/policies/tool-routing.instructions.md` as the single source of truth.
 
-The source of truth lives in `shared/`; generated installable output lives in `dist/multi-agent/`. Do not hand-edit generated files.
+The source of truth lives in `shared/`; generated installable output lives in `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` before installing). Do not hand-edit generated files.
 
 Semble and context-mode are optional helpers:
 

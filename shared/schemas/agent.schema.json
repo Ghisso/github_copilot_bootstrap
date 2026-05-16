@@ -22,11 +22,6 @@
     "model_intent": {
       "type": "object",
       "additionalProperties": true
-    },
-    "targets": {
-      "type": "object",
-      "deprecated": true,
-      "additionalProperties": true
     }
   }
 }

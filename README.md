@@ -161,7 +161,7 @@ Interpretation:
 
 ## What Is Included
 
-- Generated bootstrap: installable output in [dist/multi-agent/](dist/multi-agent/)
+- Generated bootstrap: installable output in `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build)
 - Source policies: reusable instruction files in [shared/policies/](shared/policies/)
 - Agents: canonical metadata and prompts in [shared/agents/](shared/agents/)
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)

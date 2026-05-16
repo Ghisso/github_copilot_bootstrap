@@ -1,6 +1,6 @@
 # Target Mapping
 
-The repo generates one installable output: `dist/multi-agent/`.
+The repo generates one installable output: `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build).
 
 ## Devcontainer Bootloader
 

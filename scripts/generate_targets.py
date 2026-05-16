@@ -13,7 +13,6 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
-OBSOLETE_TARGETS = ("github-copilot", "claude-code", "openai-codex")
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
@@ -87,8 +86,6 @@ def copy_ignore(directory: str, names: list[str]) -> set[str]:
 
 def copy_skills(source: Path, destination: Path, target: str) -> None:
     copy_tree(source, destination)
-    if target == "github-copilot":
-        return
     for path in destination.rglob("*"):
         if path.suffix not in {".md", ".py", ".sh"}:
             continue
@@ -125,12 +122,7 @@ def copy_tree_transformed(source: Path, destination: Path, target: str) -> None:
 
 def render_shared_basis(target_root: Path, target: str) -> None:
     support_root = target_root / SHARED_BASIS_NAMESPACE
-    target_label = {
-        "github-copilot": "GitHub Copilot",
-        "claude-code": "Claude Code",
-        "openai-codex": "OpenAI Codex",
-        "multi-agent": "multi-agent",
-    }[target]
+    target_label = {"multi-agent": "multi-agent"}[target]
 
     copy_text_transformed(REPO_ROOT / "shared" / "MEMORY.md", support_root / "MEMORY.md", "claude-code")
     copy_tree_transformed(REPO_ROOT / "shared" / "templates", support_root / "templates", "claude-code")
@@ -183,13 +175,6 @@ def reset_target(output_root: Path, target: str) -> Path:
         shutil.rmtree(target_root)
     target_root.mkdir(parents=True)
     return target_root
-
-
-def remove_obsolete_targets(output_root: Path) -> None:
-    for target in OBSOLETE_TARGETS:
-        target_root = output_root / target
-        if target_root.exists():
-            shutil.rmtree(target_root)
 
 
 def shared_agents() -> list[tuple[dict[str, Any], Path]]:
@@ -673,8 +658,6 @@ def render_multi_agent(target_root: Path) -> None:
 
 
 def generate(targets: list[str], output_root: Path) -> None:
-    if "multi-agent" in targets:
-        remove_obsolete_targets(output_root)
     for target in targets:
         target_root = reset_target(output_root, target)
         if target == "multi-agent":

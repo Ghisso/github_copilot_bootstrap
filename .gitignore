@@ -1,0 +1,11 @@
+# Generated build output — regenerate with: uv run scripts/generate_targets.py
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
