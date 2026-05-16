@@ -15,6 +15,7 @@ COPY --from=nodejs /usr/local /usr/local
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
+        build-essential \
         bubblewrap \
         ca-certificates \
         curl \
@@ -45,7 +46,8 @@ RUN if ! getent group "${USER_GID}" >/dev/null; then groupadd --gid "${USER_GID}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 RUN uv pip install --system --no-cache \
-    "huggingface_hub[hf_transfer]"
+    "huggingface_hub[hf_transfer]" \
+    "semble[mcp]"
 
 RUN mkdir -p "/home/${USERNAME}/.cache/huggingface" \
     && chown -R "${USERNAME}:${USERNAME}" "/home/${USERNAME}/.cache"
