@@ -167,7 +167,7 @@ Interpretation:
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
-- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker
+- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` is pinned directly in the image because `HfApi.sync_bucket` was added in 1.0 — older versions silently no-op; if a project dep downgrades the package anyway, `hf-ai-sync.py` detects the missing method and falls back to the `hf` CLI with a visible warning
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 

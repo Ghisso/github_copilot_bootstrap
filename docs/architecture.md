@@ -53,6 +53,8 @@ Hook errors (from `hf-ai-sync.sh` and others) are written to `.claude/session_lo
 
 `hf-ai-sync.py pull-state` snapshots all current state files (`MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, `quality_reports/**`) into `.claude/.state_backups/` before overwriting them. After the pull completes, backups whose content is identical to the pulled version are deleted. Only files that were actually overwritten by the pull retain a backup, so the developer can compare and recover any local changes that were not yet pushed to the bucket.
 
+`import_hf_api()` checks `hasattr(HfApi, "sync_bucket")` before returning the class. If the method is absent (huggingface_hub < 1.0), the function emits a named warning and returns `None`, which triggers the `hf` CLI fallback path. This prevents a transitive downgrade — e.g. from a project dependency like `haystack-ai` — from causing silent no-op syncs: without the guard, the `AttributeError` raised inside `sync_bucket()` is caught by the broad exception handler and the script exits 0 having done nothing. The Dockerfile also pins `huggingface_hub>=1.0` to prevent the downgrade at build time.
+
 This runs on every `pull-state` invocation — whether triggered by the VS Code `folderOpen` task, an AI tool `SessionStart` hook, or manually.
 
 `.state_backups/` is excluded from `push-state` (it does not match `STATE_INCLUDES` patterns) and should be added to `.gitignore`.

@@ -204,6 +204,9 @@ def import_hf_api() -> Any | None:
     except Exception as error:  # pragma: no cover - depends on container tooling.
         warn(f"huggingface_hub is unavailable ({error}); skipping sync.")
         return None
+    if not hasattr(HfApi, "sync_bucket"):
+        warn("huggingface_hub is too old (sync_bucket missing; need >=1.0); falling back to hf CLI.")
+        return None
     return HfApi
 
 

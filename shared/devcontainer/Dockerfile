@@ -56,7 +56,7 @@ RUN set -eux; \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 RUN uv pip install --system --no-cache \
-        "huggingface_hub" \
+        "huggingface_hub>=1.0" \
         "semble[mcp]" \
     && python3 -c "import huggingface_hub, semble" \
     && command -v hf \
