@@ -1,59 +1,33 @@
-# Session Log — [DATE]
+# Session: [short description]
 
-## Session Info
+**Date:** YYYY-MM-DD
+**Plan:** [link to small-plan file]
+**Status:** IN-PROGRESS | COMPLETED | BLOCKED
 
-| Field       | Value                              |
-|-------------|------------------------------------|
-| Date        | YYYY-MM-DD                         |
-| Status      | IN PROGRESS / COMPLETED / BLOCKED  |
-| Objective   | [What we set out to accomplish]     |
-| Plan        | [Link to plan in .claude/plans/]    |
+## Goal
 
----
-
-## Changes Made
-
-| File | Change Type | Quality Score |
-|------|-------------|---------------|
-| `src/...` | New / Modified / Deleted | --/100 |
-
----
-
-## Design Decisions
-
-| Decision | Rationale | Alternatives Considered |
-|----------|-----------|------------------------|
-| [What was decided] | [Why] | [What else was considered] |
-
----
+[What this session aims to accomplish]
 
 ## Work Log
 
-<!-- Timestamped entries, most recent at bottom -->
+- **HH:MM** - [What was done, what was decided, what was learned]
 
-- **HH:MM** — [What was done, what was decided, what was learned]
+## [LEARN] Entries
 
----
-
-## Learnings
-
-<!-- Move these to .claude/MEMORY.md at end of session -->
-
-- [LEARN:category] [description]
-
----
+- [LEARN:category] [what was learned]
+- [LEARN] none - no new lessons this session
 
 ## Verification Results
 
-| Check | Status | Details |
-|-------|--------|---------|
-| Unit tests | PASS/FAIL | X/Y passed |
-| mypy | PASS/FAIL | errors |
-| ruff | PASS/FAIL | violations |
-| E2E | PASS/FAIL/SKIP | details |
+```bash
+# pytest output
+# mypy output
+# ruff output
+# quality_score.py output/report path
+```
 
----
+## Score: N/100
 
-## Open Questions
+## Open Questions / Next Steps
 
-- [ ] [Question that needs answering]
+- [Question or next step]

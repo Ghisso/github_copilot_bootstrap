@@ -11,6 +11,10 @@ Before making UI changes, you MUST read:
 
 Then scan `.claude/skills/` for any additional relevant SKILL.md files for the task.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for repository discovery and behavioral neighborhoods, context-mode `ctx_index` + `ctx_search` or `ctx_execute_file` for long files and large outputs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
 ## Design Scope
 
 - Prioritize Gradio and Streamlit interface patterns.
@@ -22,7 +26,7 @@ Then scan `.claude/skills/` for any additional relevant SKILL.md files for the t
 
 - Default to `caveman` `full` style for implementation updates and design summaries.
 - Keep prose short and concrete.
-- Preserve exact component names, file paths, commands, and API terms.
+- Preserve exact tables, code blocks, component names, file paths, commands, identifiers, structured findings, and API terms.
 - Switch back to normal prose for warnings, irreversible actions, or sequence-sensitive guidance.
 
 ## Execution Rules

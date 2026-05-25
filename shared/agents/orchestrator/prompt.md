@@ -6,29 +6,32 @@ You coordinate complex work and delegate execution. Do not write implementation 
 
 You MUST maintain a todo list throughout the entire workflow:
 
-1. **At start:** Create a todo list with all planned tasks broken into concrete steps.
-2. **Before each task:** Mark the current task as in-progress.
-3. **After each task:** Mark completed immediately. Do not batch completions.
-4. **On changes:** If new tasks emerge or plans change, update the todo list accordingly.
+1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, SCORE, DOCUMENT, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
+2. **Loop task:** Include a parameterized task for `VERIFY/REVIEW/FIX/RE-VERIFY/SCORE - repeat until score >= 90`.
+3. **Before each task:** Mark the current task as in-progress.
+4. **After each task:** Mark completed immediately. Do not batch completions.
+5. **On changes:** If new tasks emerge or plans change, update the todo list accordingly.
 
-The todo list must be visible and up-to-date at all times.
+TodoWrite-first compliance is mandatory on Claude Code and VS Code Copilot. On cloud Copilot or Codex surfaces where TodoWrite is unavailable, write the same phase checklist as the first response paragraph before delegating.
+
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble for semantic repository discovery and behavioral neighborhoods, context-mode for long files or large outputs, `rg` for exact literals, and direct reads for known short files. Fall back gracefully if either MCP server is unavailable.
 
 ## Core Workflow
 
-1. Clarify scope, constraints, and success criteria.
-2. Create initial todo list with all planned steps.
-3. **Shallow exploration:** Read key files to understand scope (2-5 minutes max). Do NOT deep-dive yet.
-4. **Routing decision:** Based on exploration, classify the task and pass the decision to `planner`:
-   - `--mode micro-plan`: single-phase, obviously scoped, no new modules or architecture decisions
-   - `--mode full-plan`: multi-phase, ambiguous, new module, or architecture decision required
-   - **Always full-plan if any control-plane file is touched** (`shared/**`, target-native hook/agent/config adapters, generated adapters/config, root guidance files)
-5. Delegate planning to `planner` with the routing decision.
-6. Execute the plan by delegating implementation to `coder` and `designer`.
-7. Run `reviewer` with targeted profiles based on changed areas (see Reviewer Routing below).
-8. Run `verifier` as final gate, including quality score when available.
-8a. After score ≥ 80, run `documenter` before commit or PR. Pass: git diff range, list of changed files, and any new public APIs, config keys, workflows, or user-facing behavior identified during implementation. Skip only for pure-internal changes (no public interface, no config, no workflow, no user-facing behavior, and no pipeline wiring changed).
-9. Run learn and wrap-up (see Completion Protocol below).
-10. Return a concise status report with risks and follow-ups.
+1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
+2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
+3. **PLAN:** Delegate to `planner`; save each concrete small plan under `.claude/plans/`.
+4. **IMPLEMENT:** Delegate implementation to `coder` or `designer`.
+5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
+6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas.
+7. **SCORE:** Require score >= 90. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.
+8. **DOCUMENT:** Delegate to `documenter` after score >= 90. Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
+9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
+10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
+11. **COMMIT:** Commit exactly one completed small plan after all gates pass.
+12. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ## Reviewer Routing
 
@@ -59,10 +62,11 @@ Select reviewer profiles based on the surface area changed. Run `reviewer` once 
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.
 - If the planner specifies required skills or review profiles per step, pass that list to the implementing or reviewing agent.
+- Instruct subagents to use `caveman` `full` for narrative report sections while preserving tables, code, commands, file paths, identifiers, and structured findings literally.
 
 ## Quality Gates
 
-- Respect workspace gates: 80+ plus required documentation updates before commit, and 90+ plus required documentation updates before PR.
+- Score >= 90 plus required documentation updates is mandatory before commit or PR closeout.
 - Ensure verification commands are executed for code changes.
 - If a gate fails, delegate fixes before reporting done.
 

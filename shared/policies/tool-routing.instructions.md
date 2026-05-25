@@ -4,7 +4,7 @@ description: Load when choosing between Semble, context-mode, grep, and direct f
 
 # Tool Routing
 
-This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble and context-mode are retrieval helpers; they do not replace the plan, verify, review, score, document workflow, hook guardrails, or project-specific instructions.
+This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble and context-mode are retrieval helpers; they do not replace the pre-flight, branch, plan, verify, review, score, document, learn, session-log, commit workflow, hook guardrails, or project-specific instructions.
 
 ## Routing Contract
 

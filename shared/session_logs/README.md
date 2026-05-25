@@ -1,45 +1,20 @@
 # Session Logs
 
-This directory stores session logs created during implementation sessions.
+This directory stores implementation session logs.
+
+Use the canonical template at `.claude/templates/session-log.md`.
 
 ## Naming Convention
 
 `YYYY-MM-DD_description.md`
 
-## Session Log Template
+For the final session that closes a small plan, prefer:
 
-```markdown
-# Session: [Short Description]
+`YYYY-MM-DD_<phase-slug>-closeout.md`
 
-**Date:** YYYY-MM-DD
-**Plan:** [link to plan file]
-**Status:** IN-PROGRESS | COMPLETED
+Closeout logs must include:
 
-## Goal
-[What this session aims to accomplish]
-
-## Work Log
-
-### [Time/Phase]
-- [What was done]
-- [Decisions made and why]
-- [Problems encountered and solutions]
-
-## [LEARN] Entries
-
-- [LEARN:category] [what was learned]
-
-## Verification Results
-
-```bash
-# pytest output
-# mypy output
-# ruff output
-```
-
-## Score: [N]/100
-
-## Open Questions / Next Steps
-
-- [Question or next step]
-```
+- `**Plan:**` pointing at the small-plan file
+- `**Status:** COMPLETED`
+- `## [LEARN] Entries` with either `[LEARN:category] ...` entries or `[LEARN] none - no new lessons this session`
+- `## Score: N/100`

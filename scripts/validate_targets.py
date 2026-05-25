@@ -32,11 +32,22 @@ GITHUB_ALLOWED_AGENT_MODELS = {
     "Claude Sonnet 4.6",
 }
 REQUIRED_HOOK_SCRIPTS = (
+    "run-hook.sh",
     "protect-files.sh",
     "git-protection.sh",
     "context-mode-dispatch.sh",
     "session-log.sh",
     "hf-ai-sync.sh",
+    "enforce-branch-state.sh",
+    "record-branch-state.sh",
+    "enforce-commit-gate.sh",
+    "record-commit-closeout.sh",
+    "enforce-pr-gate.sh",
+    "session-start-state.sh",
+    "stop-session-log-check.sh",
+)
+REQUIRED_HOOK_LIBRARIES = (
+    "_lib-frontmatter.sh",
 )
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
@@ -182,6 +193,23 @@ def validate_agents(errors: list[str]) -> None:
         text = read(path)
         check(text.startswith("---\n"), f"Claude agent missing frontmatter: {path}", errors)
         check("\nname: " in text and "\ndescription: " in text, f"Claude agent missing required fields: {path}", errors)
+        check(
+            "tool-routing.instructions.md" in text,
+            f"Claude agent must route retrieval through tool-routing instructions: {path}",
+            errors,
+        )
+        if path.stem == "documenter":
+            check(
+                "normal prose" in text.lower() and "caveman" in text.lower(),
+                f"Documenter must explicitly keep user-facing docs in normal prose: {path}",
+                errors,
+            )
+        else:
+            check(
+                "caveman" in text.lower(),
+                f"Claude agent must report back with caveman full prose framing: {path}",
+                errors,
+            )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
     check(len(codex_agents) == expected_count, "Codex custom agent count must match shared agents", errors)
@@ -296,7 +324,8 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     except tomllib.TOMLDecodeError as error:
         errors.append(f"invalid Codex config TOML: {error}")
     check("[features]" in codex_config, "Codex config missing features section", errors)
-    check("codex_hooks = true" in codex_config, "Codex config must enable codex_hooks", errors)
+    check("hooks = true" in codex_config, "Codex config must enable hooks", errors)
+    check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
@@ -323,7 +352,14 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                     f"Codex hooks should invoke shared .claude hook scripts: {event_name}",
                     errors,
                 )
-                if "session-log.sh" in command or "protect-files.sh" in command:
+                if (
+                    "session-log.sh" in command
+                    or "protect-files.sh" in command
+                    or "enforce-" in command
+                    or "record-" in command
+                    or "session-start-state.sh" in command
+                    or "stop-session-log-check.sh" in command
+                ):
                     check(
                         "openai-codex" in command,
                         f"Codex hook command should pass target id: {event_name}",
@@ -336,6 +372,9 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             path = hook_root / script
             check(path.exists(), f"missing hook script: {path}", errors)
             check(path.exists() and path.stat().st_mode & 0o111, f"hook script is not executable: {path}", errors)
+        for script in REQUIRED_HOOK_LIBRARIES:
+            path = hook_root / script
+            check(path.exists(), f"missing hook library: {path}", errors)
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
@@ -374,18 +413,25 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("hf-ai-sync.sh" in claude_settings_text, "Claude stop hooks should push HF AI state", errors)
 
     check("hf-ai-sync.sh" in json.dumps(codex_hooks), "Codex stop hooks should push HF AI state", errors)
+    dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
+    check(
+        dispatcher.exists() and dispatcher.stat().st_mode & 0o111,
+        "generated hook dispatcher run-hook.sh must be executable because Claude/Codex invoke it directly",
+        errors,
+    )
 
     validate_hook_guardrails(errors)
     validate_generated_scripts(errors)
 
 
-def run_hook(script: Path, payload: dict[str, object], *args: str) -> tuple[int, str, str]:
+def run_hook(script: Path, payload: dict[str, object], *args: str, cwd: Path | None = None) -> tuple[int, str, str]:
     result = subprocess.run(
         [str(script), *args],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
         check=False,
+        cwd=cwd,
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -498,6 +544,273 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             errors,
         )
 
+    validate_lifecycle_hook_guardrails(errors)
+
+
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True, check=False)
+
+
+def write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def setup_hook_repo(temp_root: Path) -> Path:
+    repo = temp_root / "repo"
+    repo.mkdir()
+    result = subprocess.run(["git", "init", "-b", "dev"], cwd=repo, text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        subprocess.run(["git", "init"], cwd=repo, text=True, capture_output=True, check=False)
+        git(repo, "checkout", "-b", "dev")
+    git(repo, "config", "user.email", "agent@example.com")
+    git(repo, "config", "user.name", "Agent")
+    shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "scripts", repo / ".claude" / "hooks" / "scripts")
+    write(repo / ".gitignore", ".claude/\n")
+    write(repo / ".claude" / "MEMORY.md", "# Memory\n")
+    write(repo / "README.md", "# Scratch\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-m", "initial")
+    return repo
+
+
+def write_big_plan(repo: Path, status: str = "planning", phases: tuple[str, ...] = ("phase-one",)) -> None:
+    phase_lines = "\n".join(f"  - {phase}" for phase in phases)
+    write(
+        repo / ".claude" / "plans" / "foo.md",
+        f"""---
+name: foo
+type: big-plan
+status: {status}
+originating_branch: dev
+implementation_branch: foo_implementation
+started_at:
+phases:
+{phase_lines}
+current_phase:
+---
+
+# Foo
+""",
+    )
+
+
+def write_small_plan(repo: Path, status: str = "in-progress") -> None:
+    write(
+        repo / ".claude" / "plans" / "phase-one.md",
+        f"""---
+name: phase-one
+type: small-plan
+parent_plan: foo
+phase_index: 1
+status: {status}
+closeout_session_log: .claude/session_logs/phase-one-closeout.md
+---
+
+# Phase One
+""",
+    )
+
+
+def lifecycle_script(repo: Path, name: str) -> Path:
+    return repo / ".claude" / "hooks" / "scripts" / name
+
+
+def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = setup_hook_repo(Path(temp_dir))
+        write_big_plan(repo)
+        write_small_plan(repo)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "test"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit gate on dev failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "commit gate must deny commits on dev", errors)
+
+        write(repo / "dirty.txt", "dirty\n")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"branch gate dirty-tree case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "branch gate must deny dirty-tree branch creation", errors)
+        for command in (
+            "git switch --create foo_implementation",
+            "git checkout -B foo_implementation",
+        ):
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-branch-state.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                "github-copilot",
+                cwd=repo,
+            )
+            check(returncode == 0, f"branch gate alternate dirty-tree case failed to run: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"branch gate must deny dirty-tree branch creation: {command}", errors)
+        (repo / "dirty.txt").unlink()
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git checkout -b "bad:slug_implementation"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"branch gate invalid-slug case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "branch gate must deny invalid branch slugs", errors)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"branch gate positive case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' not in stdout, f"branch gate should allow valid branch: {stdout}", errors)
+        git(repo, "checkout", "-b", "foo_implementation")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "record-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"record branch state failed to run: {stderr}", errors)
+        check("current_phase: phase-one" in read(repo / ".claude" / "plans" / "foo.md"), "record branch state must set current_phase", errors)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "fixup! whatever"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit bypass case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' not in stdout, "commit gate must allow bypass prefixes", errors)
+
+        for command in (
+            "git push -u origin foo_implementation",
+            "git push origin HEAD",
+            "git push origin foo_implementation",
+        ):
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-pr-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                "github-copilot",
+                cwd=repo,
+            )
+            check(returncode == 0, f"PR gate incomplete-push case failed to run: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"PR gate must deny incomplete push command: {command}", errors)
+
+        write_small_plan(repo, status="complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        )
+        write(repo / "work.txt", "work\n")
+        git(repo, "add", "work.txt")
+        write(
+            repo / ".claude" / "quality_reports" / "score-test.json",
+            json.dumps(
+                {
+                    "score": 95,
+                    "branch": "foo_implementation",
+                    "phase": "phase-one",
+                    "generated_at": "2099-01-01T00:00:00Z",
+                },
+                indent=2,
+            )
+            + "\n",
+        )
+        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit missing-metadata case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "commit gate must reject score reports missing required metadata", errors)
+
+        head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+        merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+        write(
+            repo / ".claude" / "quality_reports" / "score-test.json",
+            json.dumps(
+                {
+                    "score": 95,
+                    "branch": "foo_implementation",
+                    "phase": "phase-one",
+                    "generated_at": "2099-01-01T00:00:00Z",
+                    "base_ref": "dev",
+                    "merge_base_sha": merge_base,
+                    "head_sha": head_sha,
+                    "target": str(repo / "work.txt"),
+                    "dirty": True,
+                    "changed_files": ["work.txt"],
+                },
+                indent=2,
+            )
+            + "\n",
+        )
+        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit positive case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' not in stdout, f"commit gate should allow complete closeout: {stdout}", errors)
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "phase 1 closeout")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git commit"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"record commit no-subject case failed to run: {stderr}", errors)
+        check(
+            "status: complete" not in read(repo / ".claude" / "plans" / "foo.md"),
+            "record commit closeout must not complete big plan without commit correlation",
+            errors,
+        )
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"record commit closeout failed to run: {stderr}", errors)
+        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan", errors)
+
+        write(
+            repo / ".claude" / "session_logs" / "hooks-bypass.log",
+            "2099-01-01T00:00:00Z, target=github-copilot, branch=foo_implementation, subject=fixup! bypass\n",
+        )
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"PR gate bypass-log case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "PR gate must deny unacknowledged bypass logs", errors)
+
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base main"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"PR gate base-main case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "PR gate must deny --base main", errors)
+
 
 def validate_generated_scripts(errors: list[str]) -> None:
     python_scripts = sorted(DIST_ROOT.rglob("*.py"))
@@ -608,17 +921,20 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     for root_guidance in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md"):
         text = read(root_guidance)
         check(
-            "plan -> implement -> verify -> review -> score -> document workflow" in text,
-            f"{root_guidance.name} must include the documentation step after score in the root workflow summary",
+            "pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow" in text,
+            f"{root_guidance.name} must include the full root workflow summary",
             errors,
         )
         check(
-            "After score >= 80, update documentation" in text,
-            f"{root_guidance.name} must require documentation updates after passing score",
+            "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout" in text,
+            f"{root_guidance.name} must require score >= 90 and documentation updates before closeout",
             errors,
         )
 
     stale_workflow_fragments = (
+        "After score >= 80",
+        "After score ≥ 80",
+        "Score >= 80",
         "plan -> implement -> verify -> review -> score workflow",
         "PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE\n",
         "plan, verify, review, score loop",
@@ -626,6 +942,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         "Score ≥ 80 = commit",
         "Score ≥ 90 = PR-ready",
         "auto-commit if score ≥ 80",
+        "auto-commit if score >= 80",
+        "Just do it",
+        "codex_hooks",
+        "quality_reports/<timestamp>-<phase>.json",
     )
     for path in (
         TARGET_ROOT / "AGENTS.md",
@@ -640,6 +960,19 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         text = read(path)
         for fragment in stale_workflow_fragments:
             check(fragment not in text, f"{path} contains stale workflow/gate phrase: {fragment}", errors)
+    source_paths = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "AGENTS.md",
+        *text_files(REPO_ROOT / "docs"),
+        *text_files(REPO_ROOT / "shared"),
+    ]
+    for path in source_paths:
+        text = read(path)
+        check(
+            "quality_reports/<timestamp>-<phase>.json" not in text,
+            f"{path} contains stale quality report path pattern",
+            errors,
+        )
     tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md")
     check(
         "Inside the generated devcontainer, Semble and context-mode are installed as required tools" in tool_routing_text,
@@ -656,6 +989,8 @@ def validate_support_files(errors: list[str]) -> None:
         "MEMORY.md",
         "scripts/quality_score.py",
         "templates/session-log.md",
+        "templates/plan-big.md",
+        "templates/plan-small.md",
         "templates/quality-report.md",
         "templates/requirements-spec.md",
         "templates/skill-template.md",
@@ -670,17 +1005,28 @@ def validate_support_files(errors: list[str]) -> None:
         "prompts/README.prompt.md",
         "review-profiles/code.md",
         "review-profiles/security.md",
+        "hooks/scripts/run-hook.sh",
         "hooks/scripts/protect-files.sh",
         "hooks/scripts/git-protection.sh",
         "hooks/scripts/context-mode-dispatch.sh",
         "hooks/scripts/session-log.sh",
         "hooks/scripts/hf-ai-sync.sh",
+        "hooks/scripts/_lib-frontmatter.sh",
+        "hooks/scripts/enforce-branch-state.sh",
+        "hooks/scripts/record-branch-state.sh",
+        "hooks/scripts/enforce-commit-gate.sh",
+        "hooks/scripts/record-commit-closeout.sh",
+        "hooks/scripts/enforce-pr-gate.sh",
+        "hooks/scripts/session-start-state.sh",
+        "hooks/scripts/stop-session-log-check.sh",
     )
     for target in TARGETS:
         support_root = target_support_root(target)
         for relative_path in required_files:
             path = support_root / relative_path
             check(path.exists(), f"{target} missing generated support file: {path}", errors)
+            if relative_path in {"templates/plan-big.md", "templates/plan-small.md"} and path.exists():
+                check(read(path).startswith("---\n"), f"{target} plan template must start with frontmatter: {path}", errors)
 
 
 def validate_generated_hygiene(errors: list[str]) -> None:

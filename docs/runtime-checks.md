@@ -12,6 +12,7 @@ Optional helpers:
 
 - `context-mode`
 - `npx`
+- `gh`
 - `uv`
 - `uvx`
 - Semble through `uvx --from "semble[mcp]" semble`
@@ -20,13 +21,25 @@ Missing optional binaries produce `WARN`, not `FAIL`.
 
 Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
+- `run-hook.sh`
 - `protect-files.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
 - `hf-ai-sync.sh`
+- `session-start-state.sh`
+- `enforce-branch-state.sh`
+- `record-branch-state.sh`
+- `enforce-commit-gate.sh`
+- `record-commit-closeout.sh`
+- `enforce-pr-gate.sh`
+- `stop-session-log-check.sh`
 
-The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos.
+The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
+
+The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
+
+Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, current HEAD SHA, `target` (a repo-relative path; commit gates reject reports whose target is an absolute path outside the current repo), dirty flag, and changed-files metadata.
 
 ## Devcontainer And HF Sync
 
@@ -46,11 +59,12 @@ then the default bucket base. Auth resolves in this order: `HF_TOKEN`,
 fail the container start or agent hook.
 
 Prefer CLI sync through `huggingface_hub` over `hf-mount`. The generated devcontainer
-does not require `/dev/fuse`, `SYS_ADMIN`, or apparmor overrides.
+does not require `/dev/fuse` or apparmor overrides. It does set `SYS_ADMIN` and
+`seccomp=unconfined` so `bubblewrap` can create namespaces inside Docker.
 
 Codex-specific runtime notes:
 
-- `.codex/config.toml` must include `[features] codex_hooks = true`.
+- `.codex/config.toml` must include `[features] hooks = true`.
 - `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded.
 - `.codex/config.toml` includes one `[[skills.config]]` entry for each `.claude/skills/<name>` directory.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, and `developer_instructions`.

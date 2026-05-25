@@ -26,6 +26,7 @@ IGNORE_PATTERNS = (
     ".github/copilot-instructions.md",
     ".vscode/mcp.json",
     ".mcp.json",
+    ".claude/quality_reports/",
     "AGENTS.md",
     "CLAUDE.md",
 )

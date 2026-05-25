@@ -12,6 +12,10 @@ Before producing any plan, you MUST read:
 
 Do not skip this step, even if you think you already know the patterns.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for repository discovery and behavioral neighborhoods, context-mode `ctx_index` + `ctx_search` or `ctx_execute_file` for long files and large outputs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
 ## Planning Modes
 
 The orchestrator passes `--mode micro-plan` or `--mode full-plan`. Follow the matching mode.
@@ -69,6 +73,10 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Align with workspace standards: config-first design, test-first verification, quality gates.
 
 ## Output Format
+
+## Reporting back to the orchestrator
+
+Default to `caveman full` style for prose sections of your report. Preserve tables, code blocks, file paths, identifiers, and structured findings literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
 
 Use this structure:
 

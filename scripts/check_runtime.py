@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
-OPTIONAL_BINARIES = ("context-mode", "npx", "uv", "uvx", "hf")
+OPTIONAL_BINARIES = ("context-mode", "npx", "uv", "uvx", "hf", "gh")
 REQUIRED_FILES = (
     "dist/multi-agent/.devcontainer/devcontainer.json",
     "dist/multi-agent/.devcontainer/Dockerfile",
@@ -48,7 +49,13 @@ def main() -> int:
         if path:
             print(f"PASS optional binary available: {command} -> {path}")
         else:
-            print(f"WARN optional binary missing: {command}")
+            if command == "gh":
+                print(
+                    "WARN optional binary missing: gh; enforce-pr-gate.sh still blocks common "
+                    "implementation-branch git push paths, but GitHub web UI PR opening itself is not gated"
+                )
+            else:
+                print(f"WARN optional binary missing: {command}")
 
     if shutil.which("uvx"):
         print("PASS Semble can be launched through uvx when requested")
@@ -59,6 +66,21 @@ def main() -> int:
         for error in errors:
             print(f"FAIL {error}", file=sys.stderr)
         return 1
+
+    validator = REPO_ROOT / "scripts" / "validate_plan_frontmatter.py"
+    if validator.exists():
+        result = subprocess.run(
+            [sys.executable, str(validator)],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            print("PASS plan frontmatter validation")
+        else:
+            output = (result.stdout + result.stderr).strip()
+            print(f"WARN plan frontmatter validation reported issues: {output}")
 
     print("PASS generated runtime wiring is present")
     return 0

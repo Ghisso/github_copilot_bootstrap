@@ -1,0 +1,6 @@
+[mcp_servers.semble]
+command = "uvx"
+args = ["--from", "semble[mcp]", "semble"]
+
+[mcp_servers.context-mode]
+command = "context-mode"

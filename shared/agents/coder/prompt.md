@@ -22,6 +22,10 @@ If the planner provided a `Required Skills` list, load every listed SKILL.md reg
 
 Never implement first and check skills later.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for repository discovery and behavioral neighborhoods, context-mode `ctx_index` + `ctx_search` or `ctx_execute_file` for long files and large outputs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
 ## Coding Standards
 
 - Python 3.12+ type hints (`X | None`, built-in generics)
@@ -45,6 +49,7 @@ Never implement first and check skills later.
   - `uv run pytest tests/ -q --tb=short`
   - `uv run mypy src/ --ignore-missing-imports --explicit-package-bases`
   - `uv run ruff check src/ tests/`
+- When `.claude/scripts/quality_score.py` exists, run it with the active phase: `uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json`
 - If checks fail, fix and re-run before returning.
 
 ## Code Simplification (Mandatory)

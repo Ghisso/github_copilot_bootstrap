@@ -47,7 +47,28 @@ The generated hook configs for all three tools use the pattern:
 REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script> [args...]
 ```
 
+Claude and Codex generated configs execute `run-hook.sh` directly. `scripts/generate_targets.py` therefore marks the generated dispatcher executable, and `scripts/validate_targets.py` treats a non-executable dispatcher as a structural failure.
+
 Hook errors (from `hf-ai-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact.
+
+## Lifecycle Enforcement
+
+The canonical workflow is:
+
+```text
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
+```
+
+Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:
+
+- `enforce-branch-state.sh` runs before branch commands and validates clean `dev`, branch naming, and big-plan metadata. It recognizes `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, `git switch --create`, and `git switch --create=<branch>` forms.
+- `record-branch-state.sh` runs after successful branch creation and records `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
+- `enforce-commit-gate.sh` runs before normal commits and requires completed small-plan metadata, completed closeout logs, `[LEARN]` evidence, and a fresh score >= 90 report for the current branch and phase. The score report must also match `base_ref`, merge-base SHA, current HEAD SHA, `target` (stored as a repo-relative path; absolute paths outside the repo are rejected), dirty flag, and changed-files metadata.
+- `record-commit-closeout.sh` runs after successful commits and advances the big-plan phase or marks the big plan complete only after the intercepted commit subject correlates with `HEAD`.
+- `enforce-pr-gate.sh` blocks PRs or pushes unless every phase is complete, the base is `dev`, and bypass commits have been acknowledged.
+- `session-start-state.sh` and `stop-session-log-check.sh` provide reminders for stale phase, score, and session-log state.
+
+Bypass commit prefixes `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` are allowed for short-lived recovery work, but they are logged and must be acknowledged before PR or push.
 
 ## HF State Sync and Pull Safety
 

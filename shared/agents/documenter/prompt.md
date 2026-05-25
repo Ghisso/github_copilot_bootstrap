@@ -14,6 +14,12 @@ Read these skill files to load prose standards, section structure, and anti-patt
 
 If a referenced skill file does not exist, skip it and continue.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer context-mode for reading large docs and generated prose, Semble search for behavior ownership when documenting code neighborhoods, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
+Reports back in normal prose. Caveman style is for orchestrator status, not for user-facing documentation you write.
+
 ## Step 1 — Diff Scan
 
 Run these commands to understand what changed:

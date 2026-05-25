@@ -14,7 +14,8 @@
     "coder",
     "designer",
     "reviewer",
-    "verifier"
+    "verifier",
+    "documenter"
   ],
   "model_intent": {
     "github-copilot": "Claude Opus 4.6",
@@ -22,4 +23,3 @@
     "openai-codex": "target-native"
   }
 }
-

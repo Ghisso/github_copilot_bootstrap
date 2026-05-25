@@ -30,7 +30,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
-- After score ≥ 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior.
+- After score >= 90, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit/PR closeout.
 - Keep hook guardrails enabled.
 - Capture reusable lessons in `.claude/MEMORY.md`.
 
@@ -40,7 +40,7 @@ Always consult the relevant files under `.claude/instructions/`:
 
 | File | Covers |
 |---|---|
-| `workflow.instructions.md` | Plan -> implement -> verify -> review -> score -> document loop |
+| `workflow.instructions.md` | Pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit loop |
 | `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
@@ -52,13 +52,13 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> FIX -> SCORE -> DOCUMENT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 
 ```text
-orchestrator -> planner -> coder/designer -> reviewer -> verifier
+orchestrator -> planner -> coder/designer -> verifier -> reviewer -> score -> documenter
 ```
 
 Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
@@ -75,6 +75,7 @@ Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/
 | `review-pass-primary` | Hidden primary review helper |
 | `review-pass-adversarial` | Hidden adversarial review helper |
 | `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
+| `documenter` | Updates documentation after score passes and before commit/PR closeout |
 
 ## Review Profiles
 
@@ -112,16 +113,15 @@ uv run ruff format --check src/ tests/
 When available, run:
 
 ```bash
-uv run python .claude/scripts/quality_score.py src/ --json
+uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
 ```
 
 Quality gates:
 
 | Score | Gate |
 |---|---|
-| >= 90 | PR-ready after required documentation updates |
-| >= 80 | Commit-ready after required documentation updates |
-| < 80 | Blocked |
+| >= 90 | Commit/PR closeout ready after required documentation updates |
+| < 90 | Blocked |
 
 ## Project State
 

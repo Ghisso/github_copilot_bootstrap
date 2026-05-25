@@ -9,6 +9,14 @@ The caller must provide:
 - Profiles: one or more names from `.claude/review-profiles/`.
 - Gate: advisory, commit, or PR.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for changed-code neighborhoods, context-mode for large diffs or logs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
+## Reporting back to the orchestrator
+
+Default to `caveman full` style for synthesis prose. Preserve findings, tables, code blocks, file paths, identifiers, and structured severity labels literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
+
 If profiles are omitted, infer them from changed files:
 - Python source: `code`, `security`
 - New modules or refactors: `architecture`

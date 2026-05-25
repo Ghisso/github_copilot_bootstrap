@@ -26,15 +26,16 @@ Main goals:
 
 I use a strict execution loop:
 
-Plan -> Implement -> Verify -> Review -> Fix -> Score
+Pre-flight -> Branch -> Plan -> Implement -> Verify -> Review -> Score -> Document -> Learn -> Session Log -> Commit
 
 Core principles:
 
-- Plan first for non-trivial work.
+- Start from `dev`, branch for each big plan, and keep plan frontmatter current.
+- Plan first for non-trivial work and split big plans into commit-sized small plans.
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
-- Ship only when quality gates are met.
+- Ship only after score >= 90, documentation updates, learning capture, and closeout logs.
 - Preserve lessons learned in memory and session logs.
 
 ## Quick Install
@@ -135,6 +136,8 @@ flowchart LR
   U[Developer Request] --> A[Orchestrator / Planner]
   A --> C[Coder or Designer]
   C --> V[Verifier + Quality Gates]
+  V --> D[Documenter]
+  D --> L[Learn + Session Log]
 
   I[Instructions] --> A
   I --> C
@@ -148,7 +151,7 @@ flowchart LR
   R[Reviewer Agents] --> V
   C --> R
 
-  V --> O[Commit or PR Decision]
+  L --> O[Commit or PR Decision]
 ```
 
 Interpretation:
@@ -180,9 +183,9 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Plan-first protocol
-  - Orchestrator loop and review order
-  - Session logging and context management
+  - Pre-flight, branch, plan, implementation, verification, review, score, documentation, learn, session-log, commit protocol
+  - Branch lifecycle and commit/PR gates
+  - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
   - Quality scoring rubric and gates
@@ -244,7 +247,7 @@ The agent layer gives me orchestration plus profile-driven reviews. Full shared 
 
 Primary flow for complex work:
 
-- orchestrator -> planner -> coder/designer -> reviewer -> verifier
+- orchestrator -> planner -> coder/designer -> verifier -> reviewer -> documenter
 
 Current agents:
 
@@ -256,6 +259,7 @@ Current agents:
 - review-pass-primary
 - review-pass-adversarial
 - verifier
+- documenter
 
 The unified `reviewer` loads one or more profiles from `shared/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`). It runs dual-pass review through `review-pass-primary` and `review-pass-adversarial`, then synthesizes findings into one report. When only one helper is available, review falls back to single-pass mode and labels findings as `[single-pass, unconfirmed]`.
 
@@ -281,18 +285,28 @@ All hook commands route through [run-hook.sh](shared/hooks/scripts/run-hook.sh),
 
 [hooks.json](shared/hooks/hooks.json) sets `"cwd": "."` on every entry rather than `"${workspaceFolder}"`. Copilot's hook runner does not interpolate VS Code variables, so using the literal string would resolve to a non-existent path and produce `spawn /bin/sh ENOENT` errors. `run-hook.sh` resolves the repo root itself, so `"."` is sufficient.
 
+Generated Claude and Codex hook configs execute `run-hook.sh` directly, so the generator marks the generated dispatcher executable and the target validator fails if it is not runnable.
+
 Configured events:
 
+- SessionStart
+  - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, latest score report, and any open lifecycle state
+  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events when available
 - PreToolUse
   - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
   - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
+  - [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh) validates branch creation from clean `dev` into `<plan_name>_implementation`, including `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, and `git switch --create`
+  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, HEAD SHA, target, dirty flag, and changed-files metadata
+  - [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) requires `gh pr create --base dev` and blocks implementation-branch pushes until every phase is complete and bypasses are acknowledged
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
 - PostToolUse / PreCompact
+  - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
+  - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; it completes the big plan after the final phase and logs allowed bypass commits
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
-  - SessionStart also calls [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) when available
 - Stop
+  - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
   - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
   - `hf-ai-sync.sh upload-bootstrap` also re-uploads the bootstrap bundle on every Stop so fresh clones can pull it without running the installer again
 - `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery
@@ -313,16 +327,17 @@ Expected verification commands after implementation:
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
-- uv run python .claude/scripts/quality_score.py src/ --json  (when available)
+- uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
 
 Quality gates:
 
-- >= 80: commit-ready after required documentation updates
-- >= 90: PR-ready after required documentation updates
+- >= 95: excellence target
+- >= 90: required for commit and PR closeout
+- < 90: blocked until implementation, verification, review, and score are rerun
 
 Documentation gate:
 
-- after score >= 80, update docs for changed public interfaces, config, workflows, and user-facing behavior before commit or PR
+- after score >= 90, update docs for changed public interfaces, config, workflows, and user-facing behavior before commit or PR closeout
 
 ## Optional Retrieval Helpers
 
@@ -384,7 +399,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the plan/verify/review/score/document workflow
+- preserving the pre-flight/branch/plan/verify/review/score/document/learn/session-log/commit workflow
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

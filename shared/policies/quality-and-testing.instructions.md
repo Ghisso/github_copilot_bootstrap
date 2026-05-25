@@ -14,8 +14,8 @@ uv run mypy src/ --ignore-missing-imports --explicit-package-bases  # Type check
 uv run ruff check src/ tests/              # Lint (0 violations required)
 ```
 
-**Testing order:** unit tests → existing tests (regression) → E2E (if applicable).
-**Never claim completion without running all three.**
+**Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
+**Never claim completion without running all three unless the repository lacks that surface and you say so.**
 
 ---
 
@@ -98,16 +98,27 @@ async def test_async_operation() -> None:
 
 | Score | Gate | Action |
 |---|---|---|
-| ≥ 95 | Excellence | Aspirational |
-| ≥ 90 | PR-ready | Ready for review/deploy after required documentation updates |
-| ≥ 80 | Commit | Good enough to save after required documentation updates |
-| < 80 | Block | List blocking issues, do not commit |
+| >= 95 | Excellence | Aspirational |
+| >= 90 | Required | Ready for commit/PR closeout after required documentation updates |
+| < 90 | Block | List blocking issues, do not commit or open PR |
+
+---
+
+## Persisted Score Reports
+
+When `.claude/scripts/quality_score.py` is available, score with branch/phase metadata:
+
+```bash
+uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
+```
+
+Commit gates read the persisted JSON, not terminal output. A score report must match the current branch and current phase and be newer than the files it gates.
 
 ---
 
 ## Common Pitfalls
 
-- **Never assume tests pass** — always run them.
+- **Never assume tests pass** - always run them.
 - **Deprecation warnings** = future breakage. Fix immediately, document in MEMORY.md.
-- **Mock-heavy tests passing ≠ real code works** — verify with at least one integration test.
-- **Partial testing** — run ALL tests, not just new ones. Catch regressions.
+- **Mock-heavy tests passing != real code works** - verify with at least one integration test.
+- **Partial testing** - run ALL tests, not just new ones. Catch regressions.

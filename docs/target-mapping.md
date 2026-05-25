@@ -18,9 +18,11 @@ The shared basis lives under `.claude/`:
 - `.claude/agents/*.md`
 - `.claude/prompts/*.prompt.md`
 - `.claude/scripts/quality_score.py`
-- `.claude/templates/*.md`
+- `.claude/templates/*.md`, including big-plan, small-plan, session-log, and quality-report templates
 - `.claude/MEMORY.md`, `.claude/plans/`, `.claude/session_logs/`, `.claude/quality_reports/`, `.claude/explorations/`
 - `.claude/hooks/scripts/*.sh`
+
+`run-hook.sh` is the executable dispatcher for target-native hook configs. Generated output marks it runnable because Claude and Codex call it directly.
 
 Keep `.claude/` when pruning optional tool adapters, because it is the shared basis for all supported systems.
 
@@ -56,4 +58,4 @@ OpenAI Codex:
 
 Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/`.
 
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` with paths such as `../.claude/skills/run-tests`. Codex project trust is required for that project config, hooks, and skill wiring to load.
+Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` with paths such as `../.claude/skills/run-tests`. Codex hooks are enabled through `[features] hooks = true`. Codex project trust is required for that project config, hooks, and skill wiring to load.

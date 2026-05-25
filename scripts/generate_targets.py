@@ -98,6 +98,10 @@ def copy_file(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def ensure_executable(path: Path) -> None:
+    path.chmod(path.stat().st_mode | 0o111)
+
+
 def copy_text_transformed(source: Path, destination: Path, target: str) -> None:
     write_text(destination, transform_target_paths(source.read_text(encoding="utf-8"), target))
 
@@ -161,6 +165,7 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     copy_skills(REPO_ROOT / "shared" / "skills", support_root / "skills", "claude-code")
     copy_tree_transformed(REPO_ROOT / "shared" / "review-profiles", support_root / "review-profiles", "claude-code")
     copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
+    ensure_executable(support_root / "hooks" / "scripts" / "run-hook.sh")
     copy_tree(REPO_ROOT / "shared" / "prompts", support_root / "prompts")
     render_claude_agents(target_root)
 
@@ -280,7 +285,7 @@ def render_codex_config(path: Path) -> None:
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
         "",
         "[features]",
-        "codex_hooks = true",
+        "hooks = true",
         "",
         "[agents]",
         "max_threads = 6",
@@ -329,6 +334,7 @@ def render_claude_settings(path: Path) -> None:
                 {
                     "hooks": [
                         cmd("session-log.sh", "claude-code"),
+                        cmd("session-start-state.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
                     ]
                 }
@@ -339,14 +345,21 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         cmd("protect-files.sh", "claude-code"),
                         cmd("git-protection.sh"),
+                        cmd("enforce-branch-state.sh", "claude-code"),
+                        cmd("enforce-commit-gate.sh", "claude-code"),
+                        cmd("enforce-pr-gate.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "pretooluse"),
                     ],
                 }
             ],
             "PostToolUse": [
                 {
-                    "matcher": "*",
-                    "hooks": [cmd("context-mode-dispatch.sh", "claude-code", "posttooluse")],
+                    "matcher": "Bash",
+                    "hooks": [
+                        cmd("record-branch-state.sh", "claude-code"),
+                        cmd("record-commit-closeout.sh", "claude-code"),
+                        cmd("context-mode-dispatch.sh", "claude-code", "posttooluse"),
+                    ],
                 }
             ],
             "PreCompact": [
@@ -356,6 +369,7 @@ def render_claude_settings(path: Path) -> None:
                 {
                     "hooks": [
                         cmd("session-log.sh", "claude-code"),
+                        cmd("stop-session-log-check.sh", "claude-code"),
                         cmd_stop("hf-ai-sync.sh", "push-state"),
                         cmd_stop("hf-ai-sync.sh", "upload-bootstrap"),
                     ]
@@ -382,6 +396,7 @@ def render_codex_hooks(path: Path) -> None:
                     "matcher": "startup|resume|clear",
                     "hooks": [
                         cmd("session-log.sh", "openai-codex"),
+                        cmd("session-start-state.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
                     ],
                 }
@@ -392,20 +407,28 @@ def render_codex_hooks(path: Path) -> None:
                     "hooks": [
                         cmd("protect-files.sh", "openai-codex"),
                         cmd("git-protection.sh"),
+                        cmd("enforce-branch-state.sh", "openai-codex"),
+                        cmd("enforce-commit-gate.sh", "openai-codex"),
+                        cmd("enforce-pr-gate.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse"),
                     ],
                 }
             ],
             "PostToolUse": [
                 {
-                    "matcher": "*",
-                    "hooks": [cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse")],
+                    "matcher": "Bash",
+                    "hooks": [
+                        cmd("record-branch-state.sh", "openai-codex"),
+                        cmd("record-commit-closeout.sh", "openai-codex"),
+                        cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
+                    ],
                 }
             ],
             "Stop": [
                 {
                     "hooks": [
                         cmd("session-log.sh", "openai-codex"),
+                        cmd("stop-session-log-check.sh", "openai-codex"),
                         cmd("hf-ai-sync.sh", "push-state", timeout=180),
                         cmd("hf-ai-sync.sh", "upload-bootstrap", timeout=180),
                     ]
@@ -448,8 +471,8 @@ def render_root_guidance(target: str) -> str:
     return (
         f"# {title}\n\n"
         "This target is generated from `shared/`. Do not edit generated files manually.\n\n"
-        "Preserve the plan -> implement -> verify -> review -> score -> document workflow and hook guardrails. "
-        "After score >= 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit or PR.\n\n"
+        "Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow and hook guardrails. "
+        "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout.\n\n"
         f"{agent_note}\n\n"
         "## Workspace\n\n"
         f"{transform_target_paths(section_body(workspace), target)}\n\n"
@@ -510,7 +533,7 @@ Native Copilot files under `.github/` are adapters:
 
 Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
 
-Preserve the plan -> implement -> verify -> review -> score -> document workflow. After score >= 80, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit or PR. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow. Score >= 90 plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
 """
 
 

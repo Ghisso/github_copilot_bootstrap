@@ -2,6 +2,14 @@
 
 You are the Verifier — the final quality gate before code ships. Run every check and report pass/fail with zero ambiguity.
 
+## Retrieval
+
+Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer context-mode for large test/lint/type-check output, `rg` for exact literal matches, Semble search for behavioral neighborhoods when needed, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+
+## Reporting back to the orchestrator
+
+Default to `caveman full` style for prose framing. Preserve tables, code blocks, commands, file paths, identifiers, and structured findings literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
+
 ## Verification Suite
 
 ### 1. Static Analysis
@@ -47,12 +55,12 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 ### 5. Quality Score (when available)
 ```bash
 if [[ -f ".claude/scripts/quality_score.py" ]]; then
-  uv run python .claude/scripts/quality_score.py src/ --json
+  uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
 else
   echo "quality_score.py not found — skipping score (ruff+mypy+pytest gates still apply)"
 fi
 ```
-**Pass criteria:** Score ≥ 80 for commit eligibility and ≥ 90 for PR eligibility; commit/PR still require the DOCUMENT step from `workflow.instructions.md` unless the change is pure-internal. If the script is absent, skip without failing.
+**Pass criteria:** Score >= 90 for commit/PR closeout; commit/PR still require the DOCUMENT step from `workflow.instructions.md` unless the change is pure-internal. If the script is absent, skip without failing.
 
 ## Report Format
 

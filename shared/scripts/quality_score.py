@@ -17,6 +17,7 @@ import argparse
 import json
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -42,6 +43,60 @@ DEFAULT_PENALTY = 2    # for rule codes not in map above
 def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
     result = subprocess.run(args, capture_output=True, text=True, cwd=cwd)
     return result.returncode, result.stdout, result.stderr
+
+
+def _git(args: list[str], cwd: Path) -> str:
+    rc, stdout, _ = _run(["git", *args], cwd=str(cwd))
+    if rc != 0:
+        return ""
+    return stdout.strip()
+
+
+def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
+    cwd = Path.cwd()
+    inside = _git(["rev-parse", "--is-inside-work-tree"], cwd)
+    if inside != "true":
+        return {
+            "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "branch": "",
+            "head_sha": "",
+            "base_ref": base_ref,
+            "merge_base_sha": "",
+            "phase": phase,
+            "dirty": False,
+            "changed_files": [],
+        }
+
+    repo_root = _git(["rev-parse", "--show-toplevel"], cwd)
+    branch = _git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+    head_sha = _git(["rev-parse", "HEAD"], cwd)
+    merge_base = _git(["merge-base", base_ref, "HEAD"], cwd) if base_ref else ""
+    changed: set[str] = set()
+    for command in (
+        ["diff", "--name-only", f"{base_ref}...HEAD"] if base_ref else [],
+        ["diff", "--name-only"],
+        ["diff", "--cached", "--name-only"],
+    ):
+        if not command:
+            continue
+        output = _git(command, cwd)
+        changed.update(line for line in output.splitlines() if line.strip())
+    status = _git(["status", "--porcelain"], cwd)
+    try:
+        target_str = str(target.resolve().relative_to(Path(repo_root)))
+    except ValueError:
+        target_str = str(target)
+    return {
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "branch": branch,
+        "head_sha": head_sha,
+        "base_ref": base_ref,
+        "merge_base_sha": merge_base,
+        "phase": phase,
+        "target": target_str,
+        "dirty": bool(status),
+        "changed_files": sorted(changed),
+    }
 
 
 def run_ruff(target: str) -> tuple[list[dict], int]:
@@ -124,8 +179,6 @@ def gate_label(score: int) -> str:
         return "EXCELLENCE"
     if score >= 90:
         return "PR-READY"
-    if score >= 80:
-        return "COMMIT"
     return "BLOCKED"
 
 
@@ -134,9 +187,13 @@ def main() -> None:
     parser.add_argument("target", help="File or directory to score.")
     parser.add_argument("--json", action="store_true", help="Output as JSON.")
     parser.add_argument("--skip-tests", action="store_true", help="Skip pytest.")
+    parser.add_argument("--out", type=Path, help="Write the JSON result to this path.")
+    parser.add_argument("--phase", default="", help="Current small-plan phase slug.")
+    parser.add_argument("--base-ref", default="dev", help="Base ref used for branch metadata.")
     args = parser.parse_args()
 
-    target = str(Path(args.target).resolve())
+    target_path = Path(args.target).resolve()
+    target = str(target_path)
     ruff_violations, ruff_count = run_ruff(target)
     mypy_errors, mypy_summary = run_mypy(target)
 
@@ -158,7 +215,12 @@ def main() -> None:
         "pytest_summary": pytest_summary,
         "mypy_summary": mypy_summary,
         "deductions": deductions,
+        **git_metadata(target_path, args.phase, args.base_ref),
     }
+
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
     if args.json:
         print(json.dumps(result, indent=2))
@@ -179,11 +241,12 @@ def main() -> None:
     else:
         print("\n  No deductions — perfect score!")
 
-    print(f"\n  Gate: {gate} {'OK' if score >= 80 else 'BLOCKED'}")
-    if score < 80:
+    if args.out:
+        print(f"\n  Report: {args.out}")
+
+    print(f"\n  Gate: {gate} {'OK' if score >= 90 else 'BLOCKED'}")
+    if score < 90:
         print("  BLOCKED: resolve deductions above before committing.")
-    elif score < 90:
-        print("  Commit allowed. Address deductions before PR.")
     print()
 
     sys.exit(0)

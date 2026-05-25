@@ -2,7 +2,9 @@
 
 **Date:** YYYY-MM-DD
 **Branch:** feature/...
-**Status:** MERGED / PENDING
+**Phase:** <current_phase>
+**Base Ref:** dev
+**Status:** PR-READY / BLOCKED
 
 ---
 
@@ -44,7 +46,9 @@
 | mypy clean | [ ] |
 | ruff clean | [ ] |
 | E2E passes | [ ] |
-| Quality >= 80 | [ ] |
+| Quality >= 90 | [ ] |
+| Report persisted under `.claude/quality_reports/` | [ ] |
+| Report newer than changed files | [ ] |
 
 ---
 
