@@ -96,6 +96,39 @@ or `hf auth login` on the host is automatically available — no env var needed.
 Missing auth, missing bucket access, or network failures produce warnings and leave
 local files in place.
 
+## Updating Existing Repos
+
+When you update this bootstrap (new hooks, revised instructions, agent changes),
+push the new version to all consumer repos with:
+
+```bash
+uv run python scripts/update_consumers.py \
+  /path/to/repo1 \
+  /path/to/repo2 \
+  /path/to/repo3
+```
+
+The script regenerates `dist/` automatically, then for each repo it:
+
+- Backs up `.claude/MEMORY.md` in memory before installing
+- Runs `install_bootstrap.py` (copies all bootstrap-controlled files, uploads to HF)
+- Restores the original `.claude/MEMORY.md` after installing
+
+Files that exist only in the consumer repo — plans, session logs, quality reports,
+explorations — are never touched. Only bootstrap-controlled files (agents, hooks,
+instructions, skills, templates, settings, root guidance) are replaced.
+
+Because the devcontainer pulls from the HF bucket on open, the HF upload is
+included by default. Use `--skip-upload` for a local-only update.
+
+```bash
+# Preview without writing
+uv run python scripts/update_consumers.py --dry-run /path/to/repo
+
+# Local install only (no HF upload)
+uv run python scripts/update_consumers.py --skip-upload /path/to/repo
+```
+
 Generated layout:
 
 - `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating
