@@ -8,12 +8,18 @@ settings, skills, templates) is replaced with the new version. Files that
 exist only in the consumer repo (plans, session_logs, quality_reports, etc.)
 are never touched.
 
+After installing, also runs push-state so that bootstrap README files inside
+plans/ and session_logs/ (which are included in BOTH the bootstrap bundle AND
+the state bundle) are updated in the HF state bucket. Without this step, the
+VS Code folderOpen pull-state task would restore old README versions from the
+state bucket over the freshly installed ones.
+
 Usage:
     uv run python scripts/update_consumers.py /path/to/repo1 /path/to/repo2 ...
 
 Options:
     --skip-regen     Skip regenerating dist/ before installing
-    --skip-upload    Skip Hugging Face upload (local install only)
+    --skip-upload    Skip Hugging Face upload (local install only; also skips push-state)
     --dry-run        Print planned actions without writing files
 """
 
@@ -96,6 +102,19 @@ def main() -> None:
             else:
                 path.write_bytes(content)
                 print(f"  restore: {rel}")
+
+        # Push state so the HF state bucket gets the new bootstrap READMEs
+        # (plans/README.md and session_logs/README.md live in both BOOTSTRAP_PATHS
+        # and STATE_INCLUDES; without this push the folderOpen pull-state task
+        # would restore the old versions from the state bucket).
+        if not args.skip_upload:
+            helper = project / ".devcontainer" / "hf-ai-sync.py"
+            if helper.is_file():
+                push_cmd = [sys.executable, str(helper), "push-state", "--repo-root", str(project)]
+                if dry:
+                    push_cmd.append("--dry-run")
+                print(f"  push-state to HF", flush=True)
+                subprocess.run(push_cmd, check=False, cwd=project)
 
         print(f"=== Done: {project.name} ===")
 
