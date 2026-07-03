@@ -57,6 +57,23 @@ fail_closed() {
   exit 2
 }
 
+# Print a file's modification time as a Unix epoch, portably across GNU coreutils
+# (stat -c), BSD/macOS (stat -f), and any POSIX system with python3. Returns
+# non-zero (and prints nothing) when the mtime cannot be read, so callers can
+# warn instead of silently treating an unreadable mtime as 0.
+file_mtime() {
+  local f="$1" m
+  [[ -e "$f" ]] || return 1
+  if m="$(stat -c %Y "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then printf '%s' "$m"; return 0; fi
+  if m="$(stat -f %m "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then printf '%s' "$m"; return 0; fi
+  if command -v python3 >/dev/null 2>&1; then
+    if m="$(python3 -c 'import os,sys; print(int(os.path.getmtime(sys.argv[1])))' "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then
+      printf '%s' "$m"; return 0
+    fi
+  fi
+  return 1
+}
+
 additional_context() {
   local event message
   event="$(json_escape "$1")"

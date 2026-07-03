@@ -146,26 +146,34 @@ else
     failures+=("quality report must include changed_files array")
   fi
 
-  report_mtime="$(stat -c %Y "$score_file" 2>/dev/null || echo 0)"
-  changed_files="$(git -C "$REPO_ROOT" diff --name-only dev...HEAD 2>/dev/null; git -C "$REPO_ROOT" diff --name-only 2>/dev/null; git -C "$REPO_ROOT" diff --cached --name-only 2>/dev/null)"
-  while IFS= read -r relative; do
-    [[ -n "$relative" ]] || continue
-    [[ -f "$REPO_ROOT/$relative" ]] || continue
-    file_mtime="$(stat -c %Y "$REPO_ROOT/$relative" 2>/dev/null || echo 0)"
-    if [[ "$file_mtime" -gt "$report_mtime" ]]; then
-      failures+=("quality report is older than changed file: $relative")
-      break
-    fi
-  done <<< "$changed_files"
+  report_mtime="$(file_mtime "$score_file" || true)"
+  if [[ -z "$report_mtime" ]]; then
+    failures+=("could not read modification time of $score_file to verify report freshness")
+  else
+    changed_files="$(git -C "$REPO_ROOT" diff --name-only dev...HEAD 2>/dev/null; git -C "$REPO_ROOT" diff --name-only 2>/dev/null; git -C "$REPO_ROOT" diff --cached --name-only 2>/dev/null)"
+    while IFS= read -r relative; do
+      [[ -n "$relative" ]] || continue
+      [[ -f "$REPO_ROOT/$relative" ]] || continue
+      changed_mtime="$(file_mtime "$REPO_ROOT/$relative" || true)"
+      if [[ -z "$changed_mtime" ]]; then
+        failures+=("could not read modification time of changed file: $relative")
+        break
+      fi
+      if [[ "$changed_mtime" -gt "$report_mtime" ]]; then
+        failures+=("quality report is older than changed file: $relative")
+        break
+      fi
+    done <<< "$changed_files"
+  fi
 fi
 
 learn_ok=0
 if [[ -n "${CLOSEOUT_LOG:-}" && -f "$CLOSEOUT_LOG" ]] && grep -Fq "[LEARN] none - no new lessons this session" "$CLOSEOUT_LOG"; then
   learn_ok=1
 elif [[ -f "$REPO_ROOT/.claude/MEMORY.md" && -n "$SMALL_PLAN" && -f "$SMALL_PLAN" ]]; then
-  memory_mtime="$(stat -c %Y "$REPO_ROOT/.claude/MEMORY.md" 2>/dev/null || echo 0)"
-  plan_mtime="$(stat -c %Y "$SMALL_PLAN" 2>/dev/null || echo 0)"
-  if [[ "$memory_mtime" -ge "$plan_mtime" ]]; then
+  memory_mtime="$(file_mtime "$REPO_ROOT/.claude/MEMORY.md" || true)"
+  plan_mtime="$(file_mtime "$SMALL_PLAN" || true)"
+  if [[ -n "$memory_mtime" && -n "$plan_mtime" && "$memory_mtime" -ge "$plan_mtime" ]]; then
     learn_ok=1
   fi
 fi
