@@ -8,6 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat)"
 
+if ! payload_parseable "$INPUT"; then
+  fail_closed "unparseable tool payload"
+fi
+
 if ! is_bash_tool_payload "$INPUT"; then
   exit 0
 fi

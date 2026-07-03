@@ -21,6 +21,42 @@ ask_pretool() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$reason"
 }
 
+# True if the payload is empty (some events send nothing) or valid JSON. A
+# present-but-unparseable payload means the gate cannot reason about the tool
+# call and must fail closed rather than silently allow.
+payload_parseable() {
+  local input="$1"
+  if [[ -z "${input//[[:space:]]/}" ]]; then
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    if printf '%s' "$input" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      return 0
+    fi
+    return 1
+  fi
+  # Fallback heuristic when python3 is unavailable: a JSON object/array only.
+  local trimmed="${input#"${input%%[![:space:]]*}"}"
+  case "$trimmed" in
+    \{*|\[*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Fail closed: emit a deny decision and exit non-zero (2) so runtimes that key
+# blocking on exit status (Copilot: any non-zero = deny; Codex/Claude: exit 2 =
+# block) refuse the tool call instead of allowing it on a silent internal error.
+fail_closed() {
+  local message="$1"
+  if [[ -n "${REPO_ROOT:-}" && -d "${REPO_ROOT:-/nonexistent}" ]]; then
+    mkdir -p "$REPO_ROOT/.claude/session_logs" 2>/dev/null || true
+    printf '%s WARN hook fail-closed: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$message" \
+      >> "$REPO_ROOT/.claude/session_logs/hooks-errors.log" 2>/dev/null || true
+  fi
+  deny_pretool "hook could not evaluate the request safely, denying: $message"
+  exit 2
+}
+
 additional_context() {
   local event message
   event="$(json_escape "$1")"

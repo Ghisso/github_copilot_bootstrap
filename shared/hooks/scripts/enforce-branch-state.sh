@@ -9,6 +9,10 @@ TARGET_ID="${1:-unknown-target}"
 REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat)"
 
+if ! payload_parseable "$INPUT"; then
+  fail_closed "unparseable tool payload"
+fi
+
 if ! is_bash_tool_payload "$INPUT"; then
   exit 0
 fi

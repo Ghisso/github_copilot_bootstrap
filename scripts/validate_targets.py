@@ -443,6 +443,23 @@ def run_hook(
     return result.returncode, result.stdout, result.stderr
 
 
+def run_hook_raw(
+    script: Path,
+    raw_input: str,
+    *args: str,
+    cwd: Path | None = None,
+) -> tuple[int, str, str]:
+    result = subprocess.run(
+        [str(script), *args],
+        input=raw_input,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
 def path_without_uv() -> dict[str, str]:
     """A copy of os.environ with any directory containing a `uv` binary removed
     from PATH, so tests can exercise the pure-bash guardrail fallback."""
@@ -667,6 +684,20 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         repo = setup_hook_repo(Path(temp_dir))
         write_big_plan(repo)
         write_small_plan(repo)
+
+        # R-HOOKS-04: a present-but-unparseable payload must fail closed
+        # (non-zero exit + deny) instead of silently allowing the tool call.
+        # Run against the temp repo so fail-closed logging stays isolated.
+        for gate in ("protect-files.sh", "git-protection.sh", "enforce-commit-gate.sh", "enforce-pr-gate.sh"):
+            returncode, stdout, stderr = run_hook_raw(
+                lifecycle_script(repo, gate), "this is not json", "github-copilot", cwd=repo
+            )
+            check(returncode != 0, f"{gate} must exit non-zero on unparseable payload (got {returncode})", errors)
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"{gate} must deny on unparseable payload",
+                errors,
+            )
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),

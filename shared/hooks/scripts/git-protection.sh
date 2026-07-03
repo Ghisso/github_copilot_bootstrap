@@ -9,6 +9,10 @@ TARGET_ID="${1:-unknown-target}"
 REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat)"
 
+if ! payload_parseable "$INPUT"; then
+  fail_closed "unparseable tool payload"
+fi
+
 log_error() {
   local log_dir="$REPO_ROOT/.claude/session_logs"
   mkdir -p "$log_dir" 2>/dev/null || true
