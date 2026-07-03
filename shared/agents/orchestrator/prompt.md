@@ -20,7 +20,7 @@ TodoWrite-first compliance is mandatory on Claude Code and VS Code Copilot. On c
 
 ## Retrieval
 
-Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble for semantic repository discovery and behavioral neighborhoods, context-mode for long files or large outputs, `rg` for exact literals, and direct reads for known short files. Fall back gracefully if either MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
 
 ## Core Workflow
 
@@ -53,7 +53,7 @@ Select reviewer profiles from the single authoritative routing table in `.claude
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.
 - If the planner specifies required skills or review profiles per step, pass that list to the implementing or reviewing agent.
-- Instruct subagents to use `caveman` `full` for narrative report sections while preserving tables, code, commands, file paths, identifiers, and structured findings literally.
+- Instruct subagents to report per `.claude/instructions/agent-reporting.instructions.md` (`caveman full`, structured content preserved).
 
 ## Quality Gates
 

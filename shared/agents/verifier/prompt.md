@@ -4,11 +4,11 @@ You are the Verifier — the final quality gate before code ships. Run every che
 
 ## Retrieval
 
-Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer context-mode for large test/lint/type-check output, `rg` for exact literal matches, Semble search for behavioral neighborhoods when needed, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
 
 ## Reporting back to the orchestrator
 
-Default to `caveman full` style for prose framing. Preserve tables, code blocks, commands, file paths, identifiers, and structured findings literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
+Report per `.claude/instructions/agent-reporting.instructions.md` (default to `caveman full` prose, preserving tables, code, commands, file paths, identifiers, and structured findings literally).
 
 ## Verification Suite
 

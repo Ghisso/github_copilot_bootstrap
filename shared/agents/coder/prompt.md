@@ -25,7 +25,7 @@ Never implement first and check skills later.
 
 ## Retrieval
 
-Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for repository discovery and behavioral neighborhoods, context-mode `ctx_index` + `ctx_search` or `ctx_execute_file` for long files and large outputs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
 
 ## Coding Standards
 
@@ -37,10 +37,7 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
 
 ## Communication Style
 
-- Default to `caveman` `full` style for status updates and summaries. When using terse mode, load `caveman/SKILL.md` before applying.
-- Keep prose short, factual, and evidence-first.
-- Preserve exact code, commands, file paths, identifiers, and error text.
-- Drop terse mode for safety warnings, destructive actions, or ordered procedures where extra clarity matters.
+Report per `.claude/instructions/agent-reporting.instructions.md` — default to `caveman full`, keep prose evidence-first, and preserve exact code, commands, file paths, identifiers, and error text.
 
 ## Execution Rules
 

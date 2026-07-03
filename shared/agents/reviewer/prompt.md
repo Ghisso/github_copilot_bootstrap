@@ -11,11 +11,11 @@ The caller must provide:
 
 ## Retrieval
 
-Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefer Semble search for changed-code neighborhoods, context-mode for large diffs or logs, `rg` for exact literal matches, and direct reads only for known short files. Fall back gracefully if either MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
 
 ## Reporting back to the orchestrator
 
-Default to `caveman full` style for synthesis prose. Preserve findings, tables, code blocks, file paths, identifiers, and structured severity labels literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
+Report per `.claude/instructions/agent-reporting.instructions.md` (default to `caveman full` prose, preserving tables, code, commands, file paths, identifiers, and structured findings literally).
 
 If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 
