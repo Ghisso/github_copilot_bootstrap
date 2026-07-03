@@ -19,8 +19,9 @@ if ! is_git_commit_command "$COMMAND"; then
 fi
 
 SUBJECT="$(commit_subject_from_command "$COMMAND")"
+BYPASS=0
 if is_bypass_subject "$SUBJECT"; then
-  exit 0
+  BYPASS=1
 fi
 
 failures=()
@@ -28,6 +29,19 @@ failures=()
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [[ ! "$CURRENT_BRANCH" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]; then
   failures+=("commits must happen on a <plan_name>_implementation branch, not ${CURRENT_BRANCH:-unknown}")
+fi
+
+# Bypass subjects (fixup!/squash!/chore(typo):/docs(typo):) skip only the
+# plan-ceremony checks below (small-plan/closeout/score/LEARN); branch-shape
+# validation above still applies, and the bypass is still ledgered by
+# record-commit-closeout.sh. This keeps the recovery use-case without turning
+# the strictest gate into a blank check.
+if [[ "$BYPASS" -eq 1 ]]; then
+  if [[ "${#failures[@]}" -gt 0 ]]; then
+    reason="$(printf '%s; ' "${failures[@]}")"
+    deny_pretool "commit gate failed for $TARGET_ID: ${reason%; }"
+  fi
+  exit 0
 fi
 
 SLUG="${CURRENT_BRANCH%_implementation}"

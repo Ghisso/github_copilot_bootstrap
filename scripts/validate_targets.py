@@ -646,6 +646,20 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             check(returncode == 0, f"commit gate flag-evasion case failed to run: {command}: {stderr}", errors)
             check('"permissionDecision":"deny"' in stdout, f"commit gate must deny flag-smuggled commit on dev: {command}", errors)
 
+        # R-HOOKS-02: bypass subjects still undergo branch-shape validation.
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "chore(typo): x"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit gate bypass-branch-shape case failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must deny bypass-subject commits off an implementation branch",
+            errors,
+        )
+
         write(repo / "dirty.txt", "dirty\n")
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-branch-state.sh"),
