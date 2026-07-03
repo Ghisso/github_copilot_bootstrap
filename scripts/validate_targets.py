@@ -844,26 +844,49 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
-        write(
-            repo / ".claude" / "quality_reports" / "score-test.json",
-            json.dumps(
-                {
-                    "score": 95,
-                    "branch": "foo_implementation",
-                    "phase": "phase-one",
-                    "generated_at": "2099-01-01T00:00:00Z",
-                    "base_ref": "dev",
-                    "merge_base_sha": merge_base,
-                    "head_sha": head_sha,
-                    "target": str(repo / "work.txt"),
-                    "dirty": True,
-                    "changed_files": ["work.txt"],
-                },
-                indent=2,
+
+        def score_report(**overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "score": 95,
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "tests_passed": True,
+                "tests_skipped": False,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def write_score(report: dict[str, object]) -> None:
+            path = repo / ".claude" / "quality_reports" / "score-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
+        # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
+        # dirty:true must all be denied even at a passing score.
+        for label, report in (
+            ("tests_passed:false", score_report(tests_passed=False)),
+            ("tests_passed missing", {k: v for k, v in score_report().items() if k != "tests_passed"}),
+            ("tests_skipped:true", score_report(tests_skipped=True)),
+            ("dirty:true", score_report(dirty=True)),
+        ):
+            write_score(report)
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-commit-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+                "github-copilot",
+                cwd=repo,
             )
-            + "\n",
-        )
-        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
+            check(returncode == 0, f"commit {label} case failed to run: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny score report with {label} even at score 95", errors)
+
+        write_score(score_report())
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),

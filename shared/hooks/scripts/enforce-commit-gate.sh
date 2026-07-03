@@ -111,6 +111,8 @@ else
   generated_at="$(json_file_string_value "$score_file" "generated_at" 2>/dev/null || true)"
   target_path="$(json_file_string_value "$score_file" "target" 2>/dev/null || true)"
   dirty="$(json_file_bool_value "$score_file" "dirty" 2>/dev/null || true)"
+  tests_passed="$(json_file_bool_value "$score_file" "tests_passed" 2>/dev/null || true)"
+  tests_skipped="$(json_file_bool_value "$score_file" "tests_skipped" 2>/dev/null || true)"
 
   if [[ "$base_ref" != "dev" ]]; then
     failures+=("quality report base_ref must be dev; found ${base_ref:-missing} in $score_file")
@@ -141,6 +143,14 @@ else
   fi
   if [[ "$dirty" != "true" && "$dirty" != "false" ]]; then
     failures+=("quality report must include dirty boolean")
+  elif [[ "$dirty" == "true" ]]; then
+    failures+=("working tree has unstaged changes (dirty=true); stage everything and re-run quality_score.py")
+  fi
+  if [[ "$tests_passed" != "true" ]]; then
+    failures+=("quality report must record tests_passed: true; found ${tests_passed:-missing}")
+  fi
+  if [[ "$tests_skipped" == "true" ]]; then
+    failures+=("tests were skipped (tests_skipped=true); run the full test suite before committing")
   fi
   if ! json_file_array_present "$score_file" "changed_files" 2>/dev/null; then
     failures+=("quality report must include changed_files array")
