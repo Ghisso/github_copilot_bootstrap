@@ -424,7 +424,13 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     validate_generated_scripts(errors)
 
 
-def run_hook(script: Path, payload: dict[str, object], *args: str, cwd: Path | None = None) -> tuple[int, str, str]:
+def run_hook(
+    script: Path,
+    payload: dict[str, object],
+    *args: str,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     result = subprocess.run(
         [str(script), *args],
         input=json.dumps(payload),
@@ -432,8 +438,22 @@ def run_hook(script: Path, payload: dict[str, object], *args: str, cwd: Path | N
         capture_output=True,
         check=False,
         cwd=cwd,
+        env=env,
     )
     return result.returncode, result.stdout, result.stderr
+
+
+def path_without_uv() -> dict[str, str]:
+    """A copy of os.environ with any directory containing a `uv` binary removed
+    from PATH, so tests can exercise the pure-bash guardrail fallback."""
+    env = dict(os.environ)
+    kept = [
+        part
+        for part in env.get("PATH", "").split(os.pathsep)
+        if part and not (Path(part) / "uv").exists()
+    ]
+    env["PATH"] = os.pathsep.join(kept)
+    return env
 
 
 def validate_hook_guardrails(errors: list[str]) -> None:
@@ -466,7 +486,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"hook guardrail failed to run: {script}: {stderr}", errors)
         check(
-            f'"permissionDecision": "{expected_decision}"' in stdout,
+            f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect {protected_path} with {expected_decision}: {script}",
             errors,
         )
@@ -483,7 +503,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny .env: {hook_root}",
             errors,
         )
@@ -495,7 +515,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"Bash protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny Bash write to .env: {hook_root}",
             errors,
         )
@@ -506,8 +526,34 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"git guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"git guardrail did not deny git reset --hard: {hook_root}",
+            errors,
+        )
+
+        # R-HOOKS-03: the two safety-critical guards must survive without `uv`.
+        no_uv = path_without_uv()
+        returncode, stdout, stderr = run_hook(
+            hook_root / "protect-files.sh",
+            {"tool_name": "Write", "tool_input": {"path": ".env"}},
+            target_id,
+            env=no_uv,
+        )
+        check(returncode == 0, f"protect-files failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"protect-files must deny .env write even without uv: {hook_root}",
+            errors,
+        )
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": "git -C . reset --hard"}},
+            env=no_uv,
+        )
+        check(returncode == 0, f"git-protection failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"git-protection must deny reset --hard even without uv (and past global flags): {hook_root}",
             errors,
         )
 
@@ -539,7 +585,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"Bash hook-file guardrail failed to run: {script}: {stderr}", errors)
         check(
-            f'"permissionDecision": "{expected_decision}"' in stdout,
+            f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect Bash hook edit with {expected_decision}: {script}",
             errors,
         )

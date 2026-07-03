@@ -1,66 +1,103 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-run_python() {
-  if command -v uv >/dev/null 2>&1; then
-    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
-    return $?
-  fi
-  return 127
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_lib-frontmatter.sh
+. "$SCRIPT_DIR/_lib-frontmatter.sh"
+
+TARGET_ID="${1:-unknown-target}"
+REPO_ROOT="$(repo_root_from_script)"
+INPUT="$(cat)"
+
+log_error() {
+  local log_dir="$REPO_ROOT/.claude/session_logs"
+  mkdir -p "$log_dir" 2>/dev/null || true
+  printf '%s WARN git-protection: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "$log_dir/hooks-errors.log" 2>/dev/null || true
 }
 
-if ! command -v uv >/dev/null 2>&1; then
+# Inspect one git invocation's tokens (operator-normalized, lowercased),
+# skipping global flags to find the subcommand, then flag its destructive forms.
+_git_danger_from_tokens() {
+  local -a tokens=("$@")
+  local i=0 n="${#tokens[@]}" tok sub=""
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+        i=$((i + 2)); continue ;;
+      --*=*) i=$((i + 1)); continue ;;
+      -*)    i=$((i + 1)); continue ;;
+      *) sub="$tok"; i=$((i + 1)); break ;;
+    esac
+  done
+  [[ -n "$sub" ]] || return 1
+  local -a args=("${tokens[@]:$i}")
+  local a cluster="" del=0
+  case "$sub" in
+    reset)
+      for a in "${args[@]:-}"; do
+        if [[ "$a" == "--hard" ]]; then printf 'git reset --hard'; return 0; fi
+      done ;;
+    push)
+      for a in "${args[@]:-}"; do
+        case "$a" in
+          -f|--force|--force-with-lease) printf 'force push'; return 0 ;;
+          --mirror) printf 'git push --mirror'; return 0 ;;
+        esac
+      done ;;
+    checkout)
+      for a in "${args[@]:-}"; do
+        if [[ "$a" == "--" ]]; then printf 'git checkout --'; return 0; fi
+      done ;;
+    restore)
+      for a in "${args[@]:-}"; do
+        if [[ "$a" == --source* ]]; then printf 'git restore --source'; return 0; fi
+      done ;;
+    clean)
+      for a in "${args[@]:-}"; do
+        if [[ "$a" == -* && "$a" != --* ]]; then cluster="$cluster${a#-}"; fi
+      done
+      if [[ "$cluster" == *f* && "$cluster" == *d* ]]; then printf 'git clean -fd'; return 0; fi ;;
+    branch)
+      for a in "${args[@]:-}"; do
+        case "$a" in
+          -d|-D|--delete) del=1 ;;
+          --*) ;;
+          -*[dD]*) del=1 ;;
+        esac
+        if [[ "$del" -eq 1 && ( "$a" == "main" || "$a" == "master" ) ]]; then
+          printf 'deleting main/master branch'; return 0
+        fi
+      done ;;
+  esac
+  return 1
+}
+
+# True (prints reason) if any git invocation in the command is destructive.
+git_danger_reason() {
+  local rest="$1" after seg reason
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    seg="${after//[;|&]/ }"
+    seg="$(printf '%s' "$seg" | tr '[:upper:]' '[:lower:]')"
+    local -a tokens
+    read -ra tokens <<< "$seg"
+    if reason="$(_git_danger_from_tokens "${tokens[@]}")"; then
+      printf '%s' "$reason"
+      return 0
+    fi
+    rest="$after"
+  done
+  return 1
+}
+
+COMMAND="$(hook_command "$INPUT" 2>/dev/null || true)"
+if [[ -z "$COMMAND" ]]; then
   exit 0
 fi
 
-INPUT=$(cat)
-OUTPUT=$(printf '%s' "$INPUT" | run_python -c 'import json, re, sys
-
-try:
-  data = json.load(sys.stdin)
-except Exception:
-  sys.exit(0)
-
-tool_input = data.get("tool_input")
-if tool_input is None:
-  tool_input = data.get("toolArgs")
-if isinstance(tool_input, str):
-  try:
-    tool_input = json.loads(tool_input)
-  except Exception:
-    tool_input = {"command": tool_input}
-if not isinstance(tool_input, dict):
-  tool_input = {}
-
-command = str(tool_input.get("command") or "")
-if not command:
-  sys.exit(0)
-
-normalized = " ".join(command.lower().split())
-rules = [
-  (r"git\s+push\b.*(?:\s-f(?:\s|$)|\s--force(?:\s|$)|\s--force-with-lease(?:\s|$))", "Blocked dangerous git operation: force push"),
-  (r"git\s+push\b.*\s--mirror(?:\s|$)", "Blocked dangerous git operation: git push --mirror"),
-  (r"git\s+reset\s+--hard(?:\s|$)", "Blocked dangerous git operation: git reset --hard"),
-  (r"git\s+checkout\s+--(?:\s|$)", "Blocked dangerous git operation: git checkout --"),
-  (r"git\s+restore\b.*\s--source(?:\s|=)", "Blocked dangerous git operation: git restore --source"),
-  (r"git\s+clean\s+-[^\n]*f[^\n]*d", "Blocked dangerous git operation: git clean -fd"),
-  (r"git\s+branch\s+-d\s+(main|master)(?:\s|$)", "Blocked dangerous git operation: deleting main/master branch"),
-]
-
-for pattern, reason in rules:
-  if re.search(pattern, normalized):
-    print(json.dumps({
-      "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": reason,
-      }
-    }))
-    sys.exit(0)
-' 2>/dev/null || true)
-
-if [[ -n "$OUTPUT" ]]; then
-  printf '%s\n' "$OUTPUT"
+if reason="$(git_danger_reason "$COMMAND")"; then
+  deny_pretool "Blocked dangerous git operation: $reason"
 fi
 
 exit 0

@@ -15,6 +15,12 @@ deny_pretool() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
 }
 
+ask_pretool() {
+  local reason
+  reason="$(json_escape "$1")"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$reason"
+}
+
 additional_context() {
   local event message
   event="$(json_escape "$1")"
