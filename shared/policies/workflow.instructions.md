@@ -44,7 +44,7 @@ For each small plan:
 1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work).
 3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
-4. **REVIEW:** Delegate to `reviewer`; use primary + adversarial review helpers for standard/control-plane changes.
+4. **REVIEW:** Delegate to `reviewer`; it runs its own primary and verification passes for standard/control-plane changes.
 5. **SCORE:** Run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`.
 6. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/SCORE, and repeat until score is >= 90.
 7. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal.

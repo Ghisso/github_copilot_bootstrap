@@ -43,7 +43,7 @@ Select reviewer profiles from the single authoritative routing table in `.claude
 
 **Complexity gate:**
 
-- **Control-plane files** (`shared/**`, target-native hook/agent/config adapters, generated adapter/config surfaces, root guidance files): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
+- **Control-plane files** (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.devcontainer/`): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
 - **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
 - **Standard changes**: run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
 

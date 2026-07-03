@@ -61,7 +61,7 @@ Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 orchestrator -> planner -> coder -> verifier -> reviewer -> score -> documenter
 ```
 
-Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
+Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project.
 
 ## Agents
 

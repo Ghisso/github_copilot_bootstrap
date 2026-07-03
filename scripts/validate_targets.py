@@ -270,6 +270,17 @@ def validate_agents(errors: list[str]) -> None:
             for label in NON_COPILOT_REVIEW_LABEL_LEAKS:
                 check(label not in text, f"non-Copilot review helper label leaked into {path}: {label}", errors)
 
+    # R-AGENTS-06: control-plane guards must use consumer paths; the authoring
+    # repo's shared/ and dist/ must not leak into generated agent bodies.
+    for path in sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md")):
+        text = read(path)
+        for authoring_path in ("shared/", "dist/"):
+            check(
+                authoring_path not in text,
+                f"generated agent must not reference authoring-repo path '{authoring_path}': {path}",
+                errors,
+            )
+
     validate_github_agent_models(errors)
 
 
