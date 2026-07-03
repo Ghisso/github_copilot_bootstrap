@@ -450,6 +450,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("hf-ai-sync.sh" in claude_settings_text, "Claude stop hooks should push HF AI state", errors)
 
     check("hf-ai-sync.sh" in json.dumps(codex_hooks), "Codex stop hooks should push HF AI state", errors)
+
+    # R-SYNC-02: consumers push state only; the canonical bootstrap is never
+    # re-uploaded from a consumer's Stop hook.
+    for label, text in (
+        ("Claude settings", claude_settings_text),
+        ("GitHub hooks", github_hook_text),
+        ("Codex hooks", json.dumps(codex_hooks)),
+    ):
+        check("push-state" in text, f"{label} Stop hook must push state", errors)
+        check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
+
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
     check(
         dispatcher.exists() and dispatcher.stat().st_mode & 0o111,

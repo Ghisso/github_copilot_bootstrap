@@ -371,7 +371,6 @@ def render_claude_settings(path: Path) -> None:
                         cmd("session-log.sh", "claude-code"),
                         cmd("stop-session-log-check.sh", "claude-code"),
                         cmd_stop("hf-ai-sync.sh", "push-state"),
-                        cmd_stop("hf-ai-sync.sh", "upload-bootstrap"),
                     ]
                 }
             ],
@@ -430,7 +429,6 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("session-log.sh", "openai-codex"),
                         cmd("stop-session-log-check.sh", "openai-codex"),
                         cmd("hf-ai-sync.sh", "push-state", timeout=180),
-                        cmd("hf-ai-sync.sh", "upload-bootstrap", timeout=180),
                     ]
                 }
             ],
