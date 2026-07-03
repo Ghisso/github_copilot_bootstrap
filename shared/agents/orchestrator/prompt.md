@@ -27,7 +27,7 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
 3. **PLAN:** Delegate to `planner`; save each concrete small plan under `.claude/plans/`.
-4. **IMPLEMENT:** Delegate implementation to `coder` or `designer`.
+4. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas.
 7. **SCORE:** Require score >= 90. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.

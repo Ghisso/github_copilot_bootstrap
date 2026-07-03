@@ -58,7 +58,7 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUME
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 
 ```text
-orchestrator -> planner -> coder/designer -> verifier -> reviewer -> score -> documenter
+orchestrator -> planner -> coder -> verifier -> reviewer -> score -> documenter
 ```
 
 Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
@@ -69,8 +69,7 @@ Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/
 |---|---|
 | `orchestrator` | Coordinates complex workflows and delegates work |
 | `planner` | Creates implementation plans with required skills and review profiles |
-| `coder` | Implements backend/code changes and performs local simplification |
-| `designer` | Implements Gradio/Streamlit UI changes |
+| `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
 | `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
 | `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
 | `documenter` | Updates documentation after score passes and before commit/PR closeout |

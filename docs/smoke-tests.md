@@ -16,9 +16,9 @@ Expected:
 
 Expected:
 
-- GitHub Copilot has 7 `.github/agents/*.agent.md` files.
-- The generated output has 7 canonical `.claude/agents/*.md` files.
-- OpenAI Codex has 7 `.codex/agents/*.toml` files.
+- GitHub Copilot has 6 `.github/agents/*.agent.md` files.
+- The generated output has 6 canonical `.claude/agents/*.md` files.
+- OpenAI Codex has 6 `.codex/agents/*.toml` files.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.

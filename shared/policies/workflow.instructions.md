@@ -42,7 +42,7 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUME
 For each small plan:
 
 1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
-2. **IMPLEMENT:** Delegate to `coder` or `designer`.
+2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work).
 3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
 4. **REVIEW:** Delegate to `reviewer`; use primary + adversarial review helpers for standard/control-plane changes.
 5. **SCORE:** Run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`.

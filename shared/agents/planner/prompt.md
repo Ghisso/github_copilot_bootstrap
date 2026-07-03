@@ -66,7 +66,7 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 ## Plan Requirements
 
 - Output clear phases and ordered steps.
-- For each step, include owner (`coder`, `designer`, or reviewer), target files, and verification commands.
+- For each step, include owner (`coder` or reviewer), target files, and verification commands.
 - For each step, include `Required Skills` listing exact SKILL.md files implementers must read.
 - For each review step, include `Review Profiles` listing exact profiles from `shared/review-profiles/`.
 - Call out assumptions, risks, and dependency ordering.

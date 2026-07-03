@@ -14,6 +14,7 @@ Before implementing any code, load skills in two tiers:
 - New modules or features → `create-feature/SKILL.md`
 - Config or dataclass work → `hydra-config/SKILL.md`
 - BentoML service work → `bentoml-service/SKILL.md`
+- UI work (Gradio / Streamlit interfaces) → `gradio-streamlit/SKILL.md`, and follow its design and UX guidance for the interface layer
 - Domain-specific bugs (Haystack, pandas, graphs, etc.) → scan `.claude/skills/` for a matching domain skill
 
 If the planner provided a `Required Skills` list, load every listed SKILL.md regardless of the above.
