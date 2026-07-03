@@ -164,7 +164,7 @@ def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
     expected_count = len(shared_agents)
-    check(expected_count > 0, f"no shared agents found under shared/agents/", errors)
+    check(expected_count > 0, "no shared agents found under shared/agents/", errors)
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))

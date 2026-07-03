@@ -122,7 +122,7 @@ def main() -> None:
                 push_cmd = [sys.executable, str(helper), "push-state", "--repo-root", str(project)]
                 if dry:
                     push_cmd.append("--dry-run")
-                print(f"  push-state to HF", flush=True)
+                print("  push-state to HF", flush=True)
                 subprocess.run(push_cmd, check=False, cwd=project)
 
         print(f"=== Done: {project.name} ===")
