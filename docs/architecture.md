@@ -8,7 +8,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/skills/`: reusable skills with `visibility: public|background` metadata.
 - `shared/hooks/`: hook config and guardrail scripts.
 - `shared/devcontainer/`: GPU devcontainer bootloader and Hugging Face AI state sync helper. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container.
-- `shared/mcp/servers.yaml`: single MCP server definition for Semble and context-mode.
+- `shared/mcp/servers.json`: single MCP server definition for Semble and context-mode.
 - `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `hf-ai-sync.sh pull-state` silently when the workspace opens) and a manual push task for non-AI sessions.
 - `shared/agents/`: canonical custom-agent metadata and neutral prompts.
 - `shared/review-profiles/`: checklists consumed by the unified `reviewer` agent.

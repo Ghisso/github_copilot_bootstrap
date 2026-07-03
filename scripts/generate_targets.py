@@ -26,6 +26,9 @@ CLAUDE_TOOL_MAP = {
     "todo": ["TodoWrite"],
     "web": ["WebFetch", "WebSearch"],
 }
+# The "vscode" capability is intentionally Copilot-only: it maps to a Copilot
+# tool and has no equivalent in Claude/Codex, so it is (correctly) omitted from
+# their tool lists rather than silently mishandled.
 COPILOT_TOOL_MAP = {
     "read": ["read"],
     "search": ["search"],
@@ -56,7 +59,7 @@ TARGET_PATH_REPLACEMENTS = {
 }
 
 
-def load_json_yaml(path: Path) -> dict[str, Any]:
+def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -186,31 +189,15 @@ def shared_agents() -> list[tuple[dict[str, Any], Path]]:
     agents_root = REPO_ROOT / "shared" / "agents"
     agents: list[tuple[dict[str, Any], Path]] = []
     for metadata_path in sorted(agents_root.glob("*/agent.yaml")):
-        agents.append((load_json_yaml(metadata_path), metadata_path.parent))
+        agents.append((load_json(metadata_path), metadata_path.parent))
     return agents
 
 
-def mapped_agent_name(agent_id: str, target: str) -> str:
-    return agent_id
-
-
 def transform_agent_text(text: str, target: str) -> str:
-    transformed = text
-    if target == "claude-code":
-        transformed = transformed.replace("GPT-5.4", "Claude target-native primary review")
-        transformed = transformed.replace("Claude Sonnet 4.6", "Claude target-native adversarial review")
-        transformed = transformed.replace("Claude Opus 4.6 (copilot)", "Claude Code default model")
-        transformed = transformed.replace("Claude Opus 4.6", "Claude Code default model")
-        transformed = transformed.replace("Claude Sonnet 4.6 (copilot)", "Claude Code default model")
-        transformed = transformed.replace("(copilot)", "")
-    elif target == "openai-codex":
-        transformed = transformed.replace("GPT-5.4", "Codex target-native primary review")
-        transformed = transformed.replace("Claude Sonnet 4.6", "Codex target-native adversarial review")
-        transformed = transformed.replace("Claude Opus 4.6 (copilot)", "Codex default model")
-        transformed = transformed.replace("Claude Opus 4.6", "Codex default model")
-        transformed = transformed.replace("Claude Sonnet 4.6 (copilot)", "Codex default model")
-        transformed = transformed.replace("(copilot)", "")
-    return transform_target_paths(transformed, target)
+    # Model names live only in agent.yaml model_intent (consumed directly when
+    # rendering the GitHub adapter), never in prompt bodies or descriptions, so
+    # there are no model-name substitutions to apply here — only path rewrites.
+    return transform_target_paths(text, target)
 
 
 def transform_target_paths(text: str, target: str) -> str:
@@ -257,7 +244,7 @@ def codex_sandbox_mode(capabilities: list[str]) -> str | None:
 
 
 def shared_mcp_servers() -> dict[str, Any]:
-    data = load_json_yaml(REPO_ROOT / "shared" / "mcp" / "servers.yaml")
+    data = load_json(REPO_ROOT / "shared" / "mcp" / "servers.json")
     return data["servers"]
 
 
@@ -280,7 +267,7 @@ def render_claude_mcp_json(path: Path) -> None:
 
 def render_codex_config(path: Path) -> None:
     lines = [
-        "# Generated from shared/mcp/servers.yaml.",
+        "# Generated from shared/mcp/servers.json.",
         "# Skills are sourced from the shared .claude basis; project trust is required.",
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
         "# Hooks are enabled by default in current Codex, so no features block is emitted.",
@@ -513,7 +500,9 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
 
 
 def canonical_agent_name(agent_id: str) -> str:
-    return mapped_agent_name(agent_id, "claude-code")
+    # Agent names are identical across every target; there is no per-target
+    # renaming (the earlier mapped_agent_name was an identity function).
+    return agent_id
 
 
 def canonical_agent_path(agent_id: str) -> str:
@@ -612,7 +601,7 @@ def render_claude_agents(target_root: Path) -> None:
 
 
 def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
-    codex_name = mapped_agent_name(agent["id"], "openai-codex")
+    codex_name = agent["id"]
     canonical_path = canonical_agent_path(agent["id"])
     capabilities = agent.get("capabilities", [])
     instructions = (
@@ -668,7 +657,7 @@ def render_codex(target_root: Path) -> None:
     render_codex_hooks(target_root / ".codex" / "hooks.json")
 
     for agent, _agent_dir in shared_agents():
-        target_name = mapped_agent_name(agent["id"], "openai-codex")
+        target_name = agent["id"]
         write_text(
             target_root / ".codex" / "agents" / f"{target_name}.toml",
             render_codex_agent_adapter(agent),

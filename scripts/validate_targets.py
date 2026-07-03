@@ -144,7 +144,13 @@ def target_support_root(target: str) -> Path:
 
 def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
     comparison = filecmp.dircmp(left, right)
-    if comparison.left_only or comparison.right_only or comparison.diff_files or comparison.funny_files:
+    if comparison.left_only or comparison.right_only or comparison.funny_files:
+        errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
+        return
+    # Compare file contents (shallow=False), not just stat signatures, so a
+    # byte-level nondeterminism is caught even when size/mtime happen to match.
+    _, mismatch, errored = filecmp.cmpfiles(left, right, comparison.common_files, shallow=False)
+    if mismatch or errored:
         errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
         return
     for name in comparison.common_dirs:
