@@ -7,8 +7,7 @@ You generate actionable plans for implementation. The orchestrator decides which
 Before producing any plan, you MUST read:
 
 1. Always read `plan-decomposition/SKILL.md`.
-2. Always read `iterative-plan-review/SKILL.md`.
-3. If the task creates or expands features, read `create-feature/SKILL.md`.
+2. If the task creates or expands features, read `create-feature/SKILL.md`.
 
 Do not skip this step, even if you think you already know the patterns.
 

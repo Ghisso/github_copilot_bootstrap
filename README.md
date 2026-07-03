@@ -256,7 +256,6 @@ There are many skills; these are the high-leverage ones I rely on most:
 Core workflow:
 
 - [plan-decomposition](shared/skills/plan-decomposition/SKILL.md)
-- [iterative-plan-review](shared/skills/iterative-plan-review/SKILL.md)
 - [create-feature](shared/skills/create-feature/SKILL.md)
 - [run-tests](shared/skills/run-tests/SKILL.md)
 - [refactor](shared/skills/refactor/SKILL.md)
