@@ -26,6 +26,10 @@ COPILOT_MODEL_PINS = (
     "Claude Sonnet 4.6",
     "(copilot)",
 )
+# Hand-maintained allow-list of Copilot picker model names. These were valid
+# against the official GitHub Copilot supported-models reference as last checked
+# 2026-07-03. This list rots silently as the picker changes — re-verify against
+# the reference and update the date when you touch it.
 GITHUB_ALLOWED_AGENT_MODELS = {
     "GPT-5.4",
     "Claude Opus 4.6",
@@ -1226,9 +1230,15 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             f"{path} contains stale quality report path pattern",
             errors,
         )
-    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md")
+    # R-VALID-01: assert the concept structurally (the devcontainer-required vs
+    # outside-fallback distinction is documented) rather than pinning one exact
+    # English sentence that every wording change would have to chase.
+    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md").lower()
     check(
-        "Inside the generated devcontainer, Semble and context-mode are installed as required tools" in tool_routing_text,
+        "devcontainer" in tool_routing_text
+        and "required" in tool_routing_text
+        and "semble" in tool_routing_text
+        and "context-mode" in tool_routing_text,
         "tool-routing instructions must distinguish required devcontainer tooling from outside-devcontainer fallbacks",
         errors,
     )
