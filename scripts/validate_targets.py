@@ -1324,16 +1324,37 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check("uv run python" not in post_start_text, "post-start must not invoke project uv for HF sync", errors)
 
     helper = devcontainer_root / "hf-ai-sync.py"
+    scrubbed_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"HF_AI_SYNC_BUCKET", "HF_AI_SYNC_PREFIX"}
+    }
     if helper.exists():
+        # R-SYNC-01: a configured bucket is honored; there is no baked default.
+        configured_env = {**scrubbed_env, "HF_AI_SYNC_BUCKET": "example-org/example-bucket"}
         result = subprocess.run(
             [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
             cwd=REPO_ROOT,
+            env=configured_env,
             text=True,
             capture_output=True,
             check=False,
         )
         check(result.returncode == 0, f"HF sync helper dry-run status failed: {result.stderr}", errors)
-        check("Ghisso/vscode_mounts" in result.stdout, "HF sync helper must default to Ghisso/vscode_mounts", errors)
+        check("example-org/example-bucket" in result.stdout, "HF sync helper must honor the configured bucket", errors)
+
+        # R-SYNC-01: with no bucket configured the helper is a graceful no-op.
+        no_bucket = subprocess.run(
+            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
+            cwd=REPO_ROOT,
+            env=scrubbed_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        combined = no_bucket.stdout + no_bucket.stderr
+        check(no_bucket.returncode == 0, "HF sync helper must not hard-fail without a bucket", errors)
+        check("no HF sync bucket configured" in combined, "HF sync helper must explain a missing bucket", errors)
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
     with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -1346,13 +1367,29 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(init_result.returncode == 0, f"temporary git init failed: {init_result.stderr}", errors)
+        # R-SYNC-01: installer errors without a bucket (no baked default).
+        no_bucket_install = subprocess.run(
+            [sys.executable, str(installer), str(temp_repo), "--skip-upload", "--dry-run"],
+            cwd=REPO_ROOT,
+            env=scrubbed_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(no_bucket_install.returncode != 0, "installer must refuse to run without a bucket", errors)
+        check(
+            "HF_AI_SYNC_BUCKET" in (no_bucket_install.stdout + no_bucket_install.stderr),
+            "installer must tell the user how to configure a bucket",
+            errors,
+        )
+
         install_result = subprocess.run(
             [
                 sys.executable,
                 str(installer),
                 str(temp_repo),
                 "--bucket",
-                "Ghisso/vscode_mounts/test-project",
+                "example-org/example-bucket/test-project",
                 "--skip-upload",
             ],
             cwd=REPO_ROOT,
@@ -1366,7 +1403,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         devcontainer_data = json.loads(read(temp_repo / ".devcontainer" / "devcontainer.json"))
         container_env = devcontainer_data.get("containerEnv", {})
         check(
-            container_env.get("HF_AI_SYNC_BUCKET") == "Ghisso/vscode_mounts/test-project",
+            container_env.get("HF_AI_SYNC_BUCKET") == "example-org/example-bucket/test-project",
             "installer must persist project-specific HF sync path in .devcontainer",
             errors,
         )
@@ -1409,7 +1446,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
         check(helper_status.returncode == 0, f"installed helper status failed: {helper_status.stderr}", errors)
         check(
-            "hf://buckets/Ghisso/vscode_mounts/test-project/bootstrap" in helper_status.stdout,
+            "hf://buckets/example-org/example-bucket/test-project/bootstrap" in helper_status.stdout,
             "installed helper must read HF sync path from .devcontainer when env vars are unset",
             errors,
         )

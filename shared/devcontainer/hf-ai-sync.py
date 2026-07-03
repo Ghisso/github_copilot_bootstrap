@@ -16,7 +16,6 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-DEFAULT_BUCKET = "Ghisso/vscode_mounts"
 BUCKET_PREFIX = "hf://buckets/"
 STATE_INCLUDES = (
     "MEMORY.md",
@@ -454,8 +453,15 @@ def main(argv: list[str] | None = None) -> int:
         args.bucket
         or os.environ.get("HF_AI_SYNC_BUCKET")
         or devcontainer_bucket
-        or DEFAULT_BUCKET
     )
+    if not configured_bucket:
+        # No personal namespace is baked in; without a configured bucket the
+        # sync helper is a graceful no-op (it runs on every Stop hook).
+        warn(
+            "no HF sync bucket configured; set HF_AI_SYNC_BUCKET or pass --bucket "
+            "(skipping sync)"
+        )
+        return 0
     configured_prefix = (
         args.prefix
         if args.prefix is not None

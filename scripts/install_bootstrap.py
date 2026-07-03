@@ -43,8 +43,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--bucket",
-        default="Ghisso/vscode_mounts",
-        help="HF bucket id or bucket prefix path used for bootstrap/state sync.",
+        default=None,
+        help="HF bucket id or bucket prefix path used for bootstrap/state sync. "
+        "Required unless HF_AI_SYNC_BUCKET is set in the environment. No default "
+        "is baked in, so no personal namespace ships in the bootstrap.",
     )
     parser.add_argument(
         "--prefix",
@@ -198,6 +200,15 @@ def upload_bootstrap(target: Path, bucket: str, prefix: str | None, dry_run: boo
 
 def main() -> int:
     args = parse_args()
+    bucket = args.bucket or os.environ.get("HF_AI_SYNC_BUCKET")
+    if not bucket:
+        print(
+            "error: no HF sync bucket configured. Pass --bucket <org/bucket[/prefix]> "
+            "or set HF_AI_SYNC_BUCKET in the environment before installing.",
+            file=sys.stderr,
+        )
+        return 2
+    args.bucket = bucket
     target = args.target_repo.expanduser().resolve()
     source = args.source.expanduser().resolve()
 
