@@ -52,7 +52,7 @@ if is_bypass_subject "$SUBJECT"; then
   exit 0
 fi
 
-if [[ ! "$CURRENT_BRANCH" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]; then
+if ! is_implementation_branch "$CURRENT_BRANCH"; then
   exit 0
 fi
 

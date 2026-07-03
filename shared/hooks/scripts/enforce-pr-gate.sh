@@ -22,7 +22,7 @@ if ! is_gh_pr_create_command "$COMMAND" && ! is_git_push_command "$COMMAND"; the
 fi
 
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-if [[ ! "$CURRENT_BRANCH" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]; then
+if ! is_implementation_branch "$CURRENT_BRANCH"; then
   deny_pretool "PR/push gate only allows implementation branches; current branch is ${CURRENT_BRANCH:-unknown}"
   exit 0
 fi

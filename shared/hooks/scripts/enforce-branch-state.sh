@@ -28,7 +28,7 @@ if ! command -v git >/dev/null 2>&1; then
   exit 0
 fi
 
-if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]; then
+if ! is_implementation_branch "$BRANCH"; then
   deny_pretool "implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash"
   exit 0
 fi

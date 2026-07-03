@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_lib-frontmatter.sh
+. "$SCRIPT_DIR/_lib-frontmatter.sh"
 REPO_ROOT_FOR_LOG="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 ERROR_LOG="$REPO_ROOT_FOR_LOG/.claude/session_logs/hooks-errors.log"
 
@@ -14,15 +16,7 @@ warn() {
   printf '%s\n' "$msg" >> "$ERROR_LOG" 2>/dev/null || true
 }
 
-run_python() {
-  if command -v uv >/dev/null 2>&1; then
-    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
-    return $?
-  fi
-  return 127
-}
-
-if ! command -v uv >/dev/null 2>&1; then
+if ! uv_available; then
   warn "uv is unavailable; skipping Hugging Face AI state sync."
   exit 0
 fi

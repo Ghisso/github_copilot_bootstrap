@@ -9,7 +9,7 @@ REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat >/dev/null || true)"
 
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-if [[ ! "$CURRENT_BRANCH" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]; then
+if ! is_implementation_branch "$CURRENT_BRANCH"; then
   exit 0
 fi
 
@@ -34,7 +34,7 @@ current_phase="$(fm_read "$BIG_PLAN" "current_phase" || true)"
 last_score=""
 score_file="$(find "$REPO_ROOT/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null | sort -r | sed -n '1p')"
 if [[ -n "$score_file" ]]; then
-  last_score="$(awk -F'[: ,]+' '/"score"[[:space:]]*:/ {print $3; exit}' "$score_file" 2>/dev/null || true)"
+  last_score="$(json_file_number_value "$score_file" "score" 2>/dev/null || true)"
 fi
 
 message="Implementation branch $CURRENT_BRANCH: big plan $SLUG, phases done=$done_count pending=$pending_count, current_phase=${current_phase:-none}"

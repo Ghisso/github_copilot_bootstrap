@@ -9,6 +9,24 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+# Single home for the implementation-branch shape used by every lifecycle gate.
+is_implementation_branch() {
+  [[ "$1" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]
+}
+
+# Single home for the uv guard / python runner shared by the optional-python paths.
+uv_available() {
+  command -v uv >/dev/null 2>&1
+}
+
+run_python() {
+  if uv_available; then
+    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
+    return $?
+  fi
+  return 127
+}
+
 deny_pretool() {
   local reason
   reason="$(json_escape "$1")"
@@ -122,10 +140,6 @@ json_string_value() {
   '
 }
 
-hook_tool_name() {
-  printf '%s' "$1" | json_string_value "tool_name"
-}
-
 hook_tool_name_any() {
   local payload="$1"
   local value
@@ -230,12 +244,6 @@ fm_read() {
       exit
     }
   ' "$file"
-}
-
-fm_has() {
-  local file="$1"
-  local key="$2"
-  [[ -n "$(fm_read "$file" "$key")" ]]
 }
 
 fm_write() {
