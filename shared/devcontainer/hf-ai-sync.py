@@ -35,7 +35,10 @@ BOOTSTRAP_PATHS = (
     ".claude/settings.json",
     ".claude/skills",
     ".claude/templates",
-    ".claude/MEMORY.md",
+    # MEMORY.md is intentionally NOT in the bootstrap bundle: its template ships
+    # in dist/ via the installer, and its evolving content lives only in the
+    # state bundle (STATE_INCLUDES). Single-homing it here removes the
+    # order-dependent restore that could clobber accumulated memory.
     ".claude/plans/README.md",
     ".claude/explorations/README.md",
     ".claude/session_logs/README.md",
@@ -417,7 +420,7 @@ def push_state(args: argparse.Namespace, repo_root: Path, bucket_id: str, prefix
         source=str(claude_root),
         dest=remote_uri(bucket_id, prefix, "state", ".claude"),
         token=token,
-        delete=False,
+        delete=bool(getattr(args, "prune", False)),
         include=STATE_INCLUDES,
     )
 
@@ -442,6 +445,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--dry-run", action="store_true", help="Print planned sync operations without HF access.")
     parser.add_argument("--verbose", action="store_true", help="Show verbose Hugging Face sync output.")
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="On push-state, delete remote state files that no longer exist locally "
+        "(reconciliation). Off by default so a partial local tree cannot wipe remote state.",
+    )
     return parser.parse_args(argv)
 
 

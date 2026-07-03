@@ -1354,6 +1354,25 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(result.returncode == 0, f"HF sync helper dry-run status failed: {result.stderr}", errors)
         check("example-org/example-bucket" in result.stdout, "HF sync helper must honor the configured bucket", errors)
 
+        # R-SYNC-04: push-state prunes only with --prune (delete off by default).
+        default_push = subprocess.run(
+            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run"],
+            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
+        )
+        check("delete=False" in default_push.stdout, "push-state must not delete remote state by default", errors)
+        prune_push = subprocess.run(
+            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run", "--prune"],
+            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
+        )
+        check("delete=True" in prune_push.stdout, "push-state --prune must reconcile (delete) remote state", errors)
+        # R-SYNC-04: MEMORY.md is single-homed in state, not the bootstrap bundle.
+        helper_src = read(helper)
+        check(
+            '".claude/MEMORY.md"' not in helper_src,
+            "MEMORY.md must not be in BOOTSTRAP_PATHS (single-homed in state)",
+            errors,
+        )
+
         # R-SYNC-01: with no bucket configured the helper is a graceful no-op.
         no_bucket = subprocess.run(
             [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],

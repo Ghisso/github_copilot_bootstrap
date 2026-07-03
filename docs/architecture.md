@@ -78,7 +78,11 @@ Bypass commit prefixes `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` ar
 
 This runs on every `pull-state` invocation — whether triggered by the VS Code `folderOpen` task, an AI tool `SessionStart` hook, or manually.
 
-`.state_backups/` is excluded from `push-state` (it does not match `STATE_INCLUDES` patterns) and should be added to `.gitignore`.
+`.state_backups/` is excluded from `push-state` (it does not match `STATE_INCLUDES` patterns) and should be added to `.gitignore`. It is a **local convenience only**: it lives inside the ephemeral, git-ignored `.claude/` and is erased by a container rebuild or fresh clone. The durable copy of state is the HF bucket — recover from `.state_backups/` immediately if you need it, but do not treat it as backup of record.
+
+`MEMORY.md` is single-homed in the **state** bundle, not the bootstrap bundle: the installer ships a template in `dist/`, and its evolving content lives only in `state/` via `STATE_INCLUDES`. This removes the earlier dual-homing where a bootstrap restore could clobber accumulated memory depending on pull order.
+
+`push-state` does not delete remote files by default, so the bucket can accumulate state for plans/logs deleted locally. Run `hf-ai-sync.py push-state --prune` to reconcile — it mirrors the local state tree to the bucket, deleting remote files that no longer exist locally. Prune is opt-in so a partial local tree can never wipe remote state unintentionally.
 
 ## VS Code Tasks
 
