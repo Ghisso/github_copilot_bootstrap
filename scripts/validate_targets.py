@@ -1205,10 +1205,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         text = read(path)
         for fragment in stale_workflow_fragments:
             check(fragment not in text, f"{path} contains stale workflow/gate phrase: {fragment}", errors)
+    # docs/history/ holds archived completed plans; they legitimately contain
+    # old path patterns and are not living documentation.
     source_paths = [
         REPO_ROOT / "README.md",
         REPO_ROOT / "AGENTS.md",
-        *text_files(REPO_ROOT / "docs"),
+        *(p for p in text_files(REPO_ROOT / "docs") if "history" not in p.relative_to(REPO_ROOT / "docs").parts),
         *text_files(REPO_ROOT / "shared"),
     ]
     for path in source_paths:
