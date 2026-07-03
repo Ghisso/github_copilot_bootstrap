@@ -631,6 +631,21 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(returncode == 0, f"commit gate on dev failed to run: {stderr}", errors)
         check('"permissionDecision":"deny"' in stdout, "commit gate must deny commits on dev", errors)
 
+        # R-HOOKS-01: global git flags must not smuggle a commit past the classifier.
+        for command in (
+            'git -C . commit -m x',
+            'git -c a=b commit -m x',
+            'git --git-dir=.git commit -m x',
+        ):
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-commit-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                "github-copilot",
+                cwd=repo,
+            )
+            check(returncode == 0, f"commit gate flag-evasion case failed to run: {command}: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny flag-smuggled commit on dev: {command}", errors)
+
         write(repo / "dirty.txt", "dirty\n")
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-branch-state.sh"),
@@ -643,6 +658,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         for command in (
             "git switch --create foo_implementation",
             "git checkout -B foo_implementation",
+            "git -C . checkout -b foo_implementation",
         ):
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-branch-state.sh"),

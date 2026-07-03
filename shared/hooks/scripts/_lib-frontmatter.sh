@@ -227,33 +227,122 @@ fm_read_list() {
   ' "$file"
 }
 
+# Return the effective subcommand of the FIRST git invocation in a segment,
+# skipping global git flags (-C <path>, -c <k=v>, --git-dir, --work-tree, ...).
+# Shell operators are normalized to spaces so a value glued to an operator does
+# not leak into the next command's word.
+_git_first_subcommand() {
+  local segment="${1//[;|&]/ }"
+  local -a tokens
+  read -ra tokens <<< "$segment"
+  local i=0 n="${#tokens[@]}" tok
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+        i=$((i + 2)); continue ;;
+      --*=*) i=$((i + 1)); continue ;;
+      -*)    i=$((i + 1)); continue ;;
+      *) printf '%s' "$tok"; return 0 ;;
+    esac
+  done
+  return 0
+}
+
+# True if any git invocation in the command uses subcommand $want. Tokenizes
+# past global flags so `git -C . commit`, `git -c k=v commit`, and chained forms
+# like `git status && git commit` are all detected.
+git_command_has_subcommand() {
+  local rest="$1" want="$2" after sub
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    sub="$(_git_first_subcommand "$after")"
+    if [[ "$sub" == "$want" ]]; then
+      return 0
+    fi
+    rest="$after"
+  done
+  return 1
+}
+
 parse_branch_create_command() {
-  local command="$1"
-  local branch=""
-  if [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+checkout[[:space:]]+(-b|-B)[[:space:]]+([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[3]}"
-  elif [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+switch[[:space:]]+(-c|-C|--create)[[:space:]]+([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[3]}"
-  elif [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+switch[[:space:]]+--create=([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[2]}"
-  fi
-  branch="${branch%\"}"
-  branch="${branch#\"}"
-  branch="${branch%\'}"
-  branch="${branch#\'}"
-  printf '%s' "$branch"
+  local rest="$1" after
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    local seg="${after//[;|&]/ }"
+    local -a tokens
+    read -ra tokens <<< "$seg"
+    local i=0 n="${#tokens[@]}" tok sub="" branch=""
+    while (( i < n )); do
+      tok="${tokens[$i]}"
+      case "$tok" in
+        -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+          i=$((i + 2)); continue ;;
+        --*=*|-*) break ;;
+        *) sub="$tok"; i=$((i + 1)); break ;;
+      esac
+    done
+    if [[ "$sub" == "checkout" ]]; then
+      while (( i < n )); do
+        case "${tokens[$i]}" in
+          -b|-B) branch="${tokens[$((i + 1))]:-}"; break ;;
+          *) i=$((i + 1)) ;;
+        esac
+      done
+    elif [[ "$sub" == "switch" ]]; then
+      while (( i < n )); do
+        case "${tokens[$i]}" in
+          -c|-C|--create) branch="${tokens[$((i + 1))]:-}"; break ;;
+          --create=*) branch="${tokens[$i]#--create=}"; break ;;
+          *) i=$((i + 1)) ;;
+        esac
+      done
+    fi
+    if [[ -n "$branch" ]]; then
+      branch="${branch%\"}"
+      branch="${branch#\"}"
+      branch="${branch%\'}"
+      branch="${branch#\'}"
+      printf '%s' "$branch"
+      return 0
+    fi
+    rest="$after"
+  done
+  return 0
 }
 
 is_git_commit_command() {
-  [[ "$1" =~ (^|[[:space:];|&])git[[:space:]]+commit($|[[:space:]]) ]]
+  git_command_has_subcommand "$1" commit
 }
 
 is_git_push_command() {
-  [[ "$1" =~ (^|[[:space:];|&])git[[:space:]]+push($|[[:space:]]) ]]
+  git_command_has_subcommand "$1" push
 }
 
 is_gh_pr_create_command() {
-  [[ "$1" =~ (^|[[:space:];|&])gh[[:space:]]+pr[[:space:]]+create($|[[:space:]]) ]]
+  local rest="$1" after seg
+  while [[ "$rest" =~ (^|[[:space:];|\&])gh[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    seg="${after//[;|&]/ }"
+    local -a tokens
+    read -ra tokens <<< "$seg"
+    local i=0 n="${#tokens[@]}" tok
+    local -a pos=()
+    while (( i < n )); do
+      tok="${tokens[$i]}"
+      case "$tok" in
+        -R|--repo|--hostname) i=$((i + 2)); continue ;;
+        --*=*|-*) i=$((i + 1)); continue ;;
+        *) pos+=("$tok"); i=$((i + 1)) ;;
+      esac
+      if (( ${#pos[@]} >= 2 )); then break; fi
+    done
+    if [[ "${pos[0]:-}" == "pr" && "${pos[1]:-}" == "create" ]]; then
+      return 0
+    fi
+    rest="$after"
+  done
+  return 1
 }
 
 commit_subject_from_command() {
