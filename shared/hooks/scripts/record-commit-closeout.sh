@@ -26,8 +26,23 @@ if [[ -z "$SUBJECT" ]]; then
 fi
 
 LATEST_SUBJECT="$(git -C "$REPO_ROOT" log -1 --format=%s 2>/dev/null || true)"
-if [[ "$LATEST_SUBJECT" != "$SUBJECT" ]]; then
-  additional_context "PostToolUse" "commit closeout not recorded because HEAD subject did not match intercepted command"
+# Tolerant correlation: shell-expanded or reflowed messages rarely byte-equal
+# the parsed -m subject, so normalize whitespace and accept a word-boundary
+# prefix match in either direction. On a miss, warn with a recovery command
+# instead of silently stalling the phase machine.
+norm_latest="$(printf '%s' "$LATEST_SUBJECT" | tr -s '[:space:]' ' ')"
+norm_latest="${norm_latest# }"; norm_latest="${norm_latest% }"
+norm_subject="$(printf '%s' "$SUBJECT" | tr -s '[:space:]' ' ')"
+norm_subject="${norm_subject# }"; norm_subject="${norm_subject% }"
+correlated=0
+if [[ -n "$norm_subject" ]] && \
+   { [[ "$norm_latest" == "$norm_subject" ]] || \
+     [[ "$norm_latest" == "$norm_subject "* ]] || \
+     [[ "$norm_subject" == "$norm_latest "* ]]; }; then
+  correlated=1
+fi
+if [[ "$correlated" -ne 1 ]]; then
+  additional_context "PostToolUse" "commit closeout not recorded: HEAD subject ('${norm_latest}') did not correlate with the intercepted commit subject ('${norm_subject}'). If this phase is complete, advance it by hand: set current_phase to the next phase (or status: complete when it was the last) in the big plan under .claude/plans/."
   exit 0
 fi
 

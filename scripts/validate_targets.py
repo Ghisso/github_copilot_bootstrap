@@ -887,14 +887,15 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "record commit closeout must not complete big plan without commit correlation",
             errors,
         )
+        # R-HOOKS-05: a whitespace-variant subject still correlates with HEAD.
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "record-commit-closeout.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1   closeout"'}},
             "github-copilot",
             cwd=repo,
         )
         check(returncode == 0, f"record commit closeout failed to run: {stderr}", errors)
-        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan", errors)
+        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan via normalized subject match", errors)
 
         write(
             repo / ".claude" / "session_logs" / "hooks-bypass.log",
