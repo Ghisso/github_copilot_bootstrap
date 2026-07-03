@@ -44,10 +44,7 @@ Claude Code:
 - `.mcp.json`
 - `.claude/settings.json`
 
-Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Review helpers are mapped to:
-
-- `review-pass-claude-primary`
-- `review-pass-claude-adversarial`
+Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
