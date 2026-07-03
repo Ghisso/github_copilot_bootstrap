@@ -1435,6 +1435,16 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
         check(devcontainer_ignore_result.returncode != 0, "installer must leave .devcontainer trackable", errors)
 
+        # R-SYNC-03: default install keeps the Copilot cloud surface ignored
+        # (local-IDE only).
+        copilot_ignored = subprocess.run(
+            ["git", "-C", str(temp_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(copilot_ignored.returncode == 0, "default install must ignore the Copilot cloud surface (.github/agents)", errors)
+
         helper_status_env = {
             key: value
             for key, value in os.environ.items()
@@ -1461,6 +1471,45 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "installed helper must read HF sync path from .devcontainer when env vars are unset",
             errors,
         )
+
+    # R-SYNC-03: --commit-copilot-surface keeps the Copilot surface trackable.
+    with tempfile.TemporaryDirectory() as flag_dir_name:
+        flag_repo = Path(flag_dir_name) / "consumer"
+        flag_repo.mkdir()
+        subprocess.run(["git", "init", str(flag_repo)], text=True, capture_output=True, check=False)
+        flag_install = subprocess.run(
+            [
+                sys.executable,
+                str(installer),
+                str(flag_repo),
+                "--bucket",
+                "example-org/example-bucket/test-project",
+                "--skip-upload",
+                "--commit-copilot-surface",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(flag_install.returncode == 0, f"installer --commit-copilot-surface run failed: {flag_install.stderr}", errors)
+        gitignore_text = read(flag_repo / ".gitignore") if (flag_repo / ".gitignore").exists() else ""
+        check(".github/agents/" not in gitignore_text, "--commit-copilot-surface must omit .github/agents from the ignore block", errors)
+        surface_trackable = subprocess.run(
+            ["git", "-C", str(flag_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(surface_trackable.returncode != 0, "--commit-copilot-surface must leave .github/agents trackable", errors)
+        # State still stays ignored regardless of the flag.
+        state_ignored = subprocess.run(
+            ["git", "-C", str(flag_repo), "check-ignore", ".claude/MEMORY.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(state_ignored.returncode == 0, "--commit-copilot-surface must still ignore .claude state", errors)
 
 
 def validate_determinism(errors: list[str]) -> None:

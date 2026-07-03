@@ -142,6 +142,17 @@ content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters
 and MCP files should stay ignored. A fresh clone can reopen in the devcontainer and
 pull the ignored AI content from:
 
+### GitHub Copilot: local-IDE vs cloud
+
+By default the installer gitignores the GitHub Copilot surface
+(`.github/agents/`, `.github/hooks/`, `.github/instructions/`,
+`.github/copilot-instructions.md`), so **only local-IDE Copilot is configured** —
+cloud Copilot agents read that surface only from the committed default branch and
+will not see gitignored files. To enable cloud Copilot, install with
+`--commit-copilot-surface`, which keeps those paths out of the ignore block so you
+can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
+ignored and HF-synced.
+
 ```text
 hf://buckets/Ghisso/vscode_mounts/<project-name>/bootstrap/
 hf://buckets/Ghisso/vscode_mounts/<project-name>/state/
