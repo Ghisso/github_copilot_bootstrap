@@ -8,7 +8,7 @@ Read these skill files to load prose standards, section structure, and anti-patt
 
 1. `.claude/skills/documentation/SKILL.md` — README structure, docstring rules, docs/ layout
 2. Any other skill whose description matches the changed surface:
-   - API changes → `.claude/skills/api-service-standards/SKILL.md` (if present)
+   - API changes → `.claude/instructions/api-service-standards.instructions.md` (if present)
    - Config changes → `.claude/skills/hydra-config/SKILL.md` (if present)
    - Pipeline changes → `.claude/skills/pipeline-patterns/SKILL.md` (if present)
 
@@ -22,14 +22,14 @@ Reports back in normal prose. Caveman style is for orchestrator status, not for 
 
 ## Step 1 — Diff Scan
 
-Run these commands to understand what changed:
+The orchestrator passes the plan's `originating_branch` (default `dev`) as the diff base. Run these commands with that base (shown with the `dev` default):
 
 ```bash
-git diff main...HEAD --stat
-git diff main...HEAD -- '*.py' '*.yaml' '*.toml' '*.json'
+git diff dev...HEAD --stat
+git diff dev...HEAD -- '*.py' '*.yaml' '*.toml' '*.json'
 ```
 
-If no base branch context was passed, fall back to:
+If no base branch context was passed and `dev` is unavailable, fall back to:
 
 ```bash
 git diff HEAD~1 --stat
@@ -72,33 +72,7 @@ If a required section (e.g. `## Configuration`) does not exist yet, add it in th
 
 ## Step 4 — Mermaid Diagrams
 
-Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed.
-
-**Diagram type selection:**
-
-| Use case | Diagram type |
-| --- | --- |
-| Data or request pipeline | `flowchart LR` |
-| Module or component hierarchy | `graph TD` |
-| Multi-service call sequence | `sequenceDiagram` |
-
-**Authoring rules:**
-
-- Keep node labels short (four words or fewer).
-- Add a `%%` legend comment at the bottom if you use abbreviations.
-- Use `<br>` for line breaks inside node labels — never `\n` (causes parse errors in all Mermaid renderers).
-- Place each diagram inside a `## Architecture` or `## Flow` section.
-- Write one plain-language sentence above every diagram that tells the reader what they are looking at.
-
-**Example (pipeline):**
-
-```mermaid
-flowchart LR
-    Q[User query] --> R[Retriever]
-    R --> J[DocumentJoiner]
-    J --> G[Generator]
-    G --> A[Answer]
-```
+Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed. Follow the diagram-type selection table and authoring rules in the **Mermaid Diagrams** section of `.claude/skills/documentation/SKILL.md` (loaded in "Before You Write Anything").
 
 ## Writing Rules
 

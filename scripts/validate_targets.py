@@ -280,6 +280,13 @@ def validate_agents(errors: list[str]) -> None:
                 f"generated agent must not reference authoring-repo path '{authoring_path}': {path}",
                 errors,
             )
+        # R-AGENTS-07: the documenter must diff against the plan's originating
+        # branch (dev), never main.
+        check(
+            "main...HEAD" not in text,
+            f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
+            errors,
+        )
 
     validate_github_agent_models(errors)
 

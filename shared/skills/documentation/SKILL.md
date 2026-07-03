@@ -115,3 +115,35 @@ How to run tests, linting, and type checking.
 - **Missing Raises section** — always document exceptions the caller must handle
 - **Wall of prose in README** — prefer tables and code blocks
 - **Undocumented env vars** — every env var must appear in `CONFIGURATION.md`
+
+---
+
+## Mermaid Diagrams
+
+Add or update a Mermaid diagram whenever a data flow, request pipeline, or module structure changed.
+
+**Diagram type selection:**
+
+| Use case | Diagram type |
+| --- | --- |
+| Data or request pipeline | `flowchart LR` |
+| Module or component hierarchy | `graph TD` |
+| Multi-service call sequence | `sequenceDiagram` |
+
+**Authoring rules:**
+
+- Keep node labels short (four words or fewer).
+- Add a `%%` legend comment at the bottom if you use abbreviations.
+- Use `<br>` for line breaks inside node labels — never `\n` (causes parse errors in all Mermaid renderers).
+- Place each diagram inside a `## Architecture` or `## Flow` section.
+- Write one plain-language sentence above every diagram that tells the reader what they are looking at.
+
+**Example (pipeline):**
+
+```mermaid
+flowchart LR
+    Q[User query] --> R[Retriever]
+    R --> J[DocumentJoiner]
+    J --> G[Generator]
+    G --> A[Answer]
+```
