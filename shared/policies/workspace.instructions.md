@@ -71,9 +71,7 @@ Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/
 | `planner` | Creates implementation plans with required skills and review profiles |
 | `coder` | Implements backend/code changes and performs local simplification |
 | `designer` | Implements Gradio/Streamlit UI changes |
-| `reviewer` | Runs profile-driven dual-pass reviews |
-| `review-pass-primary` | Hidden primary review helper |
-| `review-pass-adversarial` | Hidden adversarial review helper |
+| `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
 | `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
 | `documenter` | Updates documentation after score passes and before commit/PR closeout |
 

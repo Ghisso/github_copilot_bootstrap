@@ -29,23 +29,18 @@ If profiles are omitted, infer them from changed files:
 
 ## Review Flow
 
-1. Read each requested profile from `.claude/review-profiles/`.
-2. Run `review-pass-primary` on the same scope and merged profile checklist.
-3. Run `review-pass-adversarial` on the same scope and merged profile checklist.
+You run both passes yourself, in sequence — there are no helper agents to
+delegate to. This keeps the review a single-nesting-level operation that
+executes identically on every runtime.
+
+1. Read each requested profile from `.claude/review-profiles/`, including its `## Severity` section.
+2. Pass 1 (primary): review the scope against the merged profile checklist and record findings.
+3. Pass 2 (adversarial): review the same scope again, deliberately challenging your Pass 1 assumptions — hunt for missed edge cases, hidden coupling, and safety risks the first pass rationalized away.
 4. Merge outputs:
-   - Shared findings are high confidence.
-   - Single-pass findings are disputed but retained.
+   - Findings surfaced by both passes are high confidence.
+   - Single-pass findings are retained but marked disputed.
    - Severity disagreements use the stricter severity and note the disagreement.
 5. Output one consolidated report.
-
-## Degraded Mode
-
-If either review-pass helper is unavailable, run a single-pass review with the current model.
-
-- Add header: `Degraded review - single model only - do not treat as PR gate`
-- Label findings `[single-pass, unconfirmed]`
-- Omit shared/disputed confidence taxonomy.
-- Do not mark a PR gate as passed.
 
 ## Report Format
 

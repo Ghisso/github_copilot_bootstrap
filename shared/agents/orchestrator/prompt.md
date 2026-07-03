@@ -52,9 +52,7 @@ Select reviewer profiles based on the surface area changed. Run `reviewer` once 
 **Complexity gate:**
 - **Control-plane files** (`shared/**`, target-native hook/agent/config adapters, generated adapter/config surfaces, root guidance files): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
 - **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
-- **Standard changes**: use `reviewer` dual-pass mode through `review-pass-primary` + `review-pass-adversarial`.
-
-**Degraded review:** If `reviewer` reports degraded mode, do **not** mark the pre-PR gate as passed.
+- **Standard changes**: run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
 
 ## Delegation Rules
 
