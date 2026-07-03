@@ -1461,6 +1461,19 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
 
+        # R-POLICY-01: installer substitutes the workspace project-name placeholder.
+        installed_workspace = read(temp_repo / ".claude" / "instructions" / "workspace.instructions.md")
+        check(
+            "[TODO: project name" not in installed_workspace,
+            "installer must fill the workspace project-name placeholder",
+            errors,
+        )
+        check(
+            "**Project:** consumer" in installed_workspace,
+            "installer must substitute the target repo name into the workspace instructions",
+            errors,
+        )
+
         ignored_result = subprocess.run(
             ["git", "-C", str(temp_repo), "check-ignore", ".claude/MEMORY.md"],
             text=True,

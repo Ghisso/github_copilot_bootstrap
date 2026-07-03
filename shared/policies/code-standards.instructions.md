@@ -39,7 +39,7 @@ Run `uv run ruff check src/ tests/` — zero violations required before commit.
 - **`pathlib.Path`** for all file ops (never `os.path`)
 - **Context managers** (`with`) for all resources
 - **`ClassVar`** for dataclass class-level constants (prevent `__init__` override attacks)
-- **`from __future__ import annotations`** NEVER — breaks Hydra dataclass introspection in Python 3.12+
+- **`from __future__ import annotations`**: fine in general modules (scripts, services, tests), but NEVER in Hydra-managed config/dataclass modules (`src/configs/**` and any ConfigStore-registered dataclass) — it stringizes annotations and breaks Hydra's dataclass introspection in Python 3.12+
 
 ## Anti-Patterns (prohibited)
 

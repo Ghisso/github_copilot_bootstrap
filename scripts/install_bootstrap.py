@@ -111,6 +111,23 @@ def ignore_block(commit_copilot_surface: bool = False) -> str:
     return "\n".join(lines) + "\n"
 
 
+def substitute_project_name(target: Path, dry_run: bool) -> None:
+    """Fill the workspace instructions' [TODO: project name...] placeholder with
+    the target repo's directory name at install time, so every consumer ships a
+    named workspace instead of the unfilled template."""
+    workspace = target / ".claude" / "instructions" / "workspace.instructions.md"
+    if not workspace.is_file():
+        return
+    text = workspace.read_text(encoding="utf-8")
+    placeholder = "**Project:** [TODO: project name and one-liner description]"
+    if placeholder not in text:
+        return
+    info(f"substitute workspace project name -> {target.name}")
+    if dry_run:
+        return
+    workspace.write_text(text.replace(placeholder, f"**Project:** {target.name}"), encoding="utf-8")
+
+
 def merge_gitignore(target: Path, dry_run: bool, commit_copilot_surface: bool = False) -> None:
     gitignore = target / ".gitignore"
     block = ignore_block(commit_copilot_surface)
@@ -237,6 +254,7 @@ def main() -> int:
     source = args.source.expanduser().resolve()
 
     copy_generated_tree(source, target, args.dry_run)
+    substitute_project_name(target, args.dry_run)
     update_devcontainer_sync_env(target, args.bucket, args.prefix, args.dry_run)
     merge_gitignore(target, args.dry_run, args.commit_copilot_surface)
     chmod_runtime_scripts(target, args.dry_run)
