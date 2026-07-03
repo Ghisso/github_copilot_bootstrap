@@ -30,7 +30,7 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
 4. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas.
-7. **SCORE:** Require score >= 90. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.
+7. **SCORE:** Require score >= 90, read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`). The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.
 8. **DOCUMENT:** Delegate to `documenter` after score >= 90. Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
 9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.

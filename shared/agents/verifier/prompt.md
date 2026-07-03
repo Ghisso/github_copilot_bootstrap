@@ -53,6 +53,9 @@ uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i "deprecat" ||
 **Pass criteria:** Zero deprecation warnings.
 
 ### 5. Quality Score (when available)
+
+You are the **single, canonical owner** of the persisted score report. Only the verifier writes `--out`; the coder and orchestrator consume the report you produce, never write their own.
+
 ```bash
 if [[ -f ".claude/scripts/quality_score.py" ]]; then
   uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json

@@ -287,6 +287,14 @@ def validate_agents(errors: list[str]) -> None:
             f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
             errors,
         )
+        # R-AGENTS-08: the verifier is the single owner of the persisted score
+        # report; only it writes the report (`--json --out`).
+        if "--json --out" in text:
+            check(
+                path.stem == "verifier",
+                f"only the verifier may write a persisted score report (--json --out): {path}",
+                errors,
+            )
 
     validate_github_agent_models(errors)
 

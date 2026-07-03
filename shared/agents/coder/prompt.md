@@ -50,7 +50,7 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
   - `uv run pytest tests/ -q --tb=short`
   - `uv run mypy src/ --ignore-missing-imports --explicit-package-bases`
   - `uv run ruff check src/ tests/`
-- When `.claude/scripts/quality_score.py` exists, run it with the active phase: `uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json`
+- You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out`. The `verifier` is the single owner of the persisted score report — do not write score reports from the coder.
 - If checks fail, fix and re-run before returning.
 
 ## Code Simplification (Mandatory)
