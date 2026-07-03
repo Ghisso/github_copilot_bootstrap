@@ -1087,6 +1087,16 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             errors,
         )
 
+    # R-SKILLS-01: the commit skill must follow the enforced lifecycle, never
+    # walking the agent into feature/* branches or agent-driven merges.
+    commit_skill = skill_root / "commit" / "SKILL.md"
+    if commit_skill.exists():
+        commit_text = read(commit_skill)
+        check("feature/" not in commit_text, "commit skill must not use feature/* branches", errors)
+        check("gh pr merge" not in commit_text, "commit skill must not run gh pr merge (human merges)", errors)
+        check("_implementation" in commit_text, "commit skill must use <plan>_implementation branches", errors)
+        check("--base dev" in commit_text, "commit skill must open PRs against dev", errors)
+
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
     generated_prompts = sorted((TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md"))
     check(

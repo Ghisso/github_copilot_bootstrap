@@ -1,7 +1,7 @@
 # Quality Report — [BRANCH NAME]
 
 **Date:** YYYY-MM-DD
-**Branch:** feature/...
+**Branch:** <plan_name>_implementation
 **Phase:** <current_phase>
 **Base Ref:** dev
 **Status:** PR-READY / BLOCKED
