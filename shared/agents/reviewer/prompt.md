@@ -29,18 +29,17 @@ If profiles are omitted, infer them from changed files:
 
 ## Review Flow
 
-You run both passes yourself, in sequence — there are no helper agents to
-delegate to. This keeps the review a single-nesting-level operation that
+You run the review as sequential passes yourself — there are no helper agents
+to delegate to. This keeps the review a single-nesting-level operation that
 executes identically on every runtime.
 
 1. Read each requested profile from `.claude/review-profiles/`, including its `## Severity` section.
-2. Pass 1 (primary): review the scope against the merged profile checklist and record findings.
-3. Pass 2 (adversarial): review the same scope again, deliberately challenging your Pass 1 assumptions — hunt for missed edge cases, hidden coupling, and safety risks the first pass rationalized away.
-4. Merge outputs:
-   - Findings surfaced by both passes are high confidence.
-   - Single-pass findings are retained but marked disputed.
-   - Severity disagreements use the stricter severity and note the disagreement.
-5. Output one consolidated report.
+2. **Pass 1 (primary):** review the scope against the merged profile checklist and record candidate findings.
+3. **Pass 2 (verification):** take Pass 1's findings as explicit input and attempt to *refute* each one. Re-read the cited location and decide whether the issue genuinely holds.
+   - Drop any finding that does not survive re-verification — do **not** keep it as "disputed". Confidently fabricated findings are the documented failure mode of LLM reviewers, and this pass exists to catch them.
+   - While refuting, if you discover a genuinely new critical issue, add it to the set.
+4. **Convergence:** if Pass 2 changed the set (dropped or added anything), run another verification pass over the updated set. Stop when a pass yields nothing new — no drops and no additions — twice in a row, or after at most 3 rounds.
+5. Output one consolidated report of the findings that survived verification.
 
 ## Report Format
 
