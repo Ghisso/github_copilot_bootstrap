@@ -844,6 +844,13 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+        # Content signature the gate recomputes: git hash-object of git diff <merge-base>.
+        diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", merge_base).stdout
+        content_hash = subprocess.run(
+            ["git", "-C", str(repo), "hash-object", "--stdin"],
+            input=diff_out, text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        reports_dir = repo / ".claude" / "quality_reports"
 
         def score_report(**overrides: object) -> dict[str, object]:
             report: dict[str, object] = {
@@ -858,13 +865,19 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "dirty": False,
                 "tests_passed": True,
                 "tests_skipped": False,
+                "content_hash": content_hash,
                 "changed_files": ["work.txt"],
             }
             report.update(overrides)
             return report
 
+        def clear_reports() -> None:
+            for stale in reports_dir.glob("score-*.json"):
+                stale.unlink()
+
         def write_score(report: dict[str, object]) -> None:
-            path = repo / ".claude" / "quality_reports" / "score-test.json"
+            clear_reports()
+            path = reports_dir / "score-test.json"
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
@@ -885,6 +898,44 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             )
             check(returncode == 0, f"commit {label} case failed to run: {stderr}", errors)
             check('"permissionDecision":"deny"' in stdout, f"commit gate must deny score report with {label} even at score 95", errors)
+
+        # R-SCORE-02: select the newest report by generated_at, not filename.
+        # Older passing report has a lexically-later filename; newer failing
+        # report has a lexically-earlier one. The gate must pick the newer.
+        clear_reports()
+        write(reports_dir / "score-zzz.json", json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n")
+        write(reports_dir / "score-aaa.json", json.dumps(score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2) + "\n")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit report-selection case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "commit gate must select the newest report by generated_at", errors)
+        check("found 50" in stdout, "commit gate must use the newer (failing) report, not the lexically-later passing one", errors)
+
+        # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
+        write_score(score_report(head_sha="0" * 40))
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a stale-HEAD report", errors)
+        check("re-run quality_score" in stdout, "stale-HEAD failure must tell the user to re-run quality_score", errors)
+
+        # R-SCORE-02: content edited since scoring is caught by the content hash.
+        write_score(score_report(content_hash="deadbeef"))
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a content_hash mismatch", errors)
+        check("re-run quality_score" in stdout, "content_hash mismatch failure must tell the user to re-run quality_score", errors)
 
         write_score(score_report())
 

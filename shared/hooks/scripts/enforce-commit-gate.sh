@@ -86,20 +86,28 @@ else
 fi
 
 score_file=""
+best_generated_at=""
 if [[ -n "$CURRENT_PHASE" ]]; then
+  # Select the newest matching report by generated_at (ISO-8601 sorts lexically
+  # == chronologically), not by filename order, so a stale report cannot shadow
+  # a fresh one.
   while IFS= read -r candidate; do
     branch="$(json_file_string_value "$candidate" "branch" 2>/dev/null || true)"
     phase="$(json_file_string_value "$candidate" "phase" 2>/dev/null || true)"
     if [[ "$branch" == "$CURRENT_BRANCH" && "$phase" == "$CURRENT_PHASE" ]]; then
-      score_file="$candidate"
-      break
+      cand_generated_at="$(json_file_string_value "$candidate" "generated_at" 2>/dev/null || true)"
+      if [[ -z "$best_generated_at" || "$cand_generated_at" > "$best_generated_at" ]]; then
+        best_generated_at="$cand_generated_at"
+        score_file="$candidate"
+      fi
     fi
-  done < <(find "$REPO_ROOT/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null | sort -r)
+  done < <(find "$REPO_ROOT/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null)
 fi
 
 if [[ -z "$score_file" ]]; then
   failures+=("no matching quality report found - run uv run python .claude/scripts/quality_score.py <target> --phase ${CURRENT_PHASE:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json")
 else
+  regen_hint="re-run quality_score.py: uv run python .claude/scripts/quality_score.py <target> --phase ${CURRENT_PHASE:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json"
   score="$(json_file_number_value "$score_file" "score" 2>/dev/null || true)"
   if [[ ! "$score" =~ ^[0-9]+$ || "$score" -lt 90 ]]; then
     failures+=("quality score must be >= 90; found ${score:-unknown} in $score_file")
@@ -119,13 +127,13 @@ else
   fi
   current_head="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
   if [[ -z "$head_sha" || "$head_sha" != "$current_head" ]]; then
-    failures+=("quality report head_sha must match current HEAD")
+    failures+=("quality report head_sha (${head_sha:-missing}) does not match current HEAD (${current_head:-unknown}); HEAD moved since scoring - $regen_hint")
   fi
   expected_merge_base="$(git -C "$REPO_ROOT" merge-base dev HEAD 2>/dev/null || true)"
   if [[ -z "$merge_base_sha" ]]; then
-    failures+=("quality report must include merge_base_sha")
+    failures+=("quality report must include merge_base_sha; $regen_hint")
   elif [[ -n "$expected_merge_base" && "$merge_base_sha" != "$expected_merge_base" ]]; then
-    failures+=("quality report merge_base_sha must match dev...HEAD merge base")
+    failures+=("quality report merge_base_sha (${merge_base_sha}) must match dev...HEAD merge base (${expected_merge_base}); $regen_hint")
   fi
   if [[ ! "$generated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
     failures+=("quality report generated_at must be an ISO-8601 UTC timestamp")
@@ -156,24 +164,20 @@ else
     failures+=("quality report must include changed_files array")
   fi
 
-  report_mtime="$(file_mtime "$score_file" || true)"
-  if [[ -z "$report_mtime" ]]; then
-    failures+=("could not read modification time of $score_file to verify report freshness")
-  else
-    changed_files="$(git -C "$REPO_ROOT" diff --name-only dev...HEAD 2>/dev/null; git -C "$REPO_ROOT" diff --name-only 2>/dev/null; git -C "$REPO_ROOT" diff --cached --name-only 2>/dev/null)"
-    while IFS= read -r relative; do
-      [[ -n "$relative" ]] || continue
-      [[ -f "$REPO_ROOT/$relative" ]] || continue
-      changed_mtime="$(file_mtime "$REPO_ROOT/$relative" || true)"
-      if [[ -z "$changed_mtime" ]]; then
-        failures+=("could not read modification time of changed file: $relative")
-        break
-      fi
-      if [[ "$changed_mtime" -gt "$report_mtime" ]]; then
-        failures+=("quality report is older than changed file: $relative")
-        break
-      fi
-    done <<< "$changed_files"
+  # Freshness by content, not mtime: recompute the same content signature the
+  # scorer stamped (git hash-object of `git diff <merge-base>`). This is immune
+  # to amend/rebase/editor-touch that preserve content, and detects any edit to
+  # the changes after scoring - with a message that names the fix.
+  report_hash="$(json_file_string_value "$score_file" "content_hash" 2>/dev/null || true)"
+  if [[ -z "$report_hash" ]]; then
+    failures+=("quality report must include content_hash; $regen_hint")
+  elif [[ -n "$expected_merge_base" ]] && command -v git >/dev/null 2>&1; then
+    current_hash="$(git -C "$REPO_ROOT" diff --no-color --no-ext-diff "$expected_merge_base" 2>/dev/null | git -C "$REPO_ROOT" hash-object --stdin 2>/dev/null || true)"
+    if [[ -z "$current_hash" ]]; then
+      failures+=("could not compute the working-tree content hash to verify report freshness; $regen_hint")
+    elif [[ "$current_hash" != "$report_hash" ]]; then
+      failures+=("quality report content_hash does not match the current changes (files edited since scoring); $regen_hint")
+    fi
   fi
 fi
 

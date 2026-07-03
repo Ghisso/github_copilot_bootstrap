@@ -52,6 +52,32 @@ def _git(args: list[str], cwd: Path) -> str:
     return stdout.strip()
 
 
+def _content_hash(base: str, cwd: Path) -> str:
+    """A content signature of the branch's changes relative to `base`, computed
+    as `git hash-object` of the raw `git diff <base>` output. It is stable across
+    amend/rebase/editor-touch that preserve content (unlike an mtime check) and
+    changes only when the diff content changes. The commit gate recomputes the
+    identical value to detect edits made after scoring."""
+    if not base:
+        return ""
+    diff = subprocess.run(
+        ["git", "diff", "--no-color", "--no-ext-diff", base],
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
+    if diff.returncode != 0:
+        return ""
+    obj = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        input=diff.stdout,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
+    return obj.stdout.strip() if obj.returncode == 0 else ""
+
+
 def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     cwd = Path.cwd()
     inside = _git(["rev-parse", "--is-inside-work-tree"], cwd)
@@ -100,6 +126,7 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
         "phase": phase,
         "target": target_str,
         "dirty": bool(unstaged.strip()),
+        "content_hash": _content_hash(merge_base, cwd),
         "changed_files": sorted(changed),
     }
 
