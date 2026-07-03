@@ -3,7 +3,7 @@ name: code-review
 visibility: public
 description: |
   Unified review workflow. Runs the `reviewer` agent with one or more
-  profiles from `shared/review-profiles/` and synthesizes findings into a gate result.
+  profiles from `.claude/review-profiles/` and synthesizes findings into a gate result.
 argument-hint: "[file-or-directory]"
 ---
 
@@ -13,16 +13,7 @@ Use the unified `reviewer` agent instead of separate specialist reviewer agents.
 
 ## Profile Routing
 
-| Scope | Profiles |
-|---|---|
-| Python source | `code`, `security` |
-| New modules or refactors | `architecture` |
-| Tests | `tests` |
-| API or service files | `api`, `security`, `tests` |
-| Config dataclasses | `config` |
-| I/O-heavy or ML-heavy paths | `performance` |
-| Docs or user-facing behavior | `documentation` |
-| Domain-specific correctness | `domain` |
+Select profiles from the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 
 ## Workflow
 
@@ -30,7 +21,7 @@ Use the unified `reviewer` agent instead of separate specialist reviewer agents.
    - Argument path: review that path.
    - No argument: review uncommitted changes.
 2. Select review profiles from the table.
-3. Ask `reviewer` to run a dual-pass review with the selected profiles.
+3. Ask `reviewer` to run its primary + verification passes with the selected profiles.
 4. Fix findings by severity: critical, then major, then minor.
 5. Re-run verification and review until the target gate passes.
 

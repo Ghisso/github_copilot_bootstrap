@@ -76,7 +76,7 @@ Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/
 
 ## Review Profiles
 
-The unified `reviewer` loads checklists from `.claude/review-profiles/`:
+This is the **single authoritative profile-routing table**. The unified `reviewer` loads checklists from `.claude/review-profiles/`. Agents and skills reference this table by path rather than restating it.
 
 | Surface | Profiles |
 |---|---|
@@ -88,6 +88,7 @@ The unified `reviewer` loads checklists from `.claude/review-profiles/`:
 | I/O-heavy or ML-heavy paths | `performance` |
 | Docs/user-facing behavior | `documentation` |
 | Domain-specific correctness | `domain` |
+| Any pre-PR gate | `code`, `security`, `tests` (minimum) |
 
 ## Skills
 

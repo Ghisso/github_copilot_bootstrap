@@ -39,21 +39,10 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
 
 ## Reviewer Routing
 
-Select reviewer profiles based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
-
-| Changed surface | Reviewer profiles |
-|---|---|
-| Python source code | `code`, `security` |
-| New modules / refactoring | `architecture` |
-| API endpoints | `api`, `security`, `tests` |
-| Test files | `tests` |
-| Config / dataclasses | `config` |
-| I/O-heavy or ML-heavy paths | `performance` |
-| Docs or user-facing behavior | `documentation` |
-| Domain-specific correctness | `domain` |
-| Any pre-PR gate | `code`, `security`, `tests` minimum |
+Select reviewer profiles from the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section) based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
 
 **Complexity gate:**
+
 - **Control-plane files** (`shared/**`, target-native hook/agent/config adapters, generated adapter/config surfaces, root guidance files): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
 - **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
 - **Standard changes**: run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).

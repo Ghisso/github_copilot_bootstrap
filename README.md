@@ -280,21 +280,18 @@ The agent layer gives me orchestration plus profile-driven reviews. Full shared 
 
 Primary flow for complex work:
 
-- orchestrator -> planner -> coder/designer -> verifier -> reviewer -> documenter
+- orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
 
 Current agents:
 
 - orchestrator
 - planner
 - coder
-- designer
 - reviewer
-- review-pass-primary
-- review-pass-adversarial
 - verifier
 - documenter
 
-The unified `reviewer` loads one or more profiles from `shared/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`). It runs dual-pass review through `review-pass-primary` and `review-pass-adversarial`, then synthesizes findings into one report. When only one helper is available, review falls back to single-pass mode and labels findings as `[single-pass, unconfirmed]`.
+The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
 Orchestrator routing:
 

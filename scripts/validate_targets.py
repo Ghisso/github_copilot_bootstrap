@@ -1405,6 +1405,25 @@ def validate_determinism(errors: list[str]) -> None:
         compare_dirs(DIST_ROOT, output, errors)
 
 
+def validate_routing_table_parity(errors: list[str]) -> None:
+    """R-AGENTS-05: the profile-routing table must have exactly one home. Its
+    distinctive row marker may appear in only one shared source file
+    (workspace.instructions.md); everything else references it by path."""
+    marker = "Domain-specific correctness"
+    owner = REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
+    holders = sorted(
+        path
+        for path in (REPO_ROOT / "shared").rglob("*.md")
+        if "__pycache__" not in path.parts and marker in read(path)
+    )
+    check(
+        holders == [owner],
+        "profile-routing table must live only in shared/policies/workspace.instructions.md; "
+        f"found the routing marker in: {[str(p.relative_to(REPO_ROOT)) for p in holders]}",
+        errors,
+    )
+
+
 def main() -> int:
     errors: list[str] = []
     for target in TARGETS:
@@ -1415,6 +1434,7 @@ def main() -> int:
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_skills_and_paths(errors)
+        validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
         validate_determinism(errors)
 

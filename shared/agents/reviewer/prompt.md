@@ -17,15 +17,7 @@ Load `.claude/instructions/tool-routing.instructions.md` before searching. Prefe
 
 Default to `caveman full` style for synthesis prose. Preserve findings, tables, code blocks, file paths, identifiers, and structured severity labels literally. Load `.claude/skills/caveman/SKILL.md` if you need a refresher.
 
-If profiles are omitted, infer them from changed files:
-- Python source: `code`, `security`
-- New modules or refactors: `architecture`
-- Tests: `tests`
-- API/service files: `api`, `security`, `tests`
-- Config dataclasses: `config`
-- I/O-heavy or ML-heavy paths: `performance`
-- Docs or public behavior changes: `documentation`
-- Domain-specific correctness: `domain`
+If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 
 ## Review Flow
 
