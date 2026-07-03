@@ -161,6 +161,17 @@ def validate_agents(errors: list[str]) -> None:
         agent_id = data["id"]
         check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
         check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
+        capabilities = set(data.get("capabilities", []))
+        if agent_id == "orchestrator":
+            # R-AGENTS-01: the orchestrator's prompt mandates branch/commit/PR
+            # and memory/session-log writes, so its toolset must actually grant
+            # delegation, editing, and execution.
+            missing = {"delegate", "edit", "execute"} - capabilities
+            check(
+                not missing,
+                f"orchestrator capabilities must cover its prompt-declared actions; missing {sorted(missing)}",
+                errors,
+            )
 
     generated_github_agents = sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md"))
     check(len(generated_github_agents) == expected_count, "GitHub agent count must match shared agents", errors)
