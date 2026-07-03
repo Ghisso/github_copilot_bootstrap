@@ -360,18 +360,23 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         read_toml(TARGET_ROOT / ".codex" / "config.toml")
     except tomllib.TOMLDecodeError as error:
         errors.append(f"invalid Codex config TOML: {error}")
-    check("[features]" in codex_config, "Codex config missing features section", errors)
-    check("hooks = true" in codex_config, "Codex config must enable hooks", errors)
+    # R-CODEX-01: hooks are on by default in current Codex; the [features] block
+    # is redundant and must not be emitted.
+    check("[features]" not in codex_config, "Codex config must not emit the redundant [features] block", errors)
+    check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
     check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
     check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
+    # R-CODEX-01: skill paths point at the SKILL.md file, not the directory.
+    check('/SKILL.md"' in codex_config, "Codex skill paths must point at the SKILL.md file", errors)
 
     codex_hooks = json.loads(read(TARGET_ROOT / ".codex" / "hooks.json"))
     check(set(codex_hooks) == {"hooks"}, "Codex hooks.json should only contain the top-level hooks object", errors)
-    check("PreCompact" not in codex_hooks.get("hooks", {}), "Codex hooks must not use unsupported PreCompact event", errors)
+    # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
+    check("PreCompact" in codex_hooks.get("hooks", {}), "Codex hooks must wire the documented PreCompact event", errors)
     for event_name, groups in codex_hooks.get("hooks", {}).items():
         check(isinstance(groups, list), f"Codex hook event must be a list: {event_name}", errors)
         for group in groups if isinstance(groups, list) else []:
@@ -1112,10 +1117,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         for entry in skill_config
         if isinstance(entry, dict) and entry.get("enabled") is True
     }
-    expected_skill_paths = {f"../.claude/skills/{path.parent.name}" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    expected_skill_paths = {f"../.claude/skills/{path.parent.name}/SKILL.md" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
     check(
         configured_skill_paths == expected_skill_paths,
-        "Codex config must enable every shared .claude skill by relative path",
+        "Codex config must enable every shared .claude skill by relative SKILL.md path",
         errors,
     )
 

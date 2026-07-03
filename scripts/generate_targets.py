@@ -283,9 +283,10 @@ def render_codex_config(path: Path) -> None:
         "# Generated from shared/mcp/servers.yaml.",
         "# Skills are sourced from the shared .claude basis; project trust is required.",
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
-        "",
-        "[features]",
-        "hooks = true",
+        "# Hooks are enabled by default in current Codex, so no features block is emitted.",
+        "# Codex documents absolute paths to a SKILL.md file; the generated bundle cannot know",
+        "# the consumer's absolute path, so each skill path points at the SKILL.md file",
+        "# relative to this config (.codex/config.toml -> ../.claude/skills/<name>/SKILL.md).",
         "",
         "[agents]",
         "max_threads = 6",
@@ -301,7 +302,7 @@ def render_codex_config(path: Path) -> None:
         lines.append("")
     for skill_name in shared_skill_names():
         lines.append("[[skills.config]]")
-        lines.append(f"path = {toml_string(f'../.claude/skills/{skill_name}')}")
+        lines.append(f"path = {toml_string(f'../.claude/skills/{skill_name}/SKILL.md')}")
         lines.append("enabled = true")
         lines.append("")
     write_text(path, "\n".join(lines))
@@ -422,6 +423,9 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
                     ],
                 }
+            ],
+            "PreCompact": [
+                {"hooks": [cmd("context-mode-dispatch.sh", "openai-codex", "precompact")]}
             ],
             "Stop": [
                 {
