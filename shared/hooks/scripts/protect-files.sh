@@ -11,6 +11,13 @@ export REPO_ROOT
 export TARGET_ID
 INPUT="$(cat)"
 
+# An empty/whitespace payload carries no tool call to inspect. Allow it without
+# running any check: feeding it to the Python precision pass would exit non-zero
+# and spuriously escalate to `ask` while writing an error log into the repo.
+if [[ -z "${INPUT//[[:space:]]/}" ]]; then
+  exit 0
+fi
+
 if ! payload_parseable "$INPUT"; then
   fail_closed "unparseable tool payload"
 fi
@@ -168,12 +175,13 @@ fi
 
 # --- Python precision pass (enhancement only, when uv is available) ----------
 
-if ! command -v uv >/dev/null 2>&1; then
+# uv_available / run_python are single-homed in _lib-frontmatter.sh.
+if ! uv_available; then
   exit 0
 fi
 
 set +e
-OUTPUT="$(printf '%s' "$INPUT" | UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python -c 'import json, os, posixpath, re, shlex, sys
+OUTPUT="$(printf '%s' "$INPUT" | run_python -c 'import json, os, posixpath, re, shlex, sys
 
 repo_root = os.environ.get("REPO_ROOT", "").rstrip("/")
 target_id = os.environ.get("TARGET_ID", "")

@@ -611,6 +611,35 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             errors,
         )
 
+        # R-HOOKS-01/03: a quoted flag value with whitespace must not desync the
+        # tokenizer and smuggle a destructive subcommand past the guard.
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": 'git -C "some dir" reset --hard'}},
+        )
+        check(returncode == 0, f"git guardrail (quoted flag) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"git guardrail must deny reset --hard behind a quoted -C value: {hook_root}",
+            errors,
+        )
+
+        # An empty payload carries nothing to inspect: both guards must allow it
+        # silently (no spurious ask/deny, no error-log pollution of the repo).
+        for guard in ("protect-files.sh", "git-protection.sh"):
+            returncode, stdout, stderr = run_hook_raw(hook_root / guard, "", target_id)
+            check(returncode == 0, f"{guard} must exit 0 on empty payload: {hook_root}: {stderr}", errors)
+            check(
+                "permissionDecision" not in stdout,
+                f"{guard} must not escalate on an empty payload: {hook_root}",
+                errors,
+            )
+        check(
+            not (hook_root.parents[1] / "session_logs" / "hooks-errors.log").exists(),
+            f"empty payload must not write hooks-errors.log: {hook_root}",
+            errors,
+        )
+
         # R-HOOKS-03: the two safety-critical guards must survive without `uv`.
         no_uv = path_without_uv()
         returncode, stdout, stderr = run_hook(
@@ -772,10 +801,14 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check('"permissionDecision":"deny"' in stdout, "commit gate must deny commits on dev", errors)
 
         # R-HOOKS-01: global git flags must not smuggle a commit past the classifier.
+        # The quoted-whitespace forms guard the tokenizer against word-splitting a
+        # quoted flag value (verified 2026-07-07 regression).
         for command in (
             'git -C . commit -m x',
             'git -c a=b commit -m x',
             'git --git-dir=.git commit -m x',
+            'git -C "some dir" commit -m x',
+            "git -c user.name='A B' commit -m x",
         ):
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-commit-gate.sh"),

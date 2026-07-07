@@ -68,4 +68,4 @@ Expected:
 - `.devcontainer/` is trackable and generated AI content is ignored by the installer.
 - The generated devcontainer forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
 - The generated devcontainer does not require `/dev/fuse` or apparmor overrides, and still includes the `SYS_ADMIN`/`seccomp=unconfined` run args needed by `bubblewrap`.
-- The HF sync helper reads installed `.devcontainer` sync settings, falls back to `Ghisso/vscode_mounts`, and supports dry-run operation without network access.
+- The HF sync helper resolves the bucket from `--bucket` / `HF_AI_SYNC_BUCKET` / installed `.devcontainer` sync settings (no hardcoded default), warns and no-ops when none is configured, and supports dry-run operation without network access.

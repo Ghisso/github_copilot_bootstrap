@@ -12,6 +12,31 @@
 
 ---
 
+## 0. Post-implementation verification — 2026-07-07
+
+All 31 recommendations were implemented (one commit each) and independently re-verified on 2026-07-07 at commit `e3054e6` (branch `debloat-and-drift`). Verification was adversarial: each acceptance command was run first-hand, and the hook fixes were exercised at runtime rather than trusted through the repo's own validator. **26 of 31 are fully solid.** The remainder plus one cross-cutting defect are recorded here; all listed items were **fixed on 2026-07-07** in a follow-up commit (see the checkmarks).
+
+**Cross-cutting blocker**
+
+- ✅ **Fixed — validator not runnable from a clean regenerate.** `generate_targets.py` only `ensure_executable`d `run-hook.sh`; every other hook script was copied mode-preserved as `0644` (git tracks them `100644`; `dist/` is gitignored, so it is always freshly generated). `validate_targets.py.run_hook` execs scripts by path, so `generate_targets.py --all && validate_targets.py` died with `PermissionError` on `protect-files.sh` before asserting anything — meaning *every* "validator asserts X" acceptance was unverifiable on a fresh checkout. Production was unaffected (`run-hook.sh` uses `exec /bin/bash`). Fix: the generator now marks all `hooks/scripts/*.sh` executable.
+
+**Correctness bugs in the shipped hook layer**
+
+- ✅ **Fixed — quoted-space git-flag evasion (makes R-HOOKS-01 fail-open).** The classifier tokenized with `read -ra`, which word-splits ignoring shell quotes, so `git -C "some dir" commit` and `git -c user.name="A B" commit` were **not** detected — the same evasion class R-HOOKS-01 set out to close, and it also defeated the destructive-git guard (`git -C "some dir" reset --hard`). Fix: `_lib-frontmatter.sh` now tokenizes with a quote-aware splitter; a validator case covers the quoted-space form.
+- ✅ **Fixed — empty payload polluted `dist/` and produced a spurious `ask` (R-HOOKS-03 robustness).** An empty/whitespace stdin passed `payload_parseable`, reached the Python precision pass, which `sys.exit(3)` → `fail_safe` wrote `hooks-errors.log` under `REPO_ROOT/.claude/session_logs` (= inside `dist/` during validation) and emitted `ask`; the polluted `dist/` then failed the validator's own determinism check. Fix: `protect-files.sh` and `git-protection.sh` now `exit 0` on an empty payload (nothing to inspect); a validator case asserts no pollution.
+
+**Minor / acceptance-vs-reality gaps**
+
+- ✅ **Fixed — R-LIB-01 uv-guard not fully single-homed.** `protect-files.sh` and `enforce-commit-gate.sh` still hand-rolled `command -v uv` despite the `uv_available()` helper; both now call the helper.
+- ✅ **Fixed (doc) — R-AGENTS-04 stale count.** The acceptance below reads "agent count 8"; the correct post-implementation count is **6** (R-AGENTS-02 folded away two review-helper agents in addition to designer). The validator checks agent count by *parity* (generated == shared), so the code was always correct — only this document was stale. Corrected in place below.
+- ✅ **Fixed (doc) — R-PROMPTS-01 overstated benefit.** The extraction is correct (full duplicated blocks removed, replaced by one-line pointers into a single `agent-reporting.instructions.md`), but the claimed "~25–30% prompt shrink" did not occur (~0%, ≈15 lines) — the repeated blocks were smaller than estimated. No code defect. The recommendation text now states the real goal (one source of truth, not a size reduction) and records the corrected estimate.
+- ⚠️ **Noted — R-AGENTS-05 literal grep.** `grep -r "review-profiles" shared/ | grep -v .claude/` is not empty (2 hits in `caveman-compress`), but those are authoring-repo *source-protection* path lists, not routing tables. Single-table intent is met.
+- ✅ **Fixed — R-CODEX-01 comment.** The relative-skill-path comment in `generate_targets.py` now cites the enforcing tests (the two `validate_targets.py` assertions that pin the `../.claude/skills/<name>/SKILL.md` form) and the documented Codex relative-path behavior, rather than only explaining why the relative form is used.
+
+**Known residual (out of committed scope):** user-defined git *aliases* (e.g. `git ci` → `commit`) still bypass the classifier; detecting them requires reading git config and was never in R-HOOKS-01's scope.
+
+---
+
 ## 1. Executive Summary
 
 **1. The file-layer architecture genuinely works and is worth keeping.** All three runtimes execute the same guardrail scripts through one dispatcher; the generated `dist/` copies were verified drift-free against `shared/`; generation is deterministic; and the validator actually executes hook gates in throwaway git repos rather than merely asserting file shapes. This is a stronger foundation than the upstream project this repo descends from ever built. (§2)
@@ -340,7 +365,7 @@ Format: each block maps onto one small plan; §6 clusters them into big plans.
 **R-AGENTS-04: Merge designer into coder**
 *Problem:* Verified strict-subset capabilities (minus `todo`, `web`), 36-line prompt with no verification suite/simplification/control-plane guard — weaker-gated write path for the same class of work.
 *Change:* Delete `shared/agents/designer/`; coder's Tier-2 loads `gradio-streamlit` for UI tasks (already its pattern); orchestrator routing table updated.
-*Acceptance:* agent count 8 across all three adapter sets; validator counts updated; routing table has no designer row.
+*Acceptance:* agent count consistent across all three adapter sets (checked by parity, not a fixed number; the post-implementation count is 6 after R-AGENTS-02 also removed two review helpers — see §0); validator counts updated; routing table has no designer row.
 *Depends:* R-AGENTS-05. *Effort:* S.
 
 **R-AGENTS-05: One authoritative profile-routing table**
@@ -377,7 +402,7 @@ Format: each block maps onto one small plan; §6 clusters them into big plans.
 **R-LIB-01:** Delete `fm_has`/`hook_tool_name`; single home for the `*_implementation` regex and the `uv`-guard block; one JSON-number parser (session-start-state `:37` → `_lib`).
 **R-POLICY-01:** Scope the `__future__` ban to Hydra modules; installer substitutes the workspace `[TODO]` placeholder with the target project name.
 **R-DOCS-01:** Fix `target-mapping.md:47-51` renaming claim; reconcile `check_runtime.py` optional-vs-required framing after R-HOOKS-03 lands.
-**R-PROMPTS-01:** Extract the nine-times-repeated Retrieval block and the eight-times-repeated caveman-reporting block into one instruction file included by reference; agents keep a one-line pointer. Prompt bodies shrink ~25–30%.
+**R-PROMPTS-01:** Extract the repeated Retrieval block and the caveman-reporting block into one instruction file included by reference; agents keep a one-line pointer. Goal: one source of truth for the shared blocks, not a size reduction. (Post-implementation note, 2026-07-07: the earlier "~25–30% prompt shrink" estimate did not hold — the repeated blocks were smaller than estimated, so the net change to prompt bodies is ≈0%. The single-homing benefit stands; see §0.)
 **R-VALID-01:** Convert brittle exact-sentence assertions to structural checks; date-stamp the Copilot model allow-list against the official supported-models page.
 **R-SKILLS-02:** Align `plan-decomposition` with the single small-plan file model.
 

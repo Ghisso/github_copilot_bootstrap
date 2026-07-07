@@ -168,7 +168,12 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     copy_skills(REPO_ROOT / "shared" / "skills", support_root / "skills", "claude-code")
     copy_tree_transformed(REPO_ROOT / "shared" / "review-profiles", support_root / "review-profiles", "claude-code")
     copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
-    ensure_executable(support_root / "hooks" / "scripts" / "run-hook.sh")
+    # Every hook script must be executable: the runtime wrapper execs them, and
+    # validate_targets.py invokes them by path. The shared sources are tracked
+    # 0644 (git core.fileMode aside), so make them +x here rather than relying on
+    # the checked-out mode.
+    for script in sorted((support_root / "hooks" / "scripts").glob("*.sh")):
+        ensure_executable(script)
     copy_tree(REPO_ROOT / "shared" / "prompts", support_root / "prompts")
     render_claude_agents(target_root)
 
@@ -271,9 +276,14 @@ def render_codex_config(path: Path) -> None:
         "# Skills are sourced from the shared .claude basis; project trust is required.",
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
         "# Hooks are enabled by default in current Codex, so no features block is emitted.",
-        "# Codex documents absolute paths to a SKILL.md file; the generated bundle cannot know",
-        "# the consumer's absolute path, so each skill path points at the SKILL.md file",
-        "# relative to this config (.codex/config.toml -> ../.claude/skills/<name>/SKILL.md).",
+        "# Codex resolves a non-absolute skill `path` relative to config.toml; the generated",
+        "# bundle cannot know the consumer's absolute path, so each skill points at",
+        "# ../.claude/skills/<name>/SKILL.md relative to this config. This relative form is",
+        "# the tested contract: validate_targets.py asserts it structurally in two places -",
+        "# validate_mcp_and_hooks (\"../.claude/skills/\" in config) and validate_skills_and_paths",
+        "# (the enabled-skill path set must equal the shared/skills SKILL.md set exactly).",
+        "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
+        "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
         "",
         "[agents]",
         "max_threads = 6",

@@ -9,6 +9,11 @@ TARGET_ID="${1:-unknown-target}"
 REPO_ROOT="$(repo_root_from_script)"
 INPUT="$(cat)"
 
+# An empty/whitespace payload carries no command to inspect; allow it directly.
+if [[ -z "${INPUT//[[:space:]]/}" ]]; then
+  exit 0
+fi
+
 if ! payload_parseable "$INPUT"; then
   fail_closed "unparseable tool payload"
 fi
@@ -79,13 +84,17 @@ _git_danger_from_tokens() {
 
 # True (prints reason) if any git invocation in the command is destructive.
 git_danger_reason() {
-  local rest="$1" after seg reason
+  local rest="$1" after reason
   while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
     after="${BASH_REMATCH[2]}"
-    seg="${after//[;|&]/ }"
-    seg="$(printf '%s' "$seg" | tr '[:upper:]' '[:lower:]')"
+    # Quote-aware tokenizer (shared with the commit classifier) so a quoted flag
+    # value with whitespace, e.g. `-C "some dir"`, cannot slip a destructive
+    # subcommand past detection. Lowercase per-token for case-insensitive match.
     local -a tokens
-    read -ra tokens <<< "$seg"
+    _shell_tokenize "$after"
+    tokens=()
+    local _t
+    for _t in ${_TOKENS[@]+"${_TOKENS[@]}"}; do tokens+=("${_t,,}"); done
     if reason="$(_git_danger_from_tokens "${tokens[@]}")"; then
       printf '%s' "$reason"
       return 0

@@ -294,14 +294,39 @@ fm_read_list() {
   ' "$file"
 }
 
+# Split a command segment into tokens, honoring single/double quotes so a
+# quoted value containing whitespace (e.g. `-C "some dir"`) stays ONE token and
+# cannot desync flag/subcommand detection. Unquoted shell operators (; | &) are
+# treated as separators. Results are returned in the global array _TOKENS; quote
+# characters are stripped from the emitted tokens. Using a plain `read -ra` here
+# would word-split inside quotes and re-open the flag-evasion bypass.
+_shell_tokenize() {
+  local s="$1" n=${#1} i=0 c q='' cur='' have=0
+  _TOKENS=()
+  while (( i < n )); do
+    c="${s:i:1}"
+    if [[ -n "$q" ]]; then
+      if [[ "$c" == "$q" ]]; then q=''; else cur+="$c"; fi
+      have=1
+    else
+      case "$c" in
+        \"|\') q="$c"; have=1 ;;
+        ' '|$'\t'|$'\n'|';'|'|'|'&')
+          if (( have )); then _TOKENS+=("$cur"); cur=''; have=0; fi ;;
+        *) cur+="$c"; have=1 ;;
+      esac
+    fi
+    (( i++ ))
+  done
+  if (( have )); then _TOKENS+=("$cur"); fi
+}
+
 # Return the effective subcommand of the FIRST git invocation in a segment,
 # skipping global git flags (-C <path>, -c <k=v>, --git-dir, --work-tree, ...).
-# Shell operators are normalized to spaces so a value glued to an operator does
-# not leak into the next command's word.
 _git_first_subcommand() {
-  local segment="${1//[;|&]/ }"
   local -a tokens
-  read -ra tokens <<< "$segment"
+  _shell_tokenize "$1"
+  tokens=("${_TOKENS[@]}")
   local i=0 n="${#tokens[@]}" tok
   while (( i < n )); do
     tok="${tokens[$i]}"
@@ -336,9 +361,9 @@ parse_branch_create_command() {
   local rest="$1" after
   while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
     after="${BASH_REMATCH[2]}"
-    local seg="${after//[;|&]/ }"
     local -a tokens
-    read -ra tokens <<< "$seg"
+    _shell_tokenize "$after"
+    tokens=("${_TOKENS[@]}")
     local i=0 n="${#tokens[@]}" tok sub="" branch=""
     while (( i < n )); do
       tok="${tokens[$i]}"
