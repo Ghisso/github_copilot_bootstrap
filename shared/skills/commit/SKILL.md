@@ -2,12 +2,18 @@
 name: commit
 visibility: public
 description: |
-  Git workflow for staging, committing, branching, PR creation, and merging.
-  Use when ready to commit changes, create a PR, or merge a branch.
+  Git workflow for staging, committing, branching, and PR creation aligned with
+  the enforced lifecycle (implementation branches off dev, PRs to dev). Use when
+  ready to commit changes or open a PR.
 argument-hint: "[commit message]"
 ---
 
 # commit — Git Workflow
+
+This follows the lifecycle the hooks enforce: implementation branches are named
+`<plan_name>_implementation` and cut from a clean `dev`, PRs target `dev`, and a
+human merges the PR. The guardrails reject non-`_implementation` branch names,
+PRs to `main`, and agent-driven merges — do not fight them.
 
 ## Phase 1: Status Check
 ```bash
@@ -15,11 +21,13 @@ git status
 git diff --stat
 ```
 
-## Phase 2: Branch Creation (if on main)
+## Phase 2: Branch (if not already on an implementation branch)
+Cut the implementation branch from a clean `dev`, named for the big plan:
 ```bash
-git checkout -b feature/description
+git switch dev
+git switch -c <plan_name>_implementation
 ```
-**Never commit directly to main.**
+**Never commit directly to `dev` or `main`.** The branch name must end in `_implementation`.
 
 ## Phase 3: File Staging
 ```bash
@@ -30,6 +38,9 @@ git add src/changed_file.py tests/test_changed.py
 - Review: `git diff --cached`
 
 ## Phase 4: Commit
+Commit exactly one completed small plan, after all gates pass — small-plan
+`status: complete`, a closeout log containing `**Status:** COMPLETED`, LEARN
+evidence, and a fresh score ≥ 90 report matching the branch/phase/HEAD:
 ```bash
 git commit -m "type: description
 
@@ -37,10 +48,10 @@ Details of what changed and why."
 ```
 Types: `feat` | `fix` | `refactor` | `test` | `docs` | `config`
 
-## Phase 5: Push & PR (if requested)
+## Phase 5: Push & PR (if requested, after the last small plan)
 ```bash
-git push -u origin feature/description
-gh pr create --title "type: description" --body "$(cat <<'EOF'
+git push -u origin <plan_name>_implementation
+gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
 ## Summary
 - change 1
 - change 2
@@ -50,12 +61,14 @@ gh pr create --title "type: description" --body "$(cat <<'EOF'
 EOF
 )"
 ```
+PRs must target `dev`. All phases must be complete with at least one commit per
+small plan before the PR/push gate allows this.
 
-## Phase 6: Merge & Cleanup (if requested)
+## Phase 6: Merge (human)
+A human reviews and merges the PR into `dev`; the agent does not merge the PR
+itself. Once the merge lands, return to `dev`:
 ```bash
-gh pr merge --merge
-git checkout main && git pull
-git branch -d feature/description
+git switch dev && git pull
 ```
 
 ## Phase 7: Report

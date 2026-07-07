@@ -252,6 +252,5 @@ After implementation completes, verify:
 
 ## Related Patterns
 
-- `.claude/skills/plan-decomposition/SKILL.md` — Structuring multi-phase plans where gates are needed
-- `.claude/skills/iterative-plan-review/SKILL.md` — Design review gates that catch contract uncertainty early
+- `.claude/skills/plan-decomposition/SKILL.md` — Structuring multi-phase plans where gates are needed (also covers the design-review-gate workflow)
 - `.claude/skills/text-to-sql-safety/SKILL.md` — Similar gated defense-in-depth for unknown SQL query shapes

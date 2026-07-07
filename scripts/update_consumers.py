@@ -26,6 +26,7 @@ Options:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -53,6 +54,12 @@ def main() -> None:
     parser.add_argument("--skip-regen", action="store_true", help="Skip regenerating dist/ first.")
     parser.add_argument("--skip-upload", action="store_true", help="Skip Hugging Face upload.")
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions only.")
+    parser.add_argument(
+        "--bucket",
+        default=os.environ.get("HF_AI_SYNC_BUCKET"),
+        help="HF bucket passed through to the installer. Defaults to HF_AI_SYNC_BUCKET; "
+        "the installer errors if neither is set.",
+    )
     args = parser.parse_args()
 
     dry = args.dry_run
@@ -86,6 +93,8 @@ def main() -> None:
 
         # Run installer
         install_cmd = [sys.executable, str(INSTALLER), str(project)]
+        if args.bucket:
+            install_cmd += ["--bucket", args.bucket]
         if args.skip_upload:
             install_cmd.append("--skip-upload")
         if dry:
@@ -113,7 +122,7 @@ def main() -> None:
                 push_cmd = [sys.executable, str(helper), "push-state", "--repo-root", str(project)]
                 if dry:
                     push_cmd.append("--dry-run")
-                print(f"  push-state to HF", flush=True)
+                print("  push-state to HF", flush=True)
                 subprocess.run(push_cmd, check=False, cwd=project)
 
         print(f"=== Done: {project.name} ===")

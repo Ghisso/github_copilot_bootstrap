@@ -41,10 +41,15 @@ Core principles:
 ## Quick Install
 
 Regenerate first, then install the single generated bootstrap into a target repo.
-The installer copies the generated AI files, keeps `.devcontainer/` trackable, adds
-an idempotent `.gitignore` block for generated/private AI content, writes the
-project-specific Hugging Face sync path into the devcontainer config, and uploads the
-bootstrap bundle when auth is available.
+The installer copies the generated AI files, substitutes the target repo name into
+the workspace instructions, keeps `.devcontainer/` trackable, adds an idempotent
+`.gitignore` block for generated/private AI content, writes the project-specific
+Hugging Face sync path into the devcontainer config, and uploads the bootstrap
+bundle when auth is available.
+
+A bucket is **required** — pass `--bucket <org/bucket[/prefix]>` or set
+`HF_AI_SYNC_BUCKET`; there is no baked-in default, so no personal namespace ships
+in the bootstrap. The installer exits with an instruction if neither is set.
 
 ```bash
 set -euo pipefail
@@ -142,6 +147,17 @@ content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters
 and MCP files should stay ignored. A fresh clone can reopen in the devcontainer and
 pull the ignored AI content from:
 
+### GitHub Copilot: local-IDE vs cloud
+
+By default the installer gitignores the GitHub Copilot surface
+(`.github/agents/`, `.github/hooks/`, `.github/instructions/`,
+`.github/copilot-instructions.md`), so **only local-IDE Copilot is configured** —
+cloud Copilot agents read that surface only from the committed default branch and
+will not see gitignored files. To enable cloud Copilot, install with
+`--commit-copilot-surface`, which keeps those paths out of the ignore block so you
+can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
+ignored and HF-synced.
+
 ```text
 hf://buckets/Ghisso/vscode_mounts/<project-name>/bootstrap/
 hf://buckets/Ghisso/vscode_mounts/<project-name>/state/
@@ -167,7 +183,7 @@ Optional pruning after copy:
 ```mermaid
 flowchart LR
   U[Developer Request] --> A[Orchestrator / Planner]
-  A --> C[Coder or Designer]
+  A --> C[Coder]
   C --> V[Verifier + Quality Gates]
   V --> D[Documenter]
   D --> L[Learn + Session Log]
@@ -181,7 +197,7 @@ flowchart LR
   H[Hooks] --> T[Tool Execution Guardrails]
   T --> C
 
-  R[Reviewer Agents] --> V
+  R[Reviewer] --> V
   C --> R
 
   L --> O[Commit or PR Decision]
@@ -235,6 +251,9 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Pre-deploy checks, Bento build/container workflow, health checks
 - [tool-routing.instructions.md](shared/policies/tool-routing.instructions.md)
   - Routing between direct reads, `rg`, Semble, and context-mode
+  - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
+- [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
+  - Single home for how agents report back (caveman-full prose, structured content preserved) with the documenter's normal-prose exception
 
 ## Most Important Skills
 
@@ -245,7 +264,6 @@ There are many skills; these are the high-leverage ones I rely on most:
 Core workflow:
 
 - [plan-decomposition](shared/skills/plan-decomposition/SKILL.md)
-- [iterative-plan-review](shared/skills/iterative-plan-review/SKILL.md)
 - [create-feature](shared/skills/create-feature/SKILL.md)
 - [run-tests](shared/skills/run-tests/SKILL.md)
 - [refactor](shared/skills/refactor/SKILL.md)
@@ -280,21 +298,18 @@ The agent layer gives me orchestration plus profile-driven reviews. Full shared 
 
 Primary flow for complex work:
 
-- orchestrator -> planner -> coder/designer -> verifier -> reviewer -> documenter
+- orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
 
 Current agents:
 
 - orchestrator
 - planner
 - coder
-- designer
 - reviewer
-- review-pass-primary
-- review-pass-adversarial
 - verifier
 - documenter
 
-The unified `reviewer` loads one or more profiles from `shared/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`). It runs dual-pass review through `review-pass-primary` and `review-pass-adversarial`, then synthesizes findings into one report. When only one helper is available, review falls back to single-pass mode and labels findings as `[single-pass, unconfirmed]`.
+The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
 Orchestrator routing:
 
@@ -302,7 +317,7 @@ Orchestrator routing:
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`shared/`, `.github/hooks/`, `.codex/`, generated adapters/config, `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) always use full-plan and always trigger profile-driven dual review.
+- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use full-plan and always trigger profile-driven review.
 
 Coder skill loading:
 
@@ -326,10 +341,10 @@ Configured events:
   - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, latest score report, and any open lifecycle state
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events when available
 - PreToolUse
-  - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files; handles both relative and absolute paths correctly
-  - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master)
+  - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files. Its primary check is pure bash (no `uv` dependency); a Python precision pass runs only as an enhancement when `uv` is present, and an internal error fails toward `ask` (deny on Codex), never a silent allow
+  - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master) in pure bash — no `uv` dependency — and tokenizes past global git flags so forms like `git -C . reset --hard` are still caught
   - [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh) validates branch creation from clean `dev` into `<plan_name>_implementation`, including `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, and `git switch --create`
-  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, HEAD SHA, target, dirty flag, and changed-files metadata
+  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, and HEAD SHA. The report must also record `tests_passed: true`, not be `tests_skipped`, and be `dirty: false` (no unstaged changes), and its `content_hash` — `git hash-object` of the diff against the merge base — must still match, so an amend/rebase/editor-touch that preserves content does not false-block while any real post-scoring edit does. Failure messages name the exact mismatch and the regenerate command. Classifiers tokenize past global git flags, so `git -C . commit` / `git -c k=v commit` cannot bypass the gate; on an unparseable payload the gate fails closed (exit 2)
   - [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) requires `gh pr create --base dev` and blocks implementation-branch pushes until every phase is complete and bypasses are acknowledged
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
 - PostToolUse / PreCompact
@@ -340,9 +355,8 @@ Configured events:
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
-  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) pushes mutable AI state to the configured Hugging Face sync path; errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
-  - `hf-ai-sync.sh upload-bootstrap` also re-uploads the bootstrap bundle on every Stop so fresh clones can pull it without running the installer again
-- `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery
+  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) runs `push-state` only — it pushes mutable AI *state* to the configured Hugging Face sync path. Consumers never re-upload the canonical bootstrap bundle from a Stop hook; bootstrap uploads are an explicit installer/updater action, so a stale consumer copy can't clobber the shared bundle. With no bucket configured the helper warns and no-ops. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
+- `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery. `.state_backups/` is a local convenience; the durable copy of state is the HF bucket. `push-state --prune` reconciles the bucket (deletes remote files removed locally); it is opt-in
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 

@@ -26,6 +26,10 @@ COPILOT_MODEL_PINS = (
     "Claude Sonnet 4.6",
     "(copilot)",
 )
+# Hand-maintained allow-list of Copilot picker model names. These were valid
+# against the official GitHub Copilot supported-models reference as last checked
+# 2026-07-03. This list rots silently as the picker changes — re-verify against
+# the reference and update the date when you touch it.
 GITHUB_ALLOWED_AGENT_MODELS = {
     "GPT-5.4",
     "Claude Opus 4.6",
@@ -144,7 +148,13 @@ def target_support_root(target: str) -> Path:
 
 def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
     comparison = filecmp.dircmp(left, right)
-    if comparison.left_only or comparison.right_only or comparison.diff_files or comparison.funny_files:
+    if comparison.left_only or comparison.right_only or comparison.funny_files:
+        errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
+        return
+    # Compare file contents (shallow=False), not just stat signatures, so a
+    # byte-level nondeterminism is caught even when size/mtime happen to match.
+    _, mismatch, errored = filecmp.cmpfiles(left, right, comparison.common_files, shallow=False)
+    if mismatch or errored:
         errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
         return
     for name in comparison.common_dirs:
@@ -154,13 +164,24 @@ def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
     expected_count = len(shared_agents)
-    check(expected_count > 0, f"no shared agents found under shared/agents/", errors)
+    check(expected_count > 0, "no shared agents found under shared/agents/", errors)
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
         check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
         check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
+        capabilities = set(data.get("capabilities", []))
+        if agent_id == "orchestrator":
+            # R-AGENTS-01: the orchestrator's prompt mandates branch/commit/PR
+            # and memory/session-log writes, so its toolset must actually grant
+            # delegation, editing, and execution.
+            missing = {"delegate", "edit", "execute"} - capabilities
+            check(
+                not missing,
+                f"orchestrator capabilities must cover its prompt-declared actions; missing {sorted(missing)}",
+                errors,
+            )
 
     generated_github_agents = sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md"))
     check(len(generated_github_agents) == expected_count, "GitHub agent count must match shared agents", errors)
@@ -259,6 +280,32 @@ def validate_agents(errors: list[str]) -> None:
             for label in NON_COPILOT_REVIEW_LABEL_LEAKS:
                 check(label not in text, f"non-Copilot review helper label leaked into {path}: {label}", errors)
 
+    # R-AGENTS-06: control-plane guards must use consumer paths; the authoring
+    # repo's shared/ and dist/ must not leak into generated agent bodies.
+    for path in sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md")):
+        text = read(path)
+        for authoring_path in ("shared/", "dist/"):
+            check(
+                authoring_path not in text,
+                f"generated agent must not reference authoring-repo path '{authoring_path}': {path}",
+                errors,
+            )
+        # R-AGENTS-07: the documenter must diff against the plan's originating
+        # branch (dev), never main.
+        check(
+            "main...HEAD" not in text,
+            f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
+            errors,
+        )
+        # R-AGENTS-08: the verifier is the single owner of the persisted score
+        # report; only it writes the report (`--json --out`).
+        if "--json --out" in text:
+            check(
+                path.stem == "verifier",
+                f"only the verifier may write a persisted score report (--json --out): {path}",
+                errors,
+            )
+
     validate_github_agent_models(errors)
 
 
@@ -323,18 +370,23 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         read_toml(TARGET_ROOT / ".codex" / "config.toml")
     except tomllib.TOMLDecodeError as error:
         errors.append(f"invalid Codex config TOML: {error}")
-    check("[features]" in codex_config, "Codex config missing features section", errors)
-    check("hooks = true" in codex_config, "Codex config must enable hooks", errors)
+    # R-CODEX-01: hooks are on by default in current Codex; the [features] block
+    # is redundant and must not be emitted.
+    check("[features]" not in codex_config, "Codex config must not emit the redundant [features] block", errors)
+    check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
     check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
     check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
+    # R-CODEX-01: skill paths point at the SKILL.md file, not the directory.
+    check('/SKILL.md"' in codex_config, "Codex skill paths must point at the SKILL.md file", errors)
 
     codex_hooks = json.loads(read(TARGET_ROOT / ".codex" / "hooks.json"))
     check(set(codex_hooks) == {"hooks"}, "Codex hooks.json should only contain the top-level hooks object", errors)
-    check("PreCompact" not in codex_hooks.get("hooks", {}), "Codex hooks must not use unsupported PreCompact event", errors)
+    # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
+    check("PreCompact" in codex_hooks.get("hooks", {}), "Codex hooks must wire the documented PreCompact event", errors)
     for event_name, groups in codex_hooks.get("hooks", {}).items():
         check(isinstance(groups, list), f"Codex hook event must be a list: {event_name}", errors)
         for group in groups if isinstance(groups, list) else []:
@@ -413,6 +465,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("hf-ai-sync.sh" in claude_settings_text, "Claude stop hooks should push HF AI state", errors)
 
     check("hf-ai-sync.sh" in json.dumps(codex_hooks), "Codex stop hooks should push HF AI state", errors)
+
+    # R-SYNC-02: consumers push state only; the canonical bootstrap is never
+    # re-uploaded from a consumer's Stop hook.
+    for label, text in (
+        ("Claude settings", claude_settings_text),
+        ("GitHub hooks", github_hook_text),
+        ("Codex hooks", json.dumps(codex_hooks)),
+    ):
+        check("push-state" in text, f"{label} Stop hook must push state", errors)
+        check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
+
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
     check(
         dispatcher.exists() and dispatcher.stat().st_mode & 0o111,
@@ -424,7 +487,13 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     validate_generated_scripts(errors)
 
 
-def run_hook(script: Path, payload: dict[str, object], *args: str, cwd: Path | None = None) -> tuple[int, str, str]:
+def run_hook(
+    script: Path,
+    payload: dict[str, object],
+    *args: str,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     result = subprocess.run(
         [str(script), *args],
         input=json.dumps(payload),
@@ -432,8 +501,39 @@ def run_hook(script: Path, payload: dict[str, object], *args: str, cwd: Path | N
         capture_output=True,
         check=False,
         cwd=cwd,
+        env=env,
     )
     return result.returncode, result.stdout, result.stderr
+
+
+def run_hook_raw(
+    script: Path,
+    raw_input: str,
+    *args: str,
+    cwd: Path | None = None,
+) -> tuple[int, str, str]:
+    result = subprocess.run(
+        [str(script), *args],
+        input=raw_input,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def path_without_uv() -> dict[str, str]:
+    """A copy of os.environ with any directory containing a `uv` binary removed
+    from PATH, so tests can exercise the pure-bash guardrail fallback."""
+    env = dict(os.environ)
+    kept = [
+        part
+        for part in env.get("PATH", "").split(os.pathsep)
+        if part and not (Path(part) / "uv").exists()
+    ]
+    env["PATH"] = os.pathsep.join(kept)
+    return env
 
 
 def validate_hook_guardrails(errors: list[str]) -> None:
@@ -466,7 +566,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"hook guardrail failed to run: {script}: {stderr}", errors)
         check(
-            f'"permissionDecision": "{expected_decision}"' in stdout,
+            f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect {protected_path} with {expected_decision}: {script}",
             errors,
         )
@@ -483,7 +583,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny .env: {hook_root}",
             errors,
         )
@@ -495,7 +595,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"Bash protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny Bash write to .env: {hook_root}",
             errors,
         )
@@ -506,8 +606,34 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"git guardrail failed to run: {hook_root}: {stderr}", errors)
         check(
-            '"permissionDecision": "deny"' in stdout,
+            '"permissionDecision":"deny"' in stdout,
             f"git guardrail did not deny git reset --hard: {hook_root}",
+            errors,
+        )
+
+        # R-HOOKS-03: the two safety-critical guards must survive without `uv`.
+        no_uv = path_without_uv()
+        returncode, stdout, stderr = run_hook(
+            hook_root / "protect-files.sh",
+            {"tool_name": "Write", "tool_input": {"path": ".env"}},
+            target_id,
+            env=no_uv,
+        )
+        check(returncode == 0, f"protect-files failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"protect-files must deny .env write even without uv: {hook_root}",
+            errors,
+        )
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": "git -C . reset --hard"}},
+            env=no_uv,
+        )
+        check(returncode == 0, f"git-protection failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"git-protection must deny reset --hard even without uv (and past global flags): {hook_root}",
             errors,
         )
 
@@ -539,7 +665,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"Bash hook-file guardrail failed to run: {script}: {stderr}", errors)
         check(
-            f'"permissionDecision": "{expected_decision}"' in stdout,
+            f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect Bash hook edit with {expected_decision}: {script}",
             errors,
         )
@@ -622,6 +748,20 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         write_big_plan(repo)
         write_small_plan(repo)
 
+        # R-HOOKS-04: a present-but-unparseable payload must fail closed
+        # (non-zero exit + deny) instead of silently allowing the tool call.
+        # Run against the temp repo so fail-closed logging stays isolated.
+        for gate in ("protect-files.sh", "git-protection.sh", "enforce-commit-gate.sh", "enforce-pr-gate.sh"):
+            returncode, stdout, stderr = run_hook_raw(
+                lifecycle_script(repo, gate), "this is not json", "github-copilot", cwd=repo
+            )
+            check(returncode != 0, f"{gate} must exit non-zero on unparseable payload (got {returncode})", errors)
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"{gate} must deny on unparseable payload",
+                errors,
+            )
+
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
             {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "test"'}},
@@ -630,6 +770,35 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"commit gate on dev failed to run: {stderr}", errors)
         check('"permissionDecision":"deny"' in stdout, "commit gate must deny commits on dev", errors)
+
+        # R-HOOKS-01: global git flags must not smuggle a commit past the classifier.
+        for command in (
+            'git -C . commit -m x',
+            'git -c a=b commit -m x',
+            'git --git-dir=.git commit -m x',
+        ):
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-commit-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                "github-copilot",
+                cwd=repo,
+            )
+            check(returncode == 0, f"commit gate flag-evasion case failed to run: {command}: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny flag-smuggled commit on dev: {command}", errors)
+
+        # R-HOOKS-02: bypass subjects still undergo branch-shape validation.
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "chore(typo): x"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"commit gate bypass-branch-shape case failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must deny bypass-subject commits off an implementation branch",
+            errors,
+        )
 
         write(repo / "dirty.txt", "dirty\n")
         returncode, stdout, stderr = run_hook(
@@ -643,6 +812,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         for command in (
             "git switch --create foo_implementation",
             "git checkout -B foo_implementation",
+            "git -C . checkout -b foo_implementation",
         ):
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-branch-state.sh"),
@@ -737,26 +907,100 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
-        write(
-            repo / ".claude" / "quality_reports" / "score-test.json",
-            json.dumps(
-                {
-                    "score": 95,
-                    "branch": "foo_implementation",
-                    "phase": "phase-one",
-                    "generated_at": "2099-01-01T00:00:00Z",
-                    "base_ref": "dev",
-                    "merge_base_sha": merge_base,
-                    "head_sha": head_sha,
-                    "target": str(repo / "work.txt"),
-                    "dirty": True,
-                    "changed_files": ["work.txt"],
-                },
-                indent=2,
+        # Content signature the gate recomputes: git hash-object of git diff <merge-base>.
+        diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", merge_base).stdout
+        content_hash = subprocess.run(
+            ["git", "-C", str(repo), "hash-object", "--stdin"],
+            input=diff_out, text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        reports_dir = repo / ".claude" / "quality_reports"
+
+        def score_report(**overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "score": 95,
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "tests_passed": True,
+                "tests_skipped": False,
+                "content_hash": content_hash,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_reports() -> None:
+            for stale in reports_dir.glob("score-*.json"):
+                stale.unlink()
+
+        def write_score(report: dict[str, object]) -> None:
+            clear_reports()
+            path = reports_dir / "score-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
+        # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
+        # dirty:true must all be denied even at a passing score.
+        for label, report in (
+            ("tests_passed:false", score_report(tests_passed=False)),
+            ("tests_passed missing", {k: v for k, v in score_report().items() if k != "tests_passed"}),
+            ("tests_skipped:true", score_report(tests_skipped=True)),
+            ("dirty:true", score_report(dirty=True)),
+        ):
+            write_score(report)
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-commit-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+                "github-copilot",
+                cwd=repo,
             )
-            + "\n",
+            check(returncode == 0, f"commit {label} case failed to run: {stderr}", errors)
+            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny score report with {label} even at score 95", errors)
+
+        # R-SCORE-02: select the newest report by generated_at, not filename.
+        # Older passing report has a lexically-later filename; newer failing
+        # report has a lexically-earlier one. The gate must pick the newer.
+        clear_reports()
+        write(reports_dir / "score-zzz.json", json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n")
+        write(reports_dir / "score-aaa.json", json.dumps(score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2) + "\n")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
         )
-        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
+        check(returncode == 0, f"commit report-selection case failed to run: {stderr}", errors)
+        check('"permissionDecision":"deny"' in stdout, "commit gate must select the newest report by generated_at", errors)
+        check("found 50" in stdout, "commit gate must use the newer (failing) report, not the lexically-later passing one", errors)
+
+        # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
+        write_score(score_report(head_sha="0" * 40))
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a stale-HEAD report", errors)
+        check("re-run quality_score" in stdout, "stale-HEAD failure must tell the user to re-run quality_score", errors)
+
+        # R-SCORE-02: content edited since scoring is caught by the content hash.
+        write_score(score_report(content_hash="deadbeef"))
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a content_hash mismatch", errors)
+        check("re-run quality_score" in stdout, "content_hash mismatch failure must tell the user to re-run quality_score", errors)
+
+        write_score(score_report())
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -780,14 +1024,15 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "record commit closeout must not complete big plan without commit correlation",
             errors,
         )
+        # R-HOOKS-05: a whitespace-variant subject still correlates with HEAD.
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "record-commit-closeout.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1   closeout"'}},
             "github-copilot",
             cwd=repo,
         )
         check(returncode == 0, f"record commit closeout failed to run: {stderr}", errors)
-        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan", errors)
+        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan via normalized subject match", errors)
 
         write(
             repo / ".claude" / "session_logs" / "hooks-bypass.log",
@@ -852,6 +1097,16 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             errors,
         )
 
+    # R-SKILLS-01: the commit skill must follow the enforced lifecycle, never
+    # walking the agent into feature/* branches or agent-driven merges.
+    commit_skill = skill_root / "commit" / "SKILL.md"
+    if commit_skill.exists():
+        commit_text = read(commit_skill)
+        check("feature/" not in commit_text, "commit skill must not use feature/* branches", errors)
+        check("gh pr merge" not in commit_text, "commit skill must not run gh pr merge (human merges)", errors)
+        check("_implementation" in commit_text, "commit skill must use <plan>_implementation branches", errors)
+        check("--base dev" in commit_text, "commit skill must open PRs against dev", errors)
+
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
     generated_prompts = sorted((TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md"))
     check(
@@ -882,10 +1137,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         for entry in skill_config
         if isinstance(entry, dict) and entry.get("enabled") is True
     }
-    expected_skill_paths = {f"../.claude/skills/{path.parent.name}" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    expected_skill_paths = {f"../.claude/skills/{path.parent.name}/SKILL.md" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
     check(
         configured_skill_paths == expected_skill_paths,
-        "Codex config must enable every shared .claude skill by relative path",
+        "Codex config must enable every shared .claude skill by relative SKILL.md path",
         errors,
     )
 
@@ -960,10 +1215,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         text = read(path)
         for fragment in stale_workflow_fragments:
             check(fragment not in text, f"{path} contains stale workflow/gate phrase: {fragment}", errors)
+    # docs/history/ holds archived completed plans; they legitimately contain
+    # old path patterns and are not living documentation.
     source_paths = [
         REPO_ROOT / "README.md",
         REPO_ROOT / "AGENTS.md",
-        *text_files(REPO_ROOT / "docs"),
+        *(p for p in text_files(REPO_ROOT / "docs") if "history" not in p.relative_to(REPO_ROOT / "docs").parts),
         *text_files(REPO_ROOT / "shared"),
     ]
     for path in source_paths:
@@ -973,9 +1230,15 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             f"{path} contains stale quality report path pattern",
             errors,
         )
-    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md")
+    # R-VALID-01: assert the concept structurally (the devcontainer-required vs
+    # outside-fallback distinction is documented) rather than pinning one exact
+    # English sentence that every wording change would have to chase.
+    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md").lower()
     check(
-        "Inside the generated devcontainer, Semble and context-mode are installed as required tools" in tool_routing_text,
+        "devcontainer" in tool_routing_text
+        and "required" in tool_routing_text
+        and "semble" in tool_routing_text
+        and "context-mode" in tool_routing_text,
         "tool-routing instructions must distinguish required devcontainer tooling from outside-devcontainer fallbacks",
         errors,
     )
@@ -1105,16 +1368,56 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check("uv run python" not in post_start_text, "post-start must not invoke project uv for HF sync", errors)
 
     helper = devcontainer_root / "hf-ai-sync.py"
+    scrubbed_env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"HF_AI_SYNC_BUCKET", "HF_AI_SYNC_PREFIX"}
+    }
     if helper.exists():
+        # R-SYNC-01: a configured bucket is honored; there is no baked default.
+        configured_env = {**scrubbed_env, "HF_AI_SYNC_BUCKET": "example-org/example-bucket"}
         result = subprocess.run(
             [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
             cwd=REPO_ROOT,
+            env=configured_env,
             text=True,
             capture_output=True,
             check=False,
         )
         check(result.returncode == 0, f"HF sync helper dry-run status failed: {result.stderr}", errors)
-        check("Ghisso/vscode_mounts" in result.stdout, "HF sync helper must default to Ghisso/vscode_mounts", errors)
+        check("example-org/example-bucket" in result.stdout, "HF sync helper must honor the configured bucket", errors)
+
+        # R-SYNC-04: push-state prunes only with --prune (delete off by default).
+        default_push = subprocess.run(
+            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run"],
+            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
+        )
+        check("delete=False" in default_push.stdout, "push-state must not delete remote state by default", errors)
+        prune_push = subprocess.run(
+            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run", "--prune"],
+            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
+        )
+        check("delete=True" in prune_push.stdout, "push-state --prune must reconcile (delete) remote state", errors)
+        # R-SYNC-04: MEMORY.md is single-homed in state, not the bootstrap bundle.
+        helper_src = read(helper)
+        check(
+            '".claude/MEMORY.md"' not in helper_src,
+            "MEMORY.md must not be in BOOTSTRAP_PATHS (single-homed in state)",
+            errors,
+        )
+
+        # R-SYNC-01: with no bucket configured the helper is a graceful no-op.
+        no_bucket = subprocess.run(
+            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
+            cwd=REPO_ROOT,
+            env=scrubbed_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        combined = no_bucket.stdout + no_bucket.stderr
+        check(no_bucket.returncode == 0, "HF sync helper must not hard-fail without a bucket", errors)
+        check("no HF sync bucket configured" in combined, "HF sync helper must explain a missing bucket", errors)
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
     with tempfile.TemporaryDirectory() as temp_dir_name:
@@ -1127,13 +1430,29 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(init_result.returncode == 0, f"temporary git init failed: {init_result.stderr}", errors)
+        # R-SYNC-01: installer errors without a bucket (no baked default).
+        no_bucket_install = subprocess.run(
+            [sys.executable, str(installer), str(temp_repo), "--skip-upload", "--dry-run"],
+            cwd=REPO_ROOT,
+            env=scrubbed_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(no_bucket_install.returncode != 0, "installer must refuse to run without a bucket", errors)
+        check(
+            "HF_AI_SYNC_BUCKET" in (no_bucket_install.stdout + no_bucket_install.stderr),
+            "installer must tell the user how to configure a bucket",
+            errors,
+        )
+
         install_result = subprocess.run(
             [
                 sys.executable,
                 str(installer),
                 str(temp_repo),
                 "--bucket",
-                "Ghisso/vscode_mounts/test-project",
+                "example-org/example-bucket/test-project",
                 "--skip-upload",
             ],
             cwd=REPO_ROOT,
@@ -1147,8 +1466,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         devcontainer_data = json.loads(read(temp_repo / ".devcontainer" / "devcontainer.json"))
         container_env = devcontainer_data.get("containerEnv", {})
         check(
-            container_env.get("HF_AI_SYNC_BUCKET") == "Ghisso/vscode_mounts/test-project",
+            container_env.get("HF_AI_SYNC_BUCKET") == "example-org/example-bucket/test-project",
             "installer must persist project-specific HF sync path in .devcontainer",
+            errors,
+        )
+
+        # R-POLICY-01: installer substitutes the workspace project-name placeholder.
+        installed_workspace = read(temp_repo / ".claude" / "instructions" / "workspace.instructions.md")
+        check(
+            "[TODO: project name" not in installed_workspace,
+            "installer must fill the workspace project-name placeholder",
+            errors,
+        )
+        check(
+            "**Project:** consumer" in installed_workspace,
+            "installer must substitute the target repo name into the workspace instructions",
             errors,
         )
 
@@ -1167,6 +1499,16 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(devcontainer_ignore_result.returncode != 0, "installer must leave .devcontainer trackable", errors)
+
+        # R-SYNC-03: default install keeps the Copilot cloud surface ignored
+        # (local-IDE only).
+        copilot_ignored = subprocess.run(
+            ["git", "-C", str(temp_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(copilot_ignored.returncode == 0, "default install must ignore the Copilot cloud surface (.github/agents)", errors)
 
         helper_status_env = {
             key: value
@@ -1190,10 +1532,49 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
         check(helper_status.returncode == 0, f"installed helper status failed: {helper_status.stderr}", errors)
         check(
-            "hf://buckets/Ghisso/vscode_mounts/test-project/bootstrap" in helper_status.stdout,
+            "hf://buckets/example-org/example-bucket/test-project/bootstrap" in helper_status.stdout,
             "installed helper must read HF sync path from .devcontainer when env vars are unset",
             errors,
         )
+
+    # R-SYNC-03: --commit-copilot-surface keeps the Copilot surface trackable.
+    with tempfile.TemporaryDirectory() as flag_dir_name:
+        flag_repo = Path(flag_dir_name) / "consumer"
+        flag_repo.mkdir()
+        subprocess.run(["git", "init", str(flag_repo)], text=True, capture_output=True, check=False)
+        flag_install = subprocess.run(
+            [
+                sys.executable,
+                str(installer),
+                str(flag_repo),
+                "--bucket",
+                "example-org/example-bucket/test-project",
+                "--skip-upload",
+                "--commit-copilot-surface",
+            ],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(flag_install.returncode == 0, f"installer --commit-copilot-surface run failed: {flag_install.stderr}", errors)
+        gitignore_text = read(flag_repo / ".gitignore") if (flag_repo / ".gitignore").exists() else ""
+        check(".github/agents/" not in gitignore_text, "--commit-copilot-surface must omit .github/agents from the ignore block", errors)
+        surface_trackable = subprocess.run(
+            ["git", "-C", str(flag_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(surface_trackable.returncode != 0, "--commit-copilot-surface must leave .github/agents trackable", errors)
+        # State still stays ignored regardless of the flag.
+        state_ignored = subprocess.run(
+            ["git", "-C", str(flag_repo), "check-ignore", ".claude/MEMORY.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(state_ignored.returncode == 0, "--commit-copilot-surface must still ignore .claude state", errors)
 
 
 def validate_determinism(errors: list[str]) -> None:
@@ -1212,6 +1593,25 @@ def validate_determinism(errors: list[str]) -> None:
         compare_dirs(DIST_ROOT, output, errors)
 
 
+def validate_routing_table_parity(errors: list[str]) -> None:
+    """R-AGENTS-05: the profile-routing table must have exactly one home. Its
+    distinctive row marker may appear in only one shared source file
+    (workspace.instructions.md); everything else references it by path."""
+    marker = "Domain-specific correctness"
+    owner = REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
+    holders = sorted(
+        path
+        for path in (REPO_ROOT / "shared").rglob("*.md")
+        if "__pycache__" not in path.parts and marker in read(path)
+    )
+    check(
+        holders == [owner],
+        "profile-routing table must live only in shared/policies/workspace.instructions.md; "
+        f"found the routing marker in: {[str(p.relative_to(REPO_ROOT)) for p in holders]}",
+        errors,
+    )
+
+
 def main() -> int:
     errors: list[str] = []
     for target in TARGETS:
@@ -1222,6 +1622,7 @@ def main() -> int:
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_skills_and_paths(errors)
+        validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
         validate_determinism(errors)
 

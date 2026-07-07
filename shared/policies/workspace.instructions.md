@@ -58,10 +58,10 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUME
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 
 ```text
-orchestrator -> planner -> coder/designer -> verifier -> reviewer -> score -> documenter
+orchestrator -> planner -> coder -> verifier -> reviewer -> score -> documenter
 ```
 
-Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/agent/config adapters, generated adapters/config, and root guidance files.
+Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project.
 
 ## Agents
 
@@ -69,17 +69,14 @@ Control-plane files include `shared/**`, `.devcontainer/**`, target-native hook/
 |---|---|
 | `orchestrator` | Coordinates complex workflows and delegates work |
 | `planner` | Creates implementation plans with required skills and review profiles |
-| `coder` | Implements backend/code changes and performs local simplification |
-| `designer` | Implements Gradio/Streamlit UI changes |
-| `reviewer` | Runs profile-driven dual-pass reviews |
-| `review-pass-primary` | Hidden primary review helper |
-| `review-pass-adversarial` | Hidden adversarial review helper |
+| `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
+| `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
 | `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
 | `documenter` | Updates documentation after score passes and before commit/PR closeout |
 
 ## Review Profiles
 
-The unified `reviewer` loads checklists from `.claude/review-profiles/`:
+This is the **single authoritative profile-routing table**. The unified `reviewer` loads checklists from `.claude/review-profiles/`. Agents and skills reference this table by path rather than restating it.
 
 | Surface | Profiles |
 |---|---|
@@ -91,6 +88,7 @@ The unified `reviewer` loads checklists from `.claude/review-profiles/`:
 | I/O-heavy or ML-heavy paths | `performance` |
 | Docs/user-facing behavior | `documentation` |
 | Domain-specific correctness | `domain` |
+| Any pre-PR gate | `code`, `security`, `tests` (minimum) |
 
 ## Skills
 

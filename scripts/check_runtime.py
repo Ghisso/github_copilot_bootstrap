@@ -54,6 +54,16 @@ def main() -> int:
                     "WARN optional binary missing: gh; enforce-pr-gate.sh still blocks common "
                     "implementation-branch git push paths, but GitHub web UI PR opening itself is not gated"
                 )
+            elif command == "uv":
+                print(
+                    "WARN optional binary missing: uv; the file-protection and git guardrails run "
+                    "in pure bash without it, and quality_score.py is the only feature that needs it"
+                )
+            elif command == "context-mode":
+                print(
+                    "WARN optional binary missing: context-mode; retrieval falls back to direct reads "
+                    "and rg (context-mode is a convenience, not a requirement)"
+                )
             else:
                 print(f"WARN optional binary missing: {command}")
 

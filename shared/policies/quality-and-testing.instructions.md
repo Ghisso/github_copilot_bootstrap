@@ -48,49 +48,54 @@ async def test_async_operation() -> None:
 
 ## Quality Scoring Rubric
 
-### Python Source (`src/**/*.py`)
+`quality_score.py` computes a single deterministic number. It runs three tools
+(`ruff`, `mypy`, `pytest`) and deducts from a base of **100**. This section
+describes the **actual arithmetic the scorer implements** — not an aspirational
+rubric. (A false spec is worse than a modest one.)
 
-| Severity | Issue | Deduction |
+Starting score: **100**, floored at **0**.
+
+| Signal | Source | Deduction |
 |---|---|---|
-| Critical | Syntax errors / module won't import | -100 |
-| Critical | mypy type errors | -20 |
-| Critical | Security vulnerability (hardcoded secrets, injection, unsafe deser.) | -20 |
-| Critical | Missing tests for new public functions | -15 |
-| Major | Missing type hints on public functions | -10 |
-| Major | Missing Google-style docstrings on public functions | -5 |
-| Major | Deprecated types (`List`/`Dict`/`Optional`) | -5 |
-| Major | ruff lint errors | -3 per error |
-| Major | f-strings in logging | -3 |
-| Minor | Import order violation | -2 |
-| Minor | Line length > 120 chars | -1 per occurrence |
+| Any mypy type errors | `mypy --ignore-missing-imports --explicit-package-bases` | **-20** (binary) |
+| Any pytest failures, or tests skipped | `pytest tests/ -q` | **-15** (binary) |
+| ruff violations | `ruff check --output-format=json`, per violation, by rule-code prefix | see below |
 
-### Test Files (`tests/**/*.py`)
+ruff per-violation deductions (by the leading letters of the rule code):
 
-| Severity | Issue | Deduction |
+| Rule prefix | Category | Per violation |
 |---|---|---|
-| Critical | No assertions in test | -20 |
-| Critical | Test passes when it should fail | -20 |
-| Major | No edge cases | -10 |
-| Major | Inappropriate mocking (mocking what you own) | -5 |
-| Major | Missing parametrize for multi-input tests | -3 |
+| `E`, `W`, `I` | style / whitespace / import order | -1 |
+| `D`, `UP` | docstrings / pyupgrade | -2 |
+| `G` | logging f-strings | -3 |
+| `B`, `S` | bugbear / security (bandit) | -5 |
+| any other code | (default) | -2 |
 
-### API Services (`service.py`, `src/api/**`)
+The scorer does **not** independently classify "missing type hints",
+"missing docstrings", "no Pydantic validation", etc. — those are surfaced only
+insofar as `ruff`/`mypy` emit a rule for them. Treat the tool configuration
+(ruff rule selection, mypy strictness) as the real rubric and tune it there.
 
-| Severity | Issue | Deduction |
-|---|---|---|
-| Critical | No Pydantic input validation | -15 |
-| Critical | No error handling on endpoints | -10 |
-| Major | Secrets in code (not env vars) | -20 |
-| Major | Missing async for I/O endpoints | -5 |
-| Major | No health check endpoint | -5 |
+### Gate metadata (enforced by the commit gate)
 
-### Config Files (`src/configs/**`)
+The persisted report carries fields the commit gate checks in addition to the
+score:
 
-| Severity | Issue | Deduction |
-|---|---|---|
-| Critical | Hardcoded values that should be configurable | -10 |
-| Critical | Missing `__post_init__` validation | -5 |
-| Major | Config not registered with ConfigStore | -10 |
+- `tests_passed` must be `true` — a report with `false` or a missing field is
+  rejected **even at score 100**.
+- `tests_skipped` must not be `true` — `--skip-tests` records `tests_skipped:
+  true` and `tests_passed: false`, and the gate refuses it.
+- `dirty` must be `false` — `dirty` means the working tree has **unstaged**
+  changes to tracked files (the tree does not match the index). Stage
+  everything destined for the commit, then re-run the scorer.
+
+### Direction (not yet implemented)
+
+Numeric self-grading is a known reward-hacking setup once any input is
+agent-controlled. The intended evolution is to replace the numeric threshold
+with a **severity-count predicate over review findings** (e.g. "0 criticals, ≤N
+majors") rather than a deeper numeric rubric. Until then, the arithmetic above
+is the whole story.
 
 ---
 

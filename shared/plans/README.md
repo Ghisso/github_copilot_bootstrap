@@ -13,7 +13,6 @@ Small plans: `YYYY-MM-DD_phase-X-short-description.md`
 Before writing a plan, load relevant planning skills from `.claude/skills/`.
 
 - Always: `plan-decomposition/SKILL.md`
-- Always: `iterative-plan-review/SKILL.md`
 - For feature work: `create-feature/SKILL.md`
 
 Plans should include required skills per implementation step so coding agents know exactly what to load before editing.

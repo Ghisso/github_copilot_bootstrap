@@ -39,7 +39,7 @@ The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerat
 
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
-Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, current HEAD SHA, `target` (a repo-relative path; commit gates reject reports whose target is an absolute path outside the current repo), dirty flag, and changed-files metadata.
+Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 
 ## Devcontainer And HF Sync
 
@@ -49,11 +49,13 @@ Generated output includes `.devcontainer/`:
 - `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` is pinned directly (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead). The lower bound is required because `HfApi.sync_bucket` was added in 1.0; without it, sync calls raise `AttributeError` that the broad exception handler swallows silently, causing the script to exit 0 having done nothing. If a project's `pyproject.toml` introduces a transitive dep that would downgrade `huggingface_hub` below 1.0, the `import_hf_api()` function in `hf-ai-sync.py` detects the missing method, emits a named warning, and falls back to the `hf` CLI so the failure is visible rather than silent.
 - `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes). It then calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
 
-The default bucket base is `Ghisso/vscode_mounts`, but installed consumer repos should
-store a project-specific bucket path such as `Ghisso/vscode_mounts/img-classification`
-in `.devcontainer/devcontainer.json`. The sync helper resolves settings in this order:
-explicit CLI arguments, `HF_AI_SYNC_*` environment variables, `.devcontainer` config,
-then the default bucket base. Auth resolves in this order: `HF_TOKEN`,
+There is **no baked-in default bucket** — a bucket must be configured. The installer
+requires `--bucket <org/bucket[/prefix]>` or `HF_AI_SYNC_BUCKET` and exits with an
+instruction otherwise; it writes the project-specific bucket path (e.g.
+`your-org/your-bucket/your-project`) into `.devcontainer/devcontainer.json`. The sync
+helper resolves settings in this order: explicit CLI arguments, `HF_AI_SYNC_*`
+environment variables, then `.devcontainer` config; with none configured it warns and
+no-ops rather than falling back to any namespace. Auth resolves in this order: `HF_TOKEN`,
 `HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
 `huggingface-cli login`. Missing auth or bucket access produces warnings and does not
 fail the container start or agent hook.
@@ -64,9 +66,10 @@ does not require `/dev/fuse` or apparmor overrides. It does set `SYS_ADMIN` and
 
 Codex-specific runtime notes:
 
-- `.codex/config.toml` must include `[features] hooks = true`.
-- `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded.
-- `.codex/config.toml` includes one `[[skills.config]]` entry for each `.claude/skills/<name>` directory.
+- `.codex/config.toml` omits the `[features]` block — hooks are on by default in current Codex, so restating `hooks = true` is redundant.
+- `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
+- `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
+- `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, and `developer_instructions`.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.

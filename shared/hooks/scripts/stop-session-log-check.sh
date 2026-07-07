@@ -17,7 +17,11 @@ if [[ -z "$changed_non_state" ]]; then
 fi
 
 today="$(date -u +%Y-%m-%d)"
-if find "$LOG_DIR" -maxdepth 1 -name "${today}_*.md" -type f -newermt "${today} 00:00 UTC" 2>/dev/null | grep -q .; then
+# Portable freshness check: `-mtime -1` (modified within the last day) works on
+# both GNU and BSD find, unlike GNU-only `-newermt`. Combined with the
+# date-stamped filename this is a good-enough signal for a warn-only path; if
+# find errors, we fall through to the warning rather than silently passing.
+if find "$LOG_DIR" -maxdepth 1 -name "${today}_*.md" -type f -mtime -1 2>/dev/null | grep -q .; then
   exit 0
 fi
 

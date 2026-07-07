@@ -30,6 +30,22 @@ IGNORE_PATTERNS = (
     "AGENTS.md",
     "CLAUDE.md",
 )
+# GitHub Copilot cloud agents read the agent/hook/instruction surface only from
+# the default branch, so it must be committed to work in the cloud. By default
+# these paths are gitignored (local-IDE Copilot only); --commit-copilot-surface
+# omits them from the ignore block so they are trackable like `.devcontainer/`.
+COPILOT_SURFACE_PATTERNS = (
+    ".github/agents/",
+    ".github/hooks/",
+    ".github/instructions/",
+    ".github/copilot-instructions.md",
+)
+
+
+def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
+    if not commit_copilot_surface:
+        return IGNORE_PATTERNS
+    return tuple(p for p in IGNORE_PATTERNS if p not in COPILOT_SURFACE_PATTERNS)
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,12 +59,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--bucket",
-        default="Ghisso/vscode_mounts",
-        help="HF bucket id or bucket prefix path used for bootstrap/state sync.",
+        default=None,
+        help="HF bucket id or bucket prefix path used for bootstrap/state sync. "
+        "Required unless HF_AI_SYNC_BUCKET is set in the environment. No default "
+        "is baked in, so no personal namespace ships in the bootstrap.",
     )
     parser.add_argument(
         "--prefix",
         help="Optional project prefix inside the bucket. Overrides remote-derived prefixes.",
+    )
+    parser.add_argument(
+        "--commit-copilot-surface",
+        action="store_true",
+        help="Keep the GitHub Copilot cloud surface (.github/agents, .github/hooks, "
+        ".github/instructions, .github/copilot-instructions.md) out of the ignore block "
+        "so it can be committed. Cloud Copilot agents only read these from the default "
+        "branch; the default (omitting the flag) is local-IDE Copilot only.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions without writing files.")
     parser.add_argument("--skip-upload", action="store_true", help="Do not upload bootstrap files to HF.")
@@ -80,14 +106,31 @@ def copy_generated_tree(source: Path, target: Path, dry_run: bool) -> None:
             shutil.copy2(child, destination)
 
 
-def ignore_block() -> str:
-    lines = [IGNORE_BLOCK_START, *IGNORE_PATTERNS, IGNORE_BLOCK_END]
+def ignore_block(commit_copilot_surface: bool = False) -> str:
+    lines = [IGNORE_BLOCK_START, *active_ignore_patterns(commit_copilot_surface), IGNORE_BLOCK_END]
     return "\n".join(lines) + "\n"
 
 
-def merge_gitignore(target: Path, dry_run: bool) -> None:
+def substitute_project_name(target: Path, dry_run: bool) -> None:
+    """Fill the workspace instructions' [TODO: project name...] placeholder with
+    the target repo's directory name at install time, so every consumer ships a
+    named workspace instead of the unfilled template."""
+    workspace = target / ".claude" / "instructions" / "workspace.instructions.md"
+    if not workspace.is_file():
+        return
+    text = workspace.read_text(encoding="utf-8")
+    placeholder = "**Project:** [TODO: project name and one-liner description]"
+    if placeholder not in text:
+        return
+    info(f"substitute workspace project name -> {target.name}")
+    if dry_run:
+        return
+    workspace.write_text(text.replace(placeholder, f"**Project:** {target.name}"), encoding="utf-8")
+
+
+def merge_gitignore(target: Path, dry_run: bool, commit_copilot_surface: bool = False) -> None:
     gitignore = target / ".gitignore"
-    block = ignore_block()
+    block = ignore_block(commit_copilot_surface)
     current = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     if IGNORE_BLOCK_START in current and IGNORE_BLOCK_END in current:
         info(".gitignore already contains multi-agent ignore block")
@@ -135,9 +178,9 @@ def update_devcontainer_sync_env(target: Path, bucket: str, prefix: str | None, 
     devcontainer_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
-def tracked_generated_paths(target: Path) -> list[str]:
+def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str]:
     result = subprocess.run(
-        ["git", "-C", str(target), "ls-files", "--", *IGNORE_PATTERNS],
+        ["git", "-C", str(target), "ls-files", "--", *patterns],
         text=True,
         capture_output=True,
         check=False,
@@ -147,14 +190,14 @@ def tracked_generated_paths(target: Path) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def warn_tracked_paths(target: Path) -> None:
-    tracked = tracked_generated_paths(target)
+def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
+    tracked = tracked_generated_paths(target, patterns)
     if not tracked:
         return
     unique_roots = sorted(
         {
             pattern.rstrip("/")
-            for pattern in IGNORE_PATTERNS
+            for pattern in patterns
             if any(path == pattern.rstrip("/") or path.startswith(pattern.rstrip("/") + "/") for path in tracked)
         }
     )
@@ -198,14 +241,24 @@ def upload_bootstrap(target: Path, bucket: str, prefix: str | None, dry_run: boo
 
 def main() -> int:
     args = parse_args()
+    bucket = args.bucket or os.environ.get("HF_AI_SYNC_BUCKET")
+    if not bucket:
+        print(
+            "error: no HF sync bucket configured. Pass --bucket <org/bucket[/prefix]> "
+            "or set HF_AI_SYNC_BUCKET in the environment before installing.",
+            file=sys.stderr,
+        )
+        return 2
+    args.bucket = bucket
     target = args.target_repo.expanduser().resolve()
     source = args.source.expanduser().resolve()
 
     copy_generated_tree(source, target, args.dry_run)
+    substitute_project_name(target, args.dry_run)
     update_devcontainer_sync_env(target, args.bucket, args.prefix, args.dry_run)
-    merge_gitignore(target, args.dry_run)
+    merge_gitignore(target, args.dry_run, args.commit_copilot_surface)
     chmod_runtime_scripts(target, args.dry_run)
-    warn_tracked_paths(target)
+    warn_tracked_paths(target, active_ignore_patterns(args.commit_copilot_surface))
 
     if args.skip_upload:
         info("skipping HF bootstrap upload")

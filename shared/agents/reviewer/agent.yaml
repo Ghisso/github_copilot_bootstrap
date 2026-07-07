@@ -1,17 +1,13 @@
 {
   "id": "reviewer",
-  "description": "Unified review agent for code, architecture, security, tests, APIs, configs, performance, documentation, and domain checks. Select one or more review profiles and synthesize dual-pass findings.",
+  "description": "Unified review agent for code, architecture, security, tests, APIs, configs, performance, documentation, and domain checks. Selects one or more review profiles and runs two sequential passes itself.",
   "role_type": "reviewer",
   "visibility": "public",
   "capabilities": [
-    "delegate",
     "read",
     "search"
   ],
-  "delegates": [
-    "review-pass-primary",
-    "review-pass-adversarial"
-  ],
+  "delegates": [],
   "model_intent": {
     "github-copilot": "target-default",
     "claude-code": "target-native",

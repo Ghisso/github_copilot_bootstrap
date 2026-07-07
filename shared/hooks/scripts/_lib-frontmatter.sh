@@ -9,10 +9,87 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+# Single home for the implementation-branch shape used by every lifecycle gate.
+is_implementation_branch() {
+  [[ "$1" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]
+}
+
+# Single home for the uv guard / python runner shared by the optional-python paths.
+uv_available() {
+  command -v uv >/dev/null 2>&1
+}
+
+run_python() {
+  if uv_available; then
+    UV_CACHE_DIR="${UV_CACHE_DIR:-${TMPDIR:-/tmp}/uv-cache}" uv run python "$@"
+    return $?
+  fi
+  return 127
+}
+
 deny_pretool() {
   local reason
   reason="$(json_escape "$1")"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+}
+
+ask_pretool() {
+  local reason
+  reason="$(json_escape "$1")"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"%s"}}\n' "$reason"
+}
+
+# True if the payload is empty (some events send nothing) or valid JSON. A
+# present-but-unparseable payload means the gate cannot reason about the tool
+# call and must fail closed rather than silently allow.
+payload_parseable() {
+  local input="$1"
+  if [[ -z "${input//[[:space:]]/}" ]]; then
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    if printf '%s' "$input" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      return 0
+    fi
+    return 1
+  fi
+  # Fallback heuristic when python3 is unavailable: a JSON object/array only.
+  local trimmed="${input#"${input%%[![:space:]]*}"}"
+  case "$trimmed" in
+    \{*|\[*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Fail closed: emit a deny decision and exit non-zero (2) so runtimes that key
+# blocking on exit status (Copilot: any non-zero = deny; Codex/Claude: exit 2 =
+# block) refuse the tool call instead of allowing it on a silent internal error.
+fail_closed() {
+  local message="$1"
+  if [[ -n "${REPO_ROOT:-}" && -d "${REPO_ROOT:-/nonexistent}" ]]; then
+    mkdir -p "$REPO_ROOT/.claude/session_logs" 2>/dev/null || true
+    printf '%s WARN hook fail-closed: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$message" \
+      >> "$REPO_ROOT/.claude/session_logs/hooks-errors.log" 2>/dev/null || true
+  fi
+  deny_pretool "hook could not evaluate the request safely, denying: $message"
+  exit 2
+}
+
+# Print a file's modification time as a Unix epoch, portably across GNU coreutils
+# (stat -c), BSD/macOS (stat -f), and any POSIX system with python3. Returns
+# non-zero (and prints nothing) when the mtime cannot be read, so callers can
+# warn instead of silently treating an unreadable mtime as 0.
+file_mtime() {
+  local f="$1" m
+  [[ -e "$f" ]] || return 1
+  if m="$(stat -c %Y "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then printf '%s' "$m"; return 0; fi
+  if m="$(stat -f %m "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then printf '%s' "$m"; return 0; fi
+  if command -v python3 >/dev/null 2>&1; then
+    if m="$(python3 -c 'import os,sys; print(int(os.path.getmtime(sys.argv[1])))' "$f" 2>/dev/null)" && [[ "$m" =~ ^[0-9]+$ ]]; then
+      printf '%s' "$m"; return 0
+    fi
+  fi
+  return 1
 }
 
 additional_context() {
@@ -61,10 +138,6 @@ json_string_value() {
       }
     }
   '
-}
-
-hook_tool_name() {
-  printf '%s' "$1" | json_string_value "tool_name"
 }
 
 hook_tool_name_any() {
@@ -173,12 +246,6 @@ fm_read() {
   ' "$file"
 }
 
-fm_has() {
-  local file="$1"
-  local key="$2"
-  [[ -n "$(fm_read "$file" "$key")" ]]
-}
-
 fm_write() {
   local file="$1"
   local key="$2"
@@ -227,33 +294,122 @@ fm_read_list() {
   ' "$file"
 }
 
+# Return the effective subcommand of the FIRST git invocation in a segment,
+# skipping global git flags (-C <path>, -c <k=v>, --git-dir, --work-tree, ...).
+# Shell operators are normalized to spaces so a value glued to an operator does
+# not leak into the next command's word.
+_git_first_subcommand() {
+  local segment="${1//[;|&]/ }"
+  local -a tokens
+  read -ra tokens <<< "$segment"
+  local i=0 n="${#tokens[@]}" tok
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+        i=$((i + 2)); continue ;;
+      --*=*) i=$((i + 1)); continue ;;
+      -*)    i=$((i + 1)); continue ;;
+      *) printf '%s' "$tok"; return 0 ;;
+    esac
+  done
+  return 0
+}
+
+# True if any git invocation in the command uses subcommand $want. Tokenizes
+# past global flags so `git -C . commit`, `git -c k=v commit`, and chained forms
+# like `git status && git commit` are all detected.
+git_command_has_subcommand() {
+  local rest="$1" want="$2" after sub
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    sub="$(_git_first_subcommand "$after")"
+    if [[ "$sub" == "$want" ]]; then
+      return 0
+    fi
+    rest="$after"
+  done
+  return 1
+}
+
 parse_branch_create_command() {
-  local command="$1"
-  local branch=""
-  if [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+checkout[[:space:]]+(-b|-B)[[:space:]]+([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[3]}"
-  elif [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+switch[[:space:]]+(-c|-C|--create)[[:space:]]+([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[3]}"
-  elif [[ "$command" =~ (^|[[:space:];|&])git[[:space:]]+switch[[:space:]]+--create=([^[:space:];|&]+) ]]; then
-    branch="${BASH_REMATCH[2]}"
-  fi
-  branch="${branch%\"}"
-  branch="${branch#\"}"
-  branch="${branch%\'}"
-  branch="${branch#\'}"
-  printf '%s' "$branch"
+  local rest="$1" after
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    local seg="${after//[;|&]/ }"
+    local -a tokens
+    read -ra tokens <<< "$seg"
+    local i=0 n="${#tokens[@]}" tok sub="" branch=""
+    while (( i < n )); do
+      tok="${tokens[$i]}"
+      case "$tok" in
+        -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+          i=$((i + 2)); continue ;;
+        --*=*|-*) break ;;
+        *) sub="$tok"; i=$((i + 1)); break ;;
+      esac
+    done
+    if [[ "$sub" == "checkout" ]]; then
+      while (( i < n )); do
+        case "${tokens[$i]}" in
+          -b|-B) branch="${tokens[$((i + 1))]:-}"; break ;;
+          *) i=$((i + 1)) ;;
+        esac
+      done
+    elif [[ "$sub" == "switch" ]]; then
+      while (( i < n )); do
+        case "${tokens[$i]}" in
+          -c|-C|--create) branch="${tokens[$((i + 1))]:-}"; break ;;
+          --create=*) branch="${tokens[$i]#--create=}"; break ;;
+          *) i=$((i + 1)) ;;
+        esac
+      done
+    fi
+    if [[ -n "$branch" ]]; then
+      branch="${branch%\"}"
+      branch="${branch#\"}"
+      branch="${branch%\'}"
+      branch="${branch#\'}"
+      printf '%s' "$branch"
+      return 0
+    fi
+    rest="$after"
+  done
+  return 0
 }
 
 is_git_commit_command() {
-  [[ "$1" =~ (^|[[:space:];|&])git[[:space:]]+commit($|[[:space:]]) ]]
+  git_command_has_subcommand "$1" commit
 }
 
 is_git_push_command() {
-  [[ "$1" =~ (^|[[:space:];|&])git[[:space:]]+push($|[[:space:]]) ]]
+  git_command_has_subcommand "$1" push
 }
 
 is_gh_pr_create_command() {
-  [[ "$1" =~ (^|[[:space:];|&])gh[[:space:]]+pr[[:space:]]+create($|[[:space:]]) ]]
+  local rest="$1" after seg
+  while [[ "$rest" =~ (^|[[:space:];|\&])gh[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    seg="${after//[;|&]/ }"
+    local -a tokens
+    read -ra tokens <<< "$seg"
+    local i=0 n="${#tokens[@]}" tok
+    local -a pos=()
+    while (( i < n )); do
+      tok="${tokens[$i]}"
+      case "$tok" in
+        -R|--repo|--hostname) i=$((i + 2)); continue ;;
+        --*=*|-*) i=$((i + 1)); continue ;;
+        *) pos+=("$tok"); i=$((i + 1)) ;;
+      esac
+      if (( ${#pos[@]} >= 2 )); then break; fi
+    done
+    if [[ "${pos[0]:-}" == "pr" && "${pos[1]:-}" == "create" ]]; then
+      return 0
+    fi
+    rest="$after"
+  done
+  return 1
 }
 
 commit_subject_from_command() {

@@ -52,6 +52,32 @@ def _git(args: list[str], cwd: Path) -> str:
     return stdout.strip()
 
 
+def _content_hash(base: str, cwd: Path) -> str:
+    """A content signature of the branch's changes relative to `base`, computed
+    as `git hash-object` of the raw `git diff <base>` output. It is stable across
+    amend/rebase/editor-touch that preserve content (unlike an mtime check) and
+    changes only when the diff content changes. The commit gate recomputes the
+    identical value to detect edits made after scoring."""
+    if not base:
+        return ""
+    diff = subprocess.run(
+        ["git", "diff", "--no-color", "--no-ext-diff", base],
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
+    if diff.returncode != 0:
+        return ""
+    obj = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        input=diff.stdout,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
+    return obj.stdout.strip() if obj.returncode == 0 else ""
+
+
 def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     cwd = Path.cwd()
     inside = _git(["rev-parse", "--is-inside-work-tree"], cwd)
@@ -81,7 +107,12 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
             continue
         output = _git(command, cwd)
         changed.update(line for line in output.splitlines() if line.strip())
-    status = _git(["status", "--porcelain"], cwd)
+    # "dirty" means the working tree has unstaged changes to tracked files, i.e.
+    # the tree does not match the index. Staged changes destined for the commit
+    # are expected and do NOT count as dirty, so the commit gate can require a
+    # fully-staged tree (dirty == false) without blocking every commit. This
+    # also catches edits made after the score was generated.
+    unstaged = _git(["diff", "--name-only"], cwd)
     try:
         target_str = str(target.resolve().relative_to(Path(repo_root)))
     except ValueError:
@@ -94,7 +125,8 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
         "merge_base_sha": merge_base,
         "phase": phase,
         "target": target_str,
-        "dirty": bool(status),
+        "dirty": bool(unstaged.strip()),
+        "content_hash": _content_hash(merge_base, cwd),
         "changed_files": sorted(changed),
     }
 
@@ -198,9 +230,13 @@ def main() -> None:
     mypy_errors, mypy_summary = run_mypy(target)
 
     if args.skip_tests:
-        tests_passed, pytest_summary = True, "skipped"
+        # Skipping tests is not the same as passing them. Record it explicitly
+        # and treat tests as not-passed so the score and the commit gate both
+        # reflect that the test surface was not verified.
+        tests_passed, pytest_summary, tests_skipped = False, "skipped", True
     else:
         tests_passed, pytest_summary = run_pytest()
+        tests_skipped = False
 
     score, deductions = compute_score(ruff_violations, mypy_errors, tests_passed)
     gate = gate_label(score)
@@ -212,6 +248,7 @@ def main() -> None:
         "ruff_violations": ruff_count,
         "mypy_errors": mypy_errors,
         "tests_passed": tests_passed,
+        "tests_skipped": tests_skipped,
         "pytest_summary": pytest_summary,
         "mypy_summary": mypy_summary,
         "deductions": deductions,
