@@ -44,15 +44,15 @@ For each small plan:
 1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work).
 3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
-4. **REVIEW:** Delegate to `reviewer`; it runs its own primary and verification passes for standard/control-plane changes.
+4. **REVIEW:** Delegate to `reviewer`; it runs its own primary and verification passes for standard/control-plane changes and returns the surviving findings as JSON (it has no `execute` capability, so it cannot persist them itself). Persist that JSON with `record_findings.py --phase <current_phase> --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<timestamp>.json`.
 5. **SCORE:** Run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`.
-6. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/SCORE, and repeat until score is >= 90.
+6. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/SCORE, and repeat until score is >= 90 and the findings report has `counts.critical == 0`.
 7. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal.
 8. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 9. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
 10. **COMMIT:** Commit the completed small plan atomically.
 
-**Score >= 90 is required before commit or PR closeout.**
+**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout.**
 
 ---
 
@@ -116,7 +116,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 [ ] Big plan and current small plan saved under .claude/plans/
 [ ] TodoWrite reflects canonical workflow and current loop
 [ ] Verification passed (pytest + mypy + ruff)
-[ ] Review passed or findings fixed
+[ ] Review passed; findings persisted via record_findings.py (counts.critical == 0 for commit, counts.major == 0 also required for PR/push)
 [ ] Score >= 90 with persisted matching quality report
 [ ] Docs updated or explicitly skipped as pure-internal
 [ ] Learn entries flushed or explicit no-lessons marker recorded
@@ -148,8 +148,8 @@ Some behaviors are automated by hooks. Others are still manual.
 - Protected file edits are denied.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
-- Commit closeout is gated on small-plan completion, score >= 90, DOCUMENT/LEARN/session-log evidence.
-- PR creation/push is gated on all small plans complete and bypass acknowledgement.
+- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, and DOCUMENT/LEARN/session-log evidence.
+- PR creation/push is gated on all small plans complete, bypass acknowledgement, and the findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session stop pushes mutable AI state to the configured Hugging Face bucket when auth is available.
 - Runtime hook errors are logged to `.claude/session_logs/hooks-errors.log`.

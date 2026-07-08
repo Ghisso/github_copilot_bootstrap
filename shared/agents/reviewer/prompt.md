@@ -32,6 +32,7 @@ executes identically on every runtime.
    - While refuting, if you discover a genuinely new critical issue, add it to the set.
 4. **Convergence:** if Pass 2 changed the set (dropped or added anything), run another verification pass over the updated set. Stop when a pass yields nothing new — no drops and no additions — twice in a row, or after at most 3 rounds.
 5. Output one consolidated report of the findings that survived verification.
+6. Also emit the surviving findings as a JSON list (see **Findings JSON** below), for the orchestrator to persist with `record_findings.py`. You have no `execute` capability (`.claude/agents/reviewer.md` capabilities are `read`/`search` only) — return the JSON, do not attempt to run the script yourself.
 
 ## Report Format
 
@@ -53,3 +54,17 @@ Gate: advisory | commit | PR
 ### Gate Result
 PASS | WARN | FAIL
 ```
+
+## Findings JSON
+
+Immediately after the Report Format block, emit a fenced ```json block containing the surviving findings as a flat list, one object per finding:
+
+```json
+[
+  {"severity": "CRITICAL", "title": "...", "file": "path/to/file.py", "line": 42, "profile": "security"}
+]
+```
+
+- `severity` is exactly one of `CRITICAL`, `MAJOR`, `MINOR` (matching the Report Format sections).
+- `title` is required and non-empty; `file`, `line`, `profile` are included whenever known.
+- An empty list `[]` is a valid, normal output when nothing survived verification — it is the "review passed clean" signal the commit/push gates expect, not an omission.
