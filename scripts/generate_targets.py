@@ -341,6 +341,7 @@ def render_claude_settings(path: Path) -> None:
             "SessionStart": [
                 {
                     "hooks": [
+                        cmd("state-sync.sh", "pull"),
                         cmd("session-log.sh", "claude-code"),
                         cmd("session-start-state.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
@@ -378,7 +379,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         cmd("session-log.sh", "claude-code"),
                         cmd("stop-session-log-check.sh", "claude-code"),
-                        cmd_stop("hf-ai-sync.sh", "push-state"),
+                        cmd_stop("state-sync.sh", "push"),
                     ]
                 }
             ],
@@ -402,6 +403,7 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "startup|resume|clear",
                     "hooks": [
+                        cmd("state-sync.sh", "pull"),
                         cmd("session-log.sh", "openai-codex"),
                         cmd("session-start-state.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
@@ -439,7 +441,7 @@ def render_codex_hooks(path: Path) -> None:
                     "hooks": [
                         cmd("session-log.sh", "openai-codex"),
                         cmd("stop-session-log-check.sh", "openai-codex"),
-                        cmd("hf-ai-sync.sh", "push-state", timeout=180),
+                        cmd("state-sync.sh", "push", timeout=180),
                     ]
                 }
             ],

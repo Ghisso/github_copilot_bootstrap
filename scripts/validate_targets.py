@@ -42,6 +42,8 @@ REQUIRED_HOOK_SCRIPTS = (
     "context-mode-dispatch.sh",
     "session-log.sh",
     "hf-ai-sync.sh",
+    "state-sync.sh",
+    "restore-root-adapters.sh",
     "enforce-branch-state.sh",
     "record-branch-state.sh",
     "enforce-commit-gate.sh",
@@ -447,7 +449,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_hook_text = json.dumps(github_hooks)
     check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
     check("github-copilot" in github_hook_text, "GitHub hooks should pass target id", errors)
-    check("hf-ai-sync.sh" in github_hook_text, "GitHub stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in github_hook_text, "GitHub hooks should sync AI state via state-sync.sh", errors)
     for event_name, hooks in github_hooks.get("hooks", {}).items():
         check(isinstance(hooks, list), f"GitHub hook event must be a list: {event_name}", errors)
         for hook in hooks if isinstance(hooks, list) else []:
@@ -477,18 +479,20 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     claude_settings_text = json.dumps(claude_settings)
     check(".claude/hooks/scripts/" in claude_settings_text, "Claude settings should invoke shared .claude hook scripts", errors)
     check("claude-code" in claude_settings_text, "Claude hooks should pass target id", errors)
-    check("hf-ai-sync.sh" in claude_settings_text, "Claude stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in claude_settings_text, "Claude settings should sync AI state via state-sync.sh", errors)
 
-    check("hf-ai-sync.sh" in json.dumps(codex_hooks), "Codex stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in json.dumps(codex_hooks), "Codex hooks should sync AI state via state-sync.sh", errors)
 
-    # R-SYNC-02: consumers push state only; the canonical bootstrap is never
-    # re-uploaded from a consumer's Stop hook.
+    # R-SYNC-05: every target pulls state at SessionStart and pushes it at
+    # Stop, through the git-backed state-sync.sh (not the retired HF bucket
+    # upload-bootstrap path, which a consumer's Stop hook must never trigger).
     for label, text in (
         ("Claude settings", claude_settings_text),
         ("GitHub hooks", github_hook_text),
         ("Codex hooks", json.dumps(codex_hooks)),
     ):
-        check("push-state" in text, f"{label} Stop hook must push state", errors)
+        check("state-sync.sh pull" in text, f"{label} SessionStart hook must pull AI state", errors)
+        check("state-sync.sh push" in text, f"{label} Stop hook must push AI state", errors)
         check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
 
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
