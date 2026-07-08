@@ -28,6 +28,8 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `context-mode-dispatch.sh`
 - `session-log.sh`
 - `hf-ai-sync.sh`
+- `state-sync.sh`
+- `restore-root-adapters.sh`
 - `session-start-state.sh`
 - `enforce-branch-state.sh`
 - `record-branch-state.sh`
