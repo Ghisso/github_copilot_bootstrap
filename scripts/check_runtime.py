@@ -64,6 +64,12 @@ def main() -> int:
                     "WARN optional binary missing: context-mode; retrieval falls back to direct reads "
                     "and rg (context-mode is a convenience, not a requirement)"
                 )
+            elif command == "npx":
+                print(
+                    "WARN optional binary missing: npx; the context7 MCP server (current external "
+                    "library API docs) is unavailable, falling back to training-data knowledge, and "
+                    "context-mode-dispatch.sh loses its npx fallback for launching context-mode"
+                )
             else:
                 print(f"WARN optional binary missing: {command}")
 

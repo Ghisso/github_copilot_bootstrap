@@ -35,7 +35,7 @@ Core principles:
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
-- Ship only after score >= 90, documentation updates, learning capture, and closeout logs.
+- Ship only after score >= 90, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs.
 - Preserve lessons learned in memory and session logs.
 
 ## Quick Install
@@ -344,8 +344,8 @@ Configured events:
   - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files. Its primary check is pure bash (no `uv` dependency); a Python precision pass runs only as an enhancement when `uv` is present, and an internal error fails toward `ask` (deny on Codex), never a silent allow
   - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master) in pure bash — no `uv` dependency — and tokenizes past global git flags so forms like `git -C . reset --hard` are still caught
   - [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh) validates branch creation from clean `dev` into `<plan_name>_implementation`, including `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, and `git switch --create`
-  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, and HEAD SHA. The report must also record `tests_passed: true`, not be `tests_skipped`, and be `dirty: false` (no unstaged changes), and its `content_hash` — `git hash-object` of the diff against the merge base — must still match, so an amend/rebase/editor-touch that preserves content does not false-block while any real post-scoring edit does. Failure messages name the exact mismatch and the regenerate command. Classifiers tokenize past global git flags, so `git -C . commit` / `git -c k=v commit` cannot bypass the gate; on an unparseable payload the gate fails closed (exit 2)
-  - [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) requires `gh pr create --base dev` and blocks implementation-branch pushes until every phase is complete and bypasses are acknowledged
+  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, and HEAD SHA. The report must also record `tests_passed: true`, not be `tests_skipped`, and be `dirty: false` (no unstaged changes), and its `content_hash` — `git hash-object` of the diff against the merge base — must still match, so an amend/rebase/editor-touch that preserves content does not false-block while any real post-scoring edit does. The gate additionally requires a fresh, matching `findings-*.json` report (produced by [record_findings.py](shared/scripts/record_findings.py) from the reviewer's surviving findings) with `counts.critical == 0` — the same freshness fields, checked by the shared `assert_report_freshness` helper. Failure messages name the exact mismatch and the regenerate command. Classifiers tokenize past global git flags, so `git -C . commit` / `git -c k=v commit` cannot bypass the gate; on an unparseable payload the gate fails closed (exit 2)
+  - [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) requires `gh pr create --base dev` and blocks implementation-branch pushes until every phase is complete, bypasses are acknowledged, and the final phase's findings report has `counts.major == 0` (in addition to the `counts.critical == 0` already required to land the commit), via `assert_push_invariants` in `_lib-frontmatter.sh` (shared with the `pre-push` git hook below)
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
@@ -358,15 +358,21 @@ Configured events:
   - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) runs `push-state` only — it pushes mutable AI *state* to the configured Hugging Face sync path. Consumers never re-upload the canonical bootstrap bundle from a Stop hook; bootstrap uploads are an explicit installer/updater action, so a stale consumer copy can't clobber the shared bundle. With no bucket configured the helper warns and no-ops. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
 - `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery. `.state_backups/` is a local convenience; the durable copy of state is the HF bucket. `push-state --prune` reconciles the bucket (deletes remote files removed locally); it is opt-in
 
-### Deterministic Commit Gate (`commit-msg` Git Hook)
+### Deterministic Commit And Push Gates (Git Hooks)
 
-`enforce-commit-gate.sh` above is a `PreToolUse` hook: it can only gate the AI agent's own Bash tool calls, so a human `git commit`, an IDE commit button, a script, or a `git ci` alias never pass through it. [commit-msg](shared/hooks/git-hooks/commit-msg) is a second, deterministic layer that runs inside git itself via `core.hooksPath` (set by [install_bootstrap.py](scripts/install_bootstrap.py) and, for fresh devcontainers, by `post-start.sh` before the state pull runs). Because it fires from git's own commit lifecycle, every commit reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
+`enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath` (set by [install_bootstrap.py](scripts/install_bootstrap.py) and, for fresh devcontainers, by `post-start.sh` before the state pull runs). Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
 
-Both entry points share one ceremony contract — `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh) — covering the small-plan/closeout/score/LEARN checks, so the two paths cannot drift apart. They deliberately diverge on branch scope: `enforce-commit-gate.sh` denies an *agent* commit on any wrong branch, while `commit-msg` passes through untouched on any branch other than `<plan_name>_implementation` — merges and casual commits on `dev`/`main` are unaffected.
+Two layers, two invariants, one shared contract each:
 
-- `git commit --no-verify` is the sanctioned manual escape: git skips `commit-msg` entirely, and there is no git hook that fires when hooks are skipped.
+- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh), covering the small-plan/closeout/score/LEARN checks.
+- **Push invariant** — `enforce-pr-gate.sh` (`PreToolUse`) and `pre-push` (git hook) both call `assert_push_invariants` in the same file, covering the big-plan/phase-completeness/commit-count/bypass-acknowledgment checks. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `gh pr create --base dev` has no push-hook analog and stays `PreToolUse`-only.
+
+Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
+
+- `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes: git skips the hook entirely, and there is no git hook that fires when hooks are skipped.
 - `.claude/` is gitignored and Hugging Face-synced in consumers, so on a fresh clone *before* the first sync, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until sync completes). `post-start.sh` sets `core.hooksPath` before the pull runs so the devcontainer path closes this window as soon as the pull finishes.
-- See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) for the full design rationale.
+- Per `githooks(5)`, `commit-msg` also fires for `git merge`, not just `git commit`. A plain merge commit carries no authored content of its own, so on an implementation branch it passes through unledgered — the ceremony re-attaches at the next real commit. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (git behavior, not a bootstrap gap); the commits they create skip the git layer, but the next real commit is still gated. `git commit --amend` does invoke it, and `content_hash` freshness survives a content-preserving amend. The `MERGE_HEAD` passthrough is, like `--no-verify`, a known accepted escape: `git merge --no-commit` followed by manually staging extra changes lands ungated content on an implementation branch, since the hook cannot distinguish a pure merge from a merge plus manual staging.
+- See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) and [plans/plan-post-review-hardening.md](plans/plan-post-review-hardening.md) for the full design rationale.
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
@@ -385,12 +391,15 @@ Expected verification commands after implementation:
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
 - uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
+- uv run python .claude/scripts/record_findings.py src/ --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 
 Quality gates:
 
 - >= 95: excellence target
 - >= 90: required for commit and PR closeout
 - < 90: blocked until implementation, verification, review, and score are rerun
+- findings report `counts.critical == 0`: required for commit
+- findings report `counts.major == 0`: additionally required for PR/push closeout
 
 Documentation gate:
 
@@ -460,3 +469,5 @@ If you customize it, prioritize:
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
+
+See [plans/adr-001-multi-target-lcd.md](plans/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging.

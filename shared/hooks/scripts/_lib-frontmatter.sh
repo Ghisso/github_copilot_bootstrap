@@ -467,11 +467,171 @@ repo_root_from_script() {
   cd "$script_dir/../../.." && pwd
 }
 
-# Single home for the plan/score/closeout/LEARN ceremony shared by every commit
-# gate entry point (PreToolUse and the commit-msg git hook). Branch-shape is
-# deliberately NOT checked here - callers diverge on it (see D4 in
-# docs/plan-deterministic-commit-gate.md) - so `branch` is assumed already
-# valid (an <plan>_implementation branch) by the time this is called.
+# Select the newest-by-generated_at report file matching `glob` under
+# `reports_dir` whose `branch`/`phase` fields equal the given values.
+# ISO-8601 `generated_at` sorts lexically == chronologically, so a stale
+# report cannot shadow a fresh one by filename. Echoes the selected path (or
+# nothing on no match). Shared by score-*.json and findings-*.json selection
+# so the two report types cannot drift apart on how "freshest" is decided.
+select_fresh_report() {
+  local reports_dir="$1"
+  local glob="$2"
+  local branch="$3"
+  local phase="$4"
+  local best_file="" best_generated_at=""
+  local candidate cand_branch cand_phase cand_generated_at
+  while IFS= read -r candidate; do
+    cand_branch="$(json_file_string_value "$candidate" "branch" 2>/dev/null || true)"
+    cand_phase="$(json_file_string_value "$candidate" "phase" 2>/dev/null || true)"
+    if [[ "$cand_branch" == "$branch" && "$cand_phase" == "$phase" ]]; then
+      cand_generated_at="$(json_file_string_value "$candidate" "generated_at" 2>/dev/null || true)"
+      if [[ -z "$best_generated_at" || "$cand_generated_at" > "$best_generated_at" ]]; then
+        best_generated_at="$cand_generated_at"
+        best_file="$candidate"
+      fi
+    fi
+  done < <(find "$reports_dir" -maxdepth 1 -name "$glob" -type f 2>/dev/null)
+  printf '%s' "$best_file"
+}
+
+# Verify the freshness fields shared by every report type the commit/push
+# gates verify (score-*.json and findings-*.json, both stamped by the same
+# git_metadata() helper in quality_score.py / record_findings.py): base_ref,
+# head_sha vs `expected_head_sha`, merge_base_sha vs the actual
+# dev...expected_head_sha merge base, generated_at format, target existence,
+# dirty:false, and content_hash vs a fresh recomputation. Appends to the
+# caller's `failures` array (same dynamic-scoping convention as
+# assert_commit_invariants).
+#
+# `expected_head_sha` is caller-supplied rather than read from `git rev-parse
+# HEAD` internally, because the two callers disagree on what "the commit
+# this report certifies" is: the commit gate fires BEFORE the pending commit
+# object exists (current HEAD is its parent; the certified content is still
+# only staged), while the push gate fires AFTER the commit has already
+# landed, possibly on a branch that isn't even checked out (D4-B) - there
+# `expected_head_sha` is the pushed sha itself, an immutable, already-landed
+# commit.
+#
+# `head_relation` picks how `head_sha` is compared to `expected_head_sha`:
+# "exact" requires equality (the commit gate's case); "ancestor" requires
+# `head_sha` to be `expected_head_sha` or one of its ancestors (the push
+# gate's case). This split exists because reports are generated pre-commit
+# (during REVIEW, per workflow.instructions.md) - a report's stored head_sha
+# is always the PARENT of the commit it certifies, never that commit itself.
+# At commit time that parent IS current HEAD (exact match is correct and
+# required). At push time the branch tip is one or more commits past that
+# parent, so requiring exact equality there would reject every legitimately
+# fresh report; "ancestor" combined with the content_hash check below (which
+# independently proves the diff content is unchanged) is the correct
+# invariant - it cannot be satisfied by content that was never reviewed.
+#
+# `content_diff_ref` mirrors the exact/ancestor split for the content_hash
+# recomputation: empty means "diff merge_base against the live working tree"
+# (the commit gate's case - the certified content is still uncommitted), a
+# sha means "diff merge_base against that landed commit" (the push gate's
+# case - the working tree may belong to a different branch entirely by push
+# time).
+#
+# `label` names the report kind in messages (e.g. "quality report",
+# "findings report"); `regen_hint` names the exact regenerate command.
+assert_report_freshness() {
+  local report_file="$1"
+  local repo_root="$2"
+  local expected_head_sha="$3"
+  local head_relation="$4"
+  local content_diff_ref="$5"
+  local label="$6"
+  local regen_hint="$7"
+
+  local base_ref head_sha merge_base_sha generated_at target_path dirty
+  base_ref="$(json_file_string_value "$report_file" "base_ref" 2>/dev/null || true)"
+  head_sha="$(json_file_string_value "$report_file" "head_sha" 2>/dev/null || true)"
+  merge_base_sha="$(json_file_string_value "$report_file" "merge_base_sha" 2>/dev/null || true)"
+  generated_at="$(json_file_string_value "$report_file" "generated_at" 2>/dev/null || true)"
+  target_path="$(json_file_string_value "$report_file" "target" 2>/dev/null || true)"
+  dirty="$(json_file_bool_value "$report_file" "dirty" 2>/dev/null || true)"
+
+  if [[ "$base_ref" != "dev" ]]; then
+    failures+=("$label base_ref must be dev; found ${base_ref:-missing} in $report_file")
+  fi
+  local expected_merge_base
+  if [[ "$head_relation" == "ancestor" ]]; then
+    if [[ -z "$head_sha" ]] || ! git -C "$repo_root" merge-base --is-ancestor "$head_sha" "$expected_head_sha" 2>/dev/null; then
+      failures+=("$label head_sha (${head_sha:-missing}) is not the pushed commit or one of its ancestors (${expected_head_sha:-unknown}); $regen_hint")
+    fi
+  elif [[ -z "$head_sha" || "$head_sha" != "$expected_head_sha" ]]; then
+    failures+=("$label head_sha (${head_sha:-missing}) does not match the expected commit (${expected_head_sha:-unknown}); $regen_hint")
+  fi
+  expected_merge_base="$(git -C "$repo_root" merge-base dev "$expected_head_sha" 2>/dev/null || true)"
+  if [[ -z "$merge_base_sha" ]]; then
+    failures+=("$label must include merge_base_sha; $regen_hint")
+  elif [[ -n "$expected_merge_base" && "$merge_base_sha" != "$expected_merge_base" ]]; then
+    failures+=("$label merge_base_sha (${merge_base_sha}) must match the dev...${expected_head_sha} merge base (${expected_merge_base}); $regen_hint")
+  fi
+  if [[ ! "$generated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+    failures+=("$label generated_at must be an ISO-8601 UTC timestamp")
+  fi
+  if [[ -z "$target_path" ]]; then
+    failures+=("$label must include target")
+  elif [[ "$target_path" = /* ]]; then
+    if [[ "$target_path" != "$repo_root"* ]]; then
+      failures+=("$label target '$target_path' is outside this repo; $regen_hint")
+    fi
+  else
+    if [[ ! -e "$repo_root/$target_path" ]]; then
+      failures+=("$label target '$target_path' does not exist under repo root")
+    fi
+  fi
+  if [[ "$dirty" != "true" && "$dirty" != "false" ]]; then
+    failures+=("$label must include dirty boolean")
+  elif [[ "$dirty" == "true" ]]; then
+    failures+=("working tree has unstaged changes (dirty=true); stage everything and $regen_hint")
+  fi
+
+  local report_hash current_hash
+  report_hash="$(json_file_string_value "$report_file" "content_hash" 2>/dev/null || true)"
+  if [[ -z "$report_hash" ]]; then
+    failures+=("$label must include content_hash; $regen_hint")
+  elif [[ -n "$expected_merge_base" ]] && command -v git >/dev/null 2>&1; then
+    if [[ -n "$content_diff_ref" ]]; then
+      current_hash="$(git -C "$repo_root" diff --no-color --no-ext-diff "$expected_merge_base" "$content_diff_ref" 2>/dev/null | git -C "$repo_root" hash-object --stdin 2>/dev/null || true)"
+    else
+      current_hash="$(git -C "$repo_root" diff --no-color --no-ext-diff "$expected_merge_base" 2>/dev/null | git -C "$repo_root" hash-object --stdin 2>/dev/null || true)"
+    fi
+    if [[ -z "$current_hash" ]]; then
+      failures+=("could not compute the content hash to verify $label freshness; $regen_hint")
+    elif [[ "$current_hash" != "$report_hash" ]]; then
+      failures+=("$label content_hash does not match the current changes (files edited since generating); $regen_hint")
+    fi
+  fi
+}
+
+# Best-effort extraction of a given severity's finding titles from a
+# findings-*.json report, for an actionable failure message. The
+# `counts.<severity>` field (read via the pure-awk json_file_number_value)
+# is what actually gates the commit/push; this only enriches the message, so
+# it degrades to nothing when python3 is unavailable rather than failing
+# the gate.
+list_finding_titles_by_severity() {
+  local file="$1"
+  local severity="$2"
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 -c "
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding='utf-8'))
+except Exception:
+    sys.exit(0)
+titles = [f.get('title', 'untitled') for f in data.get('findings', []) if f.get('severity') == sys.argv[2]]
+print('; '.join(titles))
+" "$file" "$severity" 2>/dev/null || true
+}
+
+# Single home for the plan/score/findings/closeout/LEARN ceremony shared by
+# every commit gate entry point (PreToolUse and the commit-msg git hook).
+# Branch-shape is deliberately NOT checked here - callers diverge on it (see
+# D4 in docs/plan-deterministic-commit-gate.md) - so `branch` is assumed
+# already valid (an <plan>_implementation branch) by the time this is called.
 #
 # Appends failure messages to a `failures` array that the CALLER must declare
 # (`failures=()`) before calling; this function intentionally never `local`s
@@ -516,78 +676,35 @@ assert_commit_invariants() {
     failures+=("missing small-plan file: .claude/plans/${current_phase:-unknown}.md")
   fi
 
-  local score_file="" best_generated_at=""
+  # The pending commit object does not exist yet at gate time (D5 in
+  # docs/plan-deterministic-commit-gate.md): current HEAD is its parent, and
+  # the certified content is still only staged in the working tree - so
+  # report freshness is checked against HEAD + the working tree, not a
+  # landed sha (contrast assert_push_invariants below, which fires after the
+  # commit has already landed).
+  local commit_gate_head
+  commit_gate_head="$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)"
+
+  local score_file=""
   if [[ -n "$current_phase" ]]; then
-    # Select the newest matching report by generated_at (ISO-8601 sorts lexically
-    # == chronologically), not by filename order, so a stale report cannot shadow
-    # a fresh one.
-    local candidate cand_branch cand_phase cand_generated_at
-    while IFS= read -r candidate; do
-      cand_branch="$(json_file_string_value "$candidate" "branch" 2>/dev/null || true)"
-      cand_phase="$(json_file_string_value "$candidate" "phase" 2>/dev/null || true)"
-      if [[ "$cand_branch" == "$current_branch" && "$cand_phase" == "$current_phase" ]]; then
-        cand_generated_at="$(json_file_string_value "$candidate" "generated_at" 2>/dev/null || true)"
-        if [[ -z "$best_generated_at" || "$cand_generated_at" > "$best_generated_at" ]]; then
-          best_generated_at="$cand_generated_at"
-          score_file="$candidate"
-        fi
-      fi
-    done < <(find "$repo_root/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null)
+    score_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "score-*.json" "$current_branch" "$current_phase")"
   fi
 
   if [[ -z "$score_file" ]]; then
     failures+=("no matching quality report found - run uv run python .claude/scripts/quality_score.py <target> --phase ${current_phase:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json")
   else
-    local regen_hint="re-run quality_score.py: uv run python .claude/scripts/quality_score.py <target> --phase ${current_phase:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json"
+    local score_regen_hint="re-run quality_score.py: uv run python .claude/scripts/quality_score.py <target> --phase ${current_phase:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json"
     local score
     score="$(json_file_number_value "$score_file" "score" 2>/dev/null || true)"
     if [[ ! "$score" =~ ^[0-9]+$ || "$score" -lt 90 ]]; then
       failures+=("quality score must be >= 90; found ${score:-unknown} in $score_file")
     fi
 
-    local base_ref merge_base_sha head_sha generated_at target_path dirty tests_passed tests_skipped
-    base_ref="$(json_file_string_value "$score_file" "base_ref" 2>/dev/null || true)"
-    merge_base_sha="$(json_file_string_value "$score_file" "merge_base_sha" 2>/dev/null || true)"
-    head_sha="$(json_file_string_value "$score_file" "head_sha" 2>/dev/null || true)"
-    generated_at="$(json_file_string_value "$score_file" "generated_at" 2>/dev/null || true)"
-    target_path="$(json_file_string_value "$score_file" "target" 2>/dev/null || true)"
-    dirty="$(json_file_bool_value "$score_file" "dirty" 2>/dev/null || true)"
+    assert_report_freshness "$score_file" "$repo_root" "$commit_gate_head" "exact" "" "quality report" "$score_regen_hint"
+
+    local tests_passed tests_skipped
     tests_passed="$(json_file_bool_value "$score_file" "tests_passed" 2>/dev/null || true)"
     tests_skipped="$(json_file_bool_value "$score_file" "tests_skipped" 2>/dev/null || true)"
-
-    if [[ "$base_ref" != "dev" ]]; then
-      failures+=("quality report base_ref must be dev; found ${base_ref:-missing} in $score_file")
-    fi
-    local current_head expected_merge_base
-    current_head="$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)"
-    if [[ -z "$head_sha" || "$head_sha" != "$current_head" ]]; then
-      failures+=("quality report head_sha (${head_sha:-missing}) does not match current HEAD (${current_head:-unknown}); HEAD moved since scoring - $regen_hint")
-    fi
-    expected_merge_base="$(git -C "$repo_root" merge-base dev HEAD 2>/dev/null || true)"
-    if [[ -z "$merge_base_sha" ]]; then
-      failures+=("quality report must include merge_base_sha; $regen_hint")
-    elif [[ -n "$expected_merge_base" && "$merge_base_sha" != "$expected_merge_base" ]]; then
-      failures+=("quality report merge_base_sha (${merge_base_sha}) must match dev...HEAD merge base (${expected_merge_base}); $regen_hint")
-    fi
-    if [[ ! "$generated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
-      failures+=("quality report generated_at must be an ISO-8601 UTC timestamp")
-    fi
-    if [[ -z "$target_path" ]]; then
-      failures+=("quality report must include target")
-    elif [[ "$target_path" = /* ]]; then
-      if [[ "$target_path" != "$repo_root"* ]]; then
-        failures+=("quality report target '$target_path' is outside this repo; re-run quality_score.py from within this repo")
-      fi
-    else
-      if [[ ! -e "$repo_root/$target_path" ]]; then
-        failures+=("quality report target '$target_path' does not exist under repo root")
-      fi
-    fi
-    if [[ "$dirty" != "true" && "$dirty" != "false" ]]; then
-      failures+=("quality report must include dirty boolean")
-    elif [[ "$dirty" == "true" ]]; then
-      failures+=("working tree has unstaged changes (dirty=true); stage everything and re-run quality_score.py")
-    fi
     if [[ "$tests_passed" != "true" ]]; then
       failures+=("quality report must record tests_passed: true; found ${tests_passed:-missing}")
     fi
@@ -597,22 +714,31 @@ assert_commit_invariants() {
     if ! json_file_array_present "$score_file" "changed_files" 2>/dev/null; then
       failures+=("quality report must include changed_files array")
     fi
+  fi
 
-    # Freshness by content, not mtime: recompute the same content signature the
-    # scorer stamped (git hash-object of `git diff <merge-base>`). This is immune
-    # to amend/rebase/editor-touch that preserve content, and detects any edit to
-    # the changes after scoring - with a message that names the fix.
-    local report_hash current_hash
-    report_hash="$(json_file_string_value "$score_file" "content_hash" 2>/dev/null || true)"
-    if [[ -z "$report_hash" ]]; then
-      failures+=("quality report must include content_hash; $regen_hint")
-    elif [[ -n "$expected_merge_base" ]] && command -v git >/dev/null 2>&1; then
-      current_hash="$(git -C "$repo_root" diff --no-color --no-ext-diff "$expected_merge_base" 2>/dev/null | git -C "$repo_root" hash-object --stdin 2>/dev/null || true)"
-      if [[ -z "$current_hash" ]]; then
-        failures+=("could not compute the working-tree content hash to verify report freshness; $regen_hint")
-      elif [[ "$current_hash" != "$report_hash" ]]; then
-        failures+=("quality report content_hash does not match the current changes (files edited since scoring); $regen_hint")
-      fi
+  # R-SCORE-03: the REVIEW stage's own severity-gated findings report. The
+  # arithmetic score above is honest about what it measures (lint/types/tests)
+  # but says nothing about what the review found; this is the second gated
+  # artifact the review's own R-SCORE-01(d) deferred to a later iteration.
+  local findings_file=""
+  if [[ -n "$current_phase" ]]; then
+    findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$current_branch" "$current_phase")"
+  fi
+
+  if [[ -z "$findings_file" ]]; then
+    failures+=("no matching findings report found - run uv run python .claude/scripts/record_findings.py <target> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+  else
+    local findings_regen_hint="re-run record_findings.py: uv run python .claude/scripts/record_findings.py <target> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    assert_report_freshness "$findings_file" "$repo_root" "$commit_gate_head" "exact" "" "findings report" "$findings_regen_hint"
+
+    local critical_count
+    critical_count="$(json_file_number_value "$findings_file" "critical" 2>/dev/null || true)"
+    if [[ ! "$critical_count" =~ ^[0-9]+$ ]]; then
+      failures+=("findings report must include counts.critical; $findings_regen_hint")
+    elif [[ "$critical_count" -gt 0 ]]; then
+      local critical_titles
+      critical_titles="$(list_finding_titles_by_severity "$findings_file" "CRITICAL")"
+      failures+=("findings report has $critical_count CRITICAL finding(s) blocking commit: ${critical_titles:-see $findings_file}")
     fi
   fi
 
@@ -629,5 +755,110 @@ assert_commit_invariants() {
   fi
   if [[ "$learn_ok" -ne 1 ]]; then
     failures+=("LEARN evidence missing - update .claude/MEMORY.md or add [LEARN] none - no new lessons this session to closeout log")
+  fi
+}
+
+# Single home for the push/PR ceremony shared by every push gate entry point
+# (PreToolUse `enforce-pr-gate.sh` and the `pre-push` git hook). Branch-shape
+# is deliberately NOT checked here, mirroring assert_commit_invariants above:
+# callers diverge on it (docs/plan-post-review-hardening.md Phase 3), so
+# `branch` is assumed already valid (an <plan>_implementation branch).
+#
+# `local_sha` is the sha being pushed for this ref, NOT necessarily HEAD -
+# a caller pushing a branch it doesn't have checked out (or the pre-push
+# hook, which reads ref lines from stdin) must gate the pushed commit, not
+# whatever happens to be checked out. Callers pass "HEAD" when the two
+# coincide (the PreToolUse gate always evaluates the agent's own HEAD).
+#
+# Appends failure messages to a `failures` array that the CALLER must declare
+# (`failures=()`) before calling; see assert_commit_invariants for the same
+# dynamic-scoping convention. The gh/PR-shape check (`--base dev`) has no
+# pre-push analog and stays in the PreToolUse caller.
+assert_push_invariants() {
+  local repo_root="$1"
+  local branch="$2"
+  local local_sha="$3"
+  local slug="${branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  if [[ ! -f "$big_plan" ]]; then
+    failures+=("missing big-plan file: .claude/plans/$slug.md")
+    return
+  fi
+
+  # R-HOOKS-10: accumulate with `while read`, not `mapfile` - macOS's default
+  # /bin/bash is 3.2, which has no `mapfile`/`readarray` builtin (same 3.2
+  # constraint the `${phases[${#phases[@]}-1]}` below is written for). This
+  # mirrors the read loops in select_fresh_report and the bypass-ledger scan.
+  local -a phases=()
+  local _phase_line
+  while IFS= read -r _phase_line; do
+    [[ -n "$_phase_line" ]] && phases+=("$_phase_line")
+  done < <(fm_read_list "$big_plan" "phases")
+  if [[ "${#phases[@]}" -eq 0 ]]; then
+    failures+=("$big_plan has no phases list")
+    return
+  fi
+
+  local phase small_plan status
+  for phase in "${phases[@]}"; do
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    if [[ ! -f "$small_plan" ]]; then
+      failures+=("missing small-plan file: .claude/plans/$phase.md")
+      continue
+    fi
+    status="$(fm_read "$small_plan" "status" || true)"
+    if [[ "$status" != "complete" ]]; then
+      failures+=("all small plans must be complete before PR/push; $phase is ${status:-missing-status}")
+    fi
+  done
+
+  local commit_count
+  commit_count="$(git -C "$repo_root" rev-list --count "dev..$local_sha" 2>/dev/null || echo 0)"
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "${#phases[@]}" ]]; then
+    failures+=("implementation branch must have at least one commit per small plan before PR/push")
+  fi
+
+  local started_at bypass_ack
+  started_at="$(fm_read "$big_plan" "started_at" || true)"
+  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
+  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
+    local line timestamp
+    while IFS= read -r line; do
+      timestamp="${line%%,*}"
+      [[ "$line" == *"branch=$branch"* ]] || continue
+      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
+        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before opening a PR")
+        break
+      fi
+    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
+  fi
+
+  # R-SCORE-03: the push tier of the severity gate additionally requires
+  # counts.major == 0 (the commit gate already required counts.critical == 0
+  # before any commit could land). Checked against the FINAL phase - by push
+  # time every phase must be complete (checked above), so the final phase's
+  # findings report is the one that certifies the branch as a whole.
+  # `${phases[${#phases[@]}-1]}` (not `${phases[-1]}`) because macOS's
+  # default /usr/bin/bash is 3.2, which has no negative array indices, and
+  # this must run on macos-latest CI (R-CI-01).
+  local final_phase="${phases[${#phases[@]}-1]}"
+  local findings_file=""
+  findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
+
+  if [[ -z "$findings_file" ]]; then
+    failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+  else
+    local findings_regen_hint="re-run record_findings.py: uv run python .claude/scripts/record_findings.py <target> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
+
+    local major_count
+    major_count="$(json_file_number_value "$findings_file" "major" 2>/dev/null || true)"
+    if [[ ! "$major_count" =~ ^[0-9]+$ ]]; then
+      failures+=("findings report must include counts.major; $findings_regen_hint")
+    elif [[ "$major_count" -gt 0 ]]; then
+      local major_titles
+      major_titles="$(list_finding_titles_by_severity "$findings_file" "MAJOR")"
+      failures+=("findings report has $major_count MAJOR finding(s) blocking push: ${major_titles:-see $findings_file}")
+    fi
   fi
 }

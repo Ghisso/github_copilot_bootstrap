@@ -138,6 +138,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         support_root / "scripts" / "quality_score.py",
         "claude-code",
     )
+    copy_text_transformed(
+        REPO_ROOT / "shared" / "scripts" / "record_findings.py",
+        support_root / "scripts" / "record_findings.py",
+        "claude-code",
+    )
 
     for name in ("plans", "quality_reports", "session_logs"):
         source = REPO_ROOT / "shared" / name / "README.md"

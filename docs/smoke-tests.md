@@ -35,13 +35,14 @@ Expected:
 
 Expected:
 
-- GitHub and Claude JSON MCP files include `semble` and `context-mode`.
-- Codex config includes `[mcp_servers.semble]` and `[mcp_servers.context-mode]`.
+- GitHub and Claude JSON MCP files include `semble`, `context-mode`, and `context7`.
+- Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context-mode]`, and `[mcp_servers.context7]`.
 - Tool-routing policy preserves:
   - direct reads for known paths
   - `rg` for exact literals
   - Semble for semantic discovery
   - context-mode for long outputs and continuity
+  - context7 for current external library API documentation
   - no duplicate broad searches
 
 ## Hooks
@@ -65,6 +66,18 @@ Expected:
 - The `git ci` alias (`git config alias.ci commit`) and `git -C <path> commit` invoked from outside the repo are rejected identically to a bare invalid `git commit` — there is no command string for either to evade.
 - Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
 - `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
+- `.claude/hooks/git-hooks/pre-push` exists and is executable in generated output; it shares `assert_push_invariants` with `enforce-pr-gate.sh`.
+- With `core.hooksPath` set to the generated `git-hooks` directory, pushing a `<plan_name>_implementation` ref with an incomplete small plan, a missing commit-per-phase, or an unacknowledged bypass log is rejected by git and names the phase; a push after all phases are complete succeeds.
+- Pushing `dev`/`main`, or deleting a branch (`git push origin :foo_implementation`), passes through `pre-push` regardless of ceremony state.
+- `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
+- `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
+- A valid score report with no matching `findings-*.json` report blocks the commit.
+- A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
+- A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
+- Two findings reports for the same branch/phase select the newest by `generated_at`, not filename — a lexically-later but older clean report loses to a lexically-earlier but newer report containing a `CRITICAL` finding.
+- A findings report with `counts.critical == 0` but `counts.major > 0` allows the commit (the commit gate only checks `critical`) but blocks the push, naming a `MAJOR` finding.
+- A findings report generated pre-commit (its `head_sha` is the certified commit's parent) still satisfies the push gate, since `pre-push` accepts any ancestor of the pushed commit, not only an exact match.
+- All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.
 
 ## Devcontainer And HF Sync
 

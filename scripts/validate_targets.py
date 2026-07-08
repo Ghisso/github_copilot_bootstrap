@@ -55,6 +55,7 @@ REQUIRED_HOOK_LIBRARIES = (
 )
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
+    "pre-push",
 )
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
@@ -363,7 +364,7 @@ def validate_model_leaks(errors: list[str]) -> None:
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
-    for server in ("semble", "context-mode"):
+    for server in ("semble", "context-mode", "context7"):
         check(server in github_mcp.get("servers", {}), f"github missing MCP server: {server}", errors)
         check(server in claude_mcp.get("mcpServers", {}), f"claude missing MCP server: {server}", errors)
     check("servers" not in claude_mcp, "Claude .mcp.json must use mcpServers, not servers", errors)
@@ -382,6 +383,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
+    check("[mcp_servers.context7]" in codex_config, "Codex config missing context7 MCP server", errors)
     check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
     # R-CODEX-01: skill paths point at the SKILL.md file, not the directory.
     check('/SKILL.md"' in codex_config, "Codex skill paths must point at the SKILL.md file", errors)
@@ -714,6 +716,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
     validate_lifecycle_hook_guardrails(errors)
     validate_commit_msg_git_hook(errors)
+    validate_pre_push_git_hook(errors)
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -991,6 +994,40 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
+        def findings_report(**overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "content_hash": content_hash,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_findings() -> None:
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+
+        def write_findings(report: dict[str, object]) -> None:
+            clear_findings()
+            path = reports_dir / "findings-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
+        # A clean findings report stays valid for every score-axis probe below
+        # (HEAD does not move until the real commit lands further down), so
+        # each probe's denial is attributable to the score axis under test,
+        # not to a findings report that happens to be missing too.
+        write_findings(findings_report())
+
         # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
         # dirty:true must all be denied even at a passing score.
         for label, report in (
@@ -1048,6 +1085,8 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check("re-run quality_score" in stdout, "content_hash mismatch failure must tell the user to re-run quality_score", errors)
 
         write_score(score_report())
+        # findings-test.json is still the clean baseline written before the
+        # R-SCORE-01 loop above; only score-*.json has been swapped since.
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -1104,7 +1143,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check('"permissionDecision":"deny"' in stdout, "PR gate must deny --base main", errors)
 
 
-def install_commit_msg_hook(repo: Path) -> None:
+def install_git_hooks(repo: Path) -> None:
     git_hook_root = repo / ".claude" / "hooks" / "git-hooks"
     shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "git-hooks", git_hook_root)
     for hook in git_hook_root.glob("*"):
@@ -1118,7 +1157,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
     evasion paths this deterministic layer exists to close."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
-        install_commit_msg_hook(repo)
+        install_git_hooks(repo)
         write_big_plan(repo)
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
@@ -1179,6 +1218,34 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
+        def findings_report(head_sha: str, content_hash_value: str, **overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "content_hash": content_hash_value,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_findings() -> None:
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+
+        def write_findings(report: dict[str, object]) -> None:
+            clear_findings()
+            path = reports_dir / "findings-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
         write(repo / "work.txt", "work\n")
         git(repo, "add", ".")
 
@@ -1188,6 +1255,12 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(result.returncode != 0, f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}", errors)
 
         head_sha, content_hash = head_and_hash()
+
+        # A clean findings report stays valid for every score/plan/closeout/
+        # LEARN probe below (HEAD does not move until the "fully valid"
+        # commit lands further down), so each probe's denial is attributable
+        # to the axis under test, not to a findings report missing too.
+        write_findings(findings_report(head_sha, content_hash))
 
         write_score(score_report(head_sha, content_hash, score=50))
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -1200,6 +1273,63 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # From here the score itself is valid; each remaining axis breaks
         # exactly one other input and restores it before the next.
         write_score(score_report(head_sha, content_hash))
+
+        # R-SCORE-03e: findings-report axis probes, score held valid throughout.
+        clear_findings()
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a commit with a valid score but no findings report", errors)
+
+        write_findings(
+            findings_report(
+                head_sha, content_hash,
+                findings=[{"severity": "CRITICAL", "title": "sql injection in query builder", "file": "work.txt"}],
+                counts={"critical": 1, "major": 0, "minor": 0},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a findings report with a CRITICAL finding", errors)
+        check(
+            "sql injection in query builder" in result.stderr,
+            "commit-msg hook's CRITICAL-finding failure must name the finding",
+            errors,
+        )
+
+        write_findings(findings_report(head_sha, content_hash, content_hash="deadbeef"))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a stale findings content_hash", errors)
+
+        # R-SCORE-03e: select the newest findings report by generated_at, not
+        # filename order - mirrors the score report's R-SCORE-02 rule. The
+        # older report has a lexically-LATER filename and is clean; the newer
+        # one has a lexically-EARLIER filename and carries a CRITICAL finding.
+        clear_findings()
+        write(
+            reports_dir / "findings-zzz.json",
+            json.dumps(findings_report(head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n",
+        )
+        write(
+            reports_dir / "findings-aaa.json",
+            json.dumps(
+                findings_report(
+                    head_sha, content_hash,
+                    generated_at="2099-06-01T00:00:00Z",
+                    findings=[{"severity": "CRITICAL", "title": "newer critical wins", "file": "work.txt"}],
+                    counts={"critical": 1, "major": 0, "minor": 0},
+                ),
+                indent=2,
+            )
+            + "\n",
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must select the newest findings report by generated_at", errors)
+        check(
+            "newer critical wins" in result.stderr,
+            "commit-msg hook must use the newer (CRITICAL) findings report, not the lexically-later clean one",
+            errors,
+        )
+
+        # Restore the clean baseline before the remaining axis probes below.
+        write_findings(findings_report(head_sha, content_hash))
 
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -1219,6 +1349,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
+        # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(result.returncode == 0, f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}", errors)
 
@@ -1245,6 +1376,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # Fix the state; the same staged change now commits cleanly.
         head_sha, content_hash = head_and_hash()
         write_score(score_report(head_sha, content_hash))
+        write_findings(findings_report(head_sha, content_hash))
         retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
         check(retry_result.returncode == 0, f"commit-msg hook must allow the retried valid commit: {retry_result.stdout}{retry_result.stderr}", errors)
 
@@ -1263,6 +1395,240 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         git(repo, "add", "escape.txt")
         escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
         check(escape_result.returncode == 0, f"git commit --no-verify must bypass the commit-msg gate: {escape_result.stdout}{escape_result.stderr}", errors)
+
+        # R-HOOKS-08: commit-msg also fires for git-merge (githooks(5)). A merge
+        # commit from dev must pass through even with invalid ceremony state
+        # (dev already diverged above via "direct commit on dev with no
+        # ceremony at all"); the very next real commit is still gated normally.
+        clear_scores()
+        merge_result = git(repo, "merge", "--no-ff", "dev", "-m", "Merge branch 'dev' into foo_implementation")
+        check(
+            merge_result.returncode == 0,
+            f"commit-msg hook must allow a merge commit even with invalid ceremony state: {merge_result.stdout}{merge_result.stderr}",
+            errors,
+        )
+
+        write(repo / "after-merge.txt", "after merge\n")
+        git(repo, "add", "after-merge.txt")
+        post_merge_result = git(repo, "commit", "-m", "phase 1 after merge")
+        check(
+            post_merge_result.returncode != 0,
+            "commit-msg hook must still block a normal commit with invalid state right after a merge passthrough",
+            errors,
+        )
+
+
+def validate_pre_push_git_hook(errors: list[str]) -> None:
+    """R-HOOKS-09: the pre-push git hook must mirror enforce-pr-gate.sh's
+    push-invariant contract (assert_push_invariants) for REAL git pushes to a
+    bare remote, gating the ref/sha actually being pushed."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)], text=True, capture_output=True, check=False
+        )
+
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        initial_push = git(repo, "push", "origin", "dev")
+        check(initial_push.returncode == 0, f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}", errors)
+
+        reports_dir = repo / ".claude" / "quality_reports"
+
+        def content_hash_for(base: str) -> str:
+            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", base).stdout
+            return subprocess.run(
+                ["git", "-C", str(repo), "hash-object", "--stdin"],
+                input=diff_out, text=True, capture_output=True, check=False,
+            ).stdout.strip()
+
+        def write_score_report(**overrides: object) -> None:
+            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "score": 95,
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "phase-work.txt"),
+                "dirty": False,
+                "tests_passed": True,
+                "tests_skipped": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": ["phase-work.txt"],
+            }
+            report.update(overrides)
+            for stale in reports_dir.glob("score-*.json"):
+                stale.unlink()
+            write(reports_dir / "score-test.json", json.dumps(report, indent=2) + "\n")
+
+        def write_findings_report(**overrides: object) -> None:
+            # Matches the real workflow: record_findings.py runs during
+            # REVIEW, before the commit it certifies lands - so head_sha here
+            # is that commit's PARENT, never the commit itself. This is why
+            # assert_push_invariants checks head_sha as an ancestor of the
+            # pushed sha, not an exact match (a report generated pre-commit
+            # can never equal the branch tip once one or more commits land).
+            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "phase-work.txt"),
+                "dirty": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": ["phase-work.txt"],
+            }
+            report.update(overrides)
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+            write(reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n")
+
+        write_big_plan(repo)
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "add big plan", "--no-verify")
+        git(repo, "push", "origin", "dev")
+
+        git(repo, "checkout", "-b", "foo_implementation")
+        run_hook(
+            lifecycle_script(repo, "record-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        write_small_plan(repo, status="in-progress")
+        write(repo / "phase-work.txt", "phase work\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "phase 1 work", "--no-verify")
+
+        # Incomplete small plan -> push blocked, stderr names the phase.
+        push_result = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            push_result.returncode != 0,
+            f"pre-push hook must block a push with an incomplete small plan: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+        check("phase-one" in push_result.stderr, "pre-push hook failure must name the incomplete phase", errors)
+
+        # Complete the small plan/closeout/LEARN so the commit-count check
+        # (>= one commit per phase) is also satisfied.
+        write_small_plan(repo, status="complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        )
+        git(repo, "add", ".")
+        # Generated pre-commit (matching REVIEW-before-COMMIT in the real
+        # workflow): head_sha here is the parent of the commit below, so this
+        # exercises the ancestor relation, not a same-sha coincidence.
+        write_findings_report()
+        git(repo, "commit", "-m", "phase 1 closeout", "--no-verify")
+
+        push_result = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            push_result.returncode == 0,
+            f"pre-push hook must allow a push once all phases are complete: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+
+        # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
+        # allow the commit (the commit gate only checks critical) while
+        # blocking the push (the push gate additionally checks major).
+        write(repo / "major-work.txt", "major work\n")
+        git(repo, "add", "major-work.txt")
+        write_score_report()
+        write_findings_report(
+            counts={"critical": 0, "major": 2, "minor": 0},
+            findings=[
+                {"severity": "MAJOR", "title": "unbounded query", "file": "major-work.txt"},
+                {"severity": "MAJOR", "title": "missing pagination", "file": "major-work.txt"},
+            ],
+        )
+        commit_result = git(repo, "commit", "-m", "phase 1 followup with major findings")
+        check(
+            commit_result.returncode == 0,
+            f"commit-msg hook must allow a commit whose findings report has MAJOR findings but zero CRITICAL: {commit_result.stdout}{commit_result.stderr}",
+            errors,
+        )
+        major_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            major_push.returncode != 0,
+            "pre-push hook must block a push whose findings report has MAJOR findings",
+            errors,
+        )
+        check(
+            "unbounded query" in major_push.stderr or "missing pagination" in major_push.stderr,
+            "pre-push hook's MAJOR-finding failure must name at least one finding",
+            errors,
+        )
+
+        # D4-B: dev passthrough regardless of ceremony state.
+        git(repo, "checkout", "dev")
+        write(repo / "dev-arbitrary.txt", "dev\n")
+        git(repo, "add", "dev-arbitrary.txt")
+        git(repo, "commit", "-m", "arbitrary dev commit", "--no-verify")
+        dev_push = subprocess.run(
+            ["git", "push", "origin", "dev"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            dev_push.returncode == 0,
+            f"pre-push hook must pass through pushes on dev regardless of ceremony state: {dev_push.stdout}{dev_push.stderr}",
+            errors,
+        )
+
+        # Break the ceremony again, then use --no-verify as the sanctioned
+        # manual escape from the pre-push gate.
+        git(repo, "checkout", "foo_implementation")
+        write_small_plan(repo, status="in-progress")
+        write(repo / "break-ceremony.txt", "break\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "break ceremony again", "--no-verify")
+        blocked_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            blocked_push.returncode != 0,
+            "pre-push hook must still block a push with broken ceremony before the --no-verify case",
+            errors,
+        )
+        escape_push = subprocess.run(
+            ["git", "push", "--no-verify", "origin", "foo_implementation"],
+            cwd=repo, text=True, capture_output=True, check=False,
+        )
+        check(
+            escape_push.returncode == 0,
+            f"git push --no-verify must bypass the pre-push gate: {escape_push.stdout}{escape_push.stderr}",
+            errors,
+        )
+
+        # Branch deletion passthrough: the ref already exists on the remote
+        # from the successful pushes above.
+        delete_push = subprocess.run(
+            ["git", "push", "origin", "--delete", "foo_implementation"],
+            cwd=repo, text=True, capture_output=True, check=False,
+        )
+        check(
+            delete_push.returncode == 0,
+            f"pre-push hook must allow branch deletion pushes: {delete_push.stdout}{delete_push.stderr}",
+            errors,
+        )
 
 
 def validate_generated_scripts(errors: list[str]) -> None:
@@ -1298,14 +1664,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)
     check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
-    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
-        text = read(skill_path)
-        frontmatter = text.split("---\n", 2)[1] if text.startswith("---\n") and len(text.split("---\n", 2)) == 3 else ""
-        check(
-            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
-            f"skill missing visibility metadata: {skill_path}",
-            errors,
-        )
+    # Skill frontmatter integrity (visibility, description) is checked once,
+    # in validate_docs_parity, alongside the other named-inventory checks.
 
     # R-SKILLS-01: the commit skill must follow the enforced lifecycle, never
     # walking the agent into feature/* branches or agent-driven merges.
@@ -1457,10 +1817,152 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     validate_generated_hygiene(errors)
 
 
+MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+
+
+def extract_markdown_links(text: str) -> list[str]:
+    return MARKDOWN_LINK_PATTERN.findall(text)
+
+
+def extract_frontmatter(text: str) -> str:
+    parts = text.split("---\n", 2)
+    return parts[1] if text.startswith("---\n") and len(parts) == 3 else ""
+
+
+def extract_frontmatter_description(frontmatter: str) -> str:
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
+        if not line.startswith("description:"):
+            continue
+        rest = line[len("description:"):].strip()
+        if rest in ("|", ">", "|-", ">-", ""):
+            # A blank line does NOT end a YAML block scalar - only a
+            # less-indented (or EOF) line does. Treating an empty `follow`
+            # as "end of block" would silently truncate the description at
+            # the first blank paragraph break.
+            block_lines = []
+            for follow in lines[index + 1:]:
+                if not follow.strip() or follow.startswith((" ", "\t")):
+                    block_lines.append(follow.strip())
+                else:
+                    break
+            return " ".join(block_lines).strip()
+        return rest.strip("\"'")
+    return ""
+
+
+def validate_docs_parity(errors: list[str]) -> None:
+    """R-VALID-02: mechanical drift-policing for authoring docs, mirroring
+    upstream's check-surface-sync.py / check-skill-integrity.py after they
+    were burned by repeated doc drift (architecture-review-2026-07.md §3.2).
+    Structural assertions only (R-VALID-01 lesson) - no exact-sentence pins."""
+
+    # 1. Link integrity: every relative markdown link in README.md, AGENTS.md,
+    # and docs/*.md (excluding archived docs/history/) resolves to an
+    # existing file or directory, relative to the linking file's own
+    # directory (docs/*.md link with "../", matching how they render on
+    # GitHub).
+    docs_root = REPO_ROOT / "docs"
+    doc_files = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "AGENTS.md",
+        *sorted(
+            p
+            for p in text_files(docs_root)
+            if p.suffix == ".md" and "history" not in p.relative_to(docs_root).parts
+        ),
+    ]
+    for doc in doc_files:
+        if not doc.exists():
+            continue
+        for link in extract_markdown_links(read(doc)):
+            if link.startswith(("http://", "https://", "mailto:")):
+                continue
+            target = link.split("#", 1)[0]
+            if not target:
+                continue
+            resolved = (doc.parent / target).resolve()
+            check(
+                resolved.exists(),
+                f"{doc.relative_to(REPO_ROOT)} has a broken relative link: '{link}' does not resolve to {resolved}",
+                errors,
+            )
+
+    readme_text = read(REPO_ROOT / "README.md")
+
+    # 2a. Skill names: README references are a SUBSET of shared/skills/*/ (it
+    # lists "most important", not all) - the reverse is not required.
+    referenced_skills = set(re.findall(r"shared/skills/([^/]+)/SKILL\.md", readme_text))
+    disk_skills = {path.parent.name for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    missing_skills = referenced_skills - disk_skills
+    check(
+        not missing_skills,
+        f"README references skills that do not exist on disk: {sorted(missing_skills)}",
+        errors,
+    )
+
+    # 2b. Agent names: README's "Current agents" list is EXACT (list == disk),
+    # unlike skills - every agent is small enough in number to list fully.
+    agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
+    check(agents_match is not None, "README must have a 'Current agents:' list", errors)
+    if agents_match:
+        readme_agents = {line[2:].strip() for line in agents_match.group(1).splitlines() if line.strip()}
+        disk_agents = {path.parent.name for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")}
+        check(
+            readme_agents == disk_agents,
+            f"README 'Current agents' list must exactly match shared/agents/*/: readme={sorted(readme_agents)} disk={sorted(disk_agents)}",
+            errors,
+        )
+
+    # 2c. Hook script names: docs/runtime-checks.md's guardrail list is EXACT
+    # against shared/hooks/scripts/*.sh, excluding _lib-frontmatter.sh (a
+    # sourced library, not a hook entry point).
+    runtime_checks_text = read(REPO_ROOT / "docs" / "runtime-checks.md")
+    hooks_match = re.search(r"Guardrail scripts are generated under[^\n]*:\n\n((?:- [^\n]+\n)+)", runtime_checks_text)
+    check(hooks_match is not None, "docs/runtime-checks.md must list guardrail scripts", errors)
+    if hooks_match:
+        doc_hook_scripts = set(re.findall(r"`([\w.-]+\.sh)`", hooks_match.group(1)))
+        disk_hook_scripts = {
+            path.name
+            for path in (REPO_ROOT / "shared" / "hooks" / "scripts").glob("*.sh")
+            if path.name != "_lib-frontmatter.sh"
+        }
+        check(
+            doc_hook_scripts == disk_hook_scripts,
+            "docs/runtime-checks.md guardrail script list must exactly match shared/hooks/scripts/*.sh "
+            f"(excluding _lib-frontmatter.sh): doc={sorted(doc_hook_scripts)} disk={sorted(disk_hook_scripts)}",
+            errors,
+        )
+
+    # 3. Skill frontmatter integrity: visibility + non-empty, non-duplicate
+    # description (duplicate descriptions break description-match loading of
+    # background skills).
+    descriptions: dict[str, Path] = {}
+    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
+        frontmatter = extract_frontmatter(read(skill_path))
+        check(
+            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
+            f"skill missing visibility metadata: {skill_path}",
+            errors,
+        )
+        description = extract_frontmatter_description(frontmatter).strip()
+        check(bool(description), f"skill missing non-empty description: {skill_path}", errors)
+        if not description:
+            continue
+        duplicate = descriptions.get(description)
+        if duplicate is not None:
+            errors.append(
+                f"duplicate skill description breaks description-match loading: {duplicate} and {skill_path}"
+            )
+        else:
+            descriptions[description] = skill_path
+
+
 def validate_support_files(errors: list[str]) -> None:
     required_files = (
         "MEMORY.md",
         "scripts/quality_score.py",
+        "scripts/record_findings.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",
@@ -1871,6 +2373,7 @@ def main() -> int:
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_skills_and_paths(errors)
+        validate_docs_parity(errors)
         validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
         validate_determinism(errors)

@@ -12,6 +12,7 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 - Use `rg` or equivalent exact search for literals, symbols, error text, config keys, and filenames.
 - Use Semble for semantic repository discovery: behavior ownership, related-code lookup, architectural neighbors, and "where is this implemented?" questions.
 - Use context-mode for large outputs, logs, generated prose, long markdown artifacts, session continuity, and compaction-safe retrieval.
+- Use context7 for current external library API documentation (fast-moving stacks like Haystack, BentoML, Hydra, Gradio go stale in training data quickly); it is not a substitute for Semble (repo code), `rg` (literals), or context-mode (long outputs).
 - Avoid running broad Semble and context-mode retrieval for the same question unless the first pass leaves a concrete gap.
 
 ## Fallback Order

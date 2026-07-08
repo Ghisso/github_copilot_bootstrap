@@ -89,13 +89,41 @@ score:
   changes to tracked files (the tree does not match the index). Stage
   everything destined for the commit, then re-run the scorer.
 
-### Direction (not yet implemented)
+### Severity-Gated Findings (Second Artifact)
 
 Numeric self-grading is a known reward-hacking setup once any input is
-agent-controlled. The intended evolution is to replace the numeric threshold
-with a **severity-count predicate over review findings** (e.g. "0 criticals, ≤N
-majors") rather than a deeper numeric rubric. Until then, the arithmetic above
-is the whole story.
+agent-controlled: clean lint plus a green suite scores 100 regardless of what
+the change actually contains. The score above stays the deterministic floor —
+it is honest about what it measures (lint/types/tests) — but it says nothing
+about what the REVIEW stage found. A second gated artifact closes that gap: a
+**findings report**, persisted by `record_findings.py`, carrying the same
+git-metadata freshness binding as the score report (`branch`, `head_sha`,
+`merge_base_sha`, `base_ref`, `dirty`, `content_hash`) plus computed severity
+counts (`critical`, `major`, `minor`).
+
+The reviewer runs its primary + verification passes as usual (see the
+`reviewer` agent) and returns the surviving findings as JSON; the reviewer has
+no `execute` capability, so **the orchestrator** persists that JSON:
+
+```bash
+uv run python .claude/scripts/record_findings.py src/ --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+```
+
+An empty findings list (`[]`) is valid and yields all-zero counts — the normal
+"review passed clean" report, not an omission.
+
+**Severity tiering** (mirrors the score/findings binding pattern, tiered by
+gate):
+
+| Gate | Requires |
+|---|---|
+| Commit | `counts.critical == 0` in a fresh, matching findings report |
+| Push / PR | `counts.critical == 0` **and** `counts.major == 0` |
+
+The findings remain agent-authored — the gate verifies the contract (fresh,
+matching, severity-counted), not the reviewer's honesty. This is the same
+consciously-accepted residual as the score report's inputs (see
+`docs/plan-deterministic-commit-gate.md` §5).
 
 ---
 
@@ -118,6 +146,24 @@ uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --ba
 ```
 
 Commit gates read the persisted JSON, not terminal output. A score report must match the current branch and current phase and be newer than the files it gates.
+
+---
+
+## Persisted Findings Reports
+
+When `.claude/scripts/record_findings.py` is available, persist the reviewer's
+surviving findings with the same branch/phase metadata as the score report:
+
+```bash
+uv run python .claude/scripts/record_findings.py src/ --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+```
+
+Commit and push gates read the persisted JSON, not the reviewer's prose
+report. A findings report must match the current branch and phase, be as
+fresh as the score report (push gates accept a report generated for an
+ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
+`counts.critical == 0` (commit) or `counts.critical == 0` and
+`counts.major == 0` (push/PR).
 
 ---
 
