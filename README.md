@@ -43,13 +43,16 @@ Core principles:
 Regenerate first, then install the single generated bootstrap into a target repo.
 The installer copies the generated AI files, substitutes the target repo name into
 the workspace instructions, keeps `.devcontainer/` trackable, adds an idempotent
-`.gitignore` block for generated/private AI content, writes the project-specific
-Hugging Face sync path into the devcontainer config, and uploads the bootstrap
-bundle when auth is available.
+`.gitignore` block for generated/private AI content, and turns `.claude/` into its
+own nested git repository on a branch named `ai-state` that carries both the
+bootstrap files and mutable AI state (plans, session logs, memory) — see
+[ADR-002](plans/adr-002-git-backed-state-sync.md).
 
-A bucket is **required** — pass `--bucket <org/bucket[/prefix]>` or set
-`HF_AI_SYNC_BUCKET`; there is no baked-in default, so no personal namespace ships
-in the bootstrap. The installer exits with an instruction if neither is set.
+By default the nested repo's remote is this project's own `origin`, so no separate
+credentials or bucket configuration are needed. Pass `--state-remote <git-url>`
+(env `AI_STATE_REMOTE`) to point it somewhere else instead — a private personal
+repo, for example, if you would rather AI state not be visible to anyone with
+read access to the code remote.
 
 ```bash
 set -euo pipefail
@@ -57,15 +60,13 @@ set -euo pipefail
 # 1) Set paths
 BOOTSTRAP_REPO="/absolute/path/to/github_copilot_bootstrap"
 TARGET_REPO="/absolute/path/to/your-project"
-PROJECT_NAME="$(basename "$TARGET_REPO")"
-HF_BUCKET_PATH="Ghisso/vscode_mounts/$PROJECT_NAME"
 
 # 2) Regenerate installable output
 cd "$BOOTSTRAP_REPO"
 uv run python scripts/generate_targets.py --all
 
-# 3) Install into the project root and upload the private AI bootstrap bundle
-uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket "$HF_BUCKET_PATH"
+# 3) Install into the project root
+uv run python scripts/install_bootstrap.py "$TARGET_REPO"
 
 # 4) Commit the trackable devcontainer and ignore rule in the target repo
 cd "$TARGET_REPO"
@@ -79,27 +80,20 @@ If you are already inside this bootstrap repo and only need to set the target pa
 set -euo pipefail
 
 TARGET_REPO="/absolute/path/to/your-project"
-PROJECT_NAME="$(basename "$TARGET_REPO")"
-HF_BUCKET_PATH="Ghisso/vscode_mounts/$PROJECT_NAME"
 uv run python scripts/generate_targets.py --all
-uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket "$HF_BUCKET_PATH"
+uv run python scripts/install_bootstrap.py "$TARGET_REPO"
 ```
 
-For `img-classification`, that expands to:
+To keep AI state off the code remote instead of the default:
 
 ```bash
-uv run python scripts/install_bootstrap.py "$TARGET_REPO" --bucket Ghisso/vscode_mounts/img-classification
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --state-remote git@github.com:you/private-ai-state.git
 ```
 
-and stores files under `hf://buckets/Ghisso/vscode_mounts/img-classification/`.
-
-Hugging Face auth is resolved in this order: `HF_TOKEN` env var, then
-`HUGGING_FACE_HUB_TOKEN`, then the cached token at `~/.cache/huggingface/token`.
-Inside the devcontainer the host HF cache is bind-mounted at
-`/home/vscode/.cache/huggingface`, so any token saved by `huggingface-cli login`
-or `hf auth login` on the host is automatically available — no env var needed.
-Missing auth, missing bucket access, or network failures produce warnings and leave
-local files in place.
+The installer makes its own `bootstrap: install <timestamp>` commit on the
+`ai-state` branch and pushes it. Missing push access or network failures produce
+warnings and leave the commit local — it syncs on the next successful
+`state-sync.sh push` (every AI session's Stop hook, or the manual VS Code task).
 
 ## Updating Existing Repos
 
@@ -115,37 +109,38 @@ uv run python scripts/update_consumers.py \
 
 The script regenerates `dist/` automatically, then for each repo it:
 
-- Backs up `.claude/MEMORY.md` in memory before installing
-- Runs `install_bootstrap.py` (copies all bootstrap-controlled files, uploads to HF)
-- Restores the original `.claude/MEMORY.md` after installing
+- Runs `state-sync.sh migrate-from-hf` first if that repo's `.claude/` predates
+  git-backed state (no `.claude/.git` yet) — a one-time `migrate: import
+  pre-git state` commit imports whatever is on disk before the update lands.
+- Runs `install_bootstrap.py`, which replaces every bootstrap-controlled file
+  and makes its own `bootstrap: update <timestamp>` commit on the `ai-state`
+  branch, then pushes it.
 
-Files that exist only in the consumer repo — plans, session logs, quality reports,
-explorations — are never touched. Only bootstrap-controlled files (agents, hooks,
-instructions, skills, templates, settings, root guidance) are replaced.
-
-Because the devcontainer pulls from the HF bucket on open, the HF upload is
-included by default. Use `--skip-upload` for a local-only update.
+Files that exist only in the consumer repo — `MEMORY.md`, plans, session logs,
+quality reports, explorations — are never touched by the file-copy step. They
+are state, tracked in git history rather than files a bucket pull could
+silently overwrite, so there is no backup/restore step to run around them.
 
 ```bash
 # Preview without writing
 uv run python scripts/update_consumers.py --dry-run /path/to/repo
-
-# Local install only (no HF upload)
-uv run python scripts/update_consumers.py --skip-upload /path/to/repo
 ```
 
 Generated layout:
 
-- `.devcontainer/`: trackable GPU sandbox and HF sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating
-- `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings
+- `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating (still used by projects themselves — HF sync for AI state moved to git, see [ADR-002](plans/adr-002-git-backed-state-sync.md))
+- `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
 - `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
 
 Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
 content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
-and MCP files should stay ignored. A fresh clone can reopen in the devcontainer and
-pull the ignored AI content from:
+and MCP files should stay ignored. A fresh clone can reopen in the devcontainer;
+`post-start.sh` restores the ignored AI content by checking `.claude/` out from
+the `ai-state` branch (and copying `.claude/bootstrap-root/` back out to the root
+adapters — `CLAUDE.md`, `AGENTS.md`, etc.) using the same git credentials as the
+code checkout, with no separate auth to configure.
 
 ### GitHub Copilot: local-IDE vs cloud
 
@@ -156,21 +151,12 @@ cloud Copilot agents read that surface only from the committed default branch an
 will not see gitignored files. To enable cloud Copilot, install with
 `--commit-copilot-surface`, which keeps those paths out of the ignore block so you
 can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
-ignored and HF-synced.
-
-```text
-hf://buckets/Ghisso/vscode_mounts/<project-name>/bootstrap/
-hf://buckets/Ghisso/vscode_mounts/<project-name>/state/
-```
-
-For example, installing with `--bucket Ghisso/vscode_mounts/img-classification`
-uses `img-classification/` as the project path inside the `Ghisso/vscode_mounts`
-bucket.
+ignored and git-backed.
 
 If you do not use one of the tools, delete only that tool's native adapter/config
-files after installing and then re-run the installer/upload if you want the pruned
-bundle stored in HF. Keep `.claude/` unless you are intentionally removing the shared
-basis.
+files after installing and then re-run the installer if you want the pruned
+bundle reflected in the next `ai-state` commit. Keep `.claude/` unless you are
+intentionally removing the shared basis.
 
 Optional pruning after copy:
 
@@ -219,7 +205,7 @@ Interpretation:
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
-- Devcontainer: GPU sandbox and HF sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` is pinned directly in the image because `HfApi.sync_bucket` was added in 1.0 — older versions silently no-op; if a project dep downgrades the package anyway, `hf-ai-sync.py` detects the missing method and falls back to the `hf` CLI with a visible warning
+- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
@@ -353,10 +339,11 @@ Configured events:
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
+- SessionStart
+  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` rebases `.claude/`'s nested git repo (branch `ai-state`) against its configured remote (`git pull --rebase --autostash`), so the session starts against the latest synced state. On a genuine conflict it aborts the rebase, prints a `WARN` naming the conflicting files and the manual-resolution commands, and exits 0 with local files untouched — a sync problem never blocks a session from starting
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
-  - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) runs `push-state` only — it pushes mutable AI *state* to the configured Hugging Face sync path. Consumers never re-upload the canonical bootstrap bundle from a Stop hook; bootstrap uploads are an explicit installer/updater action, so a stale consumer copy can't clobber the shared bundle. With no bucket configured the helper warns and no-ops. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
-- `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery. `.state_backups/` is a local convenience; the durable copy of state is the HF bucket. `push-state --prune` reconciles the bucket (deletes remote files removed locally); it is opt-in
+  - `state-sync.sh push` commits any staged state as `session: <ISO-timestamp>` (skipping the commit if nothing changed), pulls (same rebase-with-autostash contract as above), then pushes. Consumers never re-commit the canonical bootstrap bundle from a Stop hook — bootstrap updates are an explicit installer/updater action (`bootstrap:`-prefixed commits), so a stale consumer session can't clobber it. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; a missing remote or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why this is git-backed instead of a Hugging Face bucket mirror.
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 
@@ -370,7 +357,7 @@ Two layers, two invariants, one shared contract each:
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
 
 - `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes: git skips the hook entirely, and there is no git hook that fires when hooks are skipped.
-- `.claude/` is gitignored and Hugging Face-synced in consumers, so on a fresh clone *before* the first sync, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until sync completes). `post-start.sh` sets `core.hooksPath` before the pull runs so the devcontainer path closes this window as soon as the pull finishes.
+- `.claude/` is gitignored in consumers, so on a fresh clone *before* `.claude/` is checked out, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until the checkout completes). Since AI state moved from a Hugging Face bucket to a nested git repo ([ADR-002](plans/adr-002-git-backed-state-sync.md)), this window shrank: `post-start.sh` runs `state-sync.sh setup` (which checks `.claude/` out from the `ai-state` branch using the same git credentials as the code checkout — no separate auth to configure) and sets `core.hooksPath` immediately after, before the subsequent `state-sync.sh pull`, so the devcontainer path closes the window at checkout time rather than waiting on an authenticated bucket pull.
 - Per `githooks(5)`, `commit-msg` also fires for `git merge`, not just `git commit`. A plain merge commit carries no authored content of its own, so on an implementation branch it passes through unledgered — the ceremony re-attaches at the next real commit. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (git behavior, not a bootstrap gap); the commits they create skip the git layer, but the next real commit is still gated. `git commit --amend` does invoke it, and `content_hash` freshness survives a content-preserving amend. The `MERGE_HEAD` passthrough is, like `--no-verify`, a known accepted escape: `git merge --no-commit` followed by manually staging extra changes lands ungated content on an implementation branch, since the hook cannot distinguish a pure merge from a merge plus manual staging.
 - See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) and [plans/plan-post-review-hardening.md](plans/plan-post-review-hardening.md) for the full design rationale.
 
@@ -470,4 +457,4 @@ If you customize it, prioritize:
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
 
-See [plans/adr-001-multi-target-lcd.md](plans/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging.
+See [plans/adr-001-multi-target-lcd.md](plans/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging, and [plans/adr-002-git-backed-state-sync.md](plans/adr-002-git-backed-state-sync.md) for why AI state syncs through a nested git repository instead of a Hugging Face bucket.

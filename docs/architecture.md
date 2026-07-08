@@ -7,9 +7,9 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/policies/`: reusable workflow, quality, code, testing, routing, and deployment guidance.
 - `shared/skills/`: reusable skills with `visibility: public|background` metadata.
 - `shared/hooks/`: hook config and guardrail scripts.
-- `shared/devcontainer/`: GPU devcontainer bootloader and Hugging Face AI state sync helper. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container.
+- `shared/devcontainer/`: GPU devcontainer bootloader. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container — used by the projects themselves, not by AI state sync (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)). `post-start.sh` bootstraps AI state via `state-sync.sh`/`restore-root-adapters.sh`, both also rendered here (see "Git-Backed State Sync" below).
 - `shared/mcp/servers.json`: single MCP server definition for Semble and context-mode.
-- `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `hf-ai-sync.sh pull-state` silently when the workspace opens) and a manual push task for non-AI sessions.
+- `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `state-sync.sh pull` silently when the workspace opens) and a manual push task for non-AI sessions.
 - `shared/agents/`: canonical custom-agent metadata and neutral prompts.
 - `shared/review-profiles/`: checklists consumed by the unified `reviewer` agent.
 - `shared/prompts/`: reusable prompt templates.
@@ -20,7 +20,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts. Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native HF state sync that works independently of any AI tool session.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
 
 Do not edit `dist/` manually. Regenerate it with:
 
@@ -49,7 +49,7 @@ REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script>
 
 Claude and Codex generated configs execute `run-hook.sh` directly. `scripts/generate_targets.py` therefore marks the generated dispatcher executable, and `scripts/validate_targets.py` treats a non-executable dispatcher as a structural failure.
 
-Hook errors (from `hf-ai-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact.
+Hook errors (from `state-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact.
 
 ## Lifecycle Enforcement
 
@@ -72,28 +72,31 @@ Bypass commit prefixes `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` ar
 
 The two safety-critical guards, `protect-files.sh` and `git-protection.sh`, run their primary checks in pure bash with no `uv` dependency (the Python path in `protect-files.sh` is an enhancement used only when `uv` is present). On an internal error a guard fails toward `ask` (deny on Codex) rather than a silent allow, and the PreToolUse gates exit non-zero on an unparseable payload so runtimes that key blocking on exit status deny the call.
 
-## HF State Sync and Pull Safety
+## Git-Backed State Sync
 
-`hf-ai-sync.py pull-state` snapshots all current state files (`MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, `quality_reports/**`) into `.claude/.state_backups/` before overwriting them. After the pull completes, backups whose content is identical to the pulled version are deleted. Only files that were actually overwritten by the pull retain a backup, so the developer can compare and recover any local changes that were not yet pushed to the bucket.
+`.claude/` in each consumer is a plain, self-contained git repository (its own `.git/` inside `.claude/`), tracking both the bootstrap-controlled files and mutable AI state (`MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, `quality_reports/**`) on one branch, `ai-state`. The outer consumer repo gitignores `.claude/` entirely, so the nested repo is invisible to the code branches. See [ADR-002](../plans/adr-002-git-backed-state-sync.md) for the full rationale and the alternatives it replaced (Hugging Face bucket mirroring, `git worktree`, committing state into code branches).
 
-`import_hf_api()` checks `hasattr(HfApi, "sync_bucket")` before returning the class. If the method is absent (huggingface_hub < 1.0), the function emits a named warning and returns `None`, which triggers the `hf` CLI fallback path. This prevents a transitive downgrade — e.g. from a project dependency like `haystack-ai` — from causing silent no-op syncs: without the guard, the `AttributeError` raised inside `sync_bucket()` is caught by the broad exception handler and the script exits 0 having done nothing. The Dockerfile also pins `huggingface_hub>=1.0` to prevent the downgrade at build time.
+`shared/hooks/scripts/state-sync.sh` (pure bash, no `uv`/Python) implements four subcommands, all warn-never-fail (a sync problem never fails a Stop hook or blocks a session start) and all draining stdin with the same 2-second timeout the old sync helper used:
 
-This runs on every `pull-state` invocation — whether triggered by the VS Code `folderOpen` task, an AI tool `SessionStart` hook, or manually.
+- **`setup`** — idempotent. If `.claude/.git` is missing: `git init`, resolve and configure the remote (`AI_STATE_REMOTE` / `--state-remote` at install time, else the outer repo's own `origin`), commit whatever is already on disk (there is always something — at minimum this script itself), then reconcile with `origin/ai-state` via `git merge --allow-unrelated-histories` if it already exists remotely (a real merge, not a bare checkout, so it combines file-by-file instead of refusing to overwrite untracked files that are about to converge anyway). A genuine conflict aborts the merge and warns, leaving the local commit as the source of truth.
+- **`pull`** — `git pull --rebase --autostash origin ai-state`. On conflict: abort the rebase, print a `WARN` naming the conflicting files and the manual-resolution commands, and exit 0 with local files intact.
+- **`push`** — commit any staged state as `session: <ISO-timestamp>` (skipping the commit if nothing changed), `pull` (as above), then push. A push rejection after a failed rebase gets the same loud-warn-exit-0 contract.
+- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, runs `setup`'s init/remote logic, commits everything on disk as `migrate: import pre-git state`, and pushes. No automatic pull from the old Hugging Face bucket happens here — the local tree is the source of truth at migration time; run the retired `hf-ai-sync.py pull-state` once first, manually, if you want the bucket's newer copy. `update_consumers.py` calls this automatically for any consumer whose `.claude/` predates git-backed state.
 
-`.state_backups/` is excluded from `push-state` (it does not match `STATE_INCLUDES` patterns) and should be added to `.gitignore`. It is a **local convenience only**: it lives inside the ephemeral, git-ignored `.claude/` and is erased by a container rebuild or fresh clone. The durable copy of state is the HF bucket — recover from `.state_backups/` immediately if you need it, but do not treat it as backup of record.
+Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py`/`update_consumers.py`); session state lands as `session:`-prefixed commits (made by the Stop hook). The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
 
-`MEMORY.md` is single-homed in the **state** bundle, not the bootstrap bundle: the installer ships a template in `dist/`, and its evolving content lives only in `state/` via `STATE_INCLUDES`. This removes the earlier dual-homing where a bootstrap restore could clobber accumulated memory depending on pull order.
+`state-sync.sh` and `restore-root-adapters.sh` (which copies `.claude/bootstrap-root/` — the root-level adapter files that live outside `.claude/`, such as `CLAUDE.md`/`AGENTS.md`/`.mcp.json`/`.codex/**` — back out to the repo root) are rendered in two locations: `.claude/hooks/scripts/` for normal use, and `.devcontainer/` so `post-start.sh` has a copy it can run before `.claude/` exists at all on a fresh clone.
 
-`push-state` does not delete remote files by default, so the bucket can accumulate state for plans/logs deleted locally. Run `hf-ai-sync.py push-state --prune` to reconcile — it mirrors the local state tree to the bucket, deleting remote files that no longer exist locally. Prune is opt-in so a partial local tree can never wipe remote state unintentionally.
+`MEMORY.md` is single-homed as a tracked file in `.claude/`, evolving via `session:`/`bootstrap:` commits like everything else — no separate bundle or restore-order dependency the old bucket split required.
 
 ## VS Code Tasks
 
-`.vscode/tasks.json` (source: `shared/vscode/tasks.json`) provides HF state sync that works without an active AI tool session:
+`.vscode/tasks.json` (source: `shared/vscode/tasks.json`) provides AI state sync that works without an active AI tool session:
 
-- **AI state: pull from HF bucket** — runs automatically on `folderOpen` (VS Code prompts once to allow automatic tasks). Pulls state silently in the background.
-- **AI state: push to HF bucket** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. Shows output so the developer can confirm the push succeeded.
+- **AI state: pull** — runs automatically on `folderOpen` (VS Code prompts once to allow automatic tasks). Pulls state silently in the background via `state-sync.sh pull`.
+- **AI state: push** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. Shows output so the developer can confirm the push succeeded, via `state-sync.sh push`.
 
-These complement the AI Stop hooks (which already push on every session end) for workflows where VS Code is open without an active AI session.
+These complement the AI SessionStart/Stop hooks (which already pull/push on every session start/end) for workflows where VS Code is open without an active AI session.
 
 ## Custom Agents
 
@@ -109,5 +112,6 @@ The generator derives Copilot, Claude Code, and Codex adapters from those two fi
 ## Design Decisions
 
 - [ADR-001: Multi-target bootstrap over native per-platform packaging](../plans/adr-001-multi-target-lcd.md) — why this repo generates thin adapters for Copilot/Claude/Codex from one shared basis instead of shipping Claude-native plugin packaging, what that costs, and the trigger for revisiting it.
+- [ADR-002: Git-backed AI state sync over object-storage mirroring](../plans/adr-002-git-backed-state-sync.md) — why `.claude/` is a nested git repository synced via `state-sync.sh` instead of Hugging Face bucket mirroring, and the `--state-remote` privacy trade-off.
 
 The unified `reviewer` runs both review passes itself (a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive), so it is a single-nesting-level operation that executes identically on every runtime — there are no separate review-helper agents. The orchestrator is the main-thread persona: it holds `edit`+`execute` and owns the branch/commit/PR and memory/session-log ceremony itself rather than delegating it. UI work goes through the `coder` (which loads the `gradio-streamlit` skill); there is no separate designer agent. The `verifier` is the single owner of the persisted score report.

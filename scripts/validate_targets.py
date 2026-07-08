@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 from pathlib import Path
 
@@ -41,7 +42,8 @@ REQUIRED_HOOK_SCRIPTS = (
     "git-protection.sh",
     "context-mode-dispatch.sh",
     "session-log.sh",
-    "hf-ai-sync.sh",
+    "state-sync.sh",
+    "restore-root-adapters.sh",
     "enforce-branch-state.sh",
     "record-branch-state.sh",
     "enforce-commit-gate.sh",
@@ -447,7 +449,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_hook_text = json.dumps(github_hooks)
     check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
     check("github-copilot" in github_hook_text, "GitHub hooks should pass target id", errors)
-    check("hf-ai-sync.sh" in github_hook_text, "GitHub stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in github_hook_text, "GitHub hooks should sync AI state via state-sync.sh", errors)
     for event_name, hooks in github_hooks.get("hooks", {}).items():
         check(isinstance(hooks, list), f"GitHub hook event must be a list: {event_name}", errors)
         for hook in hooks if isinstance(hooks, list) else []:
@@ -477,18 +479,20 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     claude_settings_text = json.dumps(claude_settings)
     check(".claude/hooks/scripts/" in claude_settings_text, "Claude settings should invoke shared .claude hook scripts", errors)
     check("claude-code" in claude_settings_text, "Claude hooks should pass target id", errors)
-    check("hf-ai-sync.sh" in claude_settings_text, "Claude stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in claude_settings_text, "Claude settings should sync AI state via state-sync.sh", errors)
 
-    check("hf-ai-sync.sh" in json.dumps(codex_hooks), "Codex stop hooks should push HF AI state", errors)
+    check("state-sync.sh" in json.dumps(codex_hooks), "Codex hooks should sync AI state via state-sync.sh", errors)
 
-    # R-SYNC-02: consumers push state only; the canonical bootstrap is never
-    # re-uploaded from a consumer's Stop hook.
+    # R-SYNC-05: every target pulls state at SessionStart and pushes it at
+    # Stop, through the git-backed state-sync.sh (not the retired HF bucket
+    # upload-bootstrap path, which a consumer's Stop hook must never trigger).
     for label, text in (
         ("Claude settings", claude_settings_text),
         ("GitHub hooks", github_hook_text),
         ("Codex hooks", json.dumps(codex_hooks)),
     ):
-        check("push-state" in text, f"{label} Stop hook must push state", errors)
+        check("state-sync.sh pull" in text, f"{label} SessionStart hook must pull AI state", errors)
+        check("state-sync.sh push" in text, f"{label} Stop hook must push AI state", errors)
         check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
 
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
@@ -721,6 +725,18 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True, check=False)
+
+
+def git_actor_env(actor: str) -> dict[str, str]:
+    """A hermetic git identity for temp-repo tests: real CI runners and stock
+    machines are not guaranteed to have a global user.name/user.email set."""
+    return {
+        **os.environ,
+        "GIT_AUTHOR_NAME": actor,
+        "GIT_AUTHOR_EMAIL": f"{actor.lower()}@example.com",
+        "GIT_COMMITTER_NAME": actor,
+        "GIT_COMMITTER_EMAIL": f"{actor.lower()}@example.com",
+    }
 
 
 def write(path: Path, text: str) -> None:
@@ -1985,7 +2001,8 @@ def validate_support_files(errors: list[str]) -> None:
         "hooks/scripts/git-protection.sh",
         "hooks/scripts/context-mode-dispatch.sh",
         "hooks/scripts/session-log.sh",
-        "hooks/scripts/hf-ai-sync.sh",
+        "hooks/scripts/state-sync.sh",
+        "hooks/scripts/restore-root-adapters.sh",
         "hooks/scripts/_lib-frontmatter.sh",
         "hooks/scripts/enforce-branch-state.sh",
         "hooks/scripts/record-branch-state.sh",
@@ -2016,11 +2033,19 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         "devcontainer.json",
         "Dockerfile",
         "post-start.sh",
-        "hf-ai-sync.py",
+        "state-sync.sh",
+        "restore-root-adapters.sh",
     )
     for relative_path in required_files:
         path = devcontainer_root / relative_path
         check(path.exists(), f"missing generated devcontainer file: {path}", errors)
+    for relative_path in ("state-sync.sh", "restore-root-adapters.sh"):
+        path = devcontainer_root / relative_path
+        check(
+            path.exists() and path.stat().st_mode & 0o111,
+            f"devcontainer AI-state script is not executable: {path}",
+            errors,
+        )
 
     if (devcontainer_root / "devcontainer.json").exists():
         data = json.loads(read(devcontainer_root / "devcontainer.json"))
@@ -2076,81 +2101,27 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     post_start = devcontainer_root / "post-start.sh"
     if post_start.exists():
         post_start_text = read(post_start)
-        check("python3 \"$@\"" in post_start_text, "post-start must run the HF helper with system python3", errors)
-        check("uv run python" not in post_start_text, "post-start must not invoke project uv for HF sync", errors)
-        # R-HOOKS-07: set before the HF pull so a fresh container clone is
-        # gated the moment .claude/hooks/git-hooks/ is populated, with no
-        # window where core.hooksPath is unset.
-        hooks_path_index = post_start_text.find("git -C \"$REPO_ROOT\" config core.hooksPath")
-        pull_index = post_start_text.find('"$HELPER" pull')
+        check("uv run python" not in post_start_text, "post-start must not invoke project uv for AI state sync", errors)
+        # R-SYNC-05: setup's checkout populates .claude/hooks/git-hooks/, so
+        # core.hooksPath is configured immediately after it and before pull -
+        # no window where a fresh container is ungated once setup completes.
+        setup_index = post_start_text.find('"$STATE_SYNC" setup')
+        hooks_path_index = post_start_text.find('git -C "$REPO_ROOT" config core.hooksPath')
+        pull_index = post_start_text.find('"$STATE_SYNC" pull')
+        restore_index = post_start_text.find('"$RESTORE_ROOT_ADAPTERS"')
+        check(setup_index != -1, "post-start must run state-sync.sh setup", errors)
         check(hooks_path_index != -1, "post-start must configure core.hooksPath", errors)
+        check(pull_index != -1, "post-start must run state-sync.sh pull", errors)
+        check(restore_index != -1, "post-start must run restore-root-adapters.sh", errors)
         check(
-            hooks_path_index != -1 and pull_index != -1 and hooks_path_index < pull_index,
-            "post-start must set core.hooksPath before the HF pull",
+            -1 not in (setup_index, hooks_path_index, pull_index, restore_index)
+            and setup_index < hooks_path_index < pull_index < restore_index,
+            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull, then restore-root-adapters.sh, in that order",
             errors,
         )
-
-    helper = devcontainer_root / "hf-ai-sync.py"
-    scrubbed_env = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"HF_AI_SYNC_BUCKET", "HF_AI_SYNC_PREFIX"}
-    }
-    if helper.exists():
-        # R-SYNC-01: a configured bucket is honored; there is no baked default.
-        configured_env = {**scrubbed_env, "HF_AI_SYNC_BUCKET": "example-org/example-bucket"}
-        result = subprocess.run(
-            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT,
-            env=configured_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(result.returncode == 0, f"HF sync helper dry-run status failed: {result.stderr}", errors)
-        check("example-org/example-bucket" in result.stdout, "HF sync helper must honor the configured bucket", errors)
-
-        # R-SYNC-04: push-state prunes only with --prune (delete off by default).
-        default_push = subprocess.run(
-            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
-        )
-        check("delete=False" in default_push.stdout, "push-state must not delete remote state by default", errors)
-        prune_push = subprocess.run(
-            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run", "--prune"],
-            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
-        )
-        check("delete=True" in prune_push.stdout, "push-state --prune must reconcile (delete) remote state", errors)
-        # R-SYNC-04: MEMORY.md is single-homed in state, not the bootstrap bundle.
-        helper_src = read(helper)
-        check(
-            '".claude/MEMORY.md"' not in helper_src,
-            "MEMORY.md must not be in BOOTSTRAP_PATHS (single-homed in state)",
-            errors,
-        )
-        # R-HOOKS-07: HF sync does not preserve unix permissions, so a
-        # pull-bootstrap must re-chmod the git-hooks dir or a refreshed
-        # commit-msg silently stops running (git ignores non-executable hooks).
-        check(
-            ".claude/hooks/git-hooks" in helper_src,
-            "HF sync helper must restore the git-hooks executable bit after pull",
-            errors,
-        )
-
-        # R-SYNC-01: with no bucket configured the helper is a graceful no-op.
-        no_bucket = subprocess.run(
-            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT,
-            env=scrubbed_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        combined = no_bucket.stdout + no_bucket.stderr
-        check(no_bucket.returncode == 0, "HF sync helper must not hard-fail without a bucket", errors)
-        check("no HF sync bucket configured" in combined, "HF sync helper must explain a missing bucket", errors)
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    git_identity_env = git_actor_env("Validator")
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_repo = Path(temp_dir_name) / "consumer"
         temp_repo.mkdir()
@@ -2161,32 +2132,15 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(init_result.returncode == 0, f"temporary git init failed: {init_result.stderr}", errors)
-        # R-SYNC-01: installer errors without a bucket (no baked default).
-        no_bucket_install = subprocess.run(
-            [sys.executable, str(installer), str(temp_repo), "--skip-upload", "--dry-run"],
-            cwd=REPO_ROOT,
-            env=scrubbed_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(no_bucket_install.returncode != 0, "installer must refuse to run without a bucket", errors)
-        check(
-            "HF_AI_SYNC_BUCKET" in (no_bucket_install.stdout + no_bucket_install.stderr),
-            "installer must tell the user how to configure a bucket",
-            errors,
-        )
 
+        # R-SYNC-05: no bucket, no --state-remote — the installer must succeed
+        # with no sync configuration at all (state stays local-only, per D4's
+        # fail-toward-local contract; a bare origin is exercised separately in
+        # the Phase 6 adversarial suite).
         install_result = subprocess.run(
-            [
-                sys.executable,
-                str(installer),
-                str(temp_repo),
-                "--bucket",
-                "example-org/example-bucket/test-project",
-                "--skip-upload",
-            ],
+            [sys.executable, str(installer), str(temp_repo)],
             cwd=REPO_ROOT,
+            env=git_identity_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2194,11 +2148,54 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(install_result.returncode == 0, f"installer temp run failed: {install_result.stderr}", errors)
         check((temp_repo / ".devcontainer" / "devcontainer.json").exists(), "installer must copy trackable devcontainer", errors)
         check((temp_repo / ".gitignore").exists(), "installer must create or update .gitignore", errors)
-        devcontainer_data = json.loads(read(temp_repo / ".devcontainer" / "devcontainer.json"))
-        container_env = devcontainer_data.get("containerEnv", {})
+        check("AI_STATE_REMOTE" not in read(temp_repo / ".devcontainer" / "devcontainer.json"), "installer must not write AI_STATE_REMOTE without --state-remote", errors)
+
+        # R-SYNC-05: the installer creates the nested .claude/ AI-state repo
+        # and makes its own bootstrap: install commit (distinct from the Stop
+        # hook's session: commits).
+        claude_git = temp_repo / ".claude" / ".git"
+        check(claude_git.is_dir(), "installer must create the nested .claude/ AI-state repo", errors)
+        if claude_git.is_dir():
+            claude_branch = subprocess.run(
+                ["git", "-C", str(temp_repo / ".claude"), "branch", "--show-current"],
+                text=True, capture_output=True, check=False,
+            )
+            check(claude_branch.stdout.strip() == "ai-state", "nested .claude/ repo must be on branch ai-state", errors)
+            claude_log = subprocess.run(
+                ["git", "-C", str(temp_repo / ".claude"), "log", "--oneline"],
+                text=True, capture_output=True, check=False,
+            )
+            check("bootstrap:" in claude_log.stdout, "installer must make a bootstrap:-prefixed commit in .claude/", errors)
+
+        # D3: --state-remote persists AI_STATE_REMOTE into the committed
+        # devcontainer config, since a fresh container clone has no other way
+        # to learn a non-default state remote (.claude/ itself is gitignored).
+        remote_repo = temp_dir_name and Path(temp_dir_name) / "state-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote_repo)], check=False)
+        remote_temp_repo = Path(temp_dir_name) / "consumer-with-remote"
+        remote_temp_repo.mkdir()
+        subprocess.run(["git", "init", str(remote_temp_repo)], text=True, capture_output=True, check=False)
+        remote_install_result = subprocess.run(
+            [sys.executable, str(installer), str(remote_temp_repo), "--state-remote", str(remote_repo)],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(remote_install_result.returncode == 0, f"installer --state-remote run failed: {remote_install_result.stderr}", errors)
         check(
-            container_env.get("HF_AI_SYNC_BUCKET") == "example-org/example-bucket/test-project",
-            "installer must persist project-specific HF sync path in .devcontainer",
+            f'"AI_STATE_REMOTE": "{remote_repo}"' in read(remote_temp_repo / ".devcontainer" / "devcontainer.json"),
+            "installer must persist --state-remote into the devcontainer config",
+            errors,
+        )
+        remote_branches = subprocess.run(
+            ["git", "--git-dir", str(remote_repo), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            "refs/heads/ai-state" in remote_branches.stdout,
+            "installer with --state-remote must push ai-state to that remote, not origin",
             errors,
         )
 
@@ -2261,30 +2258,17 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
         check(copilot_ignored.returncode == 0, "default install must ignore the Copilot cloud surface (.github/agents)", errors)
 
-        helper_status_env = {
-            key: value
-            for key, value in os.environ.items()
-            if key not in {"HF_AI_SYNC_BUCKET", "HF_AI_SYNC_PREFIX"}
-        }
-        helper_status = subprocess.run(
-            [
-                sys.executable,
-                str(temp_repo / ".devcontainer" / "hf-ai-sync.py"),
-                "status",
-                "--repo-root",
-                str(temp_repo),
-                "--dry-run",
-            ],
-            cwd=temp_repo,
-            env=helper_status_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(helper_status.returncode == 0, f"installed helper status failed: {helper_status.stderr}", errors)
+        # D5: root adapter files are mirrored into .claude/bootstrap-root/ so
+        # state-sync.sh's checkout of .claude/ alone still carries them.
+        for relative in ("CLAUDE.md", "AGENTS.md", ".mcp.json"):
+            check(
+                (temp_repo / ".claude" / "bootstrap-root" / relative).exists(),
+                f"installer must mirror {relative} into .claude/bootstrap-root/",
+                errors,
+            )
         check(
-            "hf://buckets/example-org/example-bucket/test-project/bootstrap" in helper_status.stdout,
-            "installed helper must read HF sync path from .devcontainer when env vars are unset",
+            (temp_repo / ".claude" / "bootstrap-root" / ".github" / "agents").exists(),
+            "installer must mirror the gitignored Copilot surface into .claude/bootstrap-root/ by default",
             errors,
         )
 
@@ -2298,12 +2282,10 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 sys.executable,
                 str(installer),
                 str(flag_repo),
-                "--bucket",
-                "example-org/example-bucket/test-project",
-                "--skip-upload",
                 "--commit-copilot-surface",
             ],
             cwd=REPO_ROOT,
+            env=git_identity_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2318,6 +2300,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(surface_trackable.returncode != 0, "--commit-copilot-surface must leave .github/agents trackable", errors)
+        check(
+            not (flag_repo / ".claude" / "bootstrap-root" / ".github").exists(),
+            "--commit-copilot-surface must not double-track the Copilot surface in .claude/bootstrap-root/",
+            errors,
+        )
         # State still stays ignored regardless of the flag.
         state_ignored = subprocess.run(
             ["git", "-C", str(flag_repo), "check-ignore", ".claude/MEMORY.md"],
@@ -2326,6 +2313,221 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             check=False,
         )
         check(state_ignored.returncode == 0, "--commit-copilot-surface must still ignore .claude state", errors)
+
+
+def state_sync_script(consumer: Path) -> Path:
+    # Mirrors post-start.sh: before .claude/ exists at all (a fresh clone
+    # that has never run `setup`), the only reachable copy is the one
+    # rendered into the trackable .devcontainer/.
+    claude_copy = consumer / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if claude_copy.is_file():
+        return claude_copy
+    return consumer / ".devcontainer" / "state-sync.sh"
+
+
+def run_state_sync(consumer: Path, mode: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(state_sync_script(consumer)), mode],
+        cwd=consumer,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        stdin=subprocess.DEVNULL,
+    )
+
+
+def validate_state_sync(errors: list[str]) -> None:
+    """R-SYNC-05f: adversarial end-to-end coverage of the git-backed state
+    sync mechanism (state-sync.sh) across two simulated "machines" sharing a
+    bare origin, mirroring the manual acceptance procedure in
+    plans/plan-git-state-sync.md Phase 6."""
+    installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_root = Path(temp_dir_name)
+        bare_origin = temp_root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(bare_origin)], check=False)
+        subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=False,
+        )
+
+        # 1. Install on machine A: ai-state exists on the remote; nested repo checked out.
+        machine_a = temp_root / "machine-a"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_a)], text=True, capture_output=True, check=False)
+        env_a = git_actor_env("MachineA")
+        install_a = subprocess.run(
+            [sys.executable, str(installer), str(machine_a)],
+            cwd=REPO_ROOT, env=env_a, text=True, capture_output=True, check=False,
+        )
+        check(install_a.returncode == 0, f"[state-sync] install on machine A failed: {install_a.stderr}", errors)
+        subprocess.run(["git", "-C", str(machine_a), "add", ".devcontainer", ".gitignore"], check=False)
+        subprocess.run(
+            ["git", "-C", str(machine_a), "commit", "-q", "-m", "chore: add AI devcontainer bootstrap"],
+            env=env_a, check=False,
+        )
+        subprocess.run(["git", "-C", str(machine_a), "push", "-q", "origin", "HEAD:refs/heads/main"], check=False)
+
+        remote_refs = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check("refs/heads/ai-state" in remote_refs.stdout, "[state-sync] install must push ai-state to the bare origin", errors)
+        check((machine_a / ".claude" / ".git").is_dir(), "[state-sync] install must check out a nested .claude/ repo", errors)
+
+        # A shared plan file with frontmatter, common to both machines from
+        # here on, so step 4 below can conflict on one of its lines.
+        plan_relpath = Path("plans") / "state-sync-test.md"
+        (machine_a / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nShared baseline plan.\n", encoding="utf-8",
+        )
+        baseline_push = run_state_sync(machine_a, "push", env_a)
+        check(baseline_push.returncode == 0, f"[state-sync] machine A baseline push failed: {baseline_push.stderr}", errors)
+
+        # 2. Machine B: clone fresh, setup && pull -> state present, byte-identical.
+        machine_b = temp_root / "machine-b"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_b)], text=True, capture_output=True, check=False)
+        env_b = git_actor_env("MachineB")
+        run_state_sync(machine_b, "setup", env_b)
+        # F1 (§9): setup on a fresh, non-devcontainer clone (no post-start.sh)
+        # must restore the root adapters carried in bootstrap-root/, not just
+        # check out .claude/. Without setup calling restore-root-adapters.sh,
+        # CLAUDE.md would never appear at the repo root outside the devcontainer.
+        check(
+            (machine_b / "CLAUDE.md").is_file(),
+            "[state-sync] setup must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
+            errors,
+        )
+        pull_b = run_state_sync(machine_b, "pull", env_b)
+        check(pull_b.returncode == 0, f"[state-sync] machine B setup+pull failed: {pull_b.stderr}", errors)
+
+        a_plan = machine_a / ".claude" / plan_relpath
+        b_plan = machine_b / ".claude" / plan_relpath
+        check(
+            b_plan.exists() and a_plan.exists() and a_plan.read_bytes() == b_plan.read_bytes(),
+            "[state-sync] machine B pull must restore state byte-identical to machine A",
+            errors,
+        )
+
+        # 3. Divergence: different new files on A and B; B's push auto-rebases.
+        (machine_a / ".claude" / "session_logs" / "a-only.md").write_text("from A\n", encoding="utf-8")
+        push_a_divergent = run_state_sync(machine_a, "push", env_a)
+        check(push_a_divergent.returncode == 0, f"[state-sync] machine A divergent push failed: {push_a_divergent.stderr}", errors)
+
+        (machine_b / ".claude" / "session_logs" / "b-only.md").write_text("from B\n", encoding="utf-8")
+        push_b_divergent = run_state_sync(machine_b, "push", env_b)
+        check(
+            push_b_divergent.returncode == 0,
+            f"[state-sync] machine B push must succeed after auto-rebasing divergent state: {push_b_divergent.stderr}",
+            errors,
+        )
+        check(
+            "WARN" not in (push_b_divergent.stdout + push_b_divergent.stderr),
+            "[state-sync] a clean divergence must rebase without warning",
+            errors,
+        )
+        check(
+            (machine_b / ".claude" / "session_logs" / "a-only.md").exists(),
+            "[state-sync] machine B must see machine A's file after its own push rebases",
+            errors,
+        )
+
+        pull_a_final = run_state_sync(machine_a, "pull", env_a)
+        check(pull_a_final.returncode == 0, "[state-sync] machine A final pull failed", errors)
+        check(
+            (machine_a / ".claude" / "session_logs" / "b-only.md").exists(),
+            "[state-sync] machine A must see machine B's divergent file after pulling",
+            errors,
+        )
+
+        # 4. Conflict: same line of the same plan frontmatter changed on both,
+        # neither having pulled the other's change first.
+        (machine_a / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nEdited by A.\n", encoding="utf-8",
+        )
+        conflict_push_a = run_state_sync(machine_a, "push", env_a)
+        check(conflict_push_a.returncode == 0, f"[state-sync] machine A conflict-setup push failed: {conflict_push_a.stderr}", errors)
+
+        (machine_b / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nEdited by B.\n", encoding="utf-8",
+        )
+        conflict_push_b = run_state_sync(machine_b, "push", env_b)
+        check(
+            conflict_push_b.returncode == 0,
+            "[state-sync] a same-line conflict must still exit 0 (warn, not fail the session)",
+            errors,
+        )
+        check(
+            "WARN" in (conflict_push_b.stdout + conflict_push_b.stderr),
+            "[state-sync] a same-line conflict must print a WARN naming the conflicting file",
+            errors,
+        )
+        check(
+            b_plan.read_text(encoding="utf-8") == "---\nstatus: in-progress\n---\n\nEdited by B.\n",
+            "[state-sync] machine B's local file must be untouched after a failed rebase",
+            errors,
+        )
+        remote_conflict_content = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "show", f"ai-state:{plan_relpath.as_posix()}"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            remote_conflict_content.stdout == "---\nstatus: in-progress\n---\n\nEdited by A.\n",
+            "[state-sync] the remote must still have machine A's version after B's conflicting push fails; nothing lost on either side",
+            errors,
+        )
+
+        # 5. Stop-hook contract: stdin held open (as VS Code / an AI Stop hook
+        # never closes it) must not hang past the 2-second drain.
+        started = time.monotonic()
+        stop_hook_process = subprocess.Popen(
+            ["bash", str(state_sync_script(machine_a)), "push"],
+            cwd=machine_a, env=env_a,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            stop_hook_process.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            stop_hook_process.kill()
+            stop_hook_process.communicate()
+            check(False, "[state-sync] push must return promptly even with stdin held open (Stop-hook contract)", errors)
+        else:
+            elapsed = time.monotonic() - started
+            check(elapsed < 10, f"[state-sync] push with stdin held open took too long ({elapsed:.1f}s)", errors)
+
+        # 6. --state-remote: a fresh install's state lands on that remote, not origin.
+        state_remote = temp_root / "state-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
+        machine_c = temp_root / "machine-c"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_c)], text=True, capture_output=True, check=False)
+        env_c = git_actor_env("MachineC")
+        install_c = subprocess.run(
+            [sys.executable, str(installer), str(machine_c), "--state-remote", str(state_remote)],
+            cwd=REPO_ROOT, env=env_c, text=True, capture_output=True, check=False,
+        )
+        check(install_c.returncode == 0, f"[state-sync] install --state-remote on machine C failed: {install_c.stderr}", errors)
+
+        state_remote_refs = subprocess.run(
+            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            "refs/heads/ai-state" in state_remote_refs.stdout,
+            "[state-sync] --state-remote must push ai-state to the configured remote",
+            errors,
+        )
+        # bare_origin already legitimately has ai-state from machine A/B above,
+        # so the meaningful assertion is which remote machine C's OWN nested
+        # repo is configured against, not whether bare_origin lacks ai-state.
+        nested_remote_url = subprocess.run(
+            ["git", "-C", str(machine_c / ".claude"), "remote", "get-url", "origin"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            nested_remote_url.stdout.strip() == str(state_remote),
+            "[state-sync] --state-remote must configure the nested repo's own remote to that URL, not the outer repo's origin",
+            errors,
+        )
 
 
 def validate_determinism(errors: list[str]) -> None:
@@ -2376,6 +2578,7 @@ def main() -> int:
         validate_docs_parity(errors)
         validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
+        validate_state_sync(errors)
         validate_determinism(errors)
 
     if errors:

@@ -4,6 +4,15 @@
     "SessionStart": [
       {
         "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "cwd": ".",
+        "timeout": 60,
+        "timeoutSec": 60
+      },
+      {
+        "type": "command",
         "bash": ".claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
         "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
         "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
@@ -147,9 +156,9 @@
       },
       {
         "type": "command",
-        "bash": ".claude/hooks/scripts/run-hook.sh hf-ai-sync.sh push-state",
-        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh hf-ai-sync.sh push-state",
-        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh hf-ai-sync.sh push-state",
+        "bash": ".claude/hooks/scripts/run-hook.sh state-sync.sh push",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh push",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh push",
         "cwd": ".",
         "timeout": 180,
         "timeoutSec": 180

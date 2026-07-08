@@ -6,7 +6,8 @@ The repo generates one installable output: `dist/multi-agent/` (gitignored — r
 
 The generated `.devcontainer/` directory is intended to be committed in consumer
 repos. It provides a GPU-capable sandbox and a post-start sync helper that restores
-ignored AI bootstrap/state files from the configured Hugging Face sync path.
+ignored AI bootstrap/state files by checking `.claude/` out from its nested `ai-state`
+git branch (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)).
 
 ## Shared Basis
 

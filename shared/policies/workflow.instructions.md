@@ -151,7 +151,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, and DOCUMENT/LEARN/session-log evidence.
 - PR creation/push is gated on all small plans complete, bypass acknowledgement, and the findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
-- Session stop pushes mutable AI state to the configured Hugging Face bucket when auth is available.
+- Session start/stop pull/push mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`).
 - Runtime hook errors are logged to `.claude/session_logs/hooks-errors.log`.
 
 **Manual reminders still required:**

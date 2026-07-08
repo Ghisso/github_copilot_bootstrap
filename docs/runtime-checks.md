@@ -27,7 +27,8 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
-- `hf-ai-sync.sh`
+- `state-sync.sh`
+- `restore-root-adapters.sh`
 - `session-start-state.sh`
 - `enforce-branch-state.sh`
 - `record-branch-state.sh`
@@ -57,32 +58,30 @@ Both git-hook layers are installed by setting `git config core.hooksPath .claude
 
 The hooks and their shared library (`_lib-frontmatter.sh`) are pure bash with no dependency on `uv`, and are written to the **bash 3.2** baseline — the version macOS still ships as `/bin/bash` — so no bash-4-only builtins (`mapfile`/`readarray`), associative arrays, or negative array indices. This keeps the gates working identically on a stock macOS consumer machine and on the `macos-latest` CI runner (`.github/workflows/validate.yml`), which is where `_lib-frontmatter.sh`'s GNU-vs-BSD `stat`/`find` fallbacks are actually exercised.
 
-`git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored and Hugging Face-synced, a fresh clone has no `.claude/hooks/git-hooks/` until the first sync — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`).
+`git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored, a fresh clone has no `.claude/hooks/git-hooks/` until it is checked out — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`). That window shrank when AI state moved from a Hugging Face bucket to a nested git repo (`plans/adr-002-git-backed-state-sync.md`): `post-start.sh` now checks `.claude/` out via `state-sync.sh setup` using the same git credentials as the code checkout, with no separate authenticated pull to wait on, and sets `core.hooksPath` immediately after.
 
 Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit`). A plain merge commit authors no content of its own, so the hook passes merge commits through unledgered on an implementation branch — the ceremony re-attaches at the next real commit, since the score's `merge_base_sha`/`content_hash` checks force a fresh report once new content lands. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (this is git behavior, not a bootstrap bug); commits they create skip the git layer, but the next real commit on the branch is still gated normally. `git commit --amend` *does* invoke `commit-msg`, and the `content_hash` check is designed to survive a content-preserving amend (the diff against the merge base is unchanged, so a report scored before the amend still matches). **Known, accepted escape:** the `MERGE_HEAD`-based passthrough cannot distinguish a pure merge from `git merge --no-commit` followed by manually staging extra changes before completing the commit — this is a second, undetected way to land ungated content on an implementation branch, alongside the sanctioned `--no-verify` escape. It requires deliberately reaching for `--no-commit`, the same trust boundary as `--no-verify`.
 
-## Devcontainer And HF Sync
+## Devcontainer And Git-Backed State Sync
 
 Generated output includes `.devcontainer/`:
 
-- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers. UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
-- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` is pinned directly (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead). The lower bound is required because `HfApi.sync_bucket` was added in 1.0; without it, sync calls raise `AttributeError` that the broad exception handler swallows silently, causing the script to exit 0 having done nothing. If a project's `pyproject.toml` introduces a transitive dep that would downgrade `huggingface_hub` below 1.0, the `import_hf_api()` function in `hf-ai-sync.py` detects the missing method, emits a named warning, and falls back to the `hf` CLI so the failure is visible rather than silent.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then sets `core.hooksPath` to `.claude/hooks/git-hooks` before calling `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files — so the commit-msg gate is wired the instant the pull populates the hook directory. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
+- `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
+- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere), sets `core.hooksPath` to `.claude/hooks/git-hooks` immediately after — so the commit-msg gate is wired the instant the checkout populates the hook directory — then `state-sync.sh pull` and `restore-root-adapters.sh` (restores `.claude/bootstrap-root/**` to the repo root: `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.). `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
 
-There is **no baked-in default bucket** — a bucket must be configured. The installer
-requires `--bucket <org/bucket[/prefix]>` or `HF_AI_SYNC_BUCKET` and exits with an
-instruction otherwise; it writes the project-specific bucket path (e.g.
-`your-org/your-bucket/your-project`) into `.devcontainer/devcontainer.json`. The sync
-helper resolves settings in this order: explicit CLI arguments, `HF_AI_SYNC_*`
-environment variables, then `.devcontainer` config; with none configured it warns and
-no-ops rather than falling back to any namespace. Auth resolves in this order: `HF_TOKEN`,
-`HUGGING_FACE_HUB_TOKEN`, then the cached token created by `hf auth login` or
-`huggingface-cli login`. Missing auth or bucket access produces warnings and does not
-fail the container start or agent hook.
+There is **no separate credential to configure** — by default the nested `.claude/`
+repo's remote is the outer repo's own `origin`, so it authenticates the same way the
+code checkout does. `install_bootstrap.py --state-remote <git-url>` (env
+`AI_STATE_REMOTE`) points it somewhere else instead (a private personal repo, for
+example); when set, the installer persists `AI_STATE_REMOTE` into
+`.devcontainer/devcontainer.json`'s `containerEnv` so a fresh container clone still
+finds it. A missing remote or network access produces warnings and does not fail
+the container start or agent hook (see `plans/adr-002-git-backed-state-sync.md`).
 
-Prefer CLI sync through `huggingface_hub` over `hf-mount`. The generated devcontainer
-does not require `/dev/fuse` or apparmor overrides. It does set `SYS_ADMIN` and
-`seccomp=unconfined` so `bubblewrap` can create namespaces inside Docker.
+The generated devcontainer does not require `/dev/fuse` or apparmor overrides for
+`huggingface_hub`. It does set `SYS_ADMIN` and `seccomp=unconfined` so `bubblewrap`
+can create namespaces inside Docker.
 
 Codex-specific runtime notes:
 

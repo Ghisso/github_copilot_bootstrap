@@ -190,6 +190,17 @@ def render_shared_basis(target_root: Path, target: str) -> None:
 
 def render_devcontainer(target_root: Path) -> None:
     copy_tree(REPO_ROOT / "shared" / "devcontainer", target_root / ".devcontainer")
+    # A second rendered copy of the two state-sync scripts, reachable BEFORE
+    # .claude/ exists at all: .claude/ is gitignored in consumers, so a fresh
+    # clone has none of it until post-start.sh's own bootstrap run of these
+    # scripts creates it (see the REPO_ROOT-resolution comment at the top of
+    # state-sync.sh). Both copies come from the same shared/ source and are
+    # regenerated together, so they cannot drift.
+    for name in ("state-sync.sh", "restore-root-adapters.sh"):
+        source = REPO_ROOT / "shared" / "hooks" / "scripts" / name
+        destination = target_root / ".devcontainer" / name
+        copy_file(source, destination)
+        ensure_executable(destination)
 
 
 def reset_target(output_root: Path, target: str) -> Path:
@@ -322,8 +333,8 @@ def _claude_hook_cmd(script: str, *args: str) -> str:
 
 
 def render_claude_settings(path: Path) -> None:
-    def cmd(script: str, *args: str) -> dict[str, Any]:
-        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 10}
+    def cmd(script: str, *args: str, timeout: int = 10) -> dict[str, Any]:
+        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": timeout}
 
     def cmd_stop(script: str, *args: str) -> dict[str, Any]:
         return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 180}
@@ -341,6 +352,7 @@ def render_claude_settings(path: Path) -> None:
             "SessionStart": [
                 {
                     "hooks": [
+                        cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "claude-code"),
                         cmd("session-start-state.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
@@ -378,7 +390,7 @@ def render_claude_settings(path: Path) -> None:
                     "hooks": [
                         cmd("session-log.sh", "claude-code"),
                         cmd("stop-session-log-check.sh", "claude-code"),
-                        cmd_stop("hf-ai-sync.sh", "push-state"),
+                        cmd_stop("state-sync.sh", "push"),
                     ]
                 }
             ],
@@ -402,6 +414,7 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "startup|resume|clear",
                     "hooks": [
+                        cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "openai-codex"),
                         cmd("session-start-state.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),
@@ -439,7 +452,7 @@ def render_codex_hooks(path: Path) -> None:
                     "hooks": [
                         cmd("session-log.sh", "openai-codex"),
                         cmd("stop-session-log-check.sh", "openai-codex"),
-                        cmd("hf-ai-sync.sh", "push-state", timeout=180),
+                        cmd("state-sync.sh", "push", timeout=180),
                     ]
                 }
             ],
