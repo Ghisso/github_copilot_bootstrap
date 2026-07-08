@@ -140,6 +140,21 @@ commit_and_reconcile() {
   fi
 }
 
+# Commits whatever is currently uncommitted under .claude/ as a session
+# snapshot. Both cmd_push and cmd_pull call this before touching the remote so
+# the working tree is clean before `git pull --rebase`: a clean tree means the
+# only reachable pull failure is a rebase conflict (which we abort cleanly),
+# never an --autostash pop conflict that would leave the tree half-merged
+# (F4 in §9 of plans/plan-git-state-sync.md).
+commit_local_state() {
+  git -C "$CLAUDE_DIR" add -A
+  if ! git -C "$CLAUDE_DIR" diff --cached --quiet; then
+    local ts
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown-timestamp)"
+    git -C "$CLAUDE_DIR" commit -q -m "session: $ts"
+  fi
+}
+
 # Idempotent: safe to call at the top of pull/push so every entry point works
 # standalone, not just after an explicit `setup` call.
 cmd_setup() {
@@ -148,6 +163,18 @@ cmd_setup() {
   fi
   init_nested_repo
   commit_and_reconcile "bootstrap: init ai-state"
+
+  # D5 / F1 (§9): once .claude/ is first materialised here, restore the
+  # root-level adapter files that live outside .claude/ (carried in
+  # bootstrap-root/). This makes every entry point that first creates .claude/
+  # restore them — a non-devcontainer `setup`, or a `pull`/`push` that reaches
+  # setup — not just the devcontainer post-start.sh. Idempotent: it copies
+  # bytes already committed under bootstrap-root/. post-start.sh keeps its own
+  # explicit restore call for the case where a later `pull` brings a newer one.
+  local restore="$SCRIPT_DIR/restore-root-adapters.sh"
+  if [[ -f "$restore" ]]; then
+    bash "$restore" || warn "restoring root adapters failed; continuing."
+  fi
 }
 
 cmd_pull() {
@@ -160,6 +187,10 @@ cmd_pull() {
     info "pull: origin has no $BRANCH branch yet; nothing to pull."
     return 0
   fi
+
+  # Commit any local edits first so the rebase below runs against a clean tree
+  # (F4): removes the --autostash-pop-conflict path entirely.
+  commit_local_state
 
   local output status
   set +e
@@ -181,12 +212,7 @@ cmd_pull() {
 cmd_push() {
   cmd_setup
 
-  git -C "$CLAUDE_DIR" add -A
-  if ! git -C "$CLAUDE_DIR" diff --cached --quiet; then
-    local ts
-    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown-timestamp)"
-    git -C "$CLAUDE_DIR" commit -q -m "session: $ts"
-  fi
+  commit_local_state
 
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; committed locally only."

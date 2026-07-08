@@ -257,12 +257,19 @@ def sync_state_after_install(
     if state_remote:
         env["AI_STATE_REMOTE"] = state_remote
 
+    # stdin=DEVNULL (F2 in plans/plan-git-state-sync.md §9): state-sync.sh
+    # drains stdin for up to 2s (a hook/task contract). When invoked from this
+    # installer with inherited stdin, an interactive run would block on — and
+    # swallow — terminal input; the installer never reads stdin, so close it.
     if not had_claude_git and had_pre_existing_content:
         # migrate-from-hf owns setup + its own "migrate:" commit + push.
-        subprocess.run(["bash", str(state_sync), "migrate-from-hf"], check=False, cwd=target, env=env)
+        subprocess.run(
+            ["bash", str(state_sync), "migrate-from-hf"],
+            check=False, cwd=target, env=env, stdin=subprocess.DEVNULL,
+        )
         return
 
-    subprocess.run(["bash", str(state_sync), "setup"], check=False, cwd=target, env=env)
+    subprocess.run(["bash", str(state_sync), "setup"], check=False, cwd=target, env=env, stdin=subprocess.DEVNULL)
     # On a truly fresh install, `setup` above already committed everything
     # currently on disk as "bootstrap: init ai-state" (it always commits
     # whatever it finds when .claude/.git doesn't yet exist) — that commit
@@ -285,7 +292,10 @@ def sync_state_after_install(
                 check=False,
             )
 
-    push_result = subprocess.run(["bash", str(state_sync), "push"], check=False, cwd=target, env=env)
+    push_result = subprocess.run(
+        ["bash", str(state_sync), "push"],
+        check=False, cwd=target, env=env, stdin=subprocess.DEVNULL,
+    )
     if push_result.returncode != 0:
         warn("state-sync push reported a non-zero exit; state committed locally, will retry on next sync.")
 

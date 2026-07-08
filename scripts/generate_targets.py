@@ -333,8 +333,8 @@ def _claude_hook_cmd(script: str, *args: str) -> str:
 
 
 def render_claude_settings(path: Path) -> None:
-    def cmd(script: str, *args: str) -> dict[str, Any]:
-        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 10}
+    def cmd(script: str, *args: str, timeout: int = 10) -> dict[str, Any]:
+        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": timeout}
 
     def cmd_stop(script: str, *args: str) -> dict[str, Any]:
         return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 180}
@@ -352,7 +352,7 @@ def render_claude_settings(path: Path) -> None:
             "SessionStart": [
                 {
                     "hooks": [
-                        cmd("state-sync.sh", "pull"),
+                        cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "claude-code"),
                         cmd("session-start-state.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "sessionstart"),
@@ -414,7 +414,7 @@ def render_codex_hooks(path: Path) -> None:
                 {
                     "matcher": "startup|resume|clear",
                     "hooks": [
-                        cmd("state-sync.sh", "pull"),
+                        cmd("state-sync.sh", "pull", timeout=60),
                         cmd("session-log.sh", "openai-codex"),
                         cmd("session-start-state.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "sessionstart"),

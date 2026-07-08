@@ -52,7 +52,12 @@ def migrate_pre_git_state(project: Path, dry_run: bool) -> None:
     print(f"  migrate-from-hf: {claude_dir} predates git-backed state", flush=True)
     if dry_run:
         return
-    subprocess.run(["bash", str(state_sync), "migrate-from-hf"], check=False, cwd=project)
+    # stdin=DEVNULL (F2 §9): state-sync.sh drains stdin for up to 2s; this
+    # updater never reads it, so an interactive run must not block/swallow it.
+    subprocess.run(
+        ["bash", str(state_sync), "migrate-from-hf"],
+        check=False, cwd=project, stdin=subprocess.DEVNULL,
+    )
 
 
 def main() -> None:

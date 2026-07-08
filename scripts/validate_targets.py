@@ -2333,6 +2333,7 @@ def run_state_sync(consumer: Path, mode: str, env: dict[str, str]) -> subprocess
         text=True,
         capture_output=True,
         check=False,
+        stdin=subprocess.DEVNULL,
     )
 
 
@@ -2388,6 +2389,15 @@ def validate_state_sync(errors: list[str]) -> None:
         subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_b)], text=True, capture_output=True, check=False)
         env_b = git_actor_env("MachineB")
         run_state_sync(machine_b, "setup", env_b)
+        # F1 (§9): setup on a fresh, non-devcontainer clone (no post-start.sh)
+        # must restore the root adapters carried in bootstrap-root/, not just
+        # check out .claude/. Without setup calling restore-root-adapters.sh,
+        # CLAUDE.md would never appear at the repo root outside the devcontainer.
+        check(
+            (machine_b / "CLAUDE.md").is_file(),
+            "[state-sync] setup must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
+            errors,
+        )
         pull_b = run_state_sync(machine_b, "pull", env_b)
         check(pull_b.returncode == 0, f"[state-sync] machine B setup+pull failed: {pull_b.stderr}", errors)
 

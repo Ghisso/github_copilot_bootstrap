@@ -8,8 +8,8 @@
         "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
         "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
         "cwd": ".",
-        "timeout": 10,
-        "timeoutSec": 10
+        "timeout": 60,
+        "timeoutSec": 60
       },
       {
         "type": "command",
