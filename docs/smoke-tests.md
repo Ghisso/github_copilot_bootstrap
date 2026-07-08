@@ -29,7 +29,7 @@ Expected:
 - Codex does not generate deprecated `.codex/rules/` output.
 - Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
 - Generated output contains `templates/plan-big.md`, `templates/plan-small.md`, and `templates/session-log.md`.
-- Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, and `.devcontainer/hf-ai-sync.py`.
+- Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, `.devcontainer/state-sync.sh`, and `.devcontainer/restore-root-adapters.sh`.
 
 ## MCP Routing
 
@@ -58,7 +58,7 @@ Expected:
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
 - PR creation uses `--base dev`, and implementation-branch pushes are blocked until all phases are complete.
-- Stop hooks invoke `hf-ai-sync.sh` to push mutable AI state to Hugging Face.
+- SessionStart/Stop hooks invoke `state-sync.sh` to pull/push mutable AI state on the git-backed `ai-state` branch.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
 - `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
@@ -79,13 +79,13 @@ Expected:
 - A findings report generated pre-commit (its `head_sha` is the certified commit's parent) still satisfies the push gate, since `pre-push` accepts any ancestor of the pushed commit, not only an exact match.
 - All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.
 
-## Devcontainer And HF Sync
+## Devcontainer And Git-Backed State Sync
 
 Expected:
 
 - `.devcontainer/` is trackable and generated AI content is ignored by the installer.
-- The generated devcontainer forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
+- The generated devcontainer forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN` (for the projects' own Hugging Face use, not AI state sync).
 - The generated devcontainer does not require `/dev/fuse` or apparmor overrides, and still includes the `SYS_ADMIN`/`seccomp=unconfined` run args needed by `bubblewrap`.
-- The HF sync helper resolves the bucket from `--bucket` / `HF_AI_SYNC_BUCKET` / installed `.devcontainer` sync settings (no hardcoded default), warns and no-ops when none is configured, and supports dry-run operation without network access.
-- `install_bootstrap.py <repo> --bucket ...` sets `git -C <repo> config core.hooksPath` to `.claude/hooks/git-hooks` and leaves `commit-msg` executable.
-- `post-start.sh` sets `core.hooksPath` before the HF pull; `hf-ai-sync.py`'s post-pull chmod step covers `.claude/hooks/git-hooks/*` (HF sync does not preserve unix permissions).
+- `state-sync.sh` resolves the nested `.claude/` repo's remote from `AI_STATE_REMOTE` / `--state-remote` at install time / the outer repo's own `origin` (no separate credential), warns and stays local-only when none is configured, and never fails a hook or session on a sync problem.
+- `install_bootstrap.py <repo>` (no bucket flag needed) sets `git -C <repo> config core.hooksPath` to `.claude/hooks/git-hooks`, leaves `commit-msg` executable, and creates+pushes the nested `.claude/` ai-state repo with a `bootstrap:`-prefixed commit; `--state-remote <url>` pushes to that remote instead of `origin` and persists it into `.devcontainer/devcontainer.json`.
+- `post-start.sh` runs `state-sync.sh setup` before setting `core.hooksPath`, then `state-sync.sh pull` and `restore-root-adapters.sh`; the checkout inside `setup` already carries the correct executable bits for `.claude/hooks/git-hooks/*` (git preserves them, unlike the retired HF bucket sync).

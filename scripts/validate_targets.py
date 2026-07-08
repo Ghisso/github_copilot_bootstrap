@@ -41,7 +41,6 @@ REQUIRED_HOOK_SCRIPTS = (
     "git-protection.sh",
     "context-mode-dispatch.sh",
     "session-log.sh",
-    "hf-ai-sync.sh",
     "state-sync.sh",
     "restore-root-adapters.sh",
     "enforce-branch-state.sh",
@@ -1989,7 +1988,8 @@ def validate_support_files(errors: list[str]) -> None:
         "hooks/scripts/git-protection.sh",
         "hooks/scripts/context-mode-dispatch.sh",
         "hooks/scripts/session-log.sh",
-        "hooks/scripts/hf-ai-sync.sh",
+        "hooks/scripts/state-sync.sh",
+        "hooks/scripts/restore-root-adapters.sh",
         "hooks/scripts/_lib-frontmatter.sh",
         "hooks/scripts/enforce-branch-state.sh",
         "hooks/scripts/record-branch-state.sh",
@@ -2020,7 +2020,6 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         "devcontainer.json",
         "Dockerfile",
         "post-start.sh",
-        "hf-ai-sync.py",
         "state-sync.sh",
         "restore-root-adapters.sh",
     )
@@ -2107,66 +2106,6 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull, then restore-root-adapters.sh, in that order",
             errors,
         )
-
-    helper = devcontainer_root / "hf-ai-sync.py"
-    scrubbed_env = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"HF_AI_SYNC_BUCKET", "HF_AI_SYNC_PREFIX"}
-    }
-    if helper.exists():
-        # R-SYNC-01: a configured bucket is honored; there is no baked default.
-        configured_env = {**scrubbed_env, "HF_AI_SYNC_BUCKET": "example-org/example-bucket"}
-        result = subprocess.run(
-            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT,
-            env=configured_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(result.returncode == 0, f"HF sync helper dry-run status failed: {result.stderr}", errors)
-        check("example-org/example-bucket" in result.stdout, "HF sync helper must honor the configured bucket", errors)
-
-        # R-SYNC-04: push-state prunes only with --prune (delete off by default).
-        default_push = subprocess.run(
-            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
-        )
-        check("delete=False" in default_push.stdout, "push-state must not delete remote state by default", errors)
-        prune_push = subprocess.run(
-            [sys.executable, str(helper), "push-state", "--repo-root", str(REPO_ROOT), "--dry-run", "--prune"],
-            cwd=REPO_ROOT, env=configured_env, text=True, capture_output=True, check=False,
-        )
-        check("delete=True" in prune_push.stdout, "push-state --prune must reconcile (delete) remote state", errors)
-        # R-SYNC-04: MEMORY.md is single-homed in state, not the bootstrap bundle.
-        helper_src = read(helper)
-        check(
-            '".claude/MEMORY.md"' not in helper_src,
-            "MEMORY.md must not be in BOOTSTRAP_PATHS (single-homed in state)",
-            errors,
-        )
-        # R-HOOKS-07: HF sync does not preserve unix permissions, so a
-        # pull-bootstrap must re-chmod the git-hooks dir or a refreshed
-        # commit-msg silently stops running (git ignores non-executable hooks).
-        check(
-            ".claude/hooks/git-hooks" in helper_src,
-            "HF sync helper must restore the git-hooks executable bit after pull",
-            errors,
-        )
-
-        # R-SYNC-01: with no bucket configured the helper is a graceful no-op.
-        no_bucket = subprocess.run(
-            [sys.executable, str(helper), "status", "--repo-root", str(REPO_ROOT), "--dry-run"],
-            cwd=REPO_ROOT,
-            env=scrubbed_env,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        combined = no_bucket.stdout + no_bucket.stderr
-        check(no_bucket.returncode == 0, "HF sync helper must not hard-fail without a bucket", errors)
-        check("no HF sync bucket configured" in combined, "HF sync helper must explain a missing bucket", errors)
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
     git_identity_env = {

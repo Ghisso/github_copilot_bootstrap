@@ -69,6 +69,11 @@ settings.local.json
 *.local.*
 __pycache__/
 *.pyc
+# Retired hf-ai-sync.py pull-time snapshots (R-SYNC-05e). Nothing on the
+# state-sync.sh path creates this directory anymore, but a consumer
+# migrating from a pre-git-backed-state install may still have one on disk;
+# never let migrate-from-hf commit it into ai-state history.
+.state_backups/
 EOF
 }
 
