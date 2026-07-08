@@ -53,6 +53,9 @@ REQUIRED_HOOK_SCRIPTS = (
 REQUIRED_HOOK_LIBRARIES = (
     "_lib-frontmatter.sh",
 )
+REQUIRED_GIT_HOOKS = (
+    "commit-msg",
+)
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
     "Review Pass (Sonnet)",
@@ -427,6 +430,16 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         for script in REQUIRED_HOOK_LIBRARIES:
             path = hook_root / script
             check(path.exists(), f"missing hook library: {path}", errors)
+
+    # R-HOOKS-07: the deterministic commit-msg git hook lives beside the
+    # PreToolUse scripts but git invokes it directly, so it needs its own
+    # presence/executability assertion (generate_targets.py's ensure_executable
+    # loop is what should satisfy this).
+    git_hook_root = TARGET_ROOT / ".claude" / "hooks" / "git-hooks"
+    for script in REQUIRED_GIT_HOOKS:
+        path = git_hook_root / script
+        check(path.exists(), f"missing git hook: {path}", errors)
+        check(path.exists() and path.stat().st_mode & 0o111, f"git hook is not executable: {path}", errors)
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
@@ -1104,7 +1117,9 @@ def validate_generated_scripts(errors: list[str]) -> None:
             except py_compile.PyCompileError as error:
                 errors.append(f"generated Python script syntax failed: {script}: {error}")
 
-    shell_scripts = sorted(DIST_ROOT.rglob("*.sh"))
+    # git-hooks/* files are named for git's hook-discovery convention (no .sh
+    # suffix), so the glob above would silently skip them.
+    shell_scripts = sorted(DIST_ROOT.rglob("*.sh")) + sorted(DIST_ROOT.rglob("git-hooks/*"))
     for script in shell_scripts:
         result = subprocess.run(
             ["bash", "-n", str(script)],
