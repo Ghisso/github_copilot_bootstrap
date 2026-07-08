@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 from pathlib import Path
 
@@ -724,6 +725,18 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True, check=False)
+
+
+def git_actor_env(actor: str) -> dict[str, str]:
+    """A hermetic git identity for temp-repo tests: real CI runners and stock
+    machines are not guaranteed to have a global user.name/user.email set."""
+    return {
+        **os.environ,
+        "GIT_AUTHOR_NAME": actor,
+        "GIT_AUTHOR_EMAIL": f"{actor.lower()}@example.com",
+        "GIT_COMMITTER_NAME": actor,
+        "GIT_COMMITTER_EMAIL": f"{actor.lower()}@example.com",
+    }
 
 
 def write(path: Path, text: str) -> None:
@@ -2108,13 +2121,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
-    git_identity_env = {
-        **os.environ,
-        "GIT_AUTHOR_NAME": "Validator",
-        "GIT_AUTHOR_EMAIL": "validator@example.com",
-        "GIT_COMMITTER_NAME": "Validator",
-        "GIT_COMMITTER_EMAIL": "validator@example.com",
-    }
+    git_identity_env = git_actor_env("Validator")
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_repo = Path(temp_dir_name) / "consumer"
         temp_repo.mkdir()
@@ -2308,6 +2315,211 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(state_ignored.returncode == 0, "--commit-copilot-surface must still ignore .claude state", errors)
 
 
+def state_sync_script(consumer: Path) -> Path:
+    # Mirrors post-start.sh: before .claude/ exists at all (a fresh clone
+    # that has never run `setup`), the only reachable copy is the one
+    # rendered into the trackable .devcontainer/.
+    claude_copy = consumer / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if claude_copy.is_file():
+        return claude_copy
+    return consumer / ".devcontainer" / "state-sync.sh"
+
+
+def run_state_sync(consumer: Path, mode: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(state_sync_script(consumer)), mode],
+        cwd=consumer,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def validate_state_sync(errors: list[str]) -> None:
+    """R-SYNC-05f: adversarial end-to-end coverage of the git-backed state
+    sync mechanism (state-sync.sh) across two simulated "machines" sharing a
+    bare origin, mirroring the manual acceptance procedure in
+    plans/plan-git-state-sync.md Phase 6."""
+    installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_root = Path(temp_dir_name)
+        bare_origin = temp_root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(bare_origin)], check=False)
+        subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+            check=False,
+        )
+
+        # 1. Install on machine A: ai-state exists on the remote; nested repo checked out.
+        machine_a = temp_root / "machine-a"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_a)], text=True, capture_output=True, check=False)
+        env_a = git_actor_env("MachineA")
+        install_a = subprocess.run(
+            [sys.executable, str(installer), str(machine_a)],
+            cwd=REPO_ROOT, env=env_a, text=True, capture_output=True, check=False,
+        )
+        check(install_a.returncode == 0, f"[state-sync] install on machine A failed: {install_a.stderr}", errors)
+        subprocess.run(["git", "-C", str(machine_a), "add", ".devcontainer", ".gitignore"], check=False)
+        subprocess.run(
+            ["git", "-C", str(machine_a), "commit", "-q", "-m", "chore: add AI devcontainer bootstrap"],
+            env=env_a, check=False,
+        )
+        subprocess.run(["git", "-C", str(machine_a), "push", "-q", "origin", "HEAD:refs/heads/main"], check=False)
+
+        remote_refs = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check("refs/heads/ai-state" in remote_refs.stdout, "[state-sync] install must push ai-state to the bare origin", errors)
+        check((machine_a / ".claude" / ".git").is_dir(), "[state-sync] install must check out a nested .claude/ repo", errors)
+
+        # A shared plan file with frontmatter, common to both machines from
+        # here on, so step 4 below can conflict on one of its lines.
+        plan_relpath = Path("plans") / "state-sync-test.md"
+        (machine_a / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nShared baseline plan.\n", encoding="utf-8",
+        )
+        baseline_push = run_state_sync(machine_a, "push", env_a)
+        check(baseline_push.returncode == 0, f"[state-sync] machine A baseline push failed: {baseline_push.stderr}", errors)
+
+        # 2. Machine B: clone fresh, setup && pull -> state present, byte-identical.
+        machine_b = temp_root / "machine-b"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_b)], text=True, capture_output=True, check=False)
+        env_b = git_actor_env("MachineB")
+        run_state_sync(machine_b, "setup", env_b)
+        pull_b = run_state_sync(machine_b, "pull", env_b)
+        check(pull_b.returncode == 0, f"[state-sync] machine B setup+pull failed: {pull_b.stderr}", errors)
+
+        a_plan = machine_a / ".claude" / plan_relpath
+        b_plan = machine_b / ".claude" / plan_relpath
+        check(
+            b_plan.exists() and a_plan.exists() and a_plan.read_bytes() == b_plan.read_bytes(),
+            "[state-sync] machine B pull must restore state byte-identical to machine A",
+            errors,
+        )
+
+        # 3. Divergence: different new files on A and B; B's push auto-rebases.
+        (machine_a / ".claude" / "session_logs" / "a-only.md").write_text("from A\n", encoding="utf-8")
+        push_a_divergent = run_state_sync(machine_a, "push", env_a)
+        check(push_a_divergent.returncode == 0, f"[state-sync] machine A divergent push failed: {push_a_divergent.stderr}", errors)
+
+        (machine_b / ".claude" / "session_logs" / "b-only.md").write_text("from B\n", encoding="utf-8")
+        push_b_divergent = run_state_sync(machine_b, "push", env_b)
+        check(
+            push_b_divergent.returncode == 0,
+            f"[state-sync] machine B push must succeed after auto-rebasing divergent state: {push_b_divergent.stderr}",
+            errors,
+        )
+        check(
+            "WARN" not in (push_b_divergent.stdout + push_b_divergent.stderr),
+            "[state-sync] a clean divergence must rebase without warning",
+            errors,
+        )
+        check(
+            (machine_b / ".claude" / "session_logs" / "a-only.md").exists(),
+            "[state-sync] machine B must see machine A's file after its own push rebases",
+            errors,
+        )
+
+        pull_a_final = run_state_sync(machine_a, "pull", env_a)
+        check(pull_a_final.returncode == 0, "[state-sync] machine A final pull failed", errors)
+        check(
+            (machine_a / ".claude" / "session_logs" / "b-only.md").exists(),
+            "[state-sync] machine A must see machine B's divergent file after pulling",
+            errors,
+        )
+
+        # 4. Conflict: same line of the same plan frontmatter changed on both,
+        # neither having pulled the other's change first.
+        (machine_a / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nEdited by A.\n", encoding="utf-8",
+        )
+        conflict_push_a = run_state_sync(machine_a, "push", env_a)
+        check(conflict_push_a.returncode == 0, f"[state-sync] machine A conflict-setup push failed: {conflict_push_a.stderr}", errors)
+
+        (machine_b / ".claude" / plan_relpath).write_text(
+            "---\nstatus: in-progress\n---\n\nEdited by B.\n", encoding="utf-8",
+        )
+        conflict_push_b = run_state_sync(machine_b, "push", env_b)
+        check(
+            conflict_push_b.returncode == 0,
+            "[state-sync] a same-line conflict must still exit 0 (warn, not fail the session)",
+            errors,
+        )
+        check(
+            "WARN" in (conflict_push_b.stdout + conflict_push_b.stderr),
+            "[state-sync] a same-line conflict must print a WARN naming the conflicting file",
+            errors,
+        )
+        check(
+            b_plan.read_text(encoding="utf-8") == "---\nstatus: in-progress\n---\n\nEdited by B.\n",
+            "[state-sync] machine B's local file must be untouched after a failed rebase",
+            errors,
+        )
+        remote_conflict_content = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "show", f"ai-state:{plan_relpath.as_posix()}"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            remote_conflict_content.stdout == "---\nstatus: in-progress\n---\n\nEdited by A.\n",
+            "[state-sync] the remote must still have machine A's version after B's conflicting push fails; nothing lost on either side",
+            errors,
+        )
+
+        # 5. Stop-hook contract: stdin held open (as VS Code / an AI Stop hook
+        # never closes it) must not hang past the 2-second drain.
+        started = time.monotonic()
+        stop_hook_process = subprocess.Popen(
+            ["bash", str(state_sync_script(machine_a)), "push"],
+            cwd=machine_a, env=env_a,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        try:
+            stop_hook_process.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            stop_hook_process.kill()
+            stop_hook_process.communicate()
+            check(False, "[state-sync] push must return promptly even with stdin held open (Stop-hook contract)", errors)
+        else:
+            elapsed = time.monotonic() - started
+            check(elapsed < 10, f"[state-sync] push with stdin held open took too long ({elapsed:.1f}s)", errors)
+
+        # 6. --state-remote: a fresh install's state lands on that remote, not origin.
+        state_remote = temp_root / "state-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
+        machine_c = temp_root / "machine-c"
+        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_c)], text=True, capture_output=True, check=False)
+        env_c = git_actor_env("MachineC")
+        install_c = subprocess.run(
+            [sys.executable, str(installer), str(machine_c), "--state-remote", str(state_remote)],
+            cwd=REPO_ROOT, env=env_c, text=True, capture_output=True, check=False,
+        )
+        check(install_c.returncode == 0, f"[state-sync] install --state-remote on machine C failed: {install_c.stderr}", errors)
+
+        state_remote_refs = subprocess.run(
+            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            "refs/heads/ai-state" in state_remote_refs.stdout,
+            "[state-sync] --state-remote must push ai-state to the configured remote",
+            errors,
+        )
+        # bare_origin already legitimately has ai-state from machine A/B above,
+        # so the meaningful assertion is which remote machine C's OWN nested
+        # repo is configured against, not whether bare_origin lacks ai-state.
+        nested_remote_url = subprocess.run(
+            ["git", "-C", str(machine_c / ".claude"), "remote", "get-url", "origin"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            nested_remote_url.stdout.strip() == str(state_remote),
+            "[state-sync] --state-remote must configure the nested repo's own remote to that URL, not the outer repo's origin",
+            errors,
+        )
+
+
 def validate_determinism(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "dist"
@@ -2356,6 +2568,7 @@ def main() -> int:
         validate_docs_parity(errors)
         validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
+        validate_state_sync(errors)
         validate_determinism(errors)
 
     if errors:
