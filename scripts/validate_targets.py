@@ -1273,6 +1273,63 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # exactly one other input and restores it before the next.
         write_score(score_report(head_sha, content_hash))
 
+        # R-SCORE-03e: findings-report axis probes, score held valid throughout.
+        clear_findings()
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a commit with a valid score but no findings report", errors)
+
+        write_findings(
+            findings_report(
+                head_sha, content_hash,
+                findings=[{"severity": "CRITICAL", "title": "sql injection in query builder", "file": "work.txt"}],
+                counts={"critical": 1, "major": 0, "minor": 0},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a findings report with a CRITICAL finding", errors)
+        check(
+            "sql injection in query builder" in result.stderr,
+            "commit-msg hook's CRITICAL-finding failure must name the finding",
+            errors,
+        )
+
+        write_findings(findings_report(head_sha, content_hash, content_hash="deadbeef"))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a stale findings content_hash", errors)
+
+        # R-SCORE-03e: select the newest findings report by generated_at, not
+        # filename order - mirrors the score report's R-SCORE-02 rule. The
+        # older report has a lexically-LATER filename and is clean; the newer
+        # one has a lexically-EARLIER filename and carries a CRITICAL finding.
+        clear_findings()
+        write(
+            reports_dir / "findings-zzz.json",
+            json.dumps(findings_report(head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n",
+        )
+        write(
+            reports_dir / "findings-aaa.json",
+            json.dumps(
+                findings_report(
+                    head_sha, content_hash,
+                    generated_at="2099-06-01T00:00:00Z",
+                    findings=[{"severity": "CRITICAL", "title": "newer critical wins", "file": "work.txt"}],
+                    counts={"critical": 1, "major": 0, "minor": 0},
+                ),
+                indent=2,
+            )
+            + "\n",
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must select the newest findings report by generated_at", errors)
+        check(
+            "newer critical wins" in result.stderr,
+            "commit-msg hook must use the newer (CRITICAL) findings report, not the lexically-later clean one",
+            errors,
+        )
+
+        # Restore the clean baseline before the remaining axis probes below.
+        write_findings(findings_report(head_sha, content_hash))
+
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(result.returncode != 0, "commit-msg hook must block an incomplete small plan", errors)
@@ -1386,6 +1443,29 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                 input=diff_out, text=True, capture_output=True, check=False,
             ).stdout.strip()
 
+        def write_score_report(**overrides: object) -> None:
+            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "score": 95,
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "phase-work.txt"),
+                "dirty": False,
+                "tests_passed": True,
+                "tests_skipped": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": ["phase-work.txt"],
+            }
+            report.update(overrides)
+            for stale in reports_dir.glob("score-*.json"):
+                stale.unlink()
+            write(reports_dir / "score-test.json", json.dumps(report, indent=2) + "\n")
+
         def write_findings_report(**overrides: object) -> None:
             # Matches the real workflow: record_findings.py runs during
             # REVIEW, before the commit it certifies lands - so head_sha here
@@ -1420,6 +1500,12 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         git(repo, "push", "origin", "dev")
 
         git(repo, "checkout", "-b", "foo_implementation")
+        run_hook(
+            lifecycle_script(repo, "record-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
         write_small_plan(repo, status="in-progress")
         write(repo / "phase-work.txt", "phase work\n")
         git(repo, "add", ".")
@@ -1456,6 +1542,39 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         check(
             push_result.returncode == 0,
             f"pre-push hook must allow a push once all phases are complete: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+
+        # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
+        # allow the commit (the commit gate only checks critical) while
+        # blocking the push (the push gate additionally checks major).
+        write(repo / "major-work.txt", "major work\n")
+        git(repo, "add", "major-work.txt")
+        write_score_report()
+        write_findings_report(
+            counts={"critical": 0, "major": 2, "minor": 0},
+            findings=[
+                {"severity": "MAJOR", "title": "unbounded query", "file": "major-work.txt"},
+                {"severity": "MAJOR", "title": "missing pagination", "file": "major-work.txt"},
+            ],
+        )
+        commit_result = git(repo, "commit", "-m", "phase 1 followup with major findings")
+        check(
+            commit_result.returncode == 0,
+            f"commit-msg hook must allow a commit whose findings report has MAJOR findings but zero CRITICAL: {commit_result.stdout}{commit_result.stderr}",
+            errors,
+        )
+        major_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            major_push.returncode != 0,
+            "pre-push hook must block a push whose findings report has MAJOR findings",
+            errors,
+        )
+        check(
+            "unbounded query" in major_push.stderr or "missing pagination" in major_push.stderr,
+            "pre-push hook's MAJOR-finding failure must name at least one finding",
             errors,
         )
 
