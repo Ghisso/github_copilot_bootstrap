@@ -106,4 +106,8 @@ Each agent contains:
 
 The generator derives Copilot, Claude Code, and Codex adapters from those two files. Copilot model fields are target bindings, not portable semantics. GitHub Copilot agent `model` fields must be a single supported Copilot model string. Claude and Codex adapters must not include Copilot model pins. Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` adapters that point to `.claude/agents/`. Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant `[features]` block (hooks are on by default) and wires the documented `PreCompact` event.
 
+## Design Decisions
+
+- [ADR-001: Multi-target bootstrap over native per-platform packaging](adr-001-multi-target-lcd.md) — why this repo generates thin adapters for Copilot/Claude/Codex from one shared basis instead of shipping Claude-native plugin packaging, what that costs, and the trigger for revisiting it.
+
 The unified `reviewer` runs both review passes itself (a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive), so it is a single-nesting-level operation that executes identically on every runtime — there are no separate review-helper agents. The orchestrator is the main-thread persona: it holds `edit`+`execute` and owns the branch/commit/PR and memory/session-log ceremony itself rather than delegating it. UI work goes through the `coder` (which loads the `gradio-streamlit` skill); there is no separate designer agent. The `verifier` is the single owner of the persisted score report.

@@ -469,3 +469,5 @@ If you customize it, prioritize:
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
+
+See [docs/adr-001-multi-target-lcd.md](docs/adr-001-multi-target-lcd.md) for the recorded decision behind supporting Copilot, Claude, and Codex from one shared basis instead of native Claude plugin packaging.
