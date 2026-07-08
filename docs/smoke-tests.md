@@ -65,6 +65,11 @@ Expected:
 - The `git ci` alias (`git config alias.ci commit`) and `git -C <path> commit` invoked from outside the repo are rejected identically to a bare invalid `git commit` — there is no command string for either to evade.
 - Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
 - `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
+- `.claude/hooks/git-hooks/pre-push` exists and is executable in generated output; it shares `assert_push_invariants` with `enforce-pr-gate.sh`.
+- With `core.hooksPath` set to the generated `git-hooks` directory, pushing a `<plan_name>_implementation` ref with an incomplete small plan, a missing commit-per-phase, or an unacknowledged bypass log is rejected by git and names the phase; a push after all phases are complete succeeds.
+- Pushing `dev`/`main`, or deleting a branch (`git push origin :foo_implementation`), passes through `pre-push` regardless of ceremony state.
+- `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
+- `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
 
 ## Devcontainer And HF Sync
 

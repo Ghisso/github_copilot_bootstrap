@@ -631,3 +631,72 @@ assert_commit_invariants() {
     failures+=("LEARN evidence missing - update .claude/MEMORY.md or add [LEARN] none - no new lessons this session to closeout log")
   fi
 }
+
+# Single home for the push/PR ceremony shared by every push gate entry point
+# (PreToolUse `enforce-pr-gate.sh` and the `pre-push` git hook). Branch-shape
+# is deliberately NOT checked here, mirroring assert_commit_invariants above:
+# callers diverge on it (docs/plan-post-review-hardening.md Phase 3), so
+# `branch` is assumed already valid (an <plan>_implementation branch).
+#
+# `local_sha` is the sha being pushed for this ref, NOT necessarily HEAD -
+# a caller pushing a branch it doesn't have checked out (or the pre-push
+# hook, which reads ref lines from stdin) must gate the pushed commit, not
+# whatever happens to be checked out. Callers pass "HEAD" when the two
+# coincide (the PreToolUse gate always evaluates the agent's own HEAD).
+#
+# Appends failure messages to a `failures` array that the CALLER must declare
+# (`failures=()`) before calling; see assert_commit_invariants for the same
+# dynamic-scoping convention. The gh/PR-shape check (`--base dev`) has no
+# pre-push analog and stays in the PreToolUse caller.
+assert_push_invariants() {
+  local repo_root="$1"
+  local branch="$2"
+  local local_sha="$3"
+  local slug="${branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  if [[ ! -f "$big_plan" ]]; then
+    failures+=("missing big-plan file: .claude/plans/$slug.md")
+    return
+  fi
+
+  local -a phases
+  mapfile -t phases < <(fm_read_list "$big_plan" "phases")
+  if [[ "${#phases[@]}" -eq 0 ]]; then
+    failures+=("$big_plan has no phases list")
+    return
+  fi
+
+  local phase small_plan status
+  for phase in "${phases[@]}"; do
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    if [[ ! -f "$small_plan" ]]; then
+      failures+=("missing small-plan file: .claude/plans/$phase.md")
+      continue
+    fi
+    status="$(fm_read "$small_plan" "status" || true)"
+    if [[ "$status" != "complete" ]]; then
+      failures+=("all small plans must be complete before PR/push; $phase is ${status:-missing-status}")
+    fi
+  done
+
+  local commit_count
+  commit_count="$(git -C "$repo_root" rev-list --count "dev..$local_sha" 2>/dev/null || echo 0)"
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "${#phases[@]}" ]]; then
+    failures+=("implementation branch must have at least one commit per small plan before PR/push")
+  fi
+
+  local started_at bypass_ack
+  started_at="$(fm_read "$big_plan" "started_at" || true)"
+  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
+  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
+    local line timestamp
+    while IFS= read -r line; do
+      timestamp="${line%%,*}"
+      [[ "$line" == *"branch=$branch"* ]] || continue
+      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
+        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before opening a PR")
+        break
+      fi
+    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
+  fi
+}

@@ -55,6 +55,7 @@ REQUIRED_HOOK_LIBRARIES = (
 )
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
+    "pre-push",
 )
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
@@ -714,6 +715,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
     validate_lifecycle_hook_guardrails(errors)
     validate_commit_msg_git_hook(errors)
+    validate_pre_push_git_hook(errors)
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -1104,7 +1106,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check('"permissionDecision":"deny"' in stdout, "PR gate must deny --base main", errors)
 
 
-def install_commit_msg_hook(repo: Path) -> None:
+def install_git_hooks(repo: Path) -> None:
     git_hook_root = repo / ".claude" / "hooks" / "git-hooks"
     shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "git-hooks", git_hook_root)
     for hook in git_hook_root.glob("*"):
@@ -1118,7 +1120,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
     evasion paths this deterministic layer exists to close."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
-        install_commit_msg_hook(repo)
+        install_git_hooks(repo)
         write_big_plan(repo)
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
@@ -1282,6 +1284,116 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(
             post_merge_result.returncode != 0,
             "commit-msg hook must still block a normal commit with invalid state right after a merge passthrough",
+            errors,
+        )
+
+
+def validate_pre_push_git_hook(errors: list[str]) -> None:
+    """R-HOOKS-09: the pre-push git hook must mirror enforce-pr-gate.sh's
+    push-invariant contract (assert_push_invariants) for REAL git pushes to a
+    bare remote, gating the ref/sha actually being pushed."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)], text=True, capture_output=True, check=False
+        )
+
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        initial_push = git(repo, "push", "origin", "dev")
+        check(initial_push.returncode == 0, f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}", errors)
+
+        write_big_plan(repo)
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "add big plan", "--no-verify")
+        git(repo, "push", "origin", "dev")
+
+        git(repo, "checkout", "-b", "foo_implementation")
+        write_small_plan(repo, status="in-progress")
+        write(repo / "phase-work.txt", "phase work\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "phase 1 work", "--no-verify")
+
+        # Incomplete small plan -> push blocked, stderr names the phase.
+        push_result = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            push_result.returncode != 0,
+            f"pre-push hook must block a push with an incomplete small plan: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+        check("phase-one" in push_result.stderr, "pre-push hook failure must name the incomplete phase", errors)
+
+        # Complete the small plan/closeout/LEARN so the commit-count check
+        # (>= one commit per phase) is also satisfied.
+        write_small_plan(repo, status="complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        )
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "phase 1 closeout", "--no-verify")
+
+        push_result = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            push_result.returncode == 0,
+            f"pre-push hook must allow a push once all phases are complete: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+
+        # D4-B: dev passthrough regardless of ceremony state.
+        git(repo, "checkout", "dev")
+        write(repo / "dev-arbitrary.txt", "dev\n")
+        git(repo, "add", "dev-arbitrary.txt")
+        git(repo, "commit", "-m", "arbitrary dev commit", "--no-verify")
+        dev_push = subprocess.run(
+            ["git", "push", "origin", "dev"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            dev_push.returncode == 0,
+            f"pre-push hook must pass through pushes on dev regardless of ceremony state: {dev_push.stdout}{dev_push.stderr}",
+            errors,
+        )
+
+        # Break the ceremony again, then use --no-verify as the sanctioned
+        # manual escape from the pre-push gate.
+        git(repo, "checkout", "foo_implementation")
+        write_small_plan(repo, status="in-progress")
+        write(repo / "break-ceremony.txt", "break\n")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "break ceremony again", "--no-verify")
+        blocked_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+        )
+        check(
+            blocked_push.returncode != 0,
+            "pre-push hook must still block a push with broken ceremony before the --no-verify case",
+            errors,
+        )
+        escape_push = subprocess.run(
+            ["git", "push", "--no-verify", "origin", "foo_implementation"],
+            cwd=repo, text=True, capture_output=True, check=False,
+        )
+        check(
+            escape_push.returncode == 0,
+            f"git push --no-verify must bypass the pre-push gate: {escape_push.stdout}{escape_push.stderr}",
+            errors,
+        )
+
+        # Branch deletion passthrough: the ref already exists on the remote
+        # from the successful pushes above.
+        delete_push = subprocess.run(
+            ["git", "push", "origin", "--delete", "foo_implementation"],
+            cwd=repo, text=True, capture_output=True, check=False,
+        )
+        check(
+            delete_push.returncode == 0,
+            f"pre-push hook must allow branch deletion pushes: {delete_push.stdout}{delete_push.stderr}",
             errors,
         )
 
