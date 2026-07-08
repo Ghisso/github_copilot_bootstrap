@@ -1377,6 +1377,43 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         initial_push = git(repo, "push", "origin", "dev")
         check(initial_push.returncode == 0, f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}", errors)
 
+        reports_dir = repo / ".claude" / "quality_reports"
+
+        def content_hash_for(base: str) -> str:
+            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", base).stdout
+            return subprocess.run(
+                ["git", "-C", str(repo), "hash-object", "--stdin"],
+                input=diff_out, text=True, capture_output=True, check=False,
+            ).stdout.strip()
+
+        def write_findings_report(**overrides: object) -> None:
+            # Matches the real workflow: record_findings.py runs during
+            # REVIEW, before the commit it certifies lands - so head_sha here
+            # is that commit's PARENT, never the commit itself. This is why
+            # assert_push_invariants checks head_sha as an ancestor of the
+            # pushed sha, not an exact match (a report generated pre-commit
+            # can never equal the branch tip once one or more commits land).
+            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "phase-work.txt"),
+                "dirty": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": ["phase-work.txt"],
+            }
+            report.update(overrides)
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+            write(reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n")
+
         write_big_plan(repo)
         git(repo, "add", ".")
         git(repo, "commit", "-m", "add big plan", "--no-verify")
@@ -1407,6 +1444,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
         git(repo, "add", ".")
+        # Generated pre-commit (matching REVIEW-before-COMMIT in the real
+        # workflow): head_sha here is the parent of the commit below, so this
+        # exercises the ancestor relation, not a same-sha coincidence.
+        write_findings_report()
         git(repo, "commit", "-m", "phase 1 closeout", "--no-verify")
 
         push_result = subprocess.run(
