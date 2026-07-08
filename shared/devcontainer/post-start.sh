@@ -22,6 +22,15 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
   sudo chown -R "$(id -u):$(id -g)" "$REPO_ROOT/.git" 2>/dev/null \
     || warn "could not fix .git ownership; git writes may fail."
 fi
+
+# Configure this before the HF pull below populates .claude/hooks/git-hooks/,
+# so there is no window where a fresh container is ungated because nobody
+# re-ran this after the pull.
+if [[ -d "$REPO_ROOT/.git" ]]; then
+  git -C "$REPO_ROOT" config core.hooksPath .claude/hooks/git-hooks \
+    || warn "could not set core.hooksPath; the commit-msg gate will not run."
+fi
+
 HELPER="$SCRIPT_DIR/hf-ai-sync.py"
 
 if ! command -v python3 >/dev/null 2>&1; then

@@ -1414,6 +1414,17 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         post_start_text = read(post_start)
         check("python3 \"$@\"" in post_start_text, "post-start must run the HF helper with system python3", errors)
         check("uv run python" not in post_start_text, "post-start must not invoke project uv for HF sync", errors)
+        # R-HOOKS-07: set before the HF pull so a fresh container clone is
+        # gated the moment .claude/hooks/git-hooks/ is populated, with no
+        # window where core.hooksPath is unset.
+        hooks_path_index = post_start_text.find("git -C \"$REPO_ROOT\" config core.hooksPath")
+        pull_index = post_start_text.find('"$HELPER" pull')
+        check(hooks_path_index != -1, "post-start must configure core.hooksPath", errors)
+        check(
+            hooks_path_index != -1 and pull_index != -1 and hooks_path_index < pull_index,
+            "post-start must set core.hooksPath before the HF pull",
+            errors,
+        )
 
     helper = devcontainer_root / "hf-ai-sync.py"
     scrubbed_env = {
@@ -1451,6 +1462,14 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(
             '".claude/MEMORY.md"' not in helper_src,
             "MEMORY.md must not be in BOOTSTRAP_PATHS (single-homed in state)",
+            errors,
+        )
+        # R-HOOKS-07: HF sync does not preserve unix permissions, so a
+        # pull-bootstrap must re-chmod the git-hooks dir or a refreshed
+        # commit-msg silently stops running (git ignores non-executable hooks).
+        check(
+            ".claude/hooks/git-hooks" in helper_src,
+            "HF sync helper must restore the git-hooks executable bit after pull",
             errors,
         )
 
@@ -1529,6 +1548,26 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(
             "**Project:** consumer" in installed_workspace,
             "installer must substitute the target repo name into the workspace instructions",
+            errors,
+        )
+
+        # R-HOOKS-07: install must wire the deterministic commit-msg git hook.
+        hooks_path_result = subprocess.run(
+            ["git", "-C", str(temp_repo), "config", "core.hooksPath"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            hooks_path_result.stdout.strip() == ".claude/hooks/git-hooks",
+            f"installer must set core.hooksPath to .claude/hooks/git-hooks (got {hooks_path_result.stdout.strip()!r})",
+            errors,
+        )
+        commit_msg_hook = temp_repo / ".claude" / "hooks" / "git-hooks" / "commit-msg"
+        check(commit_msg_hook.exists(), "installer must copy the commit-msg git hook", errors)
+        check(
+            commit_msg_hook.exists() and commit_msg_hook.stat().st_mode & 0o111,
+            "installer must leave the commit-msg git hook executable",
             errors,
         )
 
