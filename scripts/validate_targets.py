@@ -364,7 +364,7 @@ def validate_model_leaks(errors: list[str]) -> None:
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
-    for server in ("semble", "context-mode"):
+    for server in ("semble", "context-mode", "context7"):
         check(server in github_mcp.get("servers", {}), f"github missing MCP server: {server}", errors)
         check(server in claude_mcp.get("mcpServers", {}), f"claude missing MCP server: {server}", errors)
     check("servers" not in claude_mcp, "Claude .mcp.json must use mcpServers, not servers", errors)
@@ -383,6 +383,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
+    check("[mcp_servers.context7]" in codex_config, "Codex config missing context7 MCP server", errors)
     check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
     # R-CODEX-01: skill paths point at the SKILL.md file, not the directory.
     check('/SKILL.md"' in codex_config, "Codex skill paths must point at the SKILL.md file", errors)

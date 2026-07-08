@@ -35,13 +35,14 @@ Expected:
 
 Expected:
 
-- GitHub and Claude JSON MCP files include `semble` and `context-mode`.
-- Codex config includes `[mcp_servers.semble]` and `[mcp_servers.context-mode]`.
+- GitHub and Claude JSON MCP files include `semble`, `context-mode`, and `context7`.
+- Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context-mode]`, and `[mcp_servers.context7]`.
 - Tool-routing policy preserves:
   - direct reads for known paths
   - `rg` for exact literals
   - Semble for semantic discovery
   - context-mode for long outputs and continuity
+  - context7 for current external library API documentation
   - no duplicate broad searches
 
 ## Hooks

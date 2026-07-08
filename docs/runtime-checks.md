@@ -16,6 +16,7 @@ Optional helpers:
 - `uv`
 - `uvx`
 - Semble through `uvx --from "semble[mcp]" semble`
+- context7 through `npx -y @upstash/context7-mcp` (missing `npx` warns, does not fail; falls back to training-data knowledge)
 
 Missing optional binaries produce `WARN`, not `FAIL`.
 
