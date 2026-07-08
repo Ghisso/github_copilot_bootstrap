@@ -713,6 +713,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
 
     validate_lifecycle_hook_guardrails(errors)
+    validate_commit_msg_git_hook(errors)
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -1101,6 +1102,167 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         check(returncode == 0, f"PR gate base-main case failed to run: {stderr}", errors)
         check('"permissionDecision":"deny"' in stdout, "PR gate must deny --base main", errors)
+
+
+def install_commit_msg_hook(repo: Path) -> None:
+    git_hook_root = repo / ".claude" / "hooks" / "git-hooks"
+    shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "git-hooks", git_hook_root)
+    for hook in git_hook_root.glob("*"):
+        hook.chmod(hook.stat().st_mode | 0o111)
+    git(repo, "config", "core.hooksPath", ".claude/hooks/git-hooks")
+
+
+def validate_commit_msg_git_hook(errors: list[str]) -> None:
+    """R-HOOKS-07: the commit-msg git hook must mirror enforce-commit-gate.sh's
+    ceremony contract for REAL git commits, including the git-alias and `-C`
+    evasion paths this deterministic layer exists to close."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = setup_hook_repo(Path(temp_dir))
+        install_commit_msg_hook(repo)
+        write_big_plan(repo)
+        git(repo, "checkout", "-b", "foo_implementation")
+        run_hook(
+            lifecycle_script(repo, "record-branch-state.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        write_small_plan(repo, status="complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        )
+        # Pin MEMORY.md's mtime safely in the past so the mtime-based LEARN
+        # fallback (memory_mtime >= plan_mtime) cannot flip true/false on
+        # filesystem clock resolution during the "missing LEARN" case below.
+        old = 1_000_000_000
+        os.utime(repo / ".claude" / "MEMORY.md", (old, old))
+
+        reports_dir = repo / ".claude" / "quality_reports"
+        merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+
+        def head_and_hash() -> tuple[str, str]:
+            head = git(repo, "rev-parse", "HEAD").stdout.strip()
+            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", merge_base).stdout
+            content_hash = subprocess.run(
+                ["git", "-C", str(repo), "hash-object", "--stdin"],
+                input=diff_out, text=True, capture_output=True, check=False,
+            ).stdout.strip()
+            return head, content_hash
+
+        def score_report(head_sha: str, content_hash_value: str, **overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "score": 95,
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "tests_passed": True,
+                "tests_skipped": False,
+                "content_hash": content_hash_value,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_scores() -> None:
+            for stale in reports_dir.glob("score-*.json"):
+                stale.unlink()
+
+        def write_score(report: dict[str, object]) -> None:
+            clear_scores()
+            path = reports_dir / "score-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
+        write(repo / "work.txt", "work\n")
+        git(repo, "add", ".")
+
+        # Invalid states, one axis at a time, each blocked by a real `git commit`.
+
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}", errors)
+
+        head_sha, content_hash = head_and_hash()
+
+        write_score(score_report(head_sha, content_hash, score=50))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a quality score below 90", errors)
+
+        write_score(score_report(head_sha, content_hash, content_hash="deadbeef"))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a stale content_hash", errors)
+
+        # From here the score itself is valid; each remaining axis breaks
+        # exactly one other input and restores it before the next.
+        write_score(score_report(head_sha, content_hash))
+
+        write_small_plan(repo, status="in-progress")
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block an incomplete small plan", errors)
+        write_small_plan(repo, status="complete")
+
+        write(repo / ".claude" / "session_logs" / "phase-one-closeout.md", "# Session\n\nStatus: done\n")
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block a closeout log missing **Status:** COMPLETED", errors)
+
+        write(repo / ".claude" / "session_logs" / "phase-one-closeout.md", "# Session\n\n**Status:** COMPLETED\n")
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block missing LEARN evidence", errors)
+
+        # Fully valid state -> allowed; this actually lands the commit.
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode == 0, f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}", errors)
+
+        # R-HOOKS-07: git-alias evasion (the one residual gap the PreToolUse
+        # classifier could not close) must hit the same gate as `git commit`.
+        write(repo / "more.txt", "more\n")
+        git(repo, "add", ".")
+        git(repo, "config", "alias.ci", "commit")
+        clear_scores()
+        alias_result = subprocess.run(
+            ["git", "ci", "-m", "invalid via alias"],
+            cwd=repo, text=True, capture_output=True, check=False,
+        )
+        check(alias_result.returncode != 0, "commit-msg hook must block the git-alias evasion path (git ci)", errors)
+
+        # `git -C <path> commit`, invoked from entirely outside the repo: there
+        # is no cwd-dependent classifier here for a global flag to evade.
+        outside_result = subprocess.run(
+            ["git", "-C", str(repo), "commit", "-m", "invalid via -C"],
+            cwd=temp_dir, text=True, capture_output=True, check=False,
+        )
+        check(outside_result.returncode != 0, "commit-msg hook must block invalid commits invoked via git -C from outside the repo", errors)
+
+        # Fix the state; the same staged change now commits cleanly.
+        head_sha, content_hash = head_and_hash()
+        write_score(score_report(head_sha, content_hash))
+        retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
+        check(retry_result.returncode == 0, f"commit-msg hook must allow the retried valid commit: {retry_result.stdout}{retry_result.stderr}", errors)
+
+        # D4-B: dev/main pass through regardless of ceremony state.
+        clear_scores()
+        git(repo, "checkout", "dev")
+        write(repo / "dev-work.txt", "dev work\n")
+        git(repo, "add", "dev-work.txt")
+        dev_result = git(repo, "commit", "-m", "direct commit on dev with no ceremony at all")
+        check(dev_result.returncode == 0, f"commit-msg hook must pass through commits on dev regardless of state: {dev_result.stdout}{dev_result.stderr}", errors)
+
+        # `git commit --no-verify` remains the sanctioned manual escape.
+        git(repo, "checkout", "foo_implementation")
+        clear_scores()
+        write(repo / "escape.txt", "escape\n")
+        git(repo, "add", "escape.txt")
+        escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
+        check(escape_result.returncode == 0, f"git commit --no-verify must bypass the commit-msg gate: {escape_result.stdout}{escape_result.stderr}", errors)
 
 
 def validate_generated_scripts(errors: list[str]) -> None:
