@@ -1663,14 +1663,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)
     check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
-    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
-        text = read(skill_path)
-        frontmatter = text.split("---\n", 2)[1] if text.startswith("---\n") and len(text.split("---\n", 2)) == 3 else ""
-        check(
-            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
-            f"skill missing visibility metadata: {skill_path}",
-            errors,
-        )
+    # Skill frontmatter integrity (visibility, description) is checked once,
+    # in validate_docs_parity, alongside the other named-inventory checks.
 
     # R-SKILLS-01: the commit skill must follow the enforced lifecycle, never
     # walking the agent into feature/* branches or agent-driven merges.
@@ -1820,6 +1814,147 @@ def validate_skills_and_paths(errors: list[str]) -> None:
 
     validate_support_files(errors)
     validate_generated_hygiene(errors)
+
+
+MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+
+
+def extract_markdown_links(text: str) -> list[str]:
+    return MARKDOWN_LINK_PATTERN.findall(text)
+
+
+def extract_frontmatter(text: str) -> str:
+    parts = text.split("---\n", 2)
+    return parts[1] if text.startswith("---\n") and len(parts) == 3 else ""
+
+
+def extract_frontmatter_description(frontmatter: str) -> str:
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
+        if not line.startswith("description:"):
+            continue
+        rest = line[len("description:"):].strip()
+        if rest in ("|", ">", "|-", ">-", ""):
+            # A blank line does NOT end a YAML block scalar - only a
+            # less-indented (or EOF) line does. Treating an empty `follow`
+            # as "end of block" would silently truncate the description at
+            # the first blank paragraph break.
+            block_lines = []
+            for follow in lines[index + 1:]:
+                if not follow.strip() or follow.startswith((" ", "\t")):
+                    block_lines.append(follow.strip())
+                else:
+                    break
+            return " ".join(block_lines).strip()
+        return rest.strip("\"'")
+    return ""
+
+
+def validate_docs_parity(errors: list[str]) -> None:
+    """R-VALID-02: mechanical drift-policing for authoring docs, mirroring
+    upstream's check-surface-sync.py / check-skill-integrity.py after they
+    were burned by repeated doc drift (architecture-review-2026-07.md §3.2).
+    Structural assertions only (R-VALID-01 lesson) - no exact-sentence pins."""
+
+    # 1. Link integrity: every relative markdown link in README.md, AGENTS.md,
+    # and docs/*.md (excluding archived docs/history/) resolves to an
+    # existing file or directory, relative to the linking file's own
+    # directory (docs/*.md link with "../", matching how they render on
+    # GitHub).
+    docs_root = REPO_ROOT / "docs"
+    doc_files = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "AGENTS.md",
+        *sorted(
+            p
+            for p in text_files(docs_root)
+            if p.suffix == ".md" and "history" not in p.relative_to(docs_root).parts
+        ),
+    ]
+    for doc in doc_files:
+        if not doc.exists():
+            continue
+        for link in extract_markdown_links(read(doc)):
+            if link.startswith(("http://", "https://", "mailto:")):
+                continue
+            target = link.split("#", 1)[0]
+            if not target:
+                continue
+            resolved = (doc.parent / target).resolve()
+            check(
+                resolved.exists(),
+                f"{doc.relative_to(REPO_ROOT)} has a broken relative link: '{link}' does not resolve to {resolved}",
+                errors,
+            )
+
+    readme_text = read(REPO_ROOT / "README.md")
+
+    # 2a. Skill names: README references are a SUBSET of shared/skills/*/ (it
+    # lists "most important", not all) - the reverse is not required.
+    referenced_skills = set(re.findall(r"shared/skills/([^/]+)/SKILL\.md", readme_text))
+    disk_skills = {path.parent.name for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    missing_skills = referenced_skills - disk_skills
+    check(
+        not missing_skills,
+        f"README references skills that do not exist on disk: {sorted(missing_skills)}",
+        errors,
+    )
+
+    # 2b. Agent names: README's "Current agents" list is EXACT (list == disk),
+    # unlike skills - every agent is small enough in number to list fully.
+    agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
+    check(agents_match is not None, "README must have a 'Current agents:' list", errors)
+    if agents_match:
+        readme_agents = {line[2:].strip() for line in agents_match.group(1).splitlines() if line.strip()}
+        disk_agents = {path.parent.name for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")}
+        check(
+            readme_agents == disk_agents,
+            f"README 'Current agents' list must exactly match shared/agents/*/: readme={sorted(readme_agents)} disk={sorted(disk_agents)}",
+            errors,
+        )
+
+    # 2c. Hook script names: docs/runtime-checks.md's guardrail list is EXACT
+    # against shared/hooks/scripts/*.sh, excluding _lib-frontmatter.sh (a
+    # sourced library, not a hook entry point).
+    runtime_checks_text = read(REPO_ROOT / "docs" / "runtime-checks.md")
+    hooks_match = re.search(r"Guardrail scripts are generated under[^\n]*:\n\n((?:- [^\n]+\n)+)", runtime_checks_text)
+    check(hooks_match is not None, "docs/runtime-checks.md must list guardrail scripts", errors)
+    if hooks_match:
+        doc_hook_scripts = set(re.findall(r"`([\w.-]+\.sh)`", hooks_match.group(1)))
+        disk_hook_scripts = {
+            path.name
+            for path in (REPO_ROOT / "shared" / "hooks" / "scripts").glob("*.sh")
+            if path.name != "_lib-frontmatter.sh"
+        }
+        check(
+            doc_hook_scripts == disk_hook_scripts,
+            "docs/runtime-checks.md guardrail script list must exactly match shared/hooks/scripts/*.sh "
+            f"(excluding _lib-frontmatter.sh): doc={sorted(doc_hook_scripts)} disk={sorted(disk_hook_scripts)}",
+            errors,
+        )
+
+    # 3. Skill frontmatter integrity: visibility + non-empty, non-duplicate
+    # description (duplicate descriptions break description-match loading of
+    # background skills).
+    descriptions: dict[str, Path] = {}
+    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
+        frontmatter = extract_frontmatter(read(skill_path))
+        check(
+            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
+            f"skill missing visibility metadata: {skill_path}",
+            errors,
+        )
+        description = extract_frontmatter_description(frontmatter).strip()
+        check(bool(description), f"skill missing non-empty description: {skill_path}", errors)
+        if not description:
+            continue
+        duplicate = descriptions.get(description)
+        if duplicate is not None:
+            errors.append(
+                f"duplicate skill description breaks description-match loading: {duplicate} and {skill_path}"
+            )
+        else:
+            descriptions[description] = skill_path
 
 
 def validate_support_files(errors: list[str]) -> None:
@@ -2237,6 +2372,7 @@ def main() -> int:
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_skills_and_paths(errors)
+        validate_docs_parity(errors)
         validate_routing_table_parity(errors)
         validate_devcontainer_and_installer(errors)
         validate_determinism(errors)
