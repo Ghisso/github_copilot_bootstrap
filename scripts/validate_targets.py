@@ -1594,6 +1594,7 @@ def validate_support_files(errors: list[str]) -> None:
     required_files = (
         "MEMORY.md",
         "scripts/quality_score.py",
+        "scripts/record_findings.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",
