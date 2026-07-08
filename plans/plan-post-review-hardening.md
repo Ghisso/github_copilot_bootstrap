@@ -274,3 +274,62 @@ Phase 7 (R-MCP-01)             ──►  optional; any time
 ```
 
 Per repo convention, run this plan through the normal lifecycle: a big plan referencing these phases as small plans, one commit per phase (sub-commits for 4a–4e), each leaving `generate_targets.py --all && validate_targets.py` green and `dist/` drift-free.
+
+---
+
+## 11. Post-implementation review (2026-07-08)
+
+A full review of the branch `post-review-hardening` after all 7 phases landed (11 commits, `9d52155..HEAD`) confirmed every phase is implemented, the validator is green **as committed at HEAD**, and each acceptance bullet maps to a real adversarial validator case. Three items surfaced; the two code/doc items are fixed in this same pass (one commit each, review-ID-prefixed, same lifecycle rules as the phases above), the third is recorded as an accepted residual.
+
+### 11.1 `R-HOOKS-10`: `assert_push_invariants` must run on bash 3.2
+
+#### Issue
+
+[_lib-frontmatter.sh:789](../shared/hooks/scripts/_lib-frontmatter.sh#L789) (added by Phase 3) reads the big plan's `phases` list with `mapfile -t phases`. `mapfile`/`readarray` is a bash **4.0+** builtin; macOS ships `/bin/bash` 3.2.57, and the `pre-push` hook's `#!/usr/bin/env bash` shebang can resolve to it on a consumer's Mac. Under `set -euo pipefail` a missing builtin returns 127, so the hook aborts non-zero — a **blocked push** with a cryptic `mapfile: command not found`, escapable only via `git push --no-verify`. That recreates the friction-toward-the-escape-hatch loop Phase 1 was written to remove. The same function's own comment at [_lib-frontmatter.sh:834-836](../shared/hooks/scripts/_lib-frontmatter.sh#L834-L836) already documents the bash-3.2 constraint (it avoids `${phases[-1]}` for exactly this reason), so the `mapfile` use is an internal inconsistency, not a change of target. It escaped CI because the workflow has not run on `macos-latest` yet and the local validator runs on bash 5.x. It is the only bash-4-only construct introduced on the branch.
+
+#### Fix
+
+Replace the `mapfile` read with the bash-3.2-safe `while IFS= read -r` accumulation pattern **already used twice in the same file** ([_lib-frontmatter.sh:483](../shared/hooks/scripts/_lib-frontmatter.sh#L483) in `select_fresh_report`, [_lib-frontmatter.sh:819](../shared/hooks/scripts/_lib-frontmatter.sh#L819) in the bypass-ledger scan):
+
+```bash
+local -a phases=()
+local _phase_line
+while IFS= read -r _phase_line; do
+  [[ -n "$_phase_line" ]] && phases+=("$_phase_line")
+done < <(fm_read_list "$big_plan" "phases")
+```
+
+No behavior change on bash 4+/5.x; correct behavior restored on bash 3.2.
+
+#### Acceptance
+
+- `grep -n "mapfile\|readarray" shared/hooks/scripts/_lib-frontmatter.sh` → no matches.
+- `uv run python scripts/generate_targets.py --all && uv run python scripts/validate_targets.py` → PASS (the existing `validate_pre_push_git_hook` cases still pass; the push-gate contract is unchanged).
+- Manual: `bash --posix`-style check is not sufficient; the real guard is the no-`mapfile` grep plus the existing pre-push validator suite.
+
+### 11.2 `R-DOCS-03`: relocate ADR-001 to `plans/` and repoint inbound links
+
+#### Issue
+
+`docs/adr-001-multi-target-lcd.md` was relocated to `plans/adr-001-multi-target-lcd.md` (ADRs and planning docs are single-homed under `plans/` in this repo — cf. `plans/architecture-review-2026-07.md`). Two inbound links still point at the old `docs/` path, so Phase 5's own link-integrity check (`validate_docs_parity`) fails with `exit 1`:
+
+- [docs/architecture.md:111](../docs/architecture.md#L111) — relative link `adr-001-multi-target-lcd.md` (resolves under `docs/`).
+- [README.md:473](../README.md#L473) — link `docs/adr-001-multi-target-lcd.md`.
+
+The check firing on this is Phase 5 working exactly as designed.
+
+#### Fix
+
+1. Commit the file move (`plans/adr-001-multi-target-lcd.md`; remove the `docs/` copy).
+2. Repoint the two links to the new location, relative to each linking file:
+   - `docs/architecture.md` → `../plans/adr-001-multi-target-lcd.md`
+   - `README.md` → `plans/adr-001-multi-target-lcd.md`
+
+#### Acceptance
+
+- `uv run python scripts/validate_targets.py` → PASS (0 broken-link FAILs).
+- `grep -rn "docs/adr-001\|(adr-001" README.md docs/ shared/` → only the corrected `../plans/`/`plans/` forms remain.
+
+### 11.3 Accepted residual — push-gate `major == 0` is checked on the final phase only
+
+`assert_push_invariants` verifies `counts.major == 0` against the **final** phase's findings report ([_lib-frontmatter.sh:837-839](../shared/hooks/scripts/_lib-frontmatter.sh#L837)). A MAJOR introduced and committed in an earlier phase (the commit gate only blocks CRITICAL, so it lands) is re-caught at push **only if the final phase's review re-covers it**. This is the behavior Phase 4c specified ("the final phase's findings report certifies the branch as a whole") and is the same consciously-accepted "the gate verifies the contract, not the reviewer's honesty" residual recorded in [plan-deterministic-commit-gate.md §5](plan-deterministic-commit-gate.md). **No code change**; recorded here so it is a deliberate acceptance. Future direction (out of scope): aggregate the newest findings report per phase at push time and require `major == 0` across all of them.

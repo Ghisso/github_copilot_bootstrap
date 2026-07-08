@@ -785,8 +785,15 @@ assert_push_invariants() {
     return
   fi
 
-  local -a phases
-  mapfile -t phases < <(fm_read_list "$big_plan" "phases")
+  # R-HOOKS-10: accumulate with `while read`, not `mapfile` - macOS's default
+  # /bin/bash is 3.2, which has no `mapfile`/`readarray` builtin (same 3.2
+  # constraint the `${phases[${#phases[@]}-1]}` below is written for). This
+  # mirrors the read loops in select_fresh_report and the bypass-ledger scan.
+  local -a phases=()
+  local _phase_line
+  while IFS= read -r _phase_line; do
+    [[ -n "$_phase_line" ]] && phases+=("$_phase_line")
+  done < <(fm_read_list "$big_plan" "phases")
   if [[ "${#phases[@]}" -eq 0 ]]; then
     failures+=("$big_plan has no phases list")
     return
