@@ -55,6 +55,9 @@ RUN set -eux; \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
+# huggingface_hub is for the projects themselves (models/datasets via the
+# bind-mounted ~/.cache/huggingface below), not for AI state sync anymore -
+# that moved to git (state-sync.sh); see plans/adr-002-git-backed-state-sync.md.
 RUN uv pip install --system --no-cache \
         "huggingface_hub>=1.0" \
         "semble[mcp]" \

@@ -190,6 +190,17 @@ def render_shared_basis(target_root: Path, target: str) -> None:
 
 def render_devcontainer(target_root: Path) -> None:
     copy_tree(REPO_ROOT / "shared" / "devcontainer", target_root / ".devcontainer")
+    # A second rendered copy of the two state-sync scripts, reachable BEFORE
+    # .claude/ exists at all: .claude/ is gitignored in consumers, so a fresh
+    # clone has none of it until post-start.sh's own bootstrap run of these
+    # scripts creates it (see the REPO_ROOT-resolution comment at the top of
+    # state-sync.sh). Both copies come from the same shared/ source and are
+    # regenerated together, so they cannot drift.
+    for name in ("state-sync.sh", "restore-root-adapters.sh"):
+        source = REPO_ROOT / "shared" / "hooks" / "scripts" / name
+        destination = target_root / ".devcontainer" / name
+        copy_file(source, destination)
+        ensure_executable(destination)
 
 
 def reset_target(output_root: Path, target: str) -> Path:

@@ -10,6 +10,7 @@ import shutil
 import stat
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -40,6 +41,18 @@ COPILOT_SURFACE_PATTERNS = (
     ".github/instructions/",
     ".github/copilot-instructions.md",
 )
+# D5: root-level adapter files that live outside .claude/ in a consumer, so
+# state-sync.sh's checkout of .claude/ alone does not carry them. Mirrored
+# into .claude/bootstrap-root/ (tracked, git-backed) and restored back out to
+# these same relative paths by restore-root-adapters.sh on a fresh machine.
+ROOT_ADAPTER_PATHS = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".mcp.json",
+    ".codex",
+    ".vscode/mcp.json",
+    ".vscode/tasks.json",
+)
 
 
 def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
@@ -58,15 +71,10 @@ def parse_args() -> argparse.Namespace:
         help="Generated bootstrap source directory.",
     )
     parser.add_argument(
-        "--bucket",
+        "--state-remote",
         default=None,
-        help="HF bucket id or bucket prefix path used for bootstrap/state sync. "
-        "Required unless HF_AI_SYNC_BUCKET is set in the environment. No default "
-        "is baked in, so no personal namespace ships in the bootstrap.",
-    )
-    parser.add_argument(
-        "--prefix",
-        help="Optional project prefix inside the bucket. Overrides remote-derived prefixes.",
+        help="Git remote URL for the nested .claude/ AI-state repo (env: AI_STATE_REMOTE). "
+        "Defaults to this repo's own 'origin' URL when unset.",
     )
     parser.add_argument(
         "--commit-copilot-surface",
@@ -77,8 +85,6 @@ def parse_args() -> argparse.Namespace:
         "branch; the default (omitting the flag) is local-IDE Copilot only.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions without writing files.")
-    parser.add_argument("--skip-upload", action="store_true", help="Do not upload bootstrap files to HF.")
-    parser.add_argument("--verbose", action="store_true", help="Pass verbose mode to the HF sync helper.")
     return parser.parse_args()
 
 
@@ -178,26 +184,110 @@ def configure_git_hooks_path(target: Path, dry_run: bool) -> None:
         warn(f"could not set core.hooksPath: {result.stderr.strip()}")
 
 
-def update_devcontainer_sync_env(target: Path, bucket: str, prefix: str | None, dry_run: bool) -> None:
+def update_devcontainer_state_remote(target: Path, state_remote: str | None, dry_run: bool) -> None:
+    """Persists a non-default --state-remote into the committed devcontainer
+    config, so a fresh container clone (which has no other way to learn a
+    private state-remote URL, since .claude/ itself is gitignored) picks it
+    up automatically. The default (origin) needs no config at all."""
+    if not state_remote:
+        return
     devcontainer_path = target / ".devcontainer" / "devcontainer.json"
     if not devcontainer_path.is_file():
         warn(f"missing devcontainer config: {devcontainer_path}")
         return
 
-    info(f"set devcontainer HF_AI_SYNC_BUCKET={bucket}")
-    if prefix:
-        info(f"set devcontainer HF_AI_SYNC_PREFIX={prefix}")
+    info(f"set devcontainer AI_STATE_REMOTE={state_remote}")
     if dry_run:
         return
 
     data = json.loads(devcontainer_path.read_text(encoding="utf-8"))
     container_env = data.setdefault("containerEnv", {})
-    container_env["HF_AI_SYNC_BUCKET"] = bucket
-    if prefix:
-        container_env["HF_AI_SYNC_PREFIX"] = prefix
-    else:
-        container_env.pop("HF_AI_SYNC_PREFIX", None)
+    container_env["AI_STATE_REMOTE"] = state_remote
     devcontainer_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def populate_bootstrap_root(target: Path, dry_run: bool, commit_copilot_surface: bool) -> None:
+    """D5: mirrors the root-level adapter files into .claude/bootstrap-root/
+    so they are carried by the git-backed .claude/ checkout even though they
+    live outside .claude/ themselves. Skips the Copilot surface when it is
+    already committed to the outer repo (--commit-copilot-surface)."""
+    paths = ROOT_ADAPTER_PATHS
+    if not commit_copilot_surface:
+        paths = paths + tuple(pattern.rstrip("/") for pattern in COPILOT_SURFACE_PATTERNS)
+
+    destination_root = target / ".claude" / "bootstrap-root"
+    info(f"populate {destination_root} from root adapters")
+    if dry_run:
+        return
+
+    for relative in paths:
+        source = target / relative
+        if not source.exists():
+            continue
+        destination = destination_root / relative
+        if source.is_dir():
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+
+def sync_state_after_install(
+    target: Path,
+    dry_run: bool,
+    state_remote: str | None,
+    had_claude_git: bool,
+    had_pre_existing_content: bool,
+) -> None:
+    """Commits and pushes the nested .claude/ AI-state repo (D1/D4). A
+    pre-git .claude/ with real content migrates as one `migrate:` commit
+    (state-sync.sh owns that commit message); otherwise this makes its own
+    `bootstrap: install/update <timestamp>` commit, distinct from the
+    `session:` commits the Stop hook makes."""
+    state_sync = target / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        warn(f"missing state-sync helper: {state_sync}")
+        return
+
+    info("sync AI state via state-sync.sh")
+    if dry_run:
+        return
+
+    env = os.environ.copy()
+    if state_remote:
+        env["AI_STATE_REMOTE"] = state_remote
+
+    if not had_claude_git and had_pre_existing_content:
+        # migrate-from-hf owns setup + its own "migrate:" commit + push.
+        subprocess.run(["bash", str(state_sync), "migrate-from-hf"], check=False, cwd=target, env=env)
+        return
+
+    subprocess.run(["bash", str(state_sync), "setup"], check=False, cwd=target, env=env)
+    # On a truly fresh install, `setup` above already committed everything
+    # currently on disk as "bootstrap: init ai-state" (it always commits
+    # whatever it finds when .claude/.git doesn't yet exist) — that commit
+    # already satisfies D1's bootstrap:-prefixed-commit requirement, so there
+    # is nothing left to stage here. On a repeat run .claude/.git already
+    # existed, so `setup` was a no-op, and this run's freshly copied files
+    # are real, uncommitted changes that need their own commit.
+    if had_claude_git:
+        status = subprocess.run(
+            ["git", "-C", str(target / ".claude"), "status", "--porcelain"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if status.stdout.strip():
+            subprocess.run(["git", "-C", str(target / ".claude"), "add", "-A"], check=False)
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            subprocess.run(
+                ["git", "-C", str(target / ".claude"), "commit", "-q", "-m", f"bootstrap: update {timestamp}"],
+                check=False,
+            )
+
+    push_result = subprocess.run(["bash", str(state_sync), "push"], check=False, cwd=target, env=env)
+    if push_result.returncode != 0:
+        warn("state-sync push reported a non-zero exit; state committed locally, will retry on next sync.")
 
 
 def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str]:
@@ -228,65 +318,26 @@ def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
     print(f"git rm --cached -r -- {' '.join(unique_roots)}")
 
 
-def upload_bootstrap(target: Path, bucket: str, prefix: str | None, dry_run: bool, verbose: bool) -> None:
-    helper = target / ".devcontainer" / "hf-ai-sync.py"
-    if not helper.is_file():
-        warn(f"missing HF sync helper: {helper}")
-        return
-
-    command = [
-        sys.executable,
-        str(helper),
-        "upload-bootstrap",
-        "--repo-root",
-        str(target),
-        "--bucket",
-        bucket,
-    ]
-    if prefix:
-        command.extend(["--prefix", prefix])
-    if dry_run:
-        command.append("--dry-run")
-    if verbose:
-        command.append("--verbose")
-
-    env = os.environ.copy()
-    repo_venv_bin = REPO_ROOT / ".venv" / "bin"
-    if repo_venv_bin.is_dir():
-        env["PATH"] = f"{repo_venv_bin}{os.pathsep}{env.get('PATH', '')}"
-
-    info("upload generated AI bootstrap bundle to Hugging Face")
-    result = subprocess.run(command, text=True, check=False, env=env)
-    if result.returncode != 0:
-        warn("HF bootstrap upload command failed; continuing.")
-
-
 def main() -> int:
     args = parse_args()
-    bucket = args.bucket or os.environ.get("HF_AI_SYNC_BUCKET")
-    if not bucket:
-        print(
-            "error: no HF sync bucket configured. Pass --bucket <org/bucket[/prefix]> "
-            "or set HF_AI_SYNC_BUCKET in the environment before installing.",
-            file=sys.stderr,
-        )
-        return 2
-    args.bucket = bucket
+    state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     target = args.target_repo.expanduser().resolve()
     source = args.source.expanduser().resolve()
 
+    claude_dir = target / ".claude"
+    had_claude_git = (claude_dir / ".git").exists()
+    had_pre_existing_content = claude_dir.is_dir() and not had_claude_git and any(claude_dir.iterdir())
+
     copy_generated_tree(source, target, args.dry_run)
     substitute_project_name(target, args.dry_run)
-    update_devcontainer_sync_env(target, args.bucket, args.prefix, args.dry_run)
+    populate_bootstrap_root(target, args.dry_run, args.commit_copilot_surface)
+    update_devcontainer_state_remote(target, state_remote, args.dry_run)
     merge_gitignore(target, args.dry_run, args.commit_copilot_surface)
     chmod_runtime_scripts(target, args.dry_run)
     configure_git_hooks_path(target, args.dry_run)
     warn_tracked_paths(target, active_ignore_patterns(args.commit_copilot_surface))
 
-    if args.skip_upload:
-        info("skipping HF bootstrap upload")
-    else:
-        upload_bootstrap(target, args.bucket, args.prefix, args.dry_run, args.verbose)
+    sync_state_after_install(target, args.dry_run, state_remote, had_claude_git, had_pre_existing_content)
 
     info("done")
     return 0

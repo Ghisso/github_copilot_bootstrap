@@ -15,7 +15,6 @@
     "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached"
   ],
   "containerEnv": {
-    "HF_AI_SYNC_BUCKET": "",
     "HF_XET_HIGH_PERFORMANCE": "1",
     "UV_CACHE_DIR": "/home/vscode/.cache/uv",
     "UV_LINK_MODE": "copy",
