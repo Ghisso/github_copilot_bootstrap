@@ -993,6 +993,40 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
+        def findings_report(**overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "content_hash": content_hash,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_findings() -> None:
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+
+        def write_findings(report: dict[str, object]) -> None:
+            clear_findings()
+            path = reports_dir / "findings-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
+        # A clean findings report stays valid for every score-axis probe below
+        # (HEAD does not move until the real commit lands further down), so
+        # each probe's denial is attributable to the score axis under test,
+        # not to a findings report that happens to be missing too.
+        write_findings(findings_report())
+
         # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
         # dirty:true must all be denied even at a passing score.
         for label, report in (
@@ -1050,6 +1084,8 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check("re-run quality_score" in stdout, "content_hash mismatch failure must tell the user to re-run quality_score", errors)
 
         write_score(score_report())
+        # findings-test.json is still the clean baseline written before the
+        # R-SCORE-01 loop above; only score-*.json has been swapped since.
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -1181,6 +1217,34 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
+        def findings_report(head_sha: str, content_hash_value: str, **overrides: object) -> dict[str, object]:
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "branch": "foo_implementation",
+                "phase": "phase-one",
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": head_sha,
+                "target": str(repo / "work.txt"),
+                "dirty": False,
+                "content_hash": content_hash_value,
+                "changed_files": ["work.txt"],
+            }
+            report.update(overrides)
+            return report
+
+        def clear_findings() -> None:
+            for stale in reports_dir.glob("findings-*.json"):
+                stale.unlink()
+
+        def write_findings(report: dict[str, object]) -> None:
+            clear_findings()
+            path = reports_dir / "findings-test.json"
+            write(path, json.dumps(report, indent=2) + "\n")
+            os.utime(path, None)
+
         write(repo / "work.txt", "work\n")
         git(repo, "add", ".")
 
@@ -1190,6 +1254,12 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(result.returncode != 0, f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}", errors)
 
         head_sha, content_hash = head_and_hash()
+
+        # A clean findings report stays valid for every score/plan/closeout/
+        # LEARN probe below (HEAD does not move until the "fully valid"
+        # commit lands further down), so each probe's denial is attributable
+        # to the axis under test, not to a findings report missing too.
+        write_findings(findings_report(head_sha, content_hash))
 
         write_score(score_report(head_sha, content_hash, score=50))
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -1221,6 +1291,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
+        # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(result.returncode == 0, f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}", errors)
 
@@ -1247,6 +1318,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # Fix the state; the same staged change now commits cleanly.
         head_sha, content_hash = head_and_hash()
         write_score(score_report(head_sha, content_hash))
+        write_findings(findings_report(head_sha, content_hash))
         retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
         check(retry_result.returncode == 0, f"commit-msg hook must allow the retried valid commit: {retry_result.stdout}{retry_result.stderr}", errors)
 

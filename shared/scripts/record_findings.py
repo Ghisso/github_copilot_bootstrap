@@ -161,9 +161,14 @@ def main() -> None:
         sys.exit(1)
 
     counts = count_severities(findings)
+    # `counts` is serialized before `findings` so the gate's flat-text
+    # `critical`-key scanner (json_file_number_value in _lib-frontmatter.sh,
+    # which is not JSON-nesting-aware) matches counts.critical before it can
+    # reach any free-text finding title/file value that happens to contain a
+    # colliding `"critical": <digits>` substring.
     result = {
-        "findings": findings,
         "counts": counts,
+        "findings": findings,
         **git_metadata(Path(args.target).resolve(), args.phase, args.base_ref),
     }
 
