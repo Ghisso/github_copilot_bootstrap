@@ -1264,6 +1264,27 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
         check(escape_result.returncode == 0, f"git commit --no-verify must bypass the commit-msg gate: {escape_result.stdout}{escape_result.stderr}", errors)
 
+        # R-HOOKS-08: commit-msg also fires for git-merge (githooks(5)). A merge
+        # commit from dev must pass through even with invalid ceremony state
+        # (dev already diverged above via "direct commit on dev with no
+        # ceremony at all"); the very next real commit is still gated normally.
+        clear_scores()
+        merge_result = git(repo, "merge", "--no-ff", "dev", "-m", "Merge branch 'dev' into foo_implementation")
+        check(
+            merge_result.returncode == 0,
+            f"commit-msg hook must allow a merge commit even with invalid ceremony state: {merge_result.stdout}{merge_result.stderr}",
+            errors,
+        )
+
+        write(repo / "after-merge.txt", "after merge\n")
+        git(repo, "add", "after-merge.txt")
+        post_merge_result = git(repo, "commit", "-m", "phase 1 after merge")
+        check(
+            post_merge_result.returncode != 0,
+            "commit-msg hook must still block a normal commit with invalid state right after a merge passthrough",
+            errors,
+        )
+
 
 def validate_generated_scripts(errors: list[str]) -> None:
     python_scripts = sorted(DIST_ROOT.rglob("*.py"))
