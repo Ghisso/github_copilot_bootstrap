@@ -145,7 +145,12 @@ def merge_gitignore(target: Path, dry_run: bool, commit_copilot_surface: bool = 
 
 
 def chmod_runtime_scripts(target: Path, dry_run: bool) -> None:
-    patterns = (".claude/hooks/scripts/*.sh", ".devcontainer/*.sh", ".devcontainer/*.py")
+    patterns = (
+        ".claude/hooks/scripts/*.sh",
+        ".claude/hooks/git-hooks/*",
+        ".devcontainer/*.sh",
+        ".devcontainer/*.py",
+    )
     for pattern in patterns:
         for path in target.glob(pattern):
             if not path.is_file():
@@ -154,6 +159,23 @@ def chmod_runtime_scripts(target: Path, dry_run: bool) -> None:
             if dry_run:
                 continue
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def configure_git_hooks_path(target: Path, dry_run: bool) -> None:
+    if not (target / ".git").exists():
+        warn(f"{target} is not a git repository; skipping core.hooksPath configuration")
+        return
+    info("set git config core.hooksPath .claude/hooks/git-hooks")
+    if dry_run:
+        return
+    result = subprocess.run(
+        ["git", "-C", str(target), "config", "core.hooksPath", ".claude/hooks/git-hooks"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        warn(f"could not set core.hooksPath: {result.stderr.strip()}")
 
 
 def update_devcontainer_sync_env(target: Path, bucket: str, prefix: str | None, dry_run: bool) -> None:
@@ -258,6 +280,7 @@ def main() -> int:
     update_devcontainer_sync_env(target, args.bucket, args.prefix, args.dry_run)
     merge_gitignore(target, args.dry_run, args.commit_copilot_surface)
     chmod_runtime_scripts(target, args.dry_run)
+    configure_git_hooks_path(target, args.dry_run)
     warn_tracked_paths(target, active_ignore_patterns(args.commit_copilot_surface))
 
     if args.skip_upload:

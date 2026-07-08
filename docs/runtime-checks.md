@@ -41,13 +41,22 @@ The runtime checker also runs the plan frontmatter validator when it is present.
 
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 
+## Two-Layer Commit Enforcement
+
+The plan/score/closeout/LEARN ceremony above is enforced twice, from a single shared contract (`assert_commit_invariants` in `_lib-frontmatter.sh`):
+
+- **`PreToolUse` (`enforce-commit-gate.sh`)** gates the AI agent's own Bash tool calls. It can `ask`/`deny` before a turn is wasted and denies an agent commit on any branch that isn't `<plan_name>_implementation`.
+- **`commit-msg` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every commit that reaches git itself — human, IDE, script, or alias (`git ci`) — on one code path, with no command string to classify and no timeout to fail open on. It is installed by setting `git config core.hooksPath .claude/hooks/git-hooks` (done by `install_bootstrap.py` and, for containers, by `post-start.sh`), and it only runs the ceremony checks on `<plan_name>_implementation` branches — `dev`/`main` commits pass through untouched.
+
+`git commit --no-verify` is the sanctioned manual escape from the `commit-msg` layer (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored and Hugging Face-synced, a fresh clone has no `.claude/hooks/git-hooks/` until the first sync — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`).
+
 ## Devcontainer And HF Sync
 
 Generated output includes `.devcontainer/`:
 
 - `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers. UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
 - `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` is pinned directly (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead). The lower bound is required because `HfApi.sync_bucket` was added in 1.0; without it, sync calls raise `AttributeError` that the broad exception handler swallows silently, causing the script to exit 0 having done nothing. If a project's `pyproject.toml` introduces a transitive dep that would downgrade `huggingface_hub` below 1.0, the `import_hf_api()` function in `hf-ai-sync.py` detects the missing method, emits a named warning, and falls back to the `hf` CLI so the failure is visible rather than silent.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes). It then calls `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then sets `core.hooksPath` to `.claude/hooks/git-hooks` before calling `.devcontainer/hf-ai-sync.py pull` to restore ignored AI bootstrap/state files — so the commit-msg gate is wired the instant the pull populates the hook directory. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback.
 
 There is **no baked-in default bucket** — a bucket must be configured. The installer
 requires `--bucket <org/bucket[/prefix]>` or `HF_AI_SYNC_BUCKET` and exits with an

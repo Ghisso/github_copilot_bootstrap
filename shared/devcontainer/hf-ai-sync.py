@@ -339,7 +339,10 @@ def cleanup_unchanged_backups(claude_root: Path) -> None:
 
 
 def chmod_runtime_scripts(repo_root: Path) -> None:
-    for pattern in (".claude/hooks/scripts/*.sh", ".devcontainer/*.sh"):
+    # HF sync does not preserve unix permissions, so a pull-bootstrap that
+    # refreshes .claude/hooks/git-hooks/commit-msg would otherwise leave it
+    # non-executable - which git silently treats as "no hook installed".
+    for pattern in (".claude/hooks/scripts/*.sh", ".claude/hooks/git-hooks/*", ".devcontainer/*.sh"):
         for path in repo_root.glob(pattern):
             if path.is_file():
                 path.chmod(path.stat().st_mode | 0o111)

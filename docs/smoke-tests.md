@@ -60,6 +60,11 @@ Expected:
 - Stop hooks invoke `hf-ai-sync.sh` to push mutable AI state to Hugging Face.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
+- `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
+- With `core.hooksPath` set to the generated `git-hooks` directory, on a `<plan_name>_implementation` branch: a `git commit` with no score report, a score below 90, a stale `content_hash`, an incomplete small plan, a closeout log missing `**Status:** COMPLETED`, or missing `[LEARN]` evidence is each rejected by git; a fully valid commit succeeds.
+- The `git ci` alias (`git config alias.ci commit`) and `git -C <path> commit` invoked from outside the repo are rejected identically to a bare invalid `git commit` — there is no command string for either to evade.
+- Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
+- `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
 
 ## Devcontainer And HF Sync
 
@@ -69,3 +74,5 @@ Expected:
 - The generated devcontainer forwards `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN`.
 - The generated devcontainer does not require `/dev/fuse` or apparmor overrides, and still includes the `SYS_ADMIN`/`seccomp=unconfined` run args needed by `bubblewrap`.
 - The HF sync helper resolves the bucket from `--bucket` / `HF_AI_SYNC_BUCKET` / installed `.devcontainer` sync settings (no hardcoded default), warns and no-ops when none is configured, and supports dry-run operation without network access.
+- `install_bootstrap.py <repo> --bucket ...` sets `git -C <repo> config core.hooksPath` to `.claude/hooks/git-hooks` and leaves `commit-msg` executable.
+- `post-start.sh` sets `core.hooksPath` before the HF pull; `hf-ai-sync.py`'s post-pull chmod step covers `.claude/hooks/git-hooks/*` (HF sync does not preserve unix permissions).

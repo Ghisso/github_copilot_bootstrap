@@ -174,6 +174,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     # the checked-out mode.
     for script in sorted((support_root / "hooks" / "scripts").glob("*.sh")):
         ensure_executable(script)
+    copy_tree(REPO_ROOT / "shared" / "hooks" / "git-hooks", support_root / "hooks" / "git-hooks")
+    # git invokes these directly by exact filename (commit-msg, not *.sh), so
+    # they need the same executable-bit treatment as hooks/scripts/*.sh above.
+    for script in sorted((support_root / "hooks" / "git-hooks").glob("*")):
+        ensure_executable(script)
     copy_tree(REPO_ROOT / "shared" / "prompts", support_root / "prompts")
     render_claude_agents(target_root)
 

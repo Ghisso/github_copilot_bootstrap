@@ -466,3 +466,168 @@ repo_root_from_script() {
   script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
   cd "$script_dir/../../.." && pwd
 }
+
+# Single home for the plan/score/closeout/LEARN ceremony shared by every commit
+# gate entry point (PreToolUse and the commit-msg git hook). Branch-shape is
+# deliberately NOT checked here - callers diverge on it (see D4 in
+# docs/plan-deterministic-commit-gate.md) - so `branch` is assumed already
+# valid (an <plan>_implementation branch) by the time this is called.
+#
+# Appends failure messages to a `failures` array that the CALLER must declare
+# (`failures=()`) before calling; this function intentionally never `local`s
+# `failures` so its `+=` mutates the caller's array via bash dynamic scoping.
+assert_commit_invariants() {
+  local repo_root="$1"
+  local current_branch="$2"
+  local slug="${current_branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  if [[ ! -f "$big_plan" ]]; then
+    failures+=("missing big-plan file: .claude/plans/$slug.md")
+  fi
+
+  local current_phase="" small_plan=""
+  if [[ -f "$big_plan" ]]; then
+    current_phase="$(fm_read "$big_plan" "current_phase" || true)"
+    if [[ -z "$current_phase" ]]; then
+      failures+=("big plan has no current_phase")
+    else
+      small_plan="$repo_root/.claude/plans/$current_phase.md"
+    fi
+  fi
+
+  local small_status closeout_log=""
+  if [[ -n "$small_plan" && -f "$small_plan" ]]; then
+    small_status="$(fm_read "$small_plan" "status" || true)"
+    if [[ "$small_status" != "complete" ]]; then
+      failures+=("$small_plan must have status: complete before commit")
+    fi
+    closeout_log="$(fm_read "$small_plan" "closeout_session_log" || true)"
+    if [[ -z "$closeout_log" ]]; then
+      failures+=("$small_plan must set closeout_session_log before commit")
+    else
+      [[ "$closeout_log" = /* ]] || closeout_log="$repo_root/$closeout_log"
+      if [[ ! -f "$closeout_log" ]]; then
+        failures+=("closeout session log missing: $closeout_log")
+      elif ! grep -Eq '^\*\*Status:\*\*[[:space:]]+COMPLETED\b' "$closeout_log"; then
+        failures+=("closeout session log must contain exact line prefix: **Status:** COMPLETED")
+      fi
+    fi
+  else
+    failures+=("missing small-plan file: .claude/plans/${current_phase:-unknown}.md")
+  fi
+
+  local score_file="" best_generated_at=""
+  if [[ -n "$current_phase" ]]; then
+    # Select the newest matching report by generated_at (ISO-8601 sorts lexically
+    # == chronologically), not by filename order, so a stale report cannot shadow
+    # a fresh one.
+    local candidate cand_branch cand_phase cand_generated_at
+    while IFS= read -r candidate; do
+      cand_branch="$(json_file_string_value "$candidate" "branch" 2>/dev/null || true)"
+      cand_phase="$(json_file_string_value "$candidate" "phase" 2>/dev/null || true)"
+      if [[ "$cand_branch" == "$current_branch" && "$cand_phase" == "$current_phase" ]]; then
+        cand_generated_at="$(json_file_string_value "$candidate" "generated_at" 2>/dev/null || true)"
+        if [[ -z "$best_generated_at" || "$cand_generated_at" > "$best_generated_at" ]]; then
+          best_generated_at="$cand_generated_at"
+          score_file="$candidate"
+        fi
+      fi
+    done < <(find "$repo_root/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null)
+  fi
+
+  if [[ -z "$score_file" ]]; then
+    failures+=("no matching quality report found - run uv run python .claude/scripts/quality_score.py <target> --phase ${current_phase:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json")
+  else
+    local regen_hint="re-run quality_score.py: uv run python .claude/scripts/quality_score.py <target> --phase ${current_phase:-current_phase} --base-ref dev --json --out .claude/quality_reports/score-<ts>.json"
+    local score
+    score="$(json_file_number_value "$score_file" "score" 2>/dev/null || true)"
+    if [[ ! "$score" =~ ^[0-9]+$ || "$score" -lt 90 ]]; then
+      failures+=("quality score must be >= 90; found ${score:-unknown} in $score_file")
+    fi
+
+    local base_ref merge_base_sha head_sha generated_at target_path dirty tests_passed tests_skipped
+    base_ref="$(json_file_string_value "$score_file" "base_ref" 2>/dev/null || true)"
+    merge_base_sha="$(json_file_string_value "$score_file" "merge_base_sha" 2>/dev/null || true)"
+    head_sha="$(json_file_string_value "$score_file" "head_sha" 2>/dev/null || true)"
+    generated_at="$(json_file_string_value "$score_file" "generated_at" 2>/dev/null || true)"
+    target_path="$(json_file_string_value "$score_file" "target" 2>/dev/null || true)"
+    dirty="$(json_file_bool_value "$score_file" "dirty" 2>/dev/null || true)"
+    tests_passed="$(json_file_bool_value "$score_file" "tests_passed" 2>/dev/null || true)"
+    tests_skipped="$(json_file_bool_value "$score_file" "tests_skipped" 2>/dev/null || true)"
+
+    if [[ "$base_ref" != "dev" ]]; then
+      failures+=("quality report base_ref must be dev; found ${base_ref:-missing} in $score_file")
+    fi
+    local current_head expected_merge_base
+    current_head="$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || true)"
+    if [[ -z "$head_sha" || "$head_sha" != "$current_head" ]]; then
+      failures+=("quality report head_sha (${head_sha:-missing}) does not match current HEAD (${current_head:-unknown}); HEAD moved since scoring - $regen_hint")
+    fi
+    expected_merge_base="$(git -C "$repo_root" merge-base dev HEAD 2>/dev/null || true)"
+    if [[ -z "$merge_base_sha" ]]; then
+      failures+=("quality report must include merge_base_sha; $regen_hint")
+    elif [[ -n "$expected_merge_base" && "$merge_base_sha" != "$expected_merge_base" ]]; then
+      failures+=("quality report merge_base_sha (${merge_base_sha}) must match dev...HEAD merge base (${expected_merge_base}); $regen_hint")
+    fi
+    if [[ ! "$generated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+      failures+=("quality report generated_at must be an ISO-8601 UTC timestamp")
+    fi
+    if [[ -z "$target_path" ]]; then
+      failures+=("quality report must include target")
+    elif [[ "$target_path" = /* ]]; then
+      if [[ "$target_path" != "$repo_root"* ]]; then
+        failures+=("quality report target '$target_path' is outside this repo; re-run quality_score.py from within this repo")
+      fi
+    else
+      if [[ ! -e "$repo_root/$target_path" ]]; then
+        failures+=("quality report target '$target_path' does not exist under repo root")
+      fi
+    fi
+    if [[ "$dirty" != "true" && "$dirty" != "false" ]]; then
+      failures+=("quality report must include dirty boolean")
+    elif [[ "$dirty" == "true" ]]; then
+      failures+=("working tree has unstaged changes (dirty=true); stage everything and re-run quality_score.py")
+    fi
+    if [[ "$tests_passed" != "true" ]]; then
+      failures+=("quality report must record tests_passed: true; found ${tests_passed:-missing}")
+    fi
+    if [[ "$tests_skipped" == "true" ]]; then
+      failures+=("tests were skipped (tests_skipped=true); run the full test suite before committing")
+    fi
+    if ! json_file_array_present "$score_file" "changed_files" 2>/dev/null; then
+      failures+=("quality report must include changed_files array")
+    fi
+
+    # Freshness by content, not mtime: recompute the same content signature the
+    # scorer stamped (git hash-object of `git diff <merge-base>`). This is immune
+    # to amend/rebase/editor-touch that preserve content, and detects any edit to
+    # the changes after scoring - with a message that names the fix.
+    local report_hash current_hash
+    report_hash="$(json_file_string_value "$score_file" "content_hash" 2>/dev/null || true)"
+    if [[ -z "$report_hash" ]]; then
+      failures+=("quality report must include content_hash; $regen_hint")
+    elif [[ -n "$expected_merge_base" ]] && command -v git >/dev/null 2>&1; then
+      current_hash="$(git -C "$repo_root" diff --no-color --no-ext-diff "$expected_merge_base" 2>/dev/null | git -C "$repo_root" hash-object --stdin 2>/dev/null || true)"
+      if [[ -z "$current_hash" ]]; then
+        failures+=("could not compute the working-tree content hash to verify report freshness; $regen_hint")
+      elif [[ "$current_hash" != "$report_hash" ]]; then
+        failures+=("quality report content_hash does not match the current changes (files edited since scoring); $regen_hint")
+      fi
+    fi
+  fi
+
+  local learn_ok=0
+  if [[ -n "${closeout_log:-}" && -f "$closeout_log" ]] && grep -Fq "[LEARN] none - no new lessons this session" "$closeout_log"; then
+    learn_ok=1
+  elif [[ -f "$repo_root/.claude/MEMORY.md" && -n "$small_plan" && -f "$small_plan" ]]; then
+    local memory_mtime plan_mtime
+    memory_mtime="$(file_mtime "$repo_root/.claude/MEMORY.md" || true)"
+    plan_mtime="$(file_mtime "$small_plan" || true)"
+    if [[ -n "$memory_mtime" && -n "$plan_mtime" && "$memory_mtime" -ge "$plan_mtime" ]]; then
+      learn_ok=1
+    fi
+  fi
+  if [[ "$learn_ok" -ne 1 ]]; then
+    failures+=("LEARN evidence missing - update .claude/MEMORY.md or add [LEARN] none - no new lessons this session to closeout log")
+  fi
+}
