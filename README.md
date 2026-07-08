@@ -358,6 +358,16 @@ Configured events:
   - [hf-ai-sync.sh](shared/hooks/scripts/hf-ai-sync.sh) runs `push-state` only — it pushes mutable AI *state* to the configured Hugging Face sync path. Consumers never re-upload the canonical bootstrap bundle from a Stop hook; bootstrap uploads are an explicit installer/updater action, so a stale consumer copy can't clobber the shared bundle. With no bucket configured the helper warns and no-ops. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; missing HF auth or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes
 - `pull-state` (via VS Code tasks or AI SessionStart hooks) snapshots current state files to `.claude/.state_backups/` before overwriting, then deletes backups for files that were identical — only files that were actually overwritten by the pull retain a backup for manual review and recovery. `.state_backups/` is a local convenience; the durable copy of state is the HF bucket. `push-state --prune` reconciles the bucket (deletes remote files removed locally); it is opt-in
 
+### Deterministic Commit Gate (`commit-msg` Git Hook)
+
+`enforce-commit-gate.sh` above is a `PreToolUse` hook: it can only gate the AI agent's own Bash tool calls, so a human `git commit`, an IDE commit button, a script, or a `git ci` alias never pass through it. [commit-msg](shared/hooks/git-hooks/commit-msg) is a second, deterministic layer that runs inside git itself via `core.hooksPath` (set by [install_bootstrap.py](scripts/install_bootstrap.py) and, for fresh devcontainers, by `post-start.sh` before the state pull runs). Because it fires from git's own commit lifecycle, every commit reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
+
+Both entry points share one ceremony contract — `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh) — covering the small-plan/closeout/score/LEARN checks, so the two paths cannot drift apart. They deliberately diverge on branch scope: `enforce-commit-gate.sh` denies an *agent* commit on any wrong branch, while `commit-msg` passes through untouched on any branch other than `<plan_name>_implementation` — merges and casual commits on `dev`/`main` are unaffected.
+
+- `git commit --no-verify` is the sanctioned manual escape: git skips `commit-msg` entirely, and there is no git hook that fires when hooks are skipped.
+- `.claude/` is gitignored and Hugging Face-synced in consumers, so on a fresh clone *before* the first sync, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until sync completes). `post-start.sh` sets `core.hooksPath` before the pull runs so the devcontainer path closes this window as soon as the pull finishes.
+- See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) for the full design rationale.
+
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
 Design intent:
