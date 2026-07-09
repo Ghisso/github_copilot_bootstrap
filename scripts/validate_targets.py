@@ -45,6 +45,9 @@ CLAUDE_ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
 # Models that do NOT support the effort field: Haiku is absent from the
 # model-config.md effort table, so any effort on a Haiku agent is invalid.
 CLAUDE_NO_EFFORT_MODELS = {"haiku"}
+# Codex reasoning-effort levels (developers.openai.com/codex/config-reference,
+# checked 2026-07-09). Note Codex tops out at "xhigh" — there is no "max".
+CODEX_ALLOWED_EFFORT = {"minimal", "low", "medium", "high", "xhigh"}
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -299,6 +302,13 @@ def validate_agents(errors: list[str]) -> None:
         for field in ("name", "description", "developer_instructions"):
             check(isinstance(data.get(field), str) and bool(data.get(field)), f"Codex agent missing required field {field}: {path}", errors)
         check(data.get("name") == path.stem, f"Codex agent name must match filename stem: {path}", errors)
+        codex_effort = data.get("model_reasoning_effort")
+        if codex_effort is not None:
+            check(
+                codex_effort in CODEX_ALLOWED_EFFORT,
+                f"Codex agent has unsupported model_reasoning_effort '{codex_effort}' (no 'max' in Codex): {path}",
+                errors,
+            )
         instructions = str(data.get("developer_instructions", ""))
         check(
             ".claude/agents/" in instructions,
@@ -418,6 +428,10 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
     check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
+    # Codex has no stable model aliases, so the session model must be pinned in
+    # config.toml (agents inherit it). Presence check only — the concrete value
+    # lives in generate_targets.CODEX_SESSION_MODEL, the single bump point.
+    check("\nmodel = " in codex_config, "Codex config must pin the session model", errors)
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)

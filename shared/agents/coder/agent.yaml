@@ -16,7 +16,7 @@
   "model_intent": {
     "github-copilot": "GPT-5.4",
     "claude-code": { "model": "sonnet", "effort": "xhigh" },
-    "openai-codex": "target-native"
+    "openai-codex": { "effort": "xhigh" }
   }
 }
 

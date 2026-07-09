@@ -13,6 +13,6 @@
   "model_intent": {
     "github-copilot": "target-default",
     "claude-code": { "model": "sonnet", "effort": "high" },
-    "openai-codex": "target-native"
+    "openai-codex": { "effort": "high" }
   }
 }

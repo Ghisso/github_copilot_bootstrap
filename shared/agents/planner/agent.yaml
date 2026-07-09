@@ -16,7 +16,7 @@
   "model_intent": {
     "github-copilot": "Claude Opus 4.6",
     "claude-code": { "model": "opus", "effort": "max" },
-    "openai-codex": "target-native"
+    "openai-codex": { "effort": "xhigh" }
   }
 }
 

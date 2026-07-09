@@ -12,7 +12,7 @@
   "model_intent": {
     "github-copilot": "target-default",
     "claude-code": { "model": "haiku" },
-    "openai-codex": "target-native"
+    "openai-codex": { "effort": "low" }
   }
 }
 

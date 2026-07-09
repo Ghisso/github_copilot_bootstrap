@@ -16,6 +16,11 @@ TARGETS = ("multi-agent",)
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
+# Codex has no stable model aliases (unlike Claude's opus/sonnet/haiku), so the
+# session model is pinned to one concrete string here and inherited by every
+# Codex agent. This is the single place to bump when gpt-5.6 ships. Per-agent
+# reasoning-effort tiers live in each agent.yaml model_intent.openai-codex.
+CODEX_SESSION_MODEL = "gpt-5.5"
 
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
@@ -305,6 +310,12 @@ def render_codex_config(path: Path) -> None:
         "# (the enabled-skill path set must equal the shared/skills SKILL.md set exactly).",
         "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
         "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
+        "#",
+        "# Session model is pinned here (Codex has no stable model aliases). Every agent",
+        "# inherits it unless it overrides model itself; per-agent reasoning-effort tiers",
+        "# are emitted on the individual .codex/agents/*.toml files.",
+        "",
+        f"model = {toml_string(CODEX_SESSION_MODEL)}",
         "",
         "[agents]",
         "max_threads = 6",
@@ -652,8 +663,9 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     instructions = (
         "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
         f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
-        "Use the Codex TOML name, description, sandbox, and runtime behavior from this adapter "
-        "when they conflict with Claude-specific frontmatter in the canonical file.\n\n"
+        "Use the Codex TOML name, description, model, reasoning effort, sandbox, and runtime "
+        "behavior from this adapter when they conflict with Claude-specific frontmatter in the "
+        "canonical file.\n\n"
         "Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when "
         "the project is trusted. Shared memory, plans, explorations, session logs, quality reports, "
         "templates, prompts, and hook scripts also live under `.claude/`.\n\n"
@@ -665,6 +677,19 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
         f"name = {toml_string(codex_name)}",
         f"description = {toml_string(transform_agent_text(agent['description'], 'openai-codex'))}",
     ]
+    # Per-agent model/effort tiering. model_intent.openai-codex is an object
+    # carrying an optional per-agent model override and a reasoning-effort tier;
+    # a legacy "target-native" string or an omitted/"inherit" value emits nothing,
+    # so the agent inherits the session model/effort. Model is normally pinned
+    # once globally (config.toml), so agents usually set only effort here.
+    codex_intent = agent.get("model_intent", {}).get("openai-codex")
+    if isinstance(codex_intent, dict):
+        model = codex_intent.get("model")
+        effort = codex_intent.get("effort")
+        if model and model != "inherit":
+            agent_lines.append(f"model = {toml_string(model)}")
+        if effort and effort != "inherit":
+            agent_lines.append(f"model_reasoning_effort = {toml_string(effort)}")
     sandbox_mode = codex_sandbox_mode(capabilities)
     if sandbox_mode:
         agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
