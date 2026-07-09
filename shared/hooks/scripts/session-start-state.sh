@@ -19,8 +19,14 @@ BIG_PLAN="$REPO_ROOT/.claude/plans/$SLUG.md"
 
 done_count=0
 pending_count=0
-mapfile -t phases < <(fm_read_list "$BIG_PLAN" "phases")
-for phase in "${phases[@]}"; do
+# macOS's default /bin/bash is 3.2 and has no `mapfile`/`readarray`; accumulate
+# with a `while read` loop instead (mirrors _lib-frontmatter.sh).
+phases=()
+_phase_line=""
+while IFS= read -r _phase_line; do
+  [[ -n "$_phase_line" ]] && phases+=("$_phase_line")
+done < <(fm_read_list "$BIG_PLAN" "phases")
+for phase in ${phases[@]+"${phases[@]}"}; do
   small_plan="$REPO_ROOT/.claude/plans/$phase.md"
   status="$(fm_read "$small_plan" "status" 2>/dev/null || true)"
   if [[ "$status" == "complete" ]]; then

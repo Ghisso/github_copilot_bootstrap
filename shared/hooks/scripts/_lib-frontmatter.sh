@@ -155,6 +155,12 @@ hook_command() {
   printf '%s' "$payload" | json_string_value "command"
 }
 
+# Lowercase a string portably. macOS ships bash 3.2, which lacks the
+# ${var,,} case-conversion expansion (bash 4+), so route through tr.
+hook_to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 json_file_string_value() {
   local file="$1"
   local key="$2"
@@ -226,7 +232,7 @@ is_bash_tool_payload() {
   local payload="$1"
   local tool
   tool="$(hook_tool_name_any "$payload")"
-  tool="${tool,,}"
+  tool="$(hook_to_lower "$tool")"
   [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" ]]
 }
 

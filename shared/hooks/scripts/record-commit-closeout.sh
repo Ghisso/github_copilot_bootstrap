@@ -63,10 +63,16 @@ BIG_PLAN="$REPO_ROOT/.claude/plans/$SLUG.md"
 CURRENT_PHASE="$(fm_read "$BIG_PLAN" "current_phase" || true)"
 [[ -n "$CURRENT_PHASE" ]] || exit 0
 
-mapfile -t phases < <(fm_read_list "$BIG_PLAN" "phases")
+# macOS's default /bin/bash is 3.2 and has no `mapfile`/`readarray`; accumulate
+# with a `while read` loop instead (mirrors _lib-frontmatter.sh).
+phases=()
+_phase_line=""
+while IFS= read -r _phase_line; do
+  [[ -n "$_phase_line" ]] && phases+=("$_phase_line")
+done < <(fm_read_list "$BIG_PLAN" "phases")
 next_phase=""
 found=0
-for index in "${!phases[@]}"; do
+for index in ${phases[@]+"${!phases[@]}"}; do
   if [[ "${phases[$index]}" == "$CURRENT_PHASE" ]]; then
     found=1
     next_index=$((index + 1))

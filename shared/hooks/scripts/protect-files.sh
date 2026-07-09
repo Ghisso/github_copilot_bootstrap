@@ -63,7 +63,7 @@ pf_is_protected() {
   local p base lb
   p="$(pf_normalize "$1")"
   base="${p##*/}"
-  lb="${base,,}"
+  lb="$(hook_to_lower "$base")"
   case "$lb" in
     .env|.env.local) return 0 ;;
     .env.*) return 0 ;;
@@ -90,7 +90,7 @@ pf_collect() {
   local input="$1"
   local tool cmd is_bash=0
   tool="$(hook_tool_name_any "$input")"
-  tool="${tool,,}"
+  tool="$(hook_to_lower "$tool")"
   cmd="$(hook_command "$input")"
   if [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" ]]; then
     is_bash=1
