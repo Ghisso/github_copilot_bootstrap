@@ -36,6 +36,15 @@ GITHUB_ALLOWED_AGENT_MODELS = {
     "Claude Opus 4.6",
     "Claude Sonnet 4.6",
 }
+# Claude subagent frontmatter allow-lists. Model aliases and effort levels are
+# validated against the official Claude Code references as last checked
+# 2026-07-09 (subagents.md supported frontmatter fields; model-config.md effort
+# level table). Re-verify and update the date when you touch these.
+CLAUDE_ALLOWED_AGENT_MODELS = {"opus", "sonnet", "haiku", "fable", "inherit"}
+CLAUDE_ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
+# Models that do NOT support the effort field: Haiku is absent from the
+# model-config.md effort table, so any effort on a Haiku agent is invalid.
+CLAUDE_NO_EFFORT_MODELS = {"haiku"}
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -225,6 +234,33 @@ def validate_agents(errors: list[str]) -> None:
             f"Claude agent must route retrieval through tool-routing instructions: {path}",
             errors,
         )
+        # Per-agent model/effort tiering: validate any emitted frontmatter fields
+        # against the allow-lists, and reject effort on models that lack it.
+        frontmatter_block = text.split("---\n", 2)
+        frontmatter_text = frontmatter_block[1] if len(frontmatter_block) >= 3 else ""
+        model_value = effort_value = None
+        for line in frontmatter_text.splitlines():
+            if line.startswith("model:"):
+                model_value = line.split(":", 1)[1].strip()
+            elif line.startswith("effort:"):
+                effort_value = line.split(":", 1)[1].strip()
+        if model_value is not None:
+            check(
+                model_value in CLAUDE_ALLOWED_AGENT_MODELS,
+                f"Claude agent has unsupported model '{model_value}': {path}",
+                errors,
+            )
+        if effort_value is not None:
+            check(
+                effort_value in CLAUDE_ALLOWED_EFFORT,
+                f"Claude agent has unsupported effort '{effort_value}': {path}",
+                errors,
+            )
+            check(
+                model_value not in CLAUDE_NO_EFFORT_MODELS,
+                f"Claude agent model '{model_value}' does not support effort but sets '{effort_value}': {path}",
+                errors,
+            )
         if path.stem == "documenter":
             check(
                 "normal prose" in text.lower() and "caveman" in text.lower(),

@@ -626,6 +626,18 @@ def render_claude_agents(target_root: Path) -> None:
         ]
         if tools:
             frontmatter.append(f"tools: {tools}")
+        # Per-agent model/effort tiering lives in agent.yaml model_intent under the
+        # "claude-code" key as an object; a legacy "target-native" string emits
+        # nothing (inherit). "inherit" values are omitted so the agent follows the
+        # session. Haiku agents must not carry effort (Haiku has no effort level).
+        intent = agent.get("model_intent", {}).get("claude-code")
+        if isinstance(intent, dict):
+            model = intent.get("model")
+            effort = intent.get("effort")
+            if model and model != "inherit":
+                frontmatter.append(f"model: {model}")
+            if effort and effort != "inherit":
+                frontmatter.append(f"effort: {effort}")
         frontmatter.append("---")
         write_text(
             target_root / ".claude" / "agents" / f"{target_name}.md",

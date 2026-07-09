@@ -104,10 +104,12 @@ Custom agents are source-controlled under `shared/agents/<agent-id>/`.
 
 Each agent contains:
 
-- `agent.yaml`: stable metadata, capabilities, visibility, delegates, and model intent.
+- `agent.yaml`: stable metadata, capabilities, visibility, delegates, and per-target model/effort intent.
 - `prompt.md`: target-neutral behavior.
 
-The generator derives Copilot, Claude Code, and Codex adapters from those two files. Copilot model fields are target bindings, not portable semantics. GitHub Copilot agent `model` fields must be a single supported Copilot model string. Claude and Codex adapters must not include Copilot model pins. Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` adapters that point to `.claude/agents/`. Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant `[features]` block (hooks are on by default) and wires the documented `PreCompact` event.
+The generator derives Copilot, Claude Code, and Codex adapters from those two files. Copilot model fields are target bindings, not portable semantics. GitHub Copilot agent `model` fields must be a single supported Copilot model string. Claude and Codex adapters must not include Copilot model pins.
+
+The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`max`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`high`); the mechanical `verifier` runs on `haiku` with no `effort:` line, because Haiku does not support the effort field. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set. Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` adapters that point to `.claude/agents/`. Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant `[features]` block (hooks are on by default) and wires the documented `PreCompact` event.
 
 ## Design Decisions
 

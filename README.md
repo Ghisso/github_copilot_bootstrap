@@ -295,6 +295,19 @@ Current agents:
 - verifier
 - documenter
 
+Claude Code model/effort tiers (Copilot uses its own pins; Codex inherits its target default):
+
+| Agent | Model | Effort |
+| --- | --- | --- |
+| orchestrator | session (`/model`) | session (`/effort`) |
+| planner | `opus` | `max` |
+| reviewer | `sonnet` | `xhigh` |
+| coder | `sonnet` | `xhigh` |
+| documenter | `sonnet` | `high` |
+| verifier | `haiku` | — |
+
+The orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
+
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
 Orchestrator routing:
