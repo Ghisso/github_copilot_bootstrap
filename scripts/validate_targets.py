@@ -745,6 +745,13 @@ def write(path: Path, text: str) -> None:
 
 
 def setup_hook_repo(temp_root: Path) -> Path:
+    # Canonicalize the temp root before deriving any fixture paths. On macOS
+    # tempfile hands back a /var/... path, but /var is a symlink to
+    # /private/var, and both the hooks' repo_root_from_script (cd && pwd) and
+    # `git rev-parse --show-toplevel` resolve it to /private/var. Report
+    # `target` fields we write from `repo` must match that resolved form or the
+    # gates' in-repo containment check spuriously reports "outside this repo".
+    temp_root = temp_root.resolve()
     repo = temp_root / "repo"
     repo.mkdir()
     result = subprocess.run(["git", "init", "-b", "dev"], cwd=repo, text=True, capture_output=True, check=False)
