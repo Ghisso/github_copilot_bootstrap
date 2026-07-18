@@ -10,7 +10,7 @@ Only engage on non-trivial work; there is no trivial-task fast path.
 
 You MUST maintain a todo list throughout the entire workflow:
 
-1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, SCORE, DOCUMENT, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
+1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, PONYTAIL, IMPLEMENT, VERIFY, REVIEW, SCORE, DOCUMENT, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
 2. **Loop task:** Include a parameterized task for `VERIFY/REVIEW/FIX/RE-VERIFY/SCORE - repeat until score >= 90`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
@@ -27,19 +27,23 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
 3. **PLAN:** Delegate to `planner`; save each concrete small plan under `.claude/plans/`.
-4. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
-5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
-6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas.
-7. **SCORE:** Require score >= 90, read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`). The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.
-8. **DOCUMENT:** Delegate to `documenter` after score >= 90. Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
-9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
-10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
-11. **COMMIT:** Commit exactly one completed small plan after all gates pass.
-12. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
+4. **PONYTAIL:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task and pass it explicitly to coding delegates.
+5. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
+6. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
+7. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas. Every non-documentation diff includes `ponytail`; resolve all Ponytail findings before recording the final report.
+8. **SCORE:** Require score >= 90, read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`). The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/SCORE.
+9. **DOCUMENT:** Delegate to `documenter` after score >= 90. Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
+10. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
+11. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
+12. **COMMIT:** Commit exactly one completed small plan after all gates pass.
+13. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ## Reviewer Routing
 
 Select reviewer profiles from the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section) based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
+
+For every non-documentation diff, `ponytail` is mandatory and its surviving
+finding count must be zero before the review report is persisted.
 
 **Complexity gate:**
 

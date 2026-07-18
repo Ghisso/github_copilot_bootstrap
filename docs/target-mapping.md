@@ -14,7 +14,9 @@ git branch (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)).
 The shared basis lives under `.claude/`:
 
 - `.claude/skills/**/SKILL.md`
+- `.claude/skills/ponytail/SKILL.md` and `.claude/skills/ponytail-review/SKILL.md`
 - `.claude/review-profiles/*.md`
+- `.claude/third_party/ponytail/{LICENSE,UPSTREAM.md}`
 - `.claude/instructions/*.instructions.md`
 - `.claude/agents/*.md`
 - `.claude/prompts/*.prompt.md`

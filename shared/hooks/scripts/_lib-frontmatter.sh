@@ -467,6 +467,59 @@ is_bypass_subject() {
   esac
 }
 
+# Return success when the implementation diff contains anything other than
+# documentation or mutable workflow-state artifacts. With no `diff_ref`, the
+# live working tree/index is checked (commit gate); with a ref, that landed
+# commit is checked (push gate).
+diff_requires_ponytail() {
+  local repo_root="$1"
+  local diff_ref="${2:-}"
+  local head_ref="${diff_ref:-HEAD}"
+  local merge_base path
+  merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
+  [[ -n "$merge_base" ]] || return 0
+
+  if [[ -n "$diff_ref" ]]; then
+    while IFS= read -r path; do
+      [[ -n "$path" ]] || continue
+      case "$path" in
+        *.md|docs/*|plans/*|.claude/plans/*|.claude/session_logs/*|.claude/quality_reports/*) ;;
+        *) return 0 ;;
+      esac
+    done < <(git -C "$repo_root" diff --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+  else
+    while IFS= read -r path; do
+      [[ -n "$path" ]] || continue
+      case "$path" in
+        *.md|docs/*|plans/*|.claude/plans/*|.claude/session_logs/*|.claude/quality_reports/*) ;;
+        *) return 0 ;;
+      esac
+    done < <(git -C "$repo_root" diff --name-only "$merge_base" 2>/dev/null)
+  fi
+  return 1
+}
+
+assert_ponytail_review() {
+  local findings_file="$1"
+  local repo_root="$2"
+  local diff_ref="$3"
+  local gate="$4"
+  local regen_hint="$5"
+  diff_requires_ponytail "$repo_root" "$diff_ref" || return 0
+
+  local ponytail_reviewed ponytail_findings
+  ponytail_reviewed="$(json_file_bool_value "$findings_file" "ponytail_reviewed" 2>/dev/null || true)"
+  ponytail_findings="$(json_file_number_value "$findings_file" "ponytail_findings" 2>/dev/null || true)"
+  if [[ "$ponytail_reviewed" != "true" ]]; then
+    failures+=("non-documentation changes require a fresh Ponytail review before $gate; $regen_hint")
+  fi
+  if [[ ! "$ponytail_findings" =~ ^[0-9]+$ ]]; then
+    failures+=("findings report must include ponytail_findings; $regen_hint")
+  elif [[ "$ponytail_findings" -gt 0 ]]; then
+    failures+=("findings report has $ponytail_findings unresolved Ponytail finding(s) blocking $gate; simplify the diff, re-verify, and $regen_hint")
+  fi
+}
+
 repo_root_from_script() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
@@ -732,9 +785,9 @@ assert_commit_invariants() {
   fi
 
   if [[ -z "$findings_file" ]]; then
-    failures+=("no matching findings report found - run uv run python .claude/scripts/record_findings.py <target> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+    failures+=("no matching findings report found - run uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
   else
-    local findings_regen_hint="re-run record_findings.py: uv run python .claude/scripts/record_findings.py <target> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    local findings_regen_hint="re-run record_findings.py with Ponytail: uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$commit_gate_head" "exact" "" "findings report" "$findings_regen_hint"
 
     local critical_count
@@ -746,6 +799,8 @@ assert_commit_invariants() {
       critical_titles="$(list_finding_titles_by_severity "$findings_file" "CRITICAL")"
       failures+=("findings report has $critical_count CRITICAL finding(s) blocking commit: ${critical_titles:-see $findings_file}")
     fi
+
+    assert_ponytail_review "$findings_file" "$repo_root" "" "commit" "$findings_regen_hint"
   fi
 
   local learn_ok=0
@@ -852,9 +907,9 @@ assert_push_invariants() {
   findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
 
   if [[ -z "$findings_file" ]]; then
-    failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+    failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
   else
-    local findings_regen_hint="re-run record_findings.py: uv run python .claude/scripts/record_findings.py <target> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    local findings_regen_hint="re-run record_findings.py with Ponytail: uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
 
     local major_count
@@ -866,5 +921,7 @@ assert_push_invariants() {
       major_titles="$(list_finding_titles_by_severity "$findings_file" "MAJOR")"
       failures+=("findings report has $major_count MAJOR finding(s) blocking push: ${major_titles:-see $findings_file}")
     fi
+
+    assert_ponytail_review "$findings_file" "$repo_root" "$local_sha" "push" "$findings_regen_hint"
   fi
 }

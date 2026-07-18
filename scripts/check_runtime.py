@@ -26,6 +26,10 @@ REQUIRED_FILES = (
     "dist/multi-agent/.claude/settings.json",
     "dist/multi-agent/.codex/config.toml",
     "dist/multi-agent/.codex/hooks.json",
+    "dist/multi-agent/.claude/skills/ponytail/SKILL.md",
+    "dist/multi-agent/.claude/skills/ponytail-review/SKILL.md",
+    "dist/multi-agent/.claude/third_party/ponytail/LICENSE",
+    "dist/multi-agent/.claude/third_party/ponytail/UPSTREAM.md",
 )
 REQUIRED_DIRS = (
     "dist/multi-agent/.codex/agents",

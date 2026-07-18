@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import filecmp
+import hashlib
 import json
 import os
 import py_compile
@@ -1021,6 +1022,9 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             report: dict[str, object] = {
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+                "profiles_reviewed": ["code", "ponytail"],
                 "branch": "foo_implementation",
                 "phase": "phase-one",
                 "generated_at": "2099-01-01T00:00:00Z",
@@ -1245,6 +1249,9 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             report: dict[str, object] = {
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+                "profiles_reviewed": ["code", "ponytail"],
                 "branch": "foo_implementation",
                 "phase": "phase-one",
                 "generated_at": "2099-01-01T00:00:00Z",
@@ -1314,6 +1321,39 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(
             "sql injection in query builder" in result.stderr,
             "commit-msg hook's CRITICAL-finding failure must name the finding",
+            errors,
+        )
+
+        write_findings(findings_report(head_sha, content_hash, ponytail_reviewed=False))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block non-documentation changes without Ponytail review", errors)
+        check(
+            "require a fresh Ponytail review" in result.stderr,
+            "missing-Ponytail failure must name the required review",
+            errors,
+        )
+
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                ponytail_findings=1,
+                findings=[
+                    {
+                        "severity": "MINOR",
+                        "title": "yagni: unused abstraction",
+                        "file": "work.txt",
+                        "profile": "ponytail",
+                    }
+                ],
+                counts={"critical": 0, "major": 0, "minor": 1},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(result.returncode != 0, "commit-msg hook must block every surviving Ponytail finding", errors)
+        check(
+            "unresolved Ponytail finding" in result.stderr,
+            "Ponytail-finding failure must explain that simplification is required",
             errors,
         )
 
@@ -1502,6 +1542,9 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             report: dict[str, object] = {
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+                "profiles_reviewed": ["code", "ponytail"],
                 "branch": "foo_implementation",
                 "phase": "phase-one",
                 "generated_at": "2099-01-01T00:00:00Z",
@@ -1681,6 +1724,42 @@ def validate_generated_scripts(errors: list[str]) -> None:
         )
         check(result.returncode == 0, f"generated shell script syntax failed: {script}: {result.stderr}", errors)
 
+    findings_script = TARGET_ROOT / ".claude" / "scripts" / "record_findings.py"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        report_path = Path(temp_dir) / "findings.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "code",
+                "--profile",
+                "ponytail",
+                "--phase",
+                "validator",
+                "--base-ref",
+                "dev",
+                "--out",
+                str(report_path),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(result.returncode == 0, f"record_findings Ponytail metadata run failed: {result.stderr}", errors)
+        if report_path.exists():
+            report = json.loads(read(report_path))
+            check(report.get("ponytail_reviewed") is True, "record_findings must persist ponytail_reviewed", errors)
+            check(report.get("ponytail_findings") == 0, "record_findings must persist zero Ponytail findings", errors)
+            check(
+                report.get("profiles_reviewed") == ["code", "ponytail"],
+                "record_findings must persist sorted reviewed profiles",
+                errors,
+            )
+
 
 def validate_skills_and_paths(errors: list[str]) -> None:
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
@@ -1689,6 +1768,37 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
     # Skill frontmatter integrity (visibility, description) is checked once,
     # in validate_docs_parity, alongside the other named-inventory checks.
+    for skill_name in ("ponytail", "ponytail-review"):
+        skill_path = skill_root / skill_name / "SKILL.md"
+        check(skill_path.exists(), f"generated Ponytail skill missing: {skill_path}", errors)
+        if skill_path.exists():
+            skill_text = read(skill_path)
+            check("visibility: public" in skill_text, f"{skill_name} must remain public", errors)
+            check("license: MIT" in skill_text, f"{skill_name} must retain its MIT license metadata", errors)
+
+    ponytail_license = TARGET_ROOT / ".claude" / "third_party" / "ponytail" / "LICENSE"
+    ponytail_upstream = TARGET_ROOT / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
+    check(ponytail_license.exists(), "generated target must include Ponytail's MIT license", errors)
+    check(ponytail_upstream.exists(), "generated target must include Ponytail provenance", errors)
+    if ponytail_upstream.exists():
+        provenance = read(ponytail_upstream)
+        check("v4.8.4" in provenance, "Ponytail provenance must pin release v4.8.4", errors)
+        check("bc9ee94" in provenance, "Ponytail provenance must pin commit bc9ee94", errors)
+        pinned_files = {
+            REPO_ROOT / "shared" / "skills" / "ponytail" / "SKILL.md":
+                "9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3",
+            REPO_ROOT / "shared" / "skills" / "ponytail-review" / "SKILL.md":
+                "bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656",
+            REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE":
+                "fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4",
+        }
+        for source, expected_hash in pinned_files.items():
+            actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+            check(
+                actual_hash == expected_hash and f"sha256:{expected_hash}" in provenance,
+                f"Ponytail allowlist hash changed without a provenance update: {source}",
+                errors,
+            )
 
     # R-SKILLS-01: the commit skill must follow the enforced lifecycle, never
     # walking the agent into feature/* branches or agent-driven merges.
@@ -1778,6 +1888,18 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             f"{root_guidance.name} must require score >= 90 and documentation updates before closeout",
             errors,
         )
+        check(
+            ".claude/skills/ponytail/SKILL.md" in text,
+            f"{root_guidance.name} must activate the canonical Ponytail skill for coding",
+            errors,
+        )
+
+    copilot_guidance = read(TARGET_ROOT / ".github" / "copilot-instructions.md")
+    check(
+        ".claude/skills/ponytail/SKILL.md" in copilot_guidance,
+        "Copilot guidance must activate the canonical Ponytail skill for coding",
+        errors,
+    )
 
     stale_workflow_fragments = (
         "After score >= 80",
@@ -2002,7 +2124,12 @@ def validate_support_files(errors: list[str]) -> None:
         "instructions/workspace.md",
         "prompts/README.prompt.md",
         "review-profiles/code.md",
+        "review-profiles/ponytail.md",
         "review-profiles/security.md",
+        "skills/ponytail/SKILL.md",
+        "skills/ponytail-review/SKILL.md",
+        "third_party/ponytail/LICENSE",
+        "third_party/ponytail/UPSTREAM.md",
         "hooks/scripts/run-hook.sh",
         "hooks/scripts/protect-files.sh",
         "hooks/scripts/git-protection.sh",
@@ -2156,6 +2283,22 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check((temp_repo / ".devcontainer" / "devcontainer.json").exists(), "installer must copy trackable devcontainer", errors)
         check((temp_repo / ".gitignore").exists(), "installer must create or update .gitignore", errors)
         check("AI_STATE_REMOTE" not in read(temp_repo / ".devcontainer" / "devcontainer.json"), "installer must not write AI_STATE_REMOTE without --state-remote", errors)
+        for relative_path in (
+            ".claude/skills/ponytail/SKILL.md",
+            ".claude/skills/ponytail-review/SKILL.md",
+            ".claude/third_party/ponytail/LICENSE",
+            ".claude/third_party/ponytail/UPSTREAM.md",
+        ):
+            check(
+                (temp_repo / relative_path).exists(),
+                f"installer must make Ponytail available downstream: {relative_path}",
+                errors,
+            )
+        check(
+            "v4.8.4" in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
+            "installed Ponytail provenance must retain the pinned release",
+            errors,
+        )
 
         # R-SYNC-05: the installer creates the nested .claude/ AI-state repo
         # and makes its own bootstrap: install commit (distinct from the Stop
@@ -2553,6 +2696,47 @@ def validate_determinism(errors: list[str]) -> None:
         compare_dirs(DIST_ROOT, output, errors)
 
 
+def validate_ponytail_diff_classifier(errors: list[str]) -> None:
+    """Documentation-only diffs skip Ponytail; mixed/code diffs require it."""
+    library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = Path(temp_dir) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "dev", str(repo)], check=False)
+        env = git_actor_env("PonytailClassifier")
+        write(repo / "README.md", "# Fixture\n")
+        subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
+        subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False)
+        subprocess.run(["git", "switch", "-q", "-c", "fixture_implementation"], cwd=repo, env=env, check=False)
+
+        write(repo / "README.md", "# Fixture\n\nDocs only.\n")
+        docs_only = subprocess.run(
+            ["bash", "-c", '. "$1"; diff_requires_ponytail "$2"', "_", str(library), str(repo)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            docs_only.returncode != 0,
+            "Ponytail diff classifier must exempt a Markdown-only diff",
+            errors,
+        )
+
+        write(repo / "app.py", "print('fixture')\n")
+        subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
+        mixed = subprocess.run(
+            ["bash", "-c", '. "$1"; diff_requires_ponytail "$2"', "_", str(library), str(repo)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            mixed.returncode == 0,
+            "Ponytail diff classifier must require review for a mixed docs/code diff",
+            errors,
+        )
+
+
 def validate_routing_table_parity(errors: list[str]) -> None:
     """R-AGENTS-05: the profile-routing table must have exactly one home. Its
     distinctive row marker may appear in only one shared source file
@@ -2584,6 +2768,7 @@ def main() -> int:
         validate_skills_and_paths(errors)
         validate_docs_parity(errors)
         validate_routing_table_parity(errors)
+        validate_ponytail_diff_classifier(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)
         validate_determinism(errors)

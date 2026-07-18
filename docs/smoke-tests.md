@@ -21,6 +21,7 @@ Expected:
 - OpenAI Codex has 6 `.codex/agents/*.toml` files.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.
+- The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
 - `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
@@ -72,6 +73,9 @@ Expected:
 - `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
 - `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
 - A valid score report with no matching `findings-*.json` report blocks the commit.
+- A non-documentation diff without `ponytail_reviewed: true` blocks the commit.
+- Any surviving Ponytail finding, including `MINOR`, blocks the commit.
+- A Markdown/docs-only diff does not require Ponytail fields.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
 - A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
 - Two findings reports for the same branch/phase select the newest by `generated_at`, not filename — a lexically-later but older clean report loses to a lexically-earlier but newer report containing a `CRITICAL` finding.

@@ -106,7 +106,7 @@ The reviewer runs its primary + verification passes as usual (see the
 no `execute` capability, so **the orchestrator** persists that JSON:
 
 ```bash
-uv run python .claude/scripts/record_findings.py src/ --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+uv run python .claude/scripts/record_findings.py src/ --profile code --profile security --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 ```
 
 An empty findings list (`[]`) is valid and yields all-zero counts — the normal
@@ -155,7 +155,7 @@ When `.claude/scripts/record_findings.py` is available, persist the reviewer's
 surviving findings with the same branch/phase metadata as the score report:
 
 ```bash
-uv run python .claude/scripts/record_findings.py src/ --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+uv run python .claude/scripts/record_findings.py src/ --profile code --profile security --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 ```
 
 Commit and push gates read the persisted JSON, not the reviewer's prose
@@ -163,7 +163,9 @@ report. A findings report must match the current branch and phase, be as
 fresh as the score report (push gates accept a report generated for an
 ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
-`counts.major == 0` (push/PR).
+`counts.major == 0` (push/PR). Every non-documentation diff must additionally
+record `ponytail_reviewed: true` and `ponytail_findings: 0`; the same content
+hash makes that review stale after any real diff change.
 
 ---
 
