@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +64,17 @@ TARGET_PATH_REPLACEMENTS = {
         ("copilot-instructions.md", "AGENTS.md"),
     ),
 }
+
+
+def strip_quarantine(path: Path) -> None:
+    """shared/ can carry macOS's com.apple.quarantine xattr (e.g. if this repo
+    was ever extracted from a downloaded archive), and shutil.copy2/copytree
+    preserve xattrs. Left alone that flag rides into dist/ and then into every
+    consumer repo via install_bootstrap.py, where it makes git refuse to exec
+    hook scripts (EPERM). Strip it from each generated target tree."""
+    if sys.platform != "darwin":
+        return
+    subprocess.run(["xattr", "-rc", str(path)], check=False, capture_output=True)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -749,6 +762,7 @@ def generate(targets: list[str], output_root: Path) -> None:
             render_multi_agent(target_root)
         else:
             raise ValueError(f"unknown target: {target}")
+        strip_quarantine(target_root)
 
 
 def parse_args() -> argparse.Namespace:
