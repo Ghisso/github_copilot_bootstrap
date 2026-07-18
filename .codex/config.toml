@@ -1,3 +1,10 @@
+model = "gpt-5.6-sol"
+model_reasoning_effort = "xhigh"
+
+[features.multi_agent_v2]
+hide_spawn_agent_metadata = false
+tool_namespace = "agents"
+
 [mcp_servers.semble]
 command = "uvx"
 args = ["--from", "semble[mcp]", "semble"]

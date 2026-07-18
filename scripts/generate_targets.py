@@ -18,11 +18,10 @@ TARGETS = ("multi-agent",)
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
-# Codex has no stable model aliases (unlike Claude's opus/sonnet/haiku), so the
-# session model is pinned to one concrete string here and inherited by every
-# Codex agent. This is the single place to bump when gpt-5.6 ships. Per-agent
-# reasoning-effort tiers live in each agent.yaml model_intent.openai-codex.
-CODEX_SESSION_MODEL = "gpt-5.5"
+# Pin the root Codex session explicitly; custom agents override both values from
+# model_intent.openai-codex according to their task-specific quality/latency role.
+CODEX_SESSION_MODEL = "gpt-5.6-sol"
+CODEX_SESSION_EFFORT = "xhigh"
 
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
@@ -319,7 +318,9 @@ def render_codex_config(path: Path) -> None:
         "# Generated from shared/mcp/servers.json.",
         "# Skills are sourced from the shared .claude basis; project trust is required.",
         "# Semble and context-mode are optional; missing binaries should warn, not block.",
-        "# Hooks are enabled by default in current Codex, so no features block is emitted.",
+        "# Hooks are enabled by default in current Codex, so no flat features block is emitted.",
+        "# MultiAgent V2 hides agent routing metadata by default in Codex 0.144.x; expose",
+        "# it so named custom-agent model and reasoning overrides reach spawned threads.",
         "# Codex resolves a non-absolute skill `path` relative to config.toml; the generated",
         "# bundle cannot know the consumer's absolute path, so each skill points at",
         "# ../.claude/skills/<name>/SKILL.md relative to this config. This relative form is",
@@ -329,15 +330,19 @@ def render_codex_config(path: Path) -> None:
         "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
         "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
         "#",
-        "# Session model is pinned here (Codex has no stable model aliases). Every agent",
-        "# inherits it unless it overrides model itself; per-agent reasoning-effort tiers",
-        "# are emitted on the individual .codex/agents/*.toml files.",
+        "# Session model and effort are pinned for the root orchestrator. Custom agents",
+        "# override both values from model_intent.openai-codex according to task role.",
         "",
         f"model = {toml_string(CODEX_SESSION_MODEL)}",
+        f"model_reasoning_effort = {toml_string(CODEX_SESSION_EFFORT)}",
         "",
         "[agents]",
         "max_threads = 6",
         "max_depth = 1",
+        "",
+        "[features.multi_agent_v2]",
+        "hide_spawn_agent_metadata = false",
+        'tool_namespace = "agents"',
         "",
     ]
     for name, server in shared_mcp_servers().items():
@@ -698,8 +703,7 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     # Per-agent model/effort tiering. model_intent.openai-codex is an object
     # carrying an optional per-agent model override and a reasoning-effort tier;
     # a legacy "target-native" string or an omitted/"inherit" value emits nothing,
-    # so the agent inherits the session model/effort. Model is normally pinned
-    # once globally (config.toml), so agents usually set only effort here.
+    # so the agent inherits the session model/effort.
     codex_intent = agent.get("model_intent", {}).get("openai-codex")
     if isinstance(codex_intent, dict):
         model = codex_intent.get("model")

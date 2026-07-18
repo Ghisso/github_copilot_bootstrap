@@ -13,6 +13,6 @@
   "model_intent": {
     "github-copilot": "target-default",
     "claude-code": { "model": "sonnet", "effort": "high" },
-    "openai-codex": { "effort": "high" }
+    "openai-codex": { "model": "gpt-5.6-terra", "effort": "medium" }
   }
 }
