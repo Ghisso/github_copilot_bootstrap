@@ -16,7 +16,6 @@
   "model_intent": {
     "github-copilot": "Claude Opus 4.6",
     "claude-code": { "model": "opus", "effort": "max" },
-    "openai-codex": { "effort": "xhigh" }
+    "openai-codex": { "model": "gpt-5.6-sol", "effort": "max" }
   }
 }
-

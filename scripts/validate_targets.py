@@ -17,6 +17,8 @@ import time
 import tomllib
 from pathlib import Path
 
+from generate_targets import CODEX_SESSION_EFFORT, CODEX_SESSION_MODEL
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
@@ -46,9 +48,11 @@ CLAUDE_ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
 # Models that do NOT support the effort field: Haiku is absent from the
 # model-config.md effort table, so any effort on a Haiku agent is invalid.
 CLAUDE_NO_EFFORT_MODELS = {"haiku"}
-# Codex reasoning-effort levels (developers.openai.com/codex/config-reference,
-# checked 2026-07-09). Note Codex tops out at "xhigh" — there is no "max".
-CODEX_ALLOWED_EFFORT = {"minimal", "low", "medium", "high", "xhigh"}
+# GPT-5.6 model and effort values (developers.openai.com/api/docs/guides/latest-model,
+# checked 2026-07-18). Keep these strict so misspelled or retired values fail
+# generation validation instead of reaching consumer sessions.
+CODEX_ALLOWED_AGENT_MODELS = {"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
+CODEX_ALLOWED_EFFORT = {"none", "low", "medium", "high", "xhigh", "max"}
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -155,6 +159,61 @@ def check(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
+def validate_codex_model_contract(
+    label: str,
+    model: object,
+    effort: object,
+    errors: list[str],
+    *,
+    expected_model: object | None = None,
+    expected_effort: object | None = None,
+) -> None:
+    model_valid = isinstance(model, str) and bool(model)
+    effort_valid = isinstance(effort, str) and bool(effort)
+    check(model_valid, f"{label} must set an explicit Codex model", errors)
+    check(effort_valid, f"{label} must set an explicit Codex reasoning effort", errors)
+    if model_valid:
+        check(model in CODEX_ALLOWED_AGENT_MODELS, f"{label} has unsupported Codex model '{model}'", errors)
+    if effort_valid:
+        check(effort in CODEX_ALLOWED_EFFORT, f"{label} has unsupported Codex reasoning effort '{effort}'", errors)
+    if expected_model is not None:
+        check(model == expected_model, f"{label} model drift: expected '{expected_model}', got '{model}'", errors)
+    if expected_effort is not None:
+        check(effort == expected_effort, f"{label} effort drift: expected '{expected_effort}', got '{effort}'", errors)
+
+
+def validate_codex_model_contract_cases(errors: list[str]) -> None:
+    valid_errors: list[str] = []
+    validate_codex_model_contract(
+        "valid fixture",
+        "gpt-5.6-sol",
+        "max",
+        valid_errors,
+        expected_model="gpt-5.6-sol",
+        expected_effort="max",
+    )
+    check(not valid_errors, f"valid Codex model contract was rejected: {valid_errors}", errors)
+
+    invalid_cases = (
+        ("unsupported model", "gpt-5.7-sol", "high", "gpt-5.7-sol", "high"),
+        ("unsupported effort", "gpt-5.6-sol", "ultra", "gpt-5.6-sol", "ultra"),
+        ("missing model", None, "high", None, "high"),
+        ("missing effort", "gpt-5.6-sol", None, "gpt-5.6-sol", None),
+        ("generated drift", "gpt-5.6-terra", "high", "gpt-5.6-sol", "high"),
+    )
+    for label, model, effort, expected_model, expected_effort in invalid_cases:
+        case_errors: list[str] = []
+        validate_codex_model_contract(
+            label,
+            model,
+            effort,
+            case_errors,
+            expected_model=expected_model,
+            expected_effort=expected_effort,
+        )
+        check(bool(case_errors), f"adversarial Codex model case was not rejected: {label}", errors)
+
+
 def count_skills(root: Path) -> int:
     return len(list(root.glob("*/SKILL.md")))
 
@@ -184,10 +243,18 @@ def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
     expected_count = len(shared_agents)
     check(expected_count > 0, "no shared agents found under shared/agents/", errors)
+    expected_codex_intents: dict[str, tuple[object, object]] = {}
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
+        codex_intent = data.get("model_intent", {}).get("openai-codex")
+        check(isinstance(codex_intent, dict), f"{agent_id} must define an explicit openai-codex model intent", errors)
+        if isinstance(codex_intent, dict):
+            model = codex_intent.get("model")
+            effort = codex_intent.get("effort")
+            validate_codex_model_contract(f"canonical Codex agent {agent_id}", model, effort, errors)
+            expected_codex_intents[agent_id] = (model, effort)
         check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
         check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
         capabilities = set(data.get("capabilities", []))
@@ -286,7 +353,7 @@ def validate_agents(errors: list[str]) -> None:
         errors,
     )
 
-    expected_codex_names = {json.loads(read(path))["id"] for path in shared_agents}
+    expected_codex_names = set(expected_codex_intents)
     check(
         {path.stem for path in codex_agents} == expected_codex_names,
         "Codex custom agent filenames must match mapped shared agent names",
@@ -303,13 +370,15 @@ def validate_agents(errors: list[str]) -> None:
         for field in ("name", "description", "developer_instructions"):
             check(isinstance(data.get(field), str) and bool(data.get(field)), f"Codex agent missing required field {field}: {path}", errors)
         check(data.get("name") == path.stem, f"Codex agent name must match filename stem: {path}", errors)
-        codex_effort = data.get("model_reasoning_effort")
-        if codex_effort is not None:
-            check(
-                codex_effort in CODEX_ALLOWED_EFFORT,
-                f"Codex agent has unsupported model_reasoning_effort '{codex_effort}' (no 'max' in Codex): {path}",
-                errors,
-            )
+        expected_model, expected_effort = expected_codex_intents.get(path.stem, (None, None))
+        validate_codex_model_contract(
+            f"generated Codex agent {path.stem}",
+            data.get("model"),
+            data.get("model_reasoning_effort"),
+            errors,
+            expected_model=expected_model,
+            expected_effort=expected_effort,
+        )
         instructions = str(data.get("developer_instructions", ""))
         check(
             ".claude/agents/" in instructions,
@@ -378,7 +447,7 @@ def validate_github_agent_models(errors: list[str]) -> None:
             if not line.startswith("model:"):
                 continue
             value = line.split(":", 1)[1].strip()
-            check(value, f"GitHub agent model must be a single string, not a YAML list: {path}", errors)
+            check(bool(value), f"GitHub agent model must be a single string, not a YAML list: {path}", errors)
             if value:
                 check(
                     value in GITHUB_ALLOWED_AGENT_MODELS,
@@ -419,20 +488,77 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("servers" not in claude_mcp, "Claude .mcp.json must use mcpServers, not servers", errors)
 
     codex_config = read(TARGET_ROOT / ".codex" / "config.toml")
+    codex_config_data: dict[str, object] = {}
     try:
-        read_toml(TARGET_ROOT / ".codex" / "config.toml")
+        codex_config_data = read_toml(TARGET_ROOT / ".codex" / "config.toml")
     except tomllib.TOMLDecodeError as error:
         errors.append(f"invalid Codex config TOML: {error}")
-    # R-CODEX-01: hooks are on by default in current Codex; the [features] block
-    # is redundant and must not be emitted.
+    # R-CODEX-01: hooks are on by default in current Codex; the flat [features]
+    # block is redundant. The nested MultiAgent V2 table is required because
+    # Codex 0.144.x otherwise hides agent_type/model/effort routing metadata.
     check("[features]" not in codex_config, "Codex config must not emit the redundant [features] block", errors)
     check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
     check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
-    # Codex has no stable model aliases, so the session model must be pinned in
-    # config.toml (agents inherit it). Presence check only — the concrete value
-    # lives in generate_targets.CODEX_SESSION_MODEL, the single bump point.
-    check("\nmodel = " in codex_config, "Codex config must pin the session model", errors)
+    check(
+        codex_config_data.get("model") == CODEX_SESSION_MODEL,
+        f"Codex config model must be '{CODEX_SESSION_MODEL}'",
+        errors,
+    )
+    check(
+        codex_config_data.get("model_reasoning_effort") == CODEX_SESSION_EFFORT,
+        f"Codex config reasoning effort must be '{CODEX_SESSION_EFFORT}'",
+        errors,
+    )
+    codex_features = codex_config_data.get("features")
+    codex_multi_agent_v2 = codex_features.get("multi_agent_v2") if isinstance(codex_features, dict) else None
+    check(
+        isinstance(codex_multi_agent_v2, dict),
+        "Codex config must define the MultiAgent V2 routing table",
+        errors,
+    )
+    if isinstance(codex_multi_agent_v2, dict):
+        check(
+            codex_multi_agent_v2.get("hide_spawn_agent_metadata") is False,
+            "Codex config must expose MultiAgent V2 spawn metadata",
+            errors,
+        )
+        check(
+            codex_multi_agent_v2.get("tool_namespace") == "agents",
+            "Codex config must route MultiAgent V2 tools through the agents namespace",
+            errors,
+        )
+    authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
+    check(
+        authoring_config.get("model") == CODEX_SESSION_MODEL,
+        f"authoring Codex config model must be '{CODEX_SESSION_MODEL}'",
+        errors,
+    )
+    check(
+        authoring_config.get("model_reasoning_effort") == CODEX_SESSION_EFFORT,
+        f"authoring Codex config reasoning effort must be '{CODEX_SESSION_EFFORT}'",
+        errors,
+    )
+    authoring_features = authoring_config.get("features")
+    authoring_multi_agent_v2 = (
+        authoring_features.get("multi_agent_v2") if isinstance(authoring_features, dict) else None
+    )
+    check(
+        isinstance(authoring_multi_agent_v2, dict),
+        "authoring Codex config must define the MultiAgent V2 routing table",
+        errors,
+    )
+    if isinstance(authoring_multi_agent_v2, dict):
+        check(
+            authoring_multi_agent_v2.get("hide_spawn_agent_metadata") is False,
+            "authoring Codex config must expose MultiAgent V2 spawn metadata",
+            errors,
+        )
+        check(
+            authoring_multi_agent_v2.get("tool_namespace") == "agents",
+            "authoring Codex config must route MultiAgent V2 tools through the agents namespace",
+            errors,
+        )
     check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
     check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
     check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
@@ -481,7 +607,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         for script in REQUIRED_HOOK_SCRIPTS:
             path = hook_root / script
             check(path.exists(), f"missing hook script: {path}", errors)
-            check(path.exists() and path.stat().st_mode & 0o111, f"hook script is not executable: {path}", errors)
+            check(
+                path.exists() and bool(path.stat().st_mode & 0o111),
+                f"hook script is not executable: {path}",
+                errors,
+            )
         for script in REQUIRED_HOOK_LIBRARIES:
             path = hook_root / script
             check(path.exists(), f"missing hook library: {path}", errors)
@@ -494,7 +624,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     for script in REQUIRED_GIT_HOOKS:
         path = git_hook_root / script
         check(path.exists(), f"missing git hook: {path}", errors)
-        check(path.exists() and path.stat().st_mode & 0o111, f"git hook is not executable: {path}", errors)
+        check(
+            path.exists() and bool(path.stat().st_mode & 0o111),
+            f"git hook is not executable: {path}",
+            errors,
+        )
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
@@ -548,7 +682,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
     check(
-        dispatcher.exists() and dispatcher.stat().st_mode & 0o111,
+        dispatcher.exists() and bool(dispatcher.stat().st_mode & 0o111),
         "generated hook dispatcher run-hook.sh must be executable because Claude/Codex invoke it directly",
         errors,
     )
@@ -2226,7 +2360,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     for relative_path in ("state-sync.sh", "restore-root-adapters.sh"):
         path = devcontainer_root / relative_path
         check(
-            path.exists() and path.stat().st_mode & 0o111,
+            path.exists() and bool(path.stat().st_mode & 0o111),
             f"devcontainer AI-state script is not executable: {path}",
             errors,
         )
@@ -2427,7 +2561,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         commit_msg_hook = temp_repo / ".claude" / "hooks" / "git-hooks" / "commit-msg"
         check(commit_msg_hook.exists(), "installer must copy the commit-msg git hook", errors)
         check(
-            commit_msg_hook.exists() and commit_msg_hook.stat().st_mode & 0o111,
+            commit_msg_hook.exists() and bool(commit_msg_hook.stat().st_mode & 0o111),
             "installer must leave the commit-msg git hook executable",
             errors,
         )
@@ -2812,6 +2946,7 @@ def main() -> int:
         check((DIST_ROOT / target).exists(), f"missing generated target: {target}", errors)
 
     if not errors:
+        validate_codex_model_contract_cases(errors)
         validate_agents(errors)
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)

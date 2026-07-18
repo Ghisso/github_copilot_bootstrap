@@ -56,6 +56,6 @@ OpenAI Codex:
 - `.codex/hooks.json`
 - `.codex/agents/*.toml`
 
-Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/`.
+Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/` and takes its model/effort pair from `model_intent.openai-codex`.
 
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant `[features]` block (Codex enables hooks by default) and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load.
+Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load.

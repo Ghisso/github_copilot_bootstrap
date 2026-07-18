@@ -301,18 +301,18 @@ Current agents:
 
 Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its own model pins):
 
-| Agent | Claude model | Claude effort | Codex effort |
-| --- | --- | --- | --- |
-| orchestrator | session (`/model`) | session (`/effort`) | inherit |
-| planner | `opus` | `max` | `xhigh` |
-| reviewer | `sonnet` | `xhigh` | `xhigh` |
-| coder | `sonnet` | `xhigh` | `xhigh` |
-| documenter | `sonnet` | `high` | `high` |
-| verifier | `haiku` | — | `low` |
+| Agent | Claude model | Claude effort | Codex model | Codex effort |
+| --- | --- | --- | --- | --- |
+| orchestrator | session (`/model`) | session (`/effort`) | `gpt-5.6-sol` | `xhigh` |
+| planner | `opus` | `max` | `gpt-5.6-sol` | `max` |
+| reviewer | `sonnet` | `xhigh` | `gpt-5.6-sol` | `high` |
+| coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
+| documenter | `sonnet` | `high` | `gpt-5.6-terra` | `medium` |
+| verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 
 **Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
-**Codex:** Codex has no stable model aliases, so the session model is pinned once in `.codex/config.toml` (`gpt-5.5`, from `generate_targets.CODEX_SESSION_MODEL` — the single place to bump when gpt-5.6 ships) and every agent inherits it; only reasoning effort is tiered per agent. Codex effort tops out at `xhigh` (there is no `max`).
+**Codex:** the root session defaults to `gpt-5.6-sol` with `xhigh` effort from `generate_targets.CODEX_SESSION_MODEL` and `CODEX_SESSION_EFFORT`. Every generated `.codex/agents/*.toml` then pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object. The generated `[features.multi_agent_v2]` table exposes spawn metadata through the `agents` namespace so Codex can select those named profiles instead of inheriting the parent model. Sol is reserved for coordination, planning, and review; Terra handles implementation and documentation; Luna handles mechanical verification.
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 

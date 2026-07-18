@@ -221,7 +221,7 @@ def populate_bootstrap_root(target: Path, dry_run: bool, commit_copilot_surface:
     so they are carried by the git-backed .claude/ checkout even though they
     live outside .claude/ themselves. Skips the Copilot surface when it is
     already committed to the outer repo (--commit-copilot-surface)."""
-    paths = ROOT_ADAPTER_PATHS
+    paths: tuple[str, ...] = ROOT_ADAPTER_PATHS
     if not commit_copilot_surface:
         paths = paths + tuple(pattern.rstrip("/") for pattern in COPILOT_SURFACE_PATTERNS)
 
