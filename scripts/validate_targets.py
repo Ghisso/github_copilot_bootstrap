@@ -2501,6 +2501,74 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             )
             check("bootstrap:" in claude_log.stdout, "installer must make a bootstrap:-prefixed commit in .claude/", errors)
 
+        # Consumer MEMORY.md is mutable state, not bootstrap content. A repeat
+        # install must preserve it even though dist/ carries the blank seed
+        # template used for fresh consumers.
+        consumer_memory = "# Consumer memory\n\n- [LEARN:domain] preserve this exact content\n"
+        memory_path = temp_repo / ".claude" / "MEMORY.md"
+        write(memory_path, consumer_memory)
+        subprocess.run(["git", "-C", str(temp_repo / ".claude"), "add", "MEMORY.md"], check=False)
+        memory_commit = subprocess.run(
+            ["git", "-C", str(temp_repo / ".claude"), "commit", "-q", "-m", "session: add consumer memory"],
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(memory_commit.returncode == 0, f"consumer memory fixture commit failed: {memory_commit.stderr}", errors)
+        reinstall_result = subprocess.run(
+            [sys.executable, str(installer), str(temp_repo)],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(reinstall_result.returncode == 0, f"installer repeat run failed: {reinstall_result.stderr}", errors)
+        check(
+            memory_path.read_bytes() == consumer_memory.encode(),
+            "installer repeat run must preserve git-backed consumer MEMORY.md byte-for-byte",
+            errors,
+        )
+
+        # A legacy consumer has mutable state but no nested .claude git repo.
+        # Preservation must happen before migrate-from-hf snapshots that state.
+        legacy_repo = Path(temp_dir_name) / "legacy-consumer"
+        legacy_repo.mkdir()
+        subprocess.run(["git", "init", str(legacy_repo)], text=True, capture_output=True, check=False)
+        legacy_memory = "# Legacy memory\n\n- [LEARN:domain] preserve before migration\n"
+        legacy_memory_path = legacy_repo / ".claude" / "MEMORY.md"
+        write(legacy_memory_path, legacy_memory)
+        legacy_install_result = subprocess.run(
+            [sys.executable, str(installer), str(legacy_repo)],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            legacy_install_result.returncode == 0,
+            f"installer legacy refresh failed: {legacy_install_result.stderr}",
+            errors,
+        )
+        check(
+            legacy_memory_path.read_bytes() == legacy_memory.encode(),
+            "installer legacy refresh must preserve pre-git consumer MEMORY.md byte-for-byte",
+            errors,
+        )
+        migrated_memory = subprocess.run(
+            ["git", "-C", str(legacy_repo / ".claude"), "show", "HEAD:MEMORY.md"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            migrated_memory.returncode == 0 and migrated_memory.stdout == legacy_memory,
+            "legacy migration commit must contain the original consumer MEMORY.md",
+            errors,
+        )
+
         # D3: --state-remote persists AI_STATE_REMOTE into the committed
         # devcontainer config, since a fresh container clone has no other way
         # to learn a non-default state remote (.claude/ itself is gitignored).
