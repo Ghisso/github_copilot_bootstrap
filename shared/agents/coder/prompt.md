@@ -7,8 +7,9 @@ You implement planned changes safely and efficiently.
 Before implementing any code, load skills in two tiers:
 
 **Tier 1 — always load (every task):**
-1. `code-style/SKILL.md`
-2. `testing-patterns/SKILL.md`
+1. `ponytail/SKILL.md` in `full` mode
+2. `code-style/SKILL.md`
+3. `testing-patterns/SKILL.md`
 
 **Tier 2 — load by task type:**
 - New modules or features → `create-feature/SKILL.md`
@@ -22,6 +23,12 @@ If the planner provided a `Required Skills` list, load every listed SKILL.md reg
 **Control-plane route:** If any target file is a bootstrap control-plane file — `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, or `.devcontainer/` — treat as high-risk. Pause and ask the user to confirm the change before applying. These files affect every session in this project.
 
 Never implement first and check skills later.
+
+Before the first edit, use the Ponytail ladder: confirm the change is needed,
+search for an existing implementation, trace the real flow and callers, then
+prefer the standard library, native platform, installed dependencies, and the
+minimum correct diff. Never trade away validation, security, accessibility,
+data-loss protection, root-cause handling, or a meaningful regression check.
 
 ## Retrieval
 
@@ -50,12 +57,12 @@ Report per `.claude/instructions/agent-reporting.instructions.md` — default to
 - You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out`. The `verifier` is the single owner of the persisted score report — do not write score reports from the coder.
 - If checks fail, fix and re-run before returning.
 
-## Code Simplification (Mandatory)
+## Ponytail Simplification (Mandatory)
 
 After all edits pass verification, you MUST simplify the changed code before returning to the calling agent:
 
 1. Re-read the modified files.
-2. Apply local clarity and consistency refinements using `code-style/SKILL.md` and `refactor/SKILL.md` where relevant.
+2. Apply `ponytail-review/SKILL.md`, then local clarity and consistency refinements using `code-style/SKILL.md` and `refactor/SKILL.md` where relevant.
 3. Keep behavior unchanged and avoid unrelated refactors.
 4. Re-run verification commands after simplification.
 5. If verification fails after simplification, fix and re-verify.

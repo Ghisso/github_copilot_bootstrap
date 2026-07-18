@@ -171,6 +171,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     )
 
     copy_skills(REPO_ROOT / "shared" / "skills", support_root / "skills", "claude-code")
+    copy_tree_transformed(
+        REPO_ROOT / "shared" / "third_party",
+        support_root / "third_party",
+        "claude-code",
+    )
     copy_tree_transformed(REPO_ROOT / "shared" / "review-profiles", support_root / "review-profiles", "claude-code")
     copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
     # Every hook script must be executable: the runtime wrapper execs them, and
@@ -555,7 +560,7 @@ Native Copilot files under `.github/` are adapters:
 - `.github/agents/*.agent.md` preserves Copilot agent metadata and points to `.claude/agents/`.
 - `.github/hooks/hooks.json` invokes shared hook scripts in `.claude/hooks/scripts/`.
 
-Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
+Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`. Before every coding action, load `.claude/skills/ponytail/SKILL.md` in `full` mode.
 
 Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow. Score >= 90 plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
 """

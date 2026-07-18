@@ -6,6 +6,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 - `shared/policies/`: reusable workflow, quality, code, testing, routing, and deployment guidance.
 - `shared/skills/`: reusable skills with `visibility: public|background` metadata.
+- `shared/third_party/ponytail/`: pinned Ponytail provenance and MIT license; portable skills live in `shared/skills/ponytail*`.
 - `shared/hooks/`: hook config and guardrail scripts.
 - `shared/devcontainer/`: GPU devcontainer bootloader. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container — used by the projects themselves, not by AI state sync (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)). `post-start.sh` bootstraps AI state via `state-sync.sh`/`restore-root-adapters.sh`, both also rendered here (see "Git-Backed State Sync" below).
 - `shared/mcp/servers.json`: single MCP server definition for Semble and context-mode.
@@ -20,7 +21,22 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
+
+## Ponytail Integration
+
+Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
+as a per-user plugin. Every target receives `.claude/skills/ponytail/`,
+`.claude/skills/ponytail-review/`, and the upstream license/provenance. Root
+guidance and the coder role require `full` mode for coding, so fresh consumers
+work without network access or global plugin state.
+
+The unified reviewer runs a `ponytail` profile for every non-documentation
+diff. `record_findings.py --profile ponytail` persists top-level
+`ponytail_reviewed` and `ponytail_findings` fields with the existing diff
+content hash. Commit and push gates require a fresh review with zero surviving
+Ponytail findings; any subsequent code/config/script edit invalidates it.
+Documentation-only diffs are exempt.
 
 Do not edit `dist/` manually. Regenerate it with:
 

@@ -6,7 +6,9 @@ Run:
 uv run python scripts/check_runtime.py
 ```
 
-The runtime checker verifies generated runtime files exist and reports optional helper availability.
+The runtime checker verifies generated runtime files exist, including the
+Ponytail coding/review skills and upstream license/provenance, and reports
+optional helper availability.
 
 Optional helpers:
 
@@ -19,6 +21,12 @@ Optional helpers:
 - context7 through `npx -y @upstash/context7-mcp` (missing `npx` warns, does not fail; falls back to training-data knowledge)
 
 Missing optional binaries produce `WARN`, not `FAIL`.
+
+Ponytail does not add a runtime binary requirement. Its portable skills are
+vendored into `.claude/skills/`; the bootstrap's existing reviewer and pure
+Bash git gates enforce the fresh zero-finding Ponytail review. Node.js is used
+elsewhere by the managed devcontainer, but is not required solely for this
+Ponytail integration.
 
 Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
@@ -42,6 +50,13 @@ The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerat
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
+
+For non-documentation diffs, the matching findings report must also contain
+`ponytail_reviewed: true` and `ponytail_findings: 0`. `record_findings.py`
+receives `--profile ponytail`; its existing content hash invalidates the
+review after any real source, test, script, hook, config, manifest, template,
+container, or generator edit. All-Markdown and documented workflow-state
+diffs are exempt.
 
 ## Two Layers, Two Invariants: Commit And Push Enforcement
 

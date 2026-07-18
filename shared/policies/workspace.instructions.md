@@ -27,6 +27,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 
 - Plan first for non-trivial work.
 - Search before writing new code.
+- Apply the `ponytail` skill in `full` mode to every coding task.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
@@ -52,7 +53,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
@@ -62,6 +63,21 @@ orchestrator -> planner -> coder -> verifier -> reviewer -> score -> documenter
 ```
 
 Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project.
+
+## Ponytail Coding Rule
+
+Before writing, adding, fixing, refactoring, reviewing, or designing code, or
+choosing a dependency, read `.claude/skills/ponytail/SKILL.md` and apply it in
+`full` mode for the whole task. Search for reusable code and trace the real
+flow before editing; then prefer YAGNI, existing helpers, the standard library,
+native platform features, installed dependencies, and the minimum correct
+diff, in that order.
+
+Ponytail never removes required validation, data-loss protection, security,
+accessibility, root-cause investigation, or the smallest meaningful regression
+check. A user may explicitly select another Ponytail mode for implementation,
+but every non-documentation diff still requires the mandatory Ponytail review
+before commit or push.
 
 ## Agents
 
@@ -80,15 +96,16 @@ This is the **single authoritative profile-routing table**. The unified `reviewe
 
 | Surface | Profiles |
 |---|---|
-| Python source | `code`, `security` |
-| New modules/refactors | `architecture` |
-| Tests | `tests` |
-| APIs/services | `api`, `security`, `tests` |
-| Configs | `config` |
+| Python source | `code`, `security`, `ponytail` |
+| New modules/refactors | `architecture`, `ponytail` |
+| Tests | `tests`, `ponytail` |
+| APIs/services | `api`, `security`, `tests`, `ponytail` |
+| Configs | `config`, `ponytail` when executable behavior changes |
 | I/O-heavy or ML-heavy paths | `performance` |
 | Docs/user-facing behavior | `documentation` |
 | Domain-specific correctness | `domain` |
-| Any pre-PR gate | `code`, `security`, `tests` (minimum) |
+| Hooks, scripts, generators, and control-plane code | `code`, `architecture`, `security`, `tests`, `ponytail` |
+| Any pre-PR gate | `code`, `security`, `tests`, `ponytail` (minimum for non-documentation diffs) |
 
 ## Skills
 
@@ -97,7 +114,7 @@ Skills live under `.claude/skills/`. Each `SKILL.md` has machine-readable `visib
 - `public` skills are intended for direct slash-menu or user-triggered use.
 - `background` skills are hidden helpers loaded by description match or by agents.
 
-High-leverage public skills include `create-feature`, `refactor`, `run-tests`, `code-review`, `review-api`, `hydra-config`, `bentoml-service`, `debug-investigator`, `deep-audit`, `commit`, and `context-status`.
+High-leverage public skills include `ponytail`, `ponytail-review`, `create-feature`, `refactor`, `run-tests`, `code-review`, `review-api`, `hydra-config`, `bentoml-service`, `debug-investigator`, `deep-audit`, `commit`, and `context-status`.
 
 ## Verification
 
