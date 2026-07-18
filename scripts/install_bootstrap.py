@@ -115,7 +115,16 @@ def copy_generated_tree(source: Path, target: Path, dry_run: bool) -> None:
     for child in sorted(source.iterdir()):
         destination = target / child.name
         if child.is_dir():
-            shutil.copytree(child, destination, dirs_exist_ok=True)
+            memory = destination / "MEMORY.md"
+            preserve_memory = child.name == ".claude" and (memory.exists() or memory.is_symlink())
+            if preserve_memory:
+                info("preserve consumer state .claude/MEMORY.md")
+            shutil.copytree(
+                child,
+                destination,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("MEMORY.md") if preserve_memory else None,
+            )
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(child, destination)

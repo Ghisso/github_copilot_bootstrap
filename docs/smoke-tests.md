@@ -31,6 +31,7 @@ Expected:
 - Claude and Codex outputs do not contain Copilot model pins.
 - Codex does not generate deprecated `.codex/rules/` output.
 - Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
+- A fresh install seeds `.claude/MEMORY.md`; repeat installs and legacy pre-git migration preserve an existing consumer `MEMORY.md` byte-for-byte.
 - Generated output contains `templates/plan-big.md`, `templates/plan-small.md`, and `templates/session-log.md`.
 - Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, `.devcontainer/state-sync.sh`, and `.devcontainer/restore-root-adapters.sh`.
 
