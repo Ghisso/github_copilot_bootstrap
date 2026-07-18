@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,11 @@ TARGETS = ("multi-agent",)
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
+# Codex has no stable model aliases (unlike Claude's opus/sonnet/haiku), so the
+# session model is pinned to one concrete string here and inherited by every
+# Codex agent. This is the single place to bump when gpt-5.6 ships. Per-agent
+# reasoning-effort tiers live in each agent.yaml model_intent.openai-codex.
+CODEX_SESSION_MODEL = "gpt-5.5"
 
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
@@ -57,6 +64,17 @@ TARGET_PATH_REPLACEMENTS = {
         ("copilot-instructions.md", "AGENTS.md"),
     ),
 }
+
+
+def strip_quarantine(path: Path) -> None:
+    """shared/ can carry macOS's com.apple.quarantine xattr (e.g. if this repo
+    was ever extracted from a downloaded archive), and shutil.copy2/copytree
+    preserve xattrs. Left alone that flag rides into dist/ and then into every
+    consumer repo via install_bootstrap.py, where it makes git refuse to exec
+    hook scripts (EPERM). Strip it from each generated target tree."""
+    if sys.platform != "darwin":
+        return
+    subprocess.run(["xattr", "-rc", str(path)], check=False, capture_output=True)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -310,6 +328,12 @@ def render_codex_config(path: Path) -> None:
         "# (the enabled-skill path set must equal the shared/skills SKILL.md set exactly).",
         "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
         "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
+        "#",
+        "# Session model is pinned here (Codex has no stable model aliases). Every agent",
+        "# inherits it unless it overrides model itself; per-agent reasoning-effort tiers",
+        "# are emitted on the individual .codex/agents/*.toml files.",
+        "",
+        f"model = {toml_string(CODEX_SESSION_MODEL)}",
         "",
         "[agents]",
         "max_threads = 6",
@@ -631,6 +655,18 @@ def render_claude_agents(target_root: Path) -> None:
         ]
         if tools:
             frontmatter.append(f"tools: {tools}")
+        # Per-agent model/effort tiering lives in agent.yaml model_intent under the
+        # "claude-code" key as an object; a legacy "target-native" string emits
+        # nothing (inherit). "inherit" values are omitted so the agent follows the
+        # session. Haiku agents must not carry effort (Haiku has no effort level).
+        intent = agent.get("model_intent", {}).get("claude-code")
+        if isinstance(intent, dict):
+            model = intent.get("model")
+            effort = intent.get("effort")
+            if model and model != "inherit":
+                frontmatter.append(f"model: {model}")
+            if effort and effort != "inherit":
+                frontmatter.append(f"effort: {effort}")
         frontmatter.append("---")
         write_text(
             target_root / ".claude" / "agents" / f"{target_name}.md",
@@ -645,8 +681,9 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     instructions = (
         "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
         f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
-        "Use the Codex TOML name, description, sandbox, and runtime behavior from this adapter "
-        "when they conflict with Claude-specific frontmatter in the canonical file.\n\n"
+        "Use the Codex TOML name, description, model, reasoning effort, sandbox, and runtime "
+        "behavior from this adapter when they conflict with Claude-specific frontmatter in the "
+        "canonical file.\n\n"
         "Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when "
         "the project is trusted. Shared memory, plans, explorations, session logs, quality reports, "
         "templates, prompts, and hook scripts also live under `.claude/`.\n\n"
@@ -658,6 +695,19 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
         f"name = {toml_string(codex_name)}",
         f"description = {toml_string(transform_agent_text(agent['description'], 'openai-codex'))}",
     ]
+    # Per-agent model/effort tiering. model_intent.openai-codex is an object
+    # carrying an optional per-agent model override and a reasoning-effort tier;
+    # a legacy "target-native" string or an omitted/"inherit" value emits nothing,
+    # so the agent inherits the session model/effort. Model is normally pinned
+    # once globally (config.toml), so agents usually set only effort here.
+    codex_intent = agent.get("model_intent", {}).get("openai-codex")
+    if isinstance(codex_intent, dict):
+        model = codex_intent.get("model")
+        effort = codex_intent.get("effort")
+        if model and model != "inherit":
+            agent_lines.append(f"model = {toml_string(model)}")
+        if effort and effort != "inherit":
+            agent_lines.append(f"model_reasoning_effort = {toml_string(effort)}")
     sandbox_mode = codex_sandbox_mode(capabilities)
     if sandbox_mode:
         agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
@@ -717,6 +767,7 @@ def generate(targets: list[str], output_root: Path) -> None:
             render_multi_agent(target_root)
         else:
             raise ValueError(f"unknown target: {target}")
+        strip_quarantine(target_root)
 
 
 def parse_args() -> argparse.Namespace:

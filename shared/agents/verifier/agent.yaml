@@ -11,8 +11,8 @@
   "delegates": [],
   "model_intent": {
     "github-copilot": "target-default",
-    "claude-code": "target-native",
-    "openai-codex": "target-native"
+    "claude-code": { "model": "haiku" },
+    "openai-codex": { "effort": "low" }
   }
 }
 

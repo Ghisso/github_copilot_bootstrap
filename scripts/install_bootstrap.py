@@ -96,6 +96,15 @@ def warn(message: str) -> None:
     print(f"WARNING install-bootstrap: {message}", file=sys.stderr)
 
 
+def strip_quarantine(path: Path) -> None:
+    """Copied files can carry macOS's com.apple.quarantine xattr (shutil.copy2/
+    copytree preserve xattrs from the source tree). Left in place, that flag
+    makes git refuse to exec the installed hook scripts (EPERM)."""
+    if sys.platform != "darwin":
+        return
+    subprocess.run(["xattr", "-rc", str(path)], check=False, capture_output=True)
+
+
 def copy_generated_tree(source: Path, target: Path, dry_run: bool) -> None:
     if not source.is_dir():
         raise SystemExit(f"Generated source does not exist: {source}")
@@ -110,6 +119,7 @@ def copy_generated_tree(source: Path, target: Path, dry_run: bool) -> None:
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(child, destination)
+        strip_quarantine(destination)
 
 
 def ignore_block(commit_copilot_surface: bool = False) -> str:
@@ -230,6 +240,7 @@ def populate_bootstrap_root(target: Path, dry_run: bool, commit_copilot_surface:
         else:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
+        strip_quarantine(destination)
 
 
 def sync_state_after_install(

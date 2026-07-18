@@ -299,6 +299,21 @@ Current agents:
 - verifier
 - documenter
 
+Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its own model pins):
+
+| Agent | Claude model | Claude effort | Codex effort |
+| --- | --- | --- | --- |
+| orchestrator | session (`/model`) | session (`/effort`) | inherit |
+| planner | `opus` | `max` | `xhigh` |
+| reviewer | `sonnet` | `xhigh` | `xhigh` |
+| coder | `sonnet` | `xhigh` | `xhigh` |
+| documenter | `sonnet` | `high` | `high` |
+| verifier | `haiku` | — | `low` |
+
+**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
+
+**Codex:** Codex has no stable model aliases, so the session model is pinned once in `.codex/config.toml` (`gpt-5.5`, from `generate_targets.CODEX_SESSION_MODEL` — the single place to bump when gpt-5.6 ships) and every agent inherits it; only reasoning effort is tiered per agent. Codex effort tops out at `xhigh` (there is no `max`).
+
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
 Orchestrator routing:

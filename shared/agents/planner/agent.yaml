@@ -15,8 +15,8 @@
   "delegates": [],
   "model_intent": {
     "github-copilot": "Claude Opus 4.6",
-    "claude-code": "target-native",
-    "openai-codex": "target-native"
+    "claude-code": { "model": "opus", "effort": "max" },
+    "openai-codex": { "effort": "xhigh" }
   }
 }
 
