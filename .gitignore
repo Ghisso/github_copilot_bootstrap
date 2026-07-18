@@ -1,6 +1,9 @@
 # Generated build output — regenerate with: uv run scripts/generate_targets.py
 dist/
 
+# Local project context and AI state are tracked in the nested .claude repo.
+.claude/
+
 # Python
 .venv/
 __pycache__/
