@@ -55,6 +55,11 @@ credentials or bucket configuration are needed. Pass `--state-remote <git-url>`
 repo, for example, if you would rather AI state not be visible to anyone with
 read access to the code remote.
 
+Because it is a separate repository — not a worktree, not a branch of the outer
+one — `ai-state` never shows up in the outer repo's own `git branch`/`git log`.
+That is expected, not a sync failure. Inspect it explicitly: `git -C .claude
+branch`, `git -C .claude log --oneline`, etc.
+
 ```bash
 set -euo pipefail
 
@@ -144,6 +149,23 @@ and MCP files should stay ignored. A fresh clone can reopen in the devcontainer;
 the `ai-state` branch (and copying `.claude/bootstrap-root/` back out to the root
 adapters — `CLAUDE.md`, `AGENTS.md`, etc.) using the same git credentials as the
 code checkout, with no separate auth to configure.
+
+**Changing dev machines without a devcontainer:** if you open a fresh clone in
+plain VS Code, the `.vscode/tasks.json` `folderOpen` task now bootstraps state
+automatically — it calls `.devcontainer/state-sync.sh setup` (idempotent; creates
+`.claude/.git` and resolves the remote from the outer repo's own `origin` if
+`.claude/` doesn't exist yet) followed by `pull`, so opening the folder is enough.
+Without VS Code at all, run the same two commands by hand once:
+
+```bash
+bash .devcontainer/state-sync.sh setup
+bash .devcontainer/state-sync.sh pull
+```
+
+Both are safe to (re-)run anytime — `setup` no-ops once `.claude/.git` already
+exists. `.claude/hooks/scripts/state-sync.sh` (the copy normal hooks call) can't
+be used for this first bootstrap: it doesn't exist until `.claude/` does, which
+is exactly why `.devcontainer/` carries its own copy of the same script.
 
 ### GitHub Copilot: local-IDE vs cloud
 

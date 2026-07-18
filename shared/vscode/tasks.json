@@ -4,8 +4,7 @@
     {
       "label": "AI state: pull",
       "type": "shell",
-      "command": ".claude/hooks/scripts/run-hook.sh",
-      "args": ["state-sync.sh", "pull"],
+      "command": "bash .devcontainer/state-sync.sh setup && bash .devcontainer/state-sync.sh pull",
       "options": { "cwd": "${workspaceFolder}" },
       "runOptions": { "runOn": "folderOpen" },
       "presentation": {
@@ -19,8 +18,7 @@
     {
       "label": "AI state: push",
       "type": "shell",
-      "command": ".claude/hooks/scripts/run-hook.sh",
-      "args": ["state-sync.sh", "push"],
+      "command": "bash .devcontainer/state-sync.sh push",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": {
         "reveal": "always",
