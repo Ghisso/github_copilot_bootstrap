@@ -99,9 +99,16 @@ The two safety-critical guards, `protect-files.sh` and `git-protection.sh`, run 
 - **`setup`** — idempotent. If `.claude/.git` is missing: `git init`, resolve and configure the remote (`AI_STATE_REMOTE` / `--state-remote` at install time, else the outer repo's own `origin`), commit whatever is already on disk (there is always something — at minimum this script itself), then reconcile with `origin/ai-state` via `git merge --allow-unrelated-histories` if it already exists remotely (a real merge, not a bare checkout, so it combines file-by-file instead of refusing to overwrite untracked files that are about to converge anyway). A genuine conflict aborts the merge and warns, leaving the local commit as the source of truth.
 - **`pull`** — `git pull --rebase --autostash origin ai-state`. On conflict: abort the rebase, print a `WARN` naming the conflicting files and the manual-resolution commands, and exit 0 with local files intact.
 - **`push`** — commit any staged state as `session: <ISO-timestamp>` (skipping the commit if nothing changed), `pull` (as above), then push. A push rejection after a failed rebase gets the same loud-warn-exit-0 contract.
-- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, runs `setup`'s init/remote logic, commits everything on disk as `migrate: import pre-git state`, and pushes. No automatic pull from the old Hugging Face bucket happens here — the local tree is the source of truth at migration time; run the retired `hf-ai-sync.py pull-state` once first, manually, if you want the bucket's newer copy. `update_consumers.py` calls this automatically for any consumer whose `.claude/` predates git-backed state.
+- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, runs `setup`'s init/remote logic, commits everything on disk as `migrate: import pre-git state`, and pushes. No automatic pull from the old Hugging Face bucket happens here — the local tree is the source of truth at migration time; run the retired `hf-ai-sync.py pull-state` once first, manually, if you want the bucket's newer copy. `install_bootstrap.py` invokes this before replacing generated files, so the updater does not own a separate migration path.
 
-Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py`/`update_consumers.py`); session state lands as `session:`-prefixed commits (made by the Stop hook). The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
+Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py` through the updater); session state lands as `session:`-prefixed commits when a consumer's Stop hook runs the normal push flow. The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
+
+Both human CLIs push by default after a complete refresh. Their `--local-only`
+mode still refreshes all bootstrap-controlled files and creates durable nested
+commits, including ordered `migrate:` then `bootstrap:` commits for a legacy
+consumer, but has a hard remote-I/O boundary: it performs no fetch,
+`ls-remote`, pull, merge, or push. The installer prints nested status and a
+shell-quoted manual `state-sync.sh push` command so publication is deliberate.
 
 `state-sync.sh` and `restore-root-adapters.sh` (which copies `.claude/bootstrap-root/` — the root-level adapter files that live outside `.claude/`, such as `CLAUDE.md`/`AGENTS.md`/`.mcp.json`/`.codex/**` — back out to the repo root) are rendered in two locations: `.claude/hooks/scripts/` for normal use, and `.devcontainer/` so `post-start.sh` has a copy it can run before `.claude/` exists at all on a fresh clone.
 
@@ -114,7 +121,9 @@ Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootst
 - **AI state: pull** — runs automatically on `folderOpen` (VS Code prompts once to allow automatic tasks). Pulls state silently in the background via `state-sync.sh pull`.
 - **AI state: push** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. Shows output so the developer can confirm the push succeeded, via `state-sync.sh push`.
 
-These complement the AI SessionStart/Stop hooks (which already pull/push on every session start/end) for workflows where VS Code is open without an active AI session.
+These complement the AI SessionStart/Stop hooks, which run the normal pull/push
+flow for sessions in that consumer, for workflows where VS Code is open without
+an active AI session.
 
 ## Custom Agents
 

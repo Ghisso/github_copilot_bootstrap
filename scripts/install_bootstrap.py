@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -84,6 +85,11 @@ def parse_args() -> argparse.Namespace:
         "so it can be committed. Cloud Copilot agents only read these from the default "
         "branch; the default (omitting the flag) is local-IDE Copilot only.",
     )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Refresh and commit AI state locally without contacting its configured remote.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions without writing files.")
     return parser.parse_args()
 
@@ -94,6 +100,30 @@ def info(message: str) -> None:
 
 def warn(message: str) -> None:
     print(f"WARNING install-bootstrap: {message}", file=sys.stderr)
+
+
+def nested_git(target: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(target / ".claude"), *args],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def require_nested_head(target: Path, action: str) -> None:
+    """Abort when a fail-open state-sync call did not create durable state."""
+    head = nested_git(target, "rev-parse", "--verify", "HEAD")
+    if head.returncode != 0:
+        raise SystemExit(f"{action} did not create a nested AI-state commit: {head.stderr.strip()}")
+
+
+def require_clean_nested_state(target: Path, action: str) -> None:
+    """Abort when an installer operation leaves nested state uncommitted."""
+    require_nested_head(target, action)
+    status = nested_git(target, "status", "--porcelain")
+    if status.returncode != 0 or status.stdout.strip():
+        raise SystemExit(f"{action} left nested AI state uncommitted: {status.stderr.strip()}")
 
 
 def strip_quarantine(path: Path) -> None:
@@ -258,16 +288,16 @@ def sync_state_after_install(
     state_remote: str | None,
     had_claude_git: bool,
     had_pre_existing_content: bool,
+    local_only: bool,
 ) -> None:
     """Commits and pushes the nested .claude/ AI-state repo (D1/D4). A
-    pre-git .claude/ with real content migrates as one `migrate:` commit
-    (state-sync.sh owns that commit message); otherwise this makes its own
-    `bootstrap: install/update <timestamp>` commit, distinct from the
-    `session:` commits the Stop hook makes."""
+    pre-git .claude/ with real content must already have been migrated before
+    generated files replace it. This function then makes the distinct
+    `bootstrap: install/update <timestamp>` commit, separate from `session:`
+    commits made by the Stop hook."""
     state_sync = target / ".claude" / "hooks" / "scripts" / "state-sync.sh"
     if not state_sync.is_file():
-        warn(f"missing state-sync helper: {state_sync}")
-        return
+        raise SystemExit(f"missing state-sync helper: {state_sync}")
 
     info("sync AI state via state-sync.sh")
     if dry_run:
@@ -276,20 +306,17 @@ def sync_state_after_install(
     env = os.environ.copy()
     if state_remote:
         env["AI_STATE_REMOTE"] = state_remote
+    if local_only:
+        env["AI_STATE_LOCAL_ONLY"] = "1"
 
     # stdin=DEVNULL (F2 in plans/plan-git-state-sync.md §9): state-sync.sh
     # drains stdin for up to 2s (a hook/task contract). When invoked from this
     # installer with inherited stdin, an interactive run would block on — and
     # swallow — terminal input; the installer never reads stdin, so close it.
-    if not had_claude_git and had_pre_existing_content:
-        # migrate-from-hf owns setup + its own "migrate:" commit + push.
-        subprocess.run(
-            ["bash", str(state_sync), "migrate-from-hf"],
-            check=False, cwd=target, env=env, stdin=subprocess.DEVNULL,
-        )
-        return
-
     subprocess.run(["bash", str(state_sync), "setup"], check=False, cwd=target, env=env, stdin=subprocess.DEVNULL)
+    require_nested_head(target, "state-sync setup")
+    if not had_claude_git and not had_pre_existing_content:
+        require_clean_nested_state(target, "state-sync setup")
     # On a truly fresh install, `setup` above already committed everything
     # currently on disk as "bootstrap: init ai-state" (it always commits
     # whatever it finds when .claude/.git doesn't yet exist) — that commit
@@ -297,7 +324,7 @@ def sync_state_after_install(
     # is nothing left to stage here. On a repeat run .claude/.git already
     # existed, so `setup` was a no-op, and this run's freshly copied files
     # are real, uncommitted changes that need their own commit.
-    if had_claude_git:
+    if had_claude_git or had_pre_existing_content:
         status = subprocess.run(
             ["git", "-C", str(target / ".claude"), "status", "--porcelain"],
             text=True,
@@ -312,12 +339,57 @@ def sync_state_after_install(
                 check=False,
             )
 
+    require_clean_nested_state(target, "bootstrap update")
+
+    if local_only:
+        status = nested_git(target, "status", "--short", "--branch")
+        print("Nested AI-state status:")
+        print(status.stdout.rstrip() or "(unable to read nested repository status)")
+        print(f"Publish later: bash {shlex.quote(str(state_sync))} push")
+        return
+
     push_result = subprocess.run(
         ["bash", str(state_sync), "push"],
         check=False, cwd=target, env=env, stdin=subprocess.DEVNULL,
     )
     if push_result.returncode != 0:
         warn("state-sync push reported a non-zero exit; state committed locally, will retry on next sync.")
+
+
+def migrate_pre_existing_state(
+    target: Path,
+    source: Path,
+    dry_run: bool,
+    state_remote: str | None,
+    had_pre_existing_content: bool,
+    local_only: bool,
+) -> None:
+    """Commit legacy state before generated files replace it."""
+    if not had_pre_existing_content:
+        return
+
+    state_sync = source / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(f"missing source state-sync helper: {state_sync}")
+
+    info("migrate pre-existing AI state via state-sync.sh")
+    if dry_run:
+        return
+
+    env = os.environ.copy()
+    env["AI_STATE_REPO_ROOT"] = str(target)
+    if state_remote:
+        env["AI_STATE_REMOTE"] = state_remote
+    if local_only:
+        env["AI_STATE_LOCAL_ONLY"] = "1"
+    subprocess.run(
+        ["bash", str(state_sync), "migrate-from-hf"],
+        check=False, cwd=target, env=env, stdin=subprocess.DEVNULL,
+    )
+    require_clean_nested_state(target, "legacy state migration")
+    history = nested_git(target, "log", "--format=%s")
+    if history.returncode != 0 or "migrate: import pre-git state" not in history.stdout.splitlines():
+        raise SystemExit("legacy state migration did not create a migrate: import pre-git state commit")
 
 
 def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str]:
@@ -358,6 +430,14 @@ def main() -> int:
     had_claude_git = (claude_dir / ".git").exists()
     had_pre_existing_content = claude_dir.is_dir() and not had_claude_git and any(claude_dir.iterdir())
 
+    migrate_pre_existing_state(
+        target,
+        source,
+        args.dry_run,
+        state_remote,
+        had_pre_existing_content,
+        args.local_only,
+    )
     copy_generated_tree(source, target, args.dry_run)
     substitute_project_name(target, args.dry_run)
     populate_bootstrap_root(target, args.dry_run, args.commit_copilot_surface)
@@ -367,7 +447,14 @@ def main() -> int:
     configure_git_hooks_path(target, args.dry_run)
     warn_tracked_paths(target, active_ignore_patterns(args.commit_copilot_surface))
 
-    sync_state_after_install(target, args.dry_run, state_remote, had_claude_git, had_pre_existing_content)
+    sync_state_after_install(
+        target,
+        args.dry_run,
+        state_remote,
+        had_claude_git,
+        had_pre_existing_content,
+        args.local_only,
+    )
 
     info("done")
     return 0

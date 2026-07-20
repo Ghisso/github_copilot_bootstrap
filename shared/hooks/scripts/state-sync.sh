@@ -17,18 +17,22 @@ set -euo pipefail
 # Subcommands: setup | pull | push | migrate-from-hf
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-case "$SCRIPT_DIR" in
-  */.claude/hooks/scripts)
-    REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-    ;;
-  */.devcontainer)
-    REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-    ;;
-  *)
-    REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || true)"
-    [[ -n "$REPO_ROOT" ]] || REPO_ROOT="$SCRIPT_DIR"
-    ;;
-esac
+if [[ -n "${AI_STATE_REPO_ROOT:-}" ]]; then
+  REPO_ROOT="$(cd "$AI_STATE_REPO_ROOT" && pwd)"
+else
+  case "$SCRIPT_DIR" in
+    */.claude/hooks/scripts)
+      REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+      ;;
+    */.devcontainer)
+      REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+      ;;
+    *)
+      REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || true)"
+      [[ -n "$REPO_ROOT" ]] || REPO_ROOT="$SCRIPT_DIR"
+      ;;
+  esac
+fi
 
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
@@ -53,6 +57,14 @@ info() {
 timeout 2 cat >/dev/null 2>/dev/null || true
 
 MODE="${1:-push}"
+LOCAL_ONLY="${AI_STATE_LOCAL_ONLY:-0}"
+if [[ "${2:-}" == "--local-only" ]]; then
+  LOCAL_ONLY=1
+fi
+
+is_local_only() {
+  [[ "$LOCAL_ONLY" == "1" ]]
+}
 
 resolve_remote() {
   if [[ -n "${AI_STATE_REMOTE:-}" ]]; then
@@ -120,7 +132,7 @@ commit_and_reconcile() {
     git -C "$CLAUDE_DIR" commit -q --allow-empty -m "$message"
   fi
 
-  if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+  if is_local_only || ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     return 0
   fi
   if git -C "$CLAUDE_DIR" fetch origin -q 2>/dev/null \
@@ -178,6 +190,10 @@ cmd_setup() {
 }
 
 cmd_pull() {
+  if is_local_only; then
+    info "pull: local-only mode; remote sync skipped."
+    return 0
+  fi
   cmd_setup
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; nothing to pull from."
@@ -213,6 +229,11 @@ cmd_push() {
   cmd_setup
 
   commit_local_state
+
+  if is_local_only; then
+    info "push: local-only mode; committed locally without contacting origin."
+    return 0
+  fi
 
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; committed locally only."
@@ -250,7 +271,7 @@ cmd_migrate() {
   init_nested_repo
   commit_and_reconcile "migrate: import pre-git state"
 
-  if git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+  if ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     if ! git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>>"$ERROR_LOG"; then
       warn "migration commit created locally but push to origin/$BRANCH failed; push manually once network/auth is available: git -C $CLAUDE_DIR push origin $BRANCH"
     fi

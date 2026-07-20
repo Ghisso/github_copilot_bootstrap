@@ -62,7 +62,7 @@ Expected:
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
 - PR creation uses `--base dev`, and implementation-branch pushes are blocked until all phases are complete.
-- SessionStart/Stop hooks invoke `state-sync.sh` to pull/push mutable AI state on the git-backed `ai-state` branch.
+- SessionStart/Stop hooks in a configured consumer invoke `state-sync.sh` to pull/push mutable AI state on the git-backed `ai-state` branch; they do not publish a refresh merely because it was launched from another repository.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
 - `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
@@ -95,4 +95,7 @@ Expected:
 - The generated devcontainer does not require `/dev/fuse` or apparmor overrides, and still includes the `SYS_ADMIN`/`seccomp=unconfined` run args needed by `bubblewrap`.
 - `state-sync.sh` resolves the nested `.claude/` repo's remote from `AI_STATE_REMOTE` / `--state-remote` at install time / the outer repo's own `origin` (no separate credential), warns and stays local-only when none is configured, and never fails a hook or session on a sync problem.
 - `install_bootstrap.py <repo>` (no bucket flag needed) sets `git -C <repo> config core.hooksPath` to `.claude/hooks/git-hooks`, leaves `commit-msg` executable, and creates+pushes the nested `.claude/` ai-state repo with a `bootstrap:`-prefixed commit; `--state-remote <url>` pushes to that remote instead of `origin` and persists it into `.devcontainer/devcontainer.json`.
+- `install_bootstrap.py <repo> --local-only` and `update_consumers.py --local-only <repo>` refresh every bootstrap-controlled file and leave nested `ai-state` committed and clean without fetch, `ls-remote`, pull, merge, or push. For pre-git state, history contains `migrate: import pre-git state` before the bootstrap commit; output includes nested status and a shell-safe manual publish command.
+- The default installer and updater retain their human-operated commit-and-push behavior; legacy migration is initiated by the installer, not by a separate updater migration step.
+- A root `.github/` self-install overlay passes source-layout validation only when ignored and byte-identical to generated output. Tracked, unignored, and stale overlays fail.
 - `post-start.sh` runs `state-sync.sh setup` before setting `core.hooksPath`, then `state-sync.sh pull` and `restore-root-adapters.sh`; the checkout inside `setup` already carries the correct executable bits for `.claude/hooks/git-hooks/*` (git preserves them, unlike the retired HF bucket sync).
