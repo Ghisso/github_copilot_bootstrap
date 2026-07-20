@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=../scripts/_lib-frontmatter.sh
+. "$SCRIPT_DIR/../scripts/_lib-frontmatter.sh"
+
+# git always invokes hooks with cwd set to the working-tree root and passes
+# the commit-message file as $1, regardless of how commit was invoked
+# (bare `git commit`, `git -C <path> commit`, an alias, a GUI, ...) - so
+# unlike the PreToolUse gate there is no command string to classify or evade.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+MSG_FILE="${1:-}"
+SUBJECT="$(head -n 1 "$MSG_FILE" 2>/dev/null || true)"
+
+CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+
+# D4-B: this deterministic layer mirrors the ceremony contract only on
+# <plan>_implementation branches, where feature work lands; dev/main stay
+# free for merges and casual commits (docs/plan-deterministic-commit-gate.md).
+if ! is_implementation_branch "$CURRENT_BRANCH"; then
+  exit 0
+fi
+
+# githooks(5): commit-msg also fires for git-merge. A merge commit authors
+# no content of its own; ceremony re-attaches at the next real commit
+# (the score's merge_base/content_hash checks force a fresh report then).
+if git -C "$REPO_ROOT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+  exit 0
+fi
+
+if is_bypass_subject "$SUBJECT"; then
+  exit 0
+fi
+
+failures=()
+assert_commit_invariants "$REPO_ROOT" "$CURRENT_BRANCH"
+
+if [[ "${#failures[@]}" -gt 0 ]]; then
+  reason="$(printf '%s; ' "${failures[@]}")"
+  printf 'commit gate failed: %s\n' "${reason%; }" >&2
+  exit 1
+fi
+
+exit 0

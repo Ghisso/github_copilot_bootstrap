@@ -1,0 +1,122 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh pull",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-log.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-start-state.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex sessionstart",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" protect-files.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" git-protection.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" enforce-branch-state.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" enforce-commit-gate.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" enforce-pr-gate.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex pretooluse",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-branch-state.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-commit-closeout.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex posttooluse",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex precompact",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-log.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" stop-session-log-check.sh openai-codex",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

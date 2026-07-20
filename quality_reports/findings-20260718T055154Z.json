@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "code",
+    "configuration",
+    "documentation",
+    "ponytail",
+    "security"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-18T05:52:11Z",
+  "branch": "preserve-consumer-memory_implementation",
+  "head_sha": "767fefc387cec4005c833a78a416500e83f53b9c",
+  "base_ref": "dev",
+  "merge_base_sha": "767fefc387cec4005c833a78a416500e83f53b9c",
+  "phase": "2026-07-18_phase-A-preserve-consumer-memory",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "33f54f0f25ee7e3d5100f163e3af50a651cee809",
+  "changed_files": [
+    "README.md",
+    "docs/smoke-tests.md",
+    "scripts/install_bootstrap.py",
+    "scripts/validate_targets.py"
+  ]
+}

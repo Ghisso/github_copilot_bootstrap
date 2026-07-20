@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AI state: pull",
+      "type": "shell",
+      "command": "bash .devcontainer/state-sync.sh setup && bash .devcontainer/state-sync.sh pull",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "AI state: push",
+      "type": "shell",
+      "command": "bash .devcontainer/state-sync.sh push",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh pull",
+        "cwd": ".",
+        "timeout": 60,
+        "timeoutSec": 60
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh session-start-state.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh session-start-state.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh session-start-state.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot sessionstart",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot sessionstart",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot sessionstart",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh protect-files.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh protect-files.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh protect-files.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh git-protection.sh",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh git-protection.sh",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh enforce-branch-state.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-branch-state.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-branch-state.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh enforce-commit-gate.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-commit-gate.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-commit-gate.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh enforce-pr-gate.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-pr-gate.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh enforce-pr-gate.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot pretooluse",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot pretooluse",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot pretooluse",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh record-branch-state.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh record-branch-state.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh record-branch-state.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot precompact",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot precompact",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot precompact",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh session-log.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh stop-session-log-check.sh github-copilot",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh stop-session-log-check.sh github-copilot",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh stop-session-log-check.sh github-copilot",
+        "cwd": ".",
+        "timeout": 10,
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
+        "bash": ".claude/hooks/scripts/run-hook.sh state-sync.sh push",
+        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh push",
+        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh state-sync.sh push",
+        "cwd": ".",
+        "timeout": 180,
+        "timeoutSec": 180
+      }
+    ]
+  }
+}

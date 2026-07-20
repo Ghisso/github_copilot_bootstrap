@@ -1,0 +1,28 @@
+{
+  "score": 85,
+  "gate": "BLOCKED",
+  "target": "scripts",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": false,
+  "tests_skipped": false,
+  "pytest_summary": "no tests ran in 0.00s",
+  "mypy_summary": "Success: no issues found in 6 source files",
+  "deductions": [
+    "pytest: test failures  [-15]"
+  ],
+  "generated_at": "2026-07-18T05:51:59Z",
+  "branch": "preserve-consumer-memory_implementation",
+  "head_sha": "767fefc387cec4005c833a78a416500e83f53b9c",
+  "base_ref": "dev",
+  "merge_base_sha": "767fefc387cec4005c833a78a416500e83f53b9c",
+  "phase": "2026-07-18_phase-A-preserve-consumer-memory",
+  "dirty": false,
+  "content_hash": "33f54f0f25ee7e3d5100f163e3af50a651cee809",
+  "changed_files": [
+    "README.md",
+    "docs/smoke-tests.md",
+    "scripts/install_bootstrap.py",
+    "scripts/validate_targets.py"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-18T04:26:18Z",
+  "branch": "codex-gpt-5.6-model-tiering_implementation",
+  "head_sha": "9c054ec7197fb048f99786c29b1e1f36c3f8ad38",
+  "base_ref": "dev",
+  "merge_base_sha": "9c054ec7197fb048f99786c29b1e1f36c3f8ad38",
+  "phase": "2026-07-18_phase-B-configure-codex-gpt-5.6",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "98798d16d1dc20c52f92d861f16011472e2acd70",
+  "changed_files": [
+    ".codex/config.toml",
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/coder/agent.yaml",
+    "shared/agents/documenter/agent.yaml",
+    "shared/agents/orchestrator/agent.yaml",
+    "shared/agents/planner/agent.yaml",
+    "shared/agents/reviewer/agent.yaml",
+    "shared/agents/verifier/agent.yaml"
+  ]
+}

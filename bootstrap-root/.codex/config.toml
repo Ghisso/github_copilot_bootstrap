@@ -1,0 +1,249 @@
+# Generated from shared/mcp/servers.json.
+# Skills are sourced from the shared .claude basis; project trust is required.
+# Semble and context-mode are optional; missing binaries should warn, not block.
+# Hooks are enabled by default in current Codex, so no flat features block is emitted.
+# MultiAgent V2 hides agent routing metadata by default in Codex 0.144.x; expose
+# it so named custom-agent model and reasoning overrides reach spawned threads.
+# Codex resolves a non-absolute skill `path` relative to config.toml; the generated
+# bundle cannot know the consumer's absolute path, so each skill points at
+# ../.claude/skills/<name>/SKILL.md relative to this config. This relative form is
+# the tested contract: validate_targets.py asserts it structurally in two places -
+# validate_mcp_and_hooks ("../.claude/skills/" in config) and validate_skills_and_paths
+# (the enabled-skill path set must equal the shared/skills SKILL.md set exactly).
+# Runtime resolution follows Codex's documented relative-path handling (docs accessed
+# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.
+#
+# The interactive session model and effort are intentionally unpinned so users can
+# choose them manually. Custom agents set their own values from
+# model_intent.openai-codex according to task role.
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[features.multi_agent_v2]
+hide_spawn_agent_metadata = false
+tool_namespace = "agents"
+
+[mcp_servers.semble]
+command = "uvx"
+args = ["--from", "semble[mcp]", "semble"]
+
+[mcp_servers.context-mode]
+command = "context-mode"
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[[skills.config]]
+path = "../.claude/skills/add-dependency/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/bentoml-service/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/caveman/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/caveman-compress/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/code-review/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/code-style/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/commit/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/concept-to-image/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/context-manager-testing/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/context-status/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/create-feature/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/csv-driven-integration-tests/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/data-analysis/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/dataclass-classvar-constant/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/debug-investigator/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/deep-audit/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/deploy-service/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/devils-advocate/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/docling-haystack/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/documentation/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/domain-type-placement/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/draw-io/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/extraction-metadata-sourcing/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/gradio-streamlit/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/graph-schema-compat-migration/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/haystack-conditional-router/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/html-presentation/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/humanize/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/hydra-config/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/integration-gate-spike/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/learn/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/literature-review/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/md-to-pdf/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/networkx-igraph-graphml-interop/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/ollama-chat-generator/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/onboard/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/pandas-nan-bool-coercion/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/pdf/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/pipeline-patterns/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/plan-decomposition/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/ponytail/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/ponytail-review/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/prompt-lab/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/pyvis-xss-testing/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/rag-auditor/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/refactor/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/research-critique/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/review-api/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/run-tests/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/setup-project/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/test-helper-public-api/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/testing-patterns/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.claude/skills/text-to-sql-safety/SKILL.md"
+enabled = true

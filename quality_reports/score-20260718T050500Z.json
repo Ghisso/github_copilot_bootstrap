@@ -1,0 +1,39 @@
+{
+  "score": 85,
+  "gate": "BLOCKED",
+  "target": "scripts",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": false,
+  "tests_skipped": false,
+  "pytest_summary": "no tests ran in 0.00s",
+  "mypy_summary": "Success: no issues found in 6 source files",
+  "deductions": [
+    "pytest: test failures  [-15]"
+  ],
+  "generated_at": "2026-07-18T05:03:26Z",
+  "branch": "codex-gpt-5.6-model-tiering_implementation",
+  "head_sha": "9c054ec7197fb048f99786c29b1e1f36c3f8ad38",
+  "base_ref": "dev",
+  "merge_base_sha": "9c054ec7197fb048f99786c29b1e1f36c3f8ad38",
+  "phase": "2026-07-18_phase-B-configure-codex-gpt-5.6",
+  "dirty": false,
+  "content_hash": "d3d677c22d94630ed42d25a0542bc08bf7419c51",
+  "changed_files": [
+    ".codex/config.toml",
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/validate_targets.py",
+    "shared/agents/coder/agent.yaml",
+    "shared/agents/documenter/agent.yaml",
+    "shared/agents/orchestrator/agent.yaml",
+    "shared/agents/planner/agent.yaml",
+    "shared/agents/reviewer/agent.yaml",
+    "shared/agents/verifier/agent.yaml"
+  ]
+}
