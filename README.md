@@ -101,6 +101,26 @@ The installer makes its own `bootstrap: install <timestamp>` commit on the
 warnings and leave the commit local — it syncs on the next successful
 `state-sync.sh push` (every AI session's Stop hook, or the manual VS Code task).
 
+### Self-installing this source repository
+
+This repository can use the generated bootstrap itself to dogfood the same
+`ai-state` lifecycle as consumer repositories. Its editable source of truth
+remains `shared/`; do **not** commit the generated root adapters back into the
+bootstrap source tree.
+
+When the local `.claude/` directory already is a nested Git repository without
+a remote, configure its `origin` to the outer repository's `origin` and restrict
+its refspecs to `ai-state` before installing. The install then creates or updates
+the nested-state commit, and Codex's `SessionStart`/`Stop` hooks pull/push that
+branch automatically.
+
+The source repository tracks authoring versions of files such as `AGENTS.md`,
+`.codex/config.toml`, and MCP config. After self-installing, restore those
+tracked source files and keep the generated runtime overlay local via
+`.git/info/exclude` (for example `.codex/hooks.json`, `.devcontainer/`, and
+`.vscode/tasks.json`). This keeps `git status` clean while preserving the
+installed hooks and devcontainer files locally.
+
 ## Updating Existing Repos
 
 When you update this bootstrap (new hooks, revised instructions, agent changes),
