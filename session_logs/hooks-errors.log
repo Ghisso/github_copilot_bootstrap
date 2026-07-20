@@ -1,0 +1,1 @@
+2026-07-20T14:36:21.000Z state-sync: pull --rebase failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
