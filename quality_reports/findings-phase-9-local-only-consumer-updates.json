@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-20T15:44:24Z",
+  "branch": "consumer-local-only-update_implementation",
+  "head_sha": "c17cc64db3199e16e161c7fc2742b3c33446a425",
+  "base_ref": "dev",
+  "merge_base_sha": "c17cc64db3199e16e161c7fc2742b3c33446a425",
+  "phase": "2026-07-20_phase-9-local-only-consumer-updates",
+  "target": ".",
+  "dirty": true,
+  "content_hash": "10381b2dde5bb5a624946fc4101d07bae9fbbc30",
+  "changed_files": [
+    "scripts/install_bootstrap.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/state-sync.sh"
+  ]
+}

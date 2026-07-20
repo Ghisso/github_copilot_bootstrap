@@ -1,0 +1,28 @@
+{
+  "score": 85,
+  "gate": "BLOCKED",
+  "target": "scripts",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": false,
+  "tests_skipped": false,
+  "pytest_summary": "no tests ran in 0.00s",
+  "mypy_summary": "Success: no issues found in 6 source files",
+  "deductions": [
+    "pytest: test failures  [-15]"
+  ],
+  "generated_at": "2026-07-20T15:25:41Z",
+  "branch": "consumer-local-only-update_implementation",
+  "head_sha": "c17cc64db3199e16e161c7fc2742b3c33446a425",
+  "base_ref": "dev",
+  "merge_base_sha": "c17cc64db3199e16e161c7fc2742b3c33446a425",
+  "phase": "phase-9-local-only-consumer-updates",
+  "dirty": true,
+  "content_hash": "68c55103d66739962ec7d0dab32b0bb6890a56c6",
+  "changed_files": [
+    "scripts/install_bootstrap.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/state-sync.sh"
+  ]
+}
