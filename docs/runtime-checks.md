@@ -49,6 +49,14 @@ The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerat
 
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
+Runtime verification also expects the installer and updater defaults to create
+and publish nested `ai-state` commits. With `--local-only`, they must instead
+complete the full generated refresh and leave a clean, committed nested
+repository without invoking fetch, `ls-remote`, pull, merge, or push. A legacy
+consumer must retain ordered `migrate: import pre-git state` and subsequent
+`bootstrap:` history; the installer reports nested status and a shell-safe
+manual publish command.
+
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 
 For non-documentation diffs, the matching findings report must also contain
@@ -93,6 +101,11 @@ example); when set, the installer persists `AI_STATE_REMOTE` into
 `.devcontainer/devcontainer.json`'s `containerEnv` so a fresh container clone still
 finds it. A missing remote or network access produces warnings and does not fail
 the container start or agent hook (see `plans/adr-002-git-backed-state-sync.md`).
+
+Source-layout validation permits a root `.github/` self-install overlay only
+when Git ignores it and it is byte-identical to the generated target. A tracked,
+unignored, or stale mirror fails validation, preventing generated runtime files
+from becoming a second editable source.
 
 The generated devcontainer does not require `/dev/fuse` or apparmor overrides for
 `huggingface_hub`. It does set `SYS_ADMIN` and `seccomp=unconfined` so `bubblewrap`

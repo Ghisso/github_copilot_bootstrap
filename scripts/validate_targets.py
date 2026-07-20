@@ -9,6 +9,7 @@ import json
 import os
 import py_compile
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -234,6 +235,45 @@ def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
         return
     for name in comparison.common_dirs:
         compare_dirs(left / name, right / name, errors)
+
+
+def dirs_match(left: Path, right: Path) -> bool:
+    """Return whether two directory trees contain the same files and bytes."""
+    if not left.is_dir() or not right.is_dir():
+        return False
+    comparison = filecmp.dircmp(left, right)
+    if comparison.left_only or comparison.right_only or comparison.funny_files:
+        return False
+    _, mismatch, errored = filecmp.cmpfiles(left, right, comparison.common_files, shallow=False)
+    return not mismatch and not errored and all(dirs_match(left / name, right / name) for name in comparison.common_dirs)
+
+
+def root_source_mirror_errors(repo_root: Path, target_root: Path) -> list[str]:
+    """Reject legacy source mirrors while allowing exact ignored overlays."""
+    errors: list[str] = []
+    for relative_path in OBSOLETE_ROOT_SOURCE_DIRS:
+        overlay = repo_root / relative_path
+        if not overlay.exists():
+            continue
+        tracked = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "--", relative_path],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if tracked.stdout.strip():
+            errors.append(f"root .github must not keep tracked legacy source mirror: {relative_path}")
+            continue
+        ignored = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ignore", "-q", "--", relative_path],
+            check=False,
+        )
+        if ignored.returncode != 0:
+            errors.append(f"root .github legacy source mirror must be ignored: {relative_path}")
+            continue
+        if not dirs_match(overlay, target_root / relative_path):
+            errors.append(f"root .github ignored self-install overlay is stale: {relative_path}")
+    return errors
 
 
 def validate_agents(errors: list[str]) -> None:
@@ -2021,12 +2061,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             f"multi-agent must not generate obsolete target-local path: {relative_path}",
             errors,
         )
-    for relative_path in OBSOLETE_ROOT_SOURCE_DIRS:
-        check(
-            not (REPO_ROOT / relative_path).exists(),
-            f"root .github must not keep legacy source mirror: {relative_path}",
-            errors,
-        )
+    errors.extend(root_source_mirror_errors(REPO_ROOT, TARGET_ROOT))
     for path in text_files(TARGET_ROOT):
         text = read(path)
         for fragment in forbidden_fragments:
@@ -2915,6 +2950,196 @@ def validate_state_sync(errors: list[str]) -> None:
         )
 
 
+FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS = {"fetch", "ls-remote", "pull", "merge", "push"}
+
+
+def traced_remote_git_commands(trace_path: Path) -> list[str]:
+    """Return forbidden Git subcommands recorded by Git's JSON trace."""
+    if not trace_path.is_file():
+        return []
+    commands: list[str] = []
+    for line in trace_path.read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        if event.get("event") != "start":
+            continue
+        argv = event.get("argv", [])
+        if isinstance(argv, list):
+            commands.extend(arg for arg in argv if arg in FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS)
+    return commands
+
+
+def check_local_only_git_trace(label: str, trace_path: Path, errors: list[str]) -> None:
+    check(trace_path.is_file(), f"[local-only] {label} must emit a Git trace", errors)
+    commands = traced_remote_git_commands(trace_path)
+    check(
+        not commands,
+        f"[local-only] {label} invoked forbidden remote Git command(s): {commands}",
+        errors,
+    )
+
+
+def validate_installer_commit_failure(errors: list[str]) -> None:
+    """A failed legacy migration must stop before generated files replace state."""
+    installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        consumer = Path(temp_dir_name) / "legacy-consumer"
+        consumer.mkdir()
+        subprocess.run(["git", "init", "-q", str(consumer)], check=False)
+        write(consumer / ".claude" / "MEMORY.md", "# Legacy state\n")
+        failure_env = {
+            **os.environ,
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_AUTHOR_NAME": "",
+            "GIT_AUTHOR_EMAIL": "",
+            "GIT_COMMITTER_NAME": "",
+            "GIT_COMMITTER_EMAIL": "",
+        }
+        result = subprocess.run(
+            [sys.executable, str(installer), str(consumer), "--local-only"],
+            cwd=REPO_ROOT,
+            env=failure_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(result.returncode != 0, "installer must fail when legacy migration cannot commit", errors)
+        check(
+            not (consumer / ".claude" / "hooks" / "scripts" / "state-sync.sh").exists(),
+            "failed legacy migration must not replace state with generated files",
+            errors,
+        )
+
+
+def validate_local_only_state_sync(errors: list[str]) -> None:
+    """Local-only refreshes commit durable state without touching the remote."""
+    installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    updater = REPO_ROOT / "scripts" / "update_consumers.py"
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        temp_root = Path(temp_dir_name)
+        state_remote = temp_root / "state-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
+
+        consumer = temp_root / "local only consumer"
+        consumer.mkdir()
+        subprocess.run(["git", "init", "-q", str(consumer)], check=False)
+        local_env = git_actor_env("LocalOnly")
+        fresh_trace = temp_root / "fresh-trace.json"
+        fresh_install = subprocess.run(
+            [sys.executable, str(installer), str(consumer), "--state-remote", str(state_remote), "--local-only"],
+            cwd=REPO_ROOT,
+            env={**local_env, "GIT_TRACE2_EVENT": str(fresh_trace)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(fresh_install.returncode == 0, f"[local-only] fresh install failed: {fresh_install.stderr}", errors)
+        check_local_only_git_trace("fresh install", fresh_trace, errors)
+        remote_refs = subprocess.run(
+            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(not remote_refs.stdout.strip(), "[local-only] fresh install must not push ai-state", errors)
+        fresh_bootstrap_root = subprocess.run(
+            ["git", "-C", str(consumer / ".claude"), "show", "HEAD:bootstrap-root/CLAUDE.md"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            fresh_bootstrap_root.returncode == 0,
+            "[local-only] fresh bootstrap commit must include bootstrap-root content",
+            errors,
+        )
+        expected_push = f"Publish later: bash {shlex.quote(str(consumer / '.claude' / 'hooks' / 'scripts' / 'state-sync.sh'))} push"
+        check(expected_push in fresh_install.stdout, "[local-only] installer must print a shell-safe manual push command", errors)
+
+        existing_trace = temp_root / "existing-trace.json"
+        existing_install = subprocess.run(
+            [sys.executable, str(installer), str(consumer), "--state-remote", str(state_remote), "--local-only"],
+            cwd=REPO_ROOT,
+            env={**local_env, "GIT_TRACE2_EVENT": str(existing_trace)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(existing_install.returncode == 0, f"[local-only] existing install failed: {existing_install.stderr}", errors)
+        check_local_only_git_trace("existing install", existing_trace, errors)
+
+        legacy = temp_root / "legacy consumer"
+        legacy.mkdir()
+        subprocess.run(["git", "init", "-q", str(legacy)], check=False)
+        legacy_memory = "# Legacy memory\n\n- preserve local state\n"
+        write(legacy / ".claude" / "MEMORY.md", legacy_memory)
+        legacy_trace = temp_root / "legacy-trace.json"
+        legacy_install = subprocess.run(
+            [sys.executable, str(installer), str(legacy), "--state-remote", str(state_remote), "--local-only"],
+            cwd=REPO_ROOT,
+            env={**local_env, "GIT_TRACE2_EVENT": str(legacy_trace)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(legacy_install.returncode == 0, f"[local-only] legacy install failed: {legacy_install.stderr}", errors)
+        check_local_only_git_trace("legacy install", legacy_trace, errors)
+        history = subprocess.run(
+            ["git", "-C", str(legacy / ".claude"), "log", "--reverse", "--format=%s"],
+            text=True, capture_output=True, check=False,
+        )
+        subjects = history.stdout.splitlines()
+        check(
+            len(subjects) >= 2
+            and subjects[0] == "migrate: import pre-git state"
+            and subjects[1].startswith("bootstrap: update"),
+            "[local-only] legacy refresh must commit migrate before bootstrap update",
+            errors,
+        )
+        legacy_snapshot = subprocess.run(
+            ["git", "-C", str(legacy / ".claude"), "show", "HEAD~1:MEMORY.md"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            legacy_snapshot.stdout == legacy_memory,
+            "[local-only] legacy migration must preserve state before generated files replace it",
+            errors,
+        )
+        legacy_bootstrap_root = subprocess.run(
+            ["git", "-C", str(legacy / ".claude"), "show", "HEAD:bootstrap-root/CLAUDE.md"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            legacy_bootstrap_root.returncode == 0,
+            "[local-only] legacy bootstrap commit must include bootstrap-root content",
+            errors,
+        )
+        unchanged_remote = subprocess.run(
+            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(not unchanged_remote.stdout.strip(), "[local-only] legacy migration must not push ai-state", errors)
+
+        updater_remote = temp_root / "updater-remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(updater_remote)], check=False)
+        updater_consumer = temp_root / "updater consumer"
+        updater_consumer.mkdir()
+        subprocess.run(["git", "init", "-q", str(updater_consumer)], check=False)
+        subprocess.run(["git", "-C", str(updater_consumer), "remote", "add", "origin", str(updater_remote)], check=False)
+        updater_trace = temp_root / "updater-trace.json"
+        update = subprocess.run(
+            [sys.executable, str(updater), "--skip-regen", "--local-only", str(updater_consumer)],
+            cwd=REPO_ROOT,
+            env={**local_env, "GIT_TRACE2_EVENT": str(updater_trace)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(update.returncode == 0, f"[local-only] updater failed: {update.stderr}", errors)
+        check_local_only_git_trace("updater", updater_trace, errors)
+        updater_refs = subprocess.run(
+            ["git", "--git-dir", str(updater_remote), "for-each-ref", "refs/heads/ai-state"],
+            text=True, capture_output=True, check=False,
+        )
+        check(not updater_refs.stdout.strip(), "[local-only] updater must forward the no-push boundary", errors)
+
+
 def validate_determinism(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "dist"
@@ -2991,6 +3216,49 @@ def validate_routing_table_parity(errors: list[str]) -> None:
     )
 
 
+def validate_root_source_mirror_cases(errors: list[str]) -> None:
+    """Ignored self-install output is valid only while it matches generation."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        repo = Path(temp_dir_name) / "repo"
+        target = Path(temp_dir_name) / "target"
+        subprocess.run(["git", "init", "-q", str(repo)], check=False)
+        write(target / ".github" / "agents" / "coder.agent.md", "generated\n")
+        write(repo / ".github" / "agents" / "coder.agent.md", "generated\n")
+
+        unignored = root_source_mirror_errors(repo, target)
+        check(
+            any("must be ignored" in error for error in unignored),
+            "unignored legacy source mirror must be rejected even when byte-identical",
+            errors,
+        )
+
+        write(repo / ".gitignore", ".github/agents/\n")
+        check(
+            not root_source_mirror_errors(repo, target),
+            "byte-identical ignored self-install overlay must be allowed",
+            errors,
+        )
+
+        write(repo / ".github" / "agents" / "coder.agent.md", "stale\n")
+        stale = root_source_mirror_errors(repo, target)
+        check(
+            any("is stale" in error for error in stale),
+            "stale ignored self-install overlay must be rejected",
+            errors,
+        )
+
+        subprocess.run(
+            ["git", "-C", str(repo), "add", "-f", ".github/agents/coder.agent.md"],
+            check=False,
+        )
+        tracked = root_source_mirror_errors(repo, target)
+        check(
+            any("tracked legacy" in error for error in tracked),
+            "tracked legacy source mirror must be rejected",
+            errors,
+        )
+
+
 def main() -> int:
     errors: list[str] = []
     for target in TARGETS:
@@ -3004,9 +3272,12 @@ def main() -> int:
         validate_skills_and_paths(errors)
         validate_docs_parity(errors)
         validate_routing_table_parity(errors)
+        validate_root_source_mirror_cases(errors)
         validate_ponytail_diff_classifier(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)
+        validate_installer_commit_failure(errors)
+        validate_local_only_state_sync(errors)
         validate_determinism(errors)
 
     if errors:

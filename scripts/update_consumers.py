@@ -13,10 +13,9 @@ bootstrap content, so the installer never touches them beyond what a normal
 state now lives in git history rather than being overwritten in place by a
 bucket pull.
 
-For a consumer whose .claude/ predates this plan (no .claude/.git yet), runs
-state-sync.sh migrate-from-hf first so its pre-existing state becomes one
-`migrate: import pre-git state` commit before the bootstrap update lands on
-top of it.
+For a consumer whose .claude/ predates this plan (no .claude/.git yet), the
+installer commits its pre-existing state as `migrate: import pre-git state`
+before the bootstrap update lands on top of it.
 
 Usage:
     uv run python scripts/update_consumers.py /path/to/repo1 /path/to/repo2 ...
@@ -42,24 +41,6 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, cwd=BOOTSTRAP_ROOT)
 
 
-def migrate_pre_git_state(project: Path, dry_run: bool) -> None:
-    claude_dir = project / ".claude"
-    state_sync = claude_dir / "hooks" / "scripts" / "state-sync.sh"
-    if (claude_dir / ".git").exists() or not state_sync.is_file():
-        return
-    if not any(claude_dir.iterdir()):
-        return
-    print(f"  migrate-from-hf: {claude_dir} predates git-backed state", flush=True)
-    if dry_run:
-        return
-    # stdin=DEVNULL (F2 §9): state-sync.sh drains stdin for up to 2s; this
-    # updater never reads it, so an interactive run must not block/swallow it.
-    subprocess.run(
-        ["bash", str(state_sync), "migrate-from-hf"],
-        check=False, cwd=project, stdin=subprocess.DEVNULL,
-    )
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate dist/ and update consumer repos with the latest bootstrap."
@@ -67,6 +48,7 @@ def main() -> None:
     parser.add_argument("projects", nargs="+", help="Paths to consumer repos to update.")
     parser.add_argument("--skip-regen", action="store_true", help="Skip regenerating dist/ first.")
     parser.add_argument("--dry-run", action="store_true", help="Print planned actions only.")
+    parser.add_argument("--local-only", action="store_true", help="Commit refreshes locally without remote AI-state sync.")
     args = parser.parse_args()
 
     dry = args.dry_run
@@ -87,11 +69,11 @@ def main() -> None:
 
         print(f"\n=== Updating {project.name} ({project}) ===", flush=True)
 
-        migrate_pre_git_state(project, dry)
-
         install_cmd = [sys.executable, str(INSTALLER), str(project)]
         if dry:
             install_cmd.append("--dry-run")
+        if args.local_only:
+            install_cmd.append("--local-only")
         run(install_cmd)
 
         print(f"=== Done: {project.name} ===")

@@ -96,10 +96,29 @@ To keep AI state off the code remote instead of the default:
 uv run python scripts/install_bootstrap.py "$TARGET_REPO" --state-remote git@github.com:you/private-ai-state.git
 ```
 
-The installer makes its own `bootstrap: install <timestamp>` commit on the
-`ai-state` branch and pushes it. Missing push access or network failures produce
-warnings and leave the commit local — it syncs on the next successful
-`state-sync.sh push` (every AI session's Stop hook, or the manual VS Code task).
+By default, a fresh install creates `bootstrap: init ai-state`; a repeat or
+legacy refresh creates `bootstrap: update <timestamp>` after any migration.
+The installer pushes that nested `ai-state` commit. Missing push access or
+network failures produce warnings and leave the commit local; publish it later
+with `state-sync.sh push` or the manual VS Code task. Normal Stop-hook runs do
+not originate installer updates, but their `git add -A` commits any uncommitted
+nested changes — including locally modified bootstrap-controlled files — as
+session state. Clean installer/updater commits and the normal pull/rebase flow
+are the intended protection.
+
+To refresh a consumer completely while working offline or before an explicit
+review, use `--local-only`:
+
+```bash
+uv run python scripts/install_bootstrap.py "$TARGET_REPO" --local-only
+```
+
+This refreshes every bootstrap-controlled file and commits the nested state
+without contacting its remote: no fetch, `ls-remote`, pull, merge, or push. If
+the consumer has pre-git `.claude/` content, the installer first records
+`migrate: import pre-git state`, then records the bootstrap update. It prints
+the nested `ai-state` status and a shell-safe `Publish later: ...` command for
+the target path.
 
 ### Self-installing this source repository
 
@@ -133,14 +152,12 @@ uv run python scripts/update_consumers.py \
   /path/to/repo3
 ```
 
-The script regenerates `dist/` automatically, then for each repo it:
-
-- Runs `state-sync.sh migrate-from-hf` first if that repo's `.claude/` predates
-  git-backed state (no `.claude/.git` yet) — a one-time `migrate: import
-  pre-git state` commit imports whatever is on disk before the update lands.
-- Runs `install_bootstrap.py`, which replaces every bootstrap-controlled file
-  and makes its own `bootstrap: update <timestamp>` commit on the `ai-state`
-  branch, then pushes it.
+The script regenerates `dist/` automatically, then delegates each consumer to
+`install_bootstrap.py`. The installer owns legacy migration: when `.claude/`
+predates git-backed state, it first creates `migrate: import pre-git state`
+before replacing bootstrap-controlled files and creating its distinct
+`bootstrap: update <timestamp>` commit. The default updater publishes that
+commit to the nested `ai-state` remote.
 
 Files that exist only in the consumer repo — `MEMORY.md`, plans, session logs,
 quality reports, explorations — are never touched by the file-copy step. They
@@ -153,6 +170,20 @@ has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byt
 # Preview without writing
 uv run python scripts/update_consumers.py --dry-run /path/to/repo
 ```
+
+For a durable offline batch refresh, pass `--local-only`. It applies the full
+generated bootstrap to every target and preserves the same ordered migration
+and bootstrap commits, but makes no remote reads or writes. Each target reports
+its nested status and a quoted command to publish later.
+
+```bash
+uv run python scripts/update_consumers.py --local-only /path/to/repo
+```
+
+When self-installing this repository, ignored generated overlays under the root
+`.github/` tree are valid only when they are byte-identical to generated output.
+Validation rejects a tracked, unignored, or stale overlay; keep editable source
+files in `shared/` instead.
 
 Generated layout:
 
@@ -406,7 +437,7 @@ Configured events:
   - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` rebases `.claude/`'s nested git repo (branch `ai-state`) against its configured remote (`git pull --rebase --autostash`), so the session starts against the latest synced state. On a genuine conflict it aborts the rebase, prints a `WARN` naming the conflicting files and the manual-resolution commands, and exits 0 with local files untouched — a sync problem never blocks a session from starting
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
-  - `state-sync.sh push` commits any staged state as `session: <ISO-timestamp>` (skipping the commit if nothing changed), pulls (same rebase-with-autostash contract as above), then pushes. Consumers never re-commit the canonical bootstrap bundle from a Stop hook — bootstrap updates are an explicit installer/updater action (`bootstrap:`-prefixed commits), so a stale consumer session can't clobber it. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; a missing remote or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why this is git-backed instead of a Hugging Face bucket mirror.
+  - `state-sync.sh push` stages all nested changes and commits them as `session: <ISO-timestamp>` (skipping the commit if nothing changed), pulls (same rebase-with-autostash contract as above), then pushes. Normal Stop runs do not originate installer updates, but locally modified bootstrap-controlled files are included with any other uncommitted nested state; clean installer/updater commits and pull/rebase are the intended protection. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; a missing remote or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 
