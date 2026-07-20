@@ -17,9 +17,6 @@ import time
 import tomllib
 from pathlib import Path
 
-from generate_targets import CODEX_SESSION_EFFORT, CODEX_SESSION_MODEL
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
@@ -500,14 +497,10 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
     check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
+    check("model" not in codex_config_data, "Codex config must not pin the interactive session model", errors)
     check(
-        codex_config_data.get("model") == CODEX_SESSION_MODEL,
-        f"Codex config model must be '{CODEX_SESSION_MODEL}'",
-        errors,
-    )
-    check(
-        codex_config_data.get("model_reasoning_effort") == CODEX_SESSION_EFFORT,
-        f"Codex config reasoning effort must be '{CODEX_SESSION_EFFORT}'",
+        "model_reasoning_effort" not in codex_config_data,
+        "Codex config must not pin interactive session reasoning effort",
         errors,
     )
     codex_features = codex_config_data.get("features")
@@ -529,16 +522,6 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             errors,
         )
     authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
-    check(
-        authoring_config.get("model") == CODEX_SESSION_MODEL,
-        f"authoring Codex config model must be '{CODEX_SESSION_MODEL}'",
-        errors,
-    )
-    check(
-        authoring_config.get("model_reasoning_effort") == CODEX_SESSION_EFFORT,
-        f"authoring Codex config reasoning effort must be '{CODEX_SESSION_EFFORT}'",
-        errors,
-    )
     authoring_features = authoring_config.get("features")
     authoring_multi_agent_v2 = (
         authoring_features.get("multi_agent_v2") if isinstance(authoring_features, dict) else None

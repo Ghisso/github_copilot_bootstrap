@@ -19,7 +19,7 @@ Expected:
 - GitHub Copilot has 6 `.github/agents/*.agent.md` files.
 - The generated output has 6 canonical `.claude/agents/*.md` files.
 - OpenAI Codex has 6 `.codex/agents/*.toml` files.
-- Codex defaults to `gpt-5.6-sol` / `xhigh`; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
+- Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
 - The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Terra/medium, and verifier Luna/low.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.

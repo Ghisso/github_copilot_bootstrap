@@ -18,10 +18,6 @@ TARGETS = ("multi-agent",)
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
-# Pin the root Codex session explicitly; custom agents override both values from
-# model_intent.openai-codex according to their task-specific quality/latency role.
-CODEX_SESSION_MODEL = "gpt-5.6-sol"
-CODEX_SESSION_EFFORT = "xhigh"
 
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
@@ -330,11 +326,9 @@ def render_codex_config(path: Path) -> None:
         "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
         "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
         "#",
-        "# Session model and effort are pinned for the root orchestrator. Custom agents",
-        "# override both values from model_intent.openai-codex according to task role.",
-        "",
-        f"model = {toml_string(CODEX_SESSION_MODEL)}",
-        f"model_reasoning_effort = {toml_string(CODEX_SESSION_EFFORT)}",
+        "# The interactive session model and effort are intentionally unpinned so users can",
+        "# choose them manually. Custom agents set their own values from",
+        "# model_intent.openai-codex according to task role.",
         "",
         "[agents]",
         "max_threads = 6",
