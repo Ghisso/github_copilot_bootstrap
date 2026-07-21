@@ -15,11 +15,19 @@ set -euo pipefail
 #     "../../.." relative path the way the other hook scripts do)
 #
 # Subcommands: setup | pull | push | migrate-from-hf
+# `pull`/`push` accept a second positional arg `--local-only` (or set
+# AI_STATE_LOCAL_ONLY=1) to skip all origin interaction and commit to the
+# nested repo locally only. AI_STATE_REPO_ROOT overrides REPO_ROOT resolution
+# for callers that already know the repo root.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -n "${AI_STATE_REPO_ROOT:-}" ]]; then
-  REPO_ROOT="$(cd "$AI_STATE_REPO_ROOT" && pwd)"
-else
+  REPO_ROOT="$(cd "$AI_STATE_REPO_ROOT" && pwd 2>/dev/null || true)"
+  if [[ -z "$REPO_ROOT" ]]; then
+    printf 'WARN state-sync: AI_STATE_REPO_ROOT=%s is not a usable directory; falling back to script-relative resolution.\n' "$AI_STATE_REPO_ROOT" >&2
+  fi
+fi
+if [[ -z "${REPO_ROOT:-}" ]]; then
   case "$SCRIPT_DIR" in
     */.claude/hooks/scripts)
       REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -190,11 +198,11 @@ cmd_setup() {
 }
 
 cmd_pull() {
+  cmd_setup
   if is_local_only; then
-    info "pull: local-only mode; remote sync skipped."
+    info "pull: local-only mode; bootstrap complete, remote sync skipped."
     return 0
   fi
-  cmd_setup
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; nothing to pull from."
     return 0
