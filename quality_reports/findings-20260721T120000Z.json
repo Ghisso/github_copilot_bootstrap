@@ -1,0 +1,30 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-21T01:38:04Z",
+  "branch": "state-sync-local-only-regression_implementation",
+  "head_sha": "7ab85ba7501d9a8b184978226eeb510a339a1790",
+  "base_ref": "dev",
+  "merge_base_sha": "7ab85ba7501d9a8b184978226eeb510a339a1790",
+  "phase": "2026-07-21_phase-1-state-sync-local-only-regression",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "b152a8cd3a58f3305efe212c817a162f21ed3d85",
+  "changed_files": [
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/state-sync.sh"
+  ]
+}

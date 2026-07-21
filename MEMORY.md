@@ -34,3 +34,7 @@
   copying generated files. Local-only promises also need Git Trace2 coverage,
   because unchanged remote refs prove no push but not no remote read. See
   `.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md`.
+- [LEARN:testing] Cover state-sync entry points directly from the generated
+  `.devcontainer` copy: installer coverage cannot prove that `pull
+  --local-only` initializes a fresh nested repository or that an invalid
+  `AI_STATE_REPO_ROOT` falls back to the consumer root.
