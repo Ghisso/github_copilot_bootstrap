@@ -3020,10 +3020,81 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
         state_remote = temp_root / "state-remote.git"
         subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
 
+        direct_pull_consumer = temp_root / "direct local-only pull"
+        direct_pull_consumer.mkdir()
+        subprocess.run(["git", "init", "-q", str(direct_pull_consumer)], check=False)
+        shutil.copytree(
+            TARGET_ROOT / ".devcontainer", direct_pull_consumer / ".devcontainer"
+        )
+        local_env = git_actor_env("LocalOnly")
+        direct_pull_trace = temp_root / "direct-pull-trace.json"
+        direct_pull = subprocess.run(
+            [
+                "bash",
+                str(state_sync_script(direct_pull_consumer)),
+                "pull",
+                "--local-only",
+            ],
+            cwd=direct_pull_consumer,
+            env={**local_env, "GIT_TRACE2_EVENT": str(direct_pull_trace)},
+            text=True,
+            capture_output=True,
+            check=False,
+            stdin=subprocess.DEVNULL,
+        )
+        check(
+            direct_pull.returncode == 0,
+            f"[local-only] direct pull failed: {direct_pull.stderr}",
+            errors,
+        )
+        check(
+            (direct_pull_consumer / ".claude" / ".git").is_dir(),
+            "[local-only] direct pull must bootstrap nested ai-state before skipping remote sync",
+            errors,
+        )
+        check_local_only_git_trace("direct pull", direct_pull_trace, errors)
+
+        invalid_root_consumer = temp_root / "invalid root pull"
+        invalid_root_consumer.mkdir()
+        subprocess.run(["git", "init", "-q", str(invalid_root_consumer)], check=False)
+        shutil.copytree(
+            TARGET_ROOT / ".devcontainer", invalid_root_consumer / ".devcontainer"
+        )
+        invalid_root = temp_root / "not-a-directory"
+        invalid_root_pull = subprocess.run(
+            [
+                "bash",
+                str(state_sync_script(invalid_root_consumer)),
+                "pull",
+                "--local-only",
+            ],
+            cwd=invalid_root_consumer,
+            env={**local_env, "AI_STATE_REPO_ROOT": str(invalid_root)},
+            text=True,
+            capture_output=True,
+            check=False,
+            stdin=subprocess.DEVNULL,
+        )
+        check(
+            invalid_root_pull.returncode == 0,
+            f"[local-only] invalid AI_STATE_REPO_ROOT must fall back: {invalid_root_pull.stderr}",
+            errors,
+        )
+        check(
+            "AI_STATE_REPO_ROOT=" in invalid_root_pull.stderr
+            and "falling back to script-relative resolution"
+            in invalid_root_pull.stderr,
+            "[local-only] invalid AI_STATE_REPO_ROOT must warn before falling back",
+            errors,
+        )
+        check(
+            (invalid_root_consumer / ".claude" / ".git").is_dir(),
+            "[local-only] invalid AI_STATE_REPO_ROOT must fall back to the consumer root",
+            errors,
+        )
         consumer = temp_root / "local only consumer"
         consumer.mkdir()
         subprocess.run(["git", "init", "-q", str(consumer)], check=False)
-        local_env = git_actor_env("LocalOnly")
         fresh_trace = temp_root / "fresh-trace.json"
         fresh_install = subprocess.run(
             [sys.executable, str(installer), str(consumer), "--state-remote", str(state_remote), "--local-only"],
