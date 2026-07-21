@@ -7,7 +7,7 @@ implementation_branch: state-sync-local-only-regression_implementation
 started_at: 2026-07-21T00:00:00Z
 phases:
   - 2026-07-21_phase-1-state-sync-local-only-regression
-current_phase:
+current_phase: 2026-07-21_phase-1-state-sync-local-only-regression
 ---
 
 # Big Plan: State-Sync Local-Only Regression
