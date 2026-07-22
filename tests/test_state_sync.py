@@ -230,3 +230,63 @@ def test_append_only_log_union_merges(script: Path, tmp_path: Path) -> None:
     merged = _remote_show(remote, log)
     assert "from-A" in merged
     assert "from-B" in merged
+
+
+def _seed_remote(
+    script: Path, tmp_path: Path, remote: Path, relpath: str, content: str
+) -> None:
+    """Publish one file to origin/ai-state via a throwaway writer."""
+    seeder = _new_writer(script, tmp_path, remote, "seed")
+    _write(seeder, relpath, content)
+    assert _sync(script, seeder, remote, "push").returncode == 0
+
+
+def test_migrate_conflict_commits_locally_but_does_not_push(
+    script: Path, tmp_path: Path
+) -> None:
+    """A migrate whose reconciliation conflicts must not attempt a push.
+
+    ``migrate-from-hf`` imports pre-git ``.claude/`` content, then reconciles
+    with an existing remote. A genuine conflict aborts the merge; the migrated
+    state stays committed locally, but the push is skipped (it would be
+    non-fast-forward) — the twin of the cmd_push doomed-push fix.
+    """
+    remote = _bare_remote(tmp_path)
+    _seed_remote(script, tmp_path, remote, "plans/x.md", "from-remote\n")
+
+    # A pre-git root: .claude/ has content but no nested .git yet.
+    m = tmp_path / "M"
+    (m / ".claude").mkdir(parents=True)
+    _write(m, "plans/x.md", "from-local\n")
+    result = _sync(script, m, remote, "migrate-from-hf")
+
+    assert result.returncode == 0
+    # Remote is untouched — no push happened.
+    assert _remote_show(remote, "plans/x.md") == "from-remote\n"
+    # The migrated state is committed locally and reachable.
+    assert (m / ".claude" / ".git").is_dir()
+    assert _local_show(m, "plans/x.md") == "from-local\n"
+    assert _no_active_rebase_or_merge(m)
+    # Discriminate the new guard from the old unguarded code: "not pushing"
+    # appears only in the new cmd_migrate guard message, and the old code's
+    # misleading "network/auth" push-failure warning must be absent because no
+    # push was attempted. Both assertions fail against a reverted push-guard.
+    assert "not pushing" in result.stderr.lower()
+    assert "network" not in result.stderr.lower()
+
+
+def test_migrate_without_conflict_reconciles_and_pushes(
+    script: Path, tmp_path: Path
+) -> None:
+    """A migrate touching files disjoint from the remote reconciles and pushes."""
+    remote = _bare_remote(tmp_path)
+    _seed_remote(script, tmp_path, remote, "plans/x.md", "from-remote\n")
+
+    n = tmp_path / "N"
+    (n / ".claude").mkdir(parents=True)
+    _write(n, "plans/n.md", "from-migrate\n")
+    result = _sync(script, n, remote, "migrate-from-hf")
+
+    assert result.returncode == 0
+    assert _remote_show(remote, "plans/n.md") == "from-migrate\n"
+    assert _remote_show(remote, "plans/x.md") == "from-remote\n"

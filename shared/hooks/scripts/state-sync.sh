@@ -170,8 +170,14 @@ commit_and_reconcile() {
       conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
       git -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
+      # Report the aborted reconciliation so callers do not push a divergent
+      # local branch (cmd_migrate guards its push on this). cmd_setup ignores
+      # it: it never pushes, so the local commit simply stays the source of
+      # truth, unchanged from before.
+      return 1
     fi
   fi
+  return 0
 }
 
 # Commits whatever is currently uncommitted under .claude/ as a session
@@ -301,9 +307,12 @@ cmd_migrate() {
   # of truth at migration time. If a bucket has newer state, pull it manually
   # with the old hf-ai-sync.py before running this, one last time.
   init_nested_repo
-  commit_and_reconcile "migrate: import pre-git state"
-
-  if ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+  if ! commit_and_reconcile "migrate: import pre-git state"; then
+    # Reconciliation aborted on conflict (not a network problem): the migrated
+    # state is committed locally, but pushing now would be a doomed
+    # non-fast-forward. Skip the push and point at the manual resolution.
+    warn "migration state committed locally but reconciliation with origin/$BRANCH conflicts; not pushing. Resolve the conflict as described above, then: git -C $CLAUDE_DIR push origin $BRANCH."
+  elif ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     if ! git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>>"$ERROR_LOG"; then
       warn "migration commit created locally but push to origin/$BRANCH failed; push manually once network/auth is available: git -C $CLAUDE_DIR push origin $BRANCH"
     fi
