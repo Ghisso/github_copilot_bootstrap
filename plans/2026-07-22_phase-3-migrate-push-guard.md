@@ -3,8 +3,8 @@ name: 2026-07-22_phase-3-migrate-push-guard
 type: small-plan
 parent_plan: state-sync-durability
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-07-22_state-sync-durability-sp3.md
 ---
 
 # Small Plan: 2026-07-22_phase-3-migrate-push-guard

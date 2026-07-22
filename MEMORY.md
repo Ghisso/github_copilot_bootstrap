@@ -47,9 +47,15 @@
   conflict and `cmd_push` must guard its push on that result; otherwise a push
   is attempted after an aborted rebase and rejected non-fast-forward. The
   top-level dispatch still converts the non-zero return into a warning +
-  `exit 0` so hooks never block Codex shutdown. `cmd_migrate` still has the
-  same unguarded reconcile-then-push shape (harmless today; git rejects the
-  non-ff push) — candidate follow-up.
+  `exit 0` so hooks never block Codex shutdown. The same guard now applies to
+  `cmd_migrate` via `commit_and_reconcile` returning non-zero on merge abort
+  (phase-3); `cmd_setup` keeps ignoring that result since it never pushes.
+- [LEARN:testing] A regression test for a bug fix must FAIL if the fix is
+  reverted. When the buggy code was "harmless" only because a lower layer
+  already blocked the bad outcome (e.g. git rejecting a non-fast-forward push
+  either way), assert on a marker unique to the fixed path (a new warning
+  string) and on the absence of the old path's marker — outcome-only
+  assertions can pass under both old and new code and prove nothing.
 - [LEARN:domain] AI-state durability must not depend on a `Stop` event: browser/
   editor tab closure does not guarantee Stop fires. The durable checkpoints are
   the `post-commit` git hook (best-effort push after every outer commit) and the
