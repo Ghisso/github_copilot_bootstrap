@@ -1,0 +1,31 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-22T08:33:59Z",
+  "branch": "state-sync-durability_implementation",
+  "head_sha": "7dc09a73fd91313ccde0c0d82c7a956494d387e8",
+  "base_ref": "dev",
+  "merge_base_sha": "7dc09a73fd91313ccde0c0d82c7a956494d387e8",
+  "phase": "2026-07-22_phase-1-state-sync-failure-propagation",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "ec75a7c4670ffa16e78a33d8d712d26c576e5246",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "shared/hooks/scripts/state-sync.sh",
+    "tests/test_state_sync.py"
+  ]
+}

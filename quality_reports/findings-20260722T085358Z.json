@@ -1,0 +1,36 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-07-22T08:53:58Z",
+  "branch": "state-sync-durability_implementation",
+  "head_sha": "6c50f6cb9fe07f4e0771ff1297a0af8b6b54fadc",
+  "base_ref": "dev",
+  "merge_base_sha": "7dc09a73fd91313ccde0c0d82c7a956494d387e8",
+  "phase": "2026-07-22_phase-2-durable-checkpoint-and-docs",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "0e92ac9ee25bee4ac7d2393cae34737f30f50ed9",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/smoke-tests.md",
+    "scripts/validate_targets.py",
+    "shared/hooks/git-hooks/post-commit",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/workflow.instructions.md",
+    "tests/test_state_sync.py"
+  ]
+}

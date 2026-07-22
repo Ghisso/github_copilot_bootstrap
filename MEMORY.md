@@ -38,3 +38,24 @@
   `.devcontainer` copy: installer coverage cannot prove that `pull
   --local-only` initializes a fresh nested repository or that an invalid
   `AI_STATE_REPO_ROOT` falls back to the consumer root.
+- [LEARN:quality] The commit gate's `content_hash` is `git hash-object` of
+  `git diff <base>`, which excludes untracked files. Stage every file destined
+  for the commit BEFORE running `quality_score.py`/`record_findings.py`, or the
+  report's hash and `changed_files` will not match what the gate recomputes at
+  commit time (and `dirty` will be `true`, which the gate rejects).
+- [LEARN:domain] `state-sync.sh` `cmd_pull` must return non-zero on a rebase
+  conflict and `cmd_push` must guard its push on that result; otherwise a push
+  is attempted after an aborted rebase and rejected non-fast-forward. The
+  top-level dispatch still converts the non-zero return into a warning +
+  `exit 0` so hooks never block Codex shutdown. `cmd_migrate` still has the
+  same unguarded reconcile-then-push shape (harmless today; git rejects the
+  non-ff push) — candidate follow-up.
+- [LEARN:domain] AI-state durability must not depend on a `Stop` event: browser/
+  editor tab closure does not guarantee Stop fires. The durable checkpoints are
+  the `post-commit` git hook (best-effort push after every outer commit) and the
+  explicit "AI state: push" VS Code task; Stop stays a best-effort checkpoint.
+- [LEARN:quality] Structural checks over generated text must assert the literal
+  invocation (e.g. `'"$STATE_SYNC" push'`), not loose independent substrings — a
+  stray word in a comment (`cmd_push`) can satisfy `"push" in text` and mask a
+  regression. Guard any unconditional `read()` of a required-but-maybe-missing
+  file so a miss is a clean accumulated failure, not an uncaught exception.

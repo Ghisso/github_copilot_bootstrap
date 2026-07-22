@@ -1,0 +1,26 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": "tests",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "5 passed in 10.85s",
+  "mypy_summary": "Success: no issues found in 2 source files",
+  "deductions": [],
+  "generated_at": "2026-07-22T08:34:10Z",
+  "branch": "state-sync-durability_implementation",
+  "head_sha": "7dc09a73fd91313ccde0c0d82c7a956494d387e8",
+  "base_ref": "dev",
+  "merge_base_sha": "7dc09a73fd91313ccde0c0d82c7a956494d387e8",
+  "phase": "2026-07-22_phase-1-state-sync-failure-propagation",
+  "dirty": false,
+  "content_hash": "ec75a7c4670ffa16e78a33d8d712d26c576e5246",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "shared/hooks/scripts/state-sync.sh",
+    "tests/test_state_sync.py"
+  ]
+}
