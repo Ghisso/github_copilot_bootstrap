@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,6 +32,7 @@ IGNORE_PATTERNS = (
     ".claude/quality_reports/",
     "AGENTS.md",
     "CLAUDE.md",
+    ".uv-cache/",
 )
 # GitHub Copilot cloud agents read the agent/hook/instruction surface only from
 # the default branch, so it must be committed to work in the cloud. By default
@@ -181,6 +183,84 @@ def substitute_project_name(target: Path, dry_run: bool) -> None:
     if dry_run:
         return
     workspace.write_text(text.replace(placeholder, f"**Project:** {target.name}"), encoding="utf-8")
+
+
+# The bootstrap's declared Python baseline. Kept in generated guidance verbatim
+# when the target declares nothing more specific. Must stay in sync with the
+# `**Python:**`/`**Stack:**` lines in shared/policies/workspace.instructions.md.
+PYTHON_BASELINE = "3.12+"
+# Every generated surface that carries the two project-fact lines. workspace.md
+# and workspace.instructions.md are near-duplicates and the root adapters embed
+# the same section, so all four must be reconciled together.
+PYTHON_FACT_FILES = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "instructions" / "workspace.instructions.md",
+    Path(".claude") / "instructions" / "workspace.md",
+)
+
+
+def _python_display(requires_python: str | None) -> str | None:
+    """Turn a `requires-python` spec into a docs display string like `3.13+`.
+
+    Only the common `>=X.Y` form is normalized; a compound or unusual spec
+    (`>=3.11,<3.14`, `~=3.12`, `==3.12.*`) returns None so the baseline is kept
+    rather than guessed."""
+    if not requires_python:
+        return None
+    spec = requires_python.strip()
+    if not spec.startswith(">="):
+        return None
+    version = spec[2:].strip()
+    if not version or any(ch in version for ch in ",<>=!~* "):
+        return None
+    return f"{version}+"
+
+
+def _target_requires_python(target: Path) -> str | None:
+    """Read `[project].requires-python` from the target's pyproject.toml, or
+    None when it is absent/unreadable (a fresh, pre-`uv init` target)."""
+    pyproject = target / "pyproject.toml"
+    if not pyproject.is_file():
+        return None
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return None
+    value = project.get("requires-python")
+    return value if isinstance(value, str) else None
+
+
+def substitute_python_version(target: Path, dry_run: bool) -> None:
+    """Reconcile the documented Python prerequisite with the target's declared
+    `requires-python` across every generated surface that states it. A fresh
+    target with no parseable `requires-python` keeps the bootstrap baseline."""
+    display = _python_display(_target_requires_python(target))
+    if display is None or display == PYTHON_BASELINE:
+        return
+    replacements = (
+        (f"**Python:** {PYTHON_BASELINE} |", f"**Python:** {display} |"),
+        (
+            f"**Stack:** Python {PYTHON_BASELINE} with uv",
+            f"**Stack:** Python {display} with uv",
+        ),
+    )
+    info(f"substitute documented python version -> {display}")
+    if dry_run:
+        return
+    for relative in PYTHON_FACT_FILES:
+        path = target / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        updated = text
+        for old, new in replacements:
+            updated = updated.replace(old, new)
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
 
 
 def merge_gitignore(target: Path, dry_run: bool, commit_copilot_surface: bool = False) -> None:
@@ -440,6 +520,7 @@ def main() -> int:
     )
     copy_generated_tree(source, target, args.dry_run)
     substitute_project_name(target, args.dry_run)
+    substitute_python_version(target, args.dry_run)
     populate_bootstrap_root(target, args.dry_run, args.commit_copilot_surface)
     update_devcontainer_state_remote(target, state_remote, args.dry_run)
     merge_gitignore(target, args.dry_run, args.commit_copilot_surface)

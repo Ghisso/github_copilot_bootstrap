@@ -2,7 +2,7 @@
 description: "Always-on: Workflow protocol, branch lifecycle, session logging, context management. Load when planning, implementing, or starting a session."
 ---
 
-# Workflow: Pre-Flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Score -> Document -> Learn -> Session Log -> Commit
+# Workflow: Pre-Flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
 
 ---
 
@@ -36,7 +36,7 @@ description: "Always-on: Workflow protocol, branch lifecycle, session logging, c
 ## Canonical Orchestrator Loop
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 For each small plan:
@@ -45,10 +45,10 @@ For each small plan:
 2. **PONYTAIL:** Load `.claude/skills/ponytail/SKILL.md` in `full` mode and pass that requirement to every code-writing delegate.
 3. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work).
 4. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
-5. **REVIEW:** Delegate to `reviewer`; for every non-documentation diff include the `ponytail` profile alongside the normal correctness/security profiles. It runs its own primary and verification passes and returns the surviving findings as JSON (it has no `execute` capability, so it cannot persist them itself). Resolve every surviving Ponytail finding, even `MINOR`, then repeat IMPLEMENT/VERIFY/REVIEW. Persist the converged JSON with `record_findings.py --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<timestamp>.json`.
-6. **SCORE:** Run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`.
-7. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/SCORE, and repeat until score is >= 90, the findings report has `counts.critical == 0`, and a required Ponytail review has zero surviving Ponytail findings.
-8. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal.
+5. **REVIEW:** Delegate to `reviewer`; for every non-documentation diff include the `ponytail` profile alongside the normal correctness/security profiles. It runs its own primary and verification passes and returns the surviving findings as JSON (it has no `execute` capability, so it cannot persist them itself). Resolve every surviving Ponytail finding, even `MINOR`, then repeat IMPLEMENT/VERIFY/REVIEW until the review is clean on the code. Do not persist findings yet — persistence happens at step 7 (after DOCUMENT) so the report binds to the final code+docs content.
+6. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal. DOCUMENT runs before the persisted SCORE/FINDINGS so the documenter's tracked edits are inside the content those reports are bound to — otherwise a post-score doc change stales both.
+7. **SCORE & PERSIST:** After documentation is final, persist the converged findings with `record_findings.py --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<timestamp>.json` and run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`. Both artifacts now bind to the final code+docs `content_hash`. Doc-only changes from DOCUMENT are not re-reviewed — the code review already converged; persisting here simply keeps the reports fresh against the committed content. Re-run REVIEW only if a later fix changes code.
+8. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE, and repeat until score is >= 90, the findings report has `counts.critical == 0`, and a required Ponytail review has zero surviving Ponytail findings.
 9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 10. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
 11. **COMMIT:** Commit the completed small plan atomically.

@@ -2081,7 +2081,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     for root_guidance in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md"):
         text = read(root_guidance)
         check(
-            "pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow" in text,
+            "pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow" in text,
             f"{root_guidance.name} must include the full root workflow summary",
             errors,
         )

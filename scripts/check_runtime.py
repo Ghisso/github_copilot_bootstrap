@@ -6,6 +6,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -39,6 +40,35 @@ REQUIRED_DIRS = (
     "dist/multi-agent/.claude/review-profiles",
     "dist/multi-agent/.claude/hooks/scripts",
 )
+
+
+def python_baseline_warning() -> str | None:
+    """Warn when the shipped `**Python:**` baseline in generated guidance drifts
+    from the bootstrap's own `requires-python`. Consumers reconcile this at
+    install time from their own pyproject; this guards the source baseline."""
+    pyproject = REPO_ROOT / "pyproject.toml"
+    workspace = DIST_ROOT / "multi-agent" / ".claude" / "instructions" / "workspace.instructions.md"
+    if not pyproject.is_file() or not workspace.is_file():
+        return None
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    spec = (data.get("project") or {}).get("requires-python")
+    if not isinstance(spec, str) or not spec.strip().startswith(">="):
+        return None
+    version = spec.strip()[2:].strip()
+    if not version or any(ch in version for ch in ",<>=!~* "):
+        return None
+    documented = f"{version}+"
+    for line in workspace.read_text(encoding="utf-8").splitlines():
+        if line.startswith("**Python:**") and documented not in line:
+            return (
+                f"documented Python baseline in workspace.instructions.md does not match "
+                f"pyproject requires-python ({spec!r} -> expected {documented!r}); "
+                f"update the **Python:**/**Stack:** lines in shared/policies/workspace.instructions.md"
+            )
+    return None
 
 
 def main() -> int:
@@ -83,6 +113,12 @@ def main() -> int:
         print("PASS Semble can be launched through uvx when requested")
     else:
         print("WARN Semble MCP launcher uvx is missing; Semble is optional")
+
+    baseline_warning = python_baseline_warning()
+    if baseline_warning:
+        print(f"WARN {baseline_warning}")
+    else:
+        print("PASS documented Python baseline matches pyproject requires-python")
 
     if errors:
         for error in errors:

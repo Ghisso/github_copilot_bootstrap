@@ -31,7 +31,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
-- After score >= 90, update documentation for changed public interfaces, config, workflows, and user-facing behavior before commit/PR closeout.
+- After the code review converges, update documentation for changed public interfaces, config, workflows, and user-facing behavior before the persisted score/findings gate (so both reports bind to the final code+docs) and before commit/PR closeout.
 - Keep hook guardrails enabled.
 - Capture reusable lessons in `.claude/MEMORY.md`.
 
@@ -41,7 +41,7 @@ Always consult the relevant files under `.claude/instructions/`:
 
 | File | Covers |
 |---|---|
-| `workflow.instructions.md` | Pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit loop |
+| `workflow.instructions.md` | Pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit loop |
 | `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
@@ -53,13 +53,13 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Use the orchestrated path for ambiguous, multi-file, or control-plane work:
 
 ```text
-orchestrator -> planner -> coder -> verifier -> reviewer -> score -> documenter
+orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score
 ```
 
 Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project.
@@ -88,7 +88,7 @@ before commit or push.
 | `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
 | `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
 | `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
-| `documenter` | Updates documentation after score passes and before commit/PR closeout |
+| `documenter` | Updates documentation after code review converges, before the persisted score/findings gate and commit/PR closeout |
 
 ## Review Profiles
 

@@ -72,7 +72,7 @@ Hook errors (from `state-sync.sh` and others) are written to `.claude/session_lo
 The canonical workflow is:
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> SCORE -> DOCUMENT -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:
