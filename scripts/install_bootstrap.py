@@ -268,7 +268,19 @@ def merge_gitignore(target: Path, dry_run: bool, commit_copilot_surface: bool = 
     block = ignore_block(commit_copilot_surface)
     current = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     if IGNORE_BLOCK_START in current and IGNORE_BLOCK_END in current:
-        info(".gitignore already contains multi-agent ignore block")
+        # Refresh an existing block in place so pattern changes (e.g. a new
+        # ignore entry) reach consumers that already have the block. Text
+        # outside the START..END markers is left untouched.
+        start = current.index(IGNORE_BLOCK_START)
+        end = current.index(IGNORE_BLOCK_END) + len(IGNORE_BLOCK_END)
+        refreshed = current[:start] + block.rstrip("\n") + current[end:]
+        if refreshed == current:
+            info(".gitignore multi-agent ignore block is up to date")
+            return
+        info(f"refresh multi-agent ignore block in {gitignore}")
+        if dry_run:
+            return
+        gitignore.write_text(refreshed, encoding="utf-8")
         return
 
     info(f"append multi-agent ignore block to {gitignore}")
