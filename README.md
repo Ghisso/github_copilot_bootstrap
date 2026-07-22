@@ -131,7 +131,9 @@ When the local `.claude/` directory already is a nested Git repository without
 a remote, configure its `origin` to the outer repository's `origin` and restrict
 its refspecs to `ai-state` before installing. The install then creates or updates
 the nested-state commit, and Codex's `SessionStart`/`Stop` hooks pull/push that
-branch automatically.
+branch automatically. `Stop` is best-effort — it fires only when the agent
+process emits the event, not on tab closure — so the `post-commit` git hook
+(pushed after every commit) is the durable checkpoint; see [Hooks](#hooks).
 
 The source repository tracks authoring versions of files such as `AGENTS.md`,
 `.codex/config.toml`, and MCP config. After self-installing, restore those
@@ -438,6 +440,9 @@ Configured events:
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
   - `state-sync.sh push` stages all nested changes and commits them as `session: <ISO-timestamp>` (skipping the commit if nothing changed), then pulls (same rebase-with-autostash contract as above). If that pull hits a genuine rebase conflict, it aborts cleanly and `push` skips the push entirely — no non-fast-forward attempt, no mid-rebase repo, no lost commits — warning that local commits are safe and will go out on the next sync once the conflict is resolved manually. Normal Stop runs do not originate installer updates, but locally modified bootstrap-controlled files are included with any other uncommitted nested state; clean installer/updater commits and pull/rebase are the intended protection. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; a missing remote or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
+  - Stop is a best-effort checkpoint: it only pushes when the agent process actually emits the Stop event. Closing a browser tab or an editor window is not a guaranteed lifecycle event, so a session can end without a Stop-triggered push. The durable checkpoints are the `post-commit` git hook below (automatic, fires on every outer-repo commit) and the "AI state: push" VS Code task in [tasks.json](shared/vscode/tasks.json) (manual, for pushing state between commits).
+- post-commit (git hook)
+  - [post-commit](shared/hooks/git-hooks/post-commit) runs `state-sync.sh push` after every successful outer-repo commit, publishing plans, reports, memory, and session logs finalized by that commit without waiting on a Stop event that may never arrive. Like the Stop-hook push, it is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem never blocks or fails the commit. Installed the same way as `commit-msg` and `pre-push` below, via `core.hooksPath`.
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 

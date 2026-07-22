@@ -152,7 +152,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence, and DOCUMENT/LEARN/session-log evidence.
 - PR creation/push is gated on all small plans complete, bypass acknowledgement, required Ponytail review evidence, and the findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
-- Session start/stop pull/push mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`).
+- Session start/stop pull/push mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Stop is best-effort: it only pushes when the agent actually emits the Stop event, and closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoints are the `post-commit` git hook (pushes automatically after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - Runtime hook errors are logged to `.claude/session_logs/hooks-errors.log`.
 
 **Manual reminders still required:**

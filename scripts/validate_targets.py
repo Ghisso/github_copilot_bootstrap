@@ -73,6 +73,7 @@ REQUIRED_HOOK_LIBRARIES = (
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
     "pre-push",
+    "post-commit",
 )
 NON_COPILOT_REVIEW_LABEL_LEAKS = (
     "Review Pass (Codex)",
@@ -652,6 +653,34 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             f"git hook is not executable: {path}",
             errors,
         )
+
+    # R-SYNC (durable checkpoint): the post-commit hook is the reliable
+    # commit-time AI-state sync that does not depend on a Codex Stop event
+    # (browser/editor tab closure never guarantees Stop). It best-effort pushes
+    # via state-sync.sh after every successful commit. Presence/executability is
+    # already asserted by the REQUIRED_GIT_HOOKS loop above; guard the read so a
+    # missing file yields that clean failure instead of an uncaught exception.
+    post_commit = git_hook_root / "post-commit"
+    if post_commit.exists():
+        post_commit_text = read(post_commit)
+        check(
+            '"$STATE_SYNC" push' in post_commit_text,
+            "post-commit git hook must push AI state via state-sync.sh",
+            errors,
+        )
+
+    # Both installed state-sync.sh copies come from one shared/ source and must
+    # stay byte-identical: the .devcontainer/ copy bootstraps before .claude/
+    # exists, and the .claude/hooks/scripts/ copy runs afterward.
+    state_sync_claude = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    state_sync_devcontainer = TARGET_ROOT / ".devcontainer" / "state-sync.sh"
+    check(
+        state_sync_claude.exists()
+        and state_sync_devcontainer.exists()
+        and state_sync_claude.read_bytes() == state_sync_devcontainer.read_bytes(),
+        "the two installed state-sync.sh copies must be byte-identical",
+        errors,
+    )
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)

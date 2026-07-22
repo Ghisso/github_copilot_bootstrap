@@ -103,7 +103,9 @@ The two safety-critical guards, `protect-files.sh` and `git-protection.sh`, run 
 
 Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py` through the updater); session state lands as `session:`-prefixed commits when a consumer's Stop hook runs the normal push flow. The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
 
-**Multi-writer conflict policy.** `init_nested_repo` writes a `.gitattributes` into the nested `.claude/` repo alongside its `.gitignore`. Append-only machine logs matching `session_logs/*.log` get git's built-in `merge=union` driver, so two sessions appending different lines to the same log auto-reconcile during rebase instead of conflicting. Narrative state — `plans/**`, `MEMORY.md`, and session-log prose — intentionally keeps the default conflict-and-abort behavior, so a genuine divergence there still stops for a manual semantic merge rather than being silently resolved ours/theirs.
+**Multi-writer conflict policy.** `init_nested_repo` writes a `.gitattributes` into the nested `.claude/` repo alongside its `.gitignore`. Append-only machine logs matching `session_logs/*.log` get git's built-in `merge=union` driver, so two sessions appending different lines to the same log auto-reconcile during rebase instead of conflicting. Narrative state — `plans/**`, `MEMORY.md`, and session-log prose — intentionally keeps the default conflict-and-abort behavior, so a genuine divergence there still stops for a manual semantic merge rather than being silently resolved ours/theirs. Both files are written by `init_nested_repo` at nested-repo init, so this policy reaches every fresh nested `.claude/` repo the same way the existing `.gitignore` does — not just repos created before this policy existed.
+
+**Durable checkpoints vs. best-effort push.** The Stop hook's `state-sync.sh push` (above) only runs when the agent process actually emits the Stop event — closing a browser tab or an editor window is not a guaranteed lifecycle event, so a session can end without that push ever firing. Two checkpoints are durable instead of best-effort: the generated [`post-commit`](../shared/hooks/git-hooks/post-commit) git hook, which runs `state-sync.sh push` after every successful outer-repo commit and is installed via the same `core.hooksPath` wiring as `commit-msg`/`pre-push` (see "Deterministic Commit and Push Gates" in the README), and the manual **AI state: push** VS Code task (below) for publishing state between commits. Like the Stop-hook push, `post-commit` is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem can never block or fail the commit.
 
 Both human CLIs push by default after a complete refresh. Their `--local-only`
 mode still refreshes all bootstrap-controlled files and creates durable nested
@@ -125,7 +127,9 @@ shell-quoted manual `state-sync.sh push` command so publication is deliberate.
 
 These complement the AI SessionStart/Stop hooks, which run the normal pull/push
 flow for sessions in that consumer, for workflows where VS Code is open without
-an active AI session.
+an active AI session. Because Stop is best-effort, **AI state: push** doubles
+as a durable checkpoint alongside `post-commit` (see "Git-Backed State Sync"
+above) for state a session accumulated without an intervening commit.
 
 ## Custom Agents
 
