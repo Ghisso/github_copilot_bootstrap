@@ -97,6 +97,19 @@ __pycache__/
 EOF
 }
 
+# Multi-writer conflict policy (big plan: state-sync-durability). Append-only
+# machine logs auto-reconcile via git's built-in `union` merge driver, so two
+# sessions writing separate lines never conflict during rebase. Narrative
+# state (plans/**, MEMORY.md, session-log prose) is intentionally left on the
+# default conflict-and-abort path so genuine divergences get a manual semantic
+# merge instead of a silent ours/theirs.
+write_nested_gitattributes() {
+  cat > "$CLAUDE_DIR/.gitattributes" <<'EOF'
+# See write_nested_gitattributes in state-sync.sh for the policy rationale.
+session_logs/*.log merge=union
+EOF
+}
+
 # Creates the nested repo shell (git init, branch name, gitignore, remote
 # config) if .claude/.git is missing. Never commits anything itself, so the
 # caller controls the message on the first real commit (cmd_setup says
@@ -112,6 +125,7 @@ init_nested_repo() {
   # regardless of init.defaultBranch) rather than relying on `git init -b`.
   git -C "$CLAUDE_DIR" symbolic-ref HEAD "refs/heads/$BRANCH"
   write_nested_gitignore
+  write_nested_gitattributes
 
   local remote
   remote="$(resolve_remote)"
@@ -228,7 +242,10 @@ cmd_pull() {
     git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
     warn "pull --rebase failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
-    return 0
+    # Report the failed reconciliation to callers (cmd_push guards its push on
+    # this). Top-level dispatch converts it into a non-blocking warning, so a
+    # Stop/SessionStart hook still exits 0 and never blocks Codex shutdown.
+    return 1
   fi
   info "pull: up to date with origin/$BRANCH"
 }
@@ -248,7 +265,14 @@ cmd_push() {
     return 0
   fi
 
-  cmd_pull
+  # Reconcile first. If the pull failed (a rebase conflict aborted cleanly),
+  # the local commits are safe but a push would be a doomed non-fast-forward;
+  # skip it and require manual reconciliation rather than attempting a push
+  # that git will reject.
+  if ! cmd_pull; then
+    warn "push skipped: reconciliation with origin/$BRANCH failed. Local commits are safe and will retry on the next sync once the conflict is resolved (see the pull warning above for recovery steps)."
+    return 1
+  fi
 
   local output status
   set +e
