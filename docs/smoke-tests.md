@@ -62,7 +62,8 @@ Expected:
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
 - PR creation uses `--base dev`, and implementation-branch pushes are blocked until all phases are complete.
-- SessionStart/Stop hooks in a configured consumer invoke `state-sync.sh` to pull/push mutable AI state on the git-backed `ai-state` branch; they do not publish a refresh merely because it was launched from another repository.
+- SessionStart/Stop hooks in a configured consumer invoke `state-sync.sh` to pull/push mutable AI state on the git-backed `ai-state` branch; they do not publish a refresh merely because it was launched from another repository. Stop is best-effort only — it pushes only if the agent process actually emits the Stop event, and closing a browser or editor tab does not guarantee that.
+- The generated `post-commit` git hook invokes `state-sync.sh push` after every successful outer-repo commit, giving AI state a durable checkpoint that does not depend on a Stop event ever firing; git ignores its exit status, so a sync failure never blocks or fails the commit.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
 - `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
