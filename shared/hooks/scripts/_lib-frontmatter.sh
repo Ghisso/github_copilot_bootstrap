@@ -327,6 +327,34 @@ _shell_tokenize() {
   if (( have )); then _TOKENS+=("$cur"); fi
 }
 
+# Index of the first unquoted shell operator (; | &) in a command segment, or
+# the segment's length if there is none. Global git flags (-C, --git-dir, ...)
+# always precede the subcommand within one invocation with no operator in
+# between, so scanning for THOSE never needs this. Scanning an invocation's
+# ARGS (after its subcommand) is different: `git push origin main && curl
+# --force ...` tokenizes (via _shell_tokenize, which drops operators as mere
+# separators) to a flat ["push","origin","main","curl","--force",...] with no
+# trace of the "&&" — a naive "does --force appear anywhere after push" scan
+# would misattribute the unrelated curl command's flag to the git push. Callers
+# that scan args must truncate the segment to this boundary first so a later
+# chained command's tokens can never bleed into the current invocation's scan.
+_unquoted_operator_boundary() {
+  local s="$1" n=${#1} i=0 c q=''
+  while (( i < n )); do
+    c="${s:i:1}"
+    if [[ -n "$q" ]]; then
+      [[ "$c" == "$q" ]] && q=''
+    else
+      case "$c" in
+        \"|\') q="$c" ;;
+        ';'|'|'|'&') printf '%s' "$i"; return 0 ;;
+      esac
+    fi
+    (( i++ ))
+  done
+  printf '%s' "$n"
+}
+
 # Return the effective subcommand of the FIRST git invocation in a segment,
 # skipping global git flags (-C <path>, -c <k=v>, --git-dir, --work-tree, ...).
 _git_first_subcommand() {

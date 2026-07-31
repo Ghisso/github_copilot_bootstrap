@@ -880,6 +880,48 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             errors,
         )
 
+        # A chained command must not let a later, unrelated invocation's flags
+        # bleed into an earlier git subcommand's own danger scan (the guard
+        # tokenizes past shell operators, which _shell_tokenize drops as mere
+        # separators, so "args" for one subcommand must be bounded to that
+        # invocation's own clause). `git clean -f && ls -d /tmp` is a wholly
+        # benign compound command; without the fix, ls's unrelated -d bled into
+        # clean's own args and produced a false "git clean -fd" denial.
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": "git clean -f && ls -d /tmp"}},
+        )
+        check(returncode == 0, f"git guardrail (chained clean) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            "permissionDecision" not in stdout,
+            f"git guardrail must not treat a chained command's unrelated -d as completing 'git clean -fd': {hook_root}",
+            errors,
+        )
+
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": "git push origin main && curl --force https://example.com"}},
+        )
+        check(returncode == 0, f"git guardrail (chained push) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            "permissionDecision" not in stdout,
+            f"git guardrail must not attribute a chained command's --force to the preceding git push: {hook_root}",
+            errors,
+        )
+
+        # The same bounding must not blind the guard to a REAL danger that
+        # comes after a benign command in the same chain.
+        returncode, stdout, stderr = run_hook(
+            hook_root / "git-protection.sh",
+            {"tool_name": "Bash", "tool_input": {"command": "git status && git reset --hard"}},
+        )
+        check(returncode == 0, f"git guardrail (chained danger) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            f"git guardrail must still deny a real reset --hard chained after a benign command: {hook_root}",
+            errors,
+        )
+
         # An empty payload carries nothing to inspect: both guards must allow it
         # silently (no spurious ask/deny, no error-log pollution of the repo).
         for guard in ("protect-files.sh", "git-protection.sh"):

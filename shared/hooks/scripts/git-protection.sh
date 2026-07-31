@@ -84,14 +84,21 @@ _git_danger_from_tokens() {
 
 # True (prints reason) if any git invocation in the command is destructive.
 git_danger_reason() {
-  local rest="$1" after reason
+  local rest="$1" after reason boundary clause
   while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
     after="${BASH_REMATCH[2]}"
+    # Bound to this invocation's own clause (up to the next unquoted operator)
+    # before tokenizing: _git_danger_from_tokens scans ARGS after the
+    # subcommand for flags like --hard/-D/--force, and without this a chained
+    # `git push origin main && curl --force ...` would misattribute curl's
+    # --force to the git push (see _unquoted_operator_boundary).
+    boundary="$(_unquoted_operator_boundary "$after")"
+    clause="${after:0:boundary}"
     # Quote-aware tokenizer (shared with the commit classifier) so a quoted flag
     # value with whitespace, e.g. `-C "some dir"`, cannot slip a destructive
     # subcommand past detection. Lowercase per-token for case-insensitive match.
     local -a tokens
-    _shell_tokenize "$after"
+    _shell_tokenize "$clause"
     tokens=()
     local _t
     for _t in ${_TOKENS[@]+"${_TOKENS[@]}"}; do tokens+=("$(hook_to_lower "$_t")"); done
