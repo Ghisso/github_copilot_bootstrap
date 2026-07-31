@@ -3045,7 +3045,13 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
     updater = REPO_ROOT / "scripts" / "update_consumers.py"
     with tempfile.TemporaryDirectory() as temp_dir_name:
-        temp_root = Path(temp_dir_name)
+        # install_bootstrap.py resolves its target path (expanduser().resolve())
+        # before printing anything derived from it. On macOS tempfile hands back
+        # a /var/... path while /var is a symlink to /private/var, so the
+        # installer's "Publish later: ..." line comes back /private/var/...  —
+        # resolve here too (same fix as setup_hook_repo above) or the expected
+        # string built from an unresolved consumer path never matches.
+        temp_root = Path(temp_dir_name).resolve()
         state_remote = temp_root / "state-remote.git"
         subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
 
