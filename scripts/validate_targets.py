@@ -343,6 +343,20 @@ def validate_agents(errors: list[str]) -> None:
             f"Claude agent must route retrieval through tool-routing instructions: {path}",
             errors,
         )
+        # An agent told to route through tool-routing.instructions.md (which
+        # says "use Semble"/"use context-mode") but whose own tools: allowlist
+        # omits the matching mcp__ wildcard physically cannot follow that
+        # instruction — tools: is an explicit allowlist, not additive to
+        # defaults. Caught this exact bug once already (every generated
+        # subagent had the instruction but not the tool); guard against it
+        # regenerating.
+        if "tool-routing.instructions.md" in text:
+            tools_line = next((line for line in text.splitlines() if line.startswith("tools:")), "")
+            check(
+                "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
+                f"Claude agent routes retrieval through tool-routing.instructions.md but its tools: allowlist omits mcp__semble/mcp__context-mode, so it cannot follow that instruction: {path}",
+                errors,
+            )
         # Per-agent model/effort tiering: validate any emitted frontmatter fields
         # against the allow-lists, and reject effort on models that lack it.
         frontmatter_block = text.split("---\n", 2)

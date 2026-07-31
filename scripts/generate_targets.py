@@ -19,9 +19,20 @@ COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
 
+# Every agent prompt (shared/agents/*/prompt.md) carries the identical line
+# "Choose retrieval tools per .../tool-routing.instructions.md: Semble for
+# semantic and related-code discovery, context-mode for large outputs..." —
+# the "search" capability is this bootstrap's whole retrieval toolkit (grep
+# AND semantic/long-output retrieval), not just literal-text grep. Without
+# the mcp__<server> wildcards below, every subagent's `tools:` allowlist
+# (an explicit list, not additive to defaults) silently omitted all
+# mcp__semble__*/mcp__context-mode__* tools, so a subagent told by its own
+# prompt to "use Semble" had no such tool to call. `mcp__<server>` /
+# `mcp__<server>__*` grants every tool from that MCP server (Claude Code
+# subagent frontmatter `tools:` field: code.claude.com/docs/en/subagents.md).
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
-    "search": ["Grep", "Glob"],
+    "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode"],
     "edit": ["Edit", "MultiEdit", "Write"],
     "execute": ["Bash"],
     "delegate": ["Task"],
@@ -31,6 +42,17 @@ CLAUDE_TOOL_MAP = {
 # The "vscode" capability is intentionally Copilot-only: it maps to a Copilot
 # tool and has no equivalent in Claude/Codex, so it is (correctly) omitted from
 # their tool lists rather than silently mishandled.
+#
+# KNOWN GAP: unlike CLAUDE_TOOL_MAP above, this map has no MCP entry for
+# "search" — Copilot custom-agent `tools:` also filters MCP-sourced tools
+# (same explicit-allowlist semantics as Claude), so generated Copilot agents
+# have the identical bug (their prompt says "use Semble"/"use context-mode"
+# but neither is in their tools: list). Left unfixed deliberately: Copilot's
+# exact tool-name convention for MCP-sourced tools (bare server name? a
+# "server.tool" form? the raw tool name, which could collide with the
+# existing "search" alias) is not confirmed from documentation alone, and a
+# wrong guess here would look fixed while silently doing nothing. Verify the
+# real declared tool name in a live VS Code Copilot session before adding it.
 COPILOT_TOOL_MAP = {
     "read": ["read"],
     "search": ["search"],
