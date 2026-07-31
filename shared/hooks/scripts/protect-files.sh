@@ -75,10 +75,17 @@ pf_is_protected() {
   return 1
 }
 
+# Deliberately does NOT treat "contains a /" as path-like (that used to be a
+# case here) — a bare slash matches ordinary prose and unrelated tool
+# arguments (a docs sentence mentioning "docs/section", a script importing
+# something named Secret) just as often as an actual path, and blocked both.
+# The narrower shapes below miss a relative secret-like path such as
+# app/secrets/db_secret.txt; that's intentional here — the Python precision
+# pass below catches those by basename instead, and must not be skipped just
+# because this coarse pass found nothing.
 pf_looks_like_path() {
   case "$1" in
     /*|./*|../*|.github/*|.claude/*|.codex/*|.agents/*) return 0 ;;
-    */*) return 0 ;;
     *.py|*.json|*.toml|*.md|*.sh|*.lock|*.env|*.pem|*.key) return 0 ;;
     .env|.env.local|uv.lock) return 0 ;;
   esac
@@ -174,6 +181,11 @@ elif [[ "$bash_decision" == "ask" ]]; then
 fi
 
 # --- Python precision pass (enhancement only, when uv is available) ----------
+# Always runs when uv is available, even if the coarse bash scan above found
+# no candidates: the bash pass only recognizes explicit path prefixes/
+# extensions, while the Python pass also flags relative paths whose basename
+# looks like a secret (e.g. `cp app/secrets/db_secret.txt other/`). Skipping
+# this pass on an empty CANDIDATES array would silently let those through.
 
 # uv_available / run_python are single-homed in _lib-frontmatter.sh.
 if ! uv_available; then
@@ -224,12 +236,25 @@ shell_commands = {
 shell_operators = {"|", "||", "&&", ";", ">", ">>", ">|", "<", "<<", "<<<", "&>", "2>", "2>>", "1>", "1>>"}
 
 def looks_like_path(value: str) -> bool:
-  return (
-    value.startswith(("/", "./", "../", ".github/", ".claude/", ".codex/", ".agents/"))
-    or "/" in value
-    or value.endswith((".py", ".json", ".toml", ".md", ".sh", ".lock", ".env", ".pem", ".key"))
-    or value in {".env", ".env.local", "uv.lock"}
-  )
+  if value.startswith(("file://", "./", "../", ".github/", ".claude/", ".codex/", ".agents/")):
+    return True
+  if value.endswith((".py", ".json", ".toml", ".md", ".sh", ".lock", ".env", ".pem", ".key")):
+    return True
+  if value in {".env", ".env.local", "uv.lock"}:
+    return True
+  if value.startswith("/"):
+    return True
+  if "/" in value:
+    base = posixpath.basename(value)
+    if (
+      base in {".env", ".env.local"}
+      or base.startswith(".env.")
+      or base.startswith("credentials")
+      or base.endswith((".pem", ".key"))
+      or "secret" in base
+    ):
+      return True
+  return False
 
 def collect_shell_paths(command: str) -> None:
   if not command:
@@ -293,7 +318,7 @@ def collect(value: object, key: str | None = None) -> None:
 
   collect_patch_paths(value)
   normalized_key = (key or "").lower()
-  if normalized_key in path_keys or value.startswith("/") or "/" in value or value.endswith((".py", ".json", ".md", ".sh", ".lock", ".env", ".pem", ".key")):
+  if normalized_key in path_keys or looks_like_path(value):
     paths.append(value)
 
 if is_bash:

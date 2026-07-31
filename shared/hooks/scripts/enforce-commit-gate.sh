@@ -18,6 +18,16 @@ if ! is_bash_tool_payload "$INPUT"; then
 fi
 
 COMMAND="$(hook_command "$INPUT")"
+# state-sync.sh commits to the nested ai-state repo (git -C .claude commit ...)
+# constantly and has no plan/score/closeout ceremony of its own to satisfy —
+# without this, the outer gate misjudges those commits against this repo's
+# ceremony and blocks routine state syncing. git_targets_nested_claude checks
+# the specific commit invocation, not "does the command string mention
+# .claude/ anywhere", so a compound command that mixes a nested call with an
+# unrelated outer-repo commit still gates the outer one.
+if git_targets_nested_claude "$COMMAND" commit; then
+  exit 0
+fi
 if ! is_git_commit_command "$COMMAND"; then
   exit 0
 fi
