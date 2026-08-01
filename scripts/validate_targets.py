@@ -160,6 +160,59 @@ def check(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
+def check_codex_hook_trust_notice(
+    label: str,
+    stdout: str,
+    errors: list[str],
+    *,
+    dry_run: bool,
+) -> None:
+    """Validate the installer's non-authoritative Codex trust guidance."""
+    expected_action = "would install or update" if dry_run else "installed or updated"
+    for fragment in (
+        expected_action,
+        ".codex/hooks.json",
+        "Codex for VS Code",
+        "content/hash",
+        "review/retrust",
+        "reopen/reload",
+        "review and approve the project hooks when prompted",
+        "does not approve project hooks or change user trust settings",
+    ):
+        check(
+            fragment in stdout,
+            f"{label} trust notice must include {fragment!r}",
+            errors,
+        )
+    if dry_run:
+        check(
+            "installed or updated .codex/hooks.json" not in stdout,
+            f"{label} dry-run trust notice must not claim hook content changed",
+            errors,
+        )
+
+
+def check_batch_dry_run_summary(stdout: str, errors: list[str]) -> None:
+    """Validate that a batch dry run is explicitly non-mutating."""
+    for fragment in (
+        "=== Previewing ",
+        "=== Preview complete:",
+        "no files updated",
+        "Preview complete; no projects were updated.",
+    ):
+        check(
+            fragment in stdout,
+            f"updater dry-run summary must include {fragment!r}",
+            errors,
+        )
+    for forbidden in ("=== Updating ", "=== Done:", "All projects updated."):
+        check(
+            forbidden not in stdout,
+            f"updater dry-run summary must not claim {forbidden!r}",
+            errors,
+        )
+
+
 def codex_hook_command(script: str, *args: str) -> str:
     """Return the generated repo-rooted Codex hook command."""
     root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -2785,8 +2838,17 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         )
 
     installer = REPO_ROOT / "scripts" / "install_bootstrap.py"
+    updater = REPO_ROOT / "scripts" / "update_consumers.py"
     git_identity_env = git_actor_env("Validator")
     with tempfile.TemporaryDirectory() as temp_dir_name:
+        trust_home = Path(temp_dir_name) / "user-home"
+        trust_home.mkdir()
+        install_env = {
+            **git_identity_env,
+            "HOME": str(trust_home),
+            "XDG_CONFIG_HOME": str(trust_home / "xdg"),
+            "CODEX_HOME": str(trust_home / "codex-home"),
+        }
         temp_repo = Path(temp_dir_name) / "consumer"
         temp_repo.mkdir()
         init_result = subprocess.run(
@@ -2804,12 +2866,14 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         install_result = subprocess.run(
             [sys.executable, str(installer), str(temp_repo)],
             cwd=REPO_ROOT,
-            env=git_identity_env,
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
         )
         check(install_result.returncode == 0, f"installer temp run failed: {install_result.stderr}", errors)
+        check_codex_hook_trust_notice("default installer", install_result.stdout, errors, dry_run=False)
+        check(not any(trust_home.iterdir()), "installer must not write user-level trust state", errors)
         check((temp_repo / ".devcontainer" / "devcontainer.json").exists(), "installer must copy trackable devcontainer", errors)
         check((temp_repo / ".gitignore").exists(), "installer must create or update .gitignore", errors)
         check("AI_STATE_REMOTE" not in read(temp_repo / ".devcontainer" / "devcontainer.json"), "installer must not write AI_STATE_REMOTE without --state-remote", errors)
@@ -2856,7 +2920,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         subprocess.run(["git", "-C", str(temp_repo / ".claude"), "add", "MEMORY.md"], check=False)
         memory_commit = subprocess.run(
             ["git", "-C", str(temp_repo / ".claude"), "commit", "-q", "-m", "session: add consumer memory"],
-            env=git_identity_env,
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2865,7 +2929,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         reinstall_result = subprocess.run(
             [sys.executable, str(installer), str(temp_repo)],
             cwd=REPO_ROOT,
-            env=git_identity_env,
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2888,7 +2952,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         legacy_install_result = subprocess.run(
             [sys.executable, str(installer), str(legacy_repo)],
             cwd=REPO_ROOT,
-            env=git_identity_env,
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2926,7 +2990,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         remote_install_result = subprocess.run(
             [sys.executable, str(installer), str(remote_temp_repo), "--state-remote", str(remote_repo)],
             cwd=REPO_ROOT,
-            env=git_identity_env,
+            env=install_env,
             text=True,
             capture_output=True,
             check=False,
@@ -2946,6 +3010,109 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "installer with --state-remote must push ai-state to that remote, not origin",
             errors,
         )
+
+        default_batch = subprocess.run(
+            [sys.executable, str(updater), "--skip-regen", str(remote_temp_repo)],
+            cwd=REPO_ROOT,
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            default_batch.returncode == 0,
+            f"default updater run failed: {default_batch.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "default updater", default_batch.stdout, errors, dry_run=False
+        )
+        check(
+            not any(trust_home.iterdir()),
+            "updater must not write user-level trust state",
+            errors,
+        )
+
+        dry_repo = Path(temp_dir_name) / "dry-run-consumer"
+        dry_repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(dry_repo)], check=False)
+        direct_dry_run = subprocess.run(
+            [sys.executable, str(installer), str(dry_repo), "--dry-run"],
+            cwd=REPO_ROOT,
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            direct_dry_run.returncode == 0,
+            f"installer dry-run failed: {direct_dry_run.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "installer dry-run", direct_dry_run.stdout, errors, dry_run=True
+        )
+        check(
+            not (dry_repo / ".codex" / "hooks.json").exists(),
+            "installer dry-run must not write hooks.json",
+            errors,
+        )
+
+        batch_dry_run = subprocess.run(
+            [sys.executable, str(updater), "--skip-regen", "--dry-run", str(dry_repo)],
+            cwd=REPO_ROOT,
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            batch_dry_run.returncode == 0,
+            f"updater dry-run failed: {batch_dry_run.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "updater dry-run", batch_dry_run.stdout, errors, dry_run=True
+        )
+        check_batch_dry_run_summary(batch_dry_run.stdout, errors)
+        check(
+            not (dry_repo / ".codex" / "hooks.json").exists(),
+            "updater dry-run must not write hooks.json",
+            errors,
+        )
+        check(
+            not any(trust_home.iterdir()),
+            "dry runs must not write user-level trust state",
+            errors,
+        )
+
+        local_only_batch_dry_run = subprocess.run(
+            [
+                sys.executable,
+                str(updater),
+                "--skip-regen",
+                "--dry-run",
+                "--local-only",
+                str(dry_repo),
+            ],
+            cwd=REPO_ROOT,
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            local_only_batch_dry_run.returncode == 0,
+            f"local-only updater dry-run failed: {local_only_batch_dry_run.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "local-only updater dry-run",
+            local_only_batch_dry_run.stdout,
+            errors,
+            dry_run=True,
+        )
+        check_batch_dry_run_summary(local_only_batch_dry_run.stdout, errors)
 
         # R-POLICY-01: installer substitutes the workspace project-name placeholder.
         installed_workspace = read(temp_repo / ".claude" / "instructions" / "workspace.instructions.md")
@@ -3563,6 +3730,7 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
             check=False,
         )
         check(fresh_install.returncode == 0, f"[local-only] fresh install failed: {fresh_install.stderr}", errors)
+        check_codex_hook_trust_notice("local-only installer", fresh_install.stdout, errors, dry_run=False)
         check_local_only_git_trace("fresh install", fresh_trace, errors)
         remote_refs = subprocess.run(
             ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
@@ -3661,6 +3829,7 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
             check=False,
         )
         check(update.returncode == 0, f"[local-only] updater failed: {update.stderr}", errors)
+        check_codex_hook_trust_notice("local-only updater", update.stdout, errors, dry_run=False)
         check_local_only_git_trace("updater", updater_trace, errors)
         updater_refs = subprocess.run(
             ["git", "--git-dir", str(updater_remote), "for-each-ref", "refs/heads/ai-state"],

@@ -82,6 +82,14 @@ use `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` to
 inspect recovery state. Post-commit and the manual VS Code **AI state: push**
 task remain the durable checkpoint-and-publish paths.
 
+An install or update can change `.codex/hooks.json`, whose Codex for VS Code
+project trust is content/hash-bound. Verify the installer and batch updater
+only print the reopen/reload-and-review guidance: they must never approve hooks
+or mutate user trust settings. A dry run must describe the potential review
+without claiming that it changed hooks. If sync is not progressing after you
+approve updated hooks, run `state-sync.sh status` and inspect
+`.claude/session_logs/hooks-errors.log`.
+
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 
 For non-documentation diffs, the matching findings report must also contain

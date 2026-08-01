@@ -67,7 +67,8 @@ def main() -> None:
             print(f"ERROR: {project} is not a directory", file=sys.stderr)
             sys.exit(1)
 
-        print(f"\n=== Updating {project.name} ({project}) ===", flush=True)
+        action = "Previewing" if dry else "Updating"
+        print(f"\n=== {action} {project.name} ({project}) ===", flush=True)
 
         install_cmd = [sys.executable, str(INSTALLER), str(project)]
         if dry:
@@ -76,9 +77,12 @@ def main() -> None:
             install_cmd.append("--local-only")
         run(install_cmd)
 
-        print(f"=== Done: {project.name} ===")
+        if dry:
+            print(f"=== Preview complete: {project.name}; no files updated ===")
+        else:
+            print(f"=== Done: {project.name} ===")
 
-    print("\nAll projects updated.")
+    print("\nPreview complete; no projects were updated." if dry else "\nAll projects updated.")
 
 
 if __name__ == "__main__":

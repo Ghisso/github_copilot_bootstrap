@@ -123,6 +123,14 @@ Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootst
 
 Claude VS Code bundles the Claude runtime and reads the same generated `.claude/settings.json` as the CLI; no second settings adapter exists. Post-commit and the manual **AI state: push** VS Code task remain the durable checkpoint-and-publish paths.
 
+**Codex for VS Code trust.** `.codex/hooks.json` is a project hook surface
+whose trust is bound to its content/hash. A direct install or per-consumer batch
+update can therefore require review and renewed approval. Reopen/reload the
+repository in Codex for VS Code and approve the project hooks when prompted;
+the installer reports this requirement but never approves hooks or changes
+user trust settings. A dry run only previews that possible action and does not
+claim to have changed hook content.
+
 Both human CLIs push by default after a complete refresh. Their `--local-only`
 mode still refreshes all bootstrap-controlled files and creates durable nested
 commits, including ordered `migrate:` then `bootstrap:` commits for a legacy

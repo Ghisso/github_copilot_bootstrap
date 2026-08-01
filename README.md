@@ -90,6 +90,13 @@ uv run python scripts/generate_targets.py --all
 uv run python scripts/install_bootstrap.py "$TARGET_REPO"
 ```
 
+After an actual install or update, reopen or reload the repository in Codex for
+VS Code. Project-hook trust is bound to the content/hash of
+`.codex/hooks.json`, so changed generated hooks can require review and renewed
+approval. Review and approve them when Codex prompts before relying on the
+lifecycle hooks. The installer only reports this boundary; it never approves
+hooks or changes user trust settings.
+
 To keep AI state off the code remote instead of the default:
 
 ```bash
@@ -172,6 +179,11 @@ has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byt
 # Preview without writing
 uv run python scripts/update_consumers.py --dry-run /path/to/repo
 ```
+
+The dry-run notice describes the trust action that an actual update may require;
+it does not claim that hook content changed. Default and `--local-only` updates
+print the same per-consumer reminder. After each actual update, reopen/reload
+the repository in Codex for VS Code and approve project hooks if prompted.
 
 For a durable offline batch refresh, pass `--local-only`. It applies the full
 generated bootstrap to every target and preserves the same ordered migration
