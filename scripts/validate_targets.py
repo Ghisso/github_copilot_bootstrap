@@ -293,6 +293,29 @@ def validate_agents(errors: list[str]) -> None:
             effort = codex_intent.get("effort")
             validate_codex_model_contract(f"canonical Codex agent {agent_id}", model, effort, errors)
             expected_codex_intents[agent_id] = (model, effort)
+            escalate_to = codex_intent.get("escalate_to")
+            if escalate_to is not None:
+                # Declarative-only: not consumed by the TOML emitter (Codex spawn-time
+                # overrides make a second generated adapter unnecessary), so its only
+                # contract is with the orchestrator prompt text that actually acts on
+                # it. Restricted to `coder` today; widen this check deliberately if
+                # another role grows an escalation lane.
+                check(agent_id == "coder", f"{agent_id} defines escalate_to but only coder is expected to", errors)
+                esc_model = escalate_to.get("model")
+                esc_effort = escalate_to.get("effort")
+                validate_codex_model_contract(f"{agent_id} escalate_to", esc_model, esc_effort, errors)
+                check(
+                    (esc_model, esc_effort) != (model, effort),
+                    f"{agent_id} escalate_to must differ from its base Codex tier",
+                    errors,
+                )
+                orchestrator_prompt = read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md")
+                check(
+                    isinstance(esc_model, str) and esc_model in orchestrator_prompt
+                    and isinstance(esc_effort, str) and esc_effort in orchestrator_prompt,
+                    "orchestrator prompt.md must name the coder escalate_to model/effort verbatim, or it will silently drift from agent.yaml",
+                    errors,
+                )
         check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
         check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
         capabilities = set(data.get("capabilities", []))

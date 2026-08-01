@@ -51,6 +51,17 @@ finding count must be zero before the review report is persisted.
 - **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
 - **Standard changes**: run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
 
+## Escalation On Failure
+
+On OpenAI Codex only (spawn-time model/effort overrides are a Codex capability;
+Claude Code has no per-invocation effort override): if `verifier` fails, or
+`reviewer` returns a CRITICAL/MAJOR finding or any surviving `ponytail` finding,
+on a diff `coder` just produced, re-delegate the fix to `coder` with explicit
+spawn overrides `model = gpt-5.6-sol`, `model_reasoning_effort = xhigh` instead
+of retrying at its configured `gpt-5.6-terra`/`high` tier. Escalate at most once
+per phase. If the escalated attempt also fails verification or review, stop the
+fix loop and report the failure to the user instead of retrying further.
+
 ## Delegation Rules
 
 - Spawn every typed role (`planner`, `coder`, `reviewer`, `verifier`, `documenter`) **fresh**: give it a compact task (paths, symbols, failing checks, surviving finding IDs, artifact paths) rather than inheriting the parent's full conversation history. A typed role cannot be created from a full-history fork — on Codex this is an error (`fork_turns: "all"` inherits the parent agent type, so a typed spawn must use `fork_turns: "none"` or a bounded turn count), and on other runtimes a fresh, artifact-scoped spawn is both cheaper and less error-prone.
