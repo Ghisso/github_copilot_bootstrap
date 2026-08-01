@@ -3,8 +3,8 @@ name: 2026-08-01_phase-B-codex-state-lifecycle
 type: small-plan
 parent_plan: ai-state-lifecycle-sync
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-01_ai-state-lifecycle-sync-phase-B.md
 ---
 
 # Small Plan: 2026-08-01_phase-B-codex-state-lifecycle
@@ -62,7 +62,8 @@ post-commit hook, and manual VS Code push remain the publication paths.
     while diagnostics may appear on stderr;
   - generated Codex `Stop` has exactly one command handler and references the
     wrapper, not the four child commands;
-  - generated `UserPromptSubmit` has one `publish` handler;
+  - generated `UserPromptSubmit` has one `push` handler, so tracked diagnostics
+    written by a failed Stop publication are checkpointed before retry;
   - generated `SessionEnd` has one `checkpoint` handler, timeout exactly `3`,
     and no `publish`/`push` command.
 - Keep tests independent of handler array ordering—the array must contain only
@@ -101,9 +102,10 @@ post-commit hook, and manual VS Code push remain the publication paths.
   `.claude/skills/testing-patterns/SKILL.md`.
 - In `render_codex_hooks`:
   - replace the Stop group's three commands with one `codex-stop.sh` command;
-  - add one `UserPromptSubmit` group invoking `state-sync.sh publish` with a
+  - add one `UserPromptSubmit` group invoking `state-sync.sh push` with a
     bounded network timeout (use `60` unless current generated-schema evidence
-    requires a smaller supported value);
+    requires a smaller supported value), so a failed Stop publication's
+    tracked diagnostics are checkpointed before publication is retried;
   - add one `SessionEnd` group invoking `state-sync.sh checkpoint` with timeout
     exactly `3`;
   - preserve existing SessionStart, PreToolUse, PostToolUse, and PreCompact
@@ -131,7 +133,8 @@ post-commit hook, and manual VS Code push remain the publication paths.
   `docs/architecture.md`, `docs/runtime-checks.md`, `docs/smoke-tests.md`,
   `docs/target-mapping.md`, and `shared/policies/workflow.instructions.md`.
 - **Required Skills:** `.claude/skills/documentation/SKILL.md`.
-- Explain Stop's turn scope, single-wrapper ordering, UserPromptSubmit retry,
+- Explain Stop's turn scope, single-wrapper ordering, the UserPromptSubmit
+  checkpoint-plus-publication retry after failed Stop diagnostics,
   local-only/delayed SessionEnd, exact three-second limit, JSON-only Stop
   stdout, error/status recovery, and continued post-commit/manual durability.
 - Do not yet document Claude events as implemented; Phase C owns them.
@@ -186,8 +189,9 @@ uv run python .claude/scripts/quality_score.py scripts/ --phase 2026-08-01_phase
 - Codex Stop has one handler and the wrapper proves exact sequential order.
 - Stop stdout is one parseable JSON object under success and child failure;
   no child info text appears there.
-- UserPromptSubmit publishes pending committed state and duplicate publication
-  is harmless through Phase A's contract.
+- UserPromptSubmit runs `push`, checkpointing tracked diagnostics left by a
+  failed Stop publication before retrying publication; after a successful Stop
+  it is harmless through Phase A's clean-tree/no-op contract.
 - SessionEnd only checkpoints and has timeout `3`; it performs no remote Git
   operation and is documented as delayed/best-effort.
 - Existing Codex lifecycle/guardrail hooks remain structurally unchanged.
@@ -195,10 +199,10 @@ uv run python .claude/scripts/quality_score.py scripts/ --phase 2026-08-01_phase
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved, including zero surviving Ponytail findings
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated before persisted findings/score
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] One atomic Phase B commit created
+- [x] Verification passed
+- [x] Review findings resolved, including zero surviving Ponytail findings
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated before persisted findings/score
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] One atomic Phase B commit created

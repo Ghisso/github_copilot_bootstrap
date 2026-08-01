@@ -65,3 +65,33 @@
   stray word in a comment (`cmd_push`) can satisfy `"push" in text` and mask a
   regression. Guard any unconditional `read()` of a required-but-maybe-missing
   file so a miss is a clean accumulated failure, not an uncaught exception.
+- [LEARN:workflow] Never create a tracked worktree diagnostic before
+  reconciling unrelated histories: the diagnostic itself can cause a merge
+  conflict or dirty-tree refusal. Capture the evidence externally, reconcile,
+  then append and checkpoint the diagnostic afterward.
+- [LEARN:testing] A no-I/O Git Trace2 test must first assert that the trace
+  exists and contains parseable start events before checking that forbidden
+  remote commands are absent; otherwise an empty or unreadable trace can make
+  the absence assertion pass vacuously.
+- [LEARN:workflow] A clean-only publication retry can deadlock behind its own
+  tracked failure diagnostics. Prompt/retry boundaries must checkpoint and
+  then publish (`push`), or store diagnostics outside tracked state. This is
+  required whenever a failed publication writes its diagnostics into a tracked
+  file before the next retry boundary.
+- [LEARN:testing] Exact generated hook-schema validation must check handler
+  types and reject extra fields, not only command text. Shared test mechanics
+  may be parameterized, but production wrappers remain platform-specific where
+  their output contracts differ.
+- [LEARN:installer] Dry-run output is part of the safety contract: preview
+  paths must never claim that files, hooks, or trust state were applied.
+  Distinguish "would install or update" from completion wording in direct and
+  batch installer flows.
+- [LEARN:quality] Generator verification must run after concurrent source and
+  documentation edits settle. A stale ignored `dist/` tree can create a false
+  determinism failure even when two fresh generations are byte-identical.
+- [LEARN:workflow] Phase closeout gates read the small-plan frontmatter status
+  as well as checklist prose; set `status: complete` only after verification,
+  review, score, documentation, and learning evidence are recorded.
+- [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
+  checklist, session log, and big-plan checklist from the actual commit SHAs;
+  do not infer completion from a clean outer worktree alone.

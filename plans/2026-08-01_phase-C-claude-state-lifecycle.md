@@ -3,8 +3,8 @@ name: 2026-08-01_phase-C-claude-state-lifecycle
 type: small-plan
 parent_plan: ai-state-lifecycle-sync
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-01_ai-state-lifecycle-sync-phase-C.md
 ---
 
 # Small Plan: 2026-08-01_phase-C-claude-state-lifecycle
@@ -12,10 +12,11 @@ closeout_session_log:
 ## Scope
 
 Give Claude Code the same ordered Stop checkpoint/publication guarantee, plus
-publication at UserPromptSubmit, a local StopFailure checkpoint, and a
-SessionEnd checkpoint+best-effort publish bounded by Claude's 60-second project
-hook ceiling. The generated `.claude/settings.json` is shared by Claude CLI and
-the Claude runtime bundled with VS Code, so this is one wiring surface.
+a checkpoint+publication retry at UserPromptSubmit, a local StopFailure
+checkpoint, and a SessionEnd checkpoint+best-effort publish bounded by Claude's
+60-second project hook ceiling. The generated `.claude/settings.json` is shared
+by Claude CLI and the Claude runtime bundled with VS Code, so this is one wiring
+surface.
 
 ## Ownership
 
@@ -52,7 +53,9 @@ the Claude runtime bundled with VS Code, so this is one wiring surface.
   - no plain wrapper stdout (diagnostics belong on stderr; Claude has no need
     for Codex's final `{}`);
   - one generated Stop command referencing `claude-stop.sh`;
-  - one `UserPromptSubmit` command invoking `publish` with timeout `60`;
+  - one `UserPromptSubmit` command invoking `push` with timeout `60`, so
+    tracked diagnostics from an earlier failed publication are checkpointed
+    before publication is retried;
   - one `StopFailure` command invoking local `checkpoint` and no publication;
   - one `SessionEnd` command invoking the `push` compatibility composition
     (checkpoint then publish) with timeout exactly `60`;
@@ -91,7 +94,8 @@ the Claude runtime bundled with VS Code, so this is one wiring surface.
 - In `render_claude_settings`:
   - replace the Stop command list with one `claude-stop.sh` command, retaining
     the established long Stop timeout budget;
-  - add `UserPromptSubmit` -> one `state-sync.sh publish`, timeout `60`;
+  - add `UserPromptSubmit` -> one `state-sync.sh push`, timeout `60`, preserving
+    the reviewed checkpoint-before-publication retry for tracked diagnostics;
   - add `StopFailure` -> one `state-sync.sh checkpoint`, using the existing
     normal short command timeout unless generated-schema evidence requires an
     explicit smaller supported value;
@@ -122,8 +126,9 @@ the Claude runtime bundled with VS Code, so this is one wiring surface.
 - **Required Skills:** `.claude/skills/documentation/SKILL.md`.
 - State that Claude VS Code bundles the Claude runtime and reads the same
   `.claude/settings.json`; no duplicate adapter is installed.
-- Document Stop as turn-scoped, prompt publication as retry, StopFailure local
-  checkpoint, SessionEnd checkpoint+best-effort publication, timeout `60`,
+- Document Stop as turn-scoped, prompt checkpoint+publication as retry for
+  tracked diagnostics, StopFailure local checkpoint, SessionEnd
+  checkpoint+best-effort publication, timeout `60`,
   local-commit preservation on timeout/network failure, status/error commands,
   and continued post-commit/manual durability.
 - Reconcile any Phase B Codex-only wording into a compact comparison table or
@@ -175,7 +180,8 @@ uv run python .claude/scripts/quality_score.py scripts/ --phase 2026-08-01_phase
 ## Acceptance Criteria
 
 - Claude Stop has one handler and wrapper order/payload/continuation are proven.
-- UserPromptSubmit publishes pending committed state.
+- UserPromptSubmit checkpoints tracked diagnostics and retries publication via
+  `state-sync.sh push`.
 - StopFailure checkpoints locally and performs no remote Git operation.
 - SessionEnd is one checkpoint+publish composition with timeout `60`; a failed
   publication leaves the checkpoint safe for a later retry.
@@ -185,10 +191,10 @@ uv run python .claude/scripts/quality_score.py scripts/ --phase 2026-08-01_phase
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved, including zero surviving Ponytail findings
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated before persisted findings/score
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] One atomic Phase C commit created
+- [x] Verification passed
+- [x] Review findings resolved, including zero surviving Ponytail findings
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated before persisted findings/score
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] One atomic Phase C commit created

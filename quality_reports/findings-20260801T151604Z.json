@@ -1,0 +1,46 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-01T15:16:13Z",
+  "branch": "ai-state-lifecycle-sync_implementation",
+  "head_sha": "7f17c5921fc9757c0300a49ed194681eb3f16531",
+  "base_ref": "dev",
+  "merge_base_sha": "232953a28bee60b48318de033f8c1f947735a5fb",
+  "phase": "2026-08-01_phase-D-install-trust-and-closeout",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "f7837365d0b28e49416473edf50b477eb4f19e36",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/claude-stop.sh",
+    "shared/hooks/scripts/codex-stop.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/workflow.instructions.md",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_state_sync.py"
+  ]
+}

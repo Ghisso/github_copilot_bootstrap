@@ -1,16 +1,16 @@
 ---
 name: ai-state-lifecycle-sync
 type: big-plan
-status: planning
+status: complete
 originating_branch: dev
 implementation_branch: ai-state-lifecycle-sync_implementation
-started_at:
+started_at: 2026-08-01T12:41:35Z
 phases:
   - 2026-08-01_phase-A-state-sync-operations
   - 2026-08-01_phase-B-codex-state-lifecycle
   - 2026-08-01_phase-C-claude-state-lifecycle
   - 2026-08-01_phase-D-install-trust-and-closeout
-current_phase:
+current_phase: 
 ---
 
 # Big Plan: ai-state-lifecycle-sync
@@ -50,7 +50,9 @@ The plan is constrained by established runtime behavior:
 - Codex and Claude `Stop` each invoke one platform-specific wrapper; the
   wrapper performs `session-log` -> `stop-session-log-check` -> `checkpoint`
   -> best-effort `publish` sequentially.
-- Both runtimes publish pending committed state at `UserPromptSubmit`.
+- Codex `UserPromptSubmit` checkpoints any tracked diagnostics left by a failed
+  Stop publication before retrying publication; Claude publishes pending
+  committed state at `UserPromptSubmit`.
 - Codex `SessionEnd` performs only a local checkpoint with timeout `3`.
 - Claude `StopFailure` checkpoints locally, and Claude `SessionEnd` performs
   checkpoint plus best-effort publish within timeout `60`.
@@ -99,7 +101,7 @@ flowchart LR
     Log --> Check[Check closeout log]
     Check --> CP[Local checkpoint]
     CP --> Pub[Best-effort publish]
-    Prompt[Next user prompt] --> Retry[Publish pending commits]
+    Prompt[Next user prompt] --> Retry[Checkpoint diagnostics then publish]
     CEnd[Codex SessionEnd] --> CCP[Local checkpoint only]
     CFail[Claude StopFailure] --> FCP[Local checkpoint only]
     ClEnd[Claude SessionEnd] --> ClPush[Checkpoint then publish]
@@ -140,13 +142,15 @@ after a failed checkpoint/reconciliation.
 | Runtime event | Codex | Claude Code |
 |---|---|---|
 | `Stop` | One `codex-stop.sh` command: log -> check -> checkpoint -> publish; timeout remains the established long Stop budget; stdout is exactly valid JSON | One `claude-stop.sh` command with the same sequence; diagnostics only on stderr |
-| `UserPromptSubmit` | One `state-sync.sh publish` command, recommended timeout `60` | One `state-sync.sh publish` command, timeout `60` |
+| `UserPromptSubmit` | One `state-sync.sh push` command, recommended timeout `60`; checkpoint tracked failure diagnostics before publication retry | One `state-sync.sh publish` command, timeout `60` |
 | `StopFailure` | Not available/in scope | One local `state-sync.sh checkpoint`, normal short command timeout |
 | `SessionEnd` | One local `state-sync.sh checkpoint`, timeout exactly `3`; no network | One `state-sync.sh push` compatibility composition, timeout exactly `60` |
 
 Each multi-step boundary is one runtime handler. The shell wrapper/composition,
-not the hook array, owns ordering. Duplicate `publish` calls are retries/no-ops,
-so a prompt hook following a successful Stop publish is safe.
+not the hook array, owns ordering. The Codex prompt `push` is a
+checkpoint-plus-publication retry, so tracked diagnostics written by a failed
+Stop publication are not left behind. After a successful Stop publication it
+is harmless and creates no state commit when the tree is clean.
 
 ### Ponytail decisions
 
@@ -165,16 +169,16 @@ so a prompt hook following a successful Stop publish is safe.
 
 ## Phase Breakdown
 
-- [ ] `2026-08-01_phase-A-state-sync-operations` — split the shared local and
+- [x] `2026-08-01_phase-A-state-sync-operations` — split the shared local and
   remote operations, add live status/error visibility, retain `push`, and add
   direct Git-backed regression coverage.
-- [ ] `2026-08-01_phase-B-codex-state-lifecycle` — add the Codex sequential
+- [x] `2026-08-01_phase-B-codex-state-lifecycle` — add the Codex sequential
   Stop wrapper plus prompt/session hooks and enforce the JSON/three-second
   contracts in generation and validation.
-- [ ] `2026-08-01_phase-C-claude-state-lifecycle` — add the Claude sequential
+- [x] `2026-08-01_phase-C-claude-state-lifecycle` — add the Claude sequential
   Stop wrapper, prompt/failure/session hooks, and the 60-second SessionEnd
   publication contract.
-- [ ] `2026-08-01_phase-D-install-trust-and-closeout` — add safe Codex VS Code
+- [x] `2026-08-01_phase-D-install-trust-and-closeout` — add safe Codex VS Code
   trust/retrust guidance, finish cross-runtime docs/parity checks, and run the
   deterministic full closeout.
 
@@ -208,7 +212,7 @@ allow-list that accepts it must cross a phase boundary atomically.
 
 | Risk | Level | Mitigation / fallback |
 |---|---|---|
-| `publish` runs with dirty state because a delayed event overlaps another turn/runtime | Medium | Refuse to commit in `publish`; warn, preserve the dirty tree, expose it via `status`, and retry at Stop/UserPromptSubmit/SessionEnd/post-commit/manual `push`. Do not add a non-portable global lock unless a regression demonstrates data loss rather than a safe retry. |
+| `publish` runs with dirty state because a delayed event overlaps another turn/runtime | Medium | Refuse to commit in `publish`; warn and preserve the dirty tree. Codex UserPromptSubmit uses `push` so tracked diagnostics from a failed Stop publication are checkpointed before retry; other retained checkpoint/publication boundaries and `status` provide recovery. Do not add a non-portable global lock unless a regression demonstrates data loss rather than a safe retry. |
 | Codex child output corrupts required Stop JSON | High | Route every child stdout away from wrapper stdout and parse the complete result in a behavioral test. Final stdout must be one JSON object on success and child failure. |
 | A three-second Codex SessionEnd cannot finish a large local commit | High | Keep it local-only and minimal; document it as best-effort redundancy. Prior Stop, next UserPromptSubmit, post-commit, and manual push remain independent checkpoints/publication paths. |
 | Claude SessionEnd network work exceeds its configured timeout | Medium | Cap at `60`, checkpoint before publication, preserve the local commit on timeout/failure, and retry later. |
@@ -232,8 +236,10 @@ allow-list that accepts it must cross a phase boundary atomically.
 
 Resolved design questions from the critique:
 
-- Stop wrappers do include a best-effort publish after checkpoint; the prompt
-  hook is an idempotent retry, not the sole normal publisher.
+- Stop wrappers do include a best-effort publish after checkpoint. The Codex
+  prompt hook uses `push` so a failed Stop publication's tracked diagnostics
+  are checkpointed before the idempotent publication retry; it is not the sole
+  normal publisher.
 - Observability uses a minimal read-only `status` operation and the existing
   `hooks-errors.log`; no mutable status artifact is authorized.
 
@@ -275,4 +281,3 @@ before final push/PR closeout.
   post-commit/manual push as independent durability paths.
 - Full verification passes, score is at least 90 per phase, review has no
   surviving Ponytail finding, and required finding severity gates pass.
-
