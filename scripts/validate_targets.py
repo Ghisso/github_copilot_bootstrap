@@ -66,6 +66,7 @@ REQUIRED_HOOK_SCRIPTS = (
     "enforce-pr-gate.sh",
     "session-start-state.sh",
     "stop-session-log-check.sh",
+    "claude-stop.sh",
     "codex-stop.sh",
 )
 REQUIRED_HOOK_LIBRARIES = (
@@ -169,6 +170,92 @@ def codex_hook_command(script: str, *args: str) -> str:
         *args,
     ]
     return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
+
+
+def claude_hook_command(script: str, *args: str) -> str:
+    """Return the generated Claude repo-rooted hook command."""
+    root_expr = '${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}'
+    parts = [
+        f'REPO_ROOT="{root_expr}"',
+        '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+        script,
+        *args,
+    ]
+    return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
+
+
+CLAUDE_EXPECTED_EVENTS = {
+    "SessionStart",
+    "PreToolUse",
+    "PostToolUse",
+    "PreCompact",
+    "Stop",
+    "UserPromptSubmit",
+    "StopFailure",
+    "SessionEnd",
+}
+CLAUDE_LIFECYCLE_HOOKS = {
+    "Stop": ("claude-stop.sh", (), 180),
+    "UserPromptSubmit": ("state-sync.sh", ("push",), 60),
+    "StopFailure": ("state-sync.sh", ("checkpoint",), 10),
+    "SessionEnd": ("state-sync.sh", ("push",), 60),
+}
+
+
+def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
+    """Validate the generated Claude lifecycle command-handler contract."""
+    check(isinstance(hooks, dict), "Claude settings hooks must be an object", errors)
+    if not isinstance(hooks, dict):
+        return
+    check(
+        set(hooks) == CLAUDE_EXPECTED_EVENTS,
+        "Claude hooks must use only the supported generated lifecycle events",
+        errors,
+    )
+    for event_name, (script, args, timeout) in CLAUDE_LIFECYCLE_HOOKS.items():
+        groups = hooks.get(event_name)
+        check(
+            isinstance(groups, list) and len(groups) == 1,
+            f"Claude {event_name} must have exactly one handler group",
+            errors,
+        )
+        if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
+            continue
+        group = groups[0]
+        check(
+            set(group) == {"hooks"},
+            f"Claude {event_name} group must not use unsupported fields",
+            errors,
+        )
+        handlers = group.get("hooks")
+        check(
+            isinstance(handlers, list) and len(handlers) == 1,
+            f"Claude {event_name} must have exactly one command handler",
+            errors,
+        )
+        if not isinstance(handlers, list) or len(handlers) != 1 or not isinstance(handlers[0], dict):
+            continue
+        handler = handlers[0]
+        check(
+            set(handler) == {"type", "command", "timeout"},
+            f"Claude {event_name} handler must not use unsupported fields",
+            errors,
+        )
+        check(
+            handler.get("type") == "command",
+            f"Claude {event_name} handler must be a command",
+            errors,
+        )
+        check(
+            handler.get("command") == claude_hook_command(script, *args),
+            f"Claude {event_name} must invoke {script} with the expected operation",
+            errors,
+        )
+        check(
+            handler.get("timeout") == timeout,
+            f"Claude {event_name} timeout must be exactly {timeout}",
+            errors,
+        )
 
 
 def validate_codex_model_contract(
@@ -802,25 +889,28 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
 
-    # Stop accepts only JSON on stdout. Run the generated wrapper instead of
-    # relying on a text search: child diagnostics must stay on stderr and a
-    # JSON prefix followed by plaintext is invalid.
+    # Run generated Stop wrappers instead of relying on text searches: Codex
+    # needs one JSON response, while Claude must leave stdout empty.
     with tempfile.TemporaryDirectory() as temp_dir:
         wrapper_root = Path(temp_dir)
         wrapper_scripts = wrapper_root / ".claude" / "hooks" / "scripts"
         shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "scripts", wrapper_scripts)
-        wrapper = wrapper_scripts / "codex-stop.sh"
-        result = subprocess.run(
-            [str(wrapper)],
-            input=json.dumps({"hook_event_name": "Stop", "session_id": "validator"}),
+        payload = json.dumps({"hook_event_name": "Stop", "session_id": "validator"})
+        codex_result = subprocess.run(
+            [str(wrapper_scripts / "codex-stop.sh")],
+            input=payload,
             text=True,
             capture_output=True,
             check=False,
             cwd=wrapper_root,
         )
-        check(result.returncode == 0, f"generated Codex Stop wrapper failed: {result.stderr}", errors)
+        check(
+            codex_result.returncode == 0,
+            f"generated Codex Stop wrapper failed: {codex_result.stderr}",
+            errors,
+        )
         try:
-            wrapper_output = json.loads(result.stdout)
+            wrapper_output = json.loads(codex_result.stdout)
         except json.JSONDecodeError as error:
             errors.append(f"generated Codex Stop wrapper stdout must be one JSON object: {error}")
         else:
@@ -829,6 +919,24 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                 "generated Codex Stop wrapper must return the minimal continue JSON object",
                 errors,
             )
+        claude_result = subprocess.run(
+            [str(wrapper_scripts / "claude-stop.sh")],
+            input=payload,
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=wrapper_root,
+        )
+        check(
+            claude_result.returncode == 0,
+            f"generated Claude Stop wrapper failed: {claude_result.stderr}",
+            errors,
+        )
+        check(
+            claude_result.stdout == "",
+            "generated Claude Stop wrapper must not write response text to stdout",
+            errors,
+        )
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
@@ -866,18 +974,16 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check("claude-code" in claude_settings_text, "Claude hooks should pass target id", errors)
     check("state-sync.sh" in claude_settings_text, "Claude settings should sync AI state via state-sync.sh", errors)
 
+    validate_claude_lifecycle_hooks(claude_settings.get("hooks"), errors)
+
     check("state-sync.sh" in json.dumps(codex_hooks), "Codex hooks should sync AI state via state-sync.sh", errors)
 
-    # Claude and Copilot retain their direct Stop push command. Codex uses its
-    # own single sequential wrapper, validated above, because its handlers run
-    # concurrently.
-    for label, text in (
-        ("Claude settings", claude_settings_text),
-        ("GitHub hooks", github_hook_text),
-    ):
-        check("state-sync.sh pull" in text, f"{label} SessionStart hook must pull AI state", errors)
-        check("state-sync.sh push" in text, f"{label} Stop hook must push AI state", errors)
-        check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
+    check("state-sync.sh pull" in claude_settings_text, "Claude SessionStart hook must pull AI state", errors)
+    check("claude-stop.sh" in claude_settings_text, "Claude Stop hook must use claude-stop.sh", errors)
+    check("upload-bootstrap" not in claude_settings_text, "Claude hooks must not re-mirror the bootstrap (upload-bootstrap)", errors)
+    check("state-sync.sh pull" in github_hook_text, "GitHub hooks SessionStart hook must pull AI state", errors)
+    check("state-sync.sh push" in github_hook_text, "GitHub hooks Stop hook must push AI state", errors)
+    check("upload-bootstrap" not in github_hook_text, "GitHub hooks Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
     codex_hooks_text = json.dumps(codex_hooks)
     check("state-sync.sh pull" in codex_hooks_text, "Codex SessionStart hook must pull AI state", errors)
     check("codex-stop.sh" in codex_hooks_text, "Codex Stop hook must use codex-stop.sh", errors)

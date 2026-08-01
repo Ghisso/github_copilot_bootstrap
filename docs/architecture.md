@@ -114,7 +114,14 @@ Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootst
 
 **Durable checkpoints vs. best-effort hooks.** `checkpoint` is the explicit network-free local durability boundary. Post-commit continues to invoke compatible `push`, which attempts checkpoint then publication. Runtime-specific Stop paths are best-effort: they run only when the runtime emits the event, and closing a browser tab or editor window is not guaranteed to do so. Run `checkpoint` explicitly when local durability matters before a later `publish`; the hooks remain warn-never-fail, so sync trouble never blocks a session or outer-repo commit.
 
-**Codex lifecycle boundaries.** Codex uses one turn-scoped Stop wrapper, [`codex-stop.sh`](../shared/hooks/scripts/codex-stop.sh), because matching Stop handlers otherwise run concurrently. The wrapper sequentially runs session logging, the session-log check, `checkpoint`, and best-effort `publish`; it continues after a child failure, keeps child stdout out of the response, and returns one valid JSON object. Codex also retries `push` on `UserPromptSubmit` with a 60-second timeout. Its delayed, best-effort `SessionEnd` runs only `checkpoint` with a three-second timeout, so it performs no remote operation. Post-commit and the manual **AI state: push** VS Code task remain the durable checkpoint-and-publish paths.
+**Runtime lifecycle boundaries.** Matching Stop handlers can run concurrently, so Codex and Claude each use one sequential wrapper. Both continue after a child failure; checkpointed local commits remain available for a later retry, with failures recorded in `.claude/session_logs/hooks-errors.log` and inspectable through `state-sync.sh status`.
+
+| Runtime | Turn-scoped Stop | Prompt retry | Failure/end boundary |
+| --- | --- | --- | --- |
+| Codex | [`codex-stop.sh`](../shared/hooks/scripts/codex-stop.sh): log, check, checkpoint, publish; one JSON stdout response | `push`, 60 seconds | Delayed best-effort SessionEnd: local `checkpoint`, 3 seconds, no publication |
+| Claude CLI / VS Code | [`claude-stop.sh`](../shared/hooks/scripts/claude-stop.sh): log, check, checkpoint, publish; no stdout | `push`, 60 seconds | StopFailure: local `checkpoint`; SessionEnd: `push`, 60 seconds |
+
+Claude VS Code bundles the Claude runtime and reads the same generated `.claude/settings.json` as the CLI; no second settings adapter exists. Post-commit and the manual **AI state: push** VS Code task remain the durable checkpoint-and-publish paths.
 
 Both human CLIs push by default after a complete refresh. Their `--local-only`
 mode still refreshes all bootstrap-controlled files and creates durable nested
@@ -155,7 +162,7 @@ Agent names are identical across every target — the generator performs no per-
 
 `coder`'s `model_intent.openai-codex` additionally carries an `escalate_to` key (`{ "model": "gpt-5.6-sol", "effort": "xhigh" }`), declarative-only: the generator does not emit a second adapter file for it. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent (`developers.openai.com/codex/subagents`: "explicit spawn values override `agents.default_subagent_model` and `agents.default_subagent_reasoning_effort`"), so `shared/agents/orchestrator/prompt.md` instructs the orchestrator to re-delegate a `coder` fix with those override values — instead of retrying at the base Terra/high tier — when `verifier` fails or `reviewer` surfaces a CRITICAL/MAJOR/`ponytail` finding on that diff, capped at one escalation per phase. `scripts/validate_targets.py` checks that `escalate_to`'s model/effort pair is allow-listed, differs from the base tier, and appears verbatim in the orchestrator prompt text, so the data and the instruction that acts on it cannot silently drift apart. Claude Code has no per-invocation effort override, so this lane is Codex-only.
 
-Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), exposes MultiAgent V2 spawn metadata through the `agents` namespace so named model/effort profiles are selectable, and wires `PreCompact` plus the Codex lifecycle boundaries: one sequential `codex-stop.sh` Stop handler, a 60-second `UserPromptSubmit` `push` retry, and a three-second `SessionEnd` local `checkpoint`.
+Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), exposes MultiAgent V2 spawn metadata through the `agents` namespace so named model/effort profiles are selectable, and wires `PreCompact` plus the Codex lifecycle boundaries summarized above.
 
 ## Design Decisions
 

@@ -1,4 +1,4 @@
-"""Behavioral contracts for Codex's sequential Stop hook wrapper."""
+"""Behavioral contracts for Codex and Claude sequential Stop wrappers."""
 
 from __future__ import annotations
 
@@ -16,22 +16,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from generate_targets import render_codex_hooks  # noqa: E402
+from generate_targets import render_claude_settings, render_codex_hooks  # noqa: E402
+from validate_targets import validate_claude_lifecycle_hooks  # noqa: E402
 
 CODEX_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "codex-stop.sh"
+CLAUDE_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "claude-stop.sh"
 HOOK_SCRIPTS_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts"
-
-
-@pytest.fixture
-def codex_stop(tmp_path: Path) -> tuple[Path, Path]:
-    """Copy the wrapper beside deterministic child-hook fixtures."""
-    hooks_dir = tmp_path / ".claude" / "hooks" / "scripts"
-    hooks_dir.mkdir(parents=True)
-    wrapper = hooks_dir / "codex-stop.sh"
-    shutil.copy(CODEX_STOP_SOURCE, wrapper)
-    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
-
-    fixture = """#!/usr/bin/env bash
+STOP_CHILD_FIXTURE = """#!/usr/bin/env bash
 set -euo pipefail
 name="$(basename "$0")"
 cat > "$CALL_LOG.$name.${1:-no-argument}"
@@ -42,17 +33,39 @@ if [[ "${FAIL_STEP:-}" == "$(basename "$0")" ]]; then
   exit 17
 fi
 """
+
+
+def copy_stop_wrapper(tmp_path: Path, source: Path) -> tuple[Path, Path]:
+    """Copy one Stop wrapper beside deterministic child-hook fixtures."""
+    hooks_dir = tmp_path / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True)
+    wrapper = hooks_dir / source.name
+    shutil.copy(source, wrapper)
+    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
+
     for name in ("session-log.sh", "stop-session-log-check.sh", "state-sync.sh"):
         script = hooks_dir / name
-        script.write_text(fixture, encoding="utf-8")
+        script.write_text(STOP_CHILD_FIXTURE, encoding="utf-8")
         script.chmod(script.stat().st_mode | stat.S_IXUSR)
     return wrapper, tmp_path / "calls.log"
 
 
-def run_codex_stop(
+@pytest.fixture
+def codex_stop(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy the wrapper beside deterministic child-hook fixtures."""
+    return copy_stop_wrapper(tmp_path, CODEX_STOP_SOURCE)
+
+
+@pytest.fixture
+def claude_stop(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy the Claude wrapper beside deterministic child-hook fixtures."""
+    return copy_stop_wrapper(tmp_path, CLAUDE_STOP_SOURCE)
+
+
+def run_stop_wrapper(
     wrapper: Path, call_log: Path, payload: str, *, fail_step: str | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """Run the copied wrapper while recording every child invocation."""
+    """Run one copied Stop wrapper while recording every child invocation."""
     env = {**os.environ, "CALL_LOG": str(call_log)}
     if fail_step:
         env["FAIL_STEP"] = fail_step
@@ -122,7 +135,7 @@ def test_codex_stop_replays_payload_sequentially_and_returns_only_json(
     wrapper, call_log = codex_stop
     payload = '{"hook_event_name":"Stop","session_id":"turn-123"}\n'
 
-    result = run_codex_stop(wrapper, call_log, payload)
+    result = run_stop_wrapper(wrapper, call_log, payload)
 
     assert result.returncode == 0
     assert child_calls(call_log) == [
@@ -151,7 +164,7 @@ def test_codex_stop_continues_after_child_failure(
     wrapper, call_log = codex_stop
     payload = '{"hook_event_name":"Stop","session_id":"turn-456"}'
 
-    result = run_codex_stop(
+    result = run_stop_wrapper(
         wrapper, call_log, payload, fail_step="stop-session-log-check.sh"
     )
 
@@ -171,6 +184,64 @@ def test_codex_stop_continues_after_child_failure(
     assert replayed_payload(call_log, "state-sync.sh", "publish") == payload
     assert json.loads(result.stdout) == {"continue": True}
     assert "WARN codex-stop: stop-session-log-check.sh failed" in result.stderr
+
+
+def test_claude_stop_replays_payload_sequentially_without_stdout(
+    claude_stop: tuple[Path, Path],
+) -> None:
+    """Claude Stop serializes local durability and publication without response text."""
+    wrapper, call_log = claude_stop
+    payload = '{"hook_event_name":"Stop","session_id":"claude-turn-123"}\n'
+
+    result = run_stop_wrapper(wrapper, call_log, payload)
+
+    assert result.returncode == 0
+    assert child_calls(call_log) == [
+        ("session-log.sh", "claude-code"),
+        ("stop-session-log-check.sh", "claude-code"),
+        ("state-sync.sh", "checkpoint"),
+        ("state-sync.sh", "publish"),
+    ]
+    assert replayed_payload(call_log, "session-log.sh", "claude-code") == payload
+    assert (
+        replayed_payload(call_log, "stop-session-log-check.sh", "claude-code")
+        == payload
+    )
+    assert replayed_payload(call_log, "state-sync.sh", "checkpoint") == payload
+    assert replayed_payload(call_log, "state-sync.sh", "publish") == payload
+    assert result.stdout == ""
+    assert "child stdout" not in result.stdout
+    assert "child stdout" in result.stderr
+    assert "child stderr" in result.stderr
+
+
+def test_claude_stop_continues_after_child_failure(
+    claude_stop: tuple[Path, Path],
+) -> None:
+    """A failed Claude Stop child cannot prevent checkpoint or publication."""
+    wrapper, call_log = claude_stop
+    payload = '{"hook_event_name":"Stop","session_id":"claude-turn-456"}'
+
+    result = run_stop_wrapper(
+        wrapper, call_log, payload, fail_step="stop-session-log-check.sh"
+    )
+
+    assert result.returncode == 0
+    assert [name for name, _args in child_calls(call_log)] == [
+        "session-log.sh",
+        "stop-session-log-check.sh",
+        "state-sync.sh",
+        "state-sync.sh",
+    ]
+    assert replayed_payload(call_log, "session-log.sh", "claude-code") == payload
+    assert (
+        replayed_payload(call_log, "stop-session-log-check.sh", "claude-code")
+        == payload
+    )
+    assert replayed_payload(call_log, "state-sync.sh", "checkpoint") == payload
+    assert replayed_payload(call_log, "state-sync.sh", "publish") == payload
+    assert result.stdout == ""
+    assert "WARN claude-stop: stop-session-log-check.sh failed" in result.stderr
 
 
 def test_online_prompt_pushes_offline_stop_plan_and_diagnostic(tmp_path: Path) -> None:
@@ -264,3 +335,60 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     assert "publish" not in session_end_handler["command"]
     assert "push" not in session_end_handler["command"]
     assert session_end_handler["timeout"] == 3
+
+
+def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
+    tmp_path: Path,
+) -> None:
+    """Generated Claude settings keep lifecycle boundaries single and ordered."""
+    settings_path = tmp_path / "settings.json"
+
+    render_claude_settings(settings_path)
+
+    hooks = json.loads(settings_path.read_text(encoding="utf-8"))["hooks"]
+    stop = hooks["Stop"]
+    assert len(stop) == 1
+    assert len(stop[0]["hooks"]) == 1
+    assert "claude-stop.sh" in stop[0]["hooks"][0]["command"]
+    assert "state-sync.sh" not in stop[0]["hooks"][0]["command"]
+    assert stop[0]["hooks"][0]["timeout"] == 180
+
+    prompt = hooks["UserPromptSubmit"]
+    assert len(prompt) == 1
+    assert len(prompt[0]["hooks"]) == 1
+    assert "state-sync.sh push" in prompt[0]["hooks"][0]["command"]
+    assert prompt[0]["hooks"][0]["timeout"] == 60
+
+    stop_failure = hooks["StopFailure"]
+    assert len(stop_failure) == 1
+    assert len(stop_failure[0]["hooks"]) == 1
+    stop_failure_handler = stop_failure[0]["hooks"][0]
+    assert "state-sync.sh checkpoint" in stop_failure_handler["command"]
+    assert "publish" not in stop_failure_handler["command"]
+    assert "push" not in stop_failure_handler["command"]
+    assert stop_failure_handler["timeout"] == 10
+
+    session_end = hooks["SessionEnd"]
+    assert len(session_end) == 1
+    assert len(session_end[0]["hooks"]) == 1
+    session_end_handler = session_end[0]["hooks"][0]
+    assert "state-sync.sh push" in session_end_handler["command"]
+    assert session_end_handler["timeout"] == 60
+
+
+def test_claude_lifecycle_validation_rejects_non_command_prompt_handler(
+    tmp_path: Path,
+) -> None:
+    """Claude prompt publication must retain a command-handler schema."""
+    settings_path = tmp_path / "settings.json"
+    render_claude_settings(settings_path)
+    hooks = json.loads(settings_path.read_text(encoding="utf-8"))["hooks"]
+
+    errors: list[str] = []
+    validate_claude_lifecycle_hooks(hooks, errors)
+    assert not errors
+
+    hooks["UserPromptSubmit"][0]["hooks"][0]["type"] = "prompt"
+    validate_claude_lifecycle_hooks(hooks, errors)
+
+    assert errors == ["Claude UserPromptSubmit handler must be a command"]

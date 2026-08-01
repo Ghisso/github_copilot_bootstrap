@@ -438,11 +438,18 @@ def render_claude_settings(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        cmd("session-log.sh", "claude-code"),
-                        cmd("stop-session-log-check.sh", "claude-code"),
-                        cmd_stop("state-sync.sh", "push"),
+                        cmd_stop("claude-stop.sh"),
                     ]
                 }
+            ],
+            "UserPromptSubmit": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
+            ],
+            "StopFailure": [
+                {"hooks": [cmd("state-sync.sh", "checkpoint")]}
+            ],
+            "SessionEnd": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
             ],
         },
     }

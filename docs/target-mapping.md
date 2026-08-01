@@ -47,7 +47,7 @@ Claude Code:
 - `.mcp.json`
 - `.claude/settings.json`
 
-Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
+Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
