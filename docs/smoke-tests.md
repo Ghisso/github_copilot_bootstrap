@@ -63,7 +63,8 @@ Expected:
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
 - PR creation uses `--base dev`, and implementation-branch pushes are blocked until all phases are complete.
-- SessionStart/Stop hooks in a configured consumer retain `state-sync.sh pull`/compatible `push` for mutable AI state on the git-backed `ai-state` branch; this phase does not add new lifecycle events. Stop is best-effort only — it runs only if the agent process emits the event, and closing a browser or editor tab does not guarantee that.
+- SessionStart hooks in a configured consumer retain `state-sync.sh pull` for mutable AI state on the git-backed `ai-state` branch. Codex Stop is turn-scoped and uses exactly one sequential wrapper: session log, session-log check, `checkpoint`, then best-effort `publish`. Its stdout is exactly one valid JSON object, with no child stdout.
+- Codex `UserPromptSubmit` uses compatible `push` as a 60-second checkpoint-and-publish retry. Its delayed, best-effort `SessionEnd` uses only network-free `checkpoint` with timeout `3`; it must not publish. Do not infer these Codex events for other runtimes.
 - The generated `post-commit` git hook retains `state-sync.sh push` after every successful outer-repo commit; git ignores its exit status, so a sync failure never blocks or fails the commit. `checkpoint` is the explicit network-free local durability operation.
 - Missing `context-mode`, `npx`, or `uvx` reports warnings only.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.

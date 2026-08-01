@@ -500,11 +500,15 @@ def render_codex_hooks(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        cmd("session-log.sh", "openai-codex"),
-                        cmd("stop-session-log-check.sh", "openai-codex"),
-                        cmd("state-sync.sh", "push", timeout=180),
+                        cmd("codex-stop.sh", timeout=180),
                     ]
                 }
+            ],
+            "UserPromptSubmit": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
+            ],
+            "SessionEnd": [
+                {"hooks": [cmd("state-sync.sh", "checkpoint", timeout=3)]}
             ],
         },
     }

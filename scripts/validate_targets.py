@@ -66,6 +66,7 @@ REQUIRED_HOOK_SCRIPTS = (
     "enforce-pr-gate.sh",
     "session-start-state.sh",
     "stop-session-log-check.sh",
+    "codex-stop.sh",
 )
 REQUIRED_HOOK_LIBRARIES = (
     "_lib-frontmatter.sh",
@@ -156,6 +157,18 @@ def read_toml(path: Path) -> dict[str, object]:
 def check(condition: bool, message: str, errors: list[str]) -> None:
     if not condition:
         errors.append(message)
+
+
+def codex_hook_command(script: str, *args: str) -> str:
+    """Return the generated repo-rooted Codex hook command."""
+    root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    parts = [
+        f'REPO_ROOT="{root_expr}"',
+        '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+        script,
+        *args,
+    ]
+    return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
 
 
 def validate_codex_model_contract(
@@ -630,6 +643,23 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     codex_hooks = json.loads(read(TARGET_ROOT / ".codex" / "hooks.json"))
     check(set(codex_hooks) == {"hooks"}, "Codex hooks.json should only contain the top-level hooks object", errors)
+    expected_codex_events = {
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "PreCompact",
+        "Stop",
+        "UserPromptSubmit",
+        "SessionEnd",
+    }
+    hooks_by_event = codex_hooks.get("hooks", {})
+    check(isinstance(hooks_by_event, dict), "Codex hooks must be an object", errors)
+    if isinstance(hooks_by_event, dict):
+        check(
+            set(hooks_by_event) == expected_codex_events,
+            "Codex hooks must use only the supported generated lifecycle events",
+            errors,
+        )
     # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
     check("PreCompact" in codex_hooks.get("hooks", {}), "Codex hooks must wire the documented PreCompact event", errors)
     for event_name, groups in codex_hooks.get("hooks", {}).items():
@@ -662,6 +692,59 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                         f"Codex hook command should pass target id: {event_name}",
                         errors,
                     )
+
+    expected_lifecycle_hooks = {
+        "Stop": ("codex-stop.sh", (), 180),
+        "UserPromptSubmit": ("state-sync.sh", ("push",), 60),
+        "SessionEnd": ("state-sync.sh", ("checkpoint",), 3),
+    }
+    if isinstance(hooks_by_event, dict):
+        for event_name, (script, args, timeout) in expected_lifecycle_hooks.items():
+            groups = hooks_by_event.get(event_name)
+            check(
+                isinstance(groups, list) and len(groups) == 1,
+                f"Codex {event_name} must have exactly one handler group",
+                errors,
+            )
+            if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
+                continue
+            group = groups[0]
+            handlers = group.get("hooks")
+            check(
+                set(group) == {"hooks"},
+                f"Codex {event_name} group must not use unsupported fields",
+                errors,
+            )
+            check(
+                isinstance(handlers, list) and len(handlers) == 1,
+                f"Codex {event_name} must have exactly one command handler",
+                errors,
+            )
+            if not isinstance(handlers, list) or len(handlers) != 1 or not isinstance(handlers[0], dict):
+                continue
+            handler = handlers[0]
+            check(
+                set(handler) == {"type", "command", "timeout"},
+                f"Codex {event_name} handler must not use unsupported fields",
+                errors,
+            )
+            check(handler.get("type") == "command", f"Codex {event_name} handler must be a command", errors)
+            check(
+                handler.get("command") == codex_hook_command(script, *args),
+                f"Codex {event_name} must invoke {script} with the expected operation",
+                errors,
+            )
+            check(
+                handler.get("timeout") == timeout,
+                f"Codex {event_name} timeout must be exactly {timeout}",
+                errors,
+            )
+        session_end = json.dumps(hooks_by_event.get("SessionEnd", {}))
+        check(
+            "publish" not in session_end and "push" not in session_end,
+            "Codex SessionEnd must not perform a network publication",
+            errors,
+        )
 
     hook_roots = (TARGET_ROOT / ".claude" / "hooks" / "scripts",)
     for hook_root in hook_roots:
@@ -719,6 +802,34 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
 
+    # Stop accepts only JSON on stdout. Run the generated wrapper instead of
+    # relying on a text search: child diagnostics must stay on stderr and a
+    # JSON prefix followed by plaintext is invalid.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        wrapper_root = Path(temp_dir)
+        wrapper_scripts = wrapper_root / ".claude" / "hooks" / "scripts"
+        shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "scripts", wrapper_scripts)
+        wrapper = wrapper_scripts / "codex-stop.sh"
+        result = subprocess.run(
+            [str(wrapper)],
+            input=json.dumps({"hook_event_name": "Stop", "session_id": "validator"}),
+            text=True,
+            capture_output=True,
+            check=False,
+            cwd=wrapper_root,
+        )
+        check(result.returncode == 0, f"generated Codex Stop wrapper failed: {result.stderr}", errors)
+        try:
+            wrapper_output = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            errors.append(f"generated Codex Stop wrapper stdout must be one JSON object: {error}")
+        else:
+            check(
+                wrapper_output == {"continue": True},
+                "generated Codex Stop wrapper must return the minimal continue JSON object",
+                errors,
+            )
+
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
     check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
@@ -757,17 +868,20 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     check("state-sync.sh" in json.dumps(codex_hooks), "Codex hooks should sync AI state via state-sync.sh", errors)
 
-    # R-SYNC-05: every target pulls state at SessionStart and pushes it at
-    # Stop, through the git-backed state-sync.sh (not the retired HF bucket
-    # upload-bootstrap path, which a consumer's Stop hook must never trigger).
+    # Claude and Copilot retain their direct Stop push command. Codex uses its
+    # own single sequential wrapper, validated above, because its handlers run
+    # concurrently.
     for label, text in (
         ("Claude settings", claude_settings_text),
         ("GitHub hooks", github_hook_text),
-        ("Codex hooks", json.dumps(codex_hooks)),
     ):
         check("state-sync.sh pull" in text, f"{label} SessionStart hook must pull AI state", errors)
         check("state-sync.sh push" in text, f"{label} Stop hook must push AI state", errors)
         check("upload-bootstrap" not in text, f"{label} Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
+    codex_hooks_text = json.dumps(codex_hooks)
+    check("state-sync.sh pull" in codex_hooks_text, "Codex SessionStart hook must pull AI state", errors)
+    check("codex-stop.sh" in codex_hooks_text, "Codex Stop hook must use codex-stop.sh", errors)
+    check("upload-bootstrap" not in codex_hooks_text, "Codex hooks must not re-mirror the bootstrap (upload-bootstrap)", errors)
 
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
     check(

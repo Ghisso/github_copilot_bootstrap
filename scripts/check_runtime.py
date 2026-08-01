@@ -20,6 +20,7 @@ REQUIRED_FILES = (
     "dist/multi-agent/.devcontainer/state-sync.sh",
     "dist/multi-agent/.devcontainer/restore-root-adapters.sh",
     "dist/multi-agent/.claude/hooks/scripts/state-sync.sh",
+    "dist/multi-agent/.claude/hooks/scripts/codex-stop.sh",
     "dist/multi-agent/.claude/hooks/scripts/restore-root-adapters.sh",
     "dist/multi-agent/.vscode/mcp.json",
     "dist/multi-agent/.github/hooks/hooks.json",
