@@ -14,7 +14,8 @@ set -euo pipefail
 #     REPO_ROOT resolution below, which is why it cannot use a single fixed
 #     "../../.." relative path the way the other hook scripts do)
 #
-# Subcommands: setup | pull | push | migrate-from-hf
+# Subcommands: setup | pull | checkpoint | publish | push | status |
+# migrate-from-hf
 # `pull`/`push` accept a second positional arg `--local-only` (or set
 # AI_STATE_LOCAL_ONLY=1) to skip all origin interaction and commit to the
 # nested repo locally only. AI_STATE_REPO_ROOT overrides REPO_ROOT resolution
@@ -45,19 +46,22 @@ fi
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
 ERROR_LOG="$REPO_ROOT/.claude/session_logs/hooks-errors.log"
-mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
+
+prepare_error_log() {
+  mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
+}
 
 warn() {
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%S.000Z 2>/dev/null || echo unknown-timestamp)"
   local msg="$ts state-sync: $*"
   printf 'WARN %s\n' "$msg" >&2
-  mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
+  prepare_error_log
   printf '%s\n' "$msg" >> "$ERROR_LOG" 2>/dev/null || true
 }
 
 info() {
-  printf 'state-sync: %s\n' "$*"
+  printf 'state-sync: %s\n' "$*" >&2
 }
 
 # Drain hook JSON from stdin, verbatim contract from hf-ai-sync.sh: a Stop
@@ -141,45 +145,6 @@ init_nested_repo() {
   fi
 }
 
-# Commits whatever is currently on disk under the given message (there is
-# always at least .gitignore the first time this runs), then reconciles with
-# origin/$BRANCH if a remote is configured and already has that branch. Used
-# by both cmd_setup and cmd_migrate so they share one mechanism and differ
-# only in the commit message.
-commit_and_reconcile() {
-  local message="$1"
-  git -C "$CLAUDE_DIR" add -A
-  if ! git -C "$CLAUDE_DIR" diff --cached --quiet \
-    || [[ -z "$(git -C "$CLAUDE_DIR" log -1 --format=%H 2>/dev/null || true)" ]]; then
-    git -C "$CLAUDE_DIR" commit -q --allow-empty -m "$message"
-  fi
-
-  if is_local_only || ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
-    return 0
-  fi
-  if git -C "$CLAUDE_DIR" fetch origin -q 2>/dev/null \
-    && git -C "$CLAUDE_DIR" rev-parse --verify -q "origin/$BRANCH" >/dev/null 2>&1; then
-    # A real merge (not a bare checkout) so the freshly-committed local
-    # content and the remote's independent history combine file-by-file;
-    # --allow-unrelated-histories is required the first time any two
-    # machines' ai-state branches meet, since neither was cloned from the
-    # other. Genuinely conflicting files abort cleanly, same contract as
-    # cmd_pull's rebase-conflict handling below.
-    if ! git -C "$CLAUDE_DIR" merge -q --allow-unrelated-histories -m "bootstrap: merge existing ai-state" "origin/$BRANCH" 2>>"$ERROR_LOG"; then
-      local conflicts
-      conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-      git -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true
-      warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
-      # Report the aborted reconciliation so callers do not push a divergent
-      # local branch (cmd_migrate guards its push on this). cmd_setup ignores
-      # it: it never pushes, so the local commit simply stays the source of
-      # truth, unchanged from before.
-      return 1
-    fi
-  fi
-  return 0
-}
-
 # Commits whatever is currently uncommitted under .claude/ as a session
 # snapshot. Both cmd_push and cmd_pull call this before touching the remote so
 # the working tree is clean before `git pull --rebase`: a clean tree means the
@@ -187,11 +152,26 @@ commit_and_reconcile() {
 # never an --autostash pop conflict that would leave the tree half-merged
 # (F4 in §9 of plans/plan-git-state-sync.md).
 commit_local_state() {
+  local message="${1:-}"
   git -C "$CLAUDE_DIR" add -A
-  if ! git -C "$CLAUDE_DIR" diff --cached --quiet; then
+  if ! git -C "$CLAUDE_DIR" diff --cached --quiet \
+    || [[ -z "$(git -C "$CLAUDE_DIR" log -1 --format=%H 2>/dev/null || true)" ]]; then
     local ts
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown-timestamp)"
-    git -C "$CLAUDE_DIR" commit -q -m "session: $ts"
+    git -C "$CLAUDE_DIR" commit -q --allow-empty -m "${message:-session: $ts}"
+  fi
+}
+
+append_error_output() {
+  [[ -n "$1" ]] || return 0
+  prepare_error_log
+  printf '%s\n' "$1" >> "$ERROR_LOG" 2>/dev/null || true
+}
+
+restore_root_adapters() {
+  local restore="$SCRIPT_DIR/restore-root-adapters.sh"
+  if [[ -f "$restore" ]]; then
+    bash "$restore" || warn "restoring root adapters failed; continuing."
   fi
 }
 
@@ -202,7 +182,8 @@ cmd_setup() {
     return 0
   fi
   init_nested_repo
-  commit_and_reconcile "bootstrap: init ai-state"
+  commit_local_state "bootstrap: init ai-state"
+  reconcile_committed_state || true
 
   # D5 / F1 (§9): once .claude/ is first materialised here, restore the
   # root-level adapter files that live outside .claude/ (carried in
@@ -211,9 +192,98 @@ cmd_setup() {
   # setup — not just the devcontainer post-start.sh. Idempotent: it copies
   # bytes already committed under bootstrap-root/. post-start.sh keeps its own
   # explicit restore call for the case where a later `pull` brings a newer one.
-  local restore="$SCRIPT_DIR/restore-root-adapters.sh"
-  if [[ -f "$restore" ]]; then
-    bash "$restore" || warn "restoring root adapters failed; continuing."
+  restore_root_adapters
+  commit_local_state
+}
+
+# A checkpoint deliberately initializes only local Git state. Unlike setup,
+# it never fetches or merges an existing remote branch.
+cmd_checkpoint() {
+  if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
+    init_nested_repo
+    restore_root_adapters
+  fi
+  commit_local_state
+}
+
+reconcile_committed_state() {
+  if is_local_only || ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local remote_ref_status output status conflicts
+  set +e
+  git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
+  remote_ref_status=$?
+  set -e
+  if [[ $remote_ref_status -eq 2 ]]; then
+    return 0
+  fi
+  if [[ $remote_ref_status -ne 0 ]] || ! git -C "$CLAUDE_DIR" fetch origin -q 2>/dev/null; then
+    warn "fetch from origin/$BRANCH failed; local commits are intact and will retry on the next sync."
+    return 1
+  fi
+
+  if ! git -C "$CLAUDE_DIR" merge-base HEAD "origin/$BRANCH" >/dev/null 2>&1; then
+    set +e
+    output="$(git -C "$CLAUDE_DIR" merge -q --allow-unrelated-histories -m "bootstrap: merge existing ai-state" "origin/$BRANCH" 2>&1)"
+    status=$?
+    set -e
+    if [[ $status -ne 0 ]]; then
+      conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
+      git -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true
+      append_error_output "$output"
+      warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
+      return 1
+    fi
+    return 0
+  fi
+
+  set +e
+  output="$(git -C "$CLAUDE_DIR" pull --rebase --autostash origin "$BRANCH" 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -ne 0 ]]; then
+    conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
+    git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
+    append_error_output "$output"
+    warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
+    printf '%s\n' "$output" >&2
+    return 1
+  fi
+}
+
+cmd_publish() {
+  if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
+    warn "publish skipped: no local ai-state repository exists yet; run checkpoint first."
+    return 1
+  fi
+  if is_local_only; then
+    info "publish: local-only mode; remote sync skipped."
+    return 0
+  fi
+  if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
+    warn "publish skipped: local ai-state worktree is dirty; run checkpoint before publishing."
+    return 1
+  fi
+  if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+    warn "no state remote configured; local checkpoint remains unpublished."
+    return 0
+  fi
+  if ! reconcile_committed_state; then
+    warn "publish skipped: reconciliation with origin/$BRANCH failed. Local commits are safe and will retry once the conflict is resolved."
+    return 1
+  fi
+
+  local output status
+  set +e
+  output="$(git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>&1)"
+  status=$?
+  set -e
+  if [[ $status -ne 0 ]]; then
+    append_error_output "$output"
+    warn "push to origin/$BRANCH failed; local commits are intact and will retry on the next sync."
+    printf '%s\n' "$output" >&2
   fi
 }
 
@@ -227,70 +297,55 @@ cmd_pull() {
     warn "no state remote configured; nothing to pull from."
     return 0
   fi
-  if ! git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-    info "pull: origin has no $BRANCH branch yet; nothing to pull."
-    return 0
-  fi
-
   # Commit any local edits first so the rebase below runs against a clean tree
   # (F4): removes the --autostash-pop-conflict path entirely.
   commit_local_state
 
-  local output status
-  set +e
-  output="$(git -C "$CLAUDE_DIR" pull --rebase --autostash origin "$BRANCH" 2>&1)"
-  status=$?
-  set -e
-
-  if [[ $status -ne 0 ]]; then
-    local conflicts
-    conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-    git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
-    warn "pull --rebase failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
-    printf '%s\n' "$output" >&2
-    # Report the failed reconciliation to callers (cmd_push guards its push on
-    # this). Top-level dispatch converts it into a non-blocking warning, so a
-    # Stop/SessionStart hook still exits 0 and never blocks Codex shutdown.
+  if ! reconcile_committed_state; then
     return 1
   fi
   info "pull: up to date with origin/$BRANCH"
 }
 
 cmd_push() {
-  cmd_setup
-
-  commit_local_state
-
-  if is_local_only; then
-    info "push: local-only mode; committed locally without contacting origin."
-    return 0
-  fi
-
-  if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
-    warn "no state remote configured; committed locally only."
-    return 0
-  fi
-
-  # Reconcile first. If the pull failed (a rebase conflict aborted cleanly),
-  # the local commits are safe but a push would be a doomed non-fast-forward;
-  # skip it and require manual reconciliation rather than attempting a push
-  # that git will reject.
-  if ! cmd_pull; then
-    warn "push skipped: reconciliation with origin/$BRANCH failed. Local commits are safe and will retry on the next sync once the conflict is resolved (see the pull warning above for recovery steps)."
+  if ! cmd_checkpoint; then
+    warn "push skipped: checkpoint failed; publication was not attempted."
     return 1
   fi
+  cmd_publish
+}
 
-  local output status
-  set +e
-  output="$(git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>&1)"
-  status=$?
-  set -e
-  if [[ $status -ne 0 ]]; then
-    warn "push to origin/$BRANCH failed; local commits are intact and will retry on the next sync."
-    printf '%s\n' "$output" >&2
-    return 0
+cmd_status() {
+  if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\n'
+  else
+    local worktree remote tracking ahead behind
+    if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
+      worktree="dirty"
+    else
+      worktree="clean"
+    fi
+    if git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
+      remote="configured"
+    else
+      remote="not-configured"
+    fi
+    tracking="unavailable"
+    if git -C "$CLAUDE_DIR" rev-parse --verify -q HEAD >/dev/null 2>&1 \
+      && git -C "$CLAUDE_DIR" rev-parse --verify -q "origin/$BRANCH" >/dev/null 2>&1; then
+      read -r ahead behind < <(git -C "$CLAUDE_DIR" rev-list --left-right --count "HEAD...origin/$BRANCH")
+      tracking="ahead=$ahead behind=$behind"
+    fi
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\n' "$worktree" "$remote" "$tracking"
   fi
-  info "push: origin/$BRANCH updated"
+  printf 'error-log: %s\n' "$ERROR_LOG"
+  if [[ -f "$ERROR_LOG" ]]; then
+    local last_error
+    last_error="$(grep 'state-sync:' "$ERROR_LOG" 2>/dev/null | tail -n 1 || true)"
+    printf 'last-error: %s\n' "${last_error:-none}"
+  else
+    printf 'last-error: none\n'
+  fi
 }
 
 cmd_migrate() {
@@ -307,13 +362,20 @@ cmd_migrate() {
   # of truth at migration time. If a bucket has newer state, pull it manually
   # with the old hf-ai-sync.py before running this, one last time.
   init_nested_repo
-  if ! commit_and_reconcile "migrate: import pre-git state"; then
+  commit_local_state "migrate: import pre-git state"
+  if ! reconcile_committed_state; then
     # Reconciliation aborted on conflict (not a network problem): the migrated
     # state is committed locally, but pushing now would be a doomed
     # non-fast-forward. Skip the push and point at the manual resolution.
     warn "migration state committed locally but reconciliation with origin/$BRANCH conflicts; not pushing. Resolve the conflict as described above, then: git -C $CLAUDE_DIR push origin $BRANCH."
   elif ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
-    if ! git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>>"$ERROR_LOG"; then
+    local output status
+    set +e
+    output="$(git -C "$CLAUDE_DIR" push origin "$BRANCH" 2>&1)"
+    status=$?
+    set -e
+    if [[ $status -ne 0 ]]; then
+      append_error_output "$output"
       warn "migration commit created locally but push to origin/$BRANCH failed; push manually once network/auth is available: git -C $CLAUDE_DIR push origin $BRANCH"
     fi
   fi
@@ -327,9 +389,12 @@ cmd_migrate() {
 case "$MODE" in
   setup) cmd_setup || warn "setup failed; continuing." ;;
   pull) cmd_pull || warn "pull failed; continuing." ;;
+  checkpoint) cmd_checkpoint || warn "checkpoint failed; continuing." ;;
+  publish) cmd_publish || warn "publish failed; continuing." ;;
   push) cmd_push || warn "push failed; continuing." ;;
+  status) cmd_status ;;
   migrate-from-hf) cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
-  *) warn "unknown mode: $MODE (expected setup|pull|push|migrate-from-hf)" ;;
+  *) warn "unknown mode: $MODE (expected setup|pull|checkpoint|publish|push|status|migrate-from-hf)" ;;
 esac
 
 exit 0

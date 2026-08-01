@@ -8,6 +8,7 @@ git operation is local, so the suite needs no network.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -30,13 +31,17 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _sync(
-    script: Path, root: Path, remote: Path, mode: str, *args: str
+    script: Path,
+    root: Path,
+    remote: Path | None,
+    mode: str,
+    *args: str,
+    trace_path: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
     env = {
         **os.environ,
         "AI_STATE_REPO_ROOT": str(root),
-        "AI_STATE_REMOTE": str(remote),
         "AI_STATE_BRANCH": "ai-state",
         # Pin off so an ambient AI_STATE_LOCAL_ONLY in the dev shell can't
         # silently divert these tests into local-only mode (no remote ops).
@@ -48,6 +53,10 @@ def _sync(
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_SYSTEM": os.devnull,
     }
+    if remote is not None:
+        env["AI_STATE_REMOTE"] = str(remote)
+    if trace_path is not None:
+        env["GIT_TRACE2_EVENT"] = str(trace_path)
     return subprocess.run(
         ["bash", str(script), mode, *args],
         text=True,
@@ -124,6 +133,160 @@ def _no_active_rebase_or_merge(root: Path) -> bool:
         return False
     unmerged = _git(root / ".claude", "diff", "--name-only", "--diff-filter=U").stdout
     return unmerged.strip() == ""
+
+
+_REMOTE_GIT_COMMANDS = {"fetch", "ls-remote", "pull", "merge", "push"}
+
+
+def _traced_remote_commands(trace_path: Path) -> list[str]:
+    """Return remote-facing Git commands found in a Trace2 event log."""
+    assert trace_path.is_file(), "Git Trace2 event log was not created"
+    commands: list[str] = []
+    start_events = 0
+    for line in trace_path.read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        if event.get("event") != "start":
+            continue
+        start_events += 1
+        argv = event.get("argv", [])
+        if isinstance(argv, list):
+            commands.extend(
+                command for command in argv if command in _REMOTE_GIT_COMMANDS
+            )
+    assert start_events, "Git Trace2 event log contained no Git start events"
+    return commands
+
+
+def _local_head(root: Path) -> str:
+    """Return the nested repository's current commit ID."""
+    return _git(root / ".claude", "rev-parse", "HEAD").stdout.strip()
+
+
+def _local_commit_count(root: Path) -> int:
+    """Return the number of commits reachable from the nested HEAD."""
+    return int(_git(root / ".claude", "rev-list", "--count", "HEAD").stdout)
+
+
+def test_checkpoint_commits_locally_without_remote_io(
+    script: Path, tmp_path: Path
+) -> None:
+    """Checkpoint is a network-free local commit boundary."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "checkpoint")
+    _write(writer, "plans/checkpoint.md", "checkpointed\n")
+    trace_path = tmp_path / "checkpoint-trace.json"
+
+    result = _sync(script, writer, remote, "checkpoint", trace_path=trace_path)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert _local_show(writer, "plans/checkpoint.md") == "checkpointed\n"
+    assert not _remote_show(remote, "plans/checkpoint.md")
+    assert _traced_remote_commands(trace_path) == []
+
+
+def test_publish_sends_checkpoint_without_another_commit_and_is_idempotent(
+    script: Path, tmp_path: Path
+) -> None:
+    """Publish sends an existing checkpoint without creating a new commit."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "publish")
+    _write(writer, "plans/publish.md", "ready\n")
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    before_head = _local_head(writer)
+    before_count = _local_commit_count(writer)
+
+    first = _sync(script, writer, remote, "publish")
+    first_remote_head = _git(remote, "rev-parse", "ai-state").stdout.strip()
+    second = _sync(script, writer, remote, "publish")
+
+    assert first.returncode == 0
+    assert second.returncode == 0
+    assert first.stdout == second.stdout == ""
+    assert _remote_show(remote, "plans/publish.md") == "ready\n"
+    assert _local_head(writer) == before_head == first_remote_head
+    assert _local_commit_count(writer) == before_count
+    assert _git(remote, "rev-parse", "ai-state").stdout.strip() == first_remote_head
+
+
+def test_publish_refuses_dirty_state_without_committing_or_publishing(
+    script: Path, tmp_path: Path
+) -> None:
+    """Publish preserves uncheckpointed files for a later checkpoint."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "dirty-publish")
+    _write(writer, "plans/published.md", "published\n")
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    assert _sync(script, writer, remote, "publish").returncode == 0
+    remote_head = _git(remote, "rev-parse", "ai-state").stdout.strip()
+    local_head = _local_head(writer)
+    _write(writer, "plans/uncheckpointed.md", "keep-local\n")
+
+    result = _sync(script, writer, remote, "publish")
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "dirty" in result.stderr.lower()
+    assert _local_head(writer) == local_head
+    assert (
+        "?? plans/uncheckpointed.md"
+        in _git(writer / ".claude", "status", "--porcelain").stdout
+    )
+    assert not _remote_show(remote, "plans/uncheckpointed.md")
+    assert _git(remote, "rev-parse", "ai-state").stdout.strip() == remote_head
+
+
+def test_push_remains_checkpoint_then_publish_compatible(
+    script: Path, tmp_path: Path
+) -> None:
+    """The legacy push command still checkpoints and publishes in one call."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "push-compatible")
+    _write(writer, "plans/push.md", "legacy\n")
+
+    result = _sync(script, writer, remote, "push")
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert _local_show(writer, "plans/push.md") == "legacy\n"
+    assert _remote_show(remote, "plans/push.md") == "legacy\n"
+
+
+def test_status_is_local_only_credential_safe_and_reports_cached_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """Status reports local state without contacting or printing the remote."""
+    remote = _bare_remote(tmp_path)
+    uninitialized = tmp_path / "uninitialized"
+    uninitialized.mkdir()
+    remote_url = f"https://token@example.invalid/{remote.name}"
+
+    initial = _sync(script, uninitialized, None, "status")
+
+    assert initial.returncode == 0
+    assert "repository: uninitialized" in initial.stdout
+    assert "error-log:" in initial.stdout
+    assert remote_url not in initial.stdout
+
+    writer = _new_writer(script, tmp_path, remote, "status")
+    clean_trace = tmp_path / "clean-status-trace.json"
+    clean = _sync(script, writer, remote, "status", trace_path=clean_trace)
+    assert "repository: initialized" in clean.stdout
+    assert "worktree: clean" in clean.stdout
+    assert "remote: configured" in clean.stdout
+    assert "tracking: unavailable" in clean.stdout
+    assert _traced_remote_commands(clean_trace) == []
+
+    _write(writer, "plans/dirty.md", "dirty\n")
+    dirty = _sync(script, writer, remote, "status")
+    assert "worktree: dirty" in dirty.stdout
+
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    assert _sync(script, writer, remote, "publish").returncode == 0
+    _write(writer, "plans/ahead.md", "ahead\n")
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    ahead = _sync(script, writer, remote, "status")
+    assert "tracking: ahead=1 behind=0" in ahead.stdout
 
 
 def test_push_after_rebase_conflict_does_not_push(script: Path, tmp_path: Path) -> None:
@@ -236,9 +399,45 @@ def _seed_remote(
     script: Path, tmp_path: Path, remote: Path, relpath: str, content: str
 ) -> None:
     """Publish one file to origin/ai-state via a throwaway writer."""
-    seeder = _new_writer(script, tmp_path, remote, "seed")
+    seeder = _new_writer(script, tmp_path, remote, f"seed-{relpath.replace('/', '-')}")
     _write(seeder, relpath, content)
     assert _sync(script, seeder, remote, "push").returncode == 0
+
+
+def test_setup_merges_remote_error_log_without_creating_a_local_blocker(
+    script: Path, tmp_path: Path
+) -> None:
+    """Fresh setup must not create the error log before an unrelated merge."""
+    remote = _bare_remote(tmp_path)
+    _seed_remote(script, tmp_path, remote, "session_logs/hooks-errors.log", "remote\n")
+    writer = tmp_path / "fresh-setup"
+    (writer / ".claude").mkdir(parents=True)
+
+    result = _sync(script, writer, remote, "setup")
+
+    assert result.returncode == 0
+    assert _local_show(writer, "session_logs/hooks-errors.log") == "remote\n"
+    assert _no_active_rebase_or_merge(writer)
+    assert "could not be merged automatically" not in result.stderr
+
+
+def test_setup_checkpoints_error_log_when_remote_is_unavailable(
+    script: Path, tmp_path: Path
+) -> None:
+    """Offline setup leaves durable state clean after recording its warning."""
+    writer = tmp_path / "offline-setup"
+    (writer / ".claude").mkdir(parents=True)
+    unavailable_remote = tmp_path / "missing.git"
+
+    result = _sync(script, writer, unavailable_remote, "setup")
+
+    assert result.returncode == 0
+    assert _local_head(writer)
+    assert _git(writer / ".claude", "status", "--porcelain").stdout == ""
+    assert "fetch from origin/ai-state failed" in result.stderr
+    assert "fetch from origin/ai-state failed" in _local_show(
+        writer, "session_logs/hooks-errors.log"
+    )
 
 
 def test_migrate_conflict_commits_locally_but_does_not_push(
@@ -281,6 +480,7 @@ def test_migrate_without_conflict_reconciles_and_pushes(
     """A migrate touching files disjoint from the remote reconciles and pushes."""
     remote = _bare_remote(tmp_path)
     _seed_remote(script, tmp_path, remote, "plans/x.md", "from-remote\n")
+    _seed_remote(script, tmp_path, remote, "session_logs/hooks-errors.log", "remote\n")
 
     n = tmp_path / "N"
     (n / ".claude").mkdir(parents=True)

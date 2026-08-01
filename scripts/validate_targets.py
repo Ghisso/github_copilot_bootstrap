@@ -2903,6 +2903,123 @@ def validate_state_sync(errors: list[str]) -> None:
         check("refs/heads/ai-state" in remote_refs.stdout, "[state-sync] install must push ai-state to the bare origin", errors)
         check((machine_a / ".claude" / ".git").is_dir(), "[state-sync] install must check out a nested .claude/ repo", errors)
 
+        # Phase A: checkpoint is a local-only commit boundary, while publish
+        # transmits only an existing checkpoint. Trace2 distinguishes this
+        # from a failed remote push or a lower-level Git rejection.
+        checkpoint_relpath = Path("plans") / "checkpoint-only.md"
+        checkpoint_path = machine_a / ".claude" / checkpoint_relpath
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.write_text("checkpointed locally\n", encoding="utf-8")
+        checkpoint_trace = temp_root / "checkpoint-trace.json"
+        checkpoint = run_state_sync(
+            machine_a,
+            "checkpoint",
+            {**env_a, "GIT_TRACE2_EVENT": str(checkpoint_trace)},
+        )
+        remote_before_checkpoint_publish = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        check(checkpoint.returncode == 0, f"[state-sync] checkpoint failed: {checkpoint.stderr}", errors)
+        check(checkpoint.stdout == "", "[state-sync] checkpoint must not write stdout", errors)
+        check(
+            not traced_remote_git_commands(checkpoint_trace, "checkpoint", errors),
+            "[state-sync] checkpoint must not run fetch, ls-remote, pull, merge, or push",
+            errors,
+        )
+        checkpoint_remote_before_publish = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "show", f"ai-state:{checkpoint_relpath.as_posix()}"],
+            text=True, capture_output=True, check=False,
+        )
+        check(
+            checkpoint_remote_before_publish.returncode != 0,
+            "[state-sync] checkpoint must not publish its local commit",
+            errors,
+        )
+        checkpoint_head = subprocess.run(
+            ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        checkpoint_count = subprocess.run(
+            ["git", "-C", str(machine_a / ".claude"), "rev-list", "--count", "HEAD"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        first_publish = run_state_sync(machine_a, "publish", env_a)
+        second_publish = run_state_sync(machine_a, "publish", env_a)
+        remote_after_publish = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        checkpoint_head_after_publish = subprocess.run(
+            ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        checkpoint_count_after_publish = subprocess.run(
+            ["git", "-C", str(machine_a / ".claude"), "rev-list", "--count", "HEAD"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        check(first_publish.returncode == 0 and second_publish.returncode == 0, "[state-sync] publish must exit zero", errors)
+        check(first_publish.stdout == second_publish.stdout == "", "[state-sync] publish must not write stdout", errors)
+        check(
+            remote_after_publish != remote_before_checkpoint_publish,
+            "[state-sync] publish must advance the remote with the checkpoint",
+            errors,
+        )
+        check(
+            checkpoint_head == checkpoint_head_after_publish == remote_after_publish
+            and checkpoint_count == checkpoint_count_after_publish,
+            "[state-sync] publish must not create another local commit and must be idempotent",
+            errors,
+        )
+
+        dirty_publish_path = machine_a / ".claude" / "plans" / "uncheckpointed.md"
+        dirty_publish_path.write_text("preserve this locally\n", encoding="utf-8")
+        dirty_head = checkpoint_head_after_publish
+        dirty_publish = run_state_sync(machine_a, "publish", env_a)
+        dirty_remote = subprocess.run(
+            ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        dirty_head_after = subprocess.run(
+            ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
+            text=True, capture_output=True, check=False,
+        ).stdout.strip()
+        check(dirty_publish.returncode == 0, "[state-sync] dirty publish must remain non-blocking", errors)
+        check(dirty_publish.stdout == "", "[state-sync] dirty publish must not write stdout", errors)
+        check("dirty" in dirty_publish.stderr.lower(), "[state-sync] dirty publish must explain the checkpoint boundary", errors)
+        check(
+            dirty_publish_path.read_text(encoding="utf-8") == "preserve this locally\n"
+            and dirty_head == dirty_head_after
+            and dirty_remote == remote_after_publish,
+            "[state-sync] dirty publish must preserve files, HEAD, and the remote",
+            errors,
+        )
+        run_state_sync(machine_a, "checkpoint", env_a)
+        run_state_sync(machine_a, "publish", env_a)
+
+        status_trace = temp_root / "status-trace.json"
+        status = run_state_sync(
+            machine_a,
+            "status",
+            {**env_a, "GIT_TRACE2_EVENT": str(status_trace)},
+        )
+        check(status.returncode == 0, f"[state-sync] status failed: {status.stderr}", errors)
+        check(
+            "repository: initialized" in status.stdout
+            and "worktree: clean" in status.stdout
+            and "remote: configured" in status.stdout
+            and "tracking: ahead=0 behind=0" in status.stdout
+            and "error-log:" in status.stdout,
+            "[state-sync] status must report initialized clean cached state and the error log",
+            errors,
+        )
+        check(str(bare_origin) not in status.stdout, "[state-sync] status must not print the remote URL", errors)
+        check(
+            not traced_remote_git_commands(status_trace, "status", errors),
+            "[state-sync] status must not run fetch, ls-remote, pull, merge, or push",
+            errors,
+        )
+
         # A shared plan file with frontmatter, common to both machines from
         # here on, so step 4 below can conflict on one of its lines.
         plan_relpath = Path("plans") / "state-sync-test.md"
@@ -3061,24 +3178,31 @@ def validate_state_sync(errors: list[str]) -> None:
 FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS = {"fetch", "ls-remote", "pull", "merge", "push"}
 
 
-def traced_remote_git_commands(trace_path: Path) -> list[str]:
+def traced_remote_git_commands(trace_path: Path, label: str, errors: list[str]) -> list[str]:
     """Return forbidden Git subcommands recorded by Git's JSON trace."""
     if not trace_path.is_file():
+        check(False, f"[state-sync] {label} must emit a Git trace", errors)
         return []
     commands: list[str] = []
+    start_events = 0
     for line in trace_path.read_text(encoding="utf-8").splitlines():
-        event = json.loads(line)
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            check(False, f"[state-sync] {label} emitted an invalid Git trace event", errors)
+            continue
         if event.get("event") != "start":
             continue
+        start_events += 1
         argv = event.get("argv", [])
         if isinstance(argv, list):
             commands.extend(arg for arg in argv if arg in FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS)
+    check(start_events > 0, f"[state-sync] {label} Git trace must contain start events", errors)
     return commands
 
 
 def check_local_only_git_trace(label: str, trace_path: Path, errors: list[str]) -> None:
-    check(trace_path.is_file(), f"[local-only] {label} must emit a Git trace", errors)
-    commands = traced_remote_git_commands(trace_path)
+    commands = traced_remote_git_commands(trace_path, label, errors)
     check(
         not commands,
         f"[local-only] {label} invoked forbidden remote Git command(s): {commands}",

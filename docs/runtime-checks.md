@@ -57,6 +57,16 @@ consumer must retain ordered `migrate: import pre-git state` and subsequent
 `bootstrap:` history; the installer reports nested status and a shell-safe
 manual publish command.
 
+The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
+`publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without
+network access: it must create only a local commit. Verify `publish` only from
+a clean nested worktree: it must not stage or commit, and it must preserve dirty
+state for a later checkpoint. `push` remains the compatible checkpoint-then-
+publish operation. Operational output belongs on stderr; `status` alone writes
+a read-only, network-free report using local and cached tracking state, without
+printing a remote URL or credentials. Failures remain auditable in
+`.claude/session_logs/hooks-errors.log`.
+
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 
 For non-documentation diffs, the matching findings report must also contain
