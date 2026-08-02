@@ -438,11 +438,18 @@ def render_claude_settings(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        cmd("session-log.sh", "claude-code"),
-                        cmd("stop-session-log-check.sh", "claude-code"),
-                        cmd_stop("state-sync.sh", "push"),
+                        cmd_stop("claude-stop.sh"),
                     ]
                 }
+            ],
+            "UserPromptSubmit": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
+            ],
+            "StopFailure": [
+                {"hooks": [cmd("state-sync.sh", "checkpoint")]}
+            ],
+            "SessionEnd": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
             ],
         },
     }
@@ -500,11 +507,15 @@ def render_codex_hooks(path: Path) -> None:
             "Stop": [
                 {
                     "hooks": [
-                        cmd("session-log.sh", "openai-codex"),
-                        cmd("stop-session-log-check.sh", "openai-codex"),
-                        cmd("state-sync.sh", "push", timeout=180),
+                        cmd("codex-stop.sh", timeout=180),
                     ]
                 }
+            ],
+            "UserPromptSubmit": [
+                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
+            ],
+            "SessionEnd": [
+                {"hooks": [cmd("state-sync.sh", "checkpoint", timeout=3)]}
             ],
         },
     }

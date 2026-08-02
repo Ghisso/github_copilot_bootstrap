@@ -90,6 +90,13 @@ uv run python scripts/generate_targets.py --all
 uv run python scripts/install_bootstrap.py "$TARGET_REPO"
 ```
 
+After an actual install or update, reopen or reload the repository in Codex for
+VS Code. Project-hook trust is bound to the content/hash of
+`.codex/hooks.json`, so changed generated hooks can require review and renewed
+approval. Review and approve them when Codex prompts before relying on the
+lifecycle hooks. The installer only reports this boundary; it never approves
+hooks or changes user trust settings.
+
 To keep AI state off the code remote instead of the default:
 
 ```bash
@@ -172,6 +179,11 @@ has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byt
 # Preview without writing
 uv run python scripts/update_consumers.py --dry-run /path/to/repo
 ```
+
+The dry-run notice describes the trust action that an actual update may require;
+it does not claim that hook content changed. Default and `--local-only` updates
+print the same per-consumer reminder. After each actual update, reopen/reload
+the repository in Codex for VS Code and approve project hooks if prompted.
 
 For a durable offline batch refresh, pass `--local-only`. It applies the full
 generated bootstrap to every target and preserves the same ordered migration
@@ -438,11 +450,16 @@ Configured events:
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
 - SessionStart
-  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` rebases `.claude/`'s nested git repo (branch `ai-state`) against its configured remote (`git pull --rebase --autostash`), so the session starts against the latest synced state. On a genuine conflict it aborts the rebase, prints a `WARN` naming the conflicting files and the manual-resolution commands, and exits 0 with local files untouched — a sync problem never blocks a session from starting
+  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` first records local nested state, then reconciles it with the configured `ai-state` remote. A genuine conflict aborts cleanly, prints recovery guidance, and leaves local state intact; a sync problem never blocks a session from starting.
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
-  - `state-sync.sh push` stages all nested changes and commits them as `session: <ISO-timestamp>` (skipping the commit if nothing changed), then pulls (same rebase-with-autostash contract as above). If that pull hits a genuine rebase conflict, it aborts cleanly and `push` skips the push entirely — no non-fast-forward attempt, no mid-rebase repo, no lost commits — warning that local commits are safe and will go out on the next sync once the conflict is resolved manually. Normal Stop runs do not originate installer updates, but locally modified bootstrap-controlled files are included with any other uncommitted nested state; clean installer/updater commits and pull/rebase are the intended protection. Errors are written to `.claude/session_logs/hooks-errors.log` and stderr; a missing remote or network access warns and exits successfully; stdin is drained with a 2-second timeout so the script does not hang when invoked via a VS Code task where stdin never closes. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
-  - Stop is a best-effort checkpoint: it only pushes when the agent process actually emits the Stop event. Closing a browser tab or an editor window is not a guaranteed lifecycle event, so a session can end without a Stop-triggered push. The durable checkpoints are the `post-commit` git hook below (automatic, fires on every outer-repo commit) and the "AI state: push" VS Code task in [tasks.json](shared/vscode/tasks.json) (manual, for pushing state between commits).
+  - `state-sync.sh push` remains the compatible checkpoint-then-publish flow: it commits local nested changes, reconciles committed state, then publishes it when safe. Publication refuses a dirty nested worktree, preserving it for the next checkpoint; reconciliation conflicts skip publication rather than force a non-fast-forward push. Operational diagnostics go to stderr, and failures are also recorded in `.claude/session_logs/hooks-errors.log`; sync remains warn-never-fail and drains stdin with a two-second timeout. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
+  - Stop is a best-effort checkpoint-and-publish attempt: it only runs when the agent process emits the Stop event. Closing a browser tab or an editor window is not a guaranteed lifecycle event, so use `state-sync.sh checkpoint` when you need a network-free local durability boundary; use `publish` later to send that committed clean state. The existing post-commit hook and **AI state: push** VS Code task still invoke compatible `push`.
+  - Codex Stop is turn-scoped. Its single [codex-stop.sh](shared/hooks/scripts/codex-stop.sh) wrapper runs session logging, the session-log check, `checkpoint`, then best-effort `publish` in that order. Its stdout is exactly one valid JSON response; child diagnostics stay on stderr and failures remain recoverable through `.claude/session_logs/hooks-errors.log`.
+  - Claude CLI and the Claude runtime bundled with VS Code use the same generated `.claude/settings.json`; no separate VS Code adapter is installed. Its turn-scoped [claude-stop.sh](shared/hooks/scripts/claude-stop.sh) wrapper runs the same four steps sequentially, with no wrapper stdout.
+- Prompt and end retries
+  - Codex and Claude `UserPromptSubmit` run compatible `state-sync.sh push` with a 60-second timeout. A timeout or network failure preserves the local checkpoint for a later retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` for recovery details.
+  - Codex `SessionEnd` is delayed and best-effort: it runs local-only `checkpoint` with a three-second limit and does not publish. Claude `StopFailure` also runs local-only `checkpoint`; its `SessionEnd` runs compatible `push` with a 60-second limit. These do not replace post-commit or the manual **AI state: push** task.
 - post-commit (git hook)
   - [post-commit](shared/hooks/git-hooks/post-commit) runs `state-sync.sh push` after every successful outer-repo commit, publishing plans, reports, memory, and session logs finalized by that commit without waiting on a Stop event that may never arrive. Like the Stop-hook push, it is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem never blocks or fails the commit. Installed the same way as `commit-msg` and `pre-push` below, via `core.hooksPath`.
 

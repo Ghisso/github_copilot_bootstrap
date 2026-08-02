@@ -387,13 +387,13 @@ def sync_state_after_install(
     generated files replace it. This function then makes the distinct
     `bootstrap: install/update <timestamp>` commit, separate from `session:`
     commits made by the Stop hook."""
-    state_sync = target / ".claude" / "hooks" / "scripts" / "state-sync.sh"
-    if not state_sync.is_file():
-        raise SystemExit(f"missing state-sync helper: {state_sync}")
-
     info("sync AI state via state-sync.sh")
     if dry_run:
         return
+
+    state_sync = target / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(f"missing state-sync helper: {state_sync}")
 
     env = os.environ.copy()
     if state_remote:
@@ -446,6 +446,21 @@ def sync_state_after_install(
     )
     if push_result.returncode != 0:
         warn("state-sync push reported a non-zero exit; state committed locally, will retry on next sync.")
+
+
+def report_codex_hook_trust(dry_run: bool) -> None:
+    """Explain the explicit Codex for VS Code project-hook trust boundary."""
+    action = "would install or update" if dry_run else "installed or updated"
+    info(
+        f"{action} .codex/hooks.json; Codex for VS Code project-hook trust "
+        "is bound to its content/hash."
+    )
+    print("An actual install or update can require review/retrust.")
+    print(
+        "After an actual install or update, reopen/reload this repository in Codex for VS Code, "
+        "then review and approve the project hooks when prompted before relying on the new lifecycle hooks."
+    )
+    print("This installer does not approve project hooks or change user trust settings.")
 
 
 def migrate_pre_existing_state(
@@ -549,6 +564,7 @@ def main() -> int:
         args.local_only,
     )
 
+    report_codex_hook_trust(args.dry_run)
     info("done")
     return 0
 

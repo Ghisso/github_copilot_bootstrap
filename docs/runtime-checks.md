@@ -36,6 +36,8 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `context-mode-dispatch.sh`
 - `session-log.sh`
 - `state-sync.sh`
+- `claude-stop.sh`
+- `codex-stop.sh`
 - `restore-root-adapters.sh`
 - `session-start-state.sh`
 - `enforce-branch-state.sh`
@@ -56,6 +58,37 @@ repository without invoking fetch, `ls-remote`, pull, merge, or push. A legacy
 consumer must retain ordered `migrate: import pre-git state` and subsequent
 `bootstrap:` history; the installer reports nested status and a shell-safe
 manual publish command.
+
+The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
+`publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without
+network access: it must create only a local commit. Verify `publish` only from
+a clean nested worktree: it must not stage or commit, and it must preserve dirty
+state for a later checkpoint. `push` remains the compatible checkpoint-then-
+publish operation. Operational output belongs on stderr; `status` alone writes
+a read-only, network-free report using local and cached tracking state, without
+printing a remote URL or credentials. Failures remain auditable in
+`.claude/session_logs/hooks-errors.log`.
+
+For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
+runs sequentially for each turn: session log, session-log check, `checkpoint`,
+then best-effort `publish`. Codex stdout must be exactly one valid JSON object;
+Claude's wrapper emits no stdout. Both `UserPromptSubmit` hooks retry `push`
+with a 60-second timeout. Codex delayed, best-effort `SessionEnd` invokes only
+local `checkpoint` with timeout `3`; Claude `StopFailure` also invokes only
+local `checkpoint`, while Claude `SessionEnd` invokes `push` with timeout `60`.
+No lifecycle event may split checkpoint and publication into concurrent handlers.
+Timeout or network failure must preserve the local commit for a later retry;
+use `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` to
+inspect recovery state. Post-commit and the manual VS Code **AI state: push**
+task remain the durable checkpoint-and-publish paths.
+
+An install or update can change `.codex/hooks.json`, whose Codex for VS Code
+project trust is content/hash-bound. Verify the installer and batch updater
+only print the reopen/reload-and-review guidance: they must never approve hooks
+or mutate user trust settings. A dry run must describe the potential review
+without claiming that it changed hooks. If sync is not progressing after you
+approve updated hooks, run `state-sync.sh status` and inspect
+`.claude/session_logs/hooks-errors.log`.
 
 Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
 

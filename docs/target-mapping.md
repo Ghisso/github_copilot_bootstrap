@@ -47,7 +47,7 @@ Claude Code:
 - `.mcp.json`
 - `.claude/settings.json`
 
-Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
+Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
@@ -58,4 +58,4 @@ OpenAI Codex:
 
 Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/` and takes its model/effort pair from `model_intent.openai-codex`.
 
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load.
+Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.

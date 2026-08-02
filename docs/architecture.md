@@ -98,18 +98,38 @@ The two safety-critical guards, `protect-files.sh` and `git-protection.sh`, run 
 
 **This is a genuinely separate repository, not a branch of the outer one — plain `git branch`/`git log` run at the consumer root will never show `ai-state` or its commits.** Inspect it with `git -C .claude <command>` (e.g. `git -C .claude branch`, `git -C .claude log --oneline`), or `cd .claude` first. Looking for `ai-state` with the outer repo's own `git branch -a` and finding nothing is expected, not a sign that the sync failed.
 
-`shared/hooks/scripts/state-sync.sh` (pure bash, no `uv`/Python) implements four subcommands, all warn-never-fail (a sync problem never fails a Stop hook or blocks a session start) and all draining stdin with the same 2-second timeout the old sync helper used:
+`shared/hooks/scripts/state-sync.sh` (pure bash, no `uv`/Python) implements seven subcommands. It drains stdin with the same two-second timeout as the old helper. `setup`, `pull`, `checkpoint`, `publish`, `push`, and `migrate-from-hf` remain warn-never-fail for hook compatibility and emit operational diagnostics on stderr; only `status` deliberately writes its stable report to stdout.
 
 - **`setup`** — idempotent. If `.claude/.git` is missing: `git init`, resolve and configure the remote (`AI_STATE_REMOTE` / `--state-remote` at install time, else the outer repo's own `origin`), commit whatever is already on disk (there is always something — at minimum this script itself), then reconcile with `origin/ai-state` via `git merge --allow-unrelated-histories` if it already exists remotely (a real merge, not a bare checkout, so it combines file-by-file instead of refusing to overwrite untracked files that are about to converge anyway). A genuine conflict aborts the merge and warns, leaving the local commit as the source of truth.
-- **`pull`** — `git pull --rebase --autostash origin ai-state`. On conflict: abort the rebase, print a `WARN` naming the conflicting files and the manual-resolution commands, and exit 0 with local files intact.
-- **`push`** — commit any staged state as `session: <ISO-timestamp>` (skipping the commit if nothing changed), then `pull` (as above). If the pull's rebase hits a genuine conflict, it aborts cleanly and reports failure to `push`, which skips the push entirely rather than attempting one git would reject as non-fast-forward — the nested repo is never left mid-rebase, no commits are lost, and there is no force-push. `push` warns that local commits are safe and will go out on the next sync once the conflict is resolved manually.
-- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, runs `setup`'s init/remote logic, commits everything on disk as `migrate: import pre-git state`, and pushes — unless reconciliation with an existing `origin/ai-state` conflicts, in which case the migrated state stays committed locally and the push is skipped (the same skip-not-reject contract as `push`) with a warning to resolve the conflict manually. No automatic pull from the old Hugging Face bucket happens here — the local tree is the source of truth at migration time; run the retired `hf-ai-sync.py pull-state` once first, manually, if you want the bucket's newer copy. `install_bootstrap.py` invokes this before replacing generated files, so the updater does not own a separate migration path.
+- **`pull`** — records local nested changes, then reconciles committed state with `origin/ai-state`. On conflict, it aborts cleanly and leaves local files intact.
+- **`checkpoint`** — initializes local nested Git state if needed and commits local AI state as the durable boundary. It performs no remote Git operation, including no fetch, `ls-remote`, pull, merge, or push.
+- **`publish`** — sends already committed state only. It never stages or commits; if the nested worktree is dirty, it warns and preserves that uncheckpointed state. From a clean worktree it reconciles with `origin/ai-state`, then pushes; repeated clean publication is a no-op. With `--local-only`, it skips remote interaction without mutation.
+- **`push`** — the backward-compatible composition: checkpoint, then publish. Existing SessionStop, post-commit, and VS Code task wiring continues to use it.
+- **`status`** — read-only and network-free. It reports whether the nested repository is initialized, its clean/dirty worktree state, remote configuration without exposing its URL, and cached tracking ahead/behind information when available. It also reports the existing error-log path and the last state-sync error; it never fetches or exposes credentials.
+- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, initializes it, commits everything on disk as `migrate: import pre-git state`, then reconciles and publishes when safe. No automatic pull from the retired Hugging Face bucket occurs; the local tree is the source of truth at migration time. `install_bootstrap.py` invokes this before replacing generated files.
 
 Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py` through the updater); session state lands as `session:`-prefixed commits when a consumer's Stop hook runs the normal push flow. The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
 
 **Multi-writer conflict policy.** `init_nested_repo` writes a `.gitattributes` into the nested `.claude/` repo alongside its `.gitignore`. Append-only machine logs matching `session_logs/*.log` get git's built-in `merge=union` driver, so two sessions appending different lines to the same log auto-reconcile during rebase instead of conflicting. Narrative state — `plans/**`, `MEMORY.md`, and session-log prose — intentionally keeps the default conflict-and-abort behavior, so a genuine divergence there still stops for a manual semantic merge rather than being silently resolved ours/theirs. Both files are written by `init_nested_repo` at nested-repo init, so this policy reaches every fresh nested `.claude/` repo the same way the existing `.gitignore` does — not just repos created before this policy existed.
 
-**Durable checkpoints vs. best-effort push.** The Stop hook's `state-sync.sh push` (above) only runs when the agent process actually emits the Stop event — closing a browser tab or an editor window is not a guaranteed lifecycle event, so a session can end without that push ever firing. Two checkpoints are durable instead of best-effort: the generated [`post-commit`](../shared/hooks/git-hooks/post-commit) git hook, which runs `state-sync.sh push` after every successful outer-repo commit and is installed via the same `core.hooksPath` wiring as `commit-msg`/`pre-push` (see "Deterministic Commit and Push Gates" in the README), and the manual **AI state: push** VS Code task (below) for publishing state between commits. Like the Stop-hook push, `post-commit` is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem can never block or fail the commit.
+**Durable checkpoints vs. best-effort hooks.** `checkpoint` is the explicit network-free local durability boundary. Post-commit continues to invoke compatible `push`, which attempts checkpoint then publication. Runtime-specific Stop paths are best-effort: they run only when the runtime emits the event, and closing a browser tab or editor window is not guaranteed to do so. Run `checkpoint` explicitly when local durability matters before a later `publish`; the hooks remain warn-never-fail, so sync trouble never blocks a session or outer-repo commit.
+
+**Runtime lifecycle boundaries.** Matching Stop handlers can run concurrently, so Codex and Claude each use one sequential wrapper. Both continue after a child failure; checkpointed local commits remain available for a later retry, with failures recorded in `.claude/session_logs/hooks-errors.log` and inspectable through `state-sync.sh status`.
+
+| Runtime | Turn-scoped Stop | Prompt retry | Failure/end boundary |
+| --- | --- | --- | --- |
+| Codex | [`codex-stop.sh`](../shared/hooks/scripts/codex-stop.sh): log, check, checkpoint, publish; one JSON stdout response | `push`, 60 seconds | Delayed best-effort SessionEnd: local `checkpoint`, 3 seconds, no publication |
+| Claude CLI / VS Code | [`claude-stop.sh`](../shared/hooks/scripts/claude-stop.sh): log, check, checkpoint, publish; no stdout | `push`, 60 seconds | StopFailure: local `checkpoint`; SessionEnd: `push`, 60 seconds |
+
+Claude VS Code bundles the Claude runtime and reads the same generated `.claude/settings.json` as the CLI; no second settings adapter exists. Post-commit and the manual **AI state: push** VS Code task remain the durable checkpoint-and-publish paths.
+
+**Codex for VS Code trust.** `.codex/hooks.json` is a project hook surface
+whose trust is bound to its content/hash. A direct install or per-consumer batch
+update can therefore require review and renewed approval. Reopen/reload the
+repository in Codex for VS Code and approve the project hooks when prompted;
+the installer reports this requirement but never approves hooks or changes
+user trust settings. A dry run only previews that possible action and does not
+claim to have changed hook content.
 
 Both human CLIs push by default after a complete refresh. Their `--local-only`
 mode still refreshes all bootstrap-controlled files and creates durable nested
@@ -127,13 +147,11 @@ shell-quoted manual `state-sync.sh push` command so publication is deliberate.
 `.vscode/tasks.json` (source: `shared/vscode/tasks.json`) provides AI state sync that works without an active AI tool session:
 
 - **AI state: pull** — runs automatically on `folderOpen` (VS Code prompts once to allow automatic tasks). Pulls state silently in the background via `state-sync.sh pull`.
-- **AI state: push** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. Shows output so the developer can confirm the push succeeded, via `state-sync.sh push`.
+- **AI state: push** — run manually via `Tasks: Run Task` or a keyboard shortcut binding. It retains the compatible `state-sync.sh push` checkpoint-then-publish behavior.
 
-These complement the AI SessionStart/Stop hooks, which run the normal pull/push
-flow for sessions in that consumer, for workflows where VS Code is open without
-an active AI session. Because Stop is best-effort, **AI state: push** doubles
-as a durable checkpoint alongside `post-commit` (see "Git-Backed State Sync"
-above) for state a session accumulated without an intervening commit.
+These complement the AI SessionStart/Stop hooks, which retain the normal
+pull/push flow for sessions in that consumer. For a guaranteed local boundary,
+run `state-sync.sh checkpoint` explicitly before publishing later.
 
 ## Custom Agents
 
@@ -152,7 +170,7 @@ Agent names are identical across every target — the generator performs no per-
 
 `coder`'s `model_intent.openai-codex` additionally carries an `escalate_to` key (`{ "model": "gpt-5.6-sol", "effort": "xhigh" }`), declarative-only: the generator does not emit a second adapter file for it. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent (`developers.openai.com/codex/subagents`: "explicit spawn values override `agents.default_subagent_model` and `agents.default_subagent_reasoning_effort`"), so `shared/agents/orchestrator/prompt.md` instructs the orchestrator to re-delegate a `coder` fix with those override values — instead of retrying at the base Terra/high tier — when `verifier` fails or `reviewer` surfaces a CRITICAL/MAJOR/`ponytail` finding on that diff, capped at one escalation per phase. `scripts/validate_targets.py` checks that `escalate_to`'s model/effort pair is allow-listed, differs from the base tier, and appears verbatim in the orchestrator prompt text, so the data and the instruction that acts on it cannot silently drift apart. Claude Code has no per-invocation effort override, so this lane is Codex-only.
 
-Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), exposes MultiAgent V2 spawn metadata through the `agents` namespace so named model/effort profiles are selectable, and wires the documented `PreCompact` event.
+Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), exposes MultiAgent V2 spawn metadata through the `agents` namespace so named model/effort profiles are selectable, and wires `PreCompact` plus the Codex lifecycle boundaries summarized above.
 
 ## Design Decisions
 
