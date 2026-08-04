@@ -36,6 +36,31 @@ without comparing or overwriting consumer-owned AI state.
   duplicates the Python ownership enumeration, and the command-execution test
   observes the wrong working directory. Per the orchestrator escalation cap,
   the fix loop stopped and later phases were not started.
+- **14:04** - The user explicitly authorized as many additional fix passes as
+  required. Phase A resumed with a focused Sol/xhigh implementation pass for
+  the three remaining major findings.
+- **14:22** - The authorized repair passed 31 tests and resolved the prior three
+  majors, but the next two-pass review found two further majors: committed
+  Copilot install mode is not retained across repeat/batch updates, and runtime
+  parity does not detect obsolete bootstrap-owned files. One dead ownership API
+  also remained as a Ponytail minor. A fourth focused fix pass began.
+- **14:50** - The fourth pass added mode retention and reverse parity and again
+  passed 31 tests, but adversarial fixtures found four further majors: nested
+  Git files could be pruned, committed-to-local migration retained stale tracked
+  Copilot files, overlapping source/destination paths were accepted, and direct
+  script typing failed. A fifth focused fix pass began, including the associated
+  Ponytail cleanup.
+- **15:04** - The fifth pass added ten installer regressions and passed 41 tests,
+  direct script typing, lint, formatting, shell syntax, generation, validation,
+  and diff hygiene. Two adversarial review rounds returned no code, architecture,
+  security, test, or Ponytail findings.
+- **15:08** - README and runtime/target documentation were updated. A single
+  inaccurate pruning instruction was corrected, and documentation re-review
+  passed with no findings.
+- **15:10** - Phase A staging failed because `.git/index` is read-only. The
+  required escalation was denied after the environment exhausted its approval
+  quota. Per workflow, findings/score/commit were not generated and Phase B did
+  not start.
 
 ## [LEARN] Entries
 
@@ -45,30 +70,42 @@ without comparing or overwriting consumer-owned AI state.
   source of truth; parallel Python and shell enumerations drift too easily.
 - [LEARN:tests] Command-execution regressions must assert against an absolute
   marker or run the hook with an explicit working directory.
+- [LEARN:workflow] The quality reports hash staged content, so staging must occur
+  after documentation and before findings/score generation; an environment that
+  denies `.git/index` writes blocks the phase boundary even when review passes.
+- [LEARN:security] Installer path-overlap and nested Git-file fixtures belong in
+  the permanent ownership-contract suite because both failures can escape
+  ordinary generated-target validation.
 
 ## Verification Results
 
 ```bash
-UV_CACHE_DIR=.uv-cache uv run pytest -q                       # 30 passed
+UV_CACHE_DIR=.uv-cache uv run pytest -q                       # 41 passed
+UV_CACHE_DIR=.uv-cache uv run pytest -q -W error::DeprecationWarning
+                                                               # 41 passed
 UV_CACHE_DIR=.uv-cache uv run mypy scripts                    # passed
-UV_CACHE_DIR=.uv-cache uv run ruff check <changed-python>     # passed
+UV_CACHE_DIR=.uv-cache uv run ruff check scripts tests        # passed
 UV_CACHE_DIR=.uv-cache uv run ruff format --check <changed>   # passed
-bash -n shared/hooks/scripts/restore-root-adapters.sh          # passed
+bash -n shared/hooks/scripts/restore-root-adapters.sh         # passed
 UV_CACHE_DIR=.uv-cache uv run python scripts/generate_targets.py --all
 UV_CACHE_DIR=.uv-cache uv run python scripts/validate_targets.py  # passed
+git diff --check                                              # passed
 ```
 
-`scripts/check_runtime.py` reports only the six expected stale dogfood files
-pending a local-only refresh. The final review gate failed on three major
-findings; there were no critical or Ponytail findings.
+`scripts/check_runtime.py` reports only stale local dogfood paths pending the
+denied local-only refresh, including the obsolete skill that reverse parity now
+correctly detects. Final code and documentation reviews both passed with empty
+findings arrays. Protected Codex MultiAgent V2 metadata and `max_depth = 1`
+remain intact.
 
 ## Score: not run
 
-Scoring and persisted findings are intentionally deferred because review did not
-converge and documentation is not final.
+Scoring and persisted findings are intentionally deferred because the reviewed
+outer diff cannot be staged while `.git/index` is read-only and the environment
+rejects escalation. Running them unstaged would produce an invalid content hash.
 
 ## Open Questions / Next Steps
 
-- User direction is required to authorize an additional Phase A fix pass despite
-  the repository's one-escalation-per-phase limit, or to stop and decide how to
-  handle the preserved uncommitted branch state.
+- Restore Git write approval, then stage the explicit Phase A file set, record
+  the empty findings report, run the quality score, commit Phase A, and only then
+  advance to Phase B.
