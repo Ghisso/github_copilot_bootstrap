@@ -10,6 +10,16 @@ The runtime checker verifies generated runtime files exist, including the
 Ponytail coding/review skills and upstream license/provenance, and reports
 optional helper availability.
 
+It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
+files in this source checkout must match freshly generated output (after the
+documented project-name substitution); unexpected obsolete owned files fail too.
+The check deliberately excludes consumer-owned `.claude` state: `MEMORY.md`,
+plans, explorations, session logs, quality reports, and explicit project-context
+customization. Tracked source adapters such as root `AGENTS.md` are checked for
+their authoring invariants rather than byte-compared to a generated consumer
+adapter. A failure names the stale path, its authoritative source, and the
+regenerate/reinstall command.
+
 Optional helpers:
 
 - `context-mode`
@@ -58,6 +68,14 @@ repository without invoking fetch, `ls-remote`, pull, merge, or push. A legacy
 consumer must retain ordered `migrate: import pre-git state` and subsequent
 `bootstrap:` history; the installer reports nested status and a shell-safe
 manual publish command.
+
+The installer writes `.claude/bootstrap-ownership.env` as inert data, never as
+executable shell input. It records whether the Copilot surface is local-only or
+committed and which root adapters may be restored from `.claude/bootstrap-root/`.
+An update retains that mode unless you explicitly select the opposite
+`--[no-]commit-copilot-surface` option. During a refresh, obsolete files that
+are bootstrap-owned by the active mode are removed safely; consumer state and
+the nested repository metadata are retained.
 
 The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
 `publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without

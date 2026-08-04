@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from runtime_ownership import render_restore_script, restore_manifest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
@@ -66,7 +68,10 @@ COPILOT_TOOL_MAP = {
 TARGET_PATH_REPLACEMENTS = {
     "claude-code": (
         (".github/copilot-instructions.md", "CLAUDE.md"),
-        ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/CLAUDE.md")'),
+        (
+            'normalized.endswith("/.github/copilot-instructions.md")',
+            'normalized.endswith("/CLAUDE.md")',
+        ),
         (".github/hooks/hooks.json", ".claude/settings.json"),
         (".github/hooks", ".claude/hooks"),
         ("git add .github/", "git add .claude/"),
@@ -74,7 +79,10 @@ TARGET_PATH_REPLACEMENTS = {
     ),
     "openai-codex": (
         (".github/copilot-instructions.md", "AGENTS.md"),
-        ('normalized.endswith("/.github/copilot-instructions.md")', 'normalized.endswith("/AGENTS.md")'),
+        (
+            'normalized.endswith("/.github/copilot-instructions.md")',
+            'normalized.endswith("/AGENTS.md")',
+        ),
         (".github/hooks/hooks.json", ".codex/hooks.json"),
         (".github/hooks", ".codex/hooks"),
         ("git add .github/", "git add .claude/"),
@@ -141,7 +149,9 @@ def ensure_executable(path: Path) -> None:
 
 
 def copy_text_transformed(source: Path, destination: Path, target: str) -> None:
-    write_text(destination, transform_target_paths(source.read_text(encoding="utf-8"), target))
+    write_text(
+        destination, transform_target_paths(source.read_text(encoding="utf-8"), target)
+    )
 
 
 def copy_tree_transformed(source: Path, destination: Path, target: str) -> None:
@@ -149,7 +159,10 @@ def copy_tree_transformed(source: Path, destination: Path, target: str) -> None:
         shutil.rmtree(destination)
     destination.mkdir(parents=True)
     for path in sorted(source.rglob("*")):
-        if any(part in COPY_IGNORE_PARTS for part in path.parts) or path.suffix in COPY_IGNORE_SUFFIXES:
+        if (
+            any(part in COPY_IGNORE_PARTS for part in path.parts)
+            or path.suffix in COPY_IGNORE_SUFFIXES
+        ):
             continue
         relative = path.relative_to(source)
         target_path = destination / relative
@@ -166,8 +179,13 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     support_root = target_root / SHARED_BASIS_NAMESPACE
     target_label = {"multi-agent": "multi-agent"}[target]
 
-    copy_text_transformed(REPO_ROOT / "shared" / "MEMORY.md", support_root / "MEMORY.md", "claude-code")
-    copy_tree_transformed(REPO_ROOT / "shared" / "templates", support_root / "templates", "claude-code")
+    copy_text_transformed(
+        REPO_ROOT / "shared" / "MEMORY.md", support_root / "MEMORY.md", "claude-code"
+    )
+    write_text(support_root / "bootstrap-ownership.env", restore_manifest())
+    copy_tree_transformed(
+        REPO_ROOT / "shared" / "templates", support_root / "templates", "claude-code"
+    )
     copy_text_transformed(
         REPO_ROOT / "shared" / "scripts" / "quality_score.py",
         support_root / "scripts" / "quality_score.py",
@@ -211,15 +229,29 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         support_root / "third_party",
         "claude-code",
     )
-    copy_tree_transformed(REPO_ROOT / "shared" / "review-profiles", support_root / "review-profiles", "claude-code")
-    copy_tree(REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts")
+    copy_tree_transformed(
+        REPO_ROOT / "shared" / "review-profiles",
+        support_root / "review-profiles",
+        "claude-code",
+    )
+    copy_tree(
+        REPO_ROOT / "shared" / "hooks" / "scripts", support_root / "hooks" / "scripts"
+    )
+    restore_script = support_root / "hooks" / "scripts" / "restore-root-adapters.sh"
+    write_text(
+        restore_script,
+        render_restore_script(restore_script.read_text(encoding="utf-8")),
+    )
     # Every hook script must be executable: the runtime wrapper execs them, and
     # validate_targets.py invokes them by path. The shared sources are tracked
     # 0644 (git core.fileMode aside), so make them +x here rather than relying on
     # the checked-out mode.
     for script in sorted((support_root / "hooks" / "scripts").glob("*.sh")):
         ensure_executable(script)
-    copy_tree(REPO_ROOT / "shared" / "hooks" / "git-hooks", support_root / "hooks" / "git-hooks")
+    copy_tree(
+        REPO_ROOT / "shared" / "hooks" / "git-hooks",
+        support_root / "hooks" / "git-hooks",
+    )
     # git invokes these directly by exact filename (commit-msg, not *.sh), so
     # they need the same executable-bit treatment as hooks/scripts/*.sh above.
     for script in sorted((support_root / "hooks" / "git-hooks").glob("*")):
@@ -240,6 +272,11 @@ def render_devcontainer(target_root: Path) -> None:
         source = REPO_ROOT / "shared" / "hooks" / "scripts" / name
         destination = target_root / ".devcontainer" / name
         copy_file(source, destination)
+        if name == "restore-root-adapters.sh":
+            write_text(
+                destination,
+                render_restore_script(destination.read_text(encoding="utf-8")),
+            )
         ensure_executable(destination)
 
 
@@ -297,7 +334,9 @@ def toml_string(value: str) -> str:
 
 def toml_multiline_literal(value: str) -> str:
     if "'''" in value:
-        raise ValueError("Codex agent developer_instructions cannot contain triple single quotes")
+        raise ValueError(
+            "Codex agent developer_instructions cannot contain triple single quotes"
+        )
     return "'''\n" + value.strip() + "\n'''"
 
 
@@ -315,7 +354,10 @@ def shared_mcp_servers() -> dict[str, Any]:
 
 
 def shared_skill_names() -> list[str]:
-    return sorted(path.parent.name for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md"))
+    return sorted(
+        path.parent.name
+        for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")
+    )
 
 
 def render_vscode_mcp_json(path: Path) -> None:
@@ -343,7 +385,7 @@ def render_codex_config(path: Path) -> None:
         "# bundle cannot know the consumer's absolute path, so each skill points at",
         "# ../.claude/skills/<name>/SKILL.md relative to this config. This relative form is",
         "# the tested contract: validate_targets.py asserts it structurally in two places -",
-        "# validate_mcp_and_hooks (\"../.claude/skills/\" in config) and validate_skills_and_paths",
+        '# validate_mcp_and_hooks ("../.claude/skills/" in config) and validate_skills_and_paths',
         "# (the enabled-skill path set must equal the shared/skills SKILL.md set exactly).",
         "# Runtime resolution follows Codex's documented relative-path handling (docs accessed",
         "# 2026-07-03); see architecture-review-2026-07.md appendix B for the epistemic status.",
@@ -370,24 +412,41 @@ def render_codex_config(path: Path) -> None:
         lines.append("")
     for skill_name in shared_skill_names():
         lines.append("[[skills.config]]")
-        lines.append(f"path = {toml_string(f'../.claude/skills/{skill_name}/SKILL.md')}")
+        lines.append(
+            f"path = {toml_string(f'../.claude/skills/{skill_name}/SKILL.md')}"
+        )
         lines.append("enabled = true")
         lines.append("")
     write_text(path, "\n".join(lines))
 
 
 def _claude_hook_cmd(script: str, *args: str) -> str:
-    root_expr = '${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}'
-    parts = [f'REPO_ROOT="{root_expr}"', '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"', script, *args]
+    root_expr = (
+        "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+    )
+    parts = [
+        f'REPO_ROOT="{root_expr}"',
+        '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+        script,
+        *args,
+    ]
     return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
 
 
 def render_claude_settings(path: Path) -> None:
     def cmd(script: str, *args: str, timeout: int = 10) -> dict[str, Any]:
-        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": timeout}
+        return {
+            "type": "command",
+            "command": _claude_hook_cmd(script, *args),
+            "timeout": timeout,
+        }
 
     def cmd_stop(script: str, *args: str) -> dict[str, Any]:
-        return {"type": "command", "command": _claude_hook_cmd(script, *args), "timeout": 180}
+        return {
+            "type": "command",
+            "command": _claude_hook_cmd(script, *args),
+            "timeout": 180,
+        }
 
     settings: dict[str, Any] = {
         "permissions": {
@@ -433,7 +492,11 @@ def render_claude_settings(path: Path) -> None:
                 }
             ],
             "PreCompact": [
-                {"hooks": [cmd("context-mode-dispatch.sh", "claude-code", "precompact")]}
+                {
+                    "hooks": [
+                        cmd("context-mode-dispatch.sh", "claude-code", "precompact")
+                    ]
+                }
             ],
             "Stop": [
                 {
@@ -442,15 +505,9 @@ def render_claude_settings(path: Path) -> None:
                     ]
                 }
             ],
-            "UserPromptSubmit": [
-                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
-            ],
-            "StopFailure": [
-                {"hooks": [cmd("state-sync.sh", "checkpoint")]}
-            ],
-            "SessionEnd": [
-                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
-            ],
+            "UserPromptSubmit": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
+            "StopFailure": [{"hooks": [cmd("state-sync.sh", "checkpoint")]}],
+            "SessionEnd": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
         },
     }
     write_json(path, settings)
@@ -459,11 +516,20 @@ def render_claude_settings(path: Path) -> None:
 def render_codex_hooks(path: Path) -> None:
     def command(script: str, *args: str) -> str:
         root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-        parts = [f'REPO_ROOT="{root_expr}"', '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"', script, *args]
+        parts = [
+            f'REPO_ROOT="{root_expr}"',
+            '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
+            script,
+            *args,
+        ]
         return "; ".join(parts[:2]) + " " + " ".join(parts[2:])
 
     def cmd(script: str, *args: str, timeout: int = 10) -> dict[str, Any]:
-        return {"type": "command", "command": command(script, *args), "timeout": timeout}
+        return {
+            "type": "command",
+            "command": command(script, *args),
+            "timeout": timeout,
+        }
 
     hooks: dict[str, Any] = {
         "hooks": {
@@ -502,7 +568,11 @@ def render_codex_hooks(path: Path) -> None:
                 }
             ],
             "PreCompact": [
-                {"hooks": [cmd("context-mode-dispatch.sh", "openai-codex", "precompact")]}
+                {
+                    "hooks": [
+                        cmd("context-mode-dispatch.sh", "openai-codex", "precompact")
+                    ]
+                }
             ],
             "Stop": [
                 {
@@ -511,27 +581,23 @@ def render_codex_hooks(path: Path) -> None:
                     ]
                 }
             ],
-            "UserPromptSubmit": [
-                {"hooks": [cmd("state-sync.sh", "push", timeout=60)]}
-            ],
-            "SessionEnd": [
-                {"hooks": [cmd("state-sync.sh", "checkpoint", timeout=3)]}
-            ],
+            "UserPromptSubmit": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
+            "SessionEnd": [{"hooks": [cmd("state-sync.sh", "checkpoint", timeout=3)]}],
         },
     }
     write_json(path, hooks)
 
 
 def render_root_guidance(target: str) -> str:
-    workspace = (REPO_ROOT / "shared" / "policies" / "workspace.instructions.md").read_text(
-        encoding="utf-8"
-    )
-    routing = (REPO_ROOT / "shared" / "policies" / "tool-routing.instructions.md").read_text(
-        encoding="utf-8"
-    )
-    workflow = (REPO_ROOT / "shared" / "policies" / "workflow.instructions.md").read_text(
-        encoding="utf-8"
-    )
+    workspace = (
+        REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
+    ).read_text(encoding="utf-8")
+    routing = (
+        REPO_ROOT / "shared" / "policies" / "tool-routing.instructions.md"
+    ).read_text(encoding="utf-8")
+    workflow = (
+        REPO_ROOT / "shared" / "policies" / "workflow.instructions.md"
+    ).read_text(encoding="utf-8")
     quality = (
         REPO_ROOT / "shared" / "policies" / "quality-and-testing.instructions.md"
     ).read_text(encoding="utf-8")
@@ -742,18 +808,28 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     sandbox_mode = codex_sandbox_mode(capabilities)
     if sandbox_mode:
         agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
-    agent_lines.append(f"developer_instructions = {toml_multiline_literal(instructions)}")
+    agent_lines.append(
+        f"developer_instructions = {toml_multiline_literal(instructions)}"
+    )
     return "\n".join(agent_lines) + "\n"
 
 
 def render_github(target_root: Path) -> None:
-    write_text(target_root / ".github" / "copilot-instructions.md", render_copilot_instructions())
+    write_text(
+        target_root / ".github" / "copilot-instructions.md",
+        render_copilot_instructions(),
+    )
     instructions_root = target_root / ".github" / "instructions"
     instructions_root.mkdir(parents=True, exist_ok=True)
     for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
-        write_text(instructions_root / source.name, render_github_instruction_adapter(source))
+        write_text(
+            instructions_root / source.name, render_github_instruction_adapter(source)
+        )
 
-    copy_file(REPO_ROOT / "shared" / "hooks" / "hooks.json", target_root / ".github" / "hooks" / "hooks.json")
+    copy_file(
+        REPO_ROOT / "shared" / "hooks" / "hooks.json",
+        target_root / ".github" / "hooks" / "hooks.json",
+    )
     render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
     render_vscode_tasks_json(target_root / ".vscode" / "tasks.json")
 
@@ -803,9 +879,15 @@ def generate(targets: list[str], output_root: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--all", action="store_true", help="Generate the installable target.")
-    parser.add_argument("--target", action="append", choices=TARGETS, help="Target to generate.")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Output root.")
+    parser.add_argument(
+        "--all", action="store_true", help="Generate the installable target."
+    )
+    parser.add_argument(
+        "--target", action="append", choices=TARGETS, help="Target to generate."
+    )
+    parser.add_argument(
+        "--output", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Output root."
+    )
     return parser.parse_args()
 
 

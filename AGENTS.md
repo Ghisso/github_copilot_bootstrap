@@ -1,6 +1,6 @@
 # Agent Guidance
 
-This repository is a reusable multi-agent bootstrap. Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow and keep hook guardrails intact.
+This repository is a reusable multi-agent bootstrap. Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow and keep hook guardrails intact.
 
 Use `shared/policies/workspace.instructions.md` for the main workspace guidance. When choosing retrieval tools, treat `shared/policies/tool-routing.instructions.md` as the single source of truth.
 

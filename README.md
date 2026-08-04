@@ -26,7 +26,7 @@ Main goals:
 
 I use a strict execution loop:
 
-Pre-flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Score -> Document -> Learn -> Session Log -> Commit
+Pre-flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
 
 Core principles:
 
@@ -149,6 +149,13 @@ tracked source files and keep the generated runtime overlay local via
 `.vscode/tasks.json`). This keeps `git status` clean while preserving the
 installed hooks and devcontainer files locally.
 
+The installed `.claude/bootstrap-ownership.env` is an inert ownership manifest,
+not a shell configuration file. It records the selected Copilot mode and the
+root adapters that state restoration may copy. The installer, restorer, updater,
+and runtime checker use that one contract: tracked authoring adapters are
+preserved where appropriate, bootstrap-controlled runtime files are refreshed,
+and consumer-owned state remains untouched.
+
 ## Updating Existing Repos
 
 When you update this bootstrap (new hooks, revised instructions, agent changes),
@@ -174,6 +181,9 @@ are state, tracked in git history rather than files a bucket pull could
 silently overwrite, so there is no backup/restore step to run around them.
 The generated `MEMORY.md` is a fresh-install seed only: if the consumer already
 has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byte.
+Refreshes also prune obsolete bootstrap-controlled files, including files no
+longer generated after an upgrade or mode change. They do not prune consumer
+state or nested `.claude/.git` metadata.
 
 ```bash
 # Preview without writing
@@ -241,12 +251,15 @@ cloud Copilot agents read that surface only from the committed default branch an
 will not see gitignored files. To enable cloud Copilot, install with
 `--commit-copilot-surface`, which keeps those paths out of the ignore block so you
 can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
-ignored and git-backed.
+ignored and git-backed. The selected mode is persisted in the ownership manifest:
+later installs and `update_consumers.py` retain it unless you explicitly pass
+`--commit-copilot-surface` or `--no-commit-copilot-surface`.
 
-If you do not use one of the tools, delete only that tool's native adapter/config
-files after installing and then re-run the installer if you want the pruned
-bundle reflected in the next `ai-state` commit. Keep `.claude/` unless you are
-intentionally removing the shared basis.
+If you do not use one of the tools, you may delete its native adapter/config
+files locally after installing. A later installer refresh restores every path
+present in `dist/`; persistent pruning requires changing the source/ownership
+contract and regenerating. Keep `.claude/` unless you are intentionally removing
+the shared basis.
 
 Optional pruning after copy:
 

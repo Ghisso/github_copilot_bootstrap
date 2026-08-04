@@ -18,6 +18,10 @@ import time
 import tomllib
 from pathlib import Path
 
+from check_runtime import runtime_drift_errors
+from install_bootstrap import copy_generated_tree
+from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
@@ -69,9 +73,7 @@ REQUIRED_HOOK_SCRIPTS = (
     "claude-stop.sh",
     "codex-stop.sh",
 )
-REQUIRED_HOOK_LIBRARIES = (
-    "_lib-frontmatter.sh",
-)
+REQUIRED_HOOK_LIBRARIES = ("_lib-frontmatter.sh",)
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
     "pre-push",
@@ -137,6 +139,8 @@ OBSOLETE_ROOT_SOURCE_DIRS = (
     ".github/quality_reports",
     ".github/hooks/scripts",
 )
+
+
 def text_files(root: Path) -> list[Path]:
     return [
         path
@@ -227,7 +231,9 @@ def codex_hook_command(script: str, *args: str) -> str:
 
 def claude_hook_command(script: str, *args: str) -> str:
     """Return the generated Claude repo-rooted hook command."""
-    root_expr = '${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}'
+    root_expr = (
+        "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+    )
     parts = [
         f'REPO_ROOT="{root_expr}"',
         '"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh"',
@@ -272,7 +278,11 @@ def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
             f"Claude {event_name} must have exactly one handler group",
             errors,
         )
-        if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
+        if (
+            not isinstance(groups, list)
+            or len(groups) != 1
+            or not isinstance(groups[0], dict)
+        ):
             continue
         group = groups[0]
         check(
@@ -286,7 +296,11 @@ def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
             f"Claude {event_name} must have exactly one command handler",
             errors,
         )
-        if not isinstance(handlers, list) or len(handlers) != 1 or not isinstance(handlers[0], dict):
+        if (
+            not isinstance(handlers, list)
+            or len(handlers) != 1
+            or not isinstance(handlers[0], dict)
+        ):
             continue
         handler = handlers[0]
         check(
@@ -325,13 +339,29 @@ def validate_codex_model_contract(
     check(model_valid, f"{label} must set an explicit Codex model", errors)
     check(effort_valid, f"{label} must set an explicit Codex reasoning effort", errors)
     if model_valid:
-        check(model in CODEX_ALLOWED_AGENT_MODELS, f"{label} has unsupported Codex model '{model}'", errors)
+        check(
+            model in CODEX_ALLOWED_AGENT_MODELS,
+            f"{label} has unsupported Codex model '{model}'",
+            errors,
+        )
     if effort_valid:
-        check(effort in CODEX_ALLOWED_EFFORT, f"{label} has unsupported Codex reasoning effort '{effort}'", errors)
+        check(
+            effort in CODEX_ALLOWED_EFFORT,
+            f"{label} has unsupported Codex reasoning effort '{effort}'",
+            errors,
+        )
     if expected_model is not None:
-        check(model == expected_model, f"{label} model drift: expected '{expected_model}', got '{model}'", errors)
+        check(
+            model == expected_model,
+            f"{label} model drift: expected '{expected_model}', got '{model}'",
+            errors,
+        )
     if expected_effort is not None:
-        check(effort == expected_effort, f"{label} effort drift: expected '{expected_effort}', got '{effort}'", errors)
+        check(
+            effort == expected_effort,
+            f"{label} effort drift: expected '{expected_effort}', got '{effort}'",
+            errors,
+        )
 
 
 def validate_codex_model_contract_cases(errors: list[str]) -> None:
@@ -344,7 +374,11 @@ def validate_codex_model_contract_cases(errors: list[str]) -> None:
         expected_model="gpt-5.6-sol",
         expected_effort="max",
     )
-    check(not valid_errors, f"valid Codex model contract was rejected: {valid_errors}", errors)
+    check(
+        not valid_errors,
+        f"valid Codex model contract was rejected: {valid_errors}",
+        errors,
+    )
 
     invalid_cases = (
         ("unsupported model", "gpt-5.7-sol", "high", "gpt-5.7-sol", "high"),
@@ -363,7 +397,11 @@ def validate_codex_model_contract_cases(errors: list[str]) -> None:
             expected_model=expected_model,
             expected_effort=expected_effort,
         )
-        check(bool(case_errors), f"adversarial Codex model case was not rejected: {label}", errors)
+        check(
+            bool(case_errors),
+            f"adversarial Codex model case was not rejected: {label}",
+            errors,
+        )
 
 
 def count_skills(root: Path) -> int:
@@ -379,13 +417,19 @@ def target_support_root(target: str) -> Path:
 def compare_dirs(left: Path, right: Path, errors: list[str]) -> None:
     comparison = filecmp.dircmp(left, right)
     if comparison.left_only or comparison.right_only or comparison.funny_files:
-        errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
+        errors.append(
+            "generated dist is not deterministic; rerun scripts/generate_targets.py --all"
+        )
         return
     # Compare file contents (shallow=False), not just stat signatures, so a
     # byte-level nondeterminism is caught even when size/mtime happen to match.
-    _, mismatch, errored = filecmp.cmpfiles(left, right, comparison.common_files, shallow=False)
+    _, mismatch, errored = filecmp.cmpfiles(
+        left, right, comparison.common_files, shallow=False
+    )
     if mismatch or errored:
-        errors.append("generated dist is not deterministic; rerun scripts/generate_targets.py --all")
+        errors.append(
+            "generated dist is not deterministic; rerun scripts/generate_targets.py --all"
+        )
         return
     for name in comparison.common_dirs:
         compare_dirs(left / name, right / name, errors)
@@ -398,8 +442,16 @@ def dirs_match(left: Path, right: Path) -> bool:
     comparison = filecmp.dircmp(left, right)
     if comparison.left_only or comparison.right_only or comparison.funny_files:
         return False
-    _, mismatch, errored = filecmp.cmpfiles(left, right, comparison.common_files, shallow=False)
-    return not mismatch and not errored and all(dirs_match(left / name, right / name) for name in comparison.common_dirs)
+    _, mismatch, errored = filecmp.cmpfiles(
+        left, right, comparison.common_files, shallow=False
+    )
+    return (
+        not mismatch
+        and not errored
+        and all(
+            dirs_match(left / name, right / name) for name in comparison.common_dirs
+        )
+    )
 
 
 def root_source_mirror_errors(repo_root: Path, target_root: Path) -> list[str]:
@@ -416,17 +468,23 @@ def root_source_mirror_errors(repo_root: Path, target_root: Path) -> list[str]:
             check=False,
         )
         if tracked.stdout.strip():
-            errors.append(f"root .github must not keep tracked legacy source mirror: {relative_path}")
+            errors.append(
+                f"root .github must not keep tracked legacy source mirror: {relative_path}"
+            )
             continue
         ignored = subprocess.run(
             ["git", "-C", str(repo_root), "check-ignore", "-q", "--", relative_path],
             check=False,
         )
         if ignored.returncode != 0:
-            errors.append(f"root .github legacy source mirror must be ignored: {relative_path}")
+            errors.append(
+                f"root .github legacy source mirror must be ignored: {relative_path}"
+            )
             continue
         if not dirs_match(overlay, target_root / relative_path):
-            errors.append(f"root .github ignored self-install overlay is stale: {relative_path}")
+            errors.append(
+                f"root .github ignored self-install overlay is stale: {relative_path}"
+            )
     return errors
 
 
@@ -440,11 +498,17 @@ def validate_agents(errors: list[str]) -> None:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
         codex_intent = data.get("model_intent", {}).get("openai-codex")
-        check(isinstance(codex_intent, dict), f"{agent_id} must define an explicit openai-codex model intent", errors)
+        check(
+            isinstance(codex_intent, dict),
+            f"{agent_id} must define an explicit openai-codex model intent",
+            errors,
+        )
         if isinstance(codex_intent, dict):
             model = codex_intent.get("model")
             effort = codex_intent.get("effort")
-            validate_codex_model_contract(f"canonical Codex agent {agent_id}", model, effort, errors)
+            validate_codex_model_contract(
+                f"canonical Codex agent {agent_id}", model, effort, errors
+            )
             expected_codex_intents[agent_id] = (model, effort)
             escalate_to = codex_intent.get("escalate_to")
             if escalate_to is not None:
@@ -453,24 +517,42 @@ def validate_agents(errors: list[str]) -> None:
                 # contract is with the orchestrator prompt text that actually acts on
                 # it. Restricted to `coder` today; widen this check deliberately if
                 # another role grows an escalation lane.
-                check(agent_id == "coder", f"{agent_id} defines escalate_to but only coder is expected to", errors)
+                check(
+                    agent_id == "coder",
+                    f"{agent_id} defines escalate_to but only coder is expected to",
+                    errors,
+                )
                 esc_model = escalate_to.get("model")
                 esc_effort = escalate_to.get("effort")
-                validate_codex_model_contract(f"{agent_id} escalate_to", esc_model, esc_effort, errors)
+                validate_codex_model_contract(
+                    f"{agent_id} escalate_to", esc_model, esc_effort, errors
+                )
                 check(
                     (esc_model, esc_effort) != (model, effort),
                     f"{agent_id} escalate_to must differ from its base Codex tier",
                     errors,
                 )
-                orchestrator_prompt = read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md")
+                orchestrator_prompt = read(
+                    REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+                )
                 check(
-                    isinstance(esc_model, str) and esc_model in orchestrator_prompt
-                    and isinstance(esc_effort, str) and esc_effort in orchestrator_prompt,
+                    isinstance(esc_model, str)
+                    and esc_model in orchestrator_prompt
+                    and isinstance(esc_effort, str)
+                    and esc_effort in orchestrator_prompt,
                     "orchestrator prompt.md must name the coder escalate_to model/effort verbatim, or it will silently drift from agent.yaml",
                     errors,
                 )
-        check((metadata_path.parent / "prompt.md").exists(), f"{agent_id} missing canonical prompt.md", errors)
-        check(not (metadata_path.parent / "targets").exists(), f"{agent_id} must not keep target-specific prompt forks", errors)
+        check(
+            (metadata_path.parent / "prompt.md").exists(),
+            f"{agent_id} missing canonical prompt.md",
+            errors,
+        )
+        check(
+            not (metadata_path.parent / "targets").exists(),
+            f"{agent_id} must not keep target-specific prompt forks",
+            errors,
+        )
         capabilities = set(data.get("capabilities", []))
         if agent_id == "orchestrator":
             # R-AGENTS-01: the orchestrator's prompt mandates branch/commit/PR
@@ -483,8 +565,14 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    generated_github_agents = sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md"))
-    check(len(generated_github_agents) == expected_count, "GitHub agent count must match shared agents", errors)
+    generated_github_agents = sorted(
+        (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
+    )
+    check(
+        len(generated_github_agents) == expected_count,
+        "GitHub agent count must match shared agents",
+        errors,
+    )
     for metadata_path in shared_agents:
         agent_id = json.loads(read(metadata_path))["id"]
         generated = TARGET_ROOT / ".github" / "agents" / f"{agent_id}.agent.md"
@@ -509,11 +597,23 @@ def validate_agents(errors: list[str]) -> None:
             )
 
     claude_agents = sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md"))
-    check(len(claude_agents) == expected_count, "canonical .claude agent count must match shared agents", errors)
+    check(
+        len(claude_agents) == expected_count,
+        "canonical .claude agent count must match shared agents",
+        errors,
+    )
     for path in claude_agents:
         text = read(path)
-        check(text.startswith("---\n"), f"Claude agent missing frontmatter: {path}", errors)
-        check("\nname: " in text and "\ndescription: " in text, f"Claude agent missing required fields: {path}", errors)
+        check(
+            text.startswith("---\n"),
+            f"Claude agent missing frontmatter: {path}",
+            errors,
+        )
+        check(
+            "\nname: " in text and "\ndescription: " in text,
+            f"Claude agent missing required fields: {path}",
+            errors,
+        )
         check(
             "tool-routing.instructions.md" in text,
             f"Claude agent must route retrieval through tool-routing instructions: {path}",
@@ -527,7 +627,9 @@ def validate_agents(errors: list[str]) -> None:
         # subagent had the instruction but not the tool); guard against it
         # regenerating.
         if "tool-routing.instructions.md" in text:
-            tools_line = next((line for line in text.splitlines() if line.startswith("tools:")), "")
+            tools_line = next(
+                (line for line in text.splitlines() if line.startswith("tools:")), ""
+            )
             check(
                 "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
                 f"Claude agent routes retrieval through tool-routing.instructions.md but its tools: allowlist omits mcp__semble/mcp__context-mode, so it cannot follow that instruction: {path}",
@@ -574,7 +676,11 @@ def validate_agents(errors: list[str]) -> None:
             )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
-    check(len(codex_agents) == expected_count, "Codex custom agent count must match shared agents", errors)
+    check(
+        len(codex_agents) == expected_count,
+        "Codex custom agent count must match shared agents",
+        errors,
+    )
     check(
         not (TARGET_ROOT / ".codex" / "rules").exists(),
         "Codex target must not generate deprecated .codex/rules output",
@@ -596,9 +702,19 @@ def validate_agents(errors: list[str]) -> None:
             errors.append(f"invalid Codex custom agent TOML: {path}: {error}")
             continue
         for field in ("name", "description", "developer_instructions"):
-            check(isinstance(data.get(field), str) and bool(data.get(field)), f"Codex agent missing required field {field}: {path}", errors)
-        check(data.get("name") == path.stem, f"Codex agent name must match filename stem: {path}", errors)
-        expected_model, expected_effort = expected_codex_intents.get(path.stem, (None, None))
+            check(
+                isinstance(data.get(field), str) and bool(data.get(field)),
+                f"Codex agent missing required field {field}: {path}",
+                errors,
+            )
+        check(
+            data.get("name") == path.stem,
+            f"Codex agent name must match filename stem: {path}",
+            errors,
+        )
+        expected_model, expected_effort = expected_codex_intents.get(
+            path.stem, (None, None)
+        )
         validate_codex_model_contract(
             f"generated Codex agent {path.stem}",
             data.get("model"),
@@ -628,7 +744,11 @@ def validate_agents(errors: list[str]) -> None:
         for path in text_files(root):
             text = read(path)
             for label in NON_COPILOT_REVIEW_LABEL_LEAKS:
-                check(label not in text, f"non-Copilot review helper label leaked into {path}: {label}", errors)
+                check(
+                    label not in text,
+                    f"non-Copilot review helper label leaked into {path}: {label}",
+                    errors,
+                )
 
     # R-AGENTS-06: control-plane guards must use consumer paths; the authoring
     # repo's shared/ and dist/ must not leak into generated agent bodies.
@@ -675,14 +795,22 @@ def validate_github_agent_models(errors: list[str]) -> None:
             if not line.startswith("model:"):
                 continue
             value = line.split(":", 1)[1].strip()
-            check(bool(value), f"GitHub agent model must be a single string, not a YAML list: {path}", errors)
+            check(
+                bool(value),
+                f"GitHub agent model must be a single string, not a YAML list: {path}",
+                errors,
+            )
             if value:
                 check(
                     value in GITHUB_ALLOWED_AGENT_MODELS,
                     f"GitHub agent model is not a current supported Copilot model string: {path}: {value}",
                     errors,
                 )
-                check("(copilot)" not in value, f"GitHub agent model must not include provider suffix: {path}", errors)
+                check(
+                    "(copilot)" not in value,
+                    f"GitHub agent model must not include provider suffix: {path}",
+                    errors,
+                )
             if index + 1 < len(lines):
                 check(
                     not lines[index + 1].lstrip().startswith("- "),
@@ -704,16 +832,30 @@ def validate_model_leaks(errors: list[str]) -> None:
             text = read(path)
             for pin in COPILOT_MODEL_PINS:
                 if pin in text:
-                    errors.append(f"Copilot model pin leaked into non-GitHub output: {path} contains {pin}")
+                    errors.append(
+                        f"Copilot model pin leaked into non-GitHub output: {path} contains {pin}"
+                    )
 
 
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
     for server in ("semble", "context-mode", "context7"):
-        check(server in github_mcp.get("servers", {}), f"github missing MCP server: {server}", errors)
-        check(server in claude_mcp.get("mcpServers", {}), f"claude missing MCP server: {server}", errors)
-    check("servers" not in claude_mcp, "Claude .mcp.json must use mcpServers, not servers", errors)
+        check(
+            server in github_mcp.get("servers", {}),
+            f"github missing MCP server: {server}",
+            errors,
+        )
+        check(
+            server in claude_mcp.get("mcpServers", {}),
+            f"claude missing MCP server: {server}",
+            errors,
+        )
+    check(
+        "servers" not in claude_mcp,
+        "Claude .mcp.json must use mcpServers, not servers",
+        errors,
+    )
 
     codex_config = read(TARGET_ROOT / ".codex" / "config.toml")
     codex_config_data: dict[str, object] = {}
@@ -724,18 +866,38 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     # R-CODEX-01: hooks are on by default in current Codex; the flat [features]
     # block is redundant. The nested MultiAgent V2 table is required because
     # Codex 0.144.x otherwise hides agent_type/model/effort routing metadata.
-    check("[features]" not in codex_config, "Codex config must not emit the redundant [features] block", errors)
-    check("hooks = true" not in codex_config, "Codex config must not restate hooks = true (on by default)", errors)
-    check("codex_hooks = true" not in codex_config, "Codex config must not use deprecated codex_hooks alias", errors)
+    check(
+        "[features]" not in codex_config,
+        "Codex config must not emit the redundant [features] block",
+        errors,
+    )
+    check(
+        "hooks = true" not in codex_config,
+        "Codex config must not restate hooks = true (on by default)",
+        errors,
+    )
+    check(
+        "codex_hooks = true" not in codex_config,
+        "Codex config must not use deprecated codex_hooks alias",
+        errors,
+    )
     check("[agents]" in codex_config, "Codex config missing agents section", errors)
-    check("model" not in codex_config_data, "Codex config must not pin the interactive session model", errors)
+    check(
+        "model" not in codex_config_data,
+        "Codex config must not pin the interactive session model",
+        errors,
+    )
     check(
         "model_reasoning_effort" not in codex_config_data,
         "Codex config must not pin interactive session reasoning effort",
         errors,
     )
     codex_features = codex_config_data.get("features")
-    codex_multi_agent_v2 = codex_features.get("multi_agent_v2") if isinstance(codex_features, dict) else None
+    codex_multi_agent_v2 = (
+        codex_features.get("multi_agent_v2")
+        if isinstance(codex_features, dict)
+        else None
+    )
     check(
         isinstance(codex_multi_agent_v2, dict),
         "Codex config must define the MultiAgent V2 routing table",
@@ -755,7 +917,9 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
     authoring_features = authoring_config.get("features")
     authoring_multi_agent_v2 = (
-        authoring_features.get("multi_agent_v2") if isinstance(authoring_features, dict) else None
+        authoring_features.get("multi_agent_v2")
+        if isinstance(authoring_features, dict)
+        else None
     )
     check(
         isinstance(authoring_multi_agent_v2, dict),
@@ -773,16 +937,44 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             "authoring Codex config must route MultiAgent V2 tools through the agents namespace",
             errors,
         )
-    check("max_depth = 1" in codex_config, "Codex config must cap agent nesting depth", errors)
-    check("[mcp_servers.semble]" in codex_config, "Codex config missing Semble MCP server", errors)
-    check("[mcp_servers.context-mode]" in codex_config, "Codex config missing context-mode MCP server", errors)
-    check("[mcp_servers.context7]" in codex_config, "Codex config missing context7 MCP server", errors)
-    check("../.claude/skills/" in codex_config, "Codex config must point skills at .claude/skills", errors)
+    check(
+        "max_depth = 1" in codex_config,
+        "Codex config must cap agent nesting depth",
+        errors,
+    )
+    check(
+        "[mcp_servers.semble]" in codex_config,
+        "Codex config missing Semble MCP server",
+        errors,
+    )
+    check(
+        "[mcp_servers.context-mode]" in codex_config,
+        "Codex config missing context-mode MCP server",
+        errors,
+    )
+    check(
+        "[mcp_servers.context7]" in codex_config,
+        "Codex config missing context7 MCP server",
+        errors,
+    )
+    check(
+        "../.claude/skills/" in codex_config,
+        "Codex config must point skills at .claude/skills",
+        errors,
+    )
     # R-CODEX-01: skill paths point at the SKILL.md file, not the directory.
-    check('/SKILL.md"' in codex_config, "Codex skill paths must point at the SKILL.md file", errors)
+    check(
+        '/SKILL.md"' in codex_config,
+        "Codex skill paths must point at the SKILL.md file",
+        errors,
+    )
 
     codex_hooks = json.loads(read(TARGET_ROOT / ".codex" / "hooks.json"))
-    check(set(codex_hooks) == {"hooks"}, "Codex hooks.json should only contain the top-level hooks object", errors)
+    check(
+        set(codex_hooks) == {"hooks"},
+        "Codex hooks.json should only contain the top-level hooks object",
+        errors,
+    )
     expected_codex_events = {
         "SessionStart",
         "PreToolUse",
@@ -801,12 +993,28 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             errors,
         )
     # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
-    check("PreCompact" in codex_hooks.get("hooks", {}), "Codex hooks must wire the documented PreCompact event", errors)
+    check(
+        "PreCompact" in codex_hooks.get("hooks", {}),
+        "Codex hooks must wire the documented PreCompact event",
+        errors,
+    )
     for event_name, groups in codex_hooks.get("hooks", {}).items():
-        check(isinstance(groups, list), f"Codex hook event must be a list: {event_name}", errors)
+        check(
+            isinstance(groups, list),
+            f"Codex hook event must be a list: {event_name}",
+            errors,
+        )
         for group in groups if isinstance(groups, list) else []:
-            check(isinstance(group, dict), f"Codex hook group must be an object: {event_name}", errors)
-            check("hooks" in group and isinstance(group.get("hooks"), list), f"Codex hook group missing nested hooks: {event_name}", errors)
+            check(
+                isinstance(group, dict),
+                f"Codex hook group must be an object: {event_name}",
+                errors,
+            )
+            check(
+                "hooks" in group and isinstance(group.get("hooks"), list),
+                f"Codex hook group missing nested hooks: {event_name}",
+                errors,
+            )
             for hook in group.get("hooks", []) if isinstance(group, dict) else []:
                 command = hook.get("command", "") if isinstance(hook, dict) else ""
                 check(
@@ -846,7 +1054,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                 f"Codex {event_name} must have exactly one handler group",
                 errors,
             )
-            if not isinstance(groups, list) or len(groups) != 1 or not isinstance(groups[0], dict):
+            if (
+                not isinstance(groups, list)
+                or len(groups) != 1
+                or not isinstance(groups[0], dict)
+            ):
                 continue
             group = groups[0]
             handlers = group.get("hooks")
@@ -860,7 +1072,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                 f"Codex {event_name} must have exactly one command handler",
                 errors,
             )
-            if not isinstance(handlers, list) or len(handlers) != 1 or not isinstance(handlers[0], dict):
+            if (
+                not isinstance(handlers, list)
+                or len(handlers) != 1
+                or not isinstance(handlers[0], dict)
+            ):
                 continue
             handler = handlers[0]
             check(
@@ -868,7 +1084,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                 f"Codex {event_name} handler must not use unsupported fields",
                 errors,
             )
-            check(handler.get("type") == "command", f"Codex {event_name} handler must be a command", errors)
+            check(
+                handler.get("type") == "command",
+                f"Codex {event_name} handler must be a command",
+                errors,
+            )
             check(
                 handler.get("command") == codex_hook_command(script, *args),
                 f"Codex {event_name} must invoke {script} with the expected operation",
@@ -965,7 +1185,9 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         try:
             wrapper_output = json.loads(codex_result.stdout)
         except json.JSONDecodeError as error:
-            errors.append(f"generated Codex Stop wrapper stdout must be one JSON object: {error}")
+            errors.append(
+                f"generated Codex Stop wrapper stdout must be one JSON object: {error}"
+            )
         else:
             check(
                 wrapper_output == {"continue": True},
@@ -993,20 +1215,56 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
     github_hook_text = json.dumps(github_hooks)
-    check(".claude/hooks/scripts/" in github_hook_text, "GitHub hooks should invoke shared .claude hook scripts", errors)
-    check("github-copilot" in github_hook_text, "GitHub hooks should pass target id", errors)
-    check("state-sync.sh" in github_hook_text, "GitHub hooks should sync AI state via state-sync.sh", errors)
+    check(
+        ".claude/hooks/scripts/" in github_hook_text,
+        "GitHub hooks should invoke shared .claude hook scripts",
+        errors,
+    )
+    check(
+        "github-copilot" in github_hook_text,
+        "GitHub hooks should pass target id",
+        errors,
+    )
+    check(
+        "state-sync.sh" in github_hook_text,
+        "GitHub hooks should sync AI state via state-sync.sh",
+        errors,
+    )
     for event_name, hooks in github_hooks.get("hooks", {}).items():
-        check(isinstance(hooks, list), f"GitHub hook event must be a list: {event_name}", errors)
+        check(
+            isinstance(hooks, list),
+            f"GitHub hook event must be a list: {event_name}",
+            errors,
+        )
         for hook in hooks if isinstance(hooks, list) else []:
             if not isinstance(hook, dict):
                 errors.append(f"GitHub hook must be an object: {event_name}")
                 continue
-            check(hook.get("type") == "command", f"GitHub hook must be command type: {event_name}", errors)
-            check("args" not in hook, f"GitHub hooks must not use unsupported args field: {event_name}", errors)
-            check("bash" in hook, f"GitHub hook must include bash field to avoid /bin/sh fallback: {event_name}", errors)
-            check("timeout" in hook, f"GitHub hook missing VS Code timeout: {event_name}", errors)
-            check("timeoutSec" in hook, f"GitHub hook missing Copilot CLI/cloud timeoutSec: {event_name}", errors)
+            check(
+                hook.get("type") == "command",
+                f"GitHub hook must be command type: {event_name}",
+                errors,
+            )
+            check(
+                "args" not in hook,
+                f"GitHub hooks must not use unsupported args field: {event_name}",
+                errors,
+            )
+            check(
+                "bash" in hook,
+                f"GitHub hook must include bash field to avoid /bin/sh fallback: {event_name}",
+                errors,
+            )
+            check(
+                "timeout" in hook,
+                f"GitHub hook missing VS Code timeout: {event_name}",
+                errors,
+            )
+            check(
+                "timeoutSec" in hook,
+                f"GitHub hook missing Copilot CLI/cloud timeoutSec: {event_name}",
+                errors,
+            )
             for field in ("bash", "linux", "osx"):
                 command = hook.get(field)
                 if command is not None:
@@ -1023,24 +1281,76 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     claude_settings = json.loads(read(TARGET_ROOT / ".claude" / "settings.json"))
     claude_settings_text = json.dumps(claude_settings)
-    check(".claude/hooks/scripts/" in claude_settings_text, "Claude settings should invoke shared .claude hook scripts", errors)
-    check("claude-code" in claude_settings_text, "Claude hooks should pass target id", errors)
-    check("state-sync.sh" in claude_settings_text, "Claude settings should sync AI state via state-sync.sh", errors)
+    check(
+        ".claude/hooks/scripts/" in claude_settings_text,
+        "Claude settings should invoke shared .claude hook scripts",
+        errors,
+    )
+    check(
+        "claude-code" in claude_settings_text,
+        "Claude hooks should pass target id",
+        errors,
+    )
+    check(
+        "state-sync.sh" in claude_settings_text,
+        "Claude settings should sync AI state via state-sync.sh",
+        errors,
+    )
 
     validate_claude_lifecycle_hooks(claude_settings.get("hooks"), errors)
 
-    check("state-sync.sh" in json.dumps(codex_hooks), "Codex hooks should sync AI state via state-sync.sh", errors)
+    check(
+        "state-sync.sh" in json.dumps(codex_hooks),
+        "Codex hooks should sync AI state via state-sync.sh",
+        errors,
+    )
 
-    check("state-sync.sh pull" in claude_settings_text, "Claude SessionStart hook must pull AI state", errors)
-    check("claude-stop.sh" in claude_settings_text, "Claude Stop hook must use claude-stop.sh", errors)
-    check("upload-bootstrap" not in claude_settings_text, "Claude hooks must not re-mirror the bootstrap (upload-bootstrap)", errors)
-    check("state-sync.sh pull" in github_hook_text, "GitHub hooks SessionStart hook must pull AI state", errors)
-    check("state-sync.sh push" in github_hook_text, "GitHub hooks Stop hook must push AI state", errors)
-    check("upload-bootstrap" not in github_hook_text, "GitHub hooks Stop hook must not re-mirror the bootstrap (upload-bootstrap)", errors)
+    check(
+        "state-sync.sh pull" in claude_settings_text,
+        "Claude SessionStart hook must pull AI state",
+        errors,
+    )
+    check(
+        "claude-stop.sh" in claude_settings_text,
+        "Claude Stop hook must use claude-stop.sh",
+        errors,
+    )
+    check(
+        "upload-bootstrap" not in claude_settings_text,
+        "Claude hooks must not re-mirror the bootstrap (upload-bootstrap)",
+        errors,
+    )
+    check(
+        "state-sync.sh pull" in github_hook_text,
+        "GitHub hooks SessionStart hook must pull AI state",
+        errors,
+    )
+    check(
+        "state-sync.sh push" in github_hook_text,
+        "GitHub hooks Stop hook must push AI state",
+        errors,
+    )
+    check(
+        "upload-bootstrap" not in github_hook_text,
+        "GitHub hooks Stop hook must not re-mirror the bootstrap (upload-bootstrap)",
+        errors,
+    )
     codex_hooks_text = json.dumps(codex_hooks)
-    check("state-sync.sh pull" in codex_hooks_text, "Codex SessionStart hook must pull AI state", errors)
-    check("codex-stop.sh" in codex_hooks_text, "Codex Stop hook must use codex-stop.sh", errors)
-    check("upload-bootstrap" not in codex_hooks_text, "Codex hooks must not re-mirror the bootstrap (upload-bootstrap)", errors)
+    check(
+        "state-sync.sh pull" in codex_hooks_text,
+        "Codex SessionStart hook must pull AI state",
+        errors,
+    )
+    check(
+        "codex-stop.sh" in codex_hooks_text,
+        "Codex Stop hook must use codex-stop.sh",
+        errors,
+    )
+    check(
+        "upload-bootstrap" not in codex_hooks_text,
+        "Codex hooks must not re-mirror the bootstrap (upload-bootstrap)",
+        errors,
+    )
 
     dispatcher = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "run-hook.sh"
     check(
@@ -1130,7 +1440,9 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             {"tool_name": "apply_patch", "tool_input": {"command": patch}},
             target_id,
         )
-        check(returncode == 0, f"hook guardrail failed to run: {script}: {stderr}", errors)
+        check(
+            returncode == 0, f"hook guardrail failed to run: {script}: {stderr}", errors
+        )
         check(
             f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect {protected_path} with {expected_decision}: {script}",
@@ -1147,7 +1459,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             {"tool_name": "Write", "tool_input": {"path": ".env"}},
             target_id,
         )
-        check(returncode == 0, f"protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"protected-file guardrail failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny .env: {hook_root}",
@@ -1159,7 +1475,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             {"tool_name": "Bash", "tool_input": {"command": "touch .env"}},
             target_id,
         )
-        check(returncode == 0, f"Bash protected-file guardrail failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"Bash protected-file guardrail failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"protected-file guardrail did not deny Bash write to .env: {hook_root}",
@@ -1170,7 +1490,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             hook_root / "git-protection.sh",
             {"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD"}},
         )
-        check(returncode == 0, f"git guardrail failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git guardrail failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"git guardrail did not deny git reset --hard: {hook_root}",
@@ -1181,9 +1505,16 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         # tokenizer and smuggle a destructive subcommand past the guard.
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
-            {"tool_name": "Bash", "tool_input": {"command": 'git -C "some dir" reset --hard'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git -C "some dir" reset --hard'},
+            },
         )
-        check(returncode == 0, f"git guardrail (quoted flag) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git guardrail (quoted flag) failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"git guardrail must deny reset --hard behind a quoted -C value: {hook_root}",
@@ -1199,9 +1530,16 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         # clean's own args and produced a false "git clean -fd" denial.
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
-            {"tool_name": "Bash", "tool_input": {"command": "git clean -f && ls -d /tmp"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git clean -f && ls -d /tmp"},
+            },
         )
-        check(returncode == 0, f"git guardrail (chained clean) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git guardrail (chained clean) failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             "permissionDecision" not in stdout,
             f"git guardrail must not treat a chained command's unrelated -d as completing 'git clean -fd': {hook_root}",
@@ -1210,9 +1548,18 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
-            {"tool_name": "Bash", "tool_input": {"command": "git push origin main && curl --force https://example.com"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": "git push origin main && curl --force https://example.com"
+                },
+            },
         )
-        check(returncode == 0, f"git guardrail (chained push) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git guardrail (chained push) failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             "permissionDecision" not in stdout,
             f"git guardrail must not attribute a chained command's --force to the preceding git push: {hook_root}",
@@ -1223,9 +1570,16 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         # comes after a benign command in the same chain.
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
-            {"tool_name": "Bash", "tool_input": {"command": "git status && git reset --hard"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git status && git reset --hard"},
+            },
         )
-        check(returncode == 0, f"git guardrail (chained danger) failed to run: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git guardrail (chained danger) failed to run: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"git guardrail must still deny a real reset --hard chained after a benign command: {hook_root}",
@@ -1236,7 +1590,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         # silently (no spurious ask/deny, no error-log pollution of the repo).
         for guard in ("protect-files.sh", "git-protection.sh"):
             returncode, stdout, stderr = run_hook_raw(hook_root / guard, "", target_id)
-            check(returncode == 0, f"{guard} must exit 0 on empty payload: {hook_root}: {stderr}", errors)
+            check(
+                returncode == 0,
+                f"{guard} must exit 0 on empty payload: {hook_root}: {stderr}",
+                errors,
+            )
             check(
                 "permissionDecision" not in stdout,
                 f"{guard} must not escalate on an empty payload: {hook_root}",
@@ -1256,7 +1614,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             target_id,
             env=no_uv,
         )
-        check(returncode == 0, f"protect-files failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"protect-files failed to run without uv: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"protect-files must deny .env write even without uv: {hook_root}",
@@ -1267,7 +1629,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             {"tool_name": "Bash", "tool_input": {"command": "git -C . reset --hard"}},
             env=no_uv,
         )
-        check(returncode == 0, f"git-protection failed to run without uv: {hook_root}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"git-protection failed to run without uv: {hook_root}: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             f"git-protection must deny reset --hard even without uv (and past global flags): {hook_root}",
@@ -1300,7 +1666,11 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             {"tool_name": "Bash", "tool_input": {"command": command}},
             target_id,
         )
-        check(returncode == 0, f"Bash hook-file guardrail failed to run: {script}: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"Bash hook-file guardrail failed to run: {script}: {stderr}",
+            errors,
+        )
         check(
             f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect Bash hook edit with {expected_decision}: {script}",
@@ -1313,7 +1683,9 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True, check=False)
+    return subprocess.run(
+        ["git", "-C", str(repo), *args], text=True, capture_output=True, check=False
+    )
 
 
 def git_actor_env(actor: str) -> dict[str, str]:
@@ -1343,13 +1715,24 @@ def setup_hook_repo(temp_root: Path) -> Path:
     temp_root = temp_root.resolve()
     repo = temp_root / "repo"
     repo.mkdir()
-    result = subprocess.run(["git", "init", "-b", "dev"], cwd=repo, text=True, capture_output=True, check=False)
+    result = subprocess.run(
+        ["git", "init", "-b", "dev"],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     if result.returncode != 0:
-        subprocess.run(["git", "init"], cwd=repo, text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "init"], cwd=repo, text=True, capture_output=True, check=False
+        )
         git(repo, "checkout", "-b", "dev")
     git(repo, "config", "user.email", "agent@example.com")
     git(repo, "config", "user.name", "Agent")
-    shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "scripts", repo / ".claude" / "hooks" / "scripts")
+    shutil.copytree(
+        TARGET_ROOT / ".claude" / "hooks" / "scripts",
+        repo / ".claude" / "hooks" / "scripts",
+    )
     write(repo / ".gitignore", ".claude/\n")
     write(repo / ".claude" / "MEMORY.md", "# Memory\n")
     write(repo / "README.md", "# Scratch\n")
@@ -1358,7 +1741,9 @@ def setup_hook_repo(temp_root: Path) -> Path:
     return repo
 
 
-def write_big_plan(repo: Path, status: str = "planning", phases: tuple[str, ...] = ("phase-one",)) -> None:
+def write_big_plan(
+    repo: Path, status: str = "planning", phases: tuple[str, ...] = ("phase-one",)
+) -> None:
     phase_lines = "\n".join(f"  - {phase}" for phase in phases)
     write(
         repo / ".claude" / "plans" / "foo.md",
@@ -1409,11 +1794,23 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         # R-HOOKS-04: a present-but-unparseable payload must fail closed
         # (non-zero exit + deny) instead of silently allowing the tool call.
         # Run against the temp repo so fail-closed logging stays isolated.
-        for gate in ("protect-files.sh", "git-protection.sh", "enforce-commit-gate.sh", "enforce-pr-gate.sh"):
+        for gate in (
+            "protect-files.sh",
+            "git-protection.sh",
+            "enforce-commit-gate.sh",
+            "enforce-pr-gate.sh",
+        ):
             returncode, stdout, stderr = run_hook_raw(
-                lifecycle_script(repo, gate), "this is not json", "github-copilot", cwd=repo
+                lifecycle_script(repo, gate),
+                "this is not json",
+                "github-copilot",
+                cwd=repo,
             )
-            check(returncode != 0, f"{gate} must exit non-zero on unparseable payload (got {returncode})", errors)
+            check(
+                returncode != 0,
+                f"{gate} must exit non-zero on unparseable payload (got {returncode})",
+                errors,
+            )
             check(
                 '"permissionDecision":"deny"' in stdout,
                 f"{gate} must deny on unparseable payload",
@@ -1427,15 +1824,19 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             cwd=repo,
         )
         check(returncode == 0, f"commit gate on dev failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "commit gate must deny commits on dev", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must deny commits on dev",
+            errors,
+        )
 
         # R-HOOKS-01: global git flags must not smuggle a commit past the classifier.
         # The quoted-whitespace forms guard the tokenizer against word-splitting a
         # quoted flag value (verified 2026-07-07 regression).
         for command in (
-            'git -C . commit -m x',
-            'git -c a=b commit -m x',
-            'git --git-dir=.git commit -m x',
+            "git -C . commit -m x",
+            "git -c a=b commit -m x",
+            "git --git-dir=.git commit -m x",
             'git -C "some dir" commit -m x',
             "git -c user.name='A B' commit -m x",
         ):
@@ -1445,17 +1846,32 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "github-copilot",
                 cwd=repo,
             )
-            check(returncode == 0, f"commit gate flag-evasion case failed to run: {command}: {stderr}", errors)
-            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny flag-smuggled commit on dev: {command}", errors)
+            check(
+                returncode == 0,
+                f"commit gate flag-evasion case failed to run: {command}: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"commit gate must deny flag-smuggled commit on dev: {command}",
+                errors,
+            )
 
         # R-HOOKS-02: bypass subjects still undergo branch-shape validation.
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "chore(typo): x"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "chore(typo): x"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"commit gate bypass-branch-shape case failed to run: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"commit gate bypass-branch-shape case failed to run: {stderr}",
+            errors,
+        )
         check(
             '"permissionDecision":"deny"' in stdout,
             "commit gate must deny bypass-subject commits off an implementation branch",
@@ -1465,12 +1881,23 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         write(repo / "dirty.txt", "dirty\n")
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"branch gate dirty-tree case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "branch gate must deny dirty-tree branch creation", errors)
+        check(
+            returncode == 0,
+            f"branch gate dirty-tree case failed to run: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "branch gate must deny dirty-tree branch creation",
+            errors,
+        )
         for command in (
             "git switch --create foo_implementation",
             "git checkout -B foo_implementation",
@@ -1482,45 +1909,89 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "github-copilot",
                 cwd=repo,
             )
-            check(returncode == 0, f"branch gate alternate dirty-tree case failed to run: {stderr}", errors)
-            check('"permissionDecision":"deny"' in stdout, f"branch gate must deny dirty-tree branch creation: {command}", errors)
+            check(
+                returncode == 0,
+                f"branch gate alternate dirty-tree case failed to run: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"branch gate must deny dirty-tree branch creation: {command}",
+                errors,
+            )
         (repo / "dirty.txt").unlink()
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git checkout -b "bad:slug_implementation"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git checkout -b "bad:slug_implementation"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"branch gate invalid-slug case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "branch gate must deny invalid branch slugs", errors)
+        check(
+            returncode == 0,
+            f"branch gate invalid-slug case failed to run: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "branch gate must deny invalid branch slugs",
+            errors,
+        )
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"branch gate positive case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' not in stdout, f"branch gate should allow valid branch: {stdout}", errors)
+        check(
+            returncode == 0,
+            f"branch gate positive case failed to run: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            f"branch gate should allow valid branch: {stdout}",
+            errors,
+        )
         git(repo, "checkout", "-b", "foo_implementation")
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "record-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
             "github-copilot",
             cwd=repo,
         )
         check(returncode == 0, f"record branch state failed to run: {stderr}", errors)
-        check("current_phase: phase-one" in read(repo / ".claude" / "plans" / "foo.md"), "record branch state must set current_phase", errors)
+        check(
+            "current_phase: phase-one" in read(repo / ".claude" / "plans" / "foo.md"),
+            "record branch state must set current_phase",
+            errors,
+        )
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "fixup! whatever"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "fixup! whatever"'},
+            },
             "github-copilot",
             cwd=repo,
         )
         check(returncode == 0, f"commit bypass case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' not in stdout, "commit gate must allow bypass prefixes", errors)
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            "commit gate must allow bypass prefixes",
+            errors,
+        )
 
         for command in (
             "git push -u origin foo_implementation",
@@ -1533,8 +2004,16 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "github-copilot",
                 cwd=repo,
             )
-            check(returncode == 0, f"PR gate incomplete-push case failed to run: {stderr}", errors)
-            check('"permissionDecision":"deny"' in stdout, f"PR gate must deny incomplete push command: {command}", errors)
+            check(
+                returncode == 0,
+                f"PR gate incomplete-push case failed to run: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"PR gate must deny incomplete push command: {command}",
+                errors,
+            )
 
         write_small_plan(repo, status="complete")
         write(
@@ -1560,12 +2039,23 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"commit missing-metadata case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "commit gate must reject score reports missing required metadata", errors)
+        check(
+            returncode == 0,
+            f"commit missing-metadata case failed to run: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must reject score reports missing required metadata",
+            errors,
+        )
 
         head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
@@ -1573,7 +2063,10 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", merge_base).stdout
         content_hash = subprocess.run(
             ["git", "-C", str(repo), "hash-object", "--stdin"],
-            input=diff_out, text=True, capture_output=True, check=False,
+            input=diff_out,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         reports_dir = repo / ".claude" / "quality_reports"
 
@@ -1647,57 +2140,116 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         # dirty:true must all be denied even at a passing score.
         for label, report in (
             ("tests_passed:false", score_report(tests_passed=False)),
-            ("tests_passed missing", {k: v for k, v in score_report().items() if k != "tests_passed"}),
+            (
+                "tests_passed missing",
+                {k: v for k, v in score_report().items() if k != "tests_passed"},
+            ),
             ("tests_skipped:true", score_report(tests_skipped=True)),
             ("dirty:true", score_report(dirty=True)),
         ):
             write_score(report)
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-commit-gate.sh"),
-                {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+                {
+                    "tool_name": "Bash",
+                    "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+                },
                 "github-copilot",
                 cwd=repo,
             )
-            check(returncode == 0, f"commit {label} case failed to run: {stderr}", errors)
-            check('"permissionDecision":"deny"' in stdout, f"commit gate must deny score report with {label} even at score 95", errors)
+            check(
+                returncode == 0, f"commit {label} case failed to run: {stderr}", errors
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"commit gate must deny score report with {label} even at score 95",
+                errors,
+            )
 
         # R-SCORE-02: select the newest report by generated_at, not filename.
         # Older passing report has a lexically-later filename; newer failing
         # report has a lexically-earlier one. The gate must pick the newer.
         clear_reports()
-        write(reports_dir / "score-zzz.json", json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n")
-        write(reports_dir / "score-aaa.json", json.dumps(score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2) + "\n")
+        write(
+            reports_dir / "score-zzz.json",
+            json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2)
+            + "\n",
+        )
+        write(
+            reports_dir / "score-aaa.json",
+            json.dumps(
+                score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2
+            )
+            + "\n",
+        )
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"commit report-selection case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "commit gate must select the newest report by generated_at", errors)
-        check("found 50" in stdout, "commit gate must use the newer (failing) report, not the lexically-later passing one", errors)
+        check(
+            returncode == 0,
+            f"commit report-selection case failed to run: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must select the newest report by generated_at",
+            errors,
+        )
+        check(
+            "found 50" in stdout,
+            "commit gate must use the newer (failing) report, not the lexically-later passing one",
+            errors,
+        )
 
         # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
         write_score(score_report(head_sha="0" * 40))
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a stale-HEAD report", errors)
-        check("re-run quality_score" in stdout, "stale-HEAD failure must tell the user to re-run quality_score", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must deny a stale-HEAD report",
+            errors,
+        )
+        check(
+            "re-run quality_score" in stdout,
+            "stale-HEAD failure must tell the user to re-run quality_score",
+            errors,
+        )
 
         # R-SCORE-02: content edited since scoring is caught by the content hash.
         write_score(score_report(content_hash="deadbeef"))
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check('"permissionDecision":"deny"' in stdout, "commit gate must deny a content_hash mismatch", errors)
-        check("re-run quality_score" in stdout, "content_hash mismatch failure must tell the user to re-run quality_score", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "commit gate must deny a content_hash mismatch",
+            errors,
+        )
+        check(
+            "re-run quality_score" in stdout,
+            "content_hash mismatch failure must tell the user to re-run quality_score",
+            errors,
+        )
 
         write_score(score_report())
         # findings-test.json is still the clean baseline written before the
@@ -1705,12 +2257,19 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1 closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
         check(returncode == 0, f"commit positive case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' not in stdout, f"commit gate should allow complete closeout: {stdout}", errors)
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            f"commit gate should allow complete closeout: {stdout}",
+            errors,
+        )
         git(repo, "add", ".")
         git(repo, "commit", "-m", "phase 1 closeout")
         returncode, stdout, stderr = run_hook(
@@ -1719,7 +2278,11 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"record commit no-subject case failed to run: {stderr}", errors)
+        check(
+            returncode == 0,
+            f"record commit no-subject case failed to run: {stderr}",
+            errors,
+        )
         check(
             "status: complete" not in read(repo / ".claude" / "plans" / "foo.md"),
             "record commit closeout must not complete big plan without commit correlation",
@@ -1728,12 +2291,21 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         # R-HOOKS-05: a whitespace-variant subject still correlates with HEAD.
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "record-commit-closeout.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "phase 1   closeout"'}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase 1   closeout"'},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"record commit closeout failed to run: {stderr}", errors)
-        check("status: complete" in read(repo / ".claude" / "plans" / "foo.md"), "record commit closeout must complete final big plan via normalized subject match", errors)
+        check(
+            returncode == 0, f"record commit closeout failed to run: {stderr}", errors
+        )
+        check(
+            "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
+            "record commit closeout must complete final big plan via normalized subject match",
+            errors,
+        )
 
         write(
             repo / ".claude" / "session_logs" / "hooks-bypass.log",
@@ -1745,17 +2317,32 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"PR gate bypass-log case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "PR gate must deny unacknowledged bypass logs", errors)
+        check(
+            returncode == 0, f"PR gate bypass-log case failed to run: {stderr}", errors
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "PR gate must deny unacknowledged bypass logs",
+            errors,
+        )
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-pr-gate.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base main"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "gh pr create --base main"},
+            },
             "github-copilot",
             cwd=repo,
         )
-        check(returncode == 0, f"PR gate base-main case failed to run: {stderr}", errors)
-        check('"permissionDecision":"deny"' in stdout, "PR gate must deny --base main", errors)
+        check(
+            returncode == 0, f"PR gate base-main case failed to run: {stderr}", errors
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "PR gate must deny --base main",
+            errors,
+        )
 
 
 def install_git_hooks(repo: Path) -> None:
@@ -1777,7 +2364,10 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
             lifecycle_script(repo, "record-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
             "github-copilot",
             cwd=repo,
         )
@@ -1797,14 +2387,21 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         def head_and_hash() -> tuple[str, str]:
             head = git(repo, "rev-parse", "HEAD").stdout.strip()
-            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", merge_base).stdout
+            diff_out = git(
+                repo, "diff", "--no-color", "--no-ext-diff", merge_base
+            ).stdout
             content_hash = subprocess.run(
                 ["git", "-C", str(repo), "hash-object", "--stdin"],
-                input=diff_out, text=True, capture_output=True, check=False,
+                input=diff_out,
+                text=True,
+                capture_output=True,
+                check=False,
             ).stdout.strip()
             return head, content_hash
 
-        def score_report(head_sha: str, content_hash_value: str, **overrides: object) -> dict[str, object]:
+        def score_report(
+            head_sha: str, content_hash_value: str, **overrides: object
+        ) -> dict[str, object]:
             report: dict[str, object] = {
                 "score": 95,
                 "branch": "foo_implementation",
@@ -1833,7 +2430,9 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             write(path, json.dumps(report, indent=2) + "\n")
             os.utime(path, None)
 
-        def findings_report(head_sha: str, content_hash_value: str, **overrides: object) -> dict[str, object]:
+        def findings_report(
+            head_sha: str, content_hash_value: str, **overrides: object
+        ) -> dict[str, object]:
             report: dict[str, object] = {
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
@@ -1870,7 +2469,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # Invalid states, one axis at a time, each blocked by a real `git commit`.
 
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}", errors)
+        check(
+            result.returncode != 0,
+            f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}",
+            errors,
+        )
 
         head_sha, content_hash = head_and_hash()
 
@@ -1882,11 +2485,19 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         write_score(score_report(head_sha, content_hash, score=50))
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a quality score below 90", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a quality score below 90",
+            errors,
+        )
 
         write_score(score_report(head_sha, content_hash, content_hash="deadbeef"))
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a stale content_hash", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a stale content_hash",
+            errors,
+        )
 
         # From here the score itself is valid; each remaining axis breaks
         # exactly one other input and restores it before the next.
@@ -1895,17 +2506,32 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         # R-SCORE-03e: findings-report axis probes, score held valid throughout.
         clear_findings()
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a commit with a valid score but no findings report", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a commit with a valid score but no findings report",
+            errors,
+        )
 
         write_findings(
             findings_report(
-                head_sha, content_hash,
-                findings=[{"severity": "CRITICAL", "title": "sql injection in query builder", "file": "work.txt"}],
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "CRITICAL",
+                        "title": "sql injection in query builder",
+                        "file": "work.txt",
+                    }
+                ],
                 counts={"critical": 1, "major": 0, "minor": 0},
             )
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a findings report with a CRITICAL finding", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a findings report with a CRITICAL finding",
+            errors,
+        )
         check(
             "sql injection in query builder" in result.stderr,
             "commit-msg hook's CRITICAL-finding failure must name the finding",
@@ -1914,7 +2540,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         write_findings(findings_report(head_sha, content_hash, ponytail_reviewed=False))
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block non-documentation changes without Ponytail review", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block non-documentation changes without Ponytail review",
+            errors,
+        )
         check(
             "require a fresh Ponytail review" in result.stderr,
             "missing-Ponytail failure must name the required review",
@@ -1938,7 +2568,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             )
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block every surviving Ponytail finding", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block every surviving Ponytail finding",
+            errors,
+        )
         check(
             "unresolved Ponytail finding" in result.stderr,
             "Ponytail-finding failure must explain that simplification is required",
@@ -1947,7 +2581,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         write_findings(findings_report(head_sha, content_hash, content_hash="deadbeef"))
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a stale findings content_hash", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a stale findings content_hash",
+            errors,
+        )
 
         # R-SCORE-03e: select the newest findings report by generated_at, not
         # filename order - mirrors the score report's R-SCORE-02 rule. The
@@ -1956,15 +2594,28 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         clear_findings()
         write(
             reports_dir / "findings-zzz.json",
-            json.dumps(findings_report(head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"), indent=2) + "\n",
+            json.dumps(
+                findings_report(
+                    head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"
+                ),
+                indent=2,
+            )
+            + "\n",
         )
         write(
             reports_dir / "findings-aaa.json",
             json.dumps(
                 findings_report(
-                    head_sha, content_hash,
+                    head_sha,
+                    content_hash,
                     generated_at="2099-06-01T00:00:00Z",
-                    findings=[{"severity": "CRITICAL", "title": "newer critical wins", "file": "work.txt"}],
+                    findings=[
+                        {
+                            "severity": "CRITICAL",
+                            "title": "newer critical wins",
+                            "file": "work.txt",
+                        }
+                    ],
                     counts={"critical": 1, "major": 0, "minor": 0},
                 ),
                 indent=2,
@@ -1972,7 +2623,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             + "\n",
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must select the newest findings report by generated_at", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must select the newest findings report by generated_at",
+            errors,
+        )
         check(
             "newer critical wins" in result.stderr,
             "commit-msg hook must use the newer (CRITICAL) findings report, not the lexically-later clean one",
@@ -1984,16 +2639,34 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block an incomplete small plan", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block an incomplete small plan",
+            errors,
+        )
         write_small_plan(repo, status="complete")
 
-        write(repo / ".claude" / "session_logs" / "phase-one-closeout.md", "# Session\n\nStatus: done\n")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\nStatus: done\n",
+        )
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block a closeout log missing **Status:** COMPLETED", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block a closeout log missing **Status:** COMPLETED",
+            errors,
+        )
 
-        write(repo / ".claude" / "session_logs" / "phase-one-closeout.md", "# Session\n\n**Status:** COMPLETED\n")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n",
+        )
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode != 0, "commit-msg hook must block missing LEARN evidence", errors)
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block missing LEARN evidence",
+            errors,
+        )
 
         # Fully valid state -> allowed; this actually lands the commit.
         write(
@@ -2002,7 +2675,11 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(result.returncode == 0, f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}", errors)
+        check(
+            result.returncode == 0,
+            f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}",
+            errors,
+        )
 
         # R-HOOKS-07: git-alias evasion (the one residual gap the PreToolUse
         # classifier could not close) must hit the same gate as `git commit`.
@@ -2012,32 +2689,56 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         clear_scores()
         alias_result = subprocess.run(
             ["git", "ci", "-m", "invalid via alias"],
-            cwd=repo, text=True, capture_output=True, check=False,
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(alias_result.returncode != 0, "commit-msg hook must block the git-alias evasion path (git ci)", errors)
+        check(
+            alias_result.returncode != 0,
+            "commit-msg hook must block the git-alias evasion path (git ci)",
+            errors,
+        )
 
         # `git -C <path> commit`, invoked from entirely outside the repo: there
         # is no cwd-dependent classifier here for a global flag to evade.
         outside_result = subprocess.run(
             ["git", "-C", str(repo), "commit", "-m", "invalid via -C"],
-            cwd=temp_dir, text=True, capture_output=True, check=False,
+            cwd=temp_dir,
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(outside_result.returncode != 0, "commit-msg hook must block invalid commits invoked via git -C from outside the repo", errors)
+        check(
+            outside_result.returncode != 0,
+            "commit-msg hook must block invalid commits invoked via git -C from outside the repo",
+            errors,
+        )
 
         # Fix the state; the same staged change now commits cleanly.
         head_sha, content_hash = head_and_hash()
         write_score(score_report(head_sha, content_hash))
         write_findings(findings_report(head_sha, content_hash))
         retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
-        check(retry_result.returncode == 0, f"commit-msg hook must allow the retried valid commit: {retry_result.stdout}{retry_result.stderr}", errors)
+        check(
+            retry_result.returncode == 0,
+            f"commit-msg hook must allow the retried valid commit: {retry_result.stdout}{retry_result.stderr}",
+            errors,
+        )
 
         # D4-B: dev/main pass through regardless of ceremony state.
         clear_scores()
         git(repo, "checkout", "dev")
         write(repo / "dev-work.txt", "dev work\n")
         git(repo, "add", "dev-work.txt")
-        dev_result = git(repo, "commit", "-m", "direct commit on dev with no ceremony at all")
-        check(dev_result.returncode == 0, f"commit-msg hook must pass through commits on dev regardless of state: {dev_result.stdout}{dev_result.stderr}", errors)
+        dev_result = git(
+            repo, "commit", "-m", "direct commit on dev with no ceremony at all"
+        )
+        check(
+            dev_result.returncode == 0,
+            f"commit-msg hook must pass through commits on dev regardless of state: {dev_result.stdout}{dev_result.stderr}",
+            errors,
+        )
 
         # `git commit --no-verify` remains the sanctioned manual escape.
         git(repo, "checkout", "foo_implementation")
@@ -2045,14 +2746,25 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         write(repo / "escape.txt", "escape\n")
         git(repo, "add", "escape.txt")
         escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
-        check(escape_result.returncode == 0, f"git commit --no-verify must bypass the commit-msg gate: {escape_result.stdout}{escape_result.stderr}", errors)
+        check(
+            escape_result.returncode == 0,
+            f"git commit --no-verify must bypass the commit-msg gate: {escape_result.stdout}{escape_result.stderr}",
+            errors,
+        )
 
         # R-HOOKS-08: commit-msg also fires for git-merge (githooks(5)). A merge
         # commit from dev must pass through even with invalid ceremony state
         # (dev already diverged above via "direct commit on dev with no
         # ceremony at all"); the very next real commit is still gated normally.
         clear_scores()
-        merge_result = git(repo, "merge", "--no-ff", "dev", "-m", "Merge branch 'dev' into foo_implementation")
+        merge_result = git(
+            repo,
+            "merge",
+            "--no-ff",
+            "dev",
+            "-m",
+            "Merge branch 'dev' into foo_implementation",
+        )
         check(
             merge_result.returncode == 0,
             f"commit-msg hook must allow a merge commit even with invalid ceremony state: {merge_result.stdout}{merge_result.stderr}",
@@ -2077,14 +2789,21 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         temp_root = Path(temp_dir)
         remote = temp_root / "remote.git"
         subprocess.run(
-            ["git", "init", "--bare", "-b", "dev", str(remote)], text=True, capture_output=True, check=False
+            ["git", "init", "--bare", "-b", "dev", str(remote)],
+            text=True,
+            capture_output=True,
+            check=False,
         )
 
         repo = setup_hook_repo(temp_root)
         install_git_hooks(repo)
         git(repo, "remote", "add", "origin", str(remote))
         initial_push = git(repo, "push", "origin", "dev")
-        check(initial_push.returncode == 0, f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}", errors)
+        check(
+            initial_push.returncode == 0,
+            f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}",
+            errors,
+        )
 
         reports_dir = repo / ".claude" / "quality_reports"
 
@@ -2092,7 +2811,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", base).stdout
             return subprocess.run(
                 ["git", "-C", str(repo), "hash-object", "--stdin"],
-                input=diff_out, text=True, capture_output=True, check=False,
+                input=diff_out,
+                text=True,
+                capture_output=True,
+                check=False,
             ).stdout.strip()
 
         def write_score_report(**overrides: object) -> None:
@@ -2147,7 +2869,9 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             report.update(overrides)
             for stale in reports_dir.glob("findings-*.json"):
                 stale.unlink()
-            write(reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n")
+            write(
+                reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n"
+            )
 
         write_big_plan(repo)
         git(repo, "add", ".")
@@ -2157,7 +2881,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
             lifecycle_script(repo, "record-branch-state.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git checkout -b foo_implementation"}},
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
             "github-copilot",
             cwd=repo,
         )
@@ -2168,14 +2895,22 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
 
         # Incomplete small plan -> push blocked, stderr names the phase.
         push_result = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             push_result.returncode != 0,
             f"pre-push hook must block a push with an incomplete small plan: {push_result.stdout}{push_result.stderr}",
             errors,
         )
-        check("phase-one" in push_result.stderr, "pre-push hook failure must name the incomplete phase", errors)
+        check(
+            "phase-one" in push_result.stderr,
+            "pre-push hook failure must name the incomplete phase",
+            errors,
+        )
 
         # Complete the small plan/closeout/LEARN so the commit-count check
         # (>= one commit per phase) is also satisfied.
@@ -2192,7 +2927,11 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         git(repo, "commit", "-m", "phase 1 closeout", "--no-verify")
 
         push_result = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             push_result.returncode == 0,
@@ -2209,18 +2948,32 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         write_findings_report(
             counts={"critical": 0, "major": 2, "minor": 0},
             findings=[
-                {"severity": "MAJOR", "title": "unbounded query", "file": "major-work.txt"},
-                {"severity": "MAJOR", "title": "missing pagination", "file": "major-work.txt"},
+                {
+                    "severity": "MAJOR",
+                    "title": "unbounded query",
+                    "file": "major-work.txt",
+                },
+                {
+                    "severity": "MAJOR",
+                    "title": "missing pagination",
+                    "file": "major-work.txt",
+                },
             ],
         )
-        commit_result = git(repo, "commit", "-m", "phase 1 followup with major findings")
+        commit_result = git(
+            repo, "commit", "-m", "phase 1 followup with major findings"
+        )
         check(
             commit_result.returncode == 0,
             f"commit-msg hook must allow a commit whose findings report has MAJOR findings but zero CRITICAL: {commit_result.stdout}{commit_result.stderr}",
             errors,
         )
         major_push = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             major_push.returncode != 0,
@@ -2228,7 +2981,8 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
         check(
-            "unbounded query" in major_push.stderr or "missing pagination" in major_push.stderr,
+            "unbounded query" in major_push.stderr
+            or "missing pagination" in major_push.stderr,
             "pre-push hook's MAJOR-finding failure must name at least one finding",
             errors,
         )
@@ -2239,7 +2993,11 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         git(repo, "add", "dev-arbitrary.txt")
         git(repo, "commit", "-m", "arbitrary dev commit", "--no-verify")
         dev_push = subprocess.run(
-            ["git", "push", "origin", "dev"], cwd=repo, text=True, capture_output=True, check=False
+            ["git", "push", "origin", "dev"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             dev_push.returncode == 0,
@@ -2255,7 +3013,11 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         git(repo, "add", ".")
         git(repo, "commit", "-m", "break ceremony again", "--no-verify")
         blocked_push = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"], cwd=repo, text=True, capture_output=True, check=False
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             blocked_push.returncode != 0,
@@ -2264,7 +3026,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         escape_push = subprocess.run(
             ["git", "push", "--no-verify", "origin", "foo_implementation"],
-            cwd=repo, text=True, capture_output=True, check=False,
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             escape_push.returncode == 0,
@@ -2276,7 +3041,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         # from the successful pushes above.
         delete_push = subprocess.run(
             ["git", "push", "origin", "--delete", "foo_implementation"],
-            cwd=repo, text=True, capture_output=True, check=False,
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             delete_push.returncode == 0,
@@ -2297,11 +3065,15 @@ def validate_generated_scripts(errors: list[str]) -> None:
                     doraise=True,
                 )
             except py_compile.PyCompileError as error:
-                errors.append(f"generated Python script syntax failed: {script}: {error}")
+                errors.append(
+                    f"generated Python script syntax failed: {script}: {error}"
+                )
 
     # git-hooks/* files are named for git's hook-discovery convention (no .sh
     # suffix), so the glob above would silently skip them.
-    shell_scripts = sorted(DIST_ROOT.rglob("*.sh")) + sorted(DIST_ROOT.rglob("git-hooks/*"))
+    shell_scripts = sorted(DIST_ROOT.rglob("*.sh")) + sorted(
+        DIST_ROOT.rglob("git-hooks/*")
+    )
     for script in shell_scripts:
         result = subprocess.run(
             ["bash", "-n", str(script)],
@@ -2310,7 +3082,11 @@ def validate_generated_scripts(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(result.returncode == 0, f"generated shell script syntax failed: {script}: {result.stderr}", errors)
+        check(
+            result.returncode == 0,
+            f"generated shell script syntax failed: {script}: {result.stderr}",
+            errors,
+        )
 
     findings_script = TARGET_ROOT / ".claude" / "scripts" / "record_findings.py"
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -2337,11 +3113,23 @@ def validate_generated_scripts(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(result.returncode == 0, f"record_findings Ponytail metadata run failed: {result.stderr}", errors)
+        check(
+            result.returncode == 0,
+            f"record_findings Ponytail metadata run failed: {result.stderr}",
+            errors,
+        )
         if report_path.exists():
             report = json.loads(read(report_path))
-            check(report.get("ponytail_reviewed") is True, "record_findings must persist ponytail_reviewed", errors)
-            check(report.get("ponytail_findings") == 0, "record_findings must persist zero Ponytail findings", errors)
+            check(
+                report.get("ponytail_reviewed") is True,
+                "record_findings must persist ponytail_reviewed",
+                errors,
+            )
+            check(
+                report.get("ponytail_findings") == 0,
+                "record_findings must persist zero Ponytail findings",
+                errors,
+            )
             check(
                 report.get("profiles_reviewed") == ["code", "ponytail"],
                 "record_findings must persist sorted reviewed profiles",
@@ -2353,37 +3141,81 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)
-    check(count == shared_skill_count, f"multi-agent skill count mismatch: {count}", errors)
+    check(
+        count == shared_skill_count,
+        f"multi-agent skill count mismatch: {count}",
+        errors,
+    )
     # Skill frontmatter integrity (visibility, description) is checked once,
     # in validate_docs_parity, alongside the other named-inventory checks.
     for skill_name in ("ponytail", "ponytail-review"):
         skill_path = skill_root / skill_name / "SKILL.md"
-        check(skill_path.exists(), f"generated Ponytail skill missing: {skill_path}", errors)
+        check(
+            skill_path.exists(),
+            f"generated Ponytail skill missing: {skill_path}",
+            errors,
+        )
         if skill_path.exists():
             skill_text = read(skill_path)
-            check("visibility: public" in skill_text, f"{skill_name} must remain public", errors)
-            check("license: MIT" in skill_text, f"{skill_name} must retain its MIT license metadata", errors)
+            check(
+                "visibility: public" in skill_text,
+                f"{skill_name} must remain public",
+                errors,
+            )
+            check(
+                "license: MIT" in skill_text,
+                f"{skill_name} must retain its MIT license metadata",
+                errors,
+            )
 
     ponytail_license = TARGET_ROOT / ".claude" / "third_party" / "ponytail" / "LICENSE"
-    ponytail_upstream = TARGET_ROOT / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
-    check(ponytail_license.exists(), "generated target must include Ponytail's MIT license", errors)
-    check(ponytail_upstream.exists(), "generated target must include Ponytail provenance", errors)
+    ponytail_upstream = (
+        TARGET_ROOT / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
+    )
+    check(
+        ponytail_license.exists(),
+        "generated target must include Ponytail's MIT license",
+        errors,
+    )
+    check(
+        ponytail_upstream.exists(),
+        "generated target must include Ponytail provenance",
+        errors,
+    )
     if ponytail_upstream.exists():
         provenance = read(ponytail_upstream)
-        check("v4.8.4" in provenance, "Ponytail provenance must pin release v4.8.4", errors)
-        check("bc9ee94" in provenance, "Ponytail provenance must pin commit bc9ee94", errors)
+        check(
+            "v4.8.4" in provenance,
+            "Ponytail provenance must pin release v4.8.4",
+            errors,
+        )
+        check(
+            "bc9ee94" in provenance,
+            "Ponytail provenance must pin commit bc9ee94",
+            errors,
+        )
         pinned_files = {
-            REPO_ROOT / "shared" / "skills" / "ponytail" / "SKILL.md":
-                "9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3",
-            REPO_ROOT / "shared" / "skills" / "ponytail-review" / "SKILL.md":
-                "bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656",
-            REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE":
-                "fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4",
+            REPO_ROOT
+            / "shared"
+            / "skills"
+            / "ponytail"
+            / "SKILL.md": "9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3",
+            REPO_ROOT
+            / "shared"
+            / "skills"
+            / "ponytail-review"
+            / "SKILL.md": "bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656",
+            REPO_ROOT
+            / "shared"
+            / "third_party"
+            / "ponytail"
+            / "LICENSE": "fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4",
         }
         for source, expected_hash in pinned_files.items():
             actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()
             check(
-                actual_hash == expected_hash and f"sha256:{expected_hash}" in provenance,
+                actual_hash == expected_hash
+                and f"sha256:{expected_hash}" in provenance,
                 f"Ponytail allowlist hash changed without a provenance update: {source}",
                 errors,
             )
@@ -2393,26 +3225,52 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     commit_skill = skill_root / "commit" / "SKILL.md"
     if commit_skill.exists():
         commit_text = read(commit_skill)
-        check("feature/" not in commit_text, "commit skill must not use feature/* branches", errors)
-        check("gh pr merge" not in commit_text, "commit skill must not run gh pr merge (human merges)", errors)
-        check("_implementation" in commit_text, "commit skill must use <plan>_implementation branches", errors)
-        check("--base dev" in commit_text, "commit skill must open PRs against dev", errors)
+        check(
+            "feature/" not in commit_text,
+            "commit skill must not use feature/* branches",
+            errors,
+        )
+        check(
+            "gh pr merge" not in commit_text,
+            "commit skill must not run gh pr merge (human merges)",
+            errors,
+        )
+        check(
+            "_implementation" in commit_text,
+            "commit skill must use <plan>_implementation branches",
+            errors,
+        )
+        check(
+            "--base dev" in commit_text,
+            "commit skill must open PRs against dev",
+            errors,
+        )
 
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
-    generated_prompts = sorted((TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md"))
+    generated_prompts = sorted(
+        (TARGET_ROOT / ".claude" / "prompts").glob("*.prompt.md")
+    )
     check(
-        [path.name for path in generated_prompts] == [path.name for path in shared_prompts],
+        [path.name for path in generated_prompts]
+        == [path.name for path in shared_prompts],
         ".claude prompt output must mirror shared/prompts",
         errors,
     )
     for source in shared_prompts:
         generated = TARGET_ROOT / ".claude" / "prompts" / source.name
-        check(generated.exists() and read(generated) == read(source), f"generated prompt differs from source: {source.name}", errors)
+        check(
+            generated.exists() and read(generated) == read(source),
+            f"generated prompt differs from source: {source.name}",
+            errors,
+        )
 
     shared_profiles = sorted((REPO_ROOT / "shared" / "review-profiles").glob("*.md"))
-    generated_profiles = sorted((TARGET_ROOT / ".claude" / "review-profiles").glob("*.md"))
+    generated_profiles = sorted(
+        (TARGET_ROOT / ".claude" / "review-profiles").glob("*.md")
+    )
     check(
-        [path.name for path in generated_profiles] == [path.name for path in shared_profiles],
+        [path.name for path in generated_profiles]
+        == [path.name for path in shared_profiles],
         ".claude review profile output must mirror shared/review-profiles",
         errors,
     )
@@ -2428,7 +3286,10 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         for entry in skill_config
         if isinstance(entry, dict) and entry.get("enabled") is True
     }
-    expected_skill_paths = {f"../.claude/skills/{path.parent.name}/SKILL.md" for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    expected_skill_paths = {
+        f"../.claude/skills/{path.parent.name}/SKILL.md"
+        for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")
+    }
     check(
         configured_skill_paths == expected_skill_paths,
         "Codex config must enable every shared .claude skill by relative SKILL.md path",
@@ -2447,27 +3308,40 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         text = read(path)
         for fragment in forbidden_fragments:
             if fragment in text:
-                errors.append(f"forbidden fragment in generated file: {path} contains {fragment}")
+                errors.append(
+                    f"forbidden fragment in generated file: {path} contains {fragment}"
+                )
 
-    for root in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md", TARGET_ROOT / ".claude", TARGET_ROOT / ".codex"):
+    for root in (
+        TARGET_ROOT / "CLAUDE.md",
+        TARGET_ROOT / "AGENTS.md",
+        TARGET_ROOT / ".claude",
+        TARGET_ROOT / ".codex",
+    ):
         paths = [root] if root.is_file() else text_files(root)
         for path in paths:
-            if "hooks" in path.parts and "scripts" in path.parts:
+            if (
+                "hooks" in path.parts and "scripts" in path.parts
+            ) or path.name == "bootstrap-ownership.env":
                 continue
             text = read(path)
             for fragment in NON_COPILOT_PATH_LEAKS:
                 if fragment in text:
-                    errors.append(f"Copilot path leaked into non-GitHub output: {path} contains {fragment}")
+                    errors.append(
+                        f"Copilot path leaked into non-GitHub output: {path} contains {fragment}"
+                    )
 
     for root_guidance in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md"):
         text = read(root_guidance)
         check(
-            "pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow" in text,
+            "pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow"
+            in text,
             f"{root_guidance.name} must include the full root workflow summary",
             errors,
         )
         check(
-            "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout" in text,
+            "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout"
+            in text,
             f"{root_guidance.name} must require score >= 90 and documentation updates before closeout",
             errors,
         )
@@ -2506,19 +3380,30 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         TARGET_ROOT / ".claude" / "instructions" / "workspace.instructions.md",
         TARGET_ROOT / ".claude" / "instructions" / "workflow.instructions.md",
         TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md",
-        TARGET_ROOT / ".claude" / "instructions" / "quality-and-testing.instructions.md",
+        TARGET_ROOT
+        / ".claude"
+        / "instructions"
+        / "quality-and-testing.instructions.md",
         TARGET_ROOT / ".claude" / "agents" / "orchestrator.md",
         TARGET_ROOT / ".claude" / "agents" / "verifier.md",
     ):
         text = read(path)
         for fragment in stale_workflow_fragments:
-            check(fragment not in text, f"{path} contains stale workflow/gate phrase: {fragment}", errors)
+            check(
+                fragment not in text,
+                f"{path} contains stale workflow/gate phrase: {fragment}",
+                errors,
+            )
     # docs/history/ holds archived completed plans; they legitimately contain
     # old path patterns and are not living documentation.
     source_paths = [
         REPO_ROOT / "README.md",
         REPO_ROOT / "AGENTS.md",
-        *(p for p in text_files(REPO_ROOT / "docs") if "history" not in p.relative_to(REPO_ROOT / "docs").parts),
+        *(
+            p
+            for p in text_files(REPO_ROOT / "docs")
+            if "history" not in p.relative_to(REPO_ROOT / "docs").parts
+        ),
         *text_files(REPO_ROOT / "shared"),
     ]
     for path in source_paths:
@@ -2531,7 +3416,9 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     # R-VALID-01: assert the concept structurally (the devcontainer-required vs
     # outside-fallback distinction is documented) rather than pinning one exact
     # English sentence that every wording change would have to chase.
-    tool_routing_text = read(TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md").lower()
+    tool_routing_text = read(
+        TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md"
+    ).lower()
     check(
         "devcontainer" in tool_routing_text
         and "required" in tool_routing_text
@@ -2562,14 +3449,14 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     for index, line in enumerate(lines):
         if not line.startswith("description:"):
             continue
-        rest = line[len("description:"):].strip()
+        rest = line[len("description:") :].strip()
         if rest in ("|", ">", "|-", ">-", ""):
             # A blank line does NOT end a YAML block scalar - only a
             # less-indented (or EOF) line does. Treating an empty `follow`
             # as "end of block" would silently truncate the description at
             # the first blank paragraph break.
             block_lines = []
-            for follow in lines[index + 1:]:
+            for follow in lines[index + 1 :]:
                 if not follow.strip() or follow.startswith((" ", "\t")):
                     block_lines.append(follow.strip())
                 else:
@@ -2621,7 +3508,10 @@ def validate_docs_parity(errors: list[str]) -> None:
     # 2a. Skill names: README references are a SUBSET of shared/skills/*/ (it
     # lists "most important", not all) - the reverse is not required.
     referenced_skills = set(re.findall(r"shared/skills/([^/]+)/SKILL\.md", readme_text))
-    disk_skills = {path.parent.name for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")}
+    disk_skills = {
+        path.parent.name
+        for path in (REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")
+    }
     missing_skills = referenced_skills - disk_skills
     check(
         not missing_skills,
@@ -2634,8 +3524,15 @@ def validate_docs_parity(errors: list[str]) -> None:
     agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
     check(agents_match is not None, "README must have a 'Current agents:' list", errors)
     if agents_match:
-        readme_agents = {line[2:].strip() for line in agents_match.group(1).splitlines() if line.strip()}
-        disk_agents = {path.parent.name for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")}
+        readme_agents = {
+            line[2:].strip()
+            for line in agents_match.group(1).splitlines()
+            if line.strip()
+        }
+        disk_agents = {
+            path.parent.name
+            for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")
+        }
         check(
             readme_agents == disk_agents,
             f"README 'Current agents' list must exactly match shared/agents/*/: readme={sorted(readme_agents)} disk={sorted(disk_agents)}",
@@ -2646,8 +3543,15 @@ def validate_docs_parity(errors: list[str]) -> None:
     # against shared/hooks/scripts/*.sh, excluding _lib-frontmatter.sh (a
     # sourced library, not a hook entry point).
     runtime_checks_text = read(REPO_ROOT / "docs" / "runtime-checks.md")
-    hooks_match = re.search(r"Guardrail scripts are generated under[^\n]*:\n\n((?:- [^\n]+\n)+)", runtime_checks_text)
-    check(hooks_match is not None, "docs/runtime-checks.md must list guardrail scripts", errors)
+    hooks_match = re.search(
+        r"Guardrail scripts are generated under[^\n]*:\n\n((?:- [^\n]+\n)+)",
+        runtime_checks_text,
+    )
+    check(
+        hooks_match is not None,
+        "docs/runtime-checks.md must list guardrail scripts",
+        errors,
+    )
     if hooks_match:
         doc_hook_scripts = set(re.findall(r"`([\w.-]+\.sh)`", hooks_match.group(1)))
         disk_hook_scripts = {
@@ -2669,12 +3573,17 @@ def validate_docs_parity(errors: list[str]) -> None:
     for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
         frontmatter = extract_frontmatter(read(skill_path))
         check(
-            "\nvisibility: public" in f"\n{frontmatter}" or "\nvisibility: background" in f"\n{frontmatter}",
+            "\nvisibility: public" in f"\n{frontmatter}"
+            or "\nvisibility: background" in f"\n{frontmatter}",
             f"skill missing visibility metadata: {skill_path}",
             errors,
         )
         description = extract_frontmatter_description(frontmatter).strip()
-        check(bool(description), f"skill missing non-empty description: {skill_path}", errors)
+        check(
+            bool(description),
+            f"skill missing non-empty description: {skill_path}",
+            errors,
+        )
         if not description:
             continue
         duplicate = descriptions.get(description)
@@ -2733,9 +3642,20 @@ def validate_support_files(errors: list[str]) -> None:
         support_root = target_support_root(target)
         for relative_path in required_files:
             path = support_root / relative_path
-            check(path.exists(), f"{target} missing generated support file: {path}", errors)
-            if relative_path in {"templates/plan-big.md", "templates/plan-small.md"} and path.exists():
-                check(read(path).startswith("---\n"), f"{target} plan template must start with frontmatter: {path}", errors)
+            check(
+                path.exists(),
+                f"{target} missing generated support file: {path}",
+                errors,
+            )
+            if (
+                relative_path in {"templates/plan-big.md", "templates/plan-small.md"}
+                and path.exists()
+            ):
+                check(
+                    read(path).startswith("---\n"),
+                    f"{target} plan template must start with frontmatter: {path}",
+                    errors,
+                )
 
 
 def validate_generated_hygiene(errors: list[str]) -> None:
@@ -2764,6 +3684,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
 
+    restore_template = read(
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "restore-root-adapters.sh"
+    )
+    expected_restore_script = render_restore_script(restore_template)
+    for generated_restore in (
+        devcontainer_root / "restore-root-adapters.sh",
+        TARGET_ROOT / ".claude" / "hooks" / "scripts" / "restore-root-adapters.sh",
+    ):
+        check(
+            generated_restore.exists()
+            and read(generated_restore) == expected_restore_script,
+            f"generated restorer allowlist must derive from runtime ownership: {generated_restore}",
+            errors,
+        )
+
     if (devcontainer_root / "devcontainer.json").exists():
         data = json.loads(read(devcontainer_root / "devcontainer.json"))
         build = data.get("build", {})
@@ -2771,25 +3706,58 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         container_env = data.get("containerEnv", {})
         settings = data.get("customizations", {}).get("vscode", {}).get("settings", {})
         post_create = data.get("postCreateCommand", "")
-        check(build.get("context") == ".", "devcontainer build context must stay inside .devcontainer", errors)
-        check(data.get("postStartCommand") == "bash .devcontainer/post-start.sh", "devcontainer must run post-start sync script", errors)
-        check("--gpus" in run_args and "all" in run_args, "devcontainer must default to GPU sandbox run args", errors)
-        check("HF_HUB_ENABLE_HF_TRANSFER" not in container_env, "devcontainer must not use deprecated HF_HUB_ENABLE_HF_TRANSFER", errors)
-        check(container_env.get("HF_XET_HIGH_PERFORMANCE") == "1", "devcontainer must enable high-performance Hugging Face Xet transfers", errors)
+        check(
+            build.get("context") == ".",
+            "devcontainer build context must stay inside .devcontainer",
+            errors,
+        )
+        check(
+            data.get("postStartCommand") == "bash .devcontainer/post-start.sh",
+            "devcontainer must run post-start sync script",
+            errors,
+        )
+        check(
+            "--gpus" in run_args and "all" in run_args,
+            "devcontainer must default to GPU sandbox run args",
+            errors,
+        )
+        check(
+            "HF_HUB_ENABLE_HF_TRANSFER" not in container_env,
+            "devcontainer must not use deprecated HF_HUB_ENABLE_HF_TRANSFER",
+            errors,
+        )
+        check(
+            container_env.get("HF_XET_HIGH_PERFORMANCE") == "1",
+            "devcontainer must enable high-performance Hugging Face Xet transfers",
+            errors,
+        )
         check("HF_TOKEN" in container_env, "devcontainer must forward HF_TOKEN", errors)
-        check("HUGGING_FACE_HUB_TOKEN" in container_env, "devcontainer must forward HUGGING_FACE_HUB_TOKEN", errors)
+        check(
+            "HUGGING_FACE_HUB_TOKEN" in container_env,
+            "devcontainer must forward HUGGING_FACE_HUB_TOKEN",
+            errors,
+        )
         check(
             container_env.get("UV_PROJECT_ENVIRONMENT") == "/home/vscode/.venv",
             "devcontainer must not reuse a host-mounted project .venv",
             errors,
         )
-        check(container_env.get("UV_LINK_MODE") == "copy", "devcontainer must use uv copy link mode", errors)
         check(
-            settings.get("python.defaultInterpreterPath") == "/home/vscode/.venv/bin/python",
+            container_env.get("UV_LINK_MODE") == "copy",
+            "devcontainer must use uv copy link mode",
+            errors,
+        )
+        check(
+            settings.get("python.defaultInterpreterPath")
+            == "/home/vscode/.venv/bin/python",
             "devcontainer VS Code Python path must use the container-local uv venv",
             errors,
         )
-        check("/home/vscode/.venv" in post_create, "devcontainer postCreateCommand must initialize the container-local uv venv", errors)
+        check(
+            "/home/vscode/.venv" in post_create,
+            "devcontainer postCreateCommand must initialize the container-local uv venv",
+            errors,
+        )
         forbidden_run_args = ("/dev/fuse", "apparmor:unconfined")
         for fragment in forbidden_run_args:
             check(
@@ -2800,36 +3768,102 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
 
     if (devcontainer_root / "Dockerfile").exists():
         dockerfile = read(devcontainer_root / "Dockerfile")
-        check("cuda-dl-base" in dockerfile, "devcontainer Dockerfile must use the GPU base image", errors)
-        check("npm install -g context-mode" in dockerfile, "devcontainer Dockerfile must install context-mode", errors)
-        check("command -v context-mode" in dockerfile, "devcontainer Dockerfile must verify context-mode is on PATH", errors)
-        check("context-mode --help >/dev/null" in dockerfile, "devcontainer Dockerfile must verify context-mode CLI execution", errors)
-        check("huggingface_hub" in dockerfile, "devcontainer Dockerfile must install Hugging Face tooling", errors)
-        check("hf_transfer" not in dockerfile, "devcontainer Dockerfile must not install deprecated hf_transfer tooling", errors)
-        check("\"semble[mcp]\"" in dockerfile, "devcontainer Dockerfile must install Semble MCP tooling", errors)
-        check("python3 -c \"import huggingface_hub, semble\"" in dockerfile, "devcontainer Dockerfile must verify HF hub and Semble imports", errors)
-        check("command -v hf" in dockerfile, "devcontainer Dockerfile must verify the HF CLI is on PATH", errors)
-        check("command -v semble" in dockerfile, "devcontainer Dockerfile must verify the Semble CLI is on PATH", errors)
-        check("optional " not in dockerfile.lower(), "devcontainer tool installs must be required, not optional fallbacks", errors)
-        check("getent passwd \"${USERNAME}\"" in dockerfile, "devcontainer Dockerfile must verify the remote user passwd entry", errors)
-        check("id -gn \"${USERNAME}\"" in dockerfile, "devcontainer Dockerfile must use the remote user's actual primary group", errors)
-        check("USER ${USERNAME}" in dockerfile, "devcontainer Dockerfile must switch to the non-host user", errors)
+        check(
+            "cuda-dl-base" in dockerfile,
+            "devcontainer Dockerfile must use the GPU base image",
+            errors,
+        )
+        check(
+            "npm install -g context-mode" in dockerfile,
+            "devcontainer Dockerfile must install context-mode",
+            errors,
+        )
+        check(
+            "command -v context-mode" in dockerfile,
+            "devcontainer Dockerfile must verify context-mode is on PATH",
+            errors,
+        )
+        check(
+            "context-mode --help >/dev/null" in dockerfile,
+            "devcontainer Dockerfile must verify context-mode CLI execution",
+            errors,
+        )
+        check(
+            "huggingface_hub" in dockerfile,
+            "devcontainer Dockerfile must install Hugging Face tooling",
+            errors,
+        )
+        check(
+            "hf_transfer" not in dockerfile,
+            "devcontainer Dockerfile must not install deprecated hf_transfer tooling",
+            errors,
+        )
+        check(
+            '"semble[mcp]"' in dockerfile,
+            "devcontainer Dockerfile must install Semble MCP tooling",
+            errors,
+        )
+        check(
+            'python3 -c "import huggingface_hub, semble"' in dockerfile,
+            "devcontainer Dockerfile must verify HF hub and Semble imports",
+            errors,
+        )
+        check(
+            "command -v hf" in dockerfile,
+            "devcontainer Dockerfile must verify the HF CLI is on PATH",
+            errors,
+        )
+        check(
+            "command -v semble" in dockerfile,
+            "devcontainer Dockerfile must verify the Semble CLI is on PATH",
+            errors,
+        )
+        check(
+            "optional " not in dockerfile.lower(),
+            "devcontainer tool installs must be required, not optional fallbacks",
+            errors,
+        )
+        check(
+            'getent passwd "${USERNAME}"' in dockerfile,
+            "devcontainer Dockerfile must verify the remote user passwd entry",
+            errors,
+        )
+        check(
+            'id -gn "${USERNAME}"' in dockerfile,
+            "devcontainer Dockerfile must use the remote user's actual primary group",
+            errors,
+        )
+        check(
+            "USER ${USERNAME}" in dockerfile,
+            "devcontainer Dockerfile must switch to the non-host user",
+            errors,
+        )
 
     post_start = devcontainer_root / "post-start.sh"
     if post_start.exists():
         post_start_text = read(post_start)
-        check("uv run python" not in post_start_text, "post-start must not invoke project uv for AI state sync", errors)
+        check(
+            "uv run python" not in post_start_text,
+            "post-start must not invoke project uv for AI state sync",
+            errors,
+        )
         # R-SYNC-05: setup's checkout populates .claude/hooks/git-hooks/, so
         # core.hooksPath is configured immediately after it and before pull -
         # no window where a fresh container is ungated once setup completes.
         setup_index = post_start_text.find('"$STATE_SYNC" setup')
-        hooks_path_index = post_start_text.find('git -C "$REPO_ROOT" config core.hooksPath')
+        hooks_path_index = post_start_text.find(
+            'git -C "$REPO_ROOT" config core.hooksPath'
+        )
         pull_index = post_start_text.find('"$STATE_SYNC" pull')
         restore_index = post_start_text.find('"$RESTORE_ROOT_ADAPTERS"')
         check(setup_index != -1, "post-start must run state-sync.sh setup", errors)
-        check(hooks_path_index != -1, "post-start must configure core.hooksPath", errors)
+        check(
+            hooks_path_index != -1, "post-start must configure core.hooksPath", errors
+        )
         check(pull_index != -1, "post-start must run state-sync.sh pull", errors)
-        check(restore_index != -1, "post-start must run restore-root-adapters.sh", errors)
+        check(
+            restore_index != -1, "post-start must run restore-root-adapters.sh", errors
+        )
         check(
             -1 not in (setup_index, hooks_path_index, pull_index, restore_index)
             and setup_index < hooks_path_index < pull_index < restore_index,
@@ -2857,7 +3891,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(init_result.returncode == 0, f"temporary git init failed: {init_result.stderr}", errors)
+        check(
+            init_result.returncode == 0,
+            f"temporary git init failed: {init_result.stderr}",
+            errors,
+        )
 
         # R-SYNC-05: no bucket, no --state-remote — the installer must succeed
         # with no sync configuration at all (state stays local-only, per D4's
@@ -2871,12 +3909,35 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(install_result.returncode == 0, f"installer temp run failed: {install_result.stderr}", errors)
-        check_codex_hook_trust_notice("default installer", install_result.stdout, errors, dry_run=False)
-        check(not any(trust_home.iterdir()), "installer must not write user-level trust state", errors)
-        check((temp_repo / ".devcontainer" / "devcontainer.json").exists(), "installer must copy trackable devcontainer", errors)
-        check((temp_repo / ".gitignore").exists(), "installer must create or update .gitignore", errors)
-        check("AI_STATE_REMOTE" not in read(temp_repo / ".devcontainer" / "devcontainer.json"), "installer must not write AI_STATE_REMOTE without --state-remote", errors)
+        check(
+            install_result.returncode == 0,
+            f"installer temp run failed: {install_result.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "default installer", install_result.stdout, errors, dry_run=False
+        )
+        check(
+            not any(trust_home.iterdir()),
+            "installer must not write user-level trust state",
+            errors,
+        )
+        check(
+            (temp_repo / ".devcontainer" / "devcontainer.json").exists(),
+            "installer must copy trackable devcontainer",
+            errors,
+        )
+        check(
+            (temp_repo / ".gitignore").exists(),
+            "installer must create or update .gitignore",
+            errors,
+        )
+        check(
+            "AI_STATE_REMOTE"
+            not in read(temp_repo / ".devcontainer" / "devcontainer.json"),
+            "installer must not write AI_STATE_REMOTE without --state-remote",
+            errors,
+        )
         for relative_path in (
             ".claude/skills/ponytail/SKILL.md",
             ".claude/skills/ponytail-review/SKILL.md",
@@ -2889,7 +3950,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 errors,
             )
         check(
-            "v4.8.4" in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
+            "v4.8.4"
+            in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
             "installed Ponytail provenance must retain the pinned release",
             errors,
         )
@@ -2898,34 +3960,66 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         # and makes its own bootstrap: install commit (distinct from the Stop
         # hook's session: commits).
         claude_git = temp_repo / ".claude" / ".git"
-        check(claude_git.is_dir(), "installer must create the nested .claude/ AI-state repo", errors)
+        check(
+            claude_git.is_dir(),
+            "installer must create the nested .claude/ AI-state repo",
+            errors,
+        )
         if claude_git.is_dir():
             claude_branch = subprocess.run(
                 ["git", "-C", str(temp_repo / ".claude"), "branch", "--show-current"],
-                text=True, capture_output=True, check=False,
+                text=True,
+                capture_output=True,
+                check=False,
             )
-            check(claude_branch.stdout.strip() == "ai-state", "nested .claude/ repo must be on branch ai-state", errors)
+            check(
+                claude_branch.stdout.strip() == "ai-state",
+                "nested .claude/ repo must be on branch ai-state",
+                errors,
+            )
             claude_log = subprocess.run(
                 ["git", "-C", str(temp_repo / ".claude"), "log", "--oneline"],
-                text=True, capture_output=True, check=False,
+                text=True,
+                capture_output=True,
+                check=False,
             )
-            check("bootstrap:" in claude_log.stdout, "installer must make a bootstrap:-prefixed commit in .claude/", errors)
+            check(
+                "bootstrap:" in claude_log.stdout,
+                "installer must make a bootstrap:-prefixed commit in .claude/",
+                errors,
+            )
 
         # Consumer MEMORY.md is mutable state, not bootstrap content. A repeat
         # install must preserve it even though dist/ carries the blank seed
         # template used for fresh consumers.
-        consumer_memory = "# Consumer memory\n\n- [LEARN:domain] preserve this exact content\n"
+        consumer_memory = (
+            "# Consumer memory\n\n- [LEARN:domain] preserve this exact content\n"
+        )
         memory_path = temp_repo / ".claude" / "MEMORY.md"
         write(memory_path, consumer_memory)
-        subprocess.run(["git", "-C", str(temp_repo / ".claude"), "add", "MEMORY.md"], check=False)
+        subprocess.run(
+            ["git", "-C", str(temp_repo / ".claude"), "add", "MEMORY.md"], check=False
+        )
         memory_commit = subprocess.run(
-            ["git", "-C", str(temp_repo / ".claude"), "commit", "-q", "-m", "session: add consumer memory"],
+            [
+                "git",
+                "-C",
+                str(temp_repo / ".claude"),
+                "commit",
+                "-q",
+                "-m",
+                "session: add consumer memory",
+            ],
             env=install_env,
             text=True,
             capture_output=True,
             check=False,
         )
-        check(memory_commit.returncode == 0, f"consumer memory fixture commit failed: {memory_commit.stderr}", errors)
+        check(
+            memory_commit.returncode == 0,
+            f"consumer memory fixture commit failed: {memory_commit.stderr}",
+            errors,
+        )
         reinstall_result = subprocess.run(
             [sys.executable, str(installer), str(temp_repo)],
             cwd=REPO_ROOT,
@@ -2934,21 +4028,110 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(reinstall_result.returncode == 0, f"installer repeat run failed: {reinstall_result.stderr}", errors)
+        check(
+            reinstall_result.returncode == 0,
+            f"installer repeat run failed: {reinstall_result.stderr}",
+            errors,
+        )
         check(
             memory_path.read_bytes() == consumer_memory.encode(),
             "installer repeat run must preserve git-backed consumer MEMORY.md byte-for-byte",
             errors,
         )
 
+        consumer_state = {
+            "MEMORY.md": b"# Consumer memory\n",
+            "plans/consumer-plan.md": b"consumer plan\n",
+            "explorations/consumer-note.md": b"consumer exploration\n",
+            "session_logs/consumer.log": b"consumer log\n",
+            "quality_reports/consumer.json": b'{"consumer": true}\n',
+            "instructions/project-context.instructions.md": b"consumer project context\n",
+        }
+        check(
+            tuple(CONSUMER_STATE_PATHS)
+            == (
+                "MEMORY.md",
+                "plans",
+                "explorations",
+                "session_logs",
+                "quality_reports",
+                "instructions/project-context.instructions.md",
+            ),
+            "consumer-state fixture must cover every ownership-contract root",
+            errors,
+        )
+        for relative_path, content in consumer_state.items():
+            state_path = temp_repo / ".claude" / relative_path
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_bytes(content)
+        subprocess.run(
+            ["git", "-C", str(temp_repo / ".claude"), "add", *consumer_state],
+            check=False,
+        )
+        state_commit = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(temp_repo / ".claude"),
+                "commit",
+                "-q",
+                "-m",
+                "session: add consumer state",
+            ],
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            state_commit.returncode == 0,
+            f"consumer state fixture commit failed: {state_commit.stderr}",
+            errors,
+        )
+        state_reinstall = subprocess.run(
+            [sys.executable, str(installer), str(temp_repo)],
+            cwd=REPO_ROOT,
+            env=install_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            state_reinstall.returncode == 0,
+            f"installer repeat state refresh failed: {state_reinstall.stderr}",
+            errors,
+        )
+        for relative_path, content in consumer_state.items():
+            check(
+                (temp_repo / ".claude" / relative_path).read_bytes() == content,
+                f"installer repeat run must preserve consumer state {relative_path} byte-for-byte",
+                errors,
+            )
+
         # A legacy consumer has mutable state but no nested .claude git repo.
         # Preservation must happen before migrate-from-hf snapshots that state.
         legacy_repo = Path(temp_dir_name) / "legacy-consumer"
         legacy_repo.mkdir()
-        subprocess.run(["git", "init", str(legacy_repo)], text=True, capture_output=True, check=False)
-        legacy_memory = "# Legacy memory\n\n- [LEARN:domain] preserve before migration\n"
+        subprocess.run(
+            ["git", "init", str(legacy_repo)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        legacy_memory = (
+            "# Legacy memory\n\n- [LEARN:domain] preserve before migration\n"
+        )
         legacy_memory_path = legacy_repo / ".claude" / "MEMORY.md"
         write(legacy_memory_path, legacy_memory)
+        legacy_state = {
+            relative_path: content.replace(b"Consumer", b"Legacy")
+            for relative_path, content in consumer_state.items()
+        }
+        legacy_state["MEMORY.md"] = legacy_memory.encode()
+        for relative_path, content in legacy_state.items():
+            state_path = legacy_repo / ".claude" / relative_path
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_bytes(content)
         legacy_install_result = subprocess.run(
             [sys.executable, str(installer), str(legacy_repo)],
             cwd=REPO_ROOT,
@@ -2978,6 +4161,30 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "legacy migration commit must contain the original consumer MEMORY.md",
             errors,
         )
+        for relative_path, content in legacy_state.items():
+            state_path = legacy_repo / ".claude" / relative_path
+            check(
+                state_path.read_bytes() == content,
+                f"installer legacy refresh must preserve consumer state {relative_path} byte-for-byte",
+                errors,
+            )
+            migrated_state = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(legacy_repo / ".claude"),
+                    "show",
+                    f"HEAD~1:{relative_path}",
+                ],
+                text=False,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                migrated_state.returncode == 0 and migrated_state.stdout == content,
+                f"legacy migration commit must contain original consumer state {relative_path}",
+                errors,
+            )
 
         # D3: --state-remote persists AI_STATE_REMOTE into the committed
         # devcontainer config, since a fresh container clone has no other way
@@ -2986,24 +4193,48 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         subprocess.run(["git", "init", "-q", "--bare", str(remote_repo)], check=False)
         remote_temp_repo = Path(temp_dir_name) / "consumer-with-remote"
         remote_temp_repo.mkdir()
-        subprocess.run(["git", "init", str(remote_temp_repo)], text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "init", str(remote_temp_repo)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
         remote_install_result = subprocess.run(
-            [sys.executable, str(installer), str(remote_temp_repo), "--state-remote", str(remote_repo)],
+            [
+                sys.executable,
+                str(installer),
+                str(remote_temp_repo),
+                "--state-remote",
+                str(remote_repo),
+            ],
             cwd=REPO_ROOT,
             env=install_env,
             text=True,
             capture_output=True,
             check=False,
         )
-        check(remote_install_result.returncode == 0, f"installer --state-remote run failed: {remote_install_result.stderr}", errors)
         check(
-            f'"AI_STATE_REMOTE": "{remote_repo}"' in read(remote_temp_repo / ".devcontainer" / "devcontainer.json"),
+            remote_install_result.returncode == 0,
+            f"installer --state-remote run failed: {remote_install_result.stderr}",
+            errors,
+        )
+        check(
+            f'"AI_STATE_REMOTE": "{remote_repo}"'
+            in read(remote_temp_repo / ".devcontainer" / "devcontainer.json"),
             "installer must persist --state-remote into the devcontainer config",
             errors,
         )
         remote_branches = subprocess.run(
-            ["git", "--git-dir", str(remote_repo), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(remote_repo),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             "refs/heads/ai-state" in remote_branches.stdout,
@@ -3115,7 +4346,9 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check_batch_dry_run_summary(local_only_batch_dry_run.stdout, errors)
 
         # R-POLICY-01: installer substitutes the workspace project-name placeholder.
-        installed_workspace = read(temp_repo / ".claude" / "instructions" / "workspace.instructions.md")
+        installed_workspace = read(
+            temp_repo / ".claude" / "instructions" / "workspace.instructions.md"
+        )
         check(
             "[TODO: project name" not in installed_workspace,
             "installer must fill the workspace project-name placeholder",
@@ -3140,7 +4373,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
         commit_msg_hook = temp_repo / ".claude" / "hooks" / "git-hooks" / "commit-msg"
-        check(commit_msg_hook.exists(), "installer must copy the commit-msg git hook", errors)
+        check(
+            commit_msg_hook.exists(),
+            "installer must copy the commit-msg git hook",
+            errors,
+        )
         check(
             commit_msg_hook.exists() and bool(commit_msg_hook.stat().st_mode & 0o111),
             "installer must leave the commit-msg git hook executable",
@@ -3153,25 +4390,49 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(ignored_result.returncode == 0, "installer must ignore generated .claude content", errors)
+        check(
+            ignored_result.returncode == 0,
+            "installer must ignore generated .claude content",
+            errors,
+        )
 
         devcontainer_ignore_result = subprocess.run(
-            ["git", "-C", str(temp_repo), "check-ignore", ".devcontainer/devcontainer.json"],
+            [
+                "git",
+                "-C",
+                str(temp_repo),
+                "check-ignore",
+                ".devcontainer/devcontainer.json",
+            ],
             text=True,
             capture_output=True,
             check=False,
         )
-        check(devcontainer_ignore_result.returncode != 0, "installer must leave .devcontainer trackable", errors)
+        check(
+            devcontainer_ignore_result.returncode != 0,
+            "installer must leave .devcontainer trackable",
+            errors,
+        )
 
         # R-SYNC-03: default install keeps the Copilot cloud surface ignored
         # (local-IDE only).
         copilot_ignored = subprocess.run(
-            ["git", "-C", str(temp_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            [
+                "git",
+                "-C",
+                str(temp_repo),
+                "check-ignore",
+                ".github/agents/orchestrator.agent.md",
+            ],
             text=True,
             capture_output=True,
             check=False,
         )
-        check(copilot_ignored.returncode == 0, "default install must ignore the Copilot cloud surface (.github/agents)", errors)
+        check(
+            copilot_ignored.returncode == 0,
+            "default install must ignore the Copilot cloud surface (.github/agents)",
+            errors,
+        )
 
         # D5: root adapter files are mirrored into .claude/bootstrap-root/ so
         # state-sync.sh's checkout of .claude/ alone still carries them.
@@ -3191,7 +4452,27 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as flag_dir_name:
         flag_repo = Path(flag_dir_name) / "consumer"
         flag_repo.mkdir()
-        subprocess.run(["git", "init", str(flag_repo)], text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "init", str(flag_repo)], text=True, capture_output=True, check=False
+        )
+        default_install = subprocess.run(
+            [sys.executable, str(installer), str(flag_repo)],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            default_install.returncode == 0,
+            f"default installer run before mode migration failed: {default_install.stderr}",
+            errors,
+        )
+        check(
+            (flag_repo / ".claude" / "bootstrap-root" / ".github" / "agents").exists(),
+            "default install must seed the Copilot surface before mode migration",
+            errors,
+        )
         flag_install = subprocess.run(
             [
                 sys.executable,
@@ -3205,19 +4486,157 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(flag_install.returncode == 0, f"installer --commit-copilot-surface run failed: {flag_install.stderr}", errors)
-        gitignore_text = read(flag_repo / ".gitignore") if (flag_repo / ".gitignore").exists() else ""
-        check(".github/agents/" not in gitignore_text, "--commit-copilot-surface must omit .github/agents from the ignore block", errors)
+        check(
+            flag_install.returncode == 0,
+            f"installer --commit-copilot-surface run failed: {flag_install.stderr}",
+            errors,
+        )
+        gitignore_text = (
+            read(flag_repo / ".gitignore")
+            if (flag_repo / ".gitignore").exists()
+            else ""
+        )
+        check(
+            ".github/agents/" not in gitignore_text,
+            "--commit-copilot-surface must omit .github/agents from the ignore block",
+            errors,
+        )
         surface_trackable = subprocess.run(
-            ["git", "-C", str(flag_repo), "check-ignore", ".github/agents/orchestrator.agent.md"],
+            [
+                "git",
+                "-C",
+                str(flag_repo),
+                "check-ignore",
+                ".github/agents/orchestrator.agent.md",
+            ],
             text=True,
             capture_output=True,
             check=False,
         )
-        check(surface_trackable.returncode != 0, "--commit-copilot-surface must leave .github/agents trackable", errors)
+        check(
+            surface_trackable.returncode != 0,
+            "--commit-copilot-surface must leave .github/agents trackable",
+            errors,
+        )
         check(
             not (flag_repo / ".claude" / "bootstrap-root" / ".github").exists(),
-            "--commit-copilot-surface must not double-track the Copilot surface in .claude/bootstrap-root/",
+            "migrating to --commit-copilot-surface must remove the Copilot surface from .claude/bootstrap-root/",
+            errors,
+        )
+        ownership_manifest = read(flag_repo / ".claude" / "bootstrap-ownership.env")
+        check(
+            "BOOTSTRAP_ROOT_PATH=.github/" not in ownership_manifest,
+            "migrating to --commit-copilot-surface must remove Copilot paths from the restoration manifest",
+            errors,
+        )
+        check(
+            "BOOTSTRAP_ROOT_PATH=.codex\n" in ownership_manifest,
+            "mode migration must preserve non-Copilot restoration manifest paths",
+            errors,
+        )
+        check(
+            "BOOTSTRAP_COMMIT_COPILOT_SURFACE=1\n" in ownership_manifest,
+            "committed Copilot mode must be persisted as inert manifest data",
+            errors,
+        )
+
+        committed_agent = flag_repo / ".github" / "agents" / "orchestrator.agent.md"
+        subprocess.run(["git", "-C", str(flag_repo), "add", ".github"], check=False)
+        write(committed_agent, "stale committed agent\n")
+        repeat_flag_install = subprocess.run(
+            [
+                sys.executable,
+                str(installer),
+                str(flag_repo),
+                "--commit-copilot-surface",
+            ],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            repeat_flag_install.returncode == 0,
+            f"repeat committed-surface install failed: {repeat_flag_install.stderr}",
+            errors,
+        )
+        check(
+            read(committed_agent)
+            == read(TARGET_ROOT / ".github" / "agents" / "orchestrator.agent.md"),
+            "repeat committed-surface installs must refresh tracked generated Copilot files",
+            errors,
+        )
+
+        local_repo = Path(flag_dir_name) / "local-consumer"
+        local_repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(local_repo)], check=False)
+        local_install = subprocess.run(
+            [sys.executable, str(installer), str(local_repo)],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            local_install.returncode == 0,
+            f"local-surface fixture install failed: {local_install.stderr}",
+            errors,
+        )
+        retained_batch = subprocess.run(
+            [
+                sys.executable,
+                str(updater),
+                "--skip-regen",
+                "--dry-run",
+                str(flag_repo),
+                str(local_repo),
+            ],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            retained_batch.returncode == 0,
+            f"mixed-mode updater dry run failed: {retained_batch.stderr}",
+            errors,
+        )
+        check(
+            retained_batch.stdout.count("Copilot surface mode: committed (retained)")
+            == 1
+            and retained_batch.stdout.count(
+                "Copilot surface mode: local-only (retained)"
+            )
+            == 1,
+            "batch updates must retain each consumer's persisted Copilot mode",
+            errors,
+        )
+        selected_batch = subprocess.run(
+            [
+                sys.executable,
+                str(updater),
+                "--skip-regen",
+                "--dry-run",
+                "--commit-copilot-surface",
+                str(flag_repo),
+                str(local_repo),
+            ],
+            cwd=REPO_ROOT,
+            env=git_identity_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            selected_batch.returncode == 0
+            and selected_batch.stdout.count(
+                "Copilot surface mode: committed (explicit)"
+            )
+            == 2,
+            "batch updates must forward an explicit Copilot mode to every consumer",
             errors,
         )
         # State still stays ignored regardless of the flag.
@@ -3227,7 +4646,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(state_ignored.returncode == 0, "--commit-copilot-surface must still ignore .claude state", errors)
+        check(
+            state_ignored.returncode == 0,
+            "--commit-copilot-surface must still ignore .claude state",
+            errors,
+        )
 
 
 def state_sync_script(consumer: Path) -> Path:
@@ -3240,7 +4663,9 @@ def state_sync_script(consumer: Path) -> Path:
     return consumer / ".devcontainer" / "state-sync.sh"
 
 
-def run_state_sync(consumer: Path, mode: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+def run_state_sync(
+    consumer: Path, mode: str, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["bash", str(state_sync_script(consumer)), mode],
         cwd=consumer,
@@ -3263,32 +4688,91 @@ def validate_state_sync(errors: list[str]) -> None:
         bare_origin = temp_root / "origin.git"
         subprocess.run(["git", "init", "-q", "--bare", str(bare_origin)], check=False)
         subprocess.run(
-            ["git", "--git-dir", str(bare_origin), "symbolic-ref", "HEAD", "refs/heads/main"],
+            [
+                "git",
+                "--git-dir",
+                str(bare_origin),
+                "symbolic-ref",
+                "HEAD",
+                "refs/heads/main",
+            ],
             check=False,
         )
 
         # 1. Install on machine A: ai-state exists on the remote; nested repo checked out.
         machine_a = temp_root / "machine-a"
-        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_a)], text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "clone", "-q", str(bare_origin), str(machine_a)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
         env_a = git_actor_env("MachineA")
         install_a = subprocess.run(
             [sys.executable, str(installer), str(machine_a)],
-            cwd=REPO_ROOT, env=env_a, text=True, capture_output=True, check=False,
+            cwd=REPO_ROOT,
+            env=env_a,
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(install_a.returncode == 0, f"[state-sync] install on machine A failed: {install_a.stderr}", errors)
-        subprocess.run(["git", "-C", str(machine_a), "add", ".devcontainer", ".gitignore"], check=False)
+        check(
+            install_a.returncode == 0,
+            f"[state-sync] install on machine A failed: {install_a.stderr}",
+            errors,
+        )
         subprocess.run(
-            ["git", "-C", str(machine_a), "commit", "-q", "-m", "chore: add AI devcontainer bootstrap"],
-            env=env_a, check=False,
+            ["git", "-C", str(machine_a), "add", ".devcontainer", ".gitignore"],
+            check=False,
         )
-        subprocess.run(["git", "-C", str(machine_a), "push", "-q", "origin", "HEAD:refs/heads/main"], check=False)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(machine_a),
+                "commit",
+                "-q",
+                "-m",
+                "chore: add AI devcontainer bootstrap",
+            ],
+            env=env_a,
+            check=False,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(machine_a),
+                "push",
+                "-q",
+                "origin",
+                "HEAD:refs/heads/main",
+            ],
+            check=False,
+        )
 
         remote_refs = subprocess.run(
-            ["git", "--git-dir", str(bare_origin), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(bare_origin),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check("refs/heads/ai-state" in remote_refs.stdout, "[state-sync] install must push ai-state to the bare origin", errors)
-        check((machine_a / ".claude" / ".git").is_dir(), "[state-sync] install must check out a nested .claude/ repo", errors)
+        check(
+            "refs/heads/ai-state" in remote_refs.stdout,
+            "[state-sync] install must push ai-state to the bare origin",
+            errors,
+        )
+        check(
+            (machine_a / ".claude" / ".git").is_dir(),
+            "[state-sync] install must check out a nested .claude/ repo",
+            errors,
+        )
 
         # Phase A: checkpoint is a local-only commit boundary, while publish
         # transmits only an existing checkpoint. Trace2 distinguishes this
@@ -3305,18 +4789,36 @@ def validate_state_sync(errors: list[str]) -> None:
         )
         remote_before_checkpoint_publish = subprocess.run(
             ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
-        check(checkpoint.returncode == 0, f"[state-sync] checkpoint failed: {checkpoint.stderr}", errors)
-        check(checkpoint.stdout == "", "[state-sync] checkpoint must not write stdout", errors)
+        check(
+            checkpoint.returncode == 0,
+            f"[state-sync] checkpoint failed: {checkpoint.stderr}",
+            errors,
+        )
+        check(
+            checkpoint.stdout == "",
+            "[state-sync] checkpoint must not write stdout",
+            errors,
+        )
         check(
             not traced_remote_git_commands(checkpoint_trace, "checkpoint", errors),
             "[state-sync] checkpoint must not run fetch, ls-remote, pull, merge, or push",
             errors,
         )
         checkpoint_remote_before_publish = subprocess.run(
-            ["git", "--git-dir", str(bare_origin), "show", f"ai-state:{checkpoint_relpath.as_posix()}"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(bare_origin),
+                "show",
+                f"ai-state:{checkpoint_relpath.as_posix()}",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             checkpoint_remote_before_publish.returncode != 0,
@@ -3325,28 +4827,46 @@ def validate_state_sync(errors: list[str]) -> None:
         )
         checkpoint_head = subprocess.run(
             ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         checkpoint_count = subprocess.run(
             ["git", "-C", str(machine_a / ".claude"), "rev-list", "--count", "HEAD"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         first_publish = run_state_sync(machine_a, "publish", env_a)
         second_publish = run_state_sync(machine_a, "publish", env_a)
         remote_after_publish = subprocess.run(
             ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         checkpoint_head_after_publish = subprocess.run(
             ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         checkpoint_count_after_publish = subprocess.run(
             ["git", "-C", str(machine_a / ".claude"), "rev-list", "--count", "HEAD"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
-        check(first_publish.returncode == 0 and second_publish.returncode == 0, "[state-sync] publish must exit zero", errors)
-        check(first_publish.stdout == second_publish.stdout == "", "[state-sync] publish must not write stdout", errors)
+        check(
+            first_publish.returncode == 0 and second_publish.returncode == 0,
+            "[state-sync] publish must exit zero",
+            errors,
+        )
+        check(
+            first_publish.stdout == second_publish.stdout == "",
+            "[state-sync] publish must not write stdout",
+            errors,
+        )
         check(
             remote_after_publish != remote_before_checkpoint_publish,
             "[state-sync] publish must advance the remote with the checkpoint",
@@ -3365,15 +4885,31 @@ def validate_state_sync(errors: list[str]) -> None:
         dirty_publish = run_state_sync(machine_a, "publish", env_a)
         dirty_remote = subprocess.run(
             ["git", "--git-dir", str(bare_origin), "rev-parse", "ai-state"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
         dirty_head_after = subprocess.run(
             ["git", "-C", str(machine_a / ".claude"), "rev-parse", "HEAD"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         ).stdout.strip()
-        check(dirty_publish.returncode == 0, "[state-sync] dirty publish must remain non-blocking", errors)
-        check(dirty_publish.stdout == "", "[state-sync] dirty publish must not write stdout", errors)
-        check("dirty" in dirty_publish.stderr.lower(), "[state-sync] dirty publish must explain the checkpoint boundary", errors)
+        check(
+            dirty_publish.returncode == 0,
+            "[state-sync] dirty publish must remain non-blocking",
+            errors,
+        )
+        check(
+            dirty_publish.stdout == "",
+            "[state-sync] dirty publish must not write stdout",
+            errors,
+        )
+        check(
+            "dirty" in dirty_publish.stderr.lower(),
+            "[state-sync] dirty publish must explain the checkpoint boundary",
+            errors,
+        )
         check(
             dirty_publish_path.read_text(encoding="utf-8") == "preserve this locally\n"
             and dirty_head == dirty_head_after
@@ -3390,7 +4926,11 @@ def validate_state_sync(errors: list[str]) -> None:
             "status",
             {**env_a, "GIT_TRACE2_EVENT": str(status_trace)},
         )
-        check(status.returncode == 0, f"[state-sync] status failed: {status.stderr}", errors)
+        check(
+            status.returncode == 0,
+            f"[state-sync] status failed: {status.stderr}",
+            errors,
+        )
         check(
             "repository: initialized" in status.stdout
             and "worktree: clean" in status.stdout
@@ -3400,7 +4940,11 @@ def validate_state_sync(errors: list[str]) -> None:
             "[state-sync] status must report initialized clean cached state and the error log",
             errors,
         )
-        check(str(bare_origin) not in status.stdout, "[state-sync] status must not print the remote URL", errors)
+        check(
+            str(bare_origin) not in status.stdout,
+            "[state-sync] status must not print the remote URL",
+            errors,
+        )
         check(
             not traced_remote_git_commands(status_trace, "status", errors),
             "[state-sync] status must not run fetch, ls-remote, pull, merge, or push",
@@ -3411,14 +4955,24 @@ def validate_state_sync(errors: list[str]) -> None:
         # here on, so step 4 below can conflict on one of its lines.
         plan_relpath = Path("plans") / "state-sync-test.md"
         (machine_a / ".claude" / plan_relpath).write_text(
-            "---\nstatus: in-progress\n---\n\nShared baseline plan.\n", encoding="utf-8",
+            "---\nstatus: in-progress\n---\n\nShared baseline plan.\n",
+            encoding="utf-8",
         )
         baseline_push = run_state_sync(machine_a, "push", env_a)
-        check(baseline_push.returncode == 0, f"[state-sync] machine A baseline push failed: {baseline_push.stderr}", errors)
+        check(
+            baseline_push.returncode == 0,
+            f"[state-sync] machine A baseline push failed: {baseline_push.stderr}",
+            errors,
+        )
 
         # 2. Machine B: clone fresh, setup && pull -> state present, byte-identical.
         machine_b = temp_root / "machine-b"
-        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_b)], text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "clone", "-q", str(bare_origin), str(machine_b)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
         env_b = git_actor_env("MachineB")
         run_state_sync(machine_b, "setup", env_b)
         # F1 (§9): setup on a fresh, non-devcontainer clone (no post-start.sh)
@@ -3431,22 +4985,36 @@ def validate_state_sync(errors: list[str]) -> None:
             errors,
         )
         pull_b = run_state_sync(machine_b, "pull", env_b)
-        check(pull_b.returncode == 0, f"[state-sync] machine B setup+pull failed: {pull_b.stderr}", errors)
+        check(
+            pull_b.returncode == 0,
+            f"[state-sync] machine B setup+pull failed: {pull_b.stderr}",
+            errors,
+        )
 
         a_plan = machine_a / ".claude" / plan_relpath
         b_plan = machine_b / ".claude" / plan_relpath
         check(
-            b_plan.exists() and a_plan.exists() and a_plan.read_bytes() == b_plan.read_bytes(),
+            b_plan.exists()
+            and a_plan.exists()
+            and a_plan.read_bytes() == b_plan.read_bytes(),
             "[state-sync] machine B pull must restore state byte-identical to machine A",
             errors,
         )
 
         # 3. Divergence: different new files on A and B; B's push auto-rebases.
-        (machine_a / ".claude" / "session_logs" / "a-only.md").write_text("from A\n", encoding="utf-8")
+        (machine_a / ".claude" / "session_logs" / "a-only.md").write_text(
+            "from A\n", encoding="utf-8"
+        )
         push_a_divergent = run_state_sync(machine_a, "push", env_a)
-        check(push_a_divergent.returncode == 0, f"[state-sync] machine A divergent push failed: {push_a_divergent.stderr}", errors)
+        check(
+            push_a_divergent.returncode == 0,
+            f"[state-sync] machine A divergent push failed: {push_a_divergent.stderr}",
+            errors,
+        )
 
-        (machine_b / ".claude" / "session_logs" / "b-only.md").write_text("from B\n", encoding="utf-8")
+        (machine_b / ".claude" / "session_logs" / "b-only.md").write_text(
+            "from B\n", encoding="utf-8"
+        )
         push_b_divergent = run_state_sync(machine_b, "push", env_b)
         check(
             push_b_divergent.returncode == 0,
@@ -3465,7 +5033,11 @@ def validate_state_sync(errors: list[str]) -> None:
         )
 
         pull_a_final = run_state_sync(machine_a, "pull", env_a)
-        check(pull_a_final.returncode == 0, "[state-sync] machine A final pull failed", errors)
+        check(
+            pull_a_final.returncode == 0,
+            "[state-sync] machine A final pull failed",
+            errors,
+        )
         check(
             (machine_a / ".claude" / "session_logs" / "b-only.md").exists(),
             "[state-sync] machine A must see machine B's divergent file after pulling",
@@ -3475,13 +5047,19 @@ def validate_state_sync(errors: list[str]) -> None:
         # 4. Conflict: same line of the same plan frontmatter changed on both,
         # neither having pulled the other's change first.
         (machine_a / ".claude" / plan_relpath).write_text(
-            "---\nstatus: in-progress\n---\n\nEdited by A.\n", encoding="utf-8",
+            "---\nstatus: in-progress\n---\n\nEdited by A.\n",
+            encoding="utf-8",
         )
         conflict_push_a = run_state_sync(machine_a, "push", env_a)
-        check(conflict_push_a.returncode == 0, f"[state-sync] machine A conflict-setup push failed: {conflict_push_a.stderr}", errors)
+        check(
+            conflict_push_a.returncode == 0,
+            f"[state-sync] machine A conflict-setup push failed: {conflict_push_a.stderr}",
+            errors,
+        )
 
         (machine_b / ".claude" / plan_relpath).write_text(
-            "---\nstatus: in-progress\n---\n\nEdited by B.\n", encoding="utf-8",
+            "---\nstatus: in-progress\n---\n\nEdited by B.\n",
+            encoding="utf-8",
         )
         conflict_push_b = run_state_sync(machine_b, "push", env_b)
         check(
@@ -3495,16 +5073,26 @@ def validate_state_sync(errors: list[str]) -> None:
             errors,
         )
         check(
-            b_plan.read_text(encoding="utf-8") == "---\nstatus: in-progress\n---\n\nEdited by B.\n",
+            b_plan.read_text(encoding="utf-8")
+            == "---\nstatus: in-progress\n---\n\nEdited by B.\n",
             "[state-sync] machine B's local file must be untouched after a failed rebase",
             errors,
         )
         remote_conflict_content = subprocess.run(
-            ["git", "--git-dir", str(bare_origin), "show", f"ai-state:{plan_relpath.as_posix()}"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(bare_origin),
+                "show",
+                f"ai-state:{plan_relpath.as_posix()}",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
-            remote_conflict_content.stdout == "---\nstatus: in-progress\n---\n\nEdited by A.\n",
+            remote_conflict_content.stdout
+            == "---\nstatus: in-progress\n---\n\nEdited by A.\n",
             "[state-sync] the remote must still have machine A's version after B's conflicting push fails; nothing lost on either side",
             errors,
         )
@@ -3514,34 +5102,73 @@ def validate_state_sync(errors: list[str]) -> None:
         started = time.monotonic()
         stop_hook_process = subprocess.Popen(
             ["bash", str(state_sync_script(machine_a)), "push"],
-            cwd=machine_a, env=env_a,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            cwd=machine_a,
+            env=env_a,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
         try:
             stop_hook_process.communicate(timeout=10)
         except subprocess.TimeoutExpired:
             stop_hook_process.kill()
             stop_hook_process.communicate()
-            check(False, "[state-sync] push must return promptly even with stdin held open (Stop-hook contract)", errors)
+            check(
+                False,
+                "[state-sync] push must return promptly even with stdin held open (Stop-hook contract)",
+                errors,
+            )
         else:
             elapsed = time.monotonic() - started
-            check(elapsed < 10, f"[state-sync] push with stdin held open took too long ({elapsed:.1f}s)", errors)
+            check(
+                elapsed < 10,
+                f"[state-sync] push with stdin held open took too long ({elapsed:.1f}s)",
+                errors,
+            )
 
         # 6. --state-remote: a fresh install's state lands on that remote, not origin.
         state_remote = temp_root / "state-remote.git"
         subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
         machine_c = temp_root / "machine-c"
-        subprocess.run(["git", "clone", "-q", str(bare_origin), str(machine_c)], text=True, capture_output=True, check=False)
+        subprocess.run(
+            ["git", "clone", "-q", str(bare_origin), str(machine_c)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
         env_c = git_actor_env("MachineC")
         install_c = subprocess.run(
-            [sys.executable, str(installer), str(machine_c), "--state-remote", str(state_remote)],
-            cwd=REPO_ROOT, env=env_c, text=True, capture_output=True, check=False,
+            [
+                sys.executable,
+                str(installer),
+                str(machine_c),
+                "--state-remote",
+                str(state_remote),
+            ],
+            cwd=REPO_ROOT,
+            env=env_c,
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(install_c.returncode == 0, f"[state-sync] install --state-remote on machine C failed: {install_c.stderr}", errors)
+        check(
+            install_c.returncode == 0,
+            f"[state-sync] install --state-remote on machine C failed: {install_c.stderr}",
+            errors,
+        )
 
         state_remote_refs = subprocess.run(
-            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(state_remote),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             "refs/heads/ai-state" in state_remote_refs.stdout,
@@ -3553,7 +5180,9 @@ def validate_state_sync(errors: list[str]) -> None:
         # repo is configured against, not whether bare_origin lacks ai-state.
         nested_remote_url = subprocess.run(
             ["git", "-C", str(machine_c / ".claude"), "remote", "get-url", "origin"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             nested_remote_url.stdout.strip() == str(state_remote),
@@ -3565,7 +5194,9 @@ def validate_state_sync(errors: list[str]) -> None:
 FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS = {"fetch", "ls-remote", "pull", "merge", "push"}
 
 
-def traced_remote_git_commands(trace_path: Path, label: str, errors: list[str]) -> list[str]:
+def traced_remote_git_commands(
+    trace_path: Path, label: str, errors: list[str]
+) -> list[str]:
     """Return forbidden Git subcommands recorded by Git's JSON trace."""
     if not trace_path.is_file():
         check(False, f"[state-sync] {label} must emit a Git trace", errors)
@@ -3576,15 +5207,25 @@ def traced_remote_git_commands(trace_path: Path, label: str, errors: list[str]) 
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
-            check(False, f"[state-sync] {label} emitted an invalid Git trace event", errors)
+            check(
+                False,
+                f"[state-sync] {label} emitted an invalid Git trace event",
+                errors,
+            )
             continue
         if event.get("event") != "start":
             continue
         start_events += 1
         argv = event.get("argv", [])
         if isinstance(argv, list):
-            commands.extend(arg for arg in argv if arg in FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS)
-    check(start_events > 0, f"[state-sync] {label} Git trace must contain start events", errors)
+            commands.extend(
+                arg for arg in argv if arg in FORBIDDEN_LOCAL_ONLY_GIT_COMMANDS
+            )
+    check(
+        start_events > 0,
+        f"[state-sync] {label} Git trace must contain start events",
+        errors,
+    )
     return commands
 
 
@@ -3622,7 +5263,11 @@ def validate_installer_commit_failure(errors: list[str]) -> None:
             capture_output=True,
             check=False,
         )
-        check(result.returncode != 0, "installer must fail when legacy migration cannot commit", errors)
+        check(
+            result.returncode != 0,
+            "installer must fail when legacy migration cannot commit",
+            errors,
+        )
         check(
             not (consumer / ".claude" / "hooks" / "scripts" / "state-sync.sh").exists(),
             "failed legacy migration must not replace state with generated files",
@@ -3722,24 +5367,57 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
         subprocess.run(["git", "init", "-q", str(consumer)], check=False)
         fresh_trace = temp_root / "fresh-trace.json"
         fresh_install = subprocess.run(
-            [sys.executable, str(installer), str(consumer), "--state-remote", str(state_remote), "--local-only"],
+            [
+                sys.executable,
+                str(installer),
+                str(consumer),
+                "--state-remote",
+                str(state_remote),
+                "--local-only",
+            ],
             cwd=REPO_ROOT,
             env={**local_env, "GIT_TRACE2_EVENT": str(fresh_trace)},
             text=True,
             capture_output=True,
             check=False,
         )
-        check(fresh_install.returncode == 0, f"[local-only] fresh install failed: {fresh_install.stderr}", errors)
-        check_codex_hook_trust_notice("local-only installer", fresh_install.stdout, errors, dry_run=False)
+        check(
+            fresh_install.returncode == 0,
+            f"[local-only] fresh install failed: {fresh_install.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "local-only installer", fresh_install.stdout, errors, dry_run=False
+        )
         check_local_only_git_trace("fresh install", fresh_trace, errors)
         remote_refs = subprocess.run(
-            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(state_remote),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(not remote_refs.stdout.strip(), "[local-only] fresh install must not push ai-state", errors)
+        check(
+            not remote_refs.stdout.strip(),
+            "[local-only] fresh install must not push ai-state",
+            errors,
+        )
         fresh_bootstrap_root = subprocess.run(
-            ["git", "-C", str(consumer / ".claude"), "show", "HEAD:bootstrap-root/CLAUDE.md"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "-C",
+                str(consumer / ".claude"),
+                "show",
+                "HEAD:bootstrap-root/CLAUDE.md",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             fresh_bootstrap_root.returncode == 0,
@@ -3747,18 +5425,33 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
             errors,
         )
         expected_push = f"Publish later: bash {shlex.quote(str(consumer / '.claude' / 'hooks' / 'scripts' / 'state-sync.sh'))} push"
-        check(expected_push in fresh_install.stdout, "[local-only] installer must print a shell-safe manual push command", errors)
+        check(
+            expected_push in fresh_install.stdout,
+            "[local-only] installer must print a shell-safe manual push command",
+            errors,
+        )
 
         existing_trace = temp_root / "existing-trace.json"
         existing_install = subprocess.run(
-            [sys.executable, str(installer), str(consumer), "--state-remote", str(state_remote), "--local-only"],
+            [
+                sys.executable,
+                str(installer),
+                str(consumer),
+                "--state-remote",
+                str(state_remote),
+                "--local-only",
+            ],
             cwd=REPO_ROOT,
             env={**local_env, "GIT_TRACE2_EVENT": str(existing_trace)},
             text=True,
             capture_output=True,
             check=False,
         )
-        check(existing_install.returncode == 0, f"[local-only] existing install failed: {existing_install.stderr}", errors)
+        check(
+            existing_install.returncode == 0,
+            f"[local-only] existing install failed: {existing_install.stderr}",
+            errors,
+        )
         check_local_only_git_trace("existing install", existing_trace, errors)
 
         legacy = temp_root / "legacy consumer"
@@ -3768,18 +5461,31 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
         write(legacy / ".claude" / "MEMORY.md", legacy_memory)
         legacy_trace = temp_root / "legacy-trace.json"
         legacy_install = subprocess.run(
-            [sys.executable, str(installer), str(legacy), "--state-remote", str(state_remote), "--local-only"],
+            [
+                sys.executable,
+                str(installer),
+                str(legacy),
+                "--state-remote",
+                str(state_remote),
+                "--local-only",
+            ],
             cwd=REPO_ROOT,
             env={**local_env, "GIT_TRACE2_EVENT": str(legacy_trace)},
             text=True,
             capture_output=True,
             check=False,
         )
-        check(legacy_install.returncode == 0, f"[local-only] legacy install failed: {legacy_install.stderr}", errors)
+        check(
+            legacy_install.returncode == 0,
+            f"[local-only] legacy install failed: {legacy_install.stderr}",
+            errors,
+        )
         check_local_only_git_trace("legacy install", legacy_trace, errors)
         history = subprocess.run(
             ["git", "-C", str(legacy / ".claude"), "log", "--reverse", "--format=%s"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         subjects = history.stdout.splitlines()
         check(
@@ -3791,7 +5497,9 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
         )
         legacy_snapshot = subprocess.run(
             ["git", "-C", str(legacy / ".claude"), "show", "HEAD~1:MEMORY.md"],
-            text=True, capture_output=True, check=False,
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             legacy_snapshot.stdout == legacy_memory,
@@ -3799,8 +5507,16 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
             errors,
         )
         legacy_bootstrap_root = subprocess.run(
-            ["git", "-C", str(legacy / ".claude"), "show", "HEAD:bootstrap-root/CLAUDE.md"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "-C",
+                str(legacy / ".claude"),
+                "show",
+                "HEAD:bootstrap-root/CLAUDE.md",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
         check(
             legacy_bootstrap_root.returncode == 0,
@@ -3808,48 +5524,105 @@ def validate_local_only_state_sync(errors: list[str]) -> None:
             errors,
         )
         unchanged_remote = subprocess.run(
-            ["git", "--git-dir", str(state_remote), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(state_remote),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(not unchanged_remote.stdout.strip(), "[local-only] legacy migration must not push ai-state", errors)
+        check(
+            not unchanged_remote.stdout.strip(),
+            "[local-only] legacy migration must not push ai-state",
+            errors,
+        )
 
         updater_remote = temp_root / "updater-remote.git"
-        subprocess.run(["git", "init", "-q", "--bare", str(updater_remote)], check=False)
+        subprocess.run(
+            ["git", "init", "-q", "--bare", str(updater_remote)], check=False
+        )
         updater_consumer = temp_root / "updater consumer"
         updater_consumer.mkdir()
         subprocess.run(["git", "init", "-q", str(updater_consumer)], check=False)
-        subprocess.run(["git", "-C", str(updater_consumer), "remote", "add", "origin", str(updater_remote)], check=False)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(updater_consumer),
+                "remote",
+                "add",
+                "origin",
+                str(updater_remote),
+            ],
+            check=False,
+        )
         updater_trace = temp_root / "updater-trace.json"
         update = subprocess.run(
-            [sys.executable, str(updater), "--skip-regen", "--local-only", str(updater_consumer)],
+            [
+                sys.executable,
+                str(updater),
+                "--skip-regen",
+                "--local-only",
+                str(updater_consumer),
+            ],
             cwd=REPO_ROOT,
             env={**local_env, "GIT_TRACE2_EVENT": str(updater_trace)},
             text=True,
             capture_output=True,
             check=False,
         )
-        check(update.returncode == 0, f"[local-only] updater failed: {update.stderr}", errors)
-        check_codex_hook_trust_notice("local-only updater", update.stdout, errors, dry_run=False)
+        check(
+            update.returncode == 0,
+            f"[local-only] updater failed: {update.stderr}",
+            errors,
+        )
+        check_codex_hook_trust_notice(
+            "local-only updater", update.stdout, errors, dry_run=False
+        )
         check_local_only_git_trace("updater", updater_trace, errors)
         updater_refs = subprocess.run(
-            ["git", "--git-dir", str(updater_remote), "for-each-ref", "refs/heads/ai-state"],
-            text=True, capture_output=True, check=False,
+            [
+                "git",
+                "--git-dir",
+                str(updater_remote),
+                "for-each-ref",
+                "refs/heads/ai-state",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
         )
-        check(not updater_refs.stdout.strip(), "[local-only] updater must forward the no-push boundary", errors)
+        check(
+            not updater_refs.stdout.strip(),
+            "[local-only] updater must forward the no-push boundary",
+            errors,
+        )
 
 
 def validate_determinism(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         output = Path(temp_dir) / "dist"
         result = subprocess.run(
-            [sys.executable, str(REPO_ROOT / "scripts" / "generate_targets.py"), "--all", "--output", str(output)],
+            [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "generate_targets.py"),
+                "--all",
+                "--output",
+                str(output),
+            ],
             cwd=REPO_ROOT,
             text=True,
             capture_output=True,
             check=False,
         )
         if result.returncode != 0:
-            errors.append(f"temporary generation failed: {result.stderr or result.stdout}")
+            errors.append(
+                f"temporary generation failed: {result.stderr or result.stdout}"
+            )
             return
         compare_dirs(DIST_ROOT, output, errors)
 
@@ -3864,12 +5637,26 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         env = git_actor_env("PonytailClassifier")
         write(repo / "README.md", "# Fixture\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
-        subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False)
-        subprocess.run(["git", "switch", "-q", "-c", "fixture_implementation"], cwd=repo, env=env, check=False)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False
+        )
+        subprocess.run(
+            ["git", "switch", "-q", "-c", "fixture_implementation"],
+            cwd=repo,
+            env=env,
+            check=False,
+        )
 
         write(repo / "README.md", "# Fixture\n\nDocs only.\n")
         docs_only = subprocess.run(
-            ["bash", "-c", '. "$1"; diff_requires_ponytail "$2"', "_", str(library), str(repo)],
+            [
+                "bash",
+                "-c",
+                '. "$1"; diff_requires_ponytail "$2"',
+                "_",
+                str(library),
+                str(repo),
+            ],
             text=True,
             capture_output=True,
             check=False,
@@ -3883,7 +5670,14 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         write(repo / "app.py", "print('fixture')\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
         mixed = subprocess.run(
-            ["bash", "-c", '. "$1"; diff_requires_ponytail "$2"', "_", str(library), str(repo)],
+            [
+                "bash",
+                "-c",
+                '. "$1"; diff_requires_ponytail "$2"',
+                "_",
+                str(library),
+                str(repo),
+            ],
             text=True,
             capture_output=True,
             check=False,
@@ -3957,6 +5751,192 @@ def validate_root_source_mirror_cases(errors: list[str]) -> None:
         )
 
 
+def validate_runtime_drift_cases(errors: list[str]) -> None:
+    """Cover runtime ownership without mutating a consumer's state."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        repo = Path(temp_dir_name) / "repo"
+        target = Path(temp_dir_name) / "target"
+        workflow = "PRE-FLIGHT -> REVIEW -> DOCUMENT -> SCORE\n"
+        write(target / "CLAUDE.md", workflow)
+        write(target / ".codex" / "config.toml", "generated config\n")
+        write(target / ".codex" / "agents" / "coder.toml", "generated agent\n")
+        write(target / ".codex" / "hooks.json", "generated hook\n")
+        write(
+            target / ".claude" / "instructions" / "workflow.instructions.md", workflow
+        )
+        write(
+            target / ".claude" / "instructions" / "workspace.instructions.md",
+            "**Project:** [TODO: project name and one-liner description]\n",
+        )
+        write(target / ".claude" / "agents" / "orchestrator.md", workflow)
+        write(
+            repo / "AGENTS.md",
+            "The source of truth lives in `shared/`.\nREVIEW -> DOCUMENT -> SCORE\n",
+        )
+        write(repo / "CLAUDE.md", workflow)
+        write(repo / ".codex" / "config.toml", "tracked authoring config\n")
+        write(repo / ".codex" / "agents" / "coder.toml", "generated agent\n")
+        write(repo / ".codex" / "hooks.json", "generated hook\n")
+        write(repo / ".claude" / "instructions" / "workflow.instructions.md", workflow)
+        write(
+            repo / ".claude" / "instructions" / "workspace.instructions.md",
+            "**Project:** repo\n",
+        )
+        write(repo / ".claude" / "agents" / "orchestrator.md", workflow)
+        write(repo / ".claude" / "bootstrap-root" / "CLAUDE.md", workflow)
+        write(
+            repo / ".claude" / "bootstrap-root" / ".codex" / "agents" / "coder.toml",
+            "generated agent\n",
+        )
+        write(
+            repo / ".claude" / "bootstrap-root" / ".codex" / "hooks.json",
+            "generated hook\n",
+        )
+        write(repo / ".claude" / "MEMORY.md", "consumer-owned\n")
+        subprocess.run(["git", "init", "-q", str(repo)], check=False)
+        subprocess.run(
+            ["git", "-C", str(repo), "add", ".codex/config.toml"], check=False
+        )
+
+        before = {
+            path.relative_to(repo): path.read_bytes()
+            for path in repo.rglob("*")
+            if path.is_file()
+        }
+        initial_runtime_errors = runtime_drift_errors(repo, target)
+        check(
+            not initial_runtime_errors,
+            "runtime parity must allow documented project substitution and "
+            f"consumer-owned state: {initial_runtime_errors}",
+            errors,
+        )
+        after = {
+            path.relative_to(repo): path.read_bytes()
+            for path in repo.rglob("*")
+            if path.is_file()
+        }
+        check(before == after, "runtime parity checks must be read-only", errors)
+
+        write(repo / ".codex" / "agents" / "coder.toml", "stale agent\n")
+        write(repo / ".codex" / "hooks.json", "stale hook\n")
+        stale_generated = runtime_drift_errors(repo, target)
+        check(
+            any(".codex/agents/coder.toml" in error for error in stale_generated)
+            and any(".codex/hooks.json" in error for error in stale_generated),
+            "runtime parity must refresh generated siblings beside tracked authoring files",
+            errors,
+        )
+        write(repo / ".codex" / "agents" / "coder.toml", "generated agent\n")
+        write(repo / ".codex" / "hooks.json", "generated hook\n")
+
+        write(repo / "CLAUDE.md", "stale overlay\n")
+        stale_overlay = runtime_drift_errors(repo, target)
+        check(
+            any(
+                "CLAUDE.md" in error
+                and "authoritative source" in error
+                and "install_bootstrap.py" in error
+                for error in stale_overlay
+            ),
+            "stale ignored overlay diagnostics must name its path, source, and reinstall action",
+            errors,
+        )
+
+        write(
+            repo / "AGENTS.md",
+            "The source of truth lives in `shared/`.\nREVIEW -> SCORE -> DOCUMENT\n",
+        )
+        authoring = runtime_drift_errors(repo, target)
+        check(
+            any(
+                error.startswith("stale runtime path: AGENTS.md") for error in authoring
+            ),
+            "tracked authoring guidance must be checked by workflow invariants",
+            errors,
+        )
+
+        write(repo / ".claude" / "instructions" / "removed.instructions.md", "old\n")
+        write(repo / ".codex" / "agents" / "removed.toml", "old\n")
+        write(
+            repo / ".claude" / "bootstrap-root" / ".codex" / "agents" / "removed.toml",
+            "old\n",
+        )
+        obsolete = runtime_drift_errors(repo, target)
+        check(
+            any(
+                error.startswith(
+                    "stale runtime path: .claude/instructions/removed.instructions.md"
+                )
+                for error in obsolete
+            )
+            and any(
+                error.startswith("stale runtime path: .codex/agents/removed.toml")
+                for error in obsolete
+            )
+            and any(
+                error.startswith(
+                    "stale runtime path: .claude/bootstrap-root/.codex/agents/removed.toml"
+                )
+                for error in obsolete
+            ),
+            "runtime parity must detect files removed from generated ownership-controlled trees",
+            errors,
+        )
+
+        generated = Path(temp_dir_name) / "generated"
+        install_target = Path(temp_dir_name) / "install-target"
+        write(generated / "AGENTS.md", "generated adapter\n")
+        write(generated / ".codex" / "config.toml", "generated config\n")
+        write(generated / ".codex" / "agents" / "coder.toml", "generated agent\n")
+        write(install_target / "AGENTS.md", "tracked authoring adapter\n")
+        write(install_target / ".codex" / "config.toml", "tracked config\n")
+        write(install_target / ".codex" / "agents" / "coder.toml", "stale agent\n")
+        write(install_target / ".codex" / "agents" / "removed.toml", "obsolete\n")
+        write(
+            install_target / ".claude" / "instructions" / "removed.instructions.md",
+            "obsolete\n",
+        )
+        write(install_target / ".claude" / "MEMORY.md", "consumer-owned\n")
+        subprocess.run(["git", "init", "-q", str(install_target)], check=False)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(install_target),
+                "add",
+                "AGENTS.md",
+                ".codex/config.toml",
+            ],
+            check=False,
+        )
+        copy_generated_tree(generated, install_target, dry_run=False)
+        check(
+            read(install_target / "AGENTS.md") == "tracked authoring adapter\n",
+            "installer must preserve a tracked source adapter during dogfood refresh",
+            errors,
+        )
+        check(
+            read(install_target / ".codex" / "config.toml") == "tracked config\n"
+            and read(install_target / ".codex" / "agents" / "coder.toml")
+            == "generated agent\n",
+            "installer must preserve a tracked adapter file while refreshing generated siblings",
+            errors,
+        )
+        check(
+            not (install_target / ".codex" / "agents" / "removed.toml").exists()
+            and not (
+                install_target / ".claude" / "instructions" / "removed.instructions.md"
+            ).exists(),
+            "installer merges must remove obsolete ownership-controlled files",
+            errors,
+        )
+        check(
+            read(install_target / ".claude" / "MEMORY.md") == "consumer-owned\n",
+            "obsolete-file cleanup must preserve consumer state",
+            errors,
+        )
+
+
 def validate_hook_gate_regression_tests(errors: list[str]) -> None:
     """CI (.github/workflows/validate.yml) only runs this file, not `pytest` —
     pytest isn't even installed by this repo's own dependency set. Without
@@ -3981,7 +5961,9 @@ def validate_hook_gate_regression_tests(errors: list[str]) -> None:
 def main() -> int:
     errors: list[str] = []
     for target in TARGETS:
-        check((DIST_ROOT / target).exists(), f"missing generated target: {target}", errors)
+        check(
+            (DIST_ROOT / target).exists(), f"missing generated target: {target}", errors
+        )
 
     if not errors:
         validate_codex_model_contract_cases(errors)
@@ -3992,6 +5974,7 @@ def main() -> int:
         validate_docs_parity(errors)
         validate_routing_table_parity(errors)
         validate_root_source_mirror_cases(errors)
+        validate_runtime_drift_cases(errors)
         validate_ponytail_diff_classifier(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)
