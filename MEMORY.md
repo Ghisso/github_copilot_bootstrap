@@ -95,3 +95,11 @@
 - [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
   checklist, session log, and big-plan checklist from the actual commit SHAs;
   do not infer completion from a clean outer worktree alone.
+- [LEARN:installer] Runtime ownership metadata must be inert, mode-aware, and
+  single-sourced. Persist the active install mode, remove paths that become
+  inactive during migrations, and generate restoration allowlists from the
+  same Python contract instead of duplicating them in shell.
+- [LEARN:testing] Ownership/pruning suites must cover equal or overlapping
+  installer roots and nested `.git` in both directory and gitfile forms. Normal
+  generated-target tests do not expose recursive self-copy or worktree metadata
+  deletion failures.

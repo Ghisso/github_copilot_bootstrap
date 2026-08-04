@@ -12,3 +12,5 @@
 2026-07-22T02:41:53Z WARN stop-session-log-check: worktree changed but no session log was updated today
 2026-07-22T02:48:22Z WARN stop-session-log-check: worktree changed but no session log was updated today
 2026-08-01T11:53:14.000Z state-sync: pull --rebase failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
+2026-08-04T15:11:47.000Z state-sync: publish skipped: local ai-state worktree is dirty; run checkpoint before publishing.
+2026-08-04T15:11:47.000Z state-sync: push failed; continuing.
