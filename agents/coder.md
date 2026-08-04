@@ -1,7 +1,7 @@
 ---
 name: coder
 description: "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting."
-tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, TodoWrite, WebFetch, WebSearch
+tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, TodoWrite, WebFetch, WebSearch
 model: sonnet
 effort: xhigh
 ---

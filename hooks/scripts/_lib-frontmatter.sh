@@ -327,6 +327,34 @@ _shell_tokenize() {
   if (( have )); then _TOKENS+=("$cur"); fi
 }
 
+# Index of the first unquoted shell operator (; | &) in a command segment, or
+# the segment's length if there is none. Global git flags (-C, --git-dir, ...)
+# always precede the subcommand within one invocation with no operator in
+# between, so scanning for THOSE never needs this. Scanning an invocation's
+# ARGS (after its subcommand) is different: `git push origin main && curl
+# --force ...` tokenizes (via _shell_tokenize, which drops operators as mere
+# separators) to a flat ["push","origin","main","curl","--force",...] with no
+# trace of the "&&" — a naive "does --force appear anywhere after push" scan
+# would misattribute the unrelated curl command's flag to the git push. Callers
+# that scan args must truncate the segment to this boundary first so a later
+# chained command's tokens can never bleed into the current invocation's scan.
+_unquoted_operator_boundary() {
+  local s="$1" n=${#1} i=0 c q=''
+  while (( i < n )); do
+    c="${s:i:1}"
+    if [[ -n "$q" ]]; then
+      [[ "$c" == "$q" ]] && q=''
+    else
+      case "$c" in
+        \"|\') q="$c" ;;
+        ';'|'|'|'&') printf '%s' "$i"; return 0 ;;
+      esac
+    fi
+    (( i++ ))
+  done
+  printf '%s' "$n"
+}
+
 # Return the effective subcommand of the FIRST git invocation in a segment,
 # skipping global git flags (-C <path>, -c <k=v>, --git-dir, --work-tree, ...).
 _git_first_subcommand() {
@@ -417,6 +445,71 @@ is_git_push_command() {
   git_command_has_subcommand "$1" push
 }
 
+# True if the global flags of ONE git invocation (tokens starting right after
+# "git ") point -C/--git-dir/--work-tree at the nested .claude/ repo. Stops at
+# the first positional token (the subcommand) so it never reads flags that
+# actually belong to a later chained `git ...` call in the same tokens array
+# (operators are not preserved as tokens by _shell_tokenize).
+_git_invocation_targets_nested_claude() {
+  local -a tokens=("$@")
+  local i=0 n=${#tokens[@]} tok next git_dir="" work_tree="" cpath=""
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C)
+        next="${tokens[$((i + 1))]:-}"; cpath="$next"; i=$((i + 2)); continue ;;
+      --git-dir)
+        next="${tokens[$((i + 1))]:-}"; git_dir="$next"; i=$((i + 2)); continue ;;
+      --git-dir=*)
+        git_dir="${tok#--git-dir=}"; i=$((i + 1)); continue ;;
+      --work-tree)
+        next="${tokens[$((i + 1))]:-}"; work_tree="$next"; i=$((i + 2)); continue ;;
+      --work-tree=*)
+        work_tree="${tok#--work-tree=}"; i=$((i + 1)); continue ;;
+      -c|--namespace|--super-prefix|--config-env|--exec-path)
+        i=$((i + 2)); continue ;;
+      --*=*|-*)
+        i=$((i + 1)); continue ;;
+      *) break ;;
+    esac
+  done
+
+  case "$cpath" in
+    .claude|./.claude|../.claude|*/.claude|"$REPO_ROOT"/.claude) return 0 ;;
+  esac
+  case "$work_tree" in
+    .claude|./.claude|../.claude|*/.claude|"$REPO_ROOT"/.claude) return 0 ;;
+  esac
+  case "$git_dir" in
+    .claude/.git|./.claude/.git|../.claude/.git|*/.claude/.git|"$REPO_ROOT"/.claude/.git) return 0 ;;
+  esac
+  return 1
+}
+
+# True only when the command contains at least one `git $want` invocation AND
+# every invocation of that subcommand targets the nested .claude/ repo. A
+# compound command mixing a nested-.claude invocation with an unrelated
+# outer-repo invocation of the same subcommand (e.g.
+# `git -C .claude status && git commit -m "outer"`) must NOT be exempted, so
+# this checks each matching invocation individually rather than asking "does
+# ANY git call anywhere in the string target .claude".
+git_targets_nested_claude() {
+  local rest="$1" want="$2" after sub found=0
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    local -a tokens
+    _shell_tokenize "$after"
+    tokens=("${_TOKENS[@]}")
+    sub="$(_git_first_subcommand "$after")"
+    if [[ "$sub" == "$want" ]]; then
+      found=1
+      _git_invocation_targets_nested_claude "${tokens[@]}" || return 1
+    fi
+    rest="$after"
+  done
+  [[ "$found" -eq 1 ]]
+}
+
 is_gh_pr_create_command() {
   local rest="$1" after seg
   while [[ "$rest" =~ (^|[[:space:];|\&])gh[[:space:]]+(.*) ]]; do
@@ -443,20 +536,51 @@ is_gh_pr_create_command() {
   return 1
 }
 
+# Tokenizes (honoring quotes, via _shell_tokenize) rather than regexing the
+# raw string, so a quoted -m/-F value containing another flag-like substring
+# can't desync parsing. -F -/--file=- means the message is piped on stdin,
+# which this function has no access to (it only sees the command string) —
+# that intentionally yields an empty subject rather than misreading "-" as a
+# filename; callers must treat empty as "could not determine subject", not
+# "empty commit message".
 commit_subject_from_command() {
   local command="$1"
   local subject=""
-  if [[ "$command" =~ (^|[[:space:]])-m[[:space:]]+\"([^\"]*)\" ]]; then
-    subject="${BASH_REMATCH[2]}"
-  elif [[ "$command" =~ (^|[[:space:]])-m[[:space:]]+\'([^\']*)\' ]]; then
-    subject="${BASH_REMATCH[2]}"
-  elif [[ "$command" =~ (^|[[:space:]])-m[[:space:]]+([^[:space:];|&]+) ]]; then
-    subject="${BASH_REMATCH[2]}"
-  elif [[ "$command" =~ (^|[[:space:]])--file[=\ ]([^[:space:];|&]+) ]]; then
-    subject="$(head -n 1 "${BASH_REMATCH[2]}" 2>/dev/null || true)"
-  elif [[ "$command" =~ (^|[[:space:]])-F[[:space:]]+([^[:space:];|&]+) ]]; then
-    subject="$(head -n 1 "${BASH_REMATCH[2]}" 2>/dev/null || true)"
-  fi
+  _shell_tokenize "$command"
+  local i=0 n=${#_TOKENS[@]} tok next
+  while (( i < n )); do
+    tok="${_TOKENS[i]}"
+    case "$tok" in
+      -m|--message)
+        next="${_TOKENS[i+1]:-}"
+        subject="$next"
+        break
+        ;;
+      --message=*)
+        subject="${tok#--message=}"
+        break
+        ;;
+      -F|--file)
+        next="${_TOKENS[i+1]:-}"
+        if [[ "$next" == "-" ]]; then
+          subject=""
+        else
+          subject="$(head -n 1 "$next" 2>/dev/null || true)"
+        fi
+        break
+        ;;
+      --file=*)
+        next="${tok#--file=}"
+        if [[ "$next" == "-" ]]; then
+          subject=""
+        else
+          subject="$(head -n 1 "$next" 2>/dev/null || true)"
+        fi
+        break
+        ;;
+    esac
+    i=$((i + 1))
+  done
   printf '%s' "$subject"
 }
 

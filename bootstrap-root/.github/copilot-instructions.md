@@ -12,4 +12,4 @@ Native Copilot files under `.github/` are adapters:
 
 Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`. Before every coding action, load `.claude/skills/ponytail/SKILL.md` in `full` mode.
 
-Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> score -> document -> learn -> session-log -> commit workflow. Score >= 90 plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow. Score >= 90 plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.

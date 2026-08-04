@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: "End-to-end verification agent for Python AI projects. Validates tests, typing, linting, formatting, imports, deprecations, runtime wiring, and quality gates."
-tools: Bash, Read, Grep, Glob
+tools: Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
 model: haiku
 ---
 

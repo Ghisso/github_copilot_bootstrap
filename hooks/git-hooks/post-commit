@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Durable AI-state checkpoint (big plan: state-sync-durability). A successful
+# outer-repo commit is a reliable synchronization boundary — unlike a Codex
+# Stop event, which browser/editor tab closure does not guarantee. After every
+# commit this best-effort pushes .claude/'s mutable state to the ai-state
+# branch, so plans, reports, memory, and session logs finalized by the commit
+# are published without waiting for a Stop that may never arrive.
+#
+# git ignores a post-commit hook's exit status, and state-sync.sh is
+# warn-never-fail (a missing remote, offline network, or rebase conflict only
+# warns and exits 0 — see its cmd_push guard), so a sync problem can never
+# block or fail the commit. stdin is redirected from /dev/null so state-sync's
+# stdin drain returns immediately instead of waiting on the terminal.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_SYNC="$SCRIPT_DIR/../scripts/state-sync.sh"
+
+[[ -f "$STATE_SYNC" ]] || exit 0
+
+bash "$STATE_SYNC" push </dev/null || true
+exit 0

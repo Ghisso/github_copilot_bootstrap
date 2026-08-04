@@ -109,18 +109,41 @@
         "hooks": [
           {
             "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" session-log.sh claude-code",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" stop-session-log-check.sh claude-code",
-            "timeout": 10
-          },
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" claude-stop.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
-            "timeout": 180
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh checkpoint",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
+            "timeout": 60
           }
         ]
       }

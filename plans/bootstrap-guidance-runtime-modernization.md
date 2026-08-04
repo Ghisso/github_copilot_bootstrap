@@ -1,10 +1,10 @@
 ---
 name: bootstrap-guidance-runtime-modernization
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: bootstrap-guidance-runtime-modernization_implementation
-started_at:
+started_at: 2026-08-04T13:12:09Z
 phases:
   - 2026-08-04_phase-A-runtime-drift-contract
   - 2026-08-04_phase-B-root-guidance-budgets
@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase:
+current_phase: 2026-08-04_phase-A-runtime-drift-contract
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization

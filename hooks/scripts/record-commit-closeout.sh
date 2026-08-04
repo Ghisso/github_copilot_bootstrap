@@ -21,7 +21,7 @@ fi
 SUBJECT="$(commit_subject_from_command "$COMMAND")"
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [[ -z "$SUBJECT" ]]; then
-  additional_context "PostToolUse" "commit closeout not recorded because the intercepted commit subject could not be parsed"
+  additional_context "PostToolUse" "commit closeout not recorded because the intercepted commit subject could not be parsed from the git command. Use -m or -F <file> with a readable message file, or advance the phase manually if the commit was created another way."
   exit 0
 fi
 

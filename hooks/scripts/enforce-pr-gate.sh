@@ -17,6 +17,12 @@ if ! is_bash_tool_payload "$INPUT"; then
 fi
 
 COMMAND="$(hook_command "$INPUT")"
+# Same nested-ai-state exemption as enforce-commit-gate.sh, for state-sync.sh's
+# `git -C .claude push`. See the comment there for why this checks the
+# specific push invocation rather than the whole command string.
+if git_targets_nested_claude "$COMMAND" push; then
+  exit 0
+fi
 if ! is_gh_pr_create_command "$COMMAND" && ! is_git_push_command "$COMMAND"; then
   exit 0
 fi
