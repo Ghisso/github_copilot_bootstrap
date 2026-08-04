@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase: 2026-08-04_phase-A-runtime-drift-contract
+current_phase: 2026-08-04_phase-B-root-guidance-budgets
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
