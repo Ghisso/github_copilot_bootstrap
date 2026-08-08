@@ -1,7 +1,7 @@
 ---
 name: bootstrap-guidance-runtime-modernization
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: bootstrap-guidance-runtime-modernization_implementation
 started_at: 2026-08-04T13:12:09Z
@@ -19,7 +19,8 @@ phases:
   - 2026-08-04_phase-K-codex-scoped-instruction-semantics
   - 2026-08-04_phase-L-codex-role-matrix-evidence
   - 2026-08-04_phase-M-role-matrix-correction-and-dogfood-drift
-current_phase: 
+  - 2026-08-04_phase-N-phase-extension-narrative
+current_phase: 2026-08-04_phase-N-phase-extension-narrative
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
@@ -111,6 +112,45 @@ flowchart LR
 - [x] `2026-08-04_phase-K-codex-scoped-instruction-semantics`
 - [x] `2026-08-04_phase-L-codex-role-matrix-evidence`
 - [x] `2026-08-04_phase-M-role-matrix-correction-and-dogfood-drift`
+- [ ] `2026-08-04_phase-N-phase-extension-narrative`
+
+## Phase Extensions (J–N)
+
+The plan was written as A–I. Phases J–N were added on 2026-08-09 because
+Phase I's acceptance probe, once it was finally executed against real clients,
+did not work — and finding out why kept changing what this plan knew.
+
+Phase I passed every gate it had: 100/100 score, clean two-pass review, zero
+findings. It also shipped a probe that had **never been run against a Claude or
+Codex binary**. The offline suite tested a mock of the client, so nothing asked
+whether the thing had ever touched what it claimed to measure. Its first real
+execution broke in four places.
+
+| Phase | Why it was added | What it established |
+| --- | --- | --- |
+| J | The probe's first real run failed | Four defects: Codex returns the answer as JSON *text* in `agent_message`; `--disallowedTools` is variadic and ate the prompt; every non-zero exit was mislabelled `untrusted`; Claude rejects the `$schema` meta-URI |
+| K | `scoped_instruction` was non-deterministic for Codex | Codex scopes by directory (nested `AGENTS.md`), this bootstrap scopes by glob and ships no Codex scoped adapter. The probe was asking about a surface that does not exist |
+| L | `codex_role_matrix` had never produced evidence | `codex exec` has no persistent thread and cannot spawn at all. Added `spawn_unsupported` rather than guess an unobserved payload shape |
+| M | Operator runs disproved part of L | All six roles route correctly on persistent-thread interfaces — twelve child threads, client-confirmed. Also found the dogfood overlay is stale **and unrepairable** by the command its own diagnostic prints |
+| N | J–M were never explained here | This section, plus documentation corrected to match what is now known |
+
+Three things are worth carrying forward from that sequence.
+
+**The score never moved.** All fourteen phases scored 100/100, including the
+one that shipped an unrun probe. The score measures ruff, mypy, and pytest —
+it cannot see whether code has ever executed against its real target.
+
+**Model self-report is worthless for routing.** Twelve spawned children each
+reported themselves as "GPT-5" with effort "unspecified", while the client
+records showed all six routing correctly to Sol/Terra/Luna at the configured
+efforts. Believing the children would have reproduced the exact 0.144.x
+conclusion — wrongly.
+
+**The MultiAgent V2 removal gate is still open.** Routing was verified with the
+shim *present*; the candidate configuration has never been exercised on an
+interface that can spawn. One shim key (`tool_namespace = "agents"`) is
+provably inert in 0.147.0, which is evidence about the mechanism, not grounds
+for removal.
 
 ## Verification
 

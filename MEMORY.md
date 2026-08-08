@@ -213,3 +213,9 @@
 - [LEARN:architecture] `codex exec` has no persistent thread and cannot spawn
   agents at all; interactive CLI and the VS Code extension can. Interface
   choice, not client capability, decided what the probe could observe.
+- [LEARN:documentation] Appending phases to a plan's frontmatter does not update
+  the plan. Narrative sections are what a reader actually reads; a checklist
+  entry explains nothing about why the plan grew or what it found.
+- [LEARN:documentation] A wrong mechanism claim propagates across files ("spawn
+  metadata through the `agents` namespace" appeared in three). Single-home
+  volatile status in one dated record and point at it from everywhere else.
