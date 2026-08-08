@@ -109,3 +109,10 @@
 - [LEARN:testing] Context-budget work needs structural regression checks, not
   only size assertions: enforce unique sections, one canonical phase sequence,
   installer substitutions, and deterministic regeneration together.
+- [LEARN:architecture] Cross-client policy portability needs neutral authoring
+  metadata plus target-native projections. Claude can express glob-scoped rules;
+  Codex must use its documented directory hierarchy or skills instead of a
+  fabricated glob surface.
+- [LEARN:documentation] Describe structural adapter parity separately from
+  native-client loading evidence. Generation tests prove shape and scope data;
+  authenticated client probes belong in a later acceptance phase.
