@@ -21,7 +21,7 @@ Expected:
 - OpenAI Codex has 6 `.codex/agents/*.toml` files.
 - Each Codex `developer_instructions` field has exactly one generated delimiter and embeds the exact target-transformed `shared/agents/<id>/prompt.md` body; it must not instruct the agent to read `.claude/agents/<id>.md`.
 - `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
-- Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Phase I native probes must verify delivery without truncation on two supported versions.
+- Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Native probes must verify delivery without truncation on two supported versions.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
 - The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low.
 - `coder`'s `escalate_to` (Codex: `gpt-5.6-sol`/`xhigh`) names an allow-listed model/effort pair distinct from its base tier, and the orchestrator prompt names both values verbatim — a mismatch fails validation.
@@ -71,7 +71,7 @@ Expected:
 - The root `AGENTS.md` remains below Codex's default 32 KiB combined project
   guidance limit, and `CLAUDE.md` remains at or below 200 lines.
 - These are structural generation checks. Real Claude, Codex, and Copilot
-  adapter-loading probes are intentionally deferred to Phase I.
+  adapter-loading probes are covered by `scripts/check_native_clients.py`.
 - In particular, these checks do not prove current native Codex routing for all
   six roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
   defines the historical/runtime/documentation evidence boundary and the

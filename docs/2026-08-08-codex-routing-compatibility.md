@@ -49,6 +49,40 @@ checks are intentionally unexercised WARNs. These results do not retroactively
 turn the historical entries above into current PASS results. See [Native Client
 Acceptance](native-client-acceptance.md).
 
+## Status as of 2026-08-09 (Codex 0.147.0)
+
+This section is the authoritative status for the shim and its probes. Other
+documents point here rather than restating it.
+
+| Phase | Outcome |
+| --- | --- |
+| I | Probe built, but shipped without ever executing against a real client |
+| J | Four probe defects fixed on first real run: Codex returns its answer as JSON *text* in `agent_message`; the variadic `--disallowedTools` consumed the prompt; non-zero exits were mislabelled `untrusted`; Claude rejects the `$schema` meta-URI |
+| K | `scoped_instruction` made per-client — Codex scopes by directory, this bootstrap scopes by glob and ships no Codex scoped adapter |
+| L | `codex exec` has no persistent thread and cannot spawn; reported as `spawn_unsupported` rather than guessing an unobserved payload |
+| M | **Role matrix verified.** Twelve child threads across the interactive CLI and the VS Code extension, all six roles matching their configured model/effort, confirmed in client spawn events and per-child session records |
+
+**Verified.** Named-agent routing is correct on persistent-thread interfaces:
+orchestrator Sol/xhigh, planner Sol/max, coder Terra/high, reviewer Sol/high,
+documenter Terra/medium *(installed overlay; generated is Luna/medium)*,
+verifier Luna/low.
+
+**Still open.** Routing was verified with `[features.multi_agent_v2]`
+**present**. The shim-removed candidate has never been exercised on an
+interface capable of spawning, so removability remains untested and the shim
+stays. `max_depth` retains its own separate gate.
+
+**Newly known.** `tool_namespace = "agents"` is inert in 0.147.0: the
+collaboration tools appear as `collaboration.*`, nothing under `agents.*`.
+That is evidence about one key's mechanism, not grounds for removing the block,
+because `hide_spawn_agent_metadata` remains untested — no spawn occurs under
+the interface the probe drives.
+
+**Probe limitation.** `check_native_clients.py` drives `codex exec` and
+therefore cannot measure the matrix itself. Closing that means driving a
+persistent-thread interface (`codex app-server` or `mcp-server`), not waiting
+on upstream.
+
 ## MultiAgent V2 Routing-Shim Removal Gate
 
 Do not remove either MultiAgent V2 key, and do not select a different

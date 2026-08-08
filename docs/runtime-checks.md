@@ -248,7 +248,7 @@ Codex-specific runtime notes:
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
 - `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
 - `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
-- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match canonical `agent.yaml` metadata. Each instruction body has one generated delimiter and the exact transformed shared prompt, with no runtime read of a Claude-native agent file. Per-agent MCP and skill overrides are omitted, so the trusted project config supplies the shared registrations. The validator checks structural parity and records actual sizes; Phase I native probes, not a static size threshold, must establish delivery without truncation.
+- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match canonical `agent.yaml` metadata. Each instruction body has one generated delimiter and the exact transformed shared prompt, with no runtime read of a Claude-native agent file. Per-agent MCP and skill overrides are omitted, so the trusted project config supplies the shared registrations. The validator checks structural parity and records actual sizes; native probes, not a static size threshold, must establish delivery without truncation.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
@@ -261,4 +261,4 @@ The generated consumer `.codex/config.toml` is carried in
 this bootstrap repository, the root `.codex/config.toml` is protected tracked
 authoring, so a dogfood refresh preserves it while it updates generated sibling
 adapters. The protected V2 shim is not removed based on parsing or static
-validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): Phase I must provide repeated trusted-project, six-role native probes on two supported versions before removing the shim; `max_depth` has its own removal gate.
+validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): repeated trusted-project, six-role native probes on two supported versions are required before removing the shim; `max_depth` has its own removal gate. Six-role routing was verified on 2026-08-09 with the shim present.
