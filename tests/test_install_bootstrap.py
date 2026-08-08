@@ -16,6 +16,7 @@ from install_bootstrap import (  # noqa: E402
     copy_generated_tree,
     substitute_project_name,
     substitute_python_version,
+    validate_install_roots,
 )
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
@@ -317,3 +318,59 @@ def test_installer_preserves_consumer_memory_bytes_on_refresh_and_migration(
     )
     assert legacy_state.returncode == 0
     assert legacy_state.stdout == memory
+
+
+# --- --allow-self: the bootstrap repo refreshing its own dogfood overlay ----
+
+
+def test_overlapping_roots_rejected_without_allow_self(tmp_path: Path) -> None:
+    """Default stays fail-closed for every overlapping-root shape."""
+    target = tmp_path / "repo"
+    inside = target / "dist" / "multi-agent"
+    for source in (target, inside):
+        with pytest.raises(SystemExit) as excinfo:
+            validate_install_roots(source, target)
+        assert "non-overlapping" in str(excinfo.value)
+    with pytest.raises(SystemExit) as excinfo:
+        validate_install_roots(target, inside)
+    assert "non-overlapping" in str(excinfo.value)
+
+
+def test_rejection_without_the_flag_names_the_opt_in(tmp_path: Path) -> None:
+    """A blocked dogfood refresh should say how to proceed deliberately."""
+    target = tmp_path / "repo"
+    with pytest.raises(SystemExit) as excinfo:
+        validate_install_roots(target / "dist" / "multi-agent", target)
+    assert "--allow-self" in str(excinfo.value)
+
+
+def test_allow_self_permits_only_the_bootstrap_repo(tmp_path: Path) -> None:
+    """Source inside target is permitted for this repo, refused elsewhere."""
+    validate_install_roots(GENERATED, REPO_ROOT, allow_self=True)
+
+    other = tmp_path / "someone-elses-repo"
+    with pytest.raises(SystemExit) as excinfo:
+        validate_install_roots(other / "dist" / "multi-agent", other, allow_self=True)
+    assert "--allow-self only refreshes" in str(excinfo.value)
+
+
+def test_allow_self_still_rejects_the_dangerous_overlaps() -> None:
+    """The flag must not unlock installing a tree over or under itself."""
+    with pytest.raises(SystemExit):
+        validate_install_roots(REPO_ROOT, REPO_ROOT, allow_self=True)
+    with pytest.raises(SystemExit):
+        validate_install_roots(GENERATED, GENERATED / "nested", allow_self=True)
+
+
+def test_separate_roots_are_unaffected_by_the_flag(tmp_path: Path) -> None:
+    """Ordinary consumer installs behave identically with or without it."""
+    consumer = tmp_path / "consumer"
+    validate_install_roots(GENERATED, consumer)
+    validate_install_roots(GENERATED, consumer, allow_self=True)
+
+
+def test_local_client_settings_are_consumer_state() -> None:
+    """`settings.local.json` is machine-local; a refresh must not delete it."""
+    from runtime_ownership import is_consumer_state_path
+
+    assert is_consumer_state_path("settings.local.json")

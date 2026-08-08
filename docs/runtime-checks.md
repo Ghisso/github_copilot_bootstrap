@@ -10,23 +10,58 @@ The runtime checker verifies generated runtime files exist, including the
 Ponytail coding/review skills and upstream license/provenance, and reports
 optional helper availability.
 
-> **Known gap (2026-08-09): this repository's own overlay cannot be repaired
-> by the command the failure prints.** `install_bootstrap.py` refuses
-> overlapping source and target:
->
-> ```text
-> Generated source and target repository must be separate, non-overlapping
-> directories: source=.../dist/multi-agent; target=...
-> ```
->
-> So a drift failure naming a path inside this repo has no working repair
-> workflow, which is why the drift persists here. Consumer repositories are
-> unaffected — the printed command works for them. Current known-stale paths
-> include `.claude/hooks/scripts/protect-files.sh`, the absent
-> `protect-files.py` and `pretool-bash-guard.sh`, `.codex/hooks.json`, and all
-> six `.codex/agents/*.toml` (installed `documenter` is `gpt-5.6-terra`,
-> generated is `gpt-5.6-luna`). Do not hand-copy `dist/` to work around this;
-> the fix is a supported self-refresh path.
+## Refreshing This Repository's Own Overlay
+
+The bootstrap's dogfood overlay is refreshed with `--allow-self`:
+
+```bash
+uv run python scripts/generate_targets.py --all
+uv run python scripts/install_bootstrap.py . --allow-self --local-only
+```
+
+`install_bootstrap.py` normally refuses overlapping source and target, because
+the generated source (`dist/multi-agent`) lives inside this repository.
+`--allow-self` permits **only** that case, and only when the target is the
+bootstrap repository itself. Installing a tree over itself, or into a directory
+beneath the source, stays rejected with or without the flag. Removal is safe
+here because it walks only `target/.claude` and the restorable root adapters,
+so `dist/` is never a removal candidate. `update_consumers.py` accepts the same
+flag and forwards it.
+
+Never hand-copy `dist/` into place; always regenerate and install.
+
+### What a self-refresh removes
+
+Files under `.claude/` that the generated target does not contain are removed as
+obsolete owned files. Consumer state (`MEMORY.md`, `plans`, `explorations`,
+`session_logs`, `quality_reports`, `project-context.instructions.md`) is
+preserved, as are tracked authoring adapters such as `.codex/config.toml` and
+`AGENTS.md`.
+
+`.claude/settings.local.json` is now consumer state and is preserved. It used
+to be deleted as an obsolete owned file on **every** install, in every consumer
+— and because `state-sync.sh` deliberately gitignores it in the nested repo
+("local convenience only; never synced"), that deletion was unrecoverable. Any
+file matching the nested ignore list is local-only by design and must never be
+treated as bootstrap-owned.
+
+A file that exists under `.claude/` but not in the generated target is still
+removed as obsolete. `check_runtime.py` reports such orphans before a refresh
+does anything, so read its output first. An authored skill living only in the
+overlay should be promoted into `shared/skills/` so it regenerates, rather than
+being left to be deleted by the next refresh.
+
+### Expected side effects
+
+A self-refresh writes the consumer ignore block into `.gitignore`
+(`.claude/`, `.codex/`, the Copilot surface, `.vscode/mcp.json`). Files already
+tracked stay tracked; the installer prints a `git rm --cached` hint if you want
+to untrack them.
+
+The refreshed hook guards are stricter than older installed copies. They fail
+closed on opaque shell syntax — process substitution and heredocs piped into an
+interpreter are denied even when the command is read-only. Prefer plain
+commands, or run a script from a file, inside a refreshed repository.
 
 It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
 files in this source checkout must match freshly generated output (after the

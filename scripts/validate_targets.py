@@ -4729,6 +4729,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "session_logs/consumer.log": b"consumer log\n",
             "quality_reports/consumer.json": b'{"consumer": true}\n',
             "instructions/project-context.instructions.md": b"consumer project context\n",
+            "settings.local.json": b'{"consumerLocal": true}\n',
         }
         check(
             tuple(CONSUMER_STATE_PATHS)
@@ -4739,6 +4740,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 "session_logs",
                 "quality_reports",
                 "instructions/project-context.instructions.md",
+                "settings.local.json",
             ),
             "consumer-state fixture must cover every ownership-contract root",
             errors,
@@ -4851,6 +4853,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 f"installer legacy refresh must preserve consumer state {relative_path} byte-for-byte",
                 errors,
             )
+            if relative_path == "settings.local.json":
+                # Preserved on disk, but state-sync.sh gitignores it in the
+                # nested repo ("local convenience only; never synced"), so it
+                # is deliberately absent from migration history.
+                continue
             migrated_state = subprocess.run(
                 [
                     "git",

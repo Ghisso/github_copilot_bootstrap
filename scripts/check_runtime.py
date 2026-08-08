@@ -51,7 +51,10 @@ REQUIRED_DIRS = (
     "dist/multi-agent/.claude/review-profiles",
     "dist/multi-agent/.claude/hooks/scripts",
 )
-REINSTALL_COMMAND = "uv run python scripts/generate_targets.py --all && uv run python scripts/install_bootstrap.py <consumer-repo>"
+# The dogfood drift check compares this checkout against its own generated
+# output, so the repair is always a self-refresh. `--allow-self` is required:
+# without it the installer rejects the overlapping source and target.
+REINSTALL_COMMAND = "uv run python scripts/generate_targets.py --all && uv run python scripts/install_bootstrap.py . --allow-self --local-only"
 PROJECT_PLACEHOLDER = "**Project:** [TODO: project name and one-liner description]"
 
 
@@ -98,16 +101,22 @@ def parity_matches(path: Path, authoritative_path: Path, repo_root: Path) -> boo
     """Compare a bootstrap-controlled file after documented substitutions."""
     if not path.is_file():
         return False
-    if path.name != "workspace.instructions.md":
-        return same_bytes(path, authoritative_path)
-    actual = normalize_documented_substitutions(
-        path.read_text(encoding="utf-8"), repo_root
-    )
-    expected = (
-        authoritative_path.read_text(encoding="utf-8")
-        if authoritative_path.is_file()
-        else ""
-    )
+    if same_bytes(path, authoritative_path):
+        return True
+    # The installer substitutes the project name into every file carrying the
+    # placeholder, not just workspace.instructions.md. Byte-comparing those
+    # reported permanent drift no self-refresh could ever clear.
+    try:
+        actual = normalize_documented_substitutions(
+            path.read_text(encoding="utf-8"), repo_root
+        )
+        expected = (
+            authoritative_path.read_text(encoding="utf-8")
+            if authoritative_path.is_file()
+            else ""
+        )
+    except (OSError, UnicodeDecodeError):
+        return False
     return actual == expected
 
 
