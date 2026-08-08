@@ -123,3 +123,10 @@
 - [LEARN:testing] Routing-shim removal and nesting-limit removal need different
   native probes: exact role/model metadata does not prove that child agents
   cannot spawn grandchildren.
+- [LEARN:codex] Project custom-agent `developer_instructions` should embed the
+  canonical transformed role contract directly. Requiring a spawned agent to
+  read a Claude-native agent file adds avoidable tool dependence and can leave
+  the role under-specified before its first read.
+- [LEARN:config] Omit per-agent MCP and skill tables when Codex's documented
+  parent inheritance is intended; duplicating them creates shadow configuration
+  and another drift surface.
