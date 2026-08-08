@@ -138,3 +138,10 @@
   structural validation of the exact child order and isolated fixture guards
   that prove ordering, first-decision short-circuiting, and malformed-output
   fail-closed behavior.
+- [LEARN:workflow] Keep one normative task-lane table in the workflow policy.
+  A low-risk one-file edit can stay in the main thread only when no commit or
+  PR is requested; commit-bound work and every high-risk trigger upgrade to the
+  orchestrated lifecycle regardless of apparent simplicity.
+- [LEARN:architecture] Target-native path projection must preserve shared
+  control-plane surfaces that coexist in every consumer, such as
+  `.github/hooks/`; validate them in both root and scoped workspace guidance.

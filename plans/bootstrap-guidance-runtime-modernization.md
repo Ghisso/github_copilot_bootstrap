@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase: 2026-08-04_phase-F-hook-routing-efficiency
+current_phase: 2026-08-04_phase-G-task-lane-contract
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
