@@ -42,6 +42,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 - `run-hook.sh`
 - `protect-files.sh`
+- `pretool-bash-guard.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
@@ -58,6 +59,27 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `stop-session-log-check.sh`
 
 The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
+
+For the primary targets, generated `PreToolUse` routing must remain split into
+three groups: native file mutations (`Edit|MultiEdit|Write` for Claude,
+`Edit|Write` for Codex) call `protect-files.sh`; `Bash` calls the single ordered
+`pretool-bash-guard.sh`; and `*` calls only best-effort
+`context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
+The Bash wrapper must preserve the guard order: protected files, dangerous Git,
+branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
+outside that lane and retain their existing sequencing.
+
+`protect-files.sh` requires `python3` and calls its bundled classifier directly;
+it never depends on `uv run` or a project virtual environment. Missing Python,
+malformed payloads, classifier errors, incomplete redirects, indeterminate
+in-place targets, and ambiguous shell syntax must fail closed. The classifier
+must preserve the proven read-only path while checking both source and
+destination operands of copy/install/move operations, so a protected source
+cannot be exfiltrated through a write-bearing command. For opaque command or
+interpreter syntax, verify conservative literal coverage for `.env*`, `uv.lock`,
+`credentials*`, secret names, `.pem`/`.key` files, hook paths, and protected
+hook configuration files; do not require denial of unknown commands that carry
+none of those literals.
 
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
@@ -170,13 +192,14 @@ Codex-specific runtime notes:
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
 - `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
+- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match canonical `agent.yaml` metadata. Each instruction body has one generated delimiter and the exact transformed shared prompt, with no runtime read of a Claude-native agent file. Per-agent MCP and skill overrides are omitted, so the trusted project config supplies the shared registrations. The validator checks structural parity and records actual sizes; Phase I native probes, not a static size threshold, must establish delivery without truncation.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
 - Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
-- Because Codex `PreToolUse` cannot request approval, edits to Codex hook config are denied instead of downgraded to an approval prompt.
+- Because Codex `PreToolUse` cannot request approval, hook-config mutations are denied instead of downgraded to an approval prompt. Claude asks for approval. Both allow a read-only inspection of a protected configuration when the command classifier can prove it has no mutation target; redirects, in-place edits, and ambiguous commands fail closed.
 
 The generated consumer `.codex/config.toml` is carried in
 `.claude/bootstrap-root/.codex/` and restored on a fresh consumer machine. In

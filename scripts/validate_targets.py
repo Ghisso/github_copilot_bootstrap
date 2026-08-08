@@ -77,6 +77,8 @@ CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
+    "protect-files.py",
+    "pretool-bash-guard.sh",
     "git-protection.sh",
     "context-mode-dispatch.sh",
     "session-log.sh",
@@ -586,6 +588,64 @@ CLAUDE_LIFECYCLE_HOOKS = {
     "StopFailure": ("state-sync.sh", ("checkpoint",), 10),
     "SessionEnd": ("state-sync.sh", ("push",), 60),
 }
+
+
+def pretool_routing_errors(hooks: object, target: str) -> list[str]:
+    """Return errors for the deterministic mutation/observer hook split."""
+    native_matcher = "Edit|MultiEdit|Write" if target == "claude-code" else "Edit|Write"
+    errors: list[str] = []
+    if not isinstance(hooks, dict) or not isinstance(hooks.get("PreToolUse"), list):
+        return [f"{target} PreToolUse routing is missing"]
+    groups = hooks["PreToolUse"]
+    expected: dict[str, tuple[str, ...]] = {
+        native_matcher: ("protect-files.sh",),
+        "Bash": ("pretool-bash-guard.sh",),
+        "*": ("context-mode-dispatch.sh",),
+    }
+    if len(groups) != len(expected):
+        errors.append(f"{target} PreToolUse must have exactly three routing groups")
+    found: dict[str, tuple[str, ...]] = {}
+    for group in groups:
+        if not isinstance(group, dict):
+            errors.append(f"{target} PreToolUse group must be an object")
+            continue
+        matcher = group.get("matcher")
+        handlers = group.get("hooks")
+        if not isinstance(matcher, str) or not isinstance(handlers, list):
+            errors.append(f"{target} PreToolUse group must have matcher and hooks")
+            continue
+        commands: tuple[str, ...] = tuple(
+            next(
+                (
+                    script
+                    for script in (
+                        *expected[native_matcher],
+                        "pretool-bash-guard.sh",
+                        "context-mode-dispatch.sh",
+                    )
+                    if script in str(handler.get("command", ""))
+                ),
+                "",
+            )
+            for handler in handlers
+            if isinstance(handler, dict)
+        )
+        found[matcher] = commands
+    for matcher, scripts in expected.items():
+        if found.get(matcher) != scripts:
+            errors.append(
+                f"{target} PreToolUse {matcher!r} must contain only {scripts}"
+            )
+    for matcher, scripts in found.items():
+        if matcher == "*" and any(
+            script != "context-mode-dispatch.sh" for script in scripts
+        ):
+            errors.append(
+                f"{target} wildcard PreToolUse group must be observability only"
+            )
+        if matcher != "Bash" and "pretool-bash-guard.sh" in scripts:
+            errors.append(f"{target} Bash safety wrapper must not run for {matcher!r}")
+    return errors
 
 
 def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
@@ -1681,12 +1741,14 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     )
 
     validate_claude_lifecycle_hooks(claude_settings.get("hooks"), errors)
+    errors.extend(pretool_routing_errors(claude_settings.get("hooks"), "claude-code"))
 
     check(
         "state-sync.sh" in json.dumps(codex_hooks),
         "Codex hooks should sync AI state via state-sync.sh",
         errors,
     )
+    errors.extend(pretool_routing_errors(hooks_by_event, "openai-codex"))
 
     check(
         "state-sync.sh pull" in claude_settings_text,
@@ -1739,6 +1801,31 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     check(
         dispatcher.exists() and bool(dispatcher.stat().st_mode & 0o111),
         "generated hook dispatcher run-hook.sh must be executable because Claude/Codex invoke it directly",
+        errors,
+    )
+    bash_wrapper = (
+        TARGET_ROOT / ".claude" / "hooks" / "scripts" / "pretool-bash-guard.sh"
+    )
+    wrapper_text = read(bash_wrapper) if bash_wrapper.exists() else ""
+    expected_children = (
+        "protect-files.sh",
+        "git-protection.sh",
+        "enforce-branch-state.sh",
+        "enforce-commit-gate.sh",
+        "enforce-pr-gate.sh",
+    )
+    child_loop = re.search(r"for guard in ([^;]+); do", wrapper_text)
+    actual_children: tuple[str, ...] = (
+        tuple(child_loop.group(1).split()) if child_loop else ()
+    )
+    check(
+        actual_children == expected_children,
+        "Bash safety wrapper must invoke exactly five ordered child guards",
+        errors,
+    )
+    check(
+        '[[ -z "$output" ]] && continue' in wrapper_text and "exit 0" in wrapper_text,
+        "Bash safety wrapper must short-circuit after a child decision",
         errors,
     )
 

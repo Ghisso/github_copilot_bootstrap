@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
+from typing import Any
 from pathlib import Path
 
 import pytest
@@ -33,9 +34,27 @@ from validate_targets import (  # noqa: E402
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
+    pretool_routing_errors,
     root_guidance_errors,
     scope_matches,
 )
+
+
+def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
+    """Safety handlers are scoped while the wildcard remains observer-only."""
+    hooks: dict[str, Any] = {
+        "PreToolUse": [
+            {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
+            {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
+            {"matcher": "*", "hooks": [{"command": "context-mode-dispatch.sh"}]},
+        ]
+    }
+    assert pretool_routing_errors(hooks, "openai-codex") == []
+
+    hooks["PreToolUse"][2]["hooks"].append({"command": "git-protection.sh"})
+    errors = pretool_routing_errors(hooks, "openai-codex")
+    assert any("wildcard" in error for error in errors)
+    assert any("must contain only" in error for error in errors)
 
 
 def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:

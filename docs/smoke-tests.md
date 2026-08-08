@@ -83,8 +83,13 @@ Expected:
 Expected:
 
 - Guardrail scripts exist under `.claude/hooks/scripts/`.
-- `protect-files.sh` denies protected files through structured write tools and Bash writes such as `touch .env`.
-- Hook config edits through Bash redirection are protected, with Codex denying and GitHub/Claude asking for approval.
+- Claude `PreToolUse` has native mutation (`Edit|MultiEdit|Write`), ordered `Bash`, and wildcard observability matcher groups; Codex has the equivalent `Edit|Write`, `Bash`, and wildcard groups. `Read` and MCP tools do not invoke mutation guards.
+- `protect-files.sh` requires direct `python3` classification (not `uv run`) and denies protected files through structured write tools and per-segment Bash writes such as `touch .env`; absence of Python, malformed input, or classifier ambiguity fails closed. A read-only `cat`/`git diff` inspection of a protected configuration remains allowed.
+- Copy/install/move commands that name a protected source as well as a destination are denied, preventing protected-source exfiltration through a write-bearing command.
+- Unknown, archive, and interpreter-style commands are denied only when they carry a protected literal: `.env*`, `uv.lock`, `credentials*`, a secret name, `.pem`/`.key`, a hook path, or protected hook configuration. Their safe parsing failure still fails closed; the explicit read-only command set remains allowed.
+- `pretool-bash-guard.sh` runs protected-file, dangerous-Git, branch, commit, then PR guards in that exact order and returns the first safety decision. A guard failure or malformed safety output fails closed.
+- Hook config edits through native tools, Bash redirection, or in-place edits are protected, with Codex denying and Claude asking for approval. Missing redirect targets and ambiguous commands fail closed.
+- Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Generated `run-hook.sh` is executable because Claude and Codex hook commands call it directly.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.

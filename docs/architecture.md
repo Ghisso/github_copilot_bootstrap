@@ -98,6 +98,22 @@ Claude and Codex generated configs execute `run-hook.sh` directly. `scripts/gene
 
 Hook errors (from `state-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact.
 
+### Target-native PreToolUse routing
+
+Claude and Codex use target-native matcher groups to keep the safety lane narrow.
+Claude sends `Edit|MultiEdit|Write` to `protect-files.sh`; Codex sends
+`Edit|Write`. Both send `Bash` to `pretool-bash-guard.sh`, while the wildcard
+matcher runs only optional `context-mode-dispatch.sh` observability. Read and
+MCP tools have no mutation guard handler, so they do not incur a no-op safety
+classification.
+
+`pretool-bash-guard.sh` is one ordered Bash lane: `protect-files.sh`,
+`git-protection.sh`, `enforce-branch-state.sh`, `enforce-commit-gate.sh`, then
+`enforce-pr-gate.sh`. It returns the first deny/ask decision and fails closed
+if a safety guard errors or produces malformed output. This avoids relying on
+the target runtime's parallel execution order while leaving lifecycle wrappers
+and wildcard observability independent.
+
 ## Lifecycle Enforcement
 
 The canonical workflow is:
@@ -117,11 +133,33 @@ Lifecycle hook scripts keep that workflow stateful without mutating during valid
 
 Bypass commit prefixes `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` are allowed for short-lived recovery work, but they skip only the plan-ceremony checks (small-plan/closeout/score/LEARN) — branch-shape validation still runs, so a bypass commit off a non-`*_implementation` branch is still denied. Bypasses are logged and must be acknowledged before PR or push.
 
-The two safety-critical guards, `protect-files.sh` and `git-protection.sh`, run their primary checks in pure bash with no `uv` dependency (the Python path in `protect-files.sh` is an enhancement used only when `uv` is present). On an internal error a guard fails toward `ask` (deny on Codex) rather than a silent allow, and the PreToolUse gates exit non-zero on an unparseable payload so runtimes that key blocking on exit status deny the call.
+`protect-files.sh` invokes its bundled classifier directly with `python3`; it
+does not use `uv run`, because protection must work before a project environment
+exists. `python3` is therefore a required safety dependency: if it is absent,
+the hook fails closed. `git-protection.sh` remains a Bash guard. A classifier
+error, incomplete redirect, in-place edit without a determinable target, or
+ambiguous shell segment also fails closed. Classification is target-aware per
+segment rather than a whole-command heuristic, so a proven read-only
+protected-config inspection is allowed while mutations through native tools,
+redirects, `sed -i`/`perl -i`, and mutating commands remain protected. Copy,
+install, and move operations include both source and destination operands in
+the protection check, preventing a protected source file from being copied out
+through a write-bearing command; unknown command syntax with a protected literal
+is denied rather than guessed.
 
 `git-protection.sh` scans a possibly-chained Bash command for destructive git subcommands (`reset --hard`, `push --force`, `checkout --`, `clean -fd`, deleting `main`/`master`). Because `_shell_tokenize` drops shell operators (`;`/`|`/`&`) as mere separators, the flattened token stream for `git clean -f && ls -d /tmp` has no trace of the `&&` — scanning "does -d appear anywhere after clean" would misattribute `ls`'s unrelated `-d` to `git clean`, denying a wholly benign command (and the same shape misattributes an unrelated later `--force` to an earlier `git push`). `git_danger_reason` bounds each invocation's argument scan to `_unquoted_operator_boundary` — the point right before the next unquoted operator — so a later chained command's flags can never bleed into an earlier invocation's danger check, while a real danger later in the same chain (`git status && git reset --hard`) is still caught on its own invocation.
 
-`protect-files.sh`'s bash pass only recognizes explicit path shapes (a leading `/`, `./`, `../`, a known dotfolder prefix, or a tracked extension) — it deliberately does **not** treat "contains a `/`" as path-like, since that flagged ordinary prose or unrelated tool arguments (a docs sentence mentioning `docs/section`, a script that merely imports something named `Secret`) as a protected-file edit. The Python enhancement pass is stricter where it matters instead: for a token containing `/` that the bash pass would ignore, it checks whether the *basename* looks like a secret (`.env*`, `credentials*`, `*.pem`/`*.key`, or `secret` in the name) before flagging it — so `cp app/secrets/db_secret.txt other/` is still caught even though neither path has a recognized extension or absolute prefix. That Python pass must run whenever `uv` is available regardless of whether the bash pass found any candidates of its own; short-circuiting it when the coarse bash scan comes up empty would silently let exactly this kind of relative secret-file copy through.
+The direct Python classifier normalizes repository-relative and absolute paths.
+For an opaque or interpreter-style command that is not on the proven read-only
+list, conservative protected-literal detection covers `.env*`, `uv.lock`,
+`credentials*`, names containing `secret`, `.pem`/`.key` files, every
+`.github`/`.claude`/`.codex` hook path, and the protected Claude/Codex hook
+configuration files. It does not claim all unfamiliar commands are mutations:
+an unfamiliar command is denied only when it carries one of those protected
+literals, while syntax that prevents safe parsing fails closed. This prevents
+bypasses such as `cp app/secrets/db_secret.txt other/` and false confidence in
+an unfamiliar interpreter or archive command, while the explicit read-only
+command set remains inspectable.
 
 ## Git-Backed State Sync
 

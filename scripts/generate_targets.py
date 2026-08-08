@@ -511,16 +511,21 @@ def render_claude_settings(path: Path) -> None:
             ],
             "PreToolUse": [
                 {
-                    "matcher": "Edit|MultiEdit|Write|Bash",
+                    "matcher": "Edit|MultiEdit|Write",
                     "hooks": [
                         cmd("protect-files.sh", "claude-code"),
-                        cmd("git-protection.sh"),
-                        cmd("enforce-branch-state.sh", "claude-code"),
-                        cmd("enforce-commit-gate.sh", "claude-code"),
-                        cmd("enforce-pr-gate.sh", "claude-code"),
-                        cmd("context-mode-dispatch.sh", "claude-code", "pretooluse"),
                     ],
-                }
+                },
+                {
+                    "matcher": "Bash",
+                    "hooks": [cmd("pretool-bash-guard.sh", "claude-code")],
+                },
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        cmd("context-mode-dispatch.sh", "claude-code", "pretooluse")
+                    ],
+                },
             ],
             "PostToolUse": [
                 {
@@ -587,16 +592,21 @@ def render_codex_hooks(path: Path) -> None:
             ],
             "PreToolUse": [
                 {
-                    "matcher": "*",
+                    "matcher": "Edit|Write",
                     "hooks": [
                         cmd("protect-files.sh", "openai-codex"),
-                        cmd("git-protection.sh"),
-                        cmd("enforce-branch-state.sh", "openai-codex"),
-                        cmd("enforce-commit-gate.sh", "openai-codex"),
-                        cmd("enforce-pr-gate.sh", "openai-codex"),
-                        cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse"),
                     ],
-                }
+                },
+                {
+                    "matcher": "Bash",
+                    "hooks": [cmd("pretool-bash-guard.sh", "openai-codex")],
+                },
+                {
+                    "matcher": "*",
+                    "hooks": [
+                        cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse")
+                    ],
+                },
             ],
             "PostToolUse": [
                 {

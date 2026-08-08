@@ -62,6 +62,21 @@ Structural validation checks exact normalized prompt-body parity for all six rol
 
 Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), sets `agents.max_concurrent_threads_per_session = 6`, omits the legacy `max_threads` and redundant `agents.enabled`, configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
 
+For both primary targets, generated `PreToolUse` separates mutation safety from
+observability: native edit matchers call `protect-files.sh`, `Bash` calls one
+ordered guard wrapper, and `*` calls only context-mode dispatch. The Codex
+native-edit matcher is `Edit|Write`; Claude additionally supports `MultiEdit`.
+The Bash wrapper invokes direct `python3` target classification rather than
+`uv run`, allowing protection before a project environment exists. It classifies
+mutation targets segment by segment, allows proven read-only inspection, checks
+copy/install/move sources and destinations, and fails closed for missing Python,
+redirects, in-place edits, and ambiguous commands. This preserves Codex's
+deny-only hook-config protection and Claude's approval path without routing Read
+or MCP calls through a mutation handler. Opaque command handling is deliberately
+literal-based rather than a claim that every unknown command mutates: it covers
+`.env*`, `uv.lock`, `credentials*`, secret names, `.pem`/`.key`, hook paths, and
+protected hook configuration files.
+
 The generated consumer config is mirrored under
 `.claude/bootstrap-root/.codex/` for restoration. The bootstrap repository's
 root `.codex/config.toml` is instead tracked authoring and stays protected when
