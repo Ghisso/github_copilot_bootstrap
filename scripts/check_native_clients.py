@@ -30,7 +30,8 @@ OBSERVATION_SCHEMA = (
 )
 WORKSPACE_MARKER = ".native-client-probe-owned"
 WORKSPACE_MARKER_CONTENT = "native-client-probe-v1\n"
-TIMEOUT_SECONDS = 120
+# Each client runs control and candidate consecutively; 120s timed Codex out.
+TIMEOUT_SECONDS = 420
 PASS, WARN, FAIL = "PASS", "WARN", "FAIL"
 EVIDENCE_PRECHECK = "native_preflight"
 EVIDENCE_SENTINEL = "client_schema_sentinel"
@@ -246,6 +247,26 @@ def observation_schema() -> dict[str, Any]:
     return json.loads(OBSERVATION_SCHEMA.read_text(encoding="utf-8"))
 
 
+def scoped_instruction_question(client: str) -> str:
+    """Ask each client only about the scoped surface its target actually ships.
+
+    Codex discovers scoped instructions by directory (nested `AGENTS.md` on the
+    root->cwd path). This bootstrap scopes policy by glob and renders native
+    adapters for Copilot (`applyTo`) and Claude (`paths:`) only, so there is no
+    nested `AGENTS.md` to find. Asking Codex the Claude question made the answer
+    non-deterministic; ask it about the routing that does exist instead.
+    """
+    if client == "codex":
+        return (
+            "`scoped_instruction` is true only if the root AGENTS.md routes you to the "
+            "canonical shared policies under .claude/instructions/."
+        )
+    return (
+        "`scoped_instruction` is true only if a path-scoped rule adapter under "
+        ".claude/rules/ declares `paths:` frontmatter."
+    )
+
+
 def probe_prompt(client: str) -> str:
     role_request = (
         "Spawn each configured named role once. Do not report role metadata in your final answer; "
@@ -257,7 +278,10 @@ def probe_prompt(client: str) -> str:
         "Read only the current generated project. Do not write files, approve hooks, expose "
         "prompts, paths, transcript content, IDs, credentials, or environment values. Return only "
         "the schema booleans for whether the root instruction, scoped instruction, required workflow "
-        "contract, and project hooks were discovered. " + role_request
+        "contract, and project hooks were discovered. "
+        + scoped_instruction_question(client)
+        + " "
+        + role_request
     )
 
 

@@ -390,3 +390,31 @@ def test_claude_inline_schema_drops_unresolvable_meta_schema_key() -> None:
     inline = json.loads(command[command.index("--json-schema") + 1])
     assert "$schema" not in inline
     assert inline["required"] == list(native.SENTINEL_FIELDS)
+
+
+# --- Phase K: per-client scoped-instruction semantics ----------------------
+
+
+def test_scoped_instruction_question_differs_per_client() -> None:
+    """Codex scopes by directory; this target ships no nested AGENTS.md."""
+    codex_question = native.scoped_instruction_question("codex")
+    claude_question = native.scoped_instruction_question("claude")
+    assert codex_question != claude_question
+    assert "AGENTS.md" in codex_question
+    assert ".claude/instructions/" in codex_question
+    assert ".claude/rules/" in claude_question
+    assert "paths:" in claude_question
+
+
+def test_no_prompt_claims_a_surface_the_target_does_not_generate() -> None:
+    """Codex must never be asked about nested AGENTS.md scoping."""
+    codex_prompt = native.probe_prompt("codex")
+    assert ".claude/rules/" not in codex_prompt
+    assert "nested" not in codex_prompt.lower()
+    for client in ("codex", "claude"):
+        assert native.scoped_instruction_question(client) in native.probe_prompt(client)
+
+
+def test_default_timeout_allows_consecutive_control_and_candidate() -> None:
+    """120s timed Codex out mid-matrix; the default must cover both runs."""
+    assert native.TIMEOUT_SECONDS >= 300

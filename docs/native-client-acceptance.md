@@ -34,6 +34,39 @@ If a global npm install seems to vanish, confirm the npm global `bin`
 directory is on `PATH` — `node`/`npm` are often exposed by individual symlinks
 while sibling tools are not.
 
+## Codex Has No Directory-Scoped Instructions Here
+
+Codex discovers scoped instructions **by directory**: it walks from the Git
+root down to the current working directory, taking at most one file per
+directory (`AGENTS.override.md`, then `AGENTS.md`, then
+`project_doc_fallback_filenames`), concatenating root -> cwd until
+`project_doc_max_bytes` (32 KiB default). A nested file therefore loads only
+when Codex is working inside that directory.
+
+This bootstrap scopes policy by **glob** (`applicability:` in
+`shared/policies/*.instructions.md`) and renders native adapters for two
+targets:
+
+| Target | Native scoped surface |
+| --- | --- |
+| Copilot | `.github/instructions/*.instructions.md` with `applyTo` |
+| Claude | `.claude/rules/*.md` with `paths:` |
+| Codex | none — deliberate |
+
+No nested `AGENTS.md` is generated, and the target ships no `src/` or `tests/`
+directory to host one. That is a deliberate decision, not an oversight:
+emitting nested files would create directories in consumer repositories that
+may not have them.
+
+Consequently the probe asks each client only about the surface its own target
+ships. For Codex, `scoped_instruction` means "the root `AGENTS.md` routes to
+the canonical policies under `.claude/instructions/`". Asking Codex the Claude
+question made the answer non-deterministic, because it was being asked to find
+something that does not exist.
+
+Revisit this if Codex-native directory scoping is ever wanted; the upstream
+discovery rules above are what an implementation must satisfy.
+
 ## Run It Safely
 
 The ordinary test suite is offline, mocked, deterministic, and credential-free:
@@ -72,8 +105,10 @@ uv run python scripts/check_native_clients.py \
 `--client` accepts `codex`, `claude`, or `all`; `--json` emits the
 machine-readable report. `--require` makes every unresolved `WARN` for a
 requested client nonzero, including missing, unavailable, timed-out, untrusted,
-unexercised, or undocumented-event cases. The default timeout is intentionally
-internal so the release command stays small. Do not claim a current native PASS
+unexercised, or undocumented-event cases. The default timeout is 420s per
+client, which covers the control and candidate runs it performs consecutively;
+120s was not enough and produced spurious `codex_timeout` results. Do not claim
+a current native PASS
 from structural tests, a config parser, model prose, or absent trust/authentication.
 
 Codex needs a signed-in CLI and a trusted project: Codex loads project-scoped
