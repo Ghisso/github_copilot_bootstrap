@@ -293,8 +293,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     # validate_targets.py invokes them by path. The shared sources are tracked
     # 0644 (git core.fileMode aside), so make them +x here rather than relying on
     # the checked-out mode.
-    for script in sorted((support_root / "hooks" / "scripts").glob("*.sh")):
-        ensure_executable(script)
+    # Not just *.sh: protect-files.py is a required hook script too, and the
+    # glob silently skipped it, so a freshly generated tree failed validation.
+    for script in sorted((support_root / "hooks" / "scripts").iterdir()):
+        if script.is_file():
+            ensure_executable(script)
     copy_tree(
         REPO_ROOT / "shared" / "hooks" / "git-hooks",
         support_root / "hooks" / "git-hooks",

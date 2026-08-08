@@ -23,6 +23,7 @@ Usage:
 Options:
     --skip-regen     Skip regenerating dist/ before installing
     --dry-run        Print planned actions without writing files
+    --allow-self     Permit refreshing this bootstrap repo's own overlay
 """
 
 from __future__ import annotations
@@ -53,6 +54,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="Print planned actions only."
+    )
+    parser.add_argument(
+        "--allow-self",
+        action="store_true",
+        help="Permit refreshing the bootstrap repository's own dogfood overlay.",
     )
     parser.add_argument(
         "--local-only",
@@ -92,6 +98,8 @@ def main() -> None:
             install_cmd.append("--dry-run")
         if args.local_only:
             install_cmd.append("--local-only")
+        if args.allow_self:
+            install_cmd.append("--allow-self")
         if args.commit_copilot_surface is not None:
             install_cmd.append(
                 "--commit-copilot-surface"

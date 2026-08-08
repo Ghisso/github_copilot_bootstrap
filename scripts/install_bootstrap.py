@@ -75,6 +75,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print planned actions without writing files.",
     )
+    parser.add_argument(
+        "--allow-self",
+        action="store_true",
+        help="Permit the bootstrap repository to refresh its own dogfood overlay, "
+        "where the generated source lives inside the target. Every other "
+        "overlapping-root case stays rejected.",
+    )
     return parser.parse_args()
 
 
@@ -256,16 +263,38 @@ def persisted_install_mode(target: Path) -> bool | None:
         return None
 
 
-def validate_install_roots(source: Path, target: Path) -> None:
-    """Reject overlapping source and target trees before installer side effects."""
+def validate_install_roots(
+    source: Path, target: Path, allow_self: bool = False
+) -> None:
+    """Reject overlapping source and target trees before installer side effects.
+
+    ``--allow-self`` permits exactly one overlap: the bootstrap repository
+    refreshing its own dogfood overlay, where the generated source lives inside
+    the target. That case is safe because removal only walks ``target/.claude``
+    and ``RESTORABLE_ROOT_PATHS``, so the source under ``dist/`` is never a
+    removal candidate. Installing a tree over itself, or into a directory under
+    the source, stays rejected either way.
+    """
+    if allow_self and source != target and source.is_relative_to(target):
+        if target != REPO_ROOT:
+            raise SystemExit(
+                "--allow-self only refreshes the bootstrap repository's own overlay: "
+                f"target={target}; bootstrap={REPO_ROOT}"
+            )
+        return
     if (
         source == target
         or source.is_relative_to(target)
         or target.is_relative_to(source)
     ):
+        hint = (
+            ""
+            if allow_self
+            else " Pass --allow-self to refresh the bootstrap repository's own overlay."
+        )
         raise SystemExit(
             "Generated source and target repository must be separate, non-overlapping directories: "
-            f"source={source}; target={target}"
+            f"source={source}; target={target}.{hint}"
         )
 
 
@@ -733,7 +762,7 @@ def main() -> int:
     state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     target = args.target_repo.expanduser().resolve()
     source = args.source.expanduser().resolve()
-    validate_install_roots(source, target)
+    validate_install_roots(source, target, args.allow_self)
     persisted_mode = persisted_install_mode(target)
     commit_copilot_surface = (
         args.commit_copilot_surface

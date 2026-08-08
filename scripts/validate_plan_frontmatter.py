@@ -40,7 +40,9 @@ def parse_frontmatter(path: Path) -> dict[str, Any]:
     return data
 
 
-def require_fields(path: Path, data: dict[str, Any], fields: list[str], errors: list[str]) -> None:
+def require_fields(
+    path: Path, data: dict[str, Any], fields: list[str], errors: list[str]
+) -> None:
     for field in fields:
         if field not in data or data[field] in ("", []):
             errors.append(f"{path}: missing required field: {field}")
@@ -50,7 +52,14 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
     require_fields(
         path,
         data,
-        ["name", "type", "status", "originating_branch", "implementation_branch", "phases"],
+        [
+            "name",
+            "type",
+            "status",
+            "originating_branch",
+            "implementation_branch",
+            "phases",
+        ],
         errors,
     )
     status = str(data.get("status", ""))
@@ -65,7 +74,9 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
 
 
 def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> None:
-    require_fields(path, data, ["name", "type", "parent_plan", "phase_index", "status"], errors)
+    require_fields(
+        path, data, ["name", "type", "parent_plan", "phase_index", "status"], errors
+    )
     status = str(data.get("status", ""))
     if status not in {"in-progress", "complete"}:
         errors.append(f"{path}: invalid status for small-plan: {status}")

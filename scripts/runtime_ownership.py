@@ -44,6 +44,10 @@ CONSUMER_STATE_PATHS = (
     "session_logs",
     "quality_reports",
     "instructions/project-context.instructions.md",
+    # Machine-local client settings the bootstrap never generates. Without this
+    # every install deleted the consumer's own settings as an obsolete owned
+    # file, which is data loss, not a refresh.
+    "settings.local.json",
 )
 
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
