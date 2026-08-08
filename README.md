@@ -645,6 +645,16 @@ Run the bootstrap runtime check after copying optional surfaces:
 uv run python scripts/check_runtime.py
 ```
 
+For release-only behavior that structural validation cannot establish, use the
+opt-in [native client acceptance probe](docs/native-client-acceptance.md).
+It is Codex-first, then Claude: the normal offline suite remains deterministic
+and credential-free, while native availability, trust, and other unresolved
+native evidence are `WARN` unless the release command adds `--require`.
+For real native execution, first prepare a dedicated stable workspace with
+`--workspace <path> --prepare-only`, inspect it and trust it manually, then
+rerun with the same `--workspace`; the default temporary mode intentionally
+does not launch either client. The runner never mutates trust.
+
 ## How To Use This Bootstrap In Another Project
 
 1. Regenerate the installable output with `uv run python scripts/generate_targets.py --all`.

@@ -78,6 +78,35 @@ Expected:
   two-version native-probe gate for removing the V2 shim; `max_depth` has a
   separate gate.
 
+## Native Client Acceptance (Opt-In)
+
+The deterministic checks above do not start native clients or need their
+credentials. The probe's default temporary mode is also only a structure and
+missing-client smoke: it intentionally does not launch a client and reports an
+installed client as unresolved `WARN`/`untrusted`. For real native evidence,
+prepare and manually trust a dedicated stable workspace before running:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe --prepare-only --json
+# Inspect the workspace and trust it manually in the client, then:
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client codex --require --json
+```
+
+Without `--require`, a missing, unavailable, timed-out, or untrusted requested
+client is `WARN`; with it, that result is `FAIL`. The probe uses a temporary
+read-only control/candidate consumer pair, never approves hooks or mutates
+project trust, and emits only fixed schema-v2 sentinels and event-backed check
+state. `--require` also promotes unresolved `WARN` evidence to a nonzero
+result. Exact Codex routing can PASS only from explicit client JSONL
+agent/thread/subagent metadata; model prose or an absent event is not proof.
+Compact/resume and coder escalation currently remain unexercised WARNs. See
+[Native Client Acceptance](native-client-acceptance.md). Preparation refuses
+broad or nonempty unmarked paths and refreshes only marker-owned inputs; it
+never approves or changes trust.
+
 ## Hooks
 
 Expected:

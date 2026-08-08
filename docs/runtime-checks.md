@@ -32,6 +32,43 @@ Optional helpers:
 
 Missing optional binaries produce `WARN`, not `FAIL`.
 
+## Native Client Release Checks (Opt-In)
+
+`check_runtime.py` remains an offline structural/runtime check. It does not
+authenticate or start Codex or Claude, and a structural PASS is not evidence of
+native instruction delivery, hook trust, compact/resume behavior, or Codex role
+routing. The native probe's default temporary mode deliberately does not launch
+either client, so it is only a structure/missing-client smoke and reports an
+installed client as unresolved `WARN`/`untrusted`. For actual native execution,
+prepare, inspect, and manually trust a dedicated stable workspace, then rerun
+against that same workspace:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe --prepare-only --json
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client codex --require --json
+```
+
+Default availability/trust failures are `WARN`; `--require` makes them `FAIL`.
+`--require` also makes unresolved `unexercised` WARNs nonzero. The probe runs
+two separate read-only temporary consumers (control and shim-removed candidate)
+with ephemeral/non-persistent sessions, a minimal environment, process-group
+timeout cleanup, no Codex MCP/apps/web search, no hook approval, and no trust
+mutation. It keeps client output out of the result. Schema v2 records only
+instruction sentinels; trust is preflight/execution status. Codex role metadata
+can PASS only from explicit JSONL agent/thread/subagent events; undocumented or
+absent events are WARN, not proof. Compact/resume and coder escalation are
+currently unexercised WARNs. Claude has no Codex-role matrix. Read [Native
+Client Acceptance](native-client-acceptance.md) before interpreting a report or
+changing a compatibility gate.
+
+The persistent path must be dedicated: preparation refuses broad paths and
+nonempty directories without its ownership marker. A later preparation refreshes
+only marker-owned probe children. It never writes a trust setting, approves a
+hook, or forces a safety bypass; trust remains an explicit operator action.
+
 Ponytail does not add a runtime binary requirement. Its portable skills are
 vendored into `.claude/skills/`; the bootstrap's existing reviewer and pure
 Bash git gates enforce the fresh zero-finding Ponytail review. Node.js is used

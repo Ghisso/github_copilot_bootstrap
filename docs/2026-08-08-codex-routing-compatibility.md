@@ -38,6 +38,17 @@ tier. The six current declarations are: orchestrator Sol/xhigh, planner
 Sol/max, coder Terra/high, reviewer Sol/high, documenter Luna/medium, and
 verifier Luna/low. Coder alone may escalate to Sol/xhigh.
 
+Phase I adds the opt-in `scripts/check_native_clients.py` acceptance runner.
+It uses schema v2 instruction sentinels in separate ephemeral, read-only control
+and shim-removed candidate consumers. It does not approve hooks, change project
+trust, enable MCP/apps/web, or establish a PASS when Codex is unavailable,
+unauthenticated, or untrusted. Exact role metadata is accepted only from
+explicit client JSONL agent/thread/subagent events; model prose or an absent
+event is never routing proof. Current compact/resume and coder-escalation
+checks are intentionally unexercised WARNs. These results do not retroactively
+turn the historical entries above into current PASS results. See [Native Client
+Acceptance](native-client-acceptance.md).
+
 ## MultiAgent V2 Routing-Shim Removal Gate
 
 Do not remove either MultiAgent V2 key, and do not select a different
@@ -52,6 +63,18 @@ Codex versions**, each with all of the following evidence:
 4. The candidate key is absent in each probe and routing remains exact.
 5. The recorded evidence is reviewed before changing the generator and static
    validation contract.
+
+For each run, first use `--workspace <dedicated-path> --prepare-only`, inspect
+the stable generated control/candidate workspace, and trust it manually. Then
+run `uv run python scripts/check_native_clients.py --workspace
+<dedicated-path> --client codex --require --json`; the default temporary mode
+does not launch Codex and cannot provide native evidence. Preserve the redacted
+JSON evidence and repeat on two supported Codex versions. A schema sentinel,
+docs-only conclusion, model prose, untrusted result, absent/undocumented event,
+or candidate execution `WARN` cannot satisfy this gate. `--require` makes those
+unresolved warnings nonzero; separate supported exercises are still needed for
+compact/resume and coder escalation. The runner never changes trust, and its
+workspace preparation refuses broad or nonempty unmarked paths.
 
 ## `max_depth` Removal Gate
 
