@@ -76,3 +76,39 @@ fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/
 2026-08-08T12:45:46Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-08T12:45:46Z WARN hook fail-closed: unparseable tool payload
 2026-08-08T12:45:46Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:03:42Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:03:42Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:03:42Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:04:33Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:04:33Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:04:33Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:06:15Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:06:15Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:06:15Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:07:03Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:07:04Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:07:04Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:16:30Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:16:30Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:16:30Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:16:56Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:16:57Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:16:57Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:17:33Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:17:33Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:17:33Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:18:49Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:18:49Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:18:49Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:20:59Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:20:59Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:20:59Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:21:50Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:21:50Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:21:50Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:23:21Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:23:22Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:23:22Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:24:53Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:24:54Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:24:54Z WARN hook fail-closed: protect-files.sh exited with status 2
