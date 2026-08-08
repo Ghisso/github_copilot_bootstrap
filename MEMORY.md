@@ -130,3 +130,11 @@
 - [LEARN:config] Omit per-agent MCP and skill tables when Codex's documented
   parent inheritance is intended; duplicating them creates shadow configuration
   and another drift surface.
+- [LEARN:security] Phase F confirmed protected-file shell guards should classify proven read-only
+  operations and concrete mutation targets, then fail closed for opaque syntax
+  containing any protected literal. Cover wrappers, interpreters, combined
+  flags, newlines, and protected-source copies as explicit regressions.
+- [LEARN:testing] A sequential safety wrapper needs two acceptance layers:
+  structural validation of the exact child order and isolated fixture guards
+  that prove ordering, first-decision short-circuiting, and malformed-output
+  fail-closed behavior.

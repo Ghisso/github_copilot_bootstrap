@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase: 2026-08-04_phase-E-codex-agent-self-containment
+current_phase: 2026-08-04_phase-F-hook-routing-efficiency
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
