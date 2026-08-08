@@ -176,3 +176,9 @@ fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/
 2026-08-08T16:27:37Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-08T16:27:37Z WARN hook fail-closed: unparseable tool payload
 2026-08-08T16:27:37Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T16:42:45Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T16:42:45Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T16:42:45Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T16:48:18Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T16:48:18Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T16:48:18Z WARN hook fail-closed: protect-files.sh exited with status 2
