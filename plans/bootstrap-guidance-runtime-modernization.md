@@ -1,7 +1,7 @@
 ---
 name: bootstrap-guidance-runtime-modernization
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: bootstrap-guidance-runtime-modernization_implementation
 started_at: 2026-08-04T13:12:09Z
@@ -20,7 +20,7 @@ phases:
   - 2026-08-04_phase-L-codex-role-matrix-evidence
   - 2026-08-04_phase-M-role-matrix-correction-and-dogfood-drift
   - 2026-08-04_phase-N-phase-extension-narrative
-current_phase: 2026-08-04_phase-N-phase-extension-narrative
+current_phase: 
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
@@ -112,7 +112,7 @@ flowchart LR
 - [x] `2026-08-04_phase-K-codex-scoped-instruction-semantics`
 - [x] `2026-08-04_phase-L-codex-role-matrix-evidence`
 - [x] `2026-08-04_phase-M-role-matrix-correction-and-dogfood-drift`
-- [ ] `2026-08-04_phase-N-phase-extension-narrative`
+- [x] `2026-08-04_phase-N-phase-extension-narrative`
 
 ## Phase Extensions (J–N)
 
