@@ -3,8 +3,8 @@ name: 2026-08-09_phase-2-promote-orphan-skill
 type: small-plan
 parent_plan: installer-self-target-refresh
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-09_installer-self-target-refresh-phase-2.md
 ---
 
 # Small Plan: 2026-08-09_phase-2-promote-orphan-skill
@@ -27,16 +27,16 @@ survives refreshes.
 
 ## Steps
 
-- [ ] Add `visibility` to the skill's frontmatter; `shared/skills/*/SKILL.md`
+- [x] Add `visibility` to the skill's frontmatter; `shared/skills/*/SKILL.md`
   requires `public|background` and the orphan copy has neither.
-- [ ] Create `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md` with the
+- [x] Create `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md` with the
   existing body unchanged.
-- [ ] Regenerate; confirm the skill appears in the generated target and in the
+- [x] Regenerate; confirm the skill appears in the generated target and in the
   Codex `[[skills.config]]` set, which must equal the `shared/skills` set
   exactly.
-- [ ] Refresh this repository's overlay with `--allow-self` so the installed
+- [x] Refresh this repository's overlay with `--allow-self` so the installed
   copy matches generated output.
-- [ ] Confirm `check_runtime.py` reports zero drift failures.
+- [x] Confirm `check_runtime.py` reports zero drift failures.
 
 ## Verification
 
@@ -57,9 +57,9 @@ uv run python scripts/check_runtime.py
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

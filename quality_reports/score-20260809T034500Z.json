@@ -1,0 +1,33 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "129 passed in 22.68s",
+  "mypy_summary": "Success: no issues found in 19 source files",
+  "deductions": [],
+  "generated_at": "2026-08-08T18:15:37Z",
+  "branch": "installer-self-target-refresh_implementation",
+  "head_sha": "dfc446d62a7dad0c6c57da75c061ae0709abea76",
+  "base_ref": "dev",
+  "merge_base_sha": "851b904448e8c6f630ab3923ae91ccf7de834103",
+  "phase": "2026-08-09_phase-2-promote-orphan-skill",
+  "dirty": false,
+  "content_hash": "7ac3b663749cebd4f33dd40f661a175297887b4c",
+  "changed_files": [
+    ".gitignore",
+    "docs/runtime-checks.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "shared/skills/safe-consumer-bootstrap-refresh/SKILL.md",
+    "tests/test_install_bootstrap.py"
+  ]
+}

@@ -236,3 +236,8 @@
 - [LEARN:tooling] The refreshed fail-closed shell guard denies process
   substitution, heredocs piped into an interpreter, and write targets built from
   shell variables. Use literal paths and plain commands, or run a script file.
+- [LEARN:architecture] A file living only in the generated `.claude/` overlay is
+  not content, it is pending deletion. Authored material belongs in `shared/`,
+  where it regenerates; `check_runtime.py` naming a path "absent from generated
+  target" is the signal to promote it, not to restore it again. Shared skills
+  must declare `visibility: public|background`.
