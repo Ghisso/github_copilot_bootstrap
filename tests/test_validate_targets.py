@@ -20,12 +20,55 @@ from generate_targets import (  # noqa: E402
     shared_policies,
 )
 from validate_targets import (  # noqa: E402
+    CODEX_CODER_ESCALATION,
+    CODEX_ROLE_MODEL_INTENTS,
     POLICY_SCOPE_FIXTURES,
     claude_rule_paths,
+    codex_config_contract_errors,
     copilot_instruction_paths,
     root_guidance_errors,
     scope_matches,
 )
+
+
+def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
+    """The generated config uses documented concurrency without root model pins."""
+    agents = {"max_concurrent_threads_per_session": 6, "max_depth": 1}
+    config: dict[str, object] = {
+        "agents": agents,
+        "features": {
+            "multi_agent_v2": {
+                "hide_spawn_agent_metadata": False,
+                "tool_namespace": "agents",
+            }
+        },
+    }
+
+    assert codex_config_contract_errors(config, "fixture") == []
+    assert CODEX_ROLE_MODEL_INTENTS == {
+        "orchestrator": ("gpt-5.6-sol", "xhigh"),
+        "planner": ("gpt-5.6-sol", "max"),
+        "coder": ("gpt-5.6-terra", "high"),
+        "reviewer": ("gpt-5.6-sol", "high"),
+        "documenter": ("gpt-5.6-luna", "medium"),
+        "verifier": ("gpt-5.6-luna", "low"),
+    }
+    assert CODEX_CODER_ESCALATION == ("gpt-5.6-sol", "xhigh")
+
+    for key, value, expected_error in (
+        ("max_threads", 6, "legacy agents.max_threads"),
+        ("enabled", True, "agents.enabled"),
+    ):
+        invalid = {**config, "agents": {**agents, key: value}}
+        assert any(
+            expected_error in error
+            for error in codex_config_contract_errors(invalid, "fixture")
+        )
+    for key in ("model", "model_reasoning_effort"):
+        invalid = {**config, key: "gpt-5.6-sol"}
+        assert any(
+            key in error for error in codex_config_contract_errors(invalid, "fixture")
+        )
 
 
 def test_root_guidance_budgets_and_structural_invariants() -> None:

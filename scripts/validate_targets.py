@@ -56,6 +56,18 @@ CLAUDE_NO_EFFORT_MODELS = {"haiku"}
 # generation validation instead of reaching consumer sessions.
 CODEX_ALLOWED_AGENT_MODELS = {"gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"}
 CODEX_ALLOWED_EFFORT = {"none", "low", "medium", "high", "xhigh", "max"}
+# Current declared routing contract. The 2026-07-18 runtime probe used
+# documenter Terra/medium; that historical result must not overwrite the
+# current Luna/medium declaration below.
+CODEX_ROLE_MODEL_INTENTS = {
+    "orchestrator": ("gpt-5.6-sol", "xhigh"),
+    "planner": ("gpt-5.6-sol", "max"),
+    "coder": ("gpt-5.6-terra", "high"),
+    "reviewer": ("gpt-5.6-sol", "high"),
+    "documenter": ("gpt-5.6-luna", "medium"),
+    "verifier": ("gpt-5.6-luna", "low"),
+}
+CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -713,6 +725,68 @@ def validate_codex_model_contract_cases(errors: list[str]) -> None:
         )
 
 
+def codex_config_contract_errors(
+    config: dict[str, object], label: str, *, require_agent_settings: bool = True
+) -> list[str]:
+    """Return structural errors for a Codex multi-agent configuration."""
+    errors: list[str] = []
+    agents = config.get("agents")
+    if require_agent_settings:
+        check(isinstance(agents, dict), f"{label} missing agents section", errors)
+    if require_agent_settings and isinstance(agents, dict):
+        check(
+            "max_threads" not in agents,
+            f"{label} must not use legacy agents.max_threads",
+            errors,
+        )
+        check(
+            agents.get("max_concurrent_threads_per_session") == 6,
+            f"{label} must set agents.max_concurrent_threads_per_session = 6",
+            errors,
+        )
+        check(
+            agents.get("max_depth") == 1,
+            f"{label} must retain agents.max_depth = 1 pending native routing probes",
+            errors,
+        )
+        check(
+            "enabled" not in agents,
+            f"{label} must not restate agents.enabled = true (the documented default)",
+            errors,
+        )
+    check(
+        "model" not in config,
+        f"{label} must not pin root model",
+        errors,
+    )
+    check(
+        "model_reasoning_effort" not in config,
+        f"{label} must not pin root model_reasoning_effort",
+        errors,
+    )
+    features = config.get("features")
+    multi_agent_v2 = (
+        features.get("multi_agent_v2") if isinstance(features, dict) else None
+    )
+    check(
+        isinstance(multi_agent_v2, dict),
+        f"{label} must define the MultiAgent V2 routing table",
+        errors,
+    )
+    if isinstance(multi_agent_v2, dict):
+        check(
+            multi_agent_v2.get("hide_spawn_agent_metadata") is False,
+            f"{label} must expose MultiAgent V2 spawn metadata",
+            errors,
+        )
+        check(
+            multi_agent_v2.get("tool_namespace") == "agents",
+            f"{label} must route MultiAgent V2 tools through the agents namespace",
+            errors,
+        )
+    return errors
+
+
 def count_skills(root: Path) -> int:
     return len(list(root.glob("*/SKILL.md")))
 
@@ -802,6 +876,7 @@ def validate_agents(errors: list[str]) -> None:
     expected_count = len(shared_agents)
     check(expected_count > 0, "no shared agents found under shared/agents/", errors)
     expected_codex_intents: dict[str, tuple[object, object]] = {}
+    codex_escalations: dict[str, tuple[object, object]] = {}
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
@@ -831,8 +906,16 @@ def validate_agents(errors: list[str]) -> None:
                     f"{agent_id} defines escalate_to but only coder is expected to",
                     errors,
                 )
+                check(
+                    isinstance(escalate_to, dict),
+                    f"{agent_id} escalate_to must be an object",
+                    errors,
+                )
+                if not isinstance(escalate_to, dict):
+                    continue
                 esc_model = escalate_to.get("model")
                 esc_effort = escalate_to.get("effort")
+                codex_escalations[agent_id] = (esc_model, esc_effort)
                 validate_codex_model_contract(
                     f"{agent_id} escalate_to", esc_model, esc_effort, errors
                 )
@@ -873,6 +956,17 @@ def validate_agents(errors: list[str]) -> None:
                 f"orchestrator capabilities must cover its prompt-declared actions; missing {sorted(missing)}",
                 errors,
             )
+
+    check(
+        expected_codex_intents == CODEX_ROLE_MODEL_INTENTS,
+        "canonical Codex role model/effort mappings drifted from the six-role contract",
+        errors,
+    )
+    check(
+        codex_escalations == {"coder": CODEX_CODER_ESCALATION},
+        "canonical Codex escalation contract must contain only coder Sol/xhigh",
+        errors,
+    )
 
     generated_github_agents = sorted(
         (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
@@ -1190,66 +1284,14 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "Codex config must not use deprecated codex_hooks alias",
         errors,
     )
-    check("[agents]" in codex_config, "Codex config missing agents section", errors)
-    check(
-        "model" not in codex_config_data,
-        "Codex config must not pin the interactive session model",
-        errors,
-    )
-    check(
-        "model_reasoning_effort" not in codex_config_data,
-        "Codex config must not pin interactive session reasoning effort",
-        errors,
-    )
-    codex_features = codex_config_data.get("features")
-    codex_multi_agent_v2 = (
-        codex_features.get("multi_agent_v2")
-        if isinstance(codex_features, dict)
-        else None
-    )
-    check(
-        isinstance(codex_multi_agent_v2, dict),
-        "Codex config must define the MultiAgent V2 routing table",
-        errors,
-    )
-    if isinstance(codex_multi_agent_v2, dict):
-        check(
-            codex_multi_agent_v2.get("hide_spawn_agent_metadata") is False,
-            "Codex config must expose MultiAgent V2 spawn metadata",
-            errors,
-        )
-        check(
-            codex_multi_agent_v2.get("tool_namespace") == "agents",
-            "Codex config must route MultiAgent V2 tools through the agents namespace",
-            errors,
-        )
+    errors.extend(codex_config_contract_errors(codex_config_data, "Codex config"))
     authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
-    authoring_features = authoring_config.get("features")
-    authoring_multi_agent_v2 = (
-        authoring_features.get("multi_agent_v2")
-        if isinstance(authoring_features, dict)
-        else None
-    )
-    check(
-        isinstance(authoring_multi_agent_v2, dict),
-        "authoring Codex config must define the MultiAgent V2 routing table",
-        errors,
-    )
-    if isinstance(authoring_multi_agent_v2, dict):
-        check(
-            authoring_multi_agent_v2.get("hide_spawn_agent_metadata") is False,
-            "authoring Codex config must expose MultiAgent V2 spawn metadata",
-            errors,
+    errors.extend(
+        codex_config_contract_errors(
+            authoring_config,
+            "authoring Codex config",
+            require_agent_settings=False,
         )
-        check(
-            authoring_multi_agent_v2.get("tool_namespace") == "agents",
-            "authoring Codex config must route MultiAgent V2 tools through the agents namespace",
-            errors,
-        )
-    check(
-        "max_depth = 1" in codex_config,
-        "Codex config must cap agent nesting depth",
-        errors,
     )
     check(
         "[mcp_servers.semble]" in codex_config,

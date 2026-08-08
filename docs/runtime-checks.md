@@ -166,7 +166,8 @@ Codex-specific runtime notes:
 
 - `.codex/config.toml` omits the flat `[features]` block — hooks are on by default, so restating `hooks = true` is redundant — but includes `[features.multi_agent_v2]` with visible spawn metadata in the `agents` namespace so named custom-agent model and effort overrides are honored.
 - `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
-- `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
+- `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
+- `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
 - `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match the canonical shared agent metadata.
@@ -176,3 +177,10 @@ Codex-specific runtime notes:
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
 - Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
 - Because Codex `PreToolUse` cannot request approval, edits to Codex hook config are denied instead of downgraded to an approval prompt.
+
+The generated consumer `.codex/config.toml` is carried in
+`.claude/bootstrap-root/.codex/` and restored on a fresh consumer machine. In
+this bootstrap repository, the root `.codex/config.toml` is protected tracked
+authoring, so a dogfood refresh preserves it while it updates generated sibling
+adapters. The protected V2 shim is not removed based on parsing or static
+validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): Phase I must provide repeated trusted-project, six-role native probes on two supported versions before removing the shim; `max_depth` has its own removal gate.

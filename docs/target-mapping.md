@@ -58,12 +58,17 @@ OpenAI Codex:
 
 Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/` and takes its model/effort pair from `model_intent.openai-codex`.
 
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
+Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), sets `agents.max_concurrent_threads_per_session = 6`, omits the legacy `max_threads` and redundant `agents.enabled`, configures `[features.multi_agent_v2]` to expose named-agent routing metadata through the `agents` namespace, and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
 
-The protected MultiAgent V2 metadata-exposure configuration is unchanged by the
-runtime-ownership work. Keep it until native routing coverage proves that it can
-be removed safely; it remains the compatibility layer that exposes named-agent
-routing metadata through the Codex `agents` namespace.
+The generated consumer config is mirrored under
+`.claude/bootstrap-root/.codex/` for restoration. The bootstrap repository's
+root `.codex/config.toml` is instead tracked authoring and stays protected when
+dogfooding refreshes generated siblings. The protected MultiAgent V2
+metadata-exposure configuration and `max_depth = 1` are distinct compatibility
+decisions: retain both until their respective gates in the [dated Codex routing
+compatibility record](2026-08-08-codex-routing-compatibility.md) pass. Current
+generation validation is structural; it is not evidence that a contemporary
+native client has routed all six roles.
 
 GitHub Copilot (secondary compatibility adapter):
 

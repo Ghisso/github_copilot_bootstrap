@@ -27,6 +27,7 @@ Expected:
 - The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
+- Codex config sets `agents.max_concurrent_threads_per_session = 6`, omits legacy `agents.max_threads` and redundant `agents.enabled`, retains `max_depth = 1`, and retains both required `[features.multi_agent_v2]` metadata-routing values.
 - `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
 - The generated output has no obsolete `.github/skills/`, `.agents/skills/`, `.codex/skills/`, or target-local state directories.
 - Claude and Codex outputs do not contain Copilot model pins.
@@ -68,6 +69,11 @@ Expected:
   guidance limit, and `CLAUDE.md` remains at or below 200 lines.
 - These are structural generation checks. Real Claude, Codex, and Copilot
   adapter-loading probes are intentionally deferred to Phase I.
+- In particular, these checks do not prove current native Codex routing for all
+  six roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
+  defines the historical/runtime/documentation evidence boundary and the
+  two-version native-probe gate for removing the V2 shim; `max_depth` has a
+  separate gate.
 
 ## Hooks
 
