@@ -145,3 +145,10 @@
 - [LEARN:architecture] Target-native path projection must preserve shared
   control-plane surfaces that coexist in every consumer, such as
   `.github/hooks/`; validate them in both root and scoped workspace guidance.
+- [LEARN:security] Portable project memory is curated, synced, and visible to
+  every reader of its state remote; native client memory is local advisory
+  scratch. Sensitive material belongs in approved protected-data systems,
+  never either memory layer.
+- [LEARN:testing] Consumer-owned memory preservation needs binary byte-for-byte
+  coverage across refresh and legacy migration, including the nested Git
+  object, not only text markers in a broad installer scenario.

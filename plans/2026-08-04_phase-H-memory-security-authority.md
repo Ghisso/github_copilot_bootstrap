@@ -3,8 +3,8 @@ name: 2026-08-04_phase-H-memory-security-authority
 type: small-plan
 parent_plan: bootstrap-guidance-runtime-modernization
 phase_index: 8
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-08_bootstrap-guidance-runtime-modernization-phase-H.md
 ---
 
 # Small Plan: 2026-08-04_phase-H-memory-security-authority
@@ -30,18 +30,18 @@ must not disable user-level native memory or alter consumer state.
 
 ## Steps
 
-- [ ] Define `.claude/MEMORY.md` as curated, portable, cross-target project
+- [x] Define `.claude/MEMORY.md` as curated, portable, cross-target project
   memory and native Claude/Codex memory as optional machine-local scratch.
-- [ ] Define conflict handling, privacy expectations, what may be promoted to
+- [x] Define conflict handling, privacy expectations, what may be promoted to
   shared memory, and what must remain local or secret.
-- [ ] Preserve the existing installer/updater contract that existing consumer
+- [x] Preserve the existing installer/updater contract that existing consumer
   `MEMORY.md` is never overwritten; add a regression only if coverage is weak.
-- [ ] Add root `SECURITY.md` covering assets, trust boundaries, hostile inputs,
+- [x] Add root `SECURITY.md` covering assets, trust boundaries, hostile inputs,
   generated hook trust, command parsing, protected paths, nested Git state,
   credential handling, accepted escapes, reporting criteria, and exclusions.
-- [ ] Keep commands and workflow in `AGENTS.md`/`CLAUDE.md`; keep threat-model
+- [x] Keep commands and workflow in `AGENTS.md`/`CLAUDE.md`; keep threat-model
   detail in `SECURITY.md` to avoid root-instruction bloat.
-- [ ] Update links and target-mapping docs without introducing an automatic
+- [x] Update links and target-mapping docs without introducing an automatic
   native-memory disable setting.
 
 ## Verification
@@ -60,9 +60,9 @@ uv run python scripts/validate_targets.py
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
