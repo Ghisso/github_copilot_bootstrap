@@ -19,6 +19,9 @@ Expected:
 - GitHub Copilot has 6 `.github/agents/*.agent.md` files.
 - The generated output has 6 canonical `.claude/agents/*.md` files.
 - OpenAI Codex has 6 `.codex/agents/*.toml` files.
+- Each Codex `developer_instructions` field has exactly one generated delimiter and embeds the exact target-transformed `shared/agents/<id>/prompt.md` body; it must not instruct the agent to read `.claude/agents/<id>.md`.
+- `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
+- Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Native probes must verify delivery without truncation on two supported versions.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
 - The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low.
 - `coder`'s `escalate_to` (Codex: `gpt-5.6-sol`/`xhigh`) names an allow-listed model/effort pair distinct from its base tier, and the orchestrator prompt names both values verbatim — a mismatch fails validation.
@@ -27,6 +30,7 @@ Expected:
 - The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
+- Codex config sets `agents.max_concurrent_threads_per_session = 6`, omits legacy `agents.max_threads` and redundant `agents.enabled`, retains `max_depth = 1`, and retains both required `[features.multi_agent_v2]` metadata-routing values.
 - `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
 - The generated output has no obsolete `.github/skills/`, `.agents/skills/`, `.codex/skills/`, or target-local state directories.
 - Claude and Codex outputs do not contain Copilot model pins.
@@ -50,13 +54,71 @@ Expected:
   - context7 for current external library API documentation
   - no duplicate broad searches
 
+## Scoped Policy Adapters
+
+Expected:
+
+- Every `shared/policies/*.instructions.md` policy declares scope with the
+  target-neutral `applicability` schema: `always` or an explicit list of
+  repository-relative patterns; `applyTo` never appears in shared authoring.
+- Every policy is installed canonically under `.claude/instructions/`.
+- Conditional policies generate equivalent Claude `.claude/rules/` `paths` and
+  Copilot `.github/instructions/` `applyTo` scopes; always-on policies consume
+  neither a Claude conditional rule nor a Copilot `applyTo` field.
+- Codex generates no `.codex/rules/` and no nested `AGENTS.md` for the current
+  mixed/glob/file-specific policy scopes. Their non-widening fallback is the
+  corresponding enabled `.claude/skills/` workflow.
+- The root `AGENTS.md` remains below Codex's default 32 KiB combined project
+  guidance limit, and `CLAUDE.md` remains at or below 200 lines.
+- These are structural generation checks. Real Claude, Codex, and Copilot
+  adapter-loading probes are covered by `scripts/check_native_clients.py`.
+- In particular, these checks do not prove current native Codex routing for all
+  six roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
+  defines the historical/runtime/documentation evidence boundary and the
+  two-version native-probe gate for removing the V2 shim; `max_depth` has a
+  separate gate.
+
+## Native Client Acceptance (Opt-In)
+
+The deterministic checks above do not start native clients or need their
+credentials. The probe's default temporary mode is also only a structure and
+missing-client smoke: it intentionally does not launch a client and reports an
+installed client as unresolved `WARN`/`untrusted`. For real native evidence,
+prepare and manually trust a dedicated stable workspace before running:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe --prepare-only --json
+# Inspect the workspace and trust it manually in the client, then:
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client codex --require --json
+```
+
+Without `--require`, a missing, unavailable, timed-out, or untrusted requested
+client is `WARN`; with it, that result is `FAIL`. The probe uses a temporary
+read-only control/candidate consumer pair, never approves hooks or mutates
+project trust, and emits only fixed schema-v2 sentinels and event-backed check
+state. `--require` also promotes unresolved `WARN` evidence to a nonzero
+result. Exact Codex routing can PASS only from explicit client JSONL
+agent/thread/subagent metadata; model prose or an absent event is not proof.
+Compact/resume and coder escalation currently remain unexercised WARNs. See
+[Native Client Acceptance](native-client-acceptance.md). Preparation refuses
+broad or nonempty unmarked paths and refreshes only marker-owned inputs; it
+never approves or changes trust.
+
 ## Hooks
 
 Expected:
 
 - Guardrail scripts exist under `.claude/hooks/scripts/`.
-- `protect-files.sh` denies protected files through structured write tools and Bash writes such as `touch .env`.
-- Hook config edits through Bash redirection are protected, with Codex denying and GitHub/Claude asking for approval.
+- Claude `PreToolUse` has native mutation (`Edit|MultiEdit|Write`), ordered `Bash`, and wildcard observability matcher groups; Codex has the equivalent `Edit|Write`, `Bash`, and wildcard groups. `Read` and MCP tools do not invoke mutation guards.
+- `protect-files.sh` requires direct `python3` classification (not `uv run`) and denies protected files through structured write tools and per-segment Bash writes such as `touch .env`; absence of Python, malformed input, or classifier ambiguity fails closed. A read-only `cat`/`git diff` inspection of a protected configuration remains allowed.
+- Copy/install/move commands that name a protected source as well as a destination are denied, preventing protected-source exfiltration through a write-bearing command.
+- Unknown, archive, and interpreter-style commands are denied only when they carry a protected literal: `.env*`, `uv.lock`, `credentials*`, a secret name, `.pem`/`.key`, a hook path, or protected hook configuration. Their safe parsing failure still fails closed; the explicit read-only command set remains allowed.
+- `pretool-bash-guard.sh` runs protected-file, dangerous-Git, branch, commit, then PR guards in that exact order and returns the first safety decision. A guard failure or malformed safety output fails closed.
+- Hook config edits through native tools, Bash redirection, or in-place edits are protected, with Codex denying and Claude asking for approval. Missing redirect targets and ambiguous commands fail closed.
+- Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Generated `run-hook.sh` is executable because Claude and Codex hook commands call it directly.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.

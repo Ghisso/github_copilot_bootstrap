@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated bootstrap. The editable sources live in `shared/` and the generated installable output lives in `dist/multi-agent/`.
+It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are entrypoints and must not be hand-edited.
 
 Main goals:
 
@@ -26,7 +26,7 @@ Main goals:
 
 I use a strict execution loop:
 
-Pre-flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Score -> Document -> Learn -> Session Log -> Commit
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 
 Core principles:
 
@@ -39,6 +39,10 @@ Core principles:
 - Ship only after score >= 90, a matching findings report with zero CRITICAL findings and zero Ponytail findings, documentation updates, learning capture, and closeout logs.
 - Preserve lessons learned in memory and session logs.
 
+For the authority, privacy, and conflict rules for that shared state, read
+[the memory model](docs/architecture.md#memory-authority-and-privacy). For the
+detailed threat model and reporting boundary, read [SECURITY.md](SECURITY.md).
+
 ## Quick Install
 
 Regenerate first, then install the single generated bootstrap into a target repo.
@@ -48,6 +52,11 @@ the workspace instructions, keeps `.devcontainer/` trackable, adds an idempotent
 own nested git repository on a branch named `ai-state` that carries both the
 bootstrap files and mutable AI state (plans, session logs, memory) — see
 [ADR-002](plans/adr-002-git-backed-state-sync.md).
+
+After installation, record project-specific facts in
+`.claude/instructions/project-context.instructions.md`. Keep the generated root
+guidance as an entrypoint to that installed basis; change bootstrap behavior in
+`shared/` and regenerate rather than editing root adapters or `dist/` directly.
 
 By default the nested repo's remote is this project's own `origin`, so no separate
 credentials or bucket configuration are needed. Pass `--state-remote <git-url>`
@@ -149,6 +158,13 @@ tracked source files and keep the generated runtime overlay local via
 `.vscode/tasks.json`). This keeps `git status` clean while preserving the
 installed hooks and devcontainer files locally.
 
+The installed `.claude/bootstrap-ownership.env` is an inert ownership manifest,
+not a shell configuration file. It records the selected Copilot mode and the
+root adapters that state restoration may copy. The installer, restorer, updater,
+and runtime checker use that one contract: tracked authoring adapters are
+preserved where appropriate, bootstrap-controlled runtime files are refreshed,
+and consumer-owned state remains untouched.
+
 ## Updating Existing Repos
 
 When you update this bootstrap (new hooks, revised instructions, agent changes),
@@ -174,6 +190,17 @@ are state, tracked in git history rather than files a bucket pull could
 silently overwrite, so there is no backup/restore step to run around them.
 The generated `MEMORY.md` is a fresh-install seed only: if the consumer already
 has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byte.
+Refreshes also prune obsolete bootstrap-controlled files, including files no
+longer generated after an upgrade or mode change. They do not prune consumer
+state or nested `.claude/.git` metadata.
+
+Treat `.claude/MEMORY.md` as curated, portable project authority. Passwords,
+API tokens, confidential material, personal or customer-sensitive data, and
+unredacted logs belong in approved protected data systems, never shared or
+native memory. Only non-sensitive preferences and scratch may remain local.
+Native client memory remains optional and machine-local; it is neither
+synchronized by this bootstrap nor disabled.
+See [the architecture memory model](docs/architecture.md#memory-authority-and-privacy).
 
 ```bash
 # Preview without writing
@@ -202,10 +229,10 @@ files in `shared/` instead.
 Generated layout:
 
 - `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating (still used by projects themselves — HF sync for AI state moved to git, see [ADR-002](plans/adr-002-git-backed-state-sync.md))
-- `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
+- `.claude/`: installed canonical runtime basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
 - `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
-- `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
-- `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
+- `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
+- `AGENTS.md`, `.codex/`: OpenAI Codex native entrypoint/adapters/config
 
 Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
 content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
@@ -241,12 +268,15 @@ cloud Copilot agents read that surface only from the committed default branch an
 will not see gitignored files. To enable cloud Copilot, install with
 `--commit-copilot-surface`, which keeps those paths out of the ignore block so you
 can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
-ignored and git-backed.
+ignored and git-backed. The selected mode is persisted in the ownership manifest:
+later installs and `update_consumers.py` retain it unless you explicitly pass
+`--commit-copilot-surface` or `--no-commit-copilot-surface`.
 
-If you do not use one of the tools, delete only that tool's native adapter/config
-files after installing and then re-run the installer if you want the pruned
-bundle reflected in the next `ai-state` commit. Keep `.claude/` unless you are
-intentionally removing the shared basis.
+If you do not use one of the tools, you may delete its native adapter/config
+files locally after installing. A later installer refresh restores every path
+present in `dist/`; persistent pruning requires changing the source/ownership
+contract and regenerating. Keep `.claude/` unless you are intentionally removing
+the shared basis.
 
 Optional pruning after copy:
 
@@ -309,7 +339,7 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, implementation, verification, review, score, documentation, learn, session-log, commit protocol
+  - Pre-flight, branch, plan, Ponytail, implementation, verification, review, documentation, score, learn, session-log, commit protocol
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
@@ -331,6 +361,35 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
   - Single home for how agents report back (caveman-full prose, structured content preserved) with the documenter's normal-prose exception
+
+### Conditional policy applicability
+
+`shared/policies/` is the sole editable policy library. Every policy declares
+target-neutral `applicability`: either `always` or an explicit YAML list of
+repository-relative path patterns. Generation copies the canonical policy to
+`.claude/instructions/`; target-native files are discovery adapters, never
+second authoring sources.
+
+Claude Code is the primary scoped-policy path: conditional policies generate
+`.claude/rules/*.instructions.md` files with equivalent `paths` frontmatter.
+Always-on policy remains in concise root guidance rather than consuming an
+unconditional rule. This matches Claude's native path-scoped rules, which load
+when a matching file is read. See [Claude Code rules and memory
+documentation](https://code.claude.com/docs/en/memory).
+
+Codex is also primary: its root `AGENTS.md` holds durable repository-wide
+guidance. Codex discovers `AGENTS.md` from the repository root to the current
+working directory; closer files take precedence, and the combined project
+guidance limit defaults to 32 KiB. Generate nested `AGENTS.md` only where a
+policy owns one stable concrete directory. Mixed, file-specific, or glob scopes
+use the corresponding `.claude/skills/` workflow instead, so the root guidance
+budget is not widened speculatively. See [Codex AGENTS.md
+guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+GitHub Copilot is compatibility coverage: its `.github/instructions/` adapters
+derive `applyTo` from the same target-neutral patterns. Claude/Copilot scope
+parity is structurally validated; real-client loading probes live in `scripts/check_native_clients.py`
+work.
 
 ## Most Important Skills
 
@@ -373,9 +432,9 @@ These skills encode battle-tested workflows and reduce ad-hoc execution.
 
 ## Agent System
 
-The agent layer gives me orchestration plus profile-driven reviews. Full shared agent bodies render into `.claude/agents/`; Copilot and Codex keep thin native wrappers in `.github/agents/` and `.codex/agents/`.
+The agent layer gives me orchestration plus profile-driven reviews. Full shared agent bodies render into `.claude/agents/`; Copilot keeps thin native wrappers in `.github/agents/`. Codex custom-agent TOML files embed the transformed canonical shared prompt, so a spawned Codex agent receives its complete role contract without first reading a Claude-native agent file.
 
-Primary flow for complex work:
+The specialist flow for standard and high-risk implementation work is:
 
 - orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
 
@@ -401,25 +460,57 @@ Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its 
 
 **Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
-**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. The generated `[features.multi_agent_v2]` table exposes spawn metadata through the `agents` namespace so Codex can select those named profiles instead of inheriting the parent model. Sol is reserved for coordination, planning, and review; Terra handles implementation; Luna handles documentation and mechanical verification.
+**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed `shared/agents/<id>/prompt.md` body. `agent.yaml` remains the single source for metadata and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**, so keep it and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gate is met — the shim-removed candidate has never been exercised. Sol is reserved for coordination, planning, and review; Terra handles implementation; Luna handles documentation and mechanical verification.
 
 **Escalation on failure (Codex only):** `coder`'s `model_intent.openai-codex` also declares an `escalate_to` (`gpt-5.6-sol`/`xhigh`), documentation-only in `agent.yaml` — it is not consumed by the generator, so there is no second `.codex/agents/coder-*.toml` file. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent, so the orchestrator's own prompt carries the instruction: if `verifier` fails or `reviewer` returns a CRITICAL/MAJOR/ponytail finding on a diff `coder` just produced, re-delegate the fix to `coder` with those override values instead of retrying at the base Terra/high tier, capped at one escalation per phase. A validator check keeps the `agent.yaml` data and the prompt wording from silently drifting apart. Claude Code has no per-invocation effort override, so there is no equivalent lane on that target.
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
-Orchestrator routing:
+### Task lanes
 
-- The orchestrator does a shallow exploration pass, then decides between `--mode micro-plan` (small, well-scoped changes) and `--mode full-plan` (new features, cross-cutting changes) before delegating to the planner.
+Task lanes are this bootstrap's repository policy, not Codex, Claude Code, or
+Copilot-native task thresholds. The single normative table is
+[`workflow.instructions.md`](shared/policies/workflow.instructions.md); this
+summary explains how to use it without creating a second classifier.
+
+| Lane | Typical example | Owner and outcome |
+| --- | --- | --- |
+| Read-only/reporting | Explain a failing test or review a diff. | The main agent gathers evidence only. A diagnosis stays read-only until you ask for a fix. |
+| Lightweight edit | Correct one explicit typo in `README.md`, with no requested commit or PR. | The main agent makes the one low-risk, non-control-plane edit and runs focused verification. It creates no plan, score, session log, or other lifecycle artifact. |
+| Standard implementation | Make a requested single-file behavior change, or any change for which you request a commit or PR. | The main-thread orchestrator runs the specialist loop and completes the lifecycle. |
+| Control-plane/high-risk | Change a hook, script, generator, dependency or lockfile, migration, security-sensitive behavior, user-data handling, or more than one file. | The orchestrator uses a full plan and the required `code`, `architecture`, `security`, `tests`, and `ponytail` review. |
+
+Classify before planning or delegating. High-risk conditions take precedence
+over every other lane; otherwise, a request is lightweight only when every
+lightweight condition holds. A requested commit or PR therefore always
+escalates to standard implementation or higher. This policy deliberately uses
+no time or line-count cutoff.
+
+Only the orchestrator chooses a planning mode after the lane is standard or
+high-risk. A micro-plan is for an obvious, one-phase standard implementation;
+a full plan is for ambiguous, multi-phase, or new-module work, and is mandatory
+for control-plane/high-risk work. A lightweight edit is not a micro-plan: it
+does not enter the lifecycle at all.
+
+The narrow `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` commit
+bypasses are audited recovery exceptions. They do not classify a task as
+lightweight, do not permit skipping safety safeguards, and still require the
+branch-shape check; acknowledge any bypass before PR or push closeout. Existing
+hook gates remain in force for their normal lifecycle checks.
+
+Orchestrator routing details:
+
+- The orchestrator does a shallow exploration pass, then chooses `--mode micro-plan` or `--mode full-plan` under the task-lane policy before delegating to the planner.
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use full-plan and always trigger profile-driven review.
+- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use the high-risk full-plan route and its profile-driven review.
 
 Coder skill loading:
 
 - Tier 1 (always): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`
 - Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
-- Coder pauses and asks the user before modifying any control-plane file.
+- An explicit request or approved plan authorizes a known control-plane change; ask only when targets, authority, or material scope are unclear.
 
 ## Hooks
 
@@ -437,12 +528,10 @@ Configured events:
   - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, latest score report, and any open lifecycle state
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events when available
 - PreToolUse
-  - [protect-files.sh](shared/hooks/scripts/protect-files.sh) blocks protected files (env files, key files, secrets patterns, lockfiles) and hook config files. Its primary check is pure bash (no `uv` dependency); a Python precision pass runs only as an enhancement when `uv` is present, and an internal error fails toward `ask` (deny on Codex), never a silent allow
-  - [git-protection.sh](shared/hooks/scripts/git-protection.sh) blocks dangerous git commands (force push, reset --hard, clean -fd, deleting main/master) in pure bash — no `uv` dependency — and tokenizes past global git flags so forms like `git -C . reset --hard` are still caught
-  - [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh) validates branch creation from clean `dev` into `<plan_name>_implementation`, including `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, and `git switch --create`
-  - [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh) blocks normal commits until the small plan is complete, the closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the current branch, phase, base ref, merge base, and HEAD SHA. The report must also record `tests_passed: true`, not be `tests_skipped`, and be `dirty: false` (no unstaged changes), and its `content_hash` — `git hash-object` of the diff against the merge base — must still match, so an amend/rebase/editor-touch that preserves content does not false-block while any real post-scoring edit does. The gate additionally requires a fresh, matching `findings-*.json` report (produced by [record_findings.py](shared/scripts/record_findings.py) from the reviewer's surviving findings) with `counts.critical == 0`; non-documentation diffs also require `ponytail_reviewed: true` and `ponytail_findings: 0`. Failure messages name the exact mismatch and regenerate command. Classifiers tokenize past global git flags, so `git -C . commit` / `git -c k=v commit` cannot bypass the gate; on an unparseable payload the gate fails closed (exit 2)
-  - [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) requires `gh pr create --base dev` and blocks implementation-branch pushes until every phase is complete, bypasses are acknowledged, and the final phase's findings report has `counts.major == 0` (in addition to the `counts.critical == 0` already required to land the commit), via `assert_push_invariants` in `_lib-frontmatter.sh` (shared with the `pre-push` git hook below)
-  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode hook events after guardrails run
+  - Claude matches native edits with `Edit|MultiEdit|Write`; Codex matches `Edit|Write`. Only these mutation tools call [protect-files.sh](shared/hooks/scripts/protect-files.sh), so `Read` and MCP calls do not invoke a mutation classifier.
+  - Both primary targets send `Bash` through [pretool-bash-guard.sh](shared/hooks/scripts/pretool-bash-guard.sh). It runs `protect-files.sh`, [git-protection.sh](shared/hooks/scripts/git-protection.sh), [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh), [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh), and [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) in that order, stopping at the first safety decision. Lifecycle wrappers are unchanged.
+  - The protected-file classifier runs directly with required `python3`, not `uv run`, so it works before a project environment exists. It derives targets per shell segment: read-only inspection of an existing protected configuration is allowed, but native edits, redirects, in-place `sed`/`perl`, missing `python3`, and ambiguous/unparseable commands fail closed. For unknown or interpreter-style commands, it conservatively recognizes `.env*`, `uv.lock`, `credentials*`, secret names, `.pem`/`.key` files, hook paths, and protected hook configuration literals. Copy/install/move check protected source operands as well as destinations, preventing protected-source exfiltration through write-bearing commands. Hook-config edits ask in Claude and are denied in Codex, whose `PreToolUse` cannot request approval.
+  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) stays in a separate wildcard matcher for best-effort observability. It makes no safety decision and does not mutate the ordered safety lane.
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
   - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; it completes the big plan after the final phase and logs allowed bypass commits
@@ -509,7 +598,7 @@ Quality gates:
 
 Documentation gate:
 
-- after score >= 90, update docs for changed public interfaces, config, workflows, and user-facing behavior before commit or PR closeout
+- after review converges, update docs for changed public interfaces, config, workflows, and user-facing behavior before persisting findings and score; this binds their hashes to the final tree before commit or PR closeout
 
 ## Optional Retrieval Helpers
 
@@ -556,11 +645,21 @@ Run the bootstrap runtime check after copying optional surfaces:
 uv run python scripts/check_runtime.py
 ```
 
+For release-only behavior that structural validation cannot establish, use the
+opt-in [native client acceptance probe](docs/native-client-acceptance.md).
+It is Codex-first, then Claude: the normal offline suite remains deterministic
+and credential-free, while native availability, trust, and other unresolved
+native evidence are `WARN` unless the release command adds `--require`.
+For real native execution, first prepare a dedicated stable workspace with
+`--workspace <path> --prepare-only`, inspect it and trust it manually, then
+rerun with the same `--workspace`; the default temporary mode intentionally
+does not launch either client. The runner never mutates trust.
+
 ## How To Use This Bootstrap In Another Project
 
 1. Regenerate the installable output with `uv run python scripts/generate_targets.py --all`.
 2. Copy `dist/multi-agent/` into your target project.
-3. Review and adjust the generated root guidance for project-specific stack details.
+3. Put project-specific stack details in `.claude/instructions/project-context.instructions.md`; do not edit generated root guidance.
 4. Keep hooks enabled and ensure `.claude/hooks/scripts/*.sh` is executable in your environment.
 5. Update instruction apply scopes to match your project paths.
 6. Add or remove skills and agents in `shared/`, then regenerate instead of hand-editing `dist/`.
@@ -571,7 +670,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the pre-flight/branch/plan/verify/review/score/document/learn/session-log/commit workflow
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

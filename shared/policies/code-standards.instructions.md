@@ -1,5 +1,7 @@
 ---
-applyTo: "src/**/*.py,tests/**/*.py"
+applicability:
+  - src/**/*.py
+  - tests/**/*.py
 ---
 
 # Code Standards

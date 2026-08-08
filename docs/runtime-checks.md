@@ -10,6 +10,34 @@ The runtime checker verifies generated runtime files exist, including the
 Ponytail coding/review skills and upstream license/provenance, and reports
 optional helper availability.
 
+> **Known gap (2026-08-09): this repository's own overlay cannot be repaired
+> by the command the failure prints.** `install_bootstrap.py` refuses
+> overlapping source and target:
+>
+> ```text
+> Generated source and target repository must be separate, non-overlapping
+> directories: source=.../dist/multi-agent; target=...
+> ```
+>
+> So a drift failure naming a path inside this repo has no working repair
+> workflow, which is why the drift persists here. Consumer repositories are
+> unaffected — the printed command works for them. Current known-stale paths
+> include `.claude/hooks/scripts/protect-files.sh`, the absent
+> `protect-files.py` and `pretool-bash-guard.sh`, `.codex/hooks.json`, and all
+> six `.codex/agents/*.toml` (installed `documenter` is `gpt-5.6-terra`,
+> generated is `gpt-5.6-luna`). Do not hand-copy `dist/` to work around this;
+> the fix is a supported self-refresh path.
+
+It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
+files in this source checkout must match freshly generated output (after the
+documented project-name substitution); unexpected obsolete owned files fail too.
+The check deliberately excludes consumer-owned `.claude` state: `MEMORY.md`,
+plans, explorations, session logs, quality reports, and explicit project-context
+customization. Tracked source adapters such as root `AGENTS.md` are checked for
+their authoring invariants rather than byte-compared to a generated consumer
+adapter. A failure names the stale path, its authoritative source, and the
+regenerate/reinstall command.
+
 Optional helpers:
 
 - `context-mode`
@@ -22,6 +50,43 @@ Optional helpers:
 
 Missing optional binaries produce `WARN`, not `FAIL`.
 
+## Native Client Release Checks (Opt-In)
+
+`check_runtime.py` remains an offline structural/runtime check. It does not
+authenticate or start Codex or Claude, and a structural PASS is not evidence of
+native instruction delivery, hook trust, compact/resume behavior, or Codex role
+routing. The native probe's default temporary mode deliberately does not launch
+either client, so it is only a structure/missing-client smoke and reports an
+installed client as unresolved `WARN`/`untrusted`. For actual native execution,
+prepare, inspect, and manually trust a dedicated stable workspace, then rerun
+against that same workspace:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe --prepare-only --json
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client codex --require --json
+```
+
+Default availability/trust failures are `WARN`; `--require` makes them `FAIL`.
+`--require` also makes unresolved `unexercised` WARNs nonzero. The probe runs
+two separate read-only temporary consumers (control and shim-removed candidate)
+with ephemeral/non-persistent sessions, a minimal environment, process-group
+timeout cleanup, no Codex MCP/apps/web search, no hook approval, and no trust
+mutation. It keeps client output out of the result. Schema v2 records only
+instruction sentinels; trust is preflight/execution status. Codex role metadata
+can PASS only from explicit JSONL agent/thread/subagent events; undocumented or
+absent events are WARN, not proof. Compact/resume and coder escalation are
+currently unexercised WARNs. Claude has no Codex-role matrix. Read [Native
+Client Acceptance](native-client-acceptance.md) before interpreting a report or
+changing a compatibility gate.
+
+The persistent path must be dedicated: preparation refuses broad paths and
+nonempty directories without its ownership marker. A later preparation refreshes
+only marker-owned probe children. It never writes a trust setting, approves a
+hook, or forces a safety bypass; trust remains an explicit operator action.
+
 Ponytail does not add a runtime binary requirement. Its portable skills are
 vendored into `.claude/skills/`; the bootstrap's existing reviewer and pure
 Bash git gates enforce the fresh zero-finding Ponytail review. Node.js is used
@@ -32,6 +97,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 - `run-hook.sh`
 - `protect-files.sh`
+- `pretool-bash-guard.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
 - `session-log.sh`
@@ -49,6 +115,27 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
 
+For the primary targets, generated `PreToolUse` routing must remain split into
+three groups: native file mutations (`Edit|MultiEdit|Write` for Claude,
+`Edit|Write` for Codex) call `protect-files.sh`; `Bash` calls the single ordered
+`pretool-bash-guard.sh`; and `*` calls only best-effort
+`context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
+The Bash wrapper must preserve the guard order: protected files, dangerous Git,
+branch state, commit gate, then PR gate. Lifecycle Stop/Session wrappers are
+outside that lane and retain their existing sequencing.
+
+`protect-files.sh` requires `python3` and calls its bundled classifier directly;
+it never depends on `uv run` or a project virtual environment. Missing Python,
+malformed payloads, classifier errors, incomplete redirects, indeterminate
+in-place targets, and ambiguous shell syntax must fail closed. The classifier
+must preserve the proven read-only path while checking both source and
+destination operands of copy/install/move operations, so a protected source
+cannot be exfiltrated through a write-bearing command. For opaque command or
+interpreter syntax, verify conservative literal coverage for `.env*`, `uv.lock`,
+`credentials*`, secret names, `.pem`/`.key` files, hook paths, and protected
+hook configuration files; do not require denial of unknown commands that carry
+none of those literals.
+
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
 Runtime verification also expects the installer and updater defaults to create
@@ -58,6 +145,14 @@ repository without invoking fetch, `ls-remote`, pull, merge, or push. A legacy
 consumer must retain ordered `migrate: import pre-git state` and subsequent
 `bootstrap:` history; the installer reports nested status and a shell-safe
 manual publish command.
+
+The installer writes `.claude/bootstrap-ownership.env` as inert data, never as
+executable shell input. It records whether the Copilot surface is local-only or
+committed and which root adapters may be restored from `.claude/bootstrap-root/`.
+An update retains that mode unless you explicitly select the opposite
+`--[no-]commit-copilot-surface` option. During a refresh, obsolete files that
+are bootstrap-owned by the active mode are removed safely; consumer state and
+the nested repository metadata are retained.
 
 The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
 `publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without
@@ -148,13 +243,22 @@ Codex-specific runtime notes:
 
 - `.codex/config.toml` omits the flat `[features]` block — hooks are on by default, so restating `hooks = true` is redundant — but includes `[features.multi_agent_v2]` with visible spawn metadata in the `agents` namespace so named custom-agent model and effort overrides are honored.
 - `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
-- `.codex/config.toml` includes `[agents]` with `max_depth = 1` to keep generated custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
+- `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
+- `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
 - `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
-- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match the canonical shared agent metadata.
+- `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
+- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match canonical `agent.yaml` metadata. Each instruction body has one generated delimiter and the exact transformed shared prompt, with no runtime read of a Claude-native agent file. Per-agent MCP and skill overrides are omitted, so the trusted project config supplies the shared registrations. The validator checks structural parity and records actual sizes; native probes, not a static size threshold, must establish delivery without truncation.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
 - Repo-local Codex hook commands resolve shared scripts from `$(git rev-parse --show-toplevel)/.claude/hooks/scripts` so hooks still work when Codex starts in a subdirectory.
 - Codex project trust is required before `.codex/config.toml`, hooks, and skill path wiring are loaded.
-- Because Codex `PreToolUse` cannot request approval, edits to Codex hook config are denied instead of downgraded to an approval prompt.
+- Because Codex `PreToolUse` cannot request approval, hook-config mutations are denied instead of downgraded to an approval prompt. Claude asks for approval. Both allow a read-only inspection of a protected configuration when the command classifier can prove it has no mutation target; redirects, in-place edits, and ambiguous commands fail closed.
+
+The generated consumer `.codex/config.toml` is carried in
+`.claude/bootstrap-root/.codex/` and restored on a fresh consumer machine. In
+this bootstrap repository, the root `.codex/config.toml` is protected tracked
+authoring, so a dogfood refresh preserves it while it updates generated sibling
+adapters. The protected V2 shim is not removed based on parsing or static
+validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): repeated trusted-project, six-role native probes on two supported versions are required before removing the shim; `max_depth` has its own removal gate. Six-role routing was verified on 2026-08-09 with the shim present.

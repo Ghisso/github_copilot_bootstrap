@@ -9,6 +9,15 @@ import sys
 import tomllib
 from pathlib import Path
 
+from runtime_ownership import (
+    RESTORABLE_ROOT_PATHS,
+    TRACKED_AUTHORING_PATHS,
+    bootstrap_root_paths,
+    install_mode_from_manifest,
+    is_consumer_state_path,
+    is_root_adapter_path,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
@@ -42,6 +51,184 @@ REQUIRED_DIRS = (
     "dist/multi-agent/.claude/review-profiles",
     "dist/multi-agent/.claude/hooks/scripts",
 )
+REINSTALL_COMMAND = "uv run python scripts/generate_targets.py --all && uv run python scripts/install_bootstrap.py <consumer-repo>"
+PROJECT_PLACEHOLDER = "**Project:** [TODO: project name and one-liner description]"
+
+
+def drift_diagnostic(relative_path: str, authoritative_source: str) -> str:
+    """Describe a stale dogfood path and the exact safe repair workflow."""
+    return (
+        f"stale runtime path: {relative_path}; authoritative source: {authoritative_source}; "
+        f"regenerate and reinstall: {REINSTALL_COMMAND}"
+    )
+
+
+def same_bytes(left: Path, right: Path) -> bool:
+    """Return whether two files have identical content."""
+    return (
+        left.is_file() and right.is_file() and left.read_bytes() == right.read_bytes()
+    )
+
+
+def normalize_documented_substitutions(text: str, repo_root: Path) -> str:
+    """Undo only the installer substitutions intentionally unique to a consumer."""
+    return text.replace(f"**Project:** {repo_root.name}", PROJECT_PLACEHOLDER)
+
+
+def is_exact_tracked(repo_root: Path, relative_path: Path) -> bool:
+    """Return whether Git tracks exactly ``relative_path`` in ``repo_root``."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            relative_path.as_posix(),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return relative_path.as_posix() in result.stdout.splitlines()
+
+
+def parity_matches(path: Path, authoritative_path: Path, repo_root: Path) -> bool:
+    """Compare a bootstrap-controlled file after documented substitutions."""
+    if not path.is_file():
+        return False
+    if path.name != "workspace.instructions.md":
+        return same_bytes(path, authoritative_path)
+    actual = normalize_documented_substitutions(
+        path.read_text(encoding="utf-8"), repo_root
+    )
+    expected = (
+        authoritative_path.read_text(encoding="utf-8")
+        if authoritative_path.is_file()
+        else ""
+    )
+    return actual == expected
+
+
+def runtime_drift_errors(
+    repo_root: Path = REPO_ROOT, target_root: Path | None = None
+) -> list[str]:
+    """Return read-only dogfood parity failures without examining consumer state."""
+    target_root = target_root or repo_root / "dist" / "multi-agent"
+    errors: list[str] = []
+
+    for authoring_relative in TRACKED_AUTHORING_PATHS:
+        path = repo_root / authoring_relative
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        if (
+            "source of truth lives in `shared/`" not in text
+            or "review -> document -> score" not in text.lower()
+        ):
+            errors.append(
+                drift_diagnostic(
+                    authoring_relative, "shared/policies/workflow.instructions.md"
+                )
+            )
+
+    manifest = repo_root / ".claude" / "bootstrap-ownership.env"
+    install_mode: bool | None = None
+    if manifest.is_file():
+        try:
+            install_mode = install_mode_from_manifest(
+                manifest.read_text(encoding="utf-8")
+            )
+        except OSError:
+            pass
+    active_bootstrap_paths = tuple(
+        Path(path) for path in bootstrap_root_paths(install_mode or False)
+    )
+
+    expected: dict[Path, Path] = {}
+    for authoritative_path in target_root.rglob("*"):
+        if not authoritative_path.is_file():
+            continue
+        target_relative = authoritative_path.relative_to(target_root)
+        if target_relative.parts[0] == ".claude":
+            claude_relative = target_relative.relative_to(".claude")
+            if not is_consumer_state_path(claude_relative) and (
+                not claude_relative.parts
+                or claude_relative.parts[0] != "bootstrap-root"
+            ):
+                expected[target_relative] = authoritative_path
+        if not is_root_adapter_path(target_relative):
+            continue
+        if target_relative.as_posix() in TRACKED_AUTHORING_PATHS:
+            continue
+        if not is_exact_tracked(repo_root, target_relative):
+            expected[target_relative] = authoritative_path
+        if any(
+            target_relative == root or root in target_relative.parents
+            for root in active_bootstrap_paths
+        ) and not is_exact_tracked(repo_root, target_relative):
+            expected[Path(".claude/bootstrap-root") / target_relative] = (
+                authoritative_path
+            )
+
+    for expected_relative, authoritative_path in expected.items():
+        if parity_matches(repo_root / expected_relative, authoritative_path, repo_root):
+            continue
+        source = (
+            authoritative_path.relative_to(repo_root)
+            if authoritative_path.is_relative_to(repo_root)
+            else authoritative_path
+        )
+        errors.append(drift_diagnostic(expected_relative.as_posix(), str(source)))
+
+    installed: set[Path] = set()
+    claude_root = repo_root / ".claude"
+    if claude_root.is_dir():
+        for path in claude_root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(claude_root)
+            if (
+                (relative.parts and relative.parts[0] == ".git")
+                or is_consumer_state_path(relative)
+                or (relative.parts and relative.parts[0] == "bootstrap-root")
+            ):
+                continue
+            installed.add(Path(".claude") / relative)
+    for adapter in RESTORABLE_ROOT_PATHS:
+        adapter_path = repo_root / adapter
+        if adapter_path.is_file():
+            candidates = [adapter_path]
+        elif adapter_path.is_dir():
+            candidates = [path for path in adapter_path.rglob("*") if path.is_file()]
+        else:
+            candidates = []
+        installed.update(
+            path.relative_to(repo_root)
+            for path in candidates
+            if path.relative_to(repo_root).as_posix() not in TRACKED_AUTHORING_PATHS
+            if not is_exact_tracked(repo_root, path.relative_to(repo_root))
+        )
+    bootstrap_root = claude_root / "bootstrap-root"
+    if bootstrap_root.is_dir():
+        for path in bootstrap_root.rglob("*"):
+            if not path.is_file():
+                continue
+            root_relative = path.relative_to(bootstrap_root)
+            is_active = any(
+                root_relative == root or root in root_relative.parents
+                for root in active_bootstrap_paths
+            )
+            if is_active and is_exact_tracked(repo_root, root_relative):
+                continue
+            installed.add(Path(".claude/bootstrap-root") / root_relative)
+
+    for obsolete_relative in sorted(installed - expected.keys()):
+        errors.append(
+            drift_diagnostic(
+                obsolete_relative.as_posix(), "absent from generated target"
+            )
+        )
+    return errors
 
 
 def python_baseline_warning() -> str | None:
@@ -49,7 +236,13 @@ def python_baseline_warning() -> str | None:
     from the bootstrap's own `requires-python`. Consumers reconcile this at
     install time from their own pyproject; this guards the source baseline."""
     pyproject = REPO_ROOT / "pyproject.toml"
-    workspace = DIST_ROOT / "multi-agent" / ".claude" / "instructions" / "workspace.instructions.md"
+    workspace = (
+        DIST_ROOT
+        / "multi-agent"
+        / ".claude"
+        / "instructions"
+        / "workspace.instructions.md"
+    )
     if not pyproject.is_file() or not workspace.is_file():
         return None
     try:
@@ -121,6 +314,8 @@ def main() -> int:
         print(f"WARN {baseline_warning}")
     else:
         print("PASS documented Python baseline matches pyproject requires-python")
+
+    errors.extend(runtime_drift_errors())
 
     if errors:
         for error in errors:

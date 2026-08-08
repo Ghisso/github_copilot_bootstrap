@@ -1,5 +1,6 @@
 ---
 description: "Always-on: shared workspace guidance, agents, review profiles, skills, and verification defaults."
+applicability: always
 ---
 
 # Shared Workspace Instructions -- Python AI Engineering
@@ -56,13 +57,17 @@ Always consult the relevant files under `.claude/instructions/`:
 PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
-Use the orchestrated path for ambiguous, multi-file, or control-plane work:
+Classify work with the single authoritative **Task Lanes** table in
+`workflow.instructions.md` before acting. Read-only/reporting and explicitly
+eligible lightweight edits stay with the main agent; all commit/PR-bound,
+standard, and control-plane/high-risk work follows the lifecycle. Use the
+orchestrated path for standard and control-plane/high-risk work:
 
 ```text
 orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score
 ```
 
-Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project.
+Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.
 
 ## Ponytail Coding Rule
 

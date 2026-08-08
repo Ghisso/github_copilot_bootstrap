@@ -45,10 +45,27 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Regenerate dist/ and update consumer repos with the latest bootstrap."
     )
-    parser.add_argument("projects", nargs="+", help="Paths to consumer repos to update.")
-    parser.add_argument("--skip-regen", action="store_true", help="Skip regenerating dist/ first.")
-    parser.add_argument("--dry-run", action="store_true", help="Print planned actions only.")
-    parser.add_argument("--local-only", action="store_true", help="Commit refreshes locally without remote AI-state sync.")
+    parser.add_argument(
+        "projects", nargs="+", help="Paths to consumer repos to update."
+    )
+    parser.add_argument(
+        "--skip-regen", action="store_true", help="Skip regenerating dist/ first."
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print planned actions only."
+    )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Commit refreshes locally without remote AI-state sync.",
+    )
+    parser.add_argument(
+        "--commit-copilot-surface",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Select committed or local-only Copilot surfaces for every project. "
+        "Omit to retain each consumer's persisted mode.",
+    )
     args = parser.parse_args()
 
     dry = args.dry_run
@@ -75,6 +92,12 @@ def main() -> None:
             install_cmd.append("--dry-run")
         if args.local_only:
             install_cmd.append("--local-only")
+        if args.commit_copilot_surface is not None:
+            install_cmd.append(
+                "--commit-copilot-surface"
+                if args.commit_copilot_surface
+                else "--no-commit-copilot-surface"
+            )
         run(install_cmd)
 
         if dry:
@@ -82,7 +105,11 @@ def main() -> None:
         else:
             print(f"=== Done: {project.name} ===")
 
-    print("\nPreview complete; no projects were updated." if dry else "\nAll projects updated.")
+    print(
+        "\nPreview complete; no projects were updated."
+        if dry
+        else "\nAll projects updated."
+    )
 
 
 if __name__ == "__main__":
