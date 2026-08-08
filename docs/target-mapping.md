@@ -35,6 +35,20 @@ Keep `.claude/` when pruning optional tool adapters, because it is the shared ba
 Put consumer-specific facts in
 `.claude/instructions/project-context.instructions.md`. Preserve consumer-owned
 memory, plans, explorations, session logs, and quality reports during refreshes.
+`.claude/MEMORY.md` is the curated portable project-memory authority and is
+seeded copy-if-absent; an existing consumer file remains byte-identical across
+install, update, and migration. Native Claude and Codex memory is optional,
+machine-local client state, not generated or synchronized bootstrap state, and
+this bootstrap does not disable it. Promote only sanitized, durable,
+project-wide facts into the shared file; resolve conflicts in shared narrative
+state by manual semantic merge. See [Memory Authority and
+Privacy](architecture.md#memory-authority-and-privacy) and
+[SECURITY.md](../SECURITY.md).
+
+Passwords, API tokens, confidential material, personal or customer-sensitive
+data, and unredacted logs belong in approved protected data systems, never
+shared or native memory. Only non-sensitive preferences and scratch may remain
+local.
 
 ## Native Adapters
 

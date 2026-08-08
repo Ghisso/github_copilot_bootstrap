@@ -39,6 +39,10 @@ Core principles:
 - Ship only after score >= 90, a matching findings report with zero CRITICAL findings and zero Ponytail findings, documentation updates, learning capture, and closeout logs.
 - Preserve lessons learned in memory and session logs.
 
+For the authority, privacy, and conflict rules for that shared state, read
+[the memory model](docs/architecture.md#memory-authority-and-privacy). For the
+detailed threat model and reporting boundary, read [SECURITY.md](SECURITY.md).
+
 ## Quick Install
 
 Regenerate first, then install the single generated bootstrap into a target repo.
@@ -189,6 +193,14 @@ has `.claude/MEMORY.md`, reinstall and legacy migration preserve it byte-for-byt
 Refreshes also prune obsolete bootstrap-controlled files, including files no
 longer generated after an upgrade or mode change. They do not prune consumer
 state or nested `.claude/.git` metadata.
+
+Treat `.claude/MEMORY.md` as curated, portable project authority. Passwords,
+API tokens, confidential material, personal or customer-sensitive data, and
+unredacted logs belong in approved protected data systems, never shared or
+native memory. Only non-sensitive preferences and scratch may remain local.
+Native client memory remains optional and machine-local; it is neither
+synchronized by this bootstrap nor disabled.
+See [the architecture memory model](docs/architecture.md#memory-authority-and-privacy).
 
 ```bash
 # Preview without writing

@@ -224,3 +224,96 @@ def test_committed_to_local_copilot_migration_refreshes_owned_files(
     assert not (target / ".claude" / "bootstrap-root" / obsolete_relative).exists()
     manifest = (target / ".claude" / "bootstrap-ownership.env").read_text()
     assert "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n" in manifest
+
+
+def test_installer_preserves_consumer_memory_bytes_on_refresh_and_migration(
+    tmp_path: Path,
+) -> None:
+    """Consumer-owned MEMORY.md survives both supported installation paths."""
+    memory = b"# Consumer memory\r\n\r\n- preserve \xff\x00 exact bytes\r\n"
+
+    refreshed = tmp_path / "refreshed-consumer"
+    refreshed.mkdir()
+    assert _git(refreshed, "init", "-q").returncode == 0
+    first_install = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(refreshed),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert first_install.returncode == 0, first_install.stdout + first_install.stderr
+    refreshed_memory = refreshed / ".claude" / "MEMORY.md"
+    refreshed_memory.write_bytes(memory)
+    assert _git(refreshed / ".claude", "add", "MEMORY.md").returncode == 0
+    assert (
+        _git(
+            refreshed / ".claude", "commit", "-q", "-m", "session: consumer memory"
+        ).returncode
+        == 0
+    )
+
+    update = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(refreshed),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert update.returncode == 0, update.stdout + update.stderr
+    assert refreshed_memory.read_bytes() == memory
+    refreshed_state = subprocess.run(
+        ["git", "-C", str(refreshed / ".claude"), "show", "HEAD:MEMORY.md"],
+        capture_output=True,
+        check=False,
+    )
+    assert refreshed_state.returncode == 0
+    assert refreshed_state.stdout == memory
+
+    legacy = tmp_path / "legacy-consumer"
+    legacy.mkdir()
+    assert _git(legacy, "init", "-q").returncode == 0
+    legacy_memory = legacy / ".claude" / "MEMORY.md"
+    legacy_memory.parent.mkdir(parents=True)
+    legacy_memory.write_bytes(memory)
+
+    migration = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(legacy),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert migration.returncode == 0, migration.stdout + migration.stderr
+    assert legacy_memory.read_bytes() == memory
+    legacy_state = subprocess.run(
+        ["git", "-C", str(legacy / ".claude"), "show", "HEAD:MEMORY.md"],
+        capture_output=True,
+        check=False,
+    )
+    assert legacy_state.returncode == 0
+    assert legacy_state.stdout == memory

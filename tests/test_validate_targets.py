@@ -35,6 +35,7 @@ from validate_targets import (  # noqa: E402
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
+    memory_security_authority_errors,
     pretool_routing_errors,
     root_guidance_errors,
     scope_matches,
@@ -328,6 +329,37 @@ def test_validate_targets() -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS generated target is structurally valid" in result.stdout
+
+
+def test_memory_security_authority_contract_requires_headings_and_links() -> None:
+    """The threat model stays discoverable without pinning native-memory settings."""
+    security = (REPO_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    architecture = (REPO_ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    target_mapping = (REPO_ROOT / "docs" / "target-mapping.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        memory_security_authority_errors(security, readme, architecture, target_mapping)
+        == []
+    )
+
+    missing_heading = security.replace("## Credential Handling", "## Credentials", 1)
+    assert any(
+        "Credential Handling" in error
+        for error in memory_security_authority_errors(
+            missing_heading, readme, architecture, target_mapping
+        )
+    )
+
+    missing_link = readme.replace("[SECURITY.md](SECURITY.md)", "SECURITY.md", 1)
+    assert any(
+        "README.md" in error and "SECURITY.md" in error
+        for error in memory_security_authority_errors(
+            security, missing_link, architecture, target_mapping
+        )
+    )
 
 
 def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads() -> (

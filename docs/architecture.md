@@ -54,6 +54,47 @@ The single installable output is `dist/multi-agent/`.
 
 It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
 
+## Memory Authority and Privacy
+
+`.claude/MEMORY.md` is the curated, portable project-memory authority. It is
+tracked in the nested `ai-state` repository and available to every generated
+target after state restoration. Record concise, reviewable facts that another
+maintainer or client needs: stable workflow decisions, verified commands,
+architecture constraints, and reusable lessons. The installer seeds it only on
+a fresh consumer; existing consumer memory is preserved byte-for-byte during
+install, update, and migration.
+
+Client-native memory is a complementary local scratch layer, never the shared
+authority. Claude Code documents auto memory as per-repository, machine-local
+notes and leaves it enabled by default; users may manage it with `/memory`.
+Codex can reuse locally stored context across sessions, but this bootstrap does
+not depend on an undocumented path or format for that feature. Neither native
+memory system is synchronized, generated, or automatically disabled here.
+
+Only non-sensitive preferences and scratch may remain local. Passwords, API
+tokens, confidential material, personal or customer-sensitive data, and
+unredacted logs belong in approved protected data systems—never in shared or
+native memory.
+See [Claude Code's memory documentation](https://code.claude.com/docs/en/memory)
+and [Codex Memories](https://learn.chatgpt.com/docs/customization/memories)
+for their current client behavior.
+
+Promote an item from local notes only after it is accurate, durable,
+project-relevant, and safe to share with everyone who can read the AI-state
+remote. Sanitize it first: remove credentials, personal data, private URLs,
+customer content, and unredacted logs; keep that material only in an approved
+protected data system. Non-sensitive transient preferences may remain in local
+native memory. When shared and native notes conflict,
+the reviewed `.claude/MEMORY.md` contract wins for repository behavior; correct
+or remove the stale local note. A Git conflict in shared narrative state aborts
+for a manual semantic merge—do not auto-resolve it merely to proceed.
+
+This division complements, rather than replaces, project instructions:
+`project-context.instructions.md` carries current project configuration,
+`MEMORY.md` carries curated cross-session learning, and native memory may keep
+only non-sensitive local scratch. The [security model](../SECURITY.md) defines the related
+trust and credential boundaries.
+
 ## Ponytail Integration
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed

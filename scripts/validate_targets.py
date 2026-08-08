@@ -4207,6 +4207,77 @@ def validate_docs_parity(errors: list[str]) -> None:
             descriptions[description] = skill_path
 
 
+SECURITY_REQUIRED_HEADINGS = (
+    "Assets",
+    "Trust Boundaries",
+    "Hostile Inputs",
+    "Generated Hook Trust",
+    "Command Parsing",
+    "Protected Paths",
+    "Credential Handling",
+    "Nested Git State",
+    "Accepted Escapes",
+    "Reporting Criteria",
+    "Exclusions",
+)
+
+
+def memory_security_authority_errors(
+    security_text: str,
+    readme_text: str,
+    architecture_text: str,
+    target_mapping_text: str,
+) -> list[str]:
+    """Return narrow drift errors for the shared-memory security contract."""
+    errors: list[str] = []
+    for heading in SECURITY_REQUIRED_HEADINGS:
+        if not re.search(rf"^## {re.escape(heading)}$", security_text, re.MULTILINE):
+            errors.append(
+                f"SECURITY.md missing required threat-model heading: {heading}"
+            )
+
+    required_links = (
+        (
+            "README.md",
+            readme_text,
+            "docs/architecture.md#memory-authority-and-privacy",
+        ),
+        ("README.md", readme_text, "SECURITY.md"),
+        (
+            "docs/architecture.md",
+            architecture_text,
+            "../SECURITY.md",
+        ),
+        (
+            "docs/target-mapping.md",
+            target_mapping_text,
+            "architecture.md#memory-authority-and-privacy",
+        ),
+    )
+    for document, text, required_link in required_links:
+        if required_link not in extract_markdown_links(text):
+            errors.append(
+                f"{document} missing required memory/security authority link: {required_link}"
+            )
+    return errors
+
+
+def validate_memory_security_authority(errors: list[str]) -> None:
+    """Require one discoverable security model without configuring native memory."""
+    security = REPO_ROOT / "SECURITY.md"
+    if not security.is_file():
+        errors.append("missing root SECURITY.md threat model")
+        return
+    errors.extend(
+        memory_security_authority_errors(
+            read(security),
+            read(REPO_ROOT / "README.md"),
+            read(REPO_ROOT / "docs" / "architecture.md"),
+            read(REPO_ROOT / "docs" / "target-mapping.md"),
+        )
+    )
+
+
 def validate_support_files(errors: list[str]) -> None:
     required_files = (
         "MEMORY.md",
@@ -6585,6 +6656,7 @@ def main() -> int:
         validate_mcp_and_hooks(errors)
         validate_skills_and_paths(errors)
         validate_docs_parity(errors)
+        validate_memory_security_authority(errors)
         validate_routing_table_parity(errors)
         validate_root_source_mirror_cases(errors)
         validate_runtime_drift_cases(errors)
