@@ -34,11 +34,22 @@ suite deterministic and credential-free.
 
 ## Native Evidence Limitations
 
-This phase closes with honest `WARN` evidence, not a native `PASS`:
+> **Corrected in Phase J (2026-08-09).** The reasons recorded below were wrong.
+> Neither client was missing, and the workspace was already trusted
+> (`trust_level = "trusted"` in `~/.codex/config.toml`). The real cause was an
+> outdated third-party Codex snap — 0.114.0, publisher `jcat-nysasounds` —
+> which predates `[features.multi_agent_v2]` and aborted with
+> `invalid type: map, expected a boolean`. `claude` and `codex` were installed
+> outside the PATH visible to the probing shell. After installing official
+> Codex 0.147.0, Phase J executed the matrix for real and found two defects in
+> the probe itself. See
+> `.claude/session_logs/2026-08-09_bootstrap-guidance-runtime-modernization-phase-J.md`.
+
+This phase closed with `WARN` evidence, not a native `PASS`:
 
 ```text
-codex   WARN  unavailable_untrusted   # workspace not manually trusted
-claude  WARN  unavailable_untrusted   # binary/auth unavailable
+codex   WARN  unavailable_untrusted   # recorded reason was inaccurate; see above
+claude  WARN  unavailable_untrusted   # recorded reason was inaccurate; see above
 ```
 
 Persistent workspace preparation passes. Executing the required native matrix

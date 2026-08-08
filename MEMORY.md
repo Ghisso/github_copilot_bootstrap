@@ -167,3 +167,16 @@
   independently; one combined run cannot distinguish a real difference from a
   shared failure. Compatibility shims stay until repeated native PASS across
   supported client versions, not on documentation silence.
+- [LEARN:testing] A probe that has never executed against its real target is
+  untested code with a reassuring name. Phase I scored 100/100 offline while
+  carrying three defects its first real run found immediately. Require at least
+  one genuine execution before claiming an acceptance surface works.
+- [LEARN:testing] Mapping every non-zero exit to a single diagnosis makes a
+  tool assert what it never measured (a CLI argv bug reported as `untrusted`).
+  Classify the failure precisely or report it as unclassified.
+- [LEARN:tooling] Verify client provenance and version before trusting native
+  results. An outdated third-party repackage (snap `codex` 0.114.0, publisher
+  `jcat-nysasounds`, vs official 0.147.0) surfaced as `invalid type: map,
+  expected a boolean` and looked like a repo config defect.
+- [LEARN:tooling] Variadic CLI options silently consume positional arguments;
+  pass prompts after `--`. Claude's `--disallowedTools` ate the probe prompt.
