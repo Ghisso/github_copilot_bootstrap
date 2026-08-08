@@ -5,6 +5,35 @@ offline structural validation cannot observe. It prioritizes Codex; Claude is
 the second supported native client. GitHub Copilot remains covered by the
 deterministic generated-target checks, not this native-client command.
 
+## Client Version Requirements
+
+| Client | Minimum | Verified against |
+| --- | --- | --- |
+| Codex | 0.144 | 0.147.0 (official `@openai/codex`) |
+| Claude Code | 2.1 | 2.1.226 |
+
+Install Codex from the official npm package. A Codex older than 0.144 does not
+understand `[features.multi_agent_v2]` and aborts before the probe runs:
+
+```text
+Error loading configuration: .codex/config.toml:1:1:
+  invalid type: map, expected a boolean
+```
+
+That message means the client is too old, **not** that the config is wrong.
+Third-party repackages (for example the `codex` snap, published by
+`jcat-nysasounds`) lag well behind and have caused exactly this failure. Check
+what you actually have before trusting a probe result:
+
+```bash
+codex --version   # expect >= 0.144
+claude --version  # expect >= 2.1
+```
+
+If a global npm install seems to vanish, confirm the npm global `bin`
+directory is on `PATH` — `node`/`npm` are often exposed by individual symlinks
+while sibling tools are not.
+
 ## Run It Safely
 
 The ordinary test suite is offline, mocked, deterministic, and credential-free:

@@ -286,6 +286,9 @@ def codex_command(binary: str, consumer: Path, schema: Path) -> list[str]:
 
 def claude_command(binary: str, consumer: Path, schema: dict[str, Any]) -> list[str]:
     """Claude requires JSON Schema inline, unlike Codex's schema-file flag."""
+    # Claude's inline validator cannot resolve the 2020-12 meta-schema URI and
+    # rejects the whole schema; Codex reads the canonical file and keeps it.
+    inline_schema = {key: value for key, value in schema.items() if key != "$schema"}
     return [
         binary,
         "-p",
@@ -295,10 +298,13 @@ def claude_command(binary: str, consumer: Path, schema: dict[str, Any]) -> list[
         "--output-format",
         "json",
         "--json-schema",
-        json.dumps(schema, separators=(",", ":")),
+        json.dumps(inline_schema, separators=(",", ":")),
         "--strict-mcp-config",
         "--disallowedTools",
         "Edit,Write,Bash,mcp__*",
+        # `--disallowedTools` is variadic; without `--` it consumes the prompt
+        # and Claude exits non-zero demanding input.
+        "--",
         probe_prompt("claude"),
     ]
 
@@ -320,10 +326,22 @@ def parse_jsonl(text: str) -> list[dict[str, Any]] | None:
 
 
 def find_structured_observation(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, str):
+        # Codex returns the schema answer as JSON text in `agent_message.text`
+        # rather than as a nested object.
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+        return (
+            decoded
+            if isinstance(decoded, dict) and set(decoded) == set(SENTINEL_FIELDS)
+            else None
+        )
     if isinstance(value, dict):
         if set(value) == set(SENTINEL_FIELDS):
             return value
-        for key in ("structured_output", "output", "result", "item"):
+        for key in ("structured_output", "output", "result", "item", "text"):
             if key in value:
                 found = find_structured_observation(value[key])
                 if found is not None:
@@ -410,7 +428,14 @@ def unavailable_result(client: str, reason: str, require: bool) -> dict[str, Any
     safe_reason = (
         reason
         if reason
-        in {"missing", "timeout", "untrusted", "unavailable", "workspace_unprepared"}
+        in {
+            "missing",
+            "timeout",
+            "untrusted",
+            "unavailable",
+            "workspace_unprepared",
+            "invocation_failed",
+        }
         else "unavailable"
     )
     return {
@@ -486,7 +511,10 @@ def probe_client(
     if control_result is None or candidate_result is None:
         return unavailable_result(client, "timeout", require)
     if control_result.returncode != 0:
-        return unavailable_result(client, "untrusted", require)
+        # A non-zero exit is not evidence about trust: it is equally an argv,
+        # auth, or version problem. Claiming `untrusted` here would assert
+        # something untrue about the operator's environment.
+        return unavailable_result(client, "invocation_failed", require)
     events = parse_jsonl(control_result.stdout)
     observation = parse_observation(events)
     if observation is None:

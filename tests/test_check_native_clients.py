@@ -47,7 +47,10 @@ def test_claude_schema_is_inline_json_not_a_path(tmp_path: Path) -> None:
     command = native.claude_command("claude", tmp_path, schema)
     schema_arg = command[command.index("--json-schema") + 1]
 
-    assert json.loads(schema_arg) == schema
+    # Inline, not a path — but without `$schema`, which Claude cannot resolve.
+    assert json.loads(schema_arg) == {
+        key: value for key, value in schema.items() if key != "$schema"
+    }
     assert schema_arg != str(native.OBSERVATION_SCHEMA)
     assert "--no-session-persistence" in command
     assert "--strict-mcp-config" in command
@@ -319,3 +322,71 @@ def test_workspace_reuse_refreshes_only_owned_children(
 def _record_client(seen: list[str], client: str) -> dict[str, Any]:
     seen.append(client)
     return {"client": client, "status": native.PASS, "checks": []}
+
+
+# --- Phase J: regressions from the first real native run -------------------
+# Shapes below are copied from actual client output: Codex 0.147.0 and
+# Claude Code 2.1.226 against a trusted, authenticated workspace.
+
+
+def test_codex_agent_message_json_text_is_parsed() -> None:
+    """Codex returns the schema answer as JSON *text*, not a nested object."""
+    event = {
+        "type": "item.completed",
+        "item": {
+            "id": "item_2",
+            "type": "agent_message",
+            "text": json.dumps(
+                {
+                    "root_instruction": True,
+                    "scoped_instruction": False,
+                    "workflow_contract": True,
+                    "hooks": True,
+                }
+            ),
+        },
+    }
+    parsed = native.parse_observation([event])
+    assert parsed == {
+        "root_instruction": True,
+        "scoped_instruction": False,
+        "workflow_contract": True,
+        "hooks": True,
+    }
+
+
+def test_non_observation_text_is_not_mistaken_for_a_result() -> None:
+    """Prose and unrelated JSON text must not satisfy the sentinel."""
+    for text in ("done", "[1, 2, 3]", json.dumps({"root_instruction": True})):
+        event = {
+            "type": "item.completed",
+            "item": {"type": "agent_message", "text": text},
+        }
+        assert native.parse_observation([event]) is None
+
+
+def test_claude_prompt_survives_variadic_disallowed_tools() -> None:
+    """`--disallowedTools` is variadic; the prompt must not be consumed by it."""
+    command = native.claude_command("claude", Path("/tmp/consumer"), {"type": "object"})
+    assert command[-1] == native.probe_prompt("claude")
+    assert "--" in command
+    assert command.index("--") == len(command) - 2
+    assert command.index("--") > command.index("--disallowedTools")
+
+
+def test_nonzero_exit_is_not_reported_as_untrusted() -> None:
+    """An argv/auth/version failure must not assert anything about trust."""
+    result = native.unavailable_result("claude", "invocation_failed", False)
+    assert result["status"] == native.WARN
+    assert result["checks"][0]["id"] == "claude_invocation_failed"
+    assert "untrusted" not in result["checks"][0]["id"]
+
+
+def test_claude_inline_schema_drops_unresolvable_meta_schema_key() -> None:
+    """Claude rejects the whole schema if it cannot resolve `$schema`."""
+    schema = native.observation_schema()
+    assert "$schema" in schema, "canonical file should keep the meta-schema key"
+    command = native.claude_command("claude", Path("/tmp/consumer"), schema)
+    inline = json.loads(command[command.index("--json-schema") + 1])
+    assert "$schema" not in inline
+    assert inline["required"] == list(native.SENTINEL_FIELDS)
