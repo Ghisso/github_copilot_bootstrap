@@ -34,11 +34,44 @@ If a global npm install seems to vanish, confirm the npm global `bin`
 directory is on `PATH` — `node`/`npm` are often exposed by individual symlinks
 while sibling tools are not.
 
-## The Role Matrix Cannot Be Measured Yet
+## The Role Matrix Passes — But The Probe Cannot Measure It
 
-`codex_role_matrix` is the check that would let the MultiAgent V2 shim be
-removed. Measured against Codex 0.147.0 in a trusted, authenticated workspace,
-it cannot be exercised — for reasons upstream of this repository.
+**Verified 2026-08-09, Codex 0.147.0.** All six roles spawn with their
+configured model and effort. Twelve child threads across two interfaces
+(interactive CLI and VS Code extension), every one matching the installed
+configuration:
+
+| Role | Model | Effort |
+| --- | --- | --- |
+| orchestrator | `gpt-5.6-sol` | xhigh |
+| planner | `gpt-5.6-sol` | max |
+| coder | `gpt-5.6-terra` | high |
+| reviewer | `gpt-5.6-sol` | high |
+| documenter | `gpt-5.6-terra` | medium |
+| verifier | `gpt-5.6-luna` | low |
+
+Evidence is client-emitted twice: the spawn events, and each child's persisted
+session record under `~/.codex/sessions` (`payload.model`, `payload.effort`).
+
+**This does not make the shim removable.** Routing was verified with
+`[features.multi_agent_v2]` **present**. The candidate configuration, with the
+block removed, was never exercised. The shim stays.
+
+### Why the probe still reports `spawn_unsupported`
+
+Spawning needs a **persistent thread**. `check_native_clients.py` drives Codex
+through `codex exec`, which has none:
+
+| Interface | Persistent thread | Spawn |
+| --- | --- | --- |
+| `codex exec --ephemeral` | no | fails: `no thread with id` |
+| `codex exec` | no | never spawns; only `wait` |
+| interactive CLI | yes | works, correct pairs |
+| VS Code extension | yes | works, correct pairs |
+
+This is the probe's own limitation, **not** an upstream defect. Closing it
+means driving a persistent-thread interface (`codex app-server` or
+`mcp-server` are the candidates), not waiting on openai/codex.
 
 1. `--ephemeral` precludes spawning outright:
    `error=collab spawn failed: no thread with id: ...`.
@@ -51,11 +84,14 @@ it cannot be exercised — for reasons upstream of this repository.
    `collaboration.send_message`, `collaboration.interrupt_agent`,
    `collaboration.list_agents`, and `collaboration.wait_agent`. Nothing is
    namespaced `agents.*`.
-4. The six project agents are not reachable from `spawn_agent` even though
-   `.codex/agents/*.toml` exists and auto-discovery is documented — see
-   openai/codex issues #14579 and #18823.
-5. Control and candidate behave identically, because no spawn occurs in
-   either. The A/B cannot discriminate.
+4. **In `codex exec` only**, the six project agents are not reachable from
+   `spawn_agent`. They *are* reachable from any persistent-thread interface —
+   verified 2026-08-09 on both the interactive CLI and the VS Code extension.
+   openai/codex issues #14579 and #18823 were cited here in error; this is a
+   property of `codex exec`, not an upstream defect.
+5. Control and candidate behave identically **under `codex exec`**, because no
+   spawn occurs in either. The A/B cannot discriminate there, and has not yet
+   been run on a persistent-thread interface.
 
 Feature state in 0.147.0: `multi_agent` is stable/true, `multi_agent_v2` is
 stable/false.
@@ -70,9 +106,35 @@ broken.
 0.147.0, but `hide_spawn_agent_metadata` is untested because no spawn ever
 occurs. Partial evidence about one key does not justify removing the block.
 
-To unblock: a Codex version where `spawn_agent` reaches project-scoped custom
-agents, run without `--ephemeral`. Capture a populated `agents_states` payload
-first, then implement the matrix parser against the real shape.
+### Why "the model said it spawned them correctly" is not evidence
+
+A Codex session confirming that it spawned each role with the right model and
+effort does **not** close this gate. The original defect this shim exists for
+was that Codex 0.144.x silently spawned *every* named child as the parent
+`gpt-5.6-sol/high`. A model asked "did you spawn with the configured models?"
+would very plausibly answer yes in exactly that broken state, because it cannot
+observe its children's actual model assignment. Self-report is least reliable
+precisely where this gate needs it most.
+
+Admissible evidence is client-emitted: a populated `agents_states` payload, or
+per-child session records showing the configured model/effort pairs.
+
+This is not hypothetical. In the 2026-08-09 runs, **not one of the twelve
+children correctly identified its own model.** Every child reported "GPT-5",
+with effort "unspecified" or "not exposed"; two named an effort that happened
+to match. Meanwhile the client records showed all six routing correctly.
+
+Trusting the children would have produced the conclusion "routing is broken,
+everything is GPT-5 with no tiering" — precisely the 0.144.x symptom, and
+precisely wrong. The client records were right; the prose was worthless.
+
+Admissible evidence is client-emitted: the spawn events, a populated
+`agents_states` payload, or per-child session records under
+`~/.codex/sessions` (`payload.model`, `payload.effort`).
+
+To make the *probe* measure this, drive a persistent-thread interface and
+capture a populated `agents_states` payload, then implement the matrix parser
+against that real shape. Do not write the parser before capturing it.
 
 ## Codex Has No Directory-Scoped Instructions Here
 

@@ -10,6 +10,24 @@ The runtime checker verifies generated runtime files exist, including the
 Ponytail coding/review skills and upstream license/provenance, and reports
 optional helper availability.
 
+> **Known gap (2026-08-09): this repository's own overlay cannot be repaired
+> by the command the failure prints.** `install_bootstrap.py` refuses
+> overlapping source and target:
+>
+> ```text
+> Generated source and target repository must be separate, non-overlapping
+> directories: source=.../dist/multi-agent; target=...
+> ```
+>
+> So a drift failure naming a path inside this repo has no working repair
+> workflow, which is why the drift persists here. Consumer repositories are
+> unaffected — the printed command works for them. Current known-stale paths
+> include `.claude/hooks/scripts/protect-files.sh`, the absent
+> `protect-files.py` and `pretool-bash-guard.sh`, `.codex/hooks.json`, and all
+> six `.codex/agents/*.toml` (installed `documenter` is `gpt-5.6-terra`,
+> generated is `gpt-5.6-luna`). Do not hand-copy `dist/` to work around this;
+> the fix is a supported self-refresh path.
+
 It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
 files in this source checkout must match freshly generated output (after the
 documented project-name substitution); unexpected obsolete owned files fail too.
