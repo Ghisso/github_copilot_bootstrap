@@ -219,3 +219,20 @@
 - [LEARN:documentation] A wrong mechanism claim propagates across files ("spawn
   metadata through the `agents` namespace" appeared in three). Single-home
   volatile status in one dated record and point at it from everywhere else.
+- [LEARN:tooling] `install_bootstrap.py --allow-self` refreshes this repo's own
+  dogfood overlay (generated source inside the target); every other
+  overlapping-root case stays rejected. Without it the bootstrap's own drift was
+  permanently unfixable while `check_runtime.py` printed a repair command that
+  could never work here.
+- [LEARN:security] Check the nested `.claude/.gitignore` before treating a file
+  as obsolete. `settings.local.json` is deliberately never synced, so removing
+  it as an "obsolete owned file" was unrecoverable data loss in every consumer;
+  it now belongs to `CONSUMER_STATE_PATHS`.
+- [LEARN:testing] Running the installer once exposed three bugs a green suite
+  missed: unrecoverable deletion, drift no refresh could clear (normalization
+  applied to one filename only), and a freshly generated tree failing its own
+  validator (the chmod loop globbed `*.sh`, skipping required
+  `protect-files.py`).
+- [LEARN:tooling] The refreshed fail-closed shell guard denies process
+  substitution, heredocs piped into an interpreter, and write targets built from
+  shell variables. Use literal paths and plain commands, or run a script file.

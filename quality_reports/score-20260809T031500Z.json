@@ -1,0 +1,32 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "129 passed in 22.98s",
+  "mypy_summary": "Success: no issues found in 19 source files",
+  "deductions": [],
+  "generated_at": "2026-08-08T18:05:53Z",
+  "branch": "installer-self-target-refresh_implementation",
+  "head_sha": "851b904448e8c6f630ab3923ae91ccf7de834103",
+  "base_ref": "dev",
+  "merge_base_sha": "851b904448e8c6f630ab3923ae91ccf7de834103",
+  "phase": "2026-08-09_phase-1-installer-allow-self",
+  "dirty": false,
+  "content_hash": "5fa9fa613bdd29f5a1b6e4a8dc2fa542a1e57354",
+  "changed_files": [
+    ".gitignore",
+    "docs/runtime-checks.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "tests/test_install_bootstrap.py"
+  ]
+}

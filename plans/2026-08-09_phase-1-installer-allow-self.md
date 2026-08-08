@@ -3,8 +3,8 @@ name: 2026-08-09_phase-1-installer-allow-self
 type: small-plan
 parent_plan: installer-self-target-refresh
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-09_installer-self-target-refresh-phase-1.md
 ---
 
 # Small Plan: 2026-08-09_phase-1-installer-allow-self
@@ -30,18 +30,18 @@ actually run it and confirm the drift is resolved.
 
 ## Steps
 
-- [ ] Add `--allow-self` to `install_bootstrap.py`; default remains fail-closed.
-- [ ] Relax `validate_install_roots` for the source-inside-target case **only**,
+- [x] Add `--allow-self` to `install_bootstrap.py`; default remains fail-closed.
+- [x] Relax `validate_install_roots` for the source-inside-target case **only**,
   and only when the target is the bootstrap repository itself. Keep
   `source == target` and `target.is_relative_to(source)` rejected regardless.
-- [ ] Plumb the flag through `update_consumers.py`.
-- [ ] Update the `check_runtime.py` drift diagnostic so a stale path inside this
+- [x] Plumb the flag through `update_consumers.py`.
+- [x] Update the `check_runtime.py` drift diagnostic so a stale path inside this
   repository prints a command that works.
-- [ ] Add regression tests: the flag permits the dogfood case, still rejects the
+- [x] Add regression tests: the flag permits the dogfood case, still rejects the
   two dangerous cases, and the default (no flag) still rejects all three.
-- [ ] **Run it.** Dry-run first, review removals, then refresh for real and
+- [x] **Run it.** Dry-run first, review removals, then refresh for real and
   confirm `check_runtime.py` drift failures are resolved.
-- [ ] Replace the known-gap block in `docs/runtime-checks.md` with the working
+- [x] Replace the known-gap block in `docs/runtime-checks.md` with the working
   workflow.
 
 ## Verification
@@ -74,9 +74,9 @@ preserved.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
