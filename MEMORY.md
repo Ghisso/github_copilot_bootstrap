@@ -201,3 +201,15 @@
 - [LEARN:tooling] Least-privilege flags can preclude the behavior under test:
   Codex `--ephemeral` makes agent spawning structurally impossible
   ("collab spawn failed: no thread with id").
+- [LEARN:testing] Twelve Codex child agents each misreported their own model as
+  "GPT-5" while client session records showed all six routing correctly to
+  sol/terra/luna at the configured efforts. Self-report is least reliable
+  exactly where routing verification needs it most; read `payload.model` and
+  `payload.effort` from `~/.codex/sessions` instead.
+- [LEARN:tooling] A diagnostic that prints an inapplicable repair command makes
+  a real failure unactionable. `check_runtime.py` flagged the dogfood drift
+  correctly while its printed `install_bootstrap.py <consumer-repo>` fix can
+  never target this repo (installer refuses overlapping source/target).
+- [LEARN:architecture] `codex exec` has no persistent thread and cannot spawn
+  agents at all; interactive CLI and the VS Code extension can. Interface
+  choice, not client capability, decided what the probe could observe.

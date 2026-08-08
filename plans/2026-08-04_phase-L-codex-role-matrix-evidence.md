@@ -15,6 +15,12 @@ Make `codex_role_matrix` produce real evidence: spawn the six named roles and
 read their model/effort metadata from client events. This is the one check that
 would let the MultiAgent V2 shim ever be removed.
 
+> **Corrected by Phase M (2026-08-09).** Blockers 2 and 4 are wrong as stated:
+> they describe `codex exec`, not Codex. All six roles spawn with the correct
+> model/effort on the interactive CLI and the VS Code extension (twelve child
+> threads, client-confirmed). The openai/codex #14579/#18823 citation was
+> incorrect. Blockers 1, 3 and 5 stand, scoped to `codex exec`.
+
 ## Investigation Result: Currently Impossible
 
 Measured directly against Codex 0.147.0 in the trusted probe workspace. The

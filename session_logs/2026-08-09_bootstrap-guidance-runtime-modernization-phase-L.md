@@ -9,6 +9,16 @@
 Make `codex_role_matrix` spawn the six named roles and read their model/effort
 metadata — the one check that would let the MultiAgent V2 shim be removed.
 
+> **Corrected by Phase M (2026-08-09).** Blockers 2 and 4 below are wrong as
+> stated. They describe `codex exec`, not Codex. Operator runs on the
+> interactive CLI and the VS Code extension spawned all six roles with their
+> configured model/effort — twelve child threads, all matching, confirmed in
+> client spawn events and per-child session records. The real blocker is the
+> probe's own use of `codex exec`, which has no persistent thread. The
+> openai/codex #14579/#18823 citation was incorrect. Findings 1, 3 and 5 stand
+> as scoped to `codex exec`. See
+> `.claude/session_logs/2026-08-09_bootstrap-guidance-runtime-modernization-phase-M.md`.
+
 ## Result: The Matrix Cannot Be Measured Today
 
 The goal was not achieved, and the investigation shows why it cannot be, with
