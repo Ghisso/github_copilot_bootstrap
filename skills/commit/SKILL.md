@@ -15,6 +15,12 @@ This follows the lifecycle the hooks enforce: implementation branches are named
 human merges the PR. The guardrails reject non-`_implementation` branch names,
 PRs to `main`, and agent-driven merges — do not fight them.
 
+Use this skill only for standard implementation or control-plane/high-risk work
+classified by `.claude/instructions/workflow.instructions.md`. A requested
+commit or PR is never a lightweight edit. The narrow audited typo bypasses are
+recovery exceptions, not task-lane classification or a way around lifecycle
+requirements.
+
 ## Phase 1: Status Check
 ```bash
 git status

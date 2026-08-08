@@ -90,6 +90,9 @@ paths=()
 while IFS= read -r line || [[ -n "$line" ]]; do
   case "$line" in
     ''|'#'*) continue ;;
+    BOOTSTRAP_COMMIT_COPILOT_SURFACE=0|BOOTSTRAP_COMMIT_COPILOT_SURFACE=1)
+      continue
+      ;;
     BOOTSTRAP_ROOT_PATH=*)
       relative="${line#BOOTSTRAP_ROOT_PATH=}"
       [[ "$relative" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "invalid manifest path"

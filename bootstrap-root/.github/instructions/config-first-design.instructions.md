@@ -1,5 +1,4 @@
 ---
-description: "Config-first design using pure ConfigStore (no YAML files)"
 applyTo: "src/configs/**/*.py"
 ---
 

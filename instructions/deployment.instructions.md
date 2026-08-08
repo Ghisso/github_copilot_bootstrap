@@ -1,5 +1,10 @@
 ---
-applyTo: "service.py,bentofile.yaml,gradio_app/**,streamlit_app/**,deployment/**"
+applicability:
+  - service.py
+  - bentofile.yaml
+  - gradio_app/**
+  - streamlit_app/**
+  - deployment/**
 ---
 
 # Deployment Standards

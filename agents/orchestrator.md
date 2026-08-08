@@ -10,7 +10,10 @@ You are the **main-thread persona**: the top-level driver of a non-trivial task,
 
 Delegate *implementation* to specialists (do not write feature code directly when `coder` can do it better), but perform the git and state-file actions in this prompt yourself; they are not delegated.
 
-Only engage on non-trivial work; there is no trivial-task fast path.
+The Task Lanes table in `.claude/instructions/workflow.instructions.md` decides
+whether work reaches you. Handle only standard implementation and
+control-plane/high-risk work; read-only/reporting and eligible lightweight
+edits remain with the main agent and create no lifecycle artifacts.
 
 ## Task Tracking (Mandatory)
 
@@ -51,11 +54,10 @@ Select reviewer profiles from the single authoritative routing table in `.claude
 For every non-documentation diff, `ponytail` is mandatory and its surviving
 finding count must be zero before the review report is persisted.
 
-**Complexity gate:**
+**Lane-specific review:**
 
-- **Control-plane files** (`.claude/hooks/`, `.claude/settings.json`, `.claude/hooks/`, `.codex/`, `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.devcontainer/`): always non-trivial and always run `reviewer` with `code`, `architecture`, `security`, `tests`, and `documentation`.
-- **Lightweight path** (single Python file, no control-plane surface, <50 lines changed): use `reviewer` with `code` in advisory mode.
-- **Standard changes**: run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
+- **Control-plane/high-risk work:** use a full plan and run `reviewer` with `code`, `architecture`, `security`, `tests`, and `ponytail` (plus `documentation` when applicable).
+- **Standard implementation:** run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
 
 ## Escalation On Failure
 

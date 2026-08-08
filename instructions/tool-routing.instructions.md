@@ -1,5 +1,6 @@
 ---
 description: Load when choosing between Semble, context-mode, grep, and direct file reads.
+applicability: always
 ---
 
 # Tool Routing
