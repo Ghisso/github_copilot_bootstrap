@@ -103,3 +103,9 @@
   installer roots and nested `.git` in both directory and gitfile forms. Normal
   generated-target tests do not expose recursive self-copy or worktree metadata
   deletion failures.
+- [LEARN:architecture] Generated root guidance should be a compact discovery
+  entrypoint, not a concatenated policy mirror. Keep lifecycle and safety gates
+  explicit, then route conditional detail to the canonical scoped policies.
+- [LEARN:testing] Context-budget work needs structural regression checks, not
+  only size assertions: enforce unique sections, one canonical phase sequence,
+  installer substitutions, and deterministic regeneration together.

@@ -3,8 +3,8 @@ name: 2026-08-04_phase-B-root-guidance-budgets
 type: small-plan
 parent_plan: bootstrap-guidance-runtime-modernization
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-05_bootstrap-guidance-runtime-modernization-phase-B.md
 ---
 
 # Small Plan: 2026-08-04_phase-B-root-guidance-budgets
@@ -19,7 +19,8 @@ visible at startup; conditional detail stays single-homed in policies/skills.
 
 - `coder`: root-guidance renderer and validator budgets.
 - `verifier`: generated-content, discovery, and truncation tests.
-- `reviewer`: `code`, `architecture`, `tests`, `documentation`, `ponytail`.
+- `reviewer`: `code`, `architecture`, `security`, `tests`, `documentation`,
+  `ponytail`.
 - `documenter`: target mapping and customization guidance.
 
 ## Required Skills
@@ -29,18 +30,18 @@ visible at startup; conditional detail stays single-homed in policies/skills.
 
 ## Steps
 
-- [ ] Replace `render_root_guidance()` policy-body concatenation with a concise
+- [x] Replace `render_root_guidance()` policy-body concatenation with a concise
   template containing project purpose, source-of-truth rule, exact `uv`
   commands, task-lane routing, canonical lifecycle, safety constraints, and a
   short map to policies, skills, agents, and hooks.
-- [ ] Keep mandatory constraints explicit; do not rely on links for branch,
+- [x] Keep mandatory constraints explicit; do not rely on links for branch,
   verification, documentation-before-score, memory location, or protected
   control-plane behavior.
-- [ ] Add generated budgets: Claude target at most 200 lines; Codex root guidance
+- [x] Add generated budgets: Claude target at most 200 lines; Codex root guidance
   at most 16 KiB, leaving headroom under the 32 KiB combined discovery cap.
-- [ ] Add duplicate-section and stale-phase-order assertions rather than broad
+- [x] Add duplicate-section and stale-phase-order assertions rather than broad
   substring-only validation.
-- [ ] Verify installation substitutions still fill project name, Python
+- [x] Verify installation substitutions still fill project name, Python
   version, and target-specific paths without expanding beyond budgets.
 
 ## Verification
@@ -60,9 +61,9 @@ uv run python scripts/validate_targets.py
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

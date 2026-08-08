@@ -17,3 +17,6 @@
 2026-08-04T16:11:57.000Z state-sync: fetch from origin/ai-state failed; local commits are intact and will retry on the next sync.
 2026-08-04T16:11:57.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
 2026-08-04T16:11:57.000Z state-sync: push failed; continuing.
+2026-08-08T10:11:33Z WARN stop-session-log-check: worktree changed but no session log was updated today
+2026-08-08T10:11:33.000Z state-sync: publish skipped: local ai-state worktree is dirty; run checkpoint before publishing.
+2026-08-08T10:11:33.000Z state-sync: push failed; continuing.

@@ -1,0 +1,43 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-08T10:37:16Z",
+  "branch": "bootstrap-guidance-runtime-modernization_implementation",
+  "head_sha": "0f803946a1289b6fde64c1ab2afa3a4171645fda",
+  "base_ref": "dev",
+  "merge_base_sha": "fe02a75905397294c7c68f6821bc0ed6cd8513db",
+  "phase": "2026-08-04_phase-B-root-guidance-budgets",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "62cb229c0cf6abdc9e05eb16d126ba6322400809",
+  "changed_files": [
+    "AGENTS.md",
+    "README.md",
+    "docs/runtime-checks.md",
+    "docs/target-mapping.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/restore-root-adapters.sh",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ]
+}
