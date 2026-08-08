@@ -1,7 +1,7 @@
 ---
 name: bootstrap-guidance-runtime-modernization
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: bootstrap-guidance-runtime-modernization_implementation
 started_at: 2026-08-04T13:12:09Z
@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase: 2026-08-04_phase-I-native-client-acceptance
+current_phase: 
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
@@ -94,15 +94,15 @@ flowchart LR
 
 ## Phases
 
-- [ ] `2026-08-04_phase-A-runtime-drift-contract`
-- [ ] `2026-08-04_phase-B-root-guidance-budgets`
-- [ ] `2026-08-04_phase-C-scoped-policy-adapters`
-- [ ] `2026-08-04_phase-D-codex-routing-compatibility`
-- [ ] `2026-08-04_phase-E-codex-agent-self-containment`
-- [ ] `2026-08-04_phase-F-hook-routing-efficiency`
-- [ ] `2026-08-04_phase-G-task-lane-contract`
-- [ ] `2026-08-04_phase-H-memory-security-authority`
-- [ ] `2026-08-04_phase-I-native-client-acceptance`
+- [x] `2026-08-04_phase-A-runtime-drift-contract`
+- [x] `2026-08-04_phase-B-root-guidance-budgets`
+- [x] `2026-08-04_phase-C-scoped-policy-adapters`
+- [x] `2026-08-04_phase-D-codex-routing-compatibility`
+- [x] `2026-08-04_phase-E-codex-agent-self-containment`
+- [x] `2026-08-04_phase-F-hook-routing-efficiency`
+- [x] `2026-08-04_phase-G-task-lane-contract`
+- [x] `2026-08-04_phase-H-memory-security-authority`
+- [x] `2026-08-04_phase-I-native-client-acceptance`
 
 ## Verification
 
