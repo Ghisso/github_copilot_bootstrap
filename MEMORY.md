@@ -152,3 +152,18 @@
 - [LEARN:testing] Consumer-owned memory preservation needs binary byte-for-byte
   coverage across refresh and legacy migration, including the nested Git
   object, not only text markers in a broad installer scenario.
+- [LEARN:testing] Native acceptance needs three distinct evidence tiers:
+  structural validation, executed native run, and unavailable/untrusted.
+  Collapsing the third tier into a pass reports confidence never measured;
+  keep it a `WARN` by default and non-zero only under `--require`.
+- [LEARN:testing] Model prose cannot prove client routing metadata. Assert on
+  client-reported agent type/model/effort fields, never on the model's own
+  description of which agent or model it is.
+- [LEARN:security] Trusted-project probes need a stable, operator-inspected
+  workspace. Throwaway temp dirs cannot be manually trusted, and a probe must
+  never approve project hooks or mutate user trust settings to make itself
+  pass.
+- [LEARN:testing] A/B acceptance must parse and compare control and candidate
+  independently; one combined run cannot distinguish a real difference from a
+  shared failure. Compatibility shims stay until repeated native PASS across
+  supported client versions, not on documentation silence.
