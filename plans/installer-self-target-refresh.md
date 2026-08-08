@@ -1,13 +1,13 @@
 ---
 name: installer-self-target-refresh
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: installer-self-target-refresh_implementation
 started_at: 2026-08-09T00:00:00Z
 phases:
   - 2026-08-09_phase-1-installer-allow-self
-current_phase: 2026-08-09_phase-1-installer-allow-self
+current_phase: 
 ---
 
 # Big Plan: installer-self-target-refresh
@@ -69,7 +69,7 @@ candidate and the source cannot delete itself mid-run.
 
 ## Phases
 
-- [ ] `2026-08-09_phase-1-installer-allow-self`
+- [x] `2026-08-09_phase-1-installer-allow-self`
 
 ## Verification
 
