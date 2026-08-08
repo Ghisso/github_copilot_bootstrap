@@ -112,3 +112,21 @@ fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/
 2026-08-08T13:24:53Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-08T13:24:54Z WARN hook fail-closed: unparseable tool payload
 2026-08-08T13:24:54Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:26:39.000Z state-sync: fetch from origin/ai-state failed; local commits are intact and will retry on the next sync.
+2026-08-08T13:26:39.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
+2026-08-08T13:26:39.000Z state-sync: push failed; continuing.
+2026-08-08T13:39:58Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:39:59Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:39:59Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:40:51Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:40:52Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:40:52Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:50:05Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:50:05Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:50:05Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:50:59Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:50:59Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:50:59Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T13:52:34Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T13:52:35Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T13:52:35Z WARN hook fail-closed: protect-files.sh exited with status 2
