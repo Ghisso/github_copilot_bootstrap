@@ -191,3 +191,9 @@ fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/
 2026-08-08T17:05:00.000Z state-sync: fetch from origin/ai-state failed; local commits are intact and will retry on the next sync.
 2026-08-08T17:05:00.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
 2026-08-08T17:05:00.000Z state-sync: publish failed; continuing.
+2026-08-08T17:17:23Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T17:17:23Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T17:17:23Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T17:18:02Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T17:18:03Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T17:18:03Z WARN hook fail-closed: protect-files.sh exited with status 2
