@@ -180,3 +180,11 @@
   expected a boolean` and looked like a repo config defect.
 - [LEARN:tooling] Variadic CLI options silently consume positional arguments;
   pass prompts after `--`. Claude's `--disallowedTools` ate the probe prompt.
+- [LEARN:testing] A check that asks every target the same question measures the
+  targets' differences, not their correctness. Codex scopes instructions by
+  directory (nested `AGENTS.md`, root -> cwd, one file per directory,
+  `project_doc_max_bytes` 32 KiB); Claude and Copilot scope by glob. One shared
+  question made a working system look intermittently broken.
+- [LEARN:testing] Non-deterministic model output is a symptom to trace, not a
+  flake to retry. Here it pointed at a scoped surface the generator never
+  produced for Codex.

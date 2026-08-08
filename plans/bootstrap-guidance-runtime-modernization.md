@@ -1,7 +1,7 @@
 ---
 name: bootstrap-guidance-runtime-modernization
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: bootstrap-guidance-runtime-modernization_implementation
 started_at: 2026-08-04T13:12:09Z
@@ -16,7 +16,8 @@ phases:
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
   - 2026-08-04_phase-J-native-probe-parsing-fixes
-current_phase: 
+  - 2026-08-04_phase-K-codex-scoped-instruction-semantics
+current_phase: 2026-08-04_phase-K-codex-scoped-instruction-semantics
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
@@ -105,6 +106,7 @@ flowchart LR
 - [x] `2026-08-04_phase-H-memory-security-authority`
 - [x] `2026-08-04_phase-I-native-client-acceptance`
 - [x] `2026-08-04_phase-J-native-probe-parsing-fixes`
+- [ ] `2026-08-04_phase-K-codex-scoped-instruction-semantics`
 
 ## Verification
 
