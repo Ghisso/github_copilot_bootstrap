@@ -1,5 +1,6 @@
 ---
 name: safe-consumer-bootstrap-refresh
+visibility: background
 description: |
   Make consumer bootstrap installers safe when their synchronization hooks are
   deliberately warn-never-fail. Use when adding a local-only/no-network update
