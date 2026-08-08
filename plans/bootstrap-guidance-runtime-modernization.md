@@ -15,7 +15,7 @@ phases:
   - 2026-08-04_phase-G-task-lane-contract
   - 2026-08-04_phase-H-memory-security-authority
   - 2026-08-04_phase-I-native-client-acceptance
-current_phase: 2026-08-04_phase-C-scoped-policy-adapters
+current_phase: 2026-08-04_phase-D-codex-routing-compatibility
 ---
 
 # Big Plan: bootstrap-guidance-runtime-modernization
