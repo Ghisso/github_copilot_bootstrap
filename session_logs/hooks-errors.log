@@ -23,3 +23,5 @@
 2026-08-08T10:39:03.000Z state-sync: fetch from origin/ai-state failed; local commits are intact and will retry on the next sync.
 2026-08-08T10:39:03.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
 2026-08-08T10:39:03.000Z state-sync: push failed; continuing.
+fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/': Could not resolve host: github.com
+2026-08-08T11:10:44.000Z state-sync: push to origin/ai-state failed; local commits are intact and will retry on the next sync.

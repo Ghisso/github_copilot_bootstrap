@@ -116,3 +116,10 @@
 - [LEARN:documentation] Describe structural adapter parity separately from
   native-client loading evidence. Generation tests prove shape and scope data;
   authenticated client probes belong in a later acceptance phase.
+- [LEARN:codex] Treat documented configuration syntax, parse success, and
+  observed named-agent routing as separate evidence classes. A current schema
+  cannot by itself retire a compatibility shim that fixed a historical runtime
+  routing failure.
+- [LEARN:testing] Routing-shim removal and nesting-limit removal need different
+  native probes: exact role/model metadata does not prove that child agents
+  cannot spawn grandchildren.

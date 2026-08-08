@@ -3,8 +3,8 @@ name: 2026-08-04_phase-D-codex-routing-compatibility
 type: small-plan
 parent_plan: bootstrap-guidance-runtime-modernization
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-08_bootstrap-guidance-runtime-modernization-phase-D.md
 ---
 
 # Small Plan: 2026-08-04_phase-D-codex-routing-compatibility
@@ -40,8 +40,8 @@ with different supported clients.
 
 - `coder`: generator/config comments, compatibility manifest, static tests.
 - `verifier`: version matrix and exact six-role routing probe contract.
-- `reviewer`: `code`, `architecture`, `config`, `tests`, `documentation`,
-  `ponytail`.
+- `reviewer`: `code`, `architecture`, `config`, `security`, `tests`,
+  `documentation`, `ponytail`.
 - `documenter`: compatibility rationale and upgrade policy.
 
 ## Required Skills
@@ -51,19 +51,24 @@ with different supported clients.
 
 ## Steps
 
-- [ ] Replace `agents.max_threads` with
+- [x] Replace `agents.max_threads` with
   `agents.max_concurrent_threads_per_session`; emit `agents.enabled = true`
   only if explicit enabling is required by the supported-version contract.
-- [ ] Retain the MultiAgent V2 block verbatim and move its historical rationale
+- [x] Retain the MultiAgent V2 block verbatim and move its historical rationale
   into a dated compatibility record referenced by generator comments and docs.
-- [ ] Record a minimum/current Codex version matrix. Classify each non-current
-  key as required shim, legacy alias, or removal candidate.
-- [ ] Update structural validation to assert the exact six custom-agent
+- [x] Record exact versions only where exact evidence exists. Keep the historical
+  `0.144.x` routing probe distinct from current stable `0.146.0` documentation
+  and local `0.146.0-alpha.9.2` parse-only evidence. Classify each key as
+  current, legacy alias, required shim, or removal candidate.
+- [x] Update structural validation to assert the exact six custom-agent
   model/effort pairs, unpinned root, coder escalation, and required routing shim.
-- [ ] Define a removal gate: two supported native versions, trusted project,
+- [x] Define a routing-shim removal gate: two exact supported native versions,
+  trusted project,
   no root CLI model override, all six named agents spawned, exact model/effort
   observed, and repeated success with the candidate key absent.
-- [ ] Do not auto-edit user trust or infer success from a model's prose alone;
+- [x] Give `max_depth` an independent removal gate requiring documented native
+  replacement semantics or a negative child-to-grandchild spawn probe.
+- [x] Do not auto-edit user trust or infer success from a model's prose alone;
   use client metadata/tool events where available.
 
 ## Verification
@@ -79,16 +84,18 @@ Run the Phase-I native Codex probe before any future shim removal.
 
 ## Acceptance Criteria
 
-- Verifier and documenter still spawn at Luna/low and Luna/medium.
-- Other named roles retain their exact Sol/Terra model and effort.
+- Generated configuration and adapters encode verifier/documenter as Luna/low
+  and Luna/medium and the other roles at their exact Sol/Terra mappings.
 - The interactive root remains unpinned.
 - No undocumented compatibility key is removed merely because docs omit it.
+- Runtime spawn evidence and all candidate-key removal decisions remain Phase I
+  work.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
