@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated bootstrap. The editable sources live in `shared/` and the generated installable output lives in `dist/multi-agent/`.
+It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are entrypoints and must not be hand-edited.
 
 Main goals:
 
@@ -26,7 +26,7 @@ Main goals:
 
 I use a strict execution loop:
 
-Pre-flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 
 Core principles:
 
@@ -48,6 +48,11 @@ the workspace instructions, keeps `.devcontainer/` trackable, adds an idempotent
 own nested git repository on a branch named `ai-state` that carries both the
 bootstrap files and mutable AI state (plans, session logs, memory) — see
 [ADR-002](plans/adr-002-git-backed-state-sync.md).
+
+After installation, record project-specific facts in
+`.claude/instructions/project-context.instructions.md`. Keep the generated root
+guidance as an entrypoint to that installed basis; change bootstrap behavior in
+`shared/` and regenerate rather than editing root adapters or `dist/` directly.
 
 By default the nested repo's remote is this project's own `origin`, so no separate
 credentials or bucket configuration are needed. Pass `--state-remote <git-url>`
@@ -212,10 +217,10 @@ files in `shared/` instead.
 Generated layout:
 
 - `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating (still used by projects themselves — HF sync for AI state moved to git, see [ADR-002](plans/adr-002-git-backed-state-sync.md))
-- `.claude/`: shared basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
+- `.claude/`: installed canonical runtime basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
 - `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
-- `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoints/config
-- `AGENTS.md`, `.codex/`: OpenAI Codex native adapters/config
+- `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
+- `AGENTS.md`, `.codex/`: OpenAI Codex native entrypoint/adapters/config
 
 Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
 content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
@@ -573,7 +578,7 @@ uv run python scripts/check_runtime.py
 
 1. Regenerate the installable output with `uv run python scripts/generate_targets.py --all`.
 2. Copy `dist/multi-agent/` into your target project.
-3. Review and adjust the generated root guidance for project-specific stack details.
+3. Put project-specific stack details in `.claude/instructions/project-context.instructions.md`; do not edit generated root guidance.
 4. Keep hooks enabled and ensure `.claude/hooks/scripts/*.sh` is executable in your environment.
 5. Update instruction apply scopes to match your project paths.
 6. Add or remove skills and agents in `shared/`, then regenerate instead of hand-editing `dist/`.
@@ -584,7 +589,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the pre-flight/branch/plan/verify/review/score/document/learn/session-log/commit workflow
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

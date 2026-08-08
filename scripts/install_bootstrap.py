@@ -278,23 +278,37 @@ def ignore_block(commit_copilot_surface: bool = False) -> str:
     return "\n".join(lines) + "\n"
 
 
+PROJECT_NAME_PLACEHOLDER = "**Project:** [TODO: project name and one-liner description]"
+# Every generated surface that states the project's identity. Root guidance is
+# installed alongside workspace instructions and must carry the same facts.
+PROJECT_NAME_FILES = (
+    Path("CLAUDE.md"),
+    Path("AGENTS.md"),
+    Path(".claude") / "instructions" / "workspace.instructions.md",
+    Path(".claude") / "instructions" / "workspace.md",
+)
+
+
 def substitute_project_name(target: Path, dry_run: bool) -> None:
-    """Fill the workspace instructions' [TODO: project name...] placeholder with
-    the target repo's directory name at install time, so every consumer ships a
-    named workspace instead of the unfilled template."""
-    workspace = target / ".claude" / "instructions" / "workspace.instructions.md"
-    if not workspace.is_file():
+    """Fill generated project-name placeholders with the target directory name."""
+    paths = [target / relative for relative in PROJECT_NAME_FILES]
+    if not any(
+        path.is_file() and PROJECT_NAME_PLACEHOLDER in path.read_text(encoding="utf-8")
+        for path in paths
+    ):
         return
-    text = workspace.read_text(encoding="utf-8")
-    placeholder = "**Project:** [TODO: project name and one-liner description]"
-    if placeholder not in text:
-        return
-    info(f"substitute workspace project name -> {target.name}")
+    info(f"substitute generated project name -> {target.name}")
     if dry_run:
         return
-    workspace.write_text(
-        text.replace(placeholder, f"**Project:** {target.name}"), encoding="utf-8"
-    )
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if PROJECT_NAME_PLACEHOLDER in text:
+            path.write_text(
+                text.replace(PROJECT_NAME_PLACEHOLDER, f"**Project:** {target.name}"),
+                encoding="utf-8",
+            )
 
 
 # The bootstrap's declared Python baseline. Kept in generated guidance verbatim

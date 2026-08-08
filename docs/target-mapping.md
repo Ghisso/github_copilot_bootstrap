@@ -11,7 +11,9 @@ git branch (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)).
 
 ## Shared Basis
 
-The shared basis lives under `.claude/`:
+Bootstrap maintainers author reusable content in `shared/`. Generation renders
+that content into `.claude/`, which is the canonical runtime basis in an
+installed consumer project:
 
 - `.claude/skills/**/SKILL.md`
 - `.claude/skills/ponytail/SKILL.md` and `.claude/skills/ponytail-review/SKILL.md`
@@ -28,6 +30,10 @@ The shared basis lives under `.claude/`:
 `run-hook.sh` is the executable dispatcher for target-native hook configs. Generated output marks it runnable because Claude and Codex call it directly.
 
 Keep `.claude/` when pruning optional tool adapters, because it is the shared basis for all supported systems.
+
+Put consumer-specific facts in
+`.claude/instructions/project-context.instructions.md`. Preserve consumer-owned
+memory, plans, explorations, session logs, and quality reports during refreshes.
 
 ## Native Adapters
 
@@ -47,7 +53,7 @@ Claude Code:
 - `.mcp.json`
 - `.claude/settings.json`
 
-Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
+`CLAUDE.md` is a generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
@@ -55,6 +61,8 @@ OpenAI Codex:
 - `.codex/config.toml`
 - `.codex/hooks.json`
 - `.codex/agents/*.toml`
+
+`AGENTS.md` is a generated entrypoint to the installed `.claude/` basis; do not hand-edit it.
 
 Codex custom agents remain project-scoped `.codex/agents/*.toml` files with `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`. Each adapter points to the canonical body in `.claude/agents/` and takes its model/effort pair from `model_intent.openai-codex`.
 

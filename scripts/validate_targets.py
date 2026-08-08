@@ -19,6 +19,7 @@ import tomllib
 from pathlib import Path
 
 from check_runtime import runtime_drift_errors
+from generate_targets import ROOT_GUIDANCE_WORKFLOW
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
 
@@ -139,6 +140,25 @@ OBSOLETE_ROOT_SOURCE_DIRS = (
     ".github/quality_reports",
     ".github/hooks/scripts",
 )
+ROOT_GUIDANCE_HEADERS = (
+    "## Source Of Truth",
+    "## Task Lanes",
+    "## Required Lifecycle",
+    "## Exact Commands",
+    "## Safety And Control Plane",
+    "## Map",
+    "## Target Runtime",
+)
+ROOT_GUIDANCE_BUDGETS = {
+    "CLAUDE.md": ("lines", 200),
+    "AGENTS.md": ("bytes", 16 * 1024),
+}
+ROOT_LIFECYCLE_PATTERN = re.compile(
+    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
+    r"SCORE|LEARN|SESSION LOG|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN|"
+    r"PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
+    re.IGNORECASE,
+)
 
 
 def text_files(root: Path) -> list[Path]:
@@ -162,6 +182,52 @@ def read_toml(path: Path) -> dict[str, object]:
 def check(condition: bool, message: str, errors: list[str]) -> None:
     if not condition:
         errors.append(message)
+
+
+def root_guidance_errors(name: str, text: str) -> list[str]:
+    """Return structural invariant failures for one generated root guidance file."""
+    errors: list[str] = []
+    budget_kind, budget = ROOT_GUIDANCE_BUDGETS[name]
+    size = len(text.splitlines()) if budget_kind == "lines" else len(text.encode())
+    if size > budget:
+        errors.append(f"{name} exceeds its {budget_kind} budget of {budget}")
+    for header in ROOT_GUIDANCE_HEADERS:
+        if text.count(f"{header}\n") != 1:
+            errors.append(f"{name} must contain exactly one {header!r} section")
+    lifecycle_matches = [
+        " ".join(match.group(0).upper().split())
+        for match in ROOT_LIFECYCLE_PATTERN.finditer(text)
+    ]
+    if lifecycle_matches != [ROOT_GUIDANCE_WORKFLOW]:
+        errors.append(
+            f"{name} must contain exactly one canonical lifecycle in the required phase order"
+        )
+    required_fragments = (
+        ".claude/MEMORY.md",
+        "<plan_name>_implementation",
+        ".claude/skills/ponytail/SKILL.md",
+        "score is at least 90",
+        "documentation before persisting findings and score",
+        "Control-plane files include",
+        "Keep hook guardrails enabled",
+        "uv run pytest tests/ -q --tb=short",
+    )
+    for fragment in required_fragments:
+        if fragment not in text:
+            errors.append(
+                f"{name} is missing mandatory root-guidance invariant: {fragment}"
+            )
+    return errors
+
+
+def validate_root_guidance(errors: list[str]) -> None:
+    """Validate generated root guidance budgets and structural invariants."""
+    for name in ROOT_GUIDANCE_BUDGETS:
+        path = TARGET_ROOT / name
+        if not path.exists():
+            errors.append(f"missing generated root guidance: {path}")
+            continue
+        errors.extend(root_guidance_errors(name, read(path)))
 
 
 def check_codex_hook_trust_notice(
@@ -3331,25 +3397,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
                         f"Copilot path leaked into non-GitHub output: {path} contains {fragment}"
                     )
 
-    for root_guidance in (TARGET_ROOT / "CLAUDE.md", TARGET_ROOT / "AGENTS.md"):
-        text = read(root_guidance)
-        check(
-            "pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow"
-            in text,
-            f"{root_guidance.name} must include the full root workflow summary",
-            errors,
-        )
-        check(
-            "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout"
-            in text,
-            f"{root_guidance.name} must require score >= 90 and documentation updates before closeout",
-            errors,
-        )
-        check(
-            ".claude/skills/ponytail/SKILL.md" in text,
-            f"{root_guidance.name} must activate the canonical Ponytail skill for coding",
-            errors,
-        )
+    validate_root_guidance(errors)
 
     copilot_guidance = read(TARGET_ROOT / ".github" / "copilot-instructions.md")
     check(

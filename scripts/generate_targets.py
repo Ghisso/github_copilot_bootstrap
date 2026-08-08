@@ -90,6 +90,11 @@ TARGET_PATH_REPLACEMENTS = {
     ),
 }
 
+ROOT_GUIDANCE_WORKFLOW = (
+    "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+    "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
+)
+
 
 def strip_quarantine(path: Path) -> None:
     """shared/ can carry macOS's com.apple.quarantine xattr (e.g. if this repo
@@ -589,65 +594,93 @@ def render_codex_hooks(path: Path) -> None:
 
 
 def render_root_guidance(target: str) -> str:
-    workspace = (
-        REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
-    ).read_text(encoding="utf-8")
-    routing = (
-        REPO_ROOT / "shared" / "policies" / "tool-routing.instructions.md"
-    ).read_text(encoding="utf-8")
-    workflow = (
-        REPO_ROOT / "shared" / "policies" / "workflow.instructions.md"
-    ).read_text(encoding="utf-8")
-    quality = (
-        REPO_ROOT / "shared" / "policies" / "quality-and-testing.instructions.md"
-    ).read_text(encoding="utf-8")
     if target == "claude-code":
         title = "Claude Code Bootstrap Guidance"
-        agent_note = (
-            "`.claude/` is the canonical shared project space. Custom agents are rendered as "
-            "Claude Code project subagents in `.claude/agents/`; skills, plans, session logs, "
-            "quality reports, memory, templates, and hook scripts also live under `.claude/`."
+        control_plane_paths = (
+            "root guidance, `.claude/hooks/`, `.claude/settings.json`, `.mcp.json`, "
+            "and `.devcontainer/`"
+        )
+        runtime_note = (
+            "Claude Code uses `.claude/settings.json`, `.claude/agents/`, and "
+            "`.claude/skills/` natively. Keep the configured hooks enabled."
+        )
+    elif target == "openai-codex":
+        title = "OpenAI Codex Bootstrap Guidance"
+        control_plane_paths = (
+            "root guidance, `.claude/hooks/`, `.codex/`, `.mcp.json`, and "
+            "`.devcontainer/`"
+        )
+        runtime_note = (
+            "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and "
+            "`.codex/agents/*.toml` as native adapters to the canonical `.claude/` basis. "
+            "Trust the project before expecting them to load. Preserve `max_depth` and "
+            "`[features.multi_agent_v2]` metadata exposure until native routing smoke tests "
+            "prove they are unnecessary."
         )
     else:
-        title = "OpenAI Codex Bootstrap Guidance"
-        agent_note = (
-            "`.claude/` is the canonical shared project space for skills, plans, session logs, "
-            "quality reports, memory, templates, and hook scripts. Codex discovers those skills "
-            "through `.codex/config.toml`, so trust this project before expecting project skill "
-            "wiring and hooks to load. Custom agents stay as thin Codex adapters in "
-            "`.codex/agents/*.toml` and point back to `.claude/agents/`."
-        )
-    return (
-        f"# {title}\n\n"
-        "This target is generated from `shared/`. Do not edit generated files manually.\n\n"
-        "Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow and hook guardrails. "
-        "Score >= 90 plus required documentation updates are mandatory before commit or PR closeout.\n\n"
-        f"{agent_note}\n\n"
-        "## Workspace\n\n"
-        f"{transform_target_paths(section_body(workspace), target)}\n\n"
-        "## Tool Routing\n\n"
-        f"{transform_target_paths(section_body(routing), target)}\n\n"
-        "## Workflow\n\n"
-        f"{transform_target_paths(section_body(workflow), target)}\n\n"
-        "## Quality And Testing\n\n"
-        f"{transform_target_paths(section_body(quality), target)}\n"
-    )
+        raise ValueError(f"unsupported root-guidance target: {target}")
 
+    return f"""# {title}
 
-def strip_frontmatter(text: str) -> str:
-    if text.startswith("---\n"):
-        parts = text.split("---\n", 2)
-        if len(parts) == 3:
-            return parts[2].lstrip()
-    return text
+This is the entrypoint for a reusable multi-agent bootstrap for Python AI engineering. In an installed project, `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
+**Project:** [TODO: project name and one-liner description]
+**Python:** 3.12+ | **Package Manager:** uv
+**Stack:** Python 3.12+ with uv; adapt framework guidance to the target repository.
 
-def section_body(text: str) -> str:
-    body = strip_frontmatter(text).lstrip()
-    lines = body.splitlines()
-    if lines and lines[0].startswith("# "):
-        return "\n".join(lines[1:]).lstrip()
-    return body
+## Source Of Truth
+
+- Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
+- Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
+- Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode for large outputs or compaction-safe continuity. Missing optional retrieval helpers are warnings, not hard failures.
+
+## Task Lanes
+
+- Answer, explain, review, or report: inspect and provide evidence; do not mutate state unless asked.
+- Diagnose: establish the cause and explain it; implement a fix only when requested.
+- Change or build: follow the complete lifecycle below and verify in proportion to risk.
+- Ambiguous, multi-file, or control-plane work: use `orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score`.
+- Monitor or wait: use the available recurring monitor or wait mechanism without broadening scope.
+
+## Required Lifecycle
+
+`{ROOT_GUIDANCE_WORKFLOW}`
+
+- Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
+- Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
+- Verify, then run profile-driven review until clean. Update required documentation before persisting findings and score.
+- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail findings are zero, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete.
+- Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
+
+## Exact Commands
+
+```bash
+uv sync
+uv run pytest tests/ -q --tb=short
+uv run mypy src/ --ignore-missing-imports --explicit-package-bases
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+```
+
+Use `uv run` for project Python entrypoints and tooling; never substitute bare `python`, `pip`, `pytest`, `mypy`, or `ruff` in the normal workflow.
+
+## Safety And Control Plane
+
+- Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
+- Control-plane files include {control_plane_paths}. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
+- Keep `.claude/` as the canonical runtime basis. Bootstrap maintainers own authoring and regeneration; consumers should customize only their project context and consumer-owned state.
+
+## Map
+
+- Policies: `.claude/instructions/workspace.instructions.md`, `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
+- Skills: `.claude/skills/<name>/SKILL.md`; apply Ponytail to all coding and use task-matched skills when relevant.
+- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, verification, review, documentation, and scoring.
+- Hooks: target-native configuration dispatches to `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
+
+## Target Runtime
+
+{runtime_note}
+"""
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:

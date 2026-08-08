@@ -12,7 +12,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from install_bootstrap import copy_generated_tree  # noqa: E402
+from install_bootstrap import (  # noqa: E402
+    copy_generated_tree,
+    substitute_project_name,
+    substitute_python_version,
+)
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
@@ -66,6 +70,40 @@ def test_copy_preserves_nested_git_metadata(tmp_path: Path, gitfile: bool) -> No
     else:
         assert (nested_git / "HEAD").read_text() == "ref: refs/heads/ai-state\n"
     assert (target / ".claude" / "generated.md").read_text() == "fresh\n"
+
+
+def test_substitutions_update_root_guidance_and_workspace_facts(tmp_path: Path) -> None:
+    """Installer reconciles project and Python facts across generated guidance."""
+    target = tmp_path / "example-consumer"
+    project_fact = "**Project:** [TODO: project name and one-liner description]\n"
+    python_facts = (
+        "**Python:** 3.12+ | **Package Manager:** uv\n**Stack:** Python 3.12+ with uv\n"
+    )
+    for relative in (
+        Path("CLAUDE.md"),
+        Path("AGENTS.md"),
+        Path(".claude/instructions/workspace.instructions.md"),
+        Path(".claude/instructions/workspace.md"),
+    ):
+        path = target / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(project_fact + python_facts)
+    (target / "pyproject.toml").write_text('[project]\nrequires-python = ">=3.13"\n')
+
+    substitute_project_name(target, dry_run=False)
+    substitute_python_version(target, dry_run=False)
+
+    for relative in (
+        Path("CLAUDE.md"),
+        Path("AGENTS.md"),
+        Path(".claude/instructions/workspace.instructions.md"),
+        Path(".claude/instructions/workspace.md"),
+    ):
+        text = (target / relative).read_text()
+        assert "[TODO: project name" not in text
+        assert "**Project:** example-consumer" in text
+        assert "**Python:** 3.13+" in text
+        assert "**Stack:** Python 3.13+ with uv" in text
 
 
 def test_copy_preserves_genuine_tracked_copilot_authoring(tmp_path: Path) -> None:
