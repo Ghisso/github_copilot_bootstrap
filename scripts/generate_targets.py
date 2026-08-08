@@ -95,6 +95,7 @@ ROOT_GUIDANCE_WORKFLOW = (
     "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
     "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
 )
+CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
 POLICY_APPLICABILITY_KEY = "applicability"
 POLICY_ALWAYS = "always"
 
@@ -361,20 +362,31 @@ def toml_string(value: str) -> str:
     return json.dumps(value)
 
 
-def toml_multiline_literal(value: str) -> str:
-    if "'''" in value:
-        raise ValueError(
-            "Codex agent developer_instructions cannot contain triple single quotes"
-        )
-    return "'''\n" + value.strip() + "\n'''"
-
-
 def codex_sandbox_mode(capabilities: list[str]) -> str | None:
     if not capabilities:
         return None
     if "edit" not in capabilities and "execute" not in capabilities:
         return "read-only"
     return None
+
+
+def codex_agent_metadata_header(agent: dict[str, Any]) -> str:
+    """Return the stable generated metadata header for one Codex agent."""
+    capabilities = agent.get("capabilities", [])
+    return (
+        "Generated Codex custom-agent instructions.\n"
+        f"Role type: {agent.get('role_type', 'unspecified')}; "
+        f"visibility: {agent.get('visibility', 'public')}; "
+        f"capability intents: {', '.join(capabilities) or 'target default'}."
+    )
+
+
+def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
+    """Return the target-transformed shared role prompt for one Codex agent."""
+    prompt_path = REPO_ROOT / "shared" / "agents" / agent["id"] / "prompt.md"
+    return transform_agent_text(
+        prompt_path.read_text(encoding="utf-8"), "openai-codex"
+    ).strip()
 
 
 def shared_mcp_servers() -> dict[str, Any]:
@@ -928,20 +940,11 @@ def render_claude_agents(target_root: Path) -> None:
 
 def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     codex_name = agent["id"]
-    canonical_path = canonical_agent_path(agent["id"])
     capabilities = agent.get("capabilities", [])
+    prompt_body = codex_agent_prompt_body(agent)
     instructions = (
-        "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
-        f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
-        "Use the Codex TOML name, description, model, reasoning effort, sandbox, and runtime "
-        "behavior from this adapter when they conflict with Claude-specific frontmatter in the "
-        "canonical file.\n\n"
-        "Shared skills live in `.claude/skills/` and are enabled from `.codex/config.toml` when "
-        "the project is trusted. Shared memory, plans, explorations, session logs, quality reports, "
-        "templates, prompts, and hook scripts also live under `.claude/`.\n\n"
-        f"Role type: {agent.get('role_type', 'unspecified')}\n"
-        f"Visibility: {agent.get('visibility', 'public')}\n"
-        f"Capability intents: {', '.join(capabilities) or 'target default'}"
+        f"{codex_agent_metadata_header(agent)}\n\n"
+        f"{CODEX_AGENT_INSTRUCTIONS_DELIMITER}\n\n{prompt_body}"
     )
     agent_lines = [
         f"name = {toml_string(codex_name)}",
@@ -962,9 +965,7 @@ def render_codex_agent_adapter(agent: dict[str, Any]) -> str:
     sandbox_mode = codex_sandbox_mode(capabilities)
     if sandbox_mode:
         agent_lines.append(f"sandbox_mode = {toml_string(sandbox_mode)}")
-    agent_lines.append(
-        f"developer_instructions = {toml_multiline_literal(instructions)}"
-    )
+    agent_lines.append(f"developer_instructions = {toml_string(instructions)}")
     return "\n".join(agent_lines) + "\n"
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -13,16 +14,22 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from generate_targets import (  # noqa: E402
+    CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     parse_policy,
     render_claude_rule_adapter,
+    codex_agent_metadata_header,
+    render_codex_agent_adapter,
     render_github_instruction_adapter,
     render_root_guidance,
+    shared_agents,
     shared_policies,
+    transform_agent_text,
 )
 from validate_targets import (  # noqa: E402
     CODEX_CODER_ESCALATION,
     CODEX_ROLE_MODEL_INTENTS,
     POLICY_SCOPE_FIXTURES,
+    codex_agent_instruction_errors,
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
@@ -153,3 +160,43 @@ def test_validate_targets() -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS generated target is structurally valid" in result.stdout
+
+
+def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads() -> (
+    None
+):
+    """Codex agents are self-contained while inheriting project MCP configuration."""
+    for agent, agent_dir in shared_agents():
+        rendered = render_codex_agent_adapter(agent)
+        instructions = tomllib.loads(rendered)["developer_instructions"]
+        expected_body = transform_agent_text(
+            (agent_dir / "prompt.md").read_text(encoding="utf-8"), "openai-codex"
+        ).strip()
+
+        assert instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) == 1
+        assert (
+            instructions.split(CODEX_AGENT_INSTRUCTIONS_DELIMITER, 1)[1].strip()
+            == expected_body
+        )
+        assert "Before doing the task, read `.claude/agents/" not in instructions
+        assert "[mcp_servers." not in rendered
+        assert codex_agent_instruction_errors(agent, instructions) == []
+
+        legacy = (
+            "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"
+            f"Before doing the task, read `.claude/agents/{agent['id']}.md`.\n"
+        )
+        assert any(
+            "legacy Claude-native runtime read" in error
+            for error in codex_agent_instruction_errors(agent, legacy)
+        )
+
+        mutated_body = instructions.replace(
+            expected_body, f"{expected_body}\nchanged", 1
+        )
+        assert any(
+            "exactly match" in error
+            for error in codex_agent_instruction_errors(agent, mutated_body)
+        )
+
+        assert instructions.startswith(codex_agent_metadata_header(agent))

@@ -19,7 +19,13 @@ import tomllib
 from pathlib import Path
 
 from check_runtime import runtime_drift_errors
-from generate_targets import ROOT_GUIDANCE_WORKFLOW, shared_policies
+from generate_targets import (
+    CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    ROOT_GUIDANCE_WORKFLOW,
+    codex_agent_metadata_header,
+    codex_agent_prompt_body,
+    shared_policies,
+)
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
 
@@ -871,6 +877,27 @@ def root_source_mirror_errors(repo_root: Path, target_root: Path) -> list[str]:
     return errors
 
 
+def codex_agent_instruction_errors(
+    agent: dict[str, object], instructions: str
+) -> list[str]:
+    """Return self-containment contract errors for one parsed Codex agent body."""
+    expected_prefix = (
+        f"{codex_agent_metadata_header(agent)}\n\n"
+        f"{CODEX_AGENT_INSTRUCTIONS_DELIMITER}\n\n"
+    )
+    expected_prompt = codex_agent_prompt_body(agent)
+    errors: list[str] = []
+    if not instructions.startswith(expected_prefix):
+        errors.append("must use the generated metadata header and stable delimiter")
+    if instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) != 1:
+        errors.append("must contain exactly one stable prompt delimiter")
+    if instructions.removeprefix(expected_prefix) != expected_prompt:
+        errors.append("body must exactly match its transformed shared prompt")
+    if "Before doing the task, read `.claude/agents/" in instructions:
+        errors.append("must not retain the legacy Claude-native runtime read")
+    return errors
+
+
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
     expected_count = len(shared_agents)
@@ -1127,20 +1154,25 @@ def validate_agents(errors: list[str]) -> None:
             expected_effort=expected_effort,
         )
         instructions = str(data.get("developer_instructions", ""))
-        check(
-            ".claude/agents/" in instructions,
-            f"Codex agent adapter must point at canonical .claude agent: {path}",
-            errors,
+        agent = json.loads(
+            read(REPO_ROOT / "shared" / "agents" / path.stem / "agent.yaml")
         )
-        check(
-            "OpenAI Codex custom-agent adapter" in instructions,
-            f"Codex agent should be a thin native adapter: {path}",
-            errors,
+        errors.extend(
+            f"Codex agent {error}: {path}"
+            for error in codex_agent_instruction_errors(agent, instructions)
         )
-        for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", instructions):
+        if "tool-routing.instructions.md" in instructions:
             check(
-                (TARGET_ROOT / reference).exists(),
-                f"Codex agent adapter points at missing canonical agent: {path}: {reference}",
+                "[mcp_servers." not in text,
+                f"Codex agent must inherit MCP servers from config, not duplicate them: {path}",
+                errors,
+            )
+            codex_config = read_toml(TARGET_ROOT / ".codex" / "config.toml")
+            mcp_servers = codex_config.get("mcp_servers", {})
+            check(
+                isinstance(mcp_servers, dict)
+                and {"semble", "context-mode"} <= set(mcp_servers),
+                f"Codex agent requires Semble/context-mode but config does not provide inherited MCP access: {path}",
                 errors,
             )
     for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
