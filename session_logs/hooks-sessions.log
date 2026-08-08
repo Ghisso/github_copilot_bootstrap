@@ -35,3 +35,4 @@
 2026-08-04T13:59:42.000Z,event=Stop,target=openai-codex,sessionId=019fccb6-d857-7570-af2f-473fa2b7ddc5
 2026-08-04T15:11:47.000Z,event=Stop,target=openai-codex,sessionId=019fccb6-d857-7570-af2f-473fa2b7ddc5
 2026-08-04T16:11:27.000Z,event=Stop,target=openai-codex,sessionId=019fccb6-d857-7570-af2f-473fa2b7ddc5
+2026-08-08T10:09:40.000Z,event=SessionStart,target=openai-codex,sessionId=019fe0d8-aff7-7342-95b8-9cc6de0fa4c1,source=startup
