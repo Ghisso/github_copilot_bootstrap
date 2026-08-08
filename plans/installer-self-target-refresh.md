@@ -1,22 +1,25 @@
 ---
 name: installer-self-target-refresh
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: installer-self-target-refresh_implementation
 started_at: 2026-08-09T00:00:00Z
 phases:
   - 2026-08-09_phase-1-installer-allow-self
   - 2026-08-09_phase-2-promote-orphan-skill
-current_phase: 2026-08-09_phase-2-promote-orphan-skill
+current_phase: 
 ---
 
 # Big Plan: installer-self-target-refresh
 
 ## Context
 
+*(Resolved — see Outcome below. This section records the state that motivated
+the plan.)*
+
 This repository's own dogfood overlay (`.claude/`, `.codex/`, `.github/`
-adapters) has drifted from `shared/` and **cannot be refreshed**. Both entry
+adapters) had drifted from `shared/` and **could not be refreshed**. Both entry
 points refuse to run:
 
 - `install_bootstrap.py <this repo>` — `validate_install_roots` rejects
@@ -71,7 +74,24 @@ candidate and the source cannot delete itself mid-run.
 ## Phases
 
 - [x] `2026-08-09_phase-1-installer-allow-self`
-- [ ] `2026-08-09_phase-2-promote-orphan-skill`
+- [x] `2026-08-09_phase-2-promote-orphan-skill`
+
+## Outcome
+
+Resolved. `--allow-self` gives the bootstrap a supported self-refresh, the
+overlay was refreshed for real, and `check_runtime.py` drift went from 12
+failures to 0.
+
+Running it also exposed three bugs no test had caught: `settings.local.json`
+was being deleted unrecoverably on every consumer install; `check_runtime.py`
+reported drift no refresh could ever clear; and a freshly generated tree failed
+its own validator because the chmod loop globbed `*.sh` and skipped the
+required `protect-files.py`. All three are fixed.
+
+One behavioral change to expect: the refreshed hook guards are stricter and
+fail closed on opaque shell syntax — process substitution, heredocs piped into
+an interpreter, and write targets built from shell variables. See
+`docs/runtime-checks.md`.
 
 ## Verification
 
