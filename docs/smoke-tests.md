@@ -50,6 +50,25 @@ Expected:
   - context7 for current external library API documentation
   - no duplicate broad searches
 
+## Scoped Policy Adapters
+
+Expected:
+
+- Every `shared/policies/*.instructions.md` policy declares scope with the
+  target-neutral `applicability` schema: `always` or an explicit list of
+  repository-relative patterns; `applyTo` never appears in shared authoring.
+- Every policy is installed canonically under `.claude/instructions/`.
+- Conditional policies generate equivalent Claude `.claude/rules/` `paths` and
+  Copilot `.github/instructions/` `applyTo` scopes; always-on policies consume
+  neither a Claude conditional rule nor a Copilot `applyTo` field.
+- Codex generates no `.codex/rules/` and no nested `AGENTS.md` for the current
+  mixed/glob/file-specific policy scopes. Their non-widening fallback is the
+  corresponding enabled `.claude/skills/` workflow.
+- The root `AGENTS.md` remains below Codex's default 32 KiB combined project
+  guidance limit, and `CLAUDE.md` remains at or below 200 lines.
+- These are structural generation checks. Real Claude, Codex, and Copilot
+  adapter-loading probes are intentionally deferred to Phase I.
+
 ## Hooks
 
 Expected:

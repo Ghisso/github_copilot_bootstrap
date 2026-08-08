@@ -1,5 +1,6 @@
 ---
 description: "Always-on: shared workspace guidance, agents, review profiles, skills, and verification defaults."
+applicability: always
 ---
 
 # Shared Workspace Instructions -- Python AI Engineering

@@ -1,5 +1,6 @@
 ---
 description: "Always-on: Quality gates, verification commands, scoring rubric, and testing protocol. Load when verifying, testing, or scoring code."
+applicability: always
 ---
 
 # Quality Gates & Testing Protocol

@@ -1,5 +1,6 @@
 ---
 description: Load when an agent reports results back to the orchestrator or user.
+applicability: always
 ---
 
 # Agent Reporting Convention

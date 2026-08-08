@@ -1,5 +1,7 @@
 ---
-applyTo: "service.py,src/api/**/*.py"
+applicability:
+  - service.py
+  - src/api/**/*.py
 ---
 
 # API & Service Standards

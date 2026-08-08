@@ -19,7 +19,7 @@ import tomllib
 from pathlib import Path
 
 from check_runtime import runtime_drift_errors
-from generate_targets import ROOT_GUIDANCE_WORKFLOW
+from generate_targets import ROOT_GUIDANCE_WORKFLOW, shared_policies
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
 
@@ -159,6 +159,39 @@ ROOT_LIFECYCLE_PATTERN = re.compile(
     r"PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
     re.IGNORECASE,
 )
+POLICY_SCOPE_FIXTURES = {
+    "api-service-standards.instructions.md": (
+        ("service.py", True),
+        ("src/api/routes/health.py", True),
+        ("src/services/health.py", False),
+    ),
+    "code-standards.instructions.md": (
+        ("src/pipeline.py", True),
+        ("tests/unit/test_pipeline.py", True),
+        ("docs/pipeline.py", False),
+    ),
+    "config-first-design.instructions.md": (
+        ("src/configs/model.py", True),
+        ("src/models/model.py", False),
+    ),
+    "deployment.instructions.md": (
+        ("service.py", True),
+        ("gradio_app/app.py", True),
+        ("deployment/docker/Dockerfile", True),
+        ("src/service.py", False),
+    ),
+    "tests.instructions.md": (
+        ("tests/unit/test_routes.py", True),
+        ("src/test_routes.py", False),
+    ),
+}
+CODEX_POLICY_SKILL_FALLBACKS = {
+    "api-service-standards.instructions.md": "bentoml-service",
+    "code-standards.instructions.md": "code-style",
+    "config-first-design.instructions.md": "hydra-config",
+    "deployment.instructions.md": "deploy-service",
+    "tests.instructions.md": "testing-patterns",
+}
 
 
 def text_files(root: Path) -> list[Path]:
@@ -228,6 +261,216 @@ def validate_root_guidance(errors: list[str]) -> None:
             errors.append(f"missing generated root guidance: {path}")
             continue
         errors.extend(root_guidance_errors(name, read(path)))
+
+
+def scope_matches(path: str, patterns: tuple[str, ...]) -> bool:
+    """Match the narrow glob subset used by target-native policy adapters."""
+    for pattern in patterns:
+        regex = ""
+        index = 0
+        while index < len(pattern):
+            if pattern.startswith("**/", index):
+                regex += "(?:.*/)?"
+                index += 3
+            elif pattern.startswith("**", index):
+                regex += ".*"
+                index += 2
+            elif pattern[index] == "*":
+                regex += "[^/]*"
+                index += 1
+            elif pattern[index] == "?":
+                regex += "[^/]"
+                index += 1
+            else:
+                regex += re.escape(pattern[index])
+                index += 1
+        if re.fullmatch(regex, path):
+            return True
+    return False
+
+
+def claude_rule_paths(text: str) -> tuple[str, ...]:
+    """Read the generated Claude ``paths`` list without another YAML parser."""
+    frontmatter = extract_frontmatter(text)
+    lines = frontmatter.splitlines()
+    try:
+        index = lines.index("paths:") + 1
+    except ValueError:
+        return ()
+    paths: list[str] = []
+    while index < len(lines) and lines[index].startswith("  - "):
+        paths.append(json.loads(lines[index][4:]))
+        index += 1
+    return tuple(paths)
+
+
+def copilot_instruction_paths(text: str) -> tuple[str, ...]:
+    """Read a generated Copilot ``applyTo`` value without parsing source YAML."""
+    for line in extract_frontmatter(text).splitlines():
+        if line.startswith("applyTo:"):
+            return tuple(json.loads(line.split(":", 1)[1].strip()).split(","))
+    return ()
+
+
+def requires_codex_skill_fallback(patterns: tuple[str, ...]) -> bool:
+    """Return whether directory-scoped AGENTS.md would widen this policy's scope."""
+    return len(patterns) != 1 or not re.fullmatch(r"[^*?]+/\*\*", patterns[0])
+
+
+def validate_policy_adapters(errors: list[str]) -> None:
+    """Validate canonical policy schema and equivalent native scoped adapters."""
+    try:
+        policies = shared_policies()
+    except ValueError as error:
+        errors.append(f"invalid shared policy schema: {error}")
+        return
+
+    source_names = {policy.source.name for policy in policies}
+    conditional = {policy.source.name for policy in policies if policy.paths}
+    check(
+        len(source_names) == len(policies),
+        "shared policy filenames must be unique",
+        errors,
+    )
+    check(
+        conditional == set(POLICY_SCOPE_FIXTURES),
+        "every conditional policy must have matching/nonmatching scope fixtures",
+        errors,
+    )
+    check(
+        conditional == set(CODEX_POLICY_SKILL_FALLBACKS),
+        "every conditional policy must declare a Codex skill fallback decision",
+        errors,
+    )
+
+    github_root = TARGET_ROOT / ".github" / "instructions"
+    rules_root = TARGET_ROOT / ".claude" / "rules"
+    check(
+        {path.name for path in github_root.glob("*.instructions.md")} == source_names,
+        "Copilot policy adapters must uniquely mirror shared policies",
+        errors,
+    )
+    check(
+        {path.name for path in rules_root.glob("*.instructions.md")} == conditional,
+        "Claude rules must exist only for conditional shared policies",
+        errors,
+    )
+
+    for policy in policies:
+        source_text = read(policy.source)
+        canonical_path = TARGET_ROOT / ".claude" / "instructions" / policy.source.name
+        github_path = github_root / policy.source.name
+        rule_path = rules_root / policy.source.name
+        check(
+            "applyTo:" not in source_text,
+            f"shared policy must not retain Copilot-native applyTo metadata: {policy.source}",
+            errors,
+        )
+        check(
+            canonical_path.exists(),
+            f"missing canonical shared policy in target: {canonical_path}",
+            errors,
+        )
+        check(
+            github_path.exists(),
+            f"missing Copilot policy adapter: {github_path}",
+            errors,
+        )
+        if not github_path.exists():
+            continue
+        github_text = read(github_path)
+        check(
+            "applicability:" not in github_text,
+            f"target-neutral policy metadata leaked into Copilot adapter: {github_path}",
+            errors,
+        )
+        check(
+            f".claude/instructions/{policy.source.name}" in github_text,
+            f"Copilot policy adapter must reference canonical policy: {github_path}",
+            errors,
+        )
+        if not policy.paths:
+            check(
+                not copilot_instruction_paths(github_text),
+                f"always-on Copilot adapter must not emit applyTo: {github_path}",
+                errors,
+            )
+            check(
+                not rule_path.exists(),
+                f"always-on policy must not consume a Claude rule: {rule_path}",
+                errors,
+            )
+            continue
+
+        github_paths = copilot_instruction_paths(github_text)
+        check(
+            github_paths == policy.paths,
+            f"Copilot applyTo must derive exactly from canonical scope: {github_path}",
+            errors,
+        )
+        check(rule_path.exists(), f"missing Claude policy rule: {rule_path}", errors)
+        if not rule_path.exists():
+            continue
+        rule_text = read(rule_path)
+        rule_paths = claude_rule_paths(rule_text)
+        check(
+            "applicability:" not in rule_text,
+            f"target-neutral policy metadata leaked into Claude rule: {rule_path}",
+            errors,
+        )
+        check(
+            f".claude/instructions/{policy.source.name}" in rule_text,
+            f"Claude rule must reference canonical policy: {rule_path}",
+            errors,
+        )
+        check(
+            rule_paths == policy.paths,
+            f"Claude paths must derive exactly from canonical scope: {rule_path}",
+            errors,
+        )
+        for path, expected_match in POLICY_SCOPE_FIXTURES[policy.source.name]:
+            check(
+                scope_matches(path, policy.paths) == expected_match,
+                f"canonical scope has wrong matching semantics for {policy.source}: {path}",
+                errors,
+            )
+            check(
+                scope_matches(path, github_paths) == expected_match,
+                f"Copilot scope parity failed for {github_path}: {path}",
+                errors,
+            )
+            check(
+                scope_matches(path, rule_paths) == expected_match,
+                f"Claude scope parity failed for {rule_path}: {path}",
+                errors,
+            )
+        check(
+            requires_codex_skill_fallback(policy.paths),
+            f"Phase C Codex policy should not widen a mixed/glob scope with nested AGENTS.md: {policy.source}",
+            errors,
+        )
+        skill_name = CODEX_POLICY_SKILL_FALLBACKS[policy.source.name]
+        check(
+            (TARGET_ROOT / ".claude" / "skills" / skill_name / "SKILL.md").exists(),
+            f"Codex scoped-policy fallback skill is missing: {skill_name}",
+            errors,
+        )
+
+    nested_agents = [
+        path
+        for path in TARGET_ROOT.rglob("AGENTS.md")
+        if path != TARGET_ROOT / "AGENTS.md"
+    ]
+    check(
+        not nested_agents,
+        "Codex must not generate unsafe nested AGENTS.md for mixed/glob policy scopes",
+        errors,
+    )
+    check(
+        not (TARGET_ROOT / ".codex" / "rules").exists(),
+        "Codex target must not generate .codex/rules for policy scopes",
+        errors,
+    )
 
 
 def check_codex_hook_trust_notice(
@@ -3398,6 +3641,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
                     )
 
     validate_root_guidance(errors)
+    validate_policy_adapters(errors)
 
     copilot_guidance = read(TARGET_ROOT / ".github" / "copilot-instructions.md")
     check(

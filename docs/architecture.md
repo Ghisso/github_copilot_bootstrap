@@ -17,6 +17,37 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/templates/`, `shared/scripts/`, `shared/MEMORY.md`, and state README directories: source inputs rendered into the shared `.claude/` basis.
 - `shared/schemas/`: schema documentation for shared metadata.
 
+### Policy applicability and native discovery
+
+Policy scope is authored once in `shared/policies/` with target-neutral
+frontmatter: `applicability: always` or an explicit list of repository-relative
+patterns. The generator validates that minimal schema, installs every canonical
+policy under `.claude/instructions/`, and derives native discovery adapters.
+The adapters are not editable policy copies.
+
+Claude Code is the primary scoped-policy implementation. A conditional policy
+becomes `.claude/rules/<policy>.instructions.md` with equivalent YAML `paths`;
+always-on policy stays in the concise root guidance. Claude natively loads
+path-scoped rules when it reads a matching file, keeping unrelated guidance out
+of context. [Claude's rules documentation](https://code.claude.com/docs/en/memory)
+describes this behavior and its use alongside skills.
+
+Codex is the other primary implementation. Its `AGENTS.md` guidance is
+hierarchical: discovery runs from repository root to the current working
+directory, and a closer file overrides earlier guidance. The default combined
+project-document cap is 32 KiB. Therefore this bootstrap creates a nested
+`AGENTS.md` only for a policy that owns a stable concrete directory; a mixed,
+file-specific, or glob scope instead maps to an existing `.claude/skills/`
+workflow. That avoids broadening scope or consuming Codex's combined guidance
+budget. [Codex's AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
+is the source for this native behavior.
+
+GitHub Copilot is secondary compatibility coverage. Its instruction adapters
+derive `applyTo` from the same canonical patterns, and generation validates
+their scope parity with Claude's `paths`. These structural checks do not claim
+that a real client has loaded an adapter; runtime loading probes are reserved
+for Phase I.
+
 ## Generated Target
 
 The single installable output is `dist/multi-agent/`.

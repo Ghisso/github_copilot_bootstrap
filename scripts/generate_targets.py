@@ -8,6 +8,7 @@ import json
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +95,28 @@ ROOT_GUIDANCE_WORKFLOW = (
     "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
     "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
 )
+POLICY_APPLICABILITY_KEY = "applicability"
+POLICY_ALWAYS = "always"
+
+
+@dataclass(frozen=True)
+class Policy:
+    """One canonical policy and its target-neutral applicability."""
+
+    source: Path
+    body: str
+    paths: tuple[str, ...]
+
+    @property
+    def title(self) -> str:
+        """Return the policy's first H1 or a filename-derived fallback."""
+        fallback = (
+            self.source.stem.replace(".instructions", "").replace("-", " ").title()
+        )
+        for line in self.body.splitlines():
+            if line.startswith("# "):
+                return line[2:].strip()
+        return fallback
 
 
 def strip_quarantine(path: Path) -> None:
@@ -218,6 +241,7 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     instructions_root.mkdir(parents=True, exist_ok=True)
     for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
         copy_text_transformed(source, instructions_root / source.name, "claude-code")
+    render_claude_policy_rules(support_root)
     write_text(
         instructions_root / "workspace.md",
         transform_agent_text(
@@ -692,6 +716,81 @@ def split_frontmatter(text: str) -> tuple[str | None, str]:
     return parts[1].strip(), parts[2].lstrip()
 
 
+def parse_policy(source: Path) -> Policy:
+    """Parse the deliberately small, target-neutral policy frontmatter schema."""
+    frontmatter, body = split_frontmatter(source.read_text(encoding="utf-8"))
+    if frontmatter is None:
+        raise ValueError(f"policy frontmatter is required: {source}")
+
+    lines = frontmatter.splitlines()
+    fields: dict[str, str | tuple[str, ...]] = {}
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line:
+            index += 1
+            continue
+        if line.startswith((" ", "\t")) or ":" not in line:
+            raise ValueError(f"invalid policy frontmatter line in {source}: {line}")
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if key not in {"description", POLICY_APPLICABILITY_KEY}:
+            raise ValueError(f"unsupported policy frontmatter field in {source}: {key}")
+        if key in fields:
+            raise ValueError(f"duplicate policy frontmatter field in {source}: {key}")
+        if key != POLICY_APPLICABILITY_KEY:
+            fields[key] = value
+            index += 1
+            continue
+        if value:
+            fields[key] = value
+            index += 1
+            continue
+
+        patterns: list[str] = []
+        index += 1
+        while index < len(lines) and lines[index].startswith("  - "):
+            pattern = lines[index][4:].strip()
+            if not pattern:
+                raise ValueError(f"empty policy applicability pattern in {source}")
+            patterns.append(pattern)
+            index += 1
+        if not patterns:
+            raise ValueError(
+                f"policy applicability needs patterns or 'always': {source}"
+            )
+        fields[key] = tuple(patterns)
+
+    applicability = fields.get(POLICY_APPLICABILITY_KEY)
+    if applicability is None:
+        raise ValueError(f"policy applicability is required: {source}")
+    if applicability == POLICY_ALWAYS:
+        paths: tuple[str, ...] = ()
+    elif isinstance(applicability, tuple):
+        paths = applicability
+    else:
+        raise ValueError(
+            f"policy applicability must be 'always' or a YAML list in {source}"
+        )
+    for path in paths:
+        if path.startswith("/") or ".." in Path(path).parts or "," in path:
+            raise ValueError(
+                f"invalid relative policy applicability pattern in {source}: {path}"
+            )
+    return Policy(source=source, body=body, paths=paths)
+
+
+def shared_policies() -> list[Policy]:
+    """Return canonical policies parsed through the single scope schema."""
+    return [
+        parse_policy(source)
+        for source in sorted(
+            (REPO_ROOT / "shared" / "policies").glob("*.instructions.md")
+        )
+    ]
+
+
 def canonical_agent_name(agent_id: str) -> str:
     # Agent names are identical across every target; there is no per-target
     # renaming (the earlier mapped_agent_name was an identity function).
@@ -721,23 +820,45 @@ Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> do
 """
 
 
-def render_github_instruction_adapter(source: Path) -> str:
-    frontmatter, body = split_frontmatter(source.read_text(encoding="utf-8"))
-    title = source.stem.replace(".instructions", "").replace("-", " ").title()
-    for line in body.splitlines():
-        if line.startswith("# "):
-            title = line[2:].strip()
-            break
+def render_github_instruction_adapter(policy: Policy) -> str:
+    """Render the Copilot discovery adapter from canonical policy scope."""
     adapter = (
-        f"# {title} Adapter\n\n"
+        f"# {policy.title} Adapter\n\n"
         f"This Copilot instruction file is a native discovery adapter. "
-        f"Read and follow the canonical shared instruction at `.claude/instructions/{source.name}`.\n\n"
+        f"Read and follow the canonical shared instruction at `.claude/instructions/{policy.source.name}`.\n\n"
         "Critical shared-state rule: plans, explorations, session logs, memory, and quality reports "
         "belong under `.claude/` for every AI target.\n"
     )
-    if frontmatter:
-        return f"---\n{frontmatter}\n---\n\n{adapter}"
+    if policy.paths:
+        return f"---\napplyTo: {json.dumps(','.join(policy.paths))}\n---\n\n{adapter}"
     return adapter
+
+
+def render_claude_rule_adapter(policy: Policy) -> str:
+    """Render a Claude-native, path-scoped pointer to a canonical policy."""
+    if not policy.paths:
+        raise ValueError(
+            f"always-on policy has no Claude rule adapter: {policy.source}"
+        )
+    frontmatter = "\n".join(
+        ["---", "paths:", *(f"  - {json.dumps(path)}" for path in policy.paths), "---"]
+    )
+    return (
+        f"{frontmatter}\n\n"
+        f"# {policy.title} Adapter\n\n"
+        "This Claude rule is a native discovery adapter. Read and follow the canonical "
+        f"shared instruction at `.claude/instructions/{policy.source.name}`.\n"
+    )
+
+
+def render_claude_policy_rules(support_root: Path) -> None:
+    """Generate only conditional Claude rules; root guidance covers always-on policy."""
+    for policy in shared_policies():
+        if policy.paths:
+            write_text(
+                support_root / "rules" / policy.source.name,
+                render_claude_rule_adapter(policy),
+            )
 
 
 def render_github_agent_adapter(agent: dict[str, Any]) -> str:
@@ -854,9 +975,10 @@ def render_github(target_root: Path) -> None:
     )
     instructions_root = target_root / ".github" / "instructions"
     instructions_root.mkdir(parents=True, exist_ok=True)
-    for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
+    for policy in shared_policies():
         write_text(
-            instructions_root / source.name, render_github_instruction_adapter(source)
+            instructions_root / policy.source.name,
+            render_github_instruction_adapter(policy),
         )
 
     copy_file(

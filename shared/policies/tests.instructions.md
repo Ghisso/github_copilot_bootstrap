@@ -1,5 +1,6 @@
 ---
-applyTo: "tests/**/*.py"
+applicability:
+  - tests/**/*.py
 ---
 
 # Testing Standards

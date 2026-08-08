@@ -350,6 +350,35 @@ These are the source files that render into `.claude/instructions/` in every gen
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
   - Single home for how agents report back (caveman-full prose, structured content preserved) with the documenter's normal-prose exception
 
+### Conditional policy applicability
+
+`shared/policies/` is the sole editable policy library. Every policy declares
+target-neutral `applicability`: either `always` or an explicit YAML list of
+repository-relative path patterns. Generation copies the canonical policy to
+`.claude/instructions/`; target-native files are discovery adapters, never
+second authoring sources.
+
+Claude Code is the primary scoped-policy path: conditional policies generate
+`.claude/rules/*.instructions.md` files with equivalent `paths` frontmatter.
+Always-on policy remains in concise root guidance rather than consuming an
+unconditional rule. This matches Claude's native path-scoped rules, which load
+when a matching file is read. See [Claude Code rules and memory
+documentation](https://code.claude.com/docs/en/memory).
+
+Codex is also primary: its root `AGENTS.md` holds durable repository-wide
+guidance. Codex discovers `AGENTS.md` from the repository root to the current
+working directory; closer files take precedence, and the combined project
+guidance limit defaults to 32 KiB. Generate nested `AGENTS.md` only where a
+policy owns one stable concrete directory. Mixed, file-specific, or glob scopes
+use the corresponding `.claude/skills/` workflow instead, so the root guidance
+budget is not widened speculatively. See [Codex AGENTS.md
+guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+GitHub Copilot is compatibility coverage: its `.github/instructions/` adapters
+derive `applyTo` from the same target-neutral patterns. Claude/Copilot scope
+parity is structurally validated; real-client loading probes remain Phase I
+work.
+
 ## Most Important Skills
 
 Skills have machine-readable `visibility: public|background` frontmatter. **Public** skills are intended for direct use; **background** skills are hidden helpers loaded by description match or by agents.

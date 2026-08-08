@@ -1,5 +1,6 @@
 ---
 description: "Always-on: Workflow protocol, branch lifecycle, session logging, context management. Load when planning, implementing, or starting a session."
+applicability: always
 ---
 
 # Workflow: Pre-Flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
