@@ -327,7 +327,7 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, implementation, verification, review, score, documentation, learn, session-log, commit protocol
+  - Pre-flight, branch, plan, Ponytail, implementation, verification, review, documentation, score, learn, session-log, commit protocol
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
@@ -422,7 +422,7 @@ These skills encode battle-tested workflows and reduce ad-hoc execution.
 
 The agent layer gives me orchestration plus profile-driven reviews. Full shared agent bodies render into `.claude/agents/`; Copilot keeps thin native wrappers in `.github/agents/`. Codex custom-agent TOML files embed the transformed canonical shared prompt, so a spawned Codex agent receives its complete role contract without first reading a Claude-native agent file.
 
-Primary flow for complex work:
+The specialist flow for standard and high-risk implementation work is:
 
 - orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
 
@@ -454,19 +454,51 @@ Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its 
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 
-Orchestrator routing:
+### Task lanes
 
-- The orchestrator does a shallow exploration pass, then decides between `--mode micro-plan` (small, well-scoped changes) and `--mode full-plan` (new features, cross-cutting changes) before delegating to the planner.
+Task lanes are this bootstrap's repository policy, not Codex, Claude Code, or
+Copilot-native task thresholds. The single normative table is
+[`workflow.instructions.md`](shared/policies/workflow.instructions.md); this
+summary explains how to use it without creating a second classifier.
+
+| Lane | Typical example | Owner and outcome |
+| --- | --- | --- |
+| Read-only/reporting | Explain a failing test or review a diff. | The main agent gathers evidence only. A diagnosis stays read-only until you ask for a fix. |
+| Lightweight edit | Correct one explicit typo in `README.md`, with no requested commit or PR. | The main agent makes the one low-risk, non-control-plane edit and runs focused verification. It creates no plan, score, session log, or other lifecycle artifact. |
+| Standard implementation | Make a requested single-file behavior change, or any change for which you request a commit or PR. | The main-thread orchestrator runs the specialist loop and completes the lifecycle. |
+| Control-plane/high-risk | Change a hook, script, generator, dependency or lockfile, migration, security-sensitive behavior, user-data handling, or more than one file. | The orchestrator uses a full plan and the required `code`, `architecture`, `security`, `tests`, and `ponytail` review. |
+
+Classify before planning or delegating. High-risk conditions take precedence
+over every other lane; otherwise, a request is lightweight only when every
+lightweight condition holds. A requested commit or PR therefore always
+escalates to standard implementation or higher. This policy deliberately uses
+no time or line-count cutoff.
+
+Only the orchestrator chooses a planning mode after the lane is standard or
+high-risk. A micro-plan is for an obvious, one-phase standard implementation;
+a full plan is for ambiguous, multi-phase, or new-module work, and is mandatory
+for control-plane/high-risk work. A lightweight edit is not a micro-plan: it
+does not enter the lifecycle at all.
+
+The narrow `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` commit
+bypasses are audited recovery exceptions. They do not classify a task as
+lightweight, do not permit skipping safety safeguards, and still require the
+branch-shape check; acknowledge any bypass before PR or push closeout. Existing
+hook gates remain in force for their normal lifecycle checks.
+
+Orchestrator routing details:
+
+- The orchestrator does a shallow exploration pass, then chooses `--mode micro-plan` or `--mode full-plan` under the task-lane policy before delegating to the planner.
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use full-plan and always trigger profile-driven review.
+- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use the high-risk full-plan route and its profile-driven review.
 
 Coder skill loading:
 
 - Tier 1 (always): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`
 - Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
-- Coder pauses and asks the user before modifying any control-plane file.
+- An explicit request or approved plan authorizes a known control-plane change; ask only when targets, authority, or material scope are unclear.
 
 ## Hooks
 
@@ -554,7 +586,7 @@ Quality gates:
 
 Documentation gate:
 
-- after score >= 90, update docs for changed public interfaces, config, workflows, and user-facing behavior before commit or PR closeout
+- after review converges, update docs for changed public interfaces, config, workflows, and user-facing behavior before persisting findings and score; this binds their hashes to the final tree before commit or PR closeout
 
 ## Optional Retrieval Helpers
 

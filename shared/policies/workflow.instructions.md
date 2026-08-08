@@ -7,17 +7,36 @@ applicability: always
 
 ---
 
+## Task Lanes
+
+Classify a request before planning or delegating. This is the single normative
+task-size decision table; other guidance must refer here instead of redefining
+the lanes. Do not use time or line-count thresholds to classify a lane.
+
+| Lane | Enter only when | Owner and required work | Lifecycle artifacts |
+|---|---|---|---|
+| Read-only/reporting | No change is requested. | Main agent; inspect and provide evidence only. A requested diagnosis stays here until a fix is requested. | None. |
+| Lightweight edit | The request is explicit, changes one non-control-plane file, is low risk, has no dependency/lockfile, migration, user-data, security, or control-plane impact, and requests no commit or PR. | Main agent; make the focused edit and run proportionate focused verification. | No lifecycle artifacts. |
+| Standard implementation | Any requested change that is not lightweight or control-plane/high-risk, including all work with a requested commit or PR. | Main-thread orchestrator; use a micro-plan or full-plan, then the canonical specialist loop. | Full lifecycle below. |
+| Control-plane/high-risk | Any control-plane, security, dependency/lockfile, migration, multi-file, user-data, generator, or script change. | Main-thread orchestrator; use a full plan and the canonical specialist loop with `code`, `architecture`, `security`, `tests`, and `ponytail` review. | Full lifecycle below. |
+
+An already-explicit request or approved plan is sufficient authority to enter
+the control-plane/high-risk lane; ask the user only when targets, authority, or
+material scope are unclear. Narrow `fixup!`, `squash!`, `chore(typo):`, and
+`docs(typo):` commit bypasses are audited recovery exceptions, never task-lane
+classification or permission to skip safeguards.
+
 ## Plan-First Protocol
 
-**For any non-trivial task (>1 file or >30 min), plan before coding.**
+Standard implementation uses a micro-plan when its scope is obvious and one
+phase; use a full plan for ambiguous, multi-phase, or new-module work.
+Control-plane/high-risk work always uses a full plan.
 
 1. Check `.claude/MEMORY.md` for relevant `[LEARN]` entries.
 2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.claude/quality_reports/specs/`.
 3. Draft plan -> save to `.claude/plans/` for concrete implementation plans or `.claude/explorations/` for exploratory/PoC plans.
 4. Present to user -> wait for approval unless the user explicitly supplied an approved implementation plan.
 5. After approval: create session log, then implement via the orchestrator loop.
-
-**Skip planning only for:** single-file fixes, clear-and-specific requests, or when the user provides detailed approved steps.
 
 ---
 

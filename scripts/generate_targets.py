@@ -177,9 +177,20 @@ def ensure_executable(path: Path) -> None:
     path.chmod(path.stat().st_mode | 0o111)
 
 
-def copy_text_transformed(source: Path, destination: Path, target: str) -> None:
+def copy_text_transformed(
+    source: Path,
+    destination: Path,
+    target: str,
+    *,
+    preserve_shared_git_hooks: bool = False,
+) -> None:
     write_text(
-        destination, transform_target_paths(source.read_text(encoding="utf-8"), target)
+        destination,
+        transform_target_paths(
+            source.read_text(encoding="utf-8"),
+            target,
+            preserve_shared_git_hooks=preserve_shared_git_hooks,
+        ),
     )
 
 
@@ -241,7 +252,12 @@ def render_shared_basis(target_root: Path, target: str) -> None:
     instructions_root = support_root / "instructions"
     instructions_root.mkdir(parents=True, exist_ok=True)
     for source in sorted((REPO_ROOT / "shared" / "policies").glob("*.instructions.md")):
-        copy_text_transformed(source, instructions_root / source.name, "claude-code")
+        copy_text_transformed(
+            source,
+            instructions_root / source.name,
+            "claude-code",
+            preserve_shared_git_hooks=source.name == "workspace.instructions.md",
+        )
     render_claude_policy_rules(support_root)
     write_text(
         instructions_root / "workspace.md",
@@ -250,6 +266,7 @@ def render_shared_basis(target_root: Path, target: str) -> None:
                 encoding="utf-8"
             ),
             "claude-code",
+            preserve_shared_git_hooks=True,
         ),
     )
 
@@ -326,18 +343,29 @@ def shared_agents() -> list[tuple[dict[str, Any], Path]]:
     return agents
 
 
-def transform_agent_text(text: str, target: str) -> str:
+def transform_agent_text(
+    text: str, target: str, *, preserve_shared_git_hooks: bool = False
+) -> str:
     # Model names live only in agent.yaml model_intent (consumed directly when
     # rendering the GitHub adapter), never in prompt bodies or descriptions, so
     # there are no model-name substitutions to apply here — only path rewrites.
-    return transform_target_paths(text, target)
+    return transform_target_paths(
+        text, target, preserve_shared_git_hooks=preserve_shared_git_hooks
+    )
 
 
-def transform_target_paths(text: str, target: str) -> str:
-    transformed = text
+def transform_target_paths(
+    text: str, target: str, *, preserve_shared_git_hooks: bool = False
+) -> str:
+    shared_hook_marker = "__BOOTSTRAP_SHARED_GITHUB_HOOKS__"
+    transformed = (
+        text.replace(".github/hooks", shared_hook_marker)
+        if preserve_shared_git_hooks
+        else text
+    )
     for old, new in TARGET_PATH_REPLACEMENTS.get(target, ()):
         transformed = transformed.replace(old, new)
-    return transformed
+    return transformed.replace(shared_hook_marker, ".github/hooks")
 
 
 def render_claude_tools(capabilities: list[str]) -> str:
@@ -643,8 +671,8 @@ def render_root_guidance(target: str) -> str:
     if target == "claude-code":
         title = "Claude Code Bootstrap Guidance"
         control_plane_paths = (
-            "root guidance, `.claude/hooks/`, `.claude/settings.json`, `.mcp.json`, "
-            "and `.devcontainer/`"
+            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
+            "`.mcp.json`, and `.devcontainer/`"
         )
         runtime_note = (
             "Claude Code uses `.claude/settings.json`, `.claude/agents/`, and "
@@ -653,8 +681,8 @@ def render_root_guidance(target: str) -> str:
     elif target == "openai-codex":
         title = "OpenAI Codex Bootstrap Guidance"
         control_plane_paths = (
-            "root guidance, `.claude/hooks/`, `.codex/`, `.mcp.json`, and "
-            "`.devcontainer/`"
+            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, "
+            "`.mcp.json`, and `.devcontainer/`"
         )
         runtime_note = (
             "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and "
@@ -682,11 +710,12 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 ## Task Lanes
 
-- Answer, explain, review, or report: inspect and provide evidence; do not mutate state unless asked.
-- Diagnose: establish the cause and explain it; implement a fix only when requested.
-- Change or build: follow the complete lifecycle below and verify in proportion to risk.
-- Ambiguous, multi-file, or control-plane work: use `orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score`.
-- Monitor or wait: use the available recurring monitor or wait mechanism without broadening scope.
+- Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
+- Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
+- Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
+- Standard implementation and control-plane/high-risk work use `orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score`; all commit/PR work is standard or higher.
+- Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
+- Audited typo commit bypasses are recovery exceptions, never lane classification.
 
 ## Required Lifecycle
 

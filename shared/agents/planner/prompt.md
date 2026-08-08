@@ -19,7 +19,10 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 ## Planning Modes
 
-The orchestrator passes `--mode micro-plan` or `--mode full-plan`. Follow the matching mode.
+The authoritative Task Lanes table in `.claude/instructions/workflow.instructions.md`
+decides eligibility before the orchestrator delegates to you. The orchestrator
+passes `--mode micro-plan` or `--mode full-plan`; follow the matching mode.
+Control-plane/high-risk work always arrives as `--mode full-plan`.
 
 ### Micro-Plan Mode (`--mode micro-plan`)
 

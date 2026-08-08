@@ -14,6 +14,11 @@ description: |
 
 # Plan Decomposition
 
+Use this skill only after the authoritative **Task Lanes** table in
+`.claude/instructions/workflow.instructions.md` classifies the request as
+standard implementation or control-plane/high-risk. Read-only/reporting and
+eligible lightweight edits do not create plans or lifecycle artifacts.
+
 Turn a large scope into one **big plan** (`templates/plan-big.md`) that lists its
 phases, and one **small-plan file per phase** (`templates/plan-small.md`). This
 is the single-file-per-phase model the lifecycle and `validate_plan_frontmatter.py`

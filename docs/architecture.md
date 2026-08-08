@@ -114,12 +114,51 @@ if a safety guard errors or produces malformed output. This avoids relying on
 the target runtime's parallel execution order while leaving lifecycle wrappers
 and wildcard observability independent.
 
+## Task-Lane Routing
+
+The Task Lanes table in `shared/policies/workflow.instructions.md` is the
+single normative classifier. It is repository policy over the generated
+bootstrap, not a claim that Codex, Claude Code, or Copilot applies these
+thresholds natively. Target-native instructions and agents refer back to that
+one table instead of defining competing lane rules.
+
+```mermaid
+flowchart TD
+    R[Request] --> C{Change requested?}
+    C -->|No| RO[Read-only/reporting]
+    C -->|Yes| H{High-risk trigger?}
+    H -->|Yes| HR[Control-plane/high-risk<br>full plan + required review]
+    H -->|No| L{All lightweight conditions?}
+    L -->|Yes| LE[Lightweight edit<br>focused verification only]
+    L -->|No| SI[Standard implementation<br>micro-plan or full plan]
+```
+
+High-risk triggers take precedence: control-plane, security,
+dependency/lockfile, migration, multi-file, user-data, generator, and script
+changes always use the full orchestrated lane. A lightweight edit requires an
+explicit request, exactly one non-control-plane file, low risk, no high-risk
+impact, and no requested commit or PR. For example, correcting one explicit
+README typo can be lightweight; changing a hook or requesting a commit cannot.
+
+Standard implementation covers every remaining requested change, including all
+commit- or PR-bound work. The orchestrator chooses a micro-plan only for an
+obvious, one-phase standard change; ambiguous, multi-phase, and new-module work
+uses a full plan. A lightweight edit is not a micro-plan and creates no
+lifecycle artifacts. An explicit request or approved plan is enough authority
+for a known high-risk change; only unclear targets, authority, or material scope
+require clarification.
+
+The audited `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` bypasses are
+recovery exceptions, not lane classification or a safety exemption. The
+existing branch, commit, and PR gates remain unchanged; the bypasses retain the
+branch-shape check and require acknowledgement before PR or push closeout.
+
 ## Lifecycle Enforcement
 
 The canonical workflow is:
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:

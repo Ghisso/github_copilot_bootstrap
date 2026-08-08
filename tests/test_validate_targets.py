@@ -24,6 +24,7 @@ from generate_targets import (  # noqa: E402
     render_root_guidance,
     shared_agents,
     shared_policies,
+    transform_target_paths,
     transform_agent_text,
 )
 from validate_targets import (  # noqa: E402
@@ -37,6 +38,10 @@ from validate_targets import (  # noqa: E402
     pretool_routing_errors,
     root_guidance_errors,
     scope_matches,
+    task_lane_contract_errors,
+    task_lane_for,
+    TaskLaneInputs,
+    workspace_guidance_errors,
 )
 
 
@@ -104,6 +109,10 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
 
     assert root_guidance_errors("CLAUDE.md", claude) == []
     assert root_guidance_errors("AGENTS.md", codex) == []
+    assert "`.claude/hooks/`" in claude
+    assert "`.github/hooks/`" in claude
+    assert "`.codex/`" in codex
+    assert "`.github/hooks/`" in codex
     assert len(claude.splitlines()) <= 200
     assert len(codex.encode()) <= 16 * 1024
 
@@ -123,6 +132,146 @@ def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() ->
 
     assert any("exactly one '## Map' section" in error for error in errors)
     assert any("canonical lifecycle" in error for error in errors)
+
+    missing_inventory = guidance.replace("`.github/hooks/`, ", "", 1)
+    assert any(
+        "`.github/hooks/`" in error
+        for error in root_guidance_errors("CLAUDE.md", missing_inventory)
+    )
+
+    codex_missing_inventory = render_root_guidance("openai-codex").replace(
+        "`.github/hooks/`, ", "", 1
+    )
+    assert any(
+        "`.github/hooks/`" in error
+        for error in root_guidance_errors("AGENTS.md", codex_missing_inventory)
+    )
+
+
+def test_workspace_guidance_preserves_shared_git_hook_inventory() -> None:
+    """Target path rewrites retain the shared Git-hook control-plane surface."""
+    workspace = (
+        REPO_ROOT / "shared" / "policies" / "workspace.instructions.md"
+    ).read_text(encoding="utf-8")
+    for target in ("claude-code", "openai-codex"):
+        rendered = transform_target_paths(
+            workspace, target, preserve_shared_git_hooks=True
+        )
+        assert workspace_guidance_errors(rendered) == []
+
+    missing_inventory = workspace.replace("`.github/hooks/`, ", "", 1)
+    assert any(
+        "`.github/hooks/`" in error
+        for error in workspace_guidance_errors(missing_inventory)
+    )
+
+
+@pytest.mark.parametrize(
+    ("case", "inputs", "expected"),
+    (
+        (
+            "reporting request",
+            {"change_requested": False},
+            "read-only/reporting",
+        ),
+        (
+            "explicit docs typo",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("README.md",),
+                "low_risk": True,
+            },
+            "lightweight edit",
+        ),
+        (
+            "single-file behavior edit",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("src/formatter.py",),
+                "low_risk": True,
+            },
+            "lightweight edit",
+        ),
+        (
+            "dependency change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("pyproject.toml",),
+                "dependency_or_lockfile_impact": True,
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "hook change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".claude/hooks/scripts/guard.sh",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "runtime config change",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": (".codex/config.toml",),
+            },
+            "control-plane/high-risk",
+        ),
+        (
+            "commit request",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("docs/guide.md",),
+                "low_risk": True,
+                "commit_or_pr_requested": True,
+            },
+            "standard implementation",
+        ),
+        (
+            "multi-file implementation",
+            {
+                "change_requested": True,
+                "explicit": True,
+                "affected_paths": ("src/a.py", "tests/test_a.py"),
+            },
+            "control-plane/high-risk",
+        ),
+    ),
+    ids=lambda case: case,
+)
+def test_task_lane_fixtures(case: str, inputs: TaskLaneInputs, expected: str) -> None:
+    """The decision-table fixtures cover positive and safety-boundary cases."""
+    assert task_lane_for(**inputs) == expected
+
+
+def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> None:
+    """Structural validation catches omissions and prior blanket-path wording."""
+    workflow = (
+        REPO_ROOT / "shared" / "policies" / "workflow.instructions.md"
+    ).read_text(encoding="utf-8")
+    assert task_lane_contract_errors(workflow) == []
+
+    missing = workflow.replace("No lifecycle artifacts.", "No records.", 1)
+    assert any(
+        "No lifecycle artifacts." in error
+        for error in task_lane_contract_errors(missing)
+    )
+
+    drift = workflow.replace(
+        "Do not use time or line-count thresholds to classify a lane.",
+        "Do not use time or line-count thresholds to classify a lane.\n"
+        "Skip planning only for: one-file work.",
+        1,
+    )
+    assert any(
+        "Skip planning only for:" in error for error in task_lane_contract_errors(drift)
+    )
 
 
 def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:

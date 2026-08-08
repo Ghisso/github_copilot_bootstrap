@@ -17,6 +17,7 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
@@ -173,6 +174,68 @@ ROOT_GUIDANCE_BUDGETS = {
     "CLAUDE.md": ("lines", 200),
     "AGENTS.md": ("bytes", 16 * 1024),
 }
+ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
+    "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
+    "AGENTS.md": ("`.codex/`", "`.github/hooks/`"),
+}
+SHARED_GITHUB_HOOK_INVENTORY_PATHS = {
+    TARGET_ROOT / "CLAUDE.md",
+    TARGET_ROOT / "AGENTS.md",
+    TARGET_ROOT / ".claude" / "instructions" / "workspace.instructions.md",
+    TARGET_ROOT / ".claude" / "instructions" / "workspace.md",
+}
+TASK_LANE_CONTROL_PLANE_PATHS = (
+    ".claude/hooks/",
+    ".claude/settings.json",
+    ".github/hooks/",
+    ".codex/",
+    ".mcp.json",
+    ".devcontainer/",
+)
+TASK_LANE_CONTROL_PLANE_FILES = {"CLAUDE.md", "AGENTS.md"}
+TASK_LANE_REQUIRED_FRAGMENTS = (
+    "This is the single normative\ntask-size decision table",
+    "Do not use time or line-count thresholds to classify a lane.",
+    "Read-only/reporting",
+    "Main agent; inspect and provide evidence only.",
+    "Lightweight edit",
+    "The request is explicit, changes one non-control-plane file, is low risk",
+    "no dependency/lockfile, migration, user-data, security, or control-plane impact",
+    "requests no commit or PR",
+    "Main agent; make the focused edit and run proportionate focused verification.",
+    "No lifecycle artifacts.",
+    "Standard implementation",
+    "including all work with a requested commit or PR.",
+    "Main-thread orchestrator; use a micro-plan or full-plan",
+    "Control-plane/high-risk",
+    "generator, or script change.",
+    "Main-thread orchestrator; use a full plan",
+    "`code`, `architecture`, `security`, `tests`, and `ponytail` review.",
+    "already-explicit request or approved plan is sufficient authority",
+    "audited recovery exceptions, never task-lane\nclassification",
+)
+TASK_LANE_FORBIDDEN_FRAGMENTS = (
+    ">1 file or >30 min",
+    "Skip planning only for:",
+    "there is no trivial-task fast path",
+    "Pause and ask the user to confirm the change before applying.",
+)
+
+
+class TaskLaneInputs(TypedDict, total=False):
+    """Named inputs for the executable Task Lanes regression fixture."""
+
+    change_requested: bool
+    explicit: bool
+    affected_paths: tuple[str, ...]
+    low_risk: bool
+    commit_or_pr_requested: bool
+    security_impact: bool
+    dependency_or_lockfile_impact: bool
+    migration: bool
+    user_data_impact: bool
+
+
 ROOT_LIFECYCLE_PATTERN = re.compile(
     r"\b(?:PRE-FLIGHT|BRANCH|PLAN|PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
     r"SCORE|LEARN|SESSION LOG|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN|"
@@ -264,13 +327,95 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         "Control-plane files include",
         "Keep hook guardrails enabled",
         "uv run pytest tests/ -q --tb=short",
+        "sole normative classifier",
     )
     for fragment in required_fragments:
         if fragment not in text:
             errors.append(
                 f"{name} is missing mandatory root-guidance invariant: {fragment}"
             )
+    for fragment in ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS[name]:
+        if fragment not in text:
+            errors.append(f"{name} is missing control-plane inventory path: {fragment}")
     return errors
+
+
+def workspace_guidance_errors(text: str) -> list[str]:
+    """Return failures for the shared Git-hook control-plane inventory."""
+    errors: list[str] = []
+    for fragment in ("`.claude/hooks/`", "`.github/hooks/`"):
+        if text.count(fragment) != 1:
+            errors.append(
+                "workspace guidance must contain exactly one control-plane inventory path: "
+                f"{fragment}"
+            )
+    return errors
+
+
+def task_lane_contract_errors(text: str) -> list[str]:
+    """Return failures for the sole normative Task Lanes policy table."""
+    errors: list[str] = []
+    if text.count("## Task Lanes\n") != 1:
+        errors.append("workflow policy must contain exactly one Task Lanes section")
+    for fragment in TASK_LANE_REQUIRED_FRAGMENTS:
+        if fragment not in text:
+            errors.append(f"workflow Task Lanes table is missing: {fragment}")
+    for fragment in TASK_LANE_FORBIDDEN_FRAGMENTS:
+        if fragment in text:
+            errors.append(
+                f"workflow Task Lanes table contains stale contradiction: {fragment}"
+            )
+    return errors
+
+
+def task_lane_for(**inputs: Unpack[TaskLaneInputs]) -> str:
+    """Classify a task according to the canonical Task Lanes table.
+
+    This compact executable fixture mirrors the policy table for regression
+    coverage; agents still apply the table to the actual user request.
+    """
+    if not inputs.get("change_requested", False):
+        return "read-only/reporting"
+
+    affected_paths = inputs.get("affected_paths", ())
+
+    control_plane = any(
+        path in TASK_LANE_CONTROL_PLANE_FILES
+        or path.startswith(TASK_LANE_CONTROL_PLANE_PATHS)
+        for path in affected_paths
+    )
+    generator_or_script = any(
+        path.startswith("scripts/") or path.startswith("shared/scripts/")
+        for path in affected_paths
+    )
+    high_risk = (
+        control_plane
+        or inputs.get("security_impact", False)
+        or inputs.get("dependency_or_lockfile_impact", False)
+        or inputs.get("migration", False)
+        or inputs.get("user_data_impact", False)
+        or generator_or_script
+        or len(affected_paths) > 1
+    )
+    if high_risk:
+        return "control-plane/high-risk"
+    if (
+        inputs.get("explicit", False)
+        and len(affected_paths) == 1
+        and inputs.get("low_risk", False)
+        and not inputs.get("commit_or_pr_requested", False)
+    ):
+        return "lightweight edit"
+    return "standard implementation"
+
+
+def validate_task_lane_contract(errors: list[str]) -> None:
+    """Validate the authoritative policy rather than duplicating it in adapters."""
+    errors.extend(
+        task_lane_contract_errors(
+            read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
+        )
+    )
 
 
 def validate_root_guidance(errors: list[str]) -> None:
@@ -281,6 +426,12 @@ def validate_root_guidance(errors: list[str]) -> None:
             errors.append(f"missing generated root guidance: {path}")
             continue
         errors.extend(root_guidance_errors(name, read(path)))
+    for workspace_name in ("workspace.instructions.md", "workspace.md"):
+        workspace_path = TARGET_ROOT / ".claude" / "instructions" / workspace_name
+        if not workspace_path.exists():
+            errors.append(f"missing generated workspace guidance: {workspace_path}")
+        else:
+            errors.extend(workspace_guidance_errors(read(workspace_path)))
 
 
 def scope_matches(path: str, patterns: tuple[str, ...]) -> bool:
@@ -3796,6 +3947,14 @@ def validate_skills_and_paths(errors: list[str]) -> None:
                 continue
             text = read(path)
             for fragment in NON_COPILOT_PATH_LEAKS:
+                # These exact canonical inventories name the shared Git-hook
+                # surface. Every other generated non-Copilot file still rejects it.
+                if (
+                    fragment == ".github/hooks"
+                    and path in SHARED_GITHUB_HOOK_INVENTORY_PATHS
+                    and text.count(".github/hooks/") == 1
+                ):
+                    continue
                 if fragment in text:
                     errors.append(
                         f"Copilot path leaked into non-GitHub output: {path} contains {fragment}"
@@ -6419,6 +6578,7 @@ def main() -> int:
         )
 
     if not errors:
+        validate_task_lane_contract(errors)
         validate_codex_model_contract_cases(errors)
         validate_agents(errors)
         validate_model_leaks(errors)
