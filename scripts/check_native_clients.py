@@ -38,6 +38,12 @@ EVIDENCE_SENTINEL = "client_schema_sentinel"
 EVIDENCE_EVENTS = "native_event_metadata"
 EVIDENCE_UNAVAILABLE = "unavailable_untrusted"
 EVIDENCE_UNEXERCISED = "unexercised"
+# Distinct from `unexercised`: the client offered collaboration tools and the
+# spawn was attempted, but no agent thread was ever created. Codex 0.147.0
+# exposes `collaboration.*` (not the shim's `agents` namespace) and does not
+# reach project `.codex/agents/*.toml` from spawn_agent (openai/codex #14579,
+# #18823); `--ephemeral` precludes spawning outright ("no thread with id").
+EVIDENCE_SPAWN_UNSUPPORTED = "spawn_unsupported"
 
 CODEX_ROLES = {
     "orchestrator": ("orchestrator", "gpt-5.6-sol", "xhigh"),
@@ -433,6 +439,30 @@ def event_role_records(events: list[dict[str, Any]] | None) -> list[dict[str, st
     return records
 
 
+def collaboration_attempted_without_spawn(events: list[dict[str, Any]] | None) -> bool:
+    """True when collaboration tools ran but produced no agent thread.
+
+    Observed shape from Codex 0.147.0 -- a `wait` with no receivers and no
+    agent states. The populated shape is deliberately NOT guessed here: it has
+    never been captured, and coding against an imagined payload is how Phase I
+    shipped a probe that had never run.
+    """
+    if not events:
+        return False
+    calls = [
+        item
+        for event in events
+        if isinstance(item := event.get("item"), dict)
+        and item.get("type") == "collab_tool_call"
+    ]
+    if not calls:
+        return False
+    return all(
+        not call.get("receiver_thread_ids") and not call.get("agents_states")
+        for call in calls
+    )
+
+
 def valid_role_matrix(records: list[dict[str, str]]) -> bool:
     if len(records) != len(CODEX_ROLES):
         return False
@@ -574,10 +604,17 @@ def probe_client(
     if client == "codex":
         records = event_role_records(events)
         if not records:
+            # Separate "the client tried and could not spawn" from "never
+            # attempted", so the removal gate cannot be read as merely unrun.
+            matrix_evidence = (
+                EVIDENCE_SPAWN_UNSUPPORTED
+                if collaboration_attempted_without_spawn(events)
+                else EVIDENCE_UNEXERCISED
+            )
             checks.extend(
                 [
-                    check("codex_role_matrix", WARN, EVIDENCE_UNEXERCISED),
-                    check("coder_escalation", WARN, EVIDENCE_UNEXERCISED),
+                    check("codex_role_matrix", WARN, matrix_evidence),
+                    check("coder_escalation", WARN, matrix_evidence),
                 ]
             )
         else:

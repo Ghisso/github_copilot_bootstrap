@@ -418,3 +418,47 @@ def test_no_prompt_claims_a_surface_the_target_does_not_generate() -> None:
 def test_default_timeout_allows_consecutive_control_and_candidate() -> None:
     """120s timed Codex out mid-matrix; the default must cover both runs."""
     assert native.TIMEOUT_SECONDS >= 300
+
+
+# --- Phase L: spawn capability, from recorded Codex 0.147.0 output ---------
+
+
+def collab_wait_event(status: str = "completed") -> dict[str, Any]:
+    """Verbatim shape captured from Codex 0.147.0 when no spawn occurs."""
+    return {
+        "type": f"item.{status}",
+        "item": {
+            "id": "item_1",
+            "type": "collab_tool_call",
+            "tool": "wait",
+            "sender_thread_id": "019fe23f-469a-77b1-a3d1-4532aa24cb5e",
+            "receiver_thread_ids": [],
+            "prompt": None,
+            "agents_states": {},
+            "status": status,
+        },
+    }
+
+
+def test_collaboration_without_spawn_is_detected() -> None:
+    assert native.collaboration_attempted_without_spawn([collab_wait_event()])
+
+
+def test_no_collaboration_tools_is_not_spawn_unsupported() -> None:
+    """Absent collaboration calls means unexercised, not an unsupported spawn."""
+    assert not native.collaboration_attempted_without_spawn([])
+    assert not native.collaboration_attempted_without_spawn(None)
+    plain = {"type": "item.completed", "item": {"type": "agent_message", "text": "ok"}}
+    assert not native.collaboration_attempted_without_spawn([plain])
+
+
+def test_a_real_spawn_is_not_reported_as_unsupported() -> None:
+    """Any receiver thread or agent state means spawning did happen."""
+    spawned = collab_wait_event()
+    spawned["item"]["receiver_thread_ids"] = ["019fe000-0000-0000-0000-000000000001"]
+    assert not native.collaboration_attempted_without_spawn([spawned])
+
+
+def test_spawn_unsupported_is_distinct_from_unexercised() -> None:
+    """The removal gate must not read as 'simply never run'."""
+    assert native.EVIDENCE_SPAWN_UNSUPPORTED != native.EVIDENCE_UNEXERCISED

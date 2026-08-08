@@ -34,6 +34,46 @@ If a global npm install seems to vanish, confirm the npm global `bin`
 directory is on `PATH` — `node`/`npm` are often exposed by individual symlinks
 while sibling tools are not.
 
+## The Role Matrix Cannot Be Measured Yet
+
+`codex_role_matrix` is the check that would let the MultiAgent V2 shim be
+removed. Measured against Codex 0.147.0 in a trusted, authenticated workspace,
+it cannot be exercised — for reasons upstream of this repository.
+
+1. `--ephemeral` precludes spawning outright:
+   `error=collab spawn failed: no thread with id: ...`.
+2. Without `--ephemeral`, no spawn happens either. Explicit requests to call
+   `collaboration.spawn_agent` produce only a `wait` with empty
+   `receiver_thread_ids` and empty `agents_states`, after which the model does
+   the task itself.
+3. The shim's `tool_namespace = "agents"` has **no observable effect**. Codex
+   0.147.0 exposes `collaboration.spawn_agent`, `collaboration.followup_task`,
+   `collaboration.send_message`, `collaboration.interrupt_agent`,
+   `collaboration.list_agents`, and `collaboration.wait_agent`. Nothing is
+   namespaced `agents.*`.
+4. The six project agents are not reachable from `spawn_agent` even though
+   `.codex/agents/*.toml` exists and auto-discovery is documented — see
+   openai/codex issues #14579 and #18823.
+5. Control and candidate behave identically, because no spawn occurs in
+   either. The A/B cannot discriminate.
+
+Feature state in 0.147.0: `multi_agent` is stable/true, `multi_agent_v2` is
+stable/false.
+
+The probe reports this as `spawn_unsupported`, deliberately distinct from
+`unexercised`, so the gate is not mistaken for a check that was simply never
+run. No parser for a populated `agents_states` payload is written, because that
+shape has never been observed — guessing it is how the probe first shipped
+broken.
+
+**The shim stays.** Point 3 is evidence that one of its two keys is inert in
+0.147.0, but `hide_spawn_agent_metadata` is untested because no spawn ever
+occurs. Partial evidence about one key does not justify removing the block.
+
+To unblock: a Codex version where `spawn_agent` reaches project-scoped custom
+agents, run without `--ephemeral`. Capture a populated `agents_states` payload
+first, then implement the matrix parser against the real shape.
+
 ## Codex Has No Directory-Scoped Instructions Here
 
 Codex discovers scoped instructions **by directory**: it walks from the Git
