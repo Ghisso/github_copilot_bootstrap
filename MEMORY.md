@@ -188,3 +188,16 @@
 - [LEARN:testing] Non-deterministic model output is a symptom to trace, not a
   flake to retry. Here it pointed at a scoped surface the generator never
   produced for Codex.
+- [LEARN:testing] "Cannot be measured" is a finding, not a failure to deliver.
+  Record why a gate is unmet with reproducible evidence rather than leaving it
+  reporting a generic `unexercised` forever.
+- [LEARN:testing] Never write a parser for an event shape you have not
+  captured. When the payload is unobserved, write less code and document the
+  gap; guessing is how a probe ships broken.
+- [LEARN:config] A config key can be silently inert. Codex 0.147.0 exposes
+  `collaboration.*` tools, so the MultiAgent V2 shim's
+  `tool_namespace = "agents"` has no observable effect. Config presence is not
+  config effect - verify against the running client.
+- [LEARN:tooling] Least-privilege flags can preclude the behavior under test:
+  Codex `--ephemeral` makes agent spawning structurally impossible
+  ("collab spawn failed: no thread with id").
