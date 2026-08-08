@@ -140,3 +140,9 @@ fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/
 2026-08-08T14:42:44.000Z state-sync: push to origin/ai-state failed; local commits are intact and will retry on the next sync.
 fatal: unable to access 'https://github.com/Ghisso/github_copilot_bootstrap.git/': Could not resolve host: github.com
 2026-08-08T14:45:02.000Z state-sync: push to origin/ai-state failed; local commits are intact and will retry on the next sync.
+2026-08-08T14:56:20Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T14:56:20Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T14:56:20Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-08T14:56:59Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-08T14:56:59Z WARN hook fail-closed: unparseable tool payload
+2026-08-08T14:56:59Z WARN hook fail-closed: protect-files.sh exited with status 2
