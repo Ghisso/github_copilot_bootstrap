@@ -28,13 +28,9 @@ audience-appropriate communication.
 
 If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 
-Select `ponytail` for control-plane/high-risk work and for diffs that introduce
-or substantially change abstractions, dependencies, architecture, generalized
-infrastructure, configuration, execution paths, or behavior. It is optional
-for ordinary low-complexity work and unnecessary for documentation-only diffs.
-Documentation-only means all changed paths are Markdown or live under `docs/`,
-`plans/`, `.claude/plans/`, `.claude/session_logs/`, or
-`.claude/quality_reports/`. Mixed diffs are not documentation-only.
+Select `ponytail` according to the authoritative routing table, including its
+control-plane/high-risk, complexity-expansion, and documentation-only
+precedence rules.
 
 ## Review Flow
 

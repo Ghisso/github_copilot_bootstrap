@@ -14,7 +14,10 @@
 
 The two skill files retain Ponytail's behavior and safety boundaries. Local
 changes are limited to formatting, the bootstrap's required `visibility`
-frontmatter, and references to this bootstrap's review workflow.
+frontmatter, and references to this bootstrap's review workflow. The canonical
+workflow and review-routing policies decide lifecycle placement and whether the
+optional `ponytail-review` profile runs; they take precedence over imported
+generic workflow wording without modifying the imported skill files.
 
 ## Local allowlist hashes
 

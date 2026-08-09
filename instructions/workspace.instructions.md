@@ -112,6 +112,13 @@ This is the **single authoritative profile-routing table**. The unified `reviewe
 | Hooks, scripts, generators, and control-plane code | `code`, `architecture`, `security`, `tests`, `ponytail` |
 | Any pre-PR gate | `code`, `security`, `tests`; add `ponytail` for control-plane/high-risk or complexity-expanding diffs |
 
+Ponytail is required for every control-plane/high-risk diff and every diff that
+introduces or substantially changes abstractions, dependencies, architecture,
+generalized infrastructure, configuration, execution paths, or behavior. It is
+optional for ordinary low-complexity work. A documentation-only diff is exactly
+one documentation or mutable workflow-state file; a control-plane/high-risk
+path or any multi-file diff takes precedence and is not documentation-only.
+
 ## Skills
 
 Skills live under `.claude/skills/`. Each `SKILL.md` has machine-readable `visibility: public|background` metadata:

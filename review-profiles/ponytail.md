@@ -1,11 +1,10 @@
 # Ponytail Review Profile
 
-Use for control-plane/high-risk work and when a diff introduces or substantially
-changes abstractions, dependencies, architecture, generalized infrastructure,
-configuration, execution paths, or behavior. It is optional for ordinary
-low-complexity work and unnecessary for documentation-only diffs. This profile
-reviews only unnecessary complexity; combine it with the normal correctness,
-security, test, and architecture profiles.
+Use according to the authoritative routing table in
+`.claude/instructions/workspace.instructions.md`, including its
+control-plane/high-risk, complexity-expansion, and documentation-only
+precedence rules. This profile reviews only unnecessary complexity; combine it
+with the normal correctness, security, test, and architecture profiles.
 
 ## Checklist
 

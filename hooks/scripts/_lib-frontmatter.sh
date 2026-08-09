@@ -164,68 +164,63 @@ hook_to_lower() {
 json_file_string_value() {
   local file="$1"
   local key="$2"
-  [[ -f "$file" ]] || return 1
-  json_string_value "$key" < "$file"
+  json_file_top_level_value "$file" "$key" string
 }
 
 json_file_number_value() {
-  local file="$1"
-  local key="$2"
-  [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*-?[0-9]+"
-      if (!match(text, pattern)) {
-        exit
-      }
-      value = substr(text, RSTART, RLENGTH)
-      sub("^.*:[[:space:]]*", "", value)
-      sub("[^0-9-].*$", "", value)
-      print value
-    }
-  ' "$file"
+  json_file_top_level_value "$1" "$2" number
 }
 
 json_file_bool_value() {
-  local file="$1"
-  local key="$2"
-  [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*(true|false)"
-      if (!match(text, pattern)) {
-        exit
-      }
-      value = substr(text, RSTART, RLENGTH)
-      sub("^.*:[[:space:]]*", "", value)
-      sub("[^A-Za-z].*$", "", value)
-      print value
-    }
-  ' "$file"
+  json_file_top_level_value "$1" "$2" bool
 }
 
 json_file_array_present() {
+  json_file_top_level_value "$1" "$2" array >/dev/null
+}
+
+# Reports are untrusted files. Read only a named top-level key (or the explicit
+# `counts.<severity>` contract path) so a nested finding title or
+# attacker-controlled payload cannot forge a report field by appearing earlier
+# in the JSON text. Python is already the runtime baseline for this bootstrap;
+# this deliberately does not depend on uv.
+json_file_top_level_value() {
   local file="$1"
   local key="$2"
+  local kind="$3"
   [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*\\["
-      if (match(text, pattern)) {
-        found = 1
-      }
-      exit found ? 0 : 1
-    }
-  ' "$file"
+  python3 - "$file" "$key" "$kind" <<'PY'
+import json
+import sys
+
+file_name, key, kind = sys.argv[1:]
+try:
+    with open(file_name, encoding="utf-8") as handle:
+        report = json.load(handle)
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(1)
+if not isinstance(report, dict):
+    raise SystemExit(1)
+if key.startswith("counts."):
+    counts_key = key[len("counts."):]
+    counts = report.get("counts")
+    if not isinstance(counts, dict) or counts_key not in counts:
+        raise SystemExit(1)
+    value = counts[counts_key]
+elif key in report:
+    value = report[key]
+else:
+    raise SystemExit(1)
+valid = {
+    "string": isinstance(value, str),
+    "number": type(value) is int,
+    "bool": type(value) is bool,
+    "array": isinstance(value, list),
+}.get(kind, False)
+if not valid:
+    raise SystemExit(1)
+print(str(value).lower() if type(value) is bool else value)
+PY
 }
 
 is_bash_tool_payload() {
@@ -592,11 +587,14 @@ is_bypass_subject() {
 }
 
 # Return success when the implementation diff has a deterministic high-risk
-# Ponytail trigger. This shell classifier intentionally handles only paths;
-# reviewers must also select Ponytail for conceptual complexity expansion as
-# documented in workspace.instructions.md. With no `diff_ref`, the live
-# working tree/index is checked (commit gate); with a ref, that landed commit
-# is checked (push gate).
+# Ponytail trigger. This is the hook-safe subset of the authoritative Task
+# Lanes table: control-plane, scripts/generators, dependencies/lockfiles, and
+# multi-file diffs. Reviewers also select Ponytail for semantic complexity
+# expansion, which cannot be inferred safely from paths. A documentation-only
+# exemption applies only to one documentation/state file; high-risk paths and
+# multi-file diffs take precedence. With no `diff_ref`, the live working
+# tree/index is checked (commit gate); with a ref, that landed commit is checked
+# (push gate).
 diff_requires_ponytail() {
   local repo_root="$1"
   local diff_ref="${2:-}"
@@ -605,21 +603,23 @@ diff_requires_ponytail() {
   merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
   [[ -n "$merge_base" ]] || return 0
 
+  local -a paths=()
   if [[ -n "$diff_ref" ]]; then
     while IFS= read -r path; do
-      [[ -n "$path" ]] || continue
-      case "$path" in
-        .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|uv.lock|pyproject.toml) return 0 ;;
-      esac
+      [[ -n "$path" ]] && paths+=("$path")
     done < <(git -C "$repo_root" diff --name-only "$merge_base" "$diff_ref" 2>/dev/null)
   else
     while IFS= read -r path; do
-      [[ -n "$path" ]] || continue
-      case "$path" in
-        .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|uv.lock|pyproject.toml) return 0 ;;
-      esac
+      [[ -n "$path" ]] && paths+=("$path")
     done < <(git -C "$repo_root" diff --name-only "$merge_base" 2>/dev/null)
   fi
+
+  [[ "${#paths[@]}" -gt 1 ]] && return 0
+  for path in "${paths[@]}"; do
+    case "$path" in
+      .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|scripts/*|shared/scripts/*|pyproject.toml|uv.lock|requirements*.txt|Pipfile|Pipfile.lock|poetry.lock|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|Cargo.toml|Cargo.lock|go.mod|go.sum) return 0 ;;
+    esac
+  done
   return 1
 }
 
@@ -785,7 +785,7 @@ assert_report_freshness() {
 
 # Best-effort extraction of a given severity's finding titles from a
 # findings-*.json report, for an actionable failure message. The
-# `counts.<severity>` field (read via the pure-awk json_file_number_value)
+# `counts.<severity>` field (read by the exact-path json_file_number_value)
 # is what actually gates the commit/push; this only enriches the message, so
 # it degrades to nothing when python3 is unavailable rather than failing
 # the gate.
@@ -909,7 +909,7 @@ assert_commit_invariants() {
     assert_report_freshness "$findings_file" "$repo_root" "$commit_gate_head" "exact" "" "findings report" "$findings_regen_hint"
 
     local critical_count
-    critical_count="$(json_file_number_value "$findings_file" "critical" 2>/dev/null || true)"
+    critical_count="$(json_file_number_value "$findings_file" "counts.critical" 2>/dev/null || true)"
     if [[ ! "$critical_count" =~ ^[0-9]+$ ]]; then
       failures+=("findings report must include counts.critical; $findings_regen_hint")
     elif [[ "$critical_count" -gt 0 ]]; then
@@ -1031,7 +1031,7 @@ assert_push_invariants() {
     assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
 
     local major_count
-    major_count="$(json_file_number_value "$findings_file" "major" 2>/dev/null || true)"
+    major_count="$(json_file_number_value "$findings_file" "counts.major" 2>/dev/null || true)"
     if [[ ! "$major_count" =~ ^[0-9]+$ ]]; then
       failures+=("findings report must include counts.major; $findings_regen_hint")
     elif [[ "$major_count" -gt 0 ]]; then

@@ -363,3 +363,7 @@ fatal: Cannot rebase onto multiple branches.
 2026-08-09T07:22:59Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-08-09T07:23:27Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-09T07:23:27Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T07:29:09Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T07:29:09Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T07:37:44Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T07:37:44Z WARN hook fail-closed: protect-files.sh exited with status 2

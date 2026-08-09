@@ -165,10 +165,10 @@ fresh as the score report (push gates accept a report generated for an
 ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
 `counts.major == 0` (push/PR). Ponytail metadata is present only when that
-profile ran. Control-plane/high-risk and complexity-expanding work must include
-`ponytail_reviewed: true`; ordinary low-complexity and documentation-only diffs
-do not require Ponytail metadata. Ponytail findings use the same severity
-gates as every other profile.
+profile ran. The authoritative review-routing table defines when Ponytail
+metadata is required; ordinary low-complexity and documentation-only diffs do
+not require it. Ponytail findings use the same severity gates as every other
+profile.
 
 ---
 

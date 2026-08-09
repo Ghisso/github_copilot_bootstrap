@@ -164,9 +164,13 @@ def main() -> None:
     try:
         findings = load_findings(args.findings_json)
         profiles_reviewed = sorted({profile.strip() for profile in args.profile if profile.strip()})
+        if not profiles_reviewed:
+            raise ValueError("at least one --profile is required")
         for finding in findings:
             profile = finding.get("profile")
-            if profiles_reviewed and profile not in profiles_reviewed:
+            if not isinstance(profile, str) or not profile:
+                raise ValueError("each finding must have a non-empty profile")
+            if profile not in profiles_reviewed:
                 raise ValueError(
                     "each finding profile must be present in the repeated --profile arguments; "
                     f"got {profile!r}"

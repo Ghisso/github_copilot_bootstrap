@@ -38,7 +38,7 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 3. **PLAN:** Prepare the planner evidence packet, delegate to one planner, and save each concrete small plan under `.claude/plans/`.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
-6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas. Add `ponytail` for control-plane/high-risk or complexity-expanding diffs; it is optional for ordinary low-complexity work and unnecessary for documentation-only diffs.
+6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
 7. **DOCUMENT:** Delegate to `documenter` after the code review converges and **before** the persisted SCORE, so the documenter's tracked edits stay inside the content the score/findings reports bind to (documenting after SCORE stales both). Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
 8. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
 9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
@@ -50,10 +50,8 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 Select reviewer profiles from the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section) based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
 
-Ponytail is mandatory for control-plane/high-risk and complexity-expanding
-diffs. It is optional for ordinary low-complexity work and unnecessary for
-documentation-only diffs. Its findings use the same severity gates as every
-other profile.
+Use Ponytail according to the authoritative routing table. Its findings use the
+same severity gates as every other profile.
 
 **Lane-specific review:**
 
