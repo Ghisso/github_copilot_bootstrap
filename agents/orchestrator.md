@@ -78,7 +78,7 @@ fix loop and report the failure to the user instead of retrying further.
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.
 - If the planner specifies required skills or review profiles per step, pass that list to the implementing or reviewing agent.
-- Instruct subagents to report per `.claude/instructions/agent-reporting.instructions.md` (`caveman full`, structured content preserved).
+- Instruct subagents to follow `.claude/instructions/agent-reporting.instructions.md` for audience-appropriate reporting.
 
 ## Planner Supervision
 

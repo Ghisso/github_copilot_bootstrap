@@ -1,4 +1,4 @@
-# Agent Reporting Convention Adapter
+# Audience-Aware Reporting Policy Adapter
 
 This Copilot instruction file is a native discovery adapter. Read and follow the canonical shared instruction at `.claude/instructions/agent-reporting.instructions.md`.
 

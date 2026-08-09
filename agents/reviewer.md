@@ -23,7 +23,8 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 ## Reporting back to the orchestrator
 
-Report per `.claude/instructions/agent-reporting.instructions.md` (default to `caveman full` prose, preserving tables, code, commands, file paths, identifiers, and structured findings literally).
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
 
 If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 

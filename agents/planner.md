@@ -102,7 +102,8 @@ decisions remain, use a focused PRD-style interview before drafting.
 
 ## Reporting back to the orchestrator
 
-Report per `.claude/instructions/agent-reporting.instructions.md` (default to `caveman full` prose, preserving tables, code, commands, file paths, identifiers, and structured findings literally).
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
 
 Use this structure:
 
