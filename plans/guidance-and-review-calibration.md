@@ -7,8 +7,9 @@ implementation_branch: guidance-and-review-calibration_implementation
 started_at: 2026-08-09T02:13:42Z
 phases:
   - 2026-08-09_phase-A-consumer-neutral-root-guidance
-  - 2026-08-09_phase-B-human-facing-writing-guidance
-  - 2026-08-09_phase-C-ponytail-authority-calibration
+  - 2026-08-09_phase-B-planner-reliability-calibration
+  - 2026-08-09_phase-C-human-facing-writing-guidance
+  - 2026-08-09_phase-D-ponytail-authority-calibration
 current_phase:
 bypass_acknowledged: false
 ---
@@ -17,11 +18,12 @@ bypass_acknowledged: false
 
 ## Context
 
-The attached review correctly identifies three related guidance problems:
+The attached review and the planner-run investigation identify four related guidance problems:
 
 1. Generated root `AGENTS.md` and `CLAUDE.md` files describe every consumer repository as a reusable multi-agent bootstrap, which is inaccurate.
 2. The current reporting policy declares that it applies to reports sent to either the orchestrator or the user, but its concrete `caveman full` instructions are used mainly by specialist agents reporting to the orchestrator. User-facing documentation is already normal prose, and primary-agent responses are not consistently caveman in practice. The actual gap is an ambiguous audience boundary and the absence of a positive, testable standard for clear human-facing technical communication.
 3. Ponytail has accumulated more authority than a simplification aid needs: it is a named lifecycle phase, a mandatory implementation discipline, a second coder simplification pass, a required review profile for every non-documentation change, and a special commit/push gate where even a minor Ponytail finding blocks progress.
+4. Planner runs have repeatedly appeared unresponsive even when they were still making progress or completing normally. The investigated runs point to `max` effort, broad or repeated discovery, long silent intervals, and premature interruption rather than a general planner transport failure. The orchestrator needs a reliable way to brief, supervise, measure, and, only when justified, interrupt planners.
 
 These concerns belong in one big plan because they calibrate how generated agents describe a project, communicate with people, and apply simplification guidance. Each concern remains an independently verifiable, commit-sized phase.
 
@@ -31,6 +33,9 @@ The root `AGENTS.md` and `CLAUDE.md` in this authoring repository correctly desc
 
 - Make generated Claude Code and OpenAI Codex root guidance neutral to the consuming project's purpose.
 - Keep the authoring repository's root `AGENTS.md` and `CLAUDE.md` bytes unchanged across generation, installer self-refresh, and state restoration.
+- Set the Claude Code and OpenAI Codex planners to `xhigh` by default while preserving their current models and leaving the GitHub Copilot planner model unchanged.
+- Give planners a compact evidence packet so they reuse verified discovery, decisions, constraints, exact artifacts, and unresolved questions instead of repeating broad exploration.
+- Define single-planner supervision, pending-wait semantics, evidence-based health checks, user status updates, and benchmarked `max`/`high` exceptions.
 - Add an ASD-STE100-inspired human-facing technical-writing standard without claiming formal ASD-STE100 compliance.
 - Make precise, clear, direct, natural prose the default for user-facing responses, plans, explanations, reviews, reports, summaries, and documentation.
 - Restrict `caveman` compression to agent-to-agent status/reporting where it provides value.
@@ -40,6 +45,16 @@ The root `AGENTS.md` and `CLAUDE.md` in this authoring repository correctly desc
 - Define simplicity in terms of unnecessary concepts, dependencies, abstractions, layers, configuration, execution paths, and speculative behavior—not minimum physical line count.
 
 ## Design Overview
+
+### Planner reliability and effort calibration
+
+Change the canonical Claude Code planner from `opus`/`max` to `opus`/`xhigh` and the OpenAI Codex planner from `gpt-5.6-sol`/`max` to `gpt-5.6-sol`/`xhigh`. Keep the GitHub Copilot planner at `Claude Opus 4.6`. `xhigh` is the conservative first reduction: it remains suitable for quality-sensitive planning while avoiding the blanket use of the highest-cost setting. Do not claim that equal effort labels represent equal compute across vendors.
+
+Make the orchestrator responsible for preparing a compact evidence packet before delegation. It should contain the user's approved decisions, verified facts and measurements, exact artifacts, constraints, prior rejected approaches, and genuinely unresolved questions. Prefer a fresh, narrowly scoped planner context over either an empty handoff that repeats discovery or full conversation inheritance that carries irrelevant history. Raw logs and broad retrieval output remain in context-mode or dated evidence; pass derived facts and source locations.
+
+Supervise one active planner at a time. A polling timeout means that no mailbox event arrived during that polling window; it does not establish success, failure, progress, or a transport outage. Use runtime-native agent state, recent observable activity, and actual terminal/tool/configuration errors for health checks. Silence alone must not cause a duplicate spawn, effort escalation, or interruption. Keep the user informed at the host's required cadence, and at least every five minutes when no stricter cadence applies. Use 30 minutes as a provisional floor before a health review, not an automatic kill timer; explicit user cancellation and actual terminal errors remain immediate exceptions.
+
+Benchmark the final `xhigh` behavior on frozen representative micro-plan and bounded full-plan workloads for Claude Code and Codex. Compare checklist completeness, scope discipline, invented surfaces, wall time, observable gaps, tool volume, and unique files read. Retain `max` only when the same material checklist failure recurs on two `xhigh` runs and a matched `max` control resolves it. Consider `high` later only through a paired benchmark. Treat historical and new timing results as dated observations, not consumer invariants.
 
 ### Neutral consumer guidance
 
@@ -84,6 +99,9 @@ Use this bounded model:
 ## Non-Goals
 
 - Do not neutralize or rewrite the authoring repository's root `AGENTS.md` or `CLAUDE.md`.
+- Do not change the GitHub Copilot planner model, add a second planner profile, or add automatic duplicate/max retries because a planner is silent.
+- Do not encode historical timing, event shapes, or the absence of orphan processes as universal consumer guarantees.
+- Do not move either planner to `high` by default without a later paired benchmark, or build a new benchmark framework when small frozen workloads and existing evidence records suffice.
 - Do not redesign the complete generated guidance hierarchy.
 - Do not remove, fork, or rewrite the vendored Ponytail skills.
 - Do not weaken the ordinary code, architecture, security, tests, documentation, score, or severity gates.
@@ -110,7 +128,50 @@ Acceptance criteria:
 - Root `CLAUDE.md` retains SHA-256 `34416b9d55a24f2f4cb7f56e60dc47c097f4941da740ced3ea39e6f353455755`.
 - Both authoring root adapters survive generation, self-refresh, and restoration unchanged.
 
-### Phase B: STE-inspired human-facing writing guidance
+### Phase B: Planner reliability and effort calibration
+
+1. Change `shared/agents/planner/agent.yaml` from `max` to `xhigh` for Claude Code and OpenAI Codex. Preserve Claude `model: opus`, Codex `model: gpt-5.6-sol`, and GitHub Copilot `Claude Opus 4.6`.
+2. Update `shared/agents/planner/prompt.md` so explicit artifact lists, supplied evidence, and approved decisions bound exploration. A bounded full-plan revision must not repeat intake or interview questions already answered by the user.
+3. Update `shared/agents/orchestrator/prompt.md` to require a curated evidence packet, fresh/minimal scoped delegation when appropriate, one active planner, pending-wait semantics, evidence-based health checks, regular user updates, and a provisional 30-minute health-review floor before interruption absent cancellation or an actual terminal error.
+4. Update `scripts/validate_targets.py`, `scripts/check_native_clients.py`, `tests/test_validate_targets.py`, and `tests/test_check_native_clients.py` for `xhigh`, unchanged Copilot intent, evidence-packet delegation, single-planner supervision, pending waits, status cadence, and the interruption floor.
+5. Exercise `scripts/generate_targets.py`, regenerate all targets from canonical sources, and refresh the local dogfood overlay only after Phase A has established root-adapter preservation. Do not hand-edit generated `.claude/agents/*.md`, `.codex/agents/*.toml`, or `dist/` files.
+6. Benchmark one frozen micro-plan workload and one frozen bounded full-plan workload on Claude Code and Codex. Record wall time, time to first observable activity, largest observable gap, tool volume, unique files read, checklist completeness, invented surfaces, duplicated discovery, and scope expansion.
+7. Keep `max` as an exceptional measured override only when the same material checklist failure occurs on two `xhigh` runs and a matched `max` control resolves it. Leave `high` for a later paired benchmark.
+8. Verify that Claude's resolved Opus model accepts `xhigh`. If native execution rejects it, record the client version, resolved model, and exact error, then fall back only the Claude planner to `high`; keep Codex at `xhigh` and Copilot unchanged.
+9. Update `README.md`, `docs/architecture.md`, `docs/smoke-tests.md`, `docs/native-client-acceptance.md`, and `docs/2026-08-08-codex-routing-compatibility.md` with the current contract. Add `docs/2026-08-09-planner-reliability-calibration.md` for dated benchmark evidence without rewriting historical `max` observations.
+
+Ownership and review:
+
+- `coder`: `shared/agents/planner/agent.yaml`, `shared/agents/planner/prompt.md`, `shared/agents/orchestrator/prompt.md`, `scripts/validate_targets.py`, `scripts/check_native_clients.py`, `tests/test_validate_targets.py`, and `tests/test_check_native_clients.py`; use `.claude/skills/ponytail/SKILL.md` in `full` mode plus `.claude/skills/code-style/SKILL.md` and `.claude/skills/testing-patterns/SKILL.md` where applicable.
+- `verifier`: target generation, dogfood refresh, native compatibility, frozen workloads, and full verification using `.claude/skills/run-tests/SKILL.md`.
+- `documenter`: the documentation paths in step 9 using `.claude/skills/documentation/SKILL.md`.
+- `reviewer`: load `.claude/review-profiles/code.md`, `.claude/review-profiles/architecture.md`, `.claude/review-profiles/security.md`, `.claude/review-profiles/tests.md`, `.claude/review-profiles/config.md`, `.claude/review-profiles/performance.md`, `.claude/review-profiles/documentation.md`, and `.claude/review-profiles/ponytail.md`; run two passes.
+
+Acceptance criteria:
+
+- Canonical and generated Claude planner configuration is `opus`/`xhigh`, or an evidence-backed Claude-only `high` fallback records a native rejection.
+- Canonical and generated Codex planner configuration is `gpt-5.6-sol`/`xhigh`; GitHub Copilot remains `Claude Opus 4.6`.
+- Generated planner/orchestrator prompts carry the evidence-packet, scoped-delegation, pending-wait, one-planner, health-check, status-update, and interruption-floor contracts.
+- Both frozen workloads satisfy every mandatory planning checklist item without invented surfaces or duplicated discovery.
+- Timing, silence, and tool-volume results are recorded as observations rather than generalized vendor claims.
+- No generic `max` retry, second planner, or unbenchmarked move to `high` is added.
+- Existing historical evidence remains explicitly historical.
+
+Primary verification:
+
+```bash
+uv run pytest tests/test_validate_targets.py tests/test_check_native_clients.py -q --tb=short
+uv run pytest tests/ -q --tb=short
+uv run mypy . --ignore-missing-imports --explicit-package-bases
+uv run ruff check scripts/ tests/
+uv run ruff format --check scripts/ tests/
+uv run python scripts/generate_targets.py --all
+uv run python scripts/validate_targets.py
+uv run python scripts/install_bootstrap.py . --allow-self --local-only
+uv run python scripts/check_runtime.py
+```
+
+### Phase C: STE-inspired human-facing writing guidance
 
 1. Correct the central reporting policy's ambiguous scope by defining separate human-facing and agent-to-agent communication modes.
 2. Add the project-specific ASD-STE100-inspired rules from the design section, including the no-formal-compliance statement and the technical-precision priority.
@@ -129,7 +190,7 @@ Acceptance criteria:
 - No duplicate communication policy or mandatory rewrite step is introduced.
 - Canonical sources, generated targets, and validation tests agree on the same audience distinction.
 
-### Phase C: Ponytail authority calibration
+### Phase D: Ponytail authority calibration
 
 1. Remove `PONYTAIL` from the canonical lifecycle in policies, generated root guidance, README documentation, and lifecycle validators.
 2. Keep the main Ponytail skill as a once-per-coding-task implementation discipline, but remove the separate mandatory post-implementation `ponytail-review`/refactor invocation. Retain a lightweight changed-scope simplification self-check and re-verification.
@@ -163,7 +224,7 @@ For every phase:
 
 Before big-plan closeout:
 
-- Verify all three small plans are complete and committed independently.
+- Verify all four small plans are complete and committed independently.
 - Re-run full target generation and repository verification from a clean worktree.
 - Confirm the authoring root file hashes still match the recorded values.
 - Confirm generated roots, reporting policy, generated agent prompts, hook behavior, README, and validators express one consistent model.
@@ -171,6 +232,11 @@ Before big-plan closeout:
 ## Risks and Mitigations
 
 - **Tracking an ignored file is unusual:** keep the current `CLAUDE.md` bytes unchanged and document that this mirrors the existing tracked-root-adapter ownership model for `AGENTS.md`.
+- **Lower effort could omit planning details:** require checklist non-regression on frozen workloads and allow `max` only after a repeated material failure that a matched control resolves.
+- **Claude's `opus` alias can resolve differently across client versions:** verify `xhigh` natively and allow only an evidence-backed Claude-only `high` fallback.
+- **A fixed interruption timer can become stale:** make 30 minutes a provisional health-review floor, never an automatic kill timer, and recalibrate it from dated measurements.
+- **Static validation can be mistaken for native proof:** report generated/configuration parity separately from persistent-thread runtime evidence.
+- **The planner phase overlaps prompts and validators touched later:** establish root-adapter preservation in Phase A, land the supervision contract in Phase B, and require later phases to preserve it.
 - **Audience rules could become subjective:** specify observable audience categories and protect exact technical material explicitly.
 - **Removing the special Ponytail gate could hide serious findings:** preserve the ordinary CRITICAL-at-commit and MAJOR-at-push gates for every review profile.
 - **Conditional Ponytail use could drift:** centralize triggers in workflow/review guidance and test representative required, optional, and exempt cases.
