@@ -265,3 +265,69 @@ The outer repository had no other tracked or staged Phase 0 file change before
 this evidence artifact was created. Final nested status remains a lifecycle
 responsibility of the orchestrator; no further cleanup or retest is implied by
 this artifact.
+
+---
+
+## Step 7 cross-project applicability supplement — BLOCKED before execution
+
+**Supplement decision: BLOCKED; the original bootstrap NO-GO remains recorded
+and the final cross-project override decision is deferred.**
+
+The user authorized the two-consumer read-only supplement, but the exact
+package could not be acquired in its required new isolated `/tmp` cache. The
+initial sandboxed command was:
+
+```text
+env UV_CACHE_DIR=/tmp/graphify-step7-cache.pJalTD \
+  UV_TOOL_DIR=/tmp/graphify-step7-tools.lX35JD \
+  uvx --from graphifyy==0.9.35 graphify --version
+```
+
+It exited 1 after three DNS retries for `https://pypi.org/simple/graphifyy/`.
+The required narrowly scoped escalation for that identical command was then
+rejected by the approval service due to an account usage limit. The rejection
+explicitly prohibits indirect or workaround execution. No alternate version,
+pre-existing cache, package, installer, Graphify command, consumer source
+index, Docker run, or external network operation was used.
+
+This is an external execution blocker, not a new Graphify quality result. None
+of the six required Graphify questions was executed and no cross-project
+override can be evaluated. The original bootstrap NO-GO still stops Phases A-F
+unless a future authorized supplement can be executed and reviewed.
+
+### Read-only pre-flight completed before the block
+
+Both root `AGENTS.md` files were read before consumer source access. Neither
+consumer source tree was otherwise inspected or modified. RAG's tracked
+`.gitignore` was read only because Step 7 requires its existing unanchored
+`build/` limitation to be recorded; it contains `build/`, which hides live
+`src/graph/build/**`. No ignore rule was changed or defeated.
+
+| Consumer | Branch / HEAD | Initial dirty status | SHA-256 of pre-existing dirty files |
+| --- | --- | --- | --- |
+| `/home/ghisso/work/RAG` | `gliner2-graph-improvements` / `b48613f480ad87a3fa5e76975d37bc9ce5139fec` | `M .devcontainer/Dockerfile`; `M .devcontainer/devcontainer.json`; `M .devcontainer/post-start.sh`; `M .gitignore`; `?? .devcontainer/restore-root-adapters.sh`; `?? .devcontainer/state-sync.sh` | `Dockerfile` `1b80fc0bdbfef9e49d455664f3b0125d692c4776d5e953e13f019529a860bb45`; `devcontainer.json` `a80f84e6079b59b2e7fde4ae0e3358b39c8e9364d7c08c9858ba9f2239ca56a9`; `post-start.sh` `7a5a7c2eb1cd3f6f9556c0d9720347abcaa51f73b22425cce5aac2530df5d0d4`; `.gitignore` `f4b873a6600109e05233ef0a579b30492a3f2485c3bff9f0fdea506b19d49155`; `restore-root-adapters.sh` `bdf148398cd4ce2fb6cabcfd005a760e9b0a4913584a08c6143c70177466b1a1`; `state-sync.sh` `eaefeffedad382de6aaca210b6ab923f604d24a9477127a39c3c4bfffe467d70` |
+| `/home/ghisso/work/git_projects/industrial-inspection` | `2026-07-21_haystack-3-agent-refactor_implementation` / `28378951c91c08abdb136f549ab6136e6919b7d6` | `M .devcontainer/restore-root-adapters.sh`; `M .devcontainer/state-sync.sh` | `restore-root-adapters.sh` `bdf148398cd4ce2fb6cabcfd005a760e9b0a4913584a08c6143c70177466b1a1`; `state-sync.sh` `eaefeffedad382de6aaca210b6ab923f604d24a9477127a39c3c4bfffe467d70` |
+
+Both nested `.claude` status commands were clean at pre-flight. Semble was not
+available. The bootstrap outer worktree had no status, unstaged-diff, or
+staged-diff output at the same pre-flight check. The only task paths created
+before the block were the three named `/tmp/graphify-step7*` directories.
+Their cleanup and final equality checks are recorded below.
+
+### Final status and cleanup
+
+Both consumers were rechecked after the blocked acquisition. Their branch,
+HEAD, full `git status --short --untracked-files=all`, clean nested `.claude`
+status, and every listed dirty-file SHA-256 exactly matched the pre-flight
+table. The bootstrap outer worktree also remained clean; its nested status
+shows this evidence artifact as the only Phase 0 supplement modification.
+
+The empty working directory `/tmp/graphify-step7.1ZmFA3` was removed. The uv
+cache and tool directories contained only the failed acquisition's uv metadata:
+`/tmp/graphify-step7-cache.pJalTD` and
+`/tmp/graphify-step7-tools.lX35JD`. Recursive removal of these explicit,
+task-created paths was rejected by the command approval service due to the
+same account usage limit, with an instruction not to work around it. They are
+the only remaining temporary paths; no consumer or bootstrap path is a
+cleanup target. A permitted cleanup action must remove them before phase
+closeout.
