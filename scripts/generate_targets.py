@@ -92,7 +92,7 @@ TARGET_PATH_REPLACEMENTS = {
 }
 
 ROOT_GUIDANCE_WORKFLOW = (
-    "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+    "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
     "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
 )
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
@@ -672,7 +672,7 @@ def render_codex_hooks(path: Path) -> None:
 
 def render_root_guidance(target: str) -> str:
     if target == "claude-code":
-        title = "Claude Code Bootstrap Guidance"
+        title = "Claude Code Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
             "`.mcp.json`, and `.devcontainer/`"
@@ -682,7 +682,7 @@ def render_root_guidance(target: str) -> str:
             "`.claude/skills/` natively. Keep the configured hooks enabled."
         )
     elif target == "openai-codex":
-        title = "OpenAI Codex Bootstrap Guidance"
+        title = "OpenAI Codex Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, "
             "`.mcp.json`, and `.devcontainer/`"
@@ -699,7 +699,7 @@ def render_root_guidance(target: str) -> str:
 
     return f"""# {title}
 
-This is the entrypoint for a reusable multi-agent bootstrap for Python AI engineering. In an installed project, `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
+This is the repository entrypoint for Python AI engineering guidance. `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
 **Project:** [TODO: project name and one-liner description]
 **Python:** 3.12+ | **Package Manager:** uv
@@ -709,6 +709,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
+- Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
 - Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode for large outputs or compaction-safe continuity. Missing optional retrieval helpers are warnings, not hard failures.
 
 ## Task Lanes
@@ -727,7 +728,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Verify, then run profile-driven review until clean. Update required documentation before persisting findings and score.
-- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail findings are zero, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete.
+- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
 
 ## Exact Commands
@@ -746,7 +747,7 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 - Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
 - Control-plane files include {control_plane_paths}. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
-- Keep `.claude/` as the canonical runtime basis. Bootstrap maintainers own authoring and regeneration; consumers should customize only their project context and consumer-owned state.
+- Keep `.claude/` as the canonical runtime basis. Treat generated adapters as managed runtime files; customize only project context and consumer-owned state.
 
 ## Map
 

@@ -164,68 +164,63 @@ hook_to_lower() {
 json_file_string_value() {
   local file="$1"
   local key="$2"
-  [[ -f "$file" ]] || return 1
-  json_string_value "$key" < "$file"
+  json_file_top_level_value "$file" "$key" string
 }
 
 json_file_number_value() {
-  local file="$1"
-  local key="$2"
-  [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*-?[0-9]+"
-      if (!match(text, pattern)) {
-        exit
-      }
-      value = substr(text, RSTART, RLENGTH)
-      sub("^.*:[[:space:]]*", "", value)
-      sub("[^0-9-].*$", "", value)
-      print value
-    }
-  ' "$file"
+  json_file_top_level_value "$1" "$2" number
 }
 
 json_file_bool_value() {
-  local file="$1"
-  local key="$2"
-  [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*(true|false)"
-      if (!match(text, pattern)) {
-        exit
-      }
-      value = substr(text, RSTART, RLENGTH)
-      sub("^.*:[[:space:]]*", "", value)
-      sub("[^A-Za-z].*$", "", value)
-      print value
-    }
-  ' "$file"
+  json_file_top_level_value "$1" "$2" bool
 }
 
 json_file_array_present() {
+  json_file_top_level_value "$1" "$2" array >/dev/null
+}
+
+# Reports are untrusted files. Read only a named top-level key (or the explicit
+# `counts.<severity>` contract path) so a nested finding title or
+# attacker-controlled payload cannot forge a report field by appearing earlier
+# in the JSON text. Python is already the runtime baseline for this bootstrap;
+# this deliberately does not depend on uv.
+json_file_top_level_value() {
   local file="$1"
   local key="$2"
+  local kind="$3"
   [[ -f "$file" ]] || return 1
-  awk -v key="$key" '
-    {
-      text = text $0 "\n"
-    }
-    END {
-      pattern = "\"" key "\"[[:space:]]*:[[:space:]]*\\["
-      if (match(text, pattern)) {
-        found = 1
-      }
-      exit found ? 0 : 1
-    }
-  ' "$file"
+  python3 - "$file" "$key" "$kind" <<'PY'
+import json
+import sys
+
+file_name, key, kind = sys.argv[1:]
+try:
+    with open(file_name, encoding="utf-8") as handle:
+        report = json.load(handle)
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(1)
+if not isinstance(report, dict):
+    raise SystemExit(1)
+if key.startswith("counts."):
+    counts_key = key[len("counts."):]
+    counts = report.get("counts")
+    if not isinstance(counts, dict) or counts_key not in counts:
+        raise SystemExit(1)
+    value = counts[counts_key]
+elif key in report:
+    value = report[key]
+else:
+    raise SystemExit(1)
+valid = {
+    "string": isinstance(value, str),
+    "number": type(value) is int,
+    "bool": type(value) is bool,
+    "array": isinstance(value, list),
+}.get(kind, False)
+if not valid:
+    raise SystemExit(1)
+print(str(value).lower() if type(value) is bool else value)
+PY
 }
 
 is_bash_tool_payload() {
@@ -591,10 +586,15 @@ is_bypass_subject() {
   esac
 }
 
-# Return success when the implementation diff contains anything other than
-# documentation or mutable workflow-state artifacts. With no `diff_ref`, the
-# live working tree/index is checked (commit gate); with a ref, that landed
-# commit is checked (push gate).
+# Return success when the implementation diff has a deterministic high-risk
+# Ponytail trigger. This is the hook-safe subset of the authoritative Task
+# Lanes table: control-plane, scripts/generators, dependencies/lockfiles, and
+# multi-file diffs. Reviewers also select Ponytail for semantic complexity
+# expansion, which cannot be inferred safely from paths. A documentation-only
+# exemption applies only to one documentation/state file; high-risk paths and
+# multi-file diffs take precedence. With no `diff_ref`, the live working
+# tree/index is checked (commit gate); with a ref, that landed commit is checked
+# (push gate).
 diff_requires_ponytail() {
   local repo_root="$1"
   local diff_ref="${2:-}"
@@ -603,27 +603,27 @@ diff_requires_ponytail() {
   merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
   [[ -n "$merge_base" ]] || return 0
 
+  local -a paths=()
   if [[ -n "$diff_ref" ]]; then
     while IFS= read -r path; do
-      [[ -n "$path" ]] || continue
-      case "$path" in
-        *.md|docs/*|plans/*|.claude/plans/*|.claude/session_logs/*|.claude/quality_reports/*) ;;
-        *) return 0 ;;
-      esac
-    done < <(git -C "$repo_root" diff --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" "$diff_ref" 2>/dev/null)
   else
     while IFS= read -r path; do
-      [[ -n "$path" ]] || continue
-      case "$path" in
-        *.md|docs/*|plans/*|.claude/plans/*|.claude/session_logs/*|.claude/quality_reports/*) ;;
-        *) return 0 ;;
-      esac
-    done < <(git -C "$repo_root" diff --name-only "$merge_base" 2>/dev/null)
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" 2>/dev/null)
   fi
+
+  [[ "${#paths[@]}" -gt 1 ]] && return 0
+  for path in "${paths[@]}"; do
+    case "$path" in
+      .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|scripts/*|shared/scripts/*|pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|requirements*.txt|*/requirements*.txt|Pipfile|*/Pipfile|Pipfile.lock|*/Pipfile.lock|poetry.lock|*/poetry.lock|package.json|*/package.json|package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|Cargo.toml|*/Cargo.toml|Cargo.lock|*/Cargo.lock|go.mod|*/go.mod|go.sum|*/go.sum) return 0 ;;
+    esac
+  done
   return 1
 }
 
-assert_ponytail_review() {
+assert_required_ponytail_review() {
   local findings_file="$1"
   local repo_root="$2"
   local diff_ref="$3"
@@ -631,16 +631,10 @@ assert_ponytail_review() {
   local regen_hint="$5"
   diff_requires_ponytail "$repo_root" "$diff_ref" || return 0
 
-  local ponytail_reviewed ponytail_findings
+  local ponytail_reviewed
   ponytail_reviewed="$(json_file_bool_value "$findings_file" "ponytail_reviewed" 2>/dev/null || true)"
-  ponytail_findings="$(json_file_number_value "$findings_file" "ponytail_findings" 2>/dev/null || true)"
   if [[ "$ponytail_reviewed" != "true" ]]; then
-    failures+=("non-documentation changes require a fresh Ponytail review before $gate; $regen_hint")
-  fi
-  if [[ ! "$ponytail_findings" =~ ^[0-9]+$ ]]; then
-    failures+=("findings report must include ponytail_findings; $regen_hint")
-  elif [[ "$ponytail_findings" -gt 0 ]]; then
-    failures+=("findings report has $ponytail_findings unresolved Ponytail finding(s) blocking $gate; simplify the diff, re-verify, and $regen_hint")
+    failures+=("this high-risk diff requires a fresh Ponytail review before $gate; $regen_hint")
   fi
 }
 
@@ -791,7 +785,7 @@ assert_report_freshness() {
 
 # Best-effort extraction of a given severity's finding titles from a
 # findings-*.json report, for an actionable failure message. The
-# `counts.<severity>` field (read via the pure-awk json_file_number_value)
+# `counts.<severity>` field (read by the exact-path json_file_number_value)
 # is what actually gates the commit/push; this only enriches the message, so
 # it degrades to nothing when python3 is unavailable rather than failing
 # the gate.
@@ -909,13 +903,13 @@ assert_commit_invariants() {
   fi
 
   if [[ -z "$findings_file" ]]; then
-    failures+=("no matching findings report found - run uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+    failures+=("no matching findings report found - run uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
   else
-    local findings_regen_hint="re-run record_findings.py with Ponytail: uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    local findings_regen_hint="re-run record_findings.py with the profiles that ran: uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase ${current_phase:-current_phase} --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$commit_gate_head" "exact" "" "findings report" "$findings_regen_hint"
 
     local critical_count
-    critical_count="$(json_file_number_value "$findings_file" "critical" 2>/dev/null || true)"
+    critical_count="$(json_file_number_value "$findings_file" "counts.critical" 2>/dev/null || true)"
     if [[ ! "$critical_count" =~ ^[0-9]+$ ]]; then
       failures+=("findings report must include counts.critical; $findings_regen_hint")
     elif [[ "$critical_count" -gt 0 ]]; then
@@ -924,7 +918,7 @@ assert_commit_invariants() {
       failures+=("findings report has $critical_count CRITICAL finding(s) blocking commit: ${critical_titles:-see $findings_file}")
     fi
 
-    assert_ponytail_review "$findings_file" "$repo_root" "" "commit" "$findings_regen_hint"
+    assert_required_ponytail_review "$findings_file" "$repo_root" "" "commit" "$findings_regen_hint"
   fi
 
   local learn_ok=0
@@ -1031,13 +1025,13 @@ assert_push_invariants() {
   findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
 
   if [[ -z "$findings_file" ]]; then
-    failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
+    failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
   else
-    local findings_regen_hint="re-run record_findings.py with Ponytail: uv run python .claude/scripts/record_findings.py <target> --profile ponytail --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
+    local findings_regen_hint="re-run record_findings.py with the profiles that ran: uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
 
     local major_count
-    major_count="$(json_file_number_value "$findings_file" "major" 2>/dev/null || true)"
+    major_count="$(json_file_number_value "$findings_file" "counts.major" 2>/dev/null || true)"
     if [[ ! "$major_count" =~ ^[0-9]+$ ]]; then
       failures+=("findings report must include counts.major; $findings_regen_hint")
     elif [[ "$major_count" -gt 0 ]]; then
@@ -1046,6 +1040,6 @@ assert_push_invariants() {
       failures+=("findings report has $major_count MAJOR finding(s) blocking push: ${major_titles:-see $findings_file}")
     fi
 
-    assert_ponytail_review "$findings_file" "$repo_root" "$local_sha" "push" "$findings_regen_hint"
+    assert_required_ponytail_review "$findings_file" "$repo_root" "$local_sha" "push" "$findings_regen_hint"
   fi
 }

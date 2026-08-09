@@ -12,15 +12,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -44,10 +46,85 @@ EVIDENCE_UNEXERCISED = "unexercised"
 # reach project `.codex/agents/*.toml` from spawn_agent (openai/codex #14579,
 # #18823); `--ephemeral` precludes spawning outright ("no thread with id").
 EVIDENCE_SPAWN_UNSUPPORTED = "spawn_unsupported"
+RUNTIME_DIRECTORY = "runtime"
+WORKLOAD_RESULT_FIELDS = (
+    "checklist",
+    "artifacts",
+    "invented_surfaces",
+    "duplicated_discovery",
+    "scope_expansion",
+)
+FENCED_JSON_PATTERN = re.compile(
+    r"\A```(?:json)?[ \t]*\n(?P<object>\{.*\})\n?```[ \t]*\Z",
+    re.DOTALL | re.IGNORECASE,
+)
+PLANNER_WORKLOAD_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": list(WORKLOAD_RESULT_FIELDS),
+    "properties": {
+        "checklist": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["scope", "artifacts", "constraints", "verification"],
+            "properties": {
+                "scope": {"type": "boolean"},
+                "artifacts": {"type": "boolean"},
+                "constraints": {"type": "boolean"},
+                "verification": {"type": "boolean"},
+            },
+        },
+        "artifacts": {"type": "array", "items": {"type": "string"}},
+        "invented_surfaces": {"type": "array", "items": {"type": "string"}},
+        "duplicated_discovery": {"type": "boolean"},
+        "scope_expansion": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+
+class FrozenPlannerWorkload(TypedDict):
+    """One fixed planner calibration workload and its exact artifact contract."""
+
+    mode: str
+    artifacts: tuple[str, ...]
+    prompt: str
+
+
+FROZEN_PLANNER_WORKLOADS: dict[str, FrozenPlannerWorkload] = {
+    "micro-plan": {
+        "mode": "--mode micro-plan",
+        "artifacts": (
+            ".claude/agents/planner.md",
+            ".codex/agents/planner.toml",
+        ),
+        "prompt": (
+            "Produce one small implementation plan only. Verify that the planner model and "
+            "effort metadata agree between `.claude/agents/planner.md` and "
+            "`.codex/agents/planner.toml`. Do not propose code changes, files, tools, or "
+            "requirements outside those two artifacts. State one read-only verification step."
+        ),
+    },
+    "bounded-full-plan": {
+        "mode": "--mode full-plan",
+        "artifacts": (
+            ".claude/agents/planner.md",
+            ".claude/agents/orchestrator.md",
+            ".claude/instructions/workflow.instructions.md",
+        ),
+        "prompt": (
+            "Produce a bounded full implementation plan only. The approved decision is to "
+            "preserve one active planner and use the supplied evidence packet. Read only "
+            "`.claude/agents/planner.md`, `.claude/agents/orchestrator.md`, and "
+            "`.claude/instructions/workflow.instructions.md`. Do not repeat intake questions, "
+            "invent new surfaces, or expand the scope. Include constraints and read-only "
+            "verification."
+        ),
+    },
+}
 
 CODEX_ROLES = {
     "orchestrator": ("orchestrator", "gpt-5.6-sol", "xhigh"),
-    "planner": ("planner", "gpt-5.6-sol", "max"),
+    "planner": ("planner", "gpt-5.6-sol", "xhigh"),
     "coder": ("coder", "gpt-5.6-terra", "high"),
     "reviewer": ("reviewer", "gpt-5.6-sol", "high"),
     "documenter": ("documenter", "gpt-5.6-luna", "medium"),
@@ -77,6 +154,11 @@ def parse_args() -> argparse.Namespace:
         help="Create or refresh the marked workspace without executing either client.",
     )
     parser.add_argument(
+        "--planner-workloads",
+        action="store_true",
+        help="Run frozen planner calibration workloads in a prepared trusted workspace.",
+    )
+    parser.add_argument(
         "--timeout", type=int, default=TIMEOUT_SECONDS, help=argparse.SUPPRESS
     )
     return parser.parse_args()
@@ -87,10 +169,71 @@ def check(check_id: str, status: str, evidence: str) -> dict[str, str]:
     return {"id": check_id, "status": status, "evidence": evidence}
 
 
-def minimal_environment(temp_root: Path) -> dict[str, str]:
+def client_runtime_root(workspace: Path, client: str, invocation: str) -> Path:
+    """Return the marker-owned writable state root for one client invocation."""
+    return workspace / RUNTIME_DIRECTORY / client / invocation
+
+
+def client_auth_source(client: str) -> Path:
+    """Return the existing client credential path without reading its contents."""
+    if client == "codex":
+        return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "auth.json"
+    return (
+        Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
+        / ".credentials.json"
+    )
+
+
+def prepare_client_runtime(runtime_root: Path, client: str) -> bool:
+    """Create isolated writable state and link only existing client credentials."""
+    credential = client_auth_source(client)
+    state_root = runtime_root / ("codex" if client == "codex" else "claude")
+    try:
+        if not remove_owned_path(runtime_root / "tmp"):
+            return False
+        for path in (
+            runtime_root / "home",
+            runtime_root / "tmp",
+            runtime_root / "xdg-cache",
+            runtime_root / "xdg-config",
+            runtime_root / "xdg-data",
+            runtime_root / "xdg-state",
+            state_root,
+        ):
+            path.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if credential.is_file():
+            target = state_root / credential.name
+            if not target.exists():
+                target.symlink_to(credential)
+    except OSError:
+        return False
+    return True
+
+
+def minimal_environment(
+    temp_root: Path, *, client: str | None = None, runtime_root: Path | None = None
+) -> dict[str, str]:
     """Pass only client location/auth and portable temporary/locale settings."""
     names = ("PATH", "HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "LANG", "LC_ALL")
     env = {name: os.environ[name] for name in names if os.environ.get(name)}
+    if client is not None and runtime_root is not None:
+        state_root = runtime_root / ("codex" if client == "codex" else "claude")
+        temp_root = runtime_root / "tmp"
+        env.update(
+            {
+                "HOME": str(runtime_root / "home"),
+                "XDG_CACHE_HOME": str(runtime_root / "xdg-cache"),
+                "XDG_CONFIG_HOME": str(runtime_root / "xdg-config"),
+                "XDG_DATA_HOME": str(runtime_root / "xdg-data"),
+                "XDG_STATE_HOME": str(runtime_root / "xdg-state"),
+            }
+        )
+        if client == "codex":
+            env["CODEX_HOME"] = str(state_root)
+            env.pop("CLAUDE_CONFIG_DIR", None)
+        else:
+            env["CLAUDE_CONFIG_DIR"] = str(state_root)
+            env.pop("CODEX_HOME", None)
     env.update(
         {
             "TMPDIR": str(temp_root),
@@ -103,7 +246,13 @@ def minimal_environment(temp_root: Path) -> dict[str, str]:
 
 
 def run_process(
-    command: list[str], *, cwd: Path, timeout: int, temp_root: Path
+    command: list[str],
+    *,
+    cwd: Path,
+    timeout: int,
+    temp_root: Path,
+    client: str | None = None,
+    runtime_root: Path | None = None,
 ) -> subprocess.CompletedProcess[str] | None:
     """Start a new process group and always reap it; discard failure text."""
     try:
@@ -114,7 +263,9 @@ def run_process(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=minimal_environment(temp_root),
+            env=minimal_environment(
+                temp_root, client=client, runtime_root=runtime_root
+            ),
             start_new_session=True,
         )
         try:
@@ -201,11 +352,10 @@ def prepare_workspace(workspace: Path, timeout: int) -> bool:
         marker = safe / WORKSPACE_MARKER
         if not marker.exists():
             marker.write_text(WORKSPACE_MARKER_CONTENT, encoding="utf-8")
-        for name in ("control", "candidate"):
+        for name in ("control", "candidate", RUNTIME_DIRECTORY):
             child = safe / name
-            if child.exists():
-                unlock_for_cleanup(child)
-                shutil.rmtree(child)
+            if not remove_owned_path(child):
+                return False
     except OSError:
         return False
     return prepare_variants(safe, timeout) is not None
@@ -237,16 +387,48 @@ def lock_readonly(root: Path) -> bool:
     return True
 
 
-def unlock_for_cleanup(root: Path) -> None:
-    for path in root.rglob("*"):
-        try:
-            path.chmod(stat.S_IRWXU if path.is_dir() else stat.S_IRUSR | stat.S_IWUSR)
-        except OSError:
-            pass
+def unlock_for_cleanup(root: Path) -> bool:
+    """Make a known owned tree removable without following symlinks."""
     try:
-        root.chmod(stat.S_IRWXU)
+        root_mode = root.lstat().st_mode
+        if stat.S_ISLNK(root_mode):
+            root.unlink()
+            return True
+        if not stat.S_ISDIR(root_mode):
+            return False
+        for parent, directories, files in os.walk(root, followlinks=False):
+            parent_path = Path(parent)
+            parent_path.chmod(stat.S_IRWXU)
+            for name in [*directories, *files]:
+                path = parent_path / name
+                mode = path.lstat().st_mode
+                if stat.S_ISLNK(mode):
+                    path.unlink()
+                    if name in directories:
+                        directories.remove(name)
+                elif stat.S_ISDIR(mode):
+                    path.chmod(stat.S_IRWXU)
+                elif stat.S_ISREG(mode):
+                    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+                else:
+                    return False
     except OSError:
-        pass
+        return False
+    return True
+
+
+def remove_owned_path(path: Path) -> bool:
+    """Remove one known marker-owned child, treating symlinks as leaf nodes."""
+    try:
+        if path.is_symlink():
+            path.unlink()
+        elif path.exists():
+            if not unlock_for_cleanup(path):
+                return False
+            shutil.rmtree(path)
+    except OSError:
+        return False
+    return True
 
 
 def observation_schema() -> dict[str, Any]:
@@ -502,8 +684,16 @@ def unavailable_result(client: str, reason: str, require: bool) -> dict[str, Any
 def preflight(binary: str, client: str, root: Path) -> bool:
     if client != "codex":
         return True
+    runtime_root = client_runtime_root(root, client, "preflight")
+    if not prepare_client_runtime(runtime_root, client):
+        return False
     result = run_process(
-        [binary, "login", "status"], cwd=REPO_ROOT, timeout=20, temp_root=root
+        [binary, "login", "status"],
+        cwd=REPO_ROOT,
+        timeout=20,
+        temp_root=root,
+        client=client,
+        runtime_root=runtime_root,
     )
     return result is not None and result.returncode == 0
 
@@ -516,6 +706,319 @@ def client_command(
         if client == "codex"
         else claude_command(binary, consumer, schema)
     )
+
+
+def planner_workload_prompt(workload: str) -> str:
+    """Return one frozen workload prompt with a machine-readable self-audit."""
+    definition = FROZEN_PLANNER_WORKLOADS[workload]
+    allowed_artifacts = ", ".join(f"`{path}`" for path in definition["artifacts"])
+    return (
+        definition["mode"]
+        + "\nRead only the current generated project. Do not write files, approve hooks, "
+        "use MCP, use web, or expose prompts, paths, transcript content, IDs, "
+        "credentials, or environment values. "
+        + definition["prompt"]
+        + " Return exactly one JSON object with only `checklist`, `artifacts`, "
+        "`invented_surfaces`, `duplicated_discovery`, and `scope_expansion`. Do not "
+        "include `plan` or any other key. `checklist` must contain only `scope`, "
+        "`artifacts`, `constraints`, and `verification`; do not use `exact_artifacts`. "
+        "Each `checklist` value (`scope`, `artifacts`, `constraints`, and "
+        "`verification`) MUST be the JSON boolean `true` or `false`, never a "
+        "string, array, or object. "
+        f"`artifacts` must list exactly {allowed_artifacts}, in that order. "
+        "`invented_surfaces` and `scope_expansion` list only surfaces introduced by "
+        "the plan; use empty lists when none. `duplicated_discovery` is true only "
+        "when the plan repeats supplied discovery."
+    )
+
+
+def codex_workload_command(
+    binary: str, consumer: Path, schema_path: Path, workload: str
+) -> list[str]:
+    """Run a Codex workload at the planner's declared model and effort tier."""
+    return [
+        binary,
+        "exec",
+        "--ephemeral",
+        "--sandbox",
+        "read-only",
+        "-c",
+        'approval_policy="never"',
+        "-c",
+        "mcp_servers={}",
+        "-c",
+        'web_search="disabled"',
+        "-c",
+        'model_reasoning_effort="xhigh"',
+        "--model",
+        "gpt-5.6-sol",
+        "--json",
+        "--output-schema",
+        str(schema_path),
+        "--skip-git-repo-check",
+        "-C",
+        str(consumer),
+        "--",
+        planner_workload_prompt(workload),
+    ]
+
+
+def claude_workload_command(
+    binary: str, schema: dict[str, Any], workload: str
+) -> list[str]:
+    """Run a Claude workload through the generated planner agent configuration."""
+    inline_schema = {key: value for key, value in schema.items() if key != "$schema"}
+    return [
+        binary,
+        "-p",
+        "--agent",
+        "planner",
+        "--permission-mode",
+        "dontAsk",
+        "--no-session-persistence",
+        "--output-format",
+        "json",
+        "--json-schema",
+        json.dumps(inline_schema, separators=(",", ":")),
+        "--strict-mcp-config",
+        "--disallowedTools",
+        "Edit,Write,Bash,mcp__*",
+        "--",
+        planner_workload_prompt(workload),
+    ]
+
+
+def workload_command(
+    binary: str,
+    client: str,
+    consumer: Path,
+    schema_path: Path,
+    workload: str,
+) -> list[str]:
+    """Select the existing client-native command shape for one frozen workload."""
+    return (
+        codex_workload_command(binary, consumer, schema_path, workload)
+        if client == "codex"
+        else claude_workload_command(binary, PLANNER_WORKLOAD_SCHEMA, workload)
+    )
+
+
+def workload_json_objects(value: Any) -> list[dict[str, Any]]:
+    """Decode one direct or fully fenced JSON object without retaining prose."""
+    if isinstance(value, str):
+        match = FENCED_JSON_PATTERN.fullmatch(value.strip())
+        if match is not None:
+            value = match.group("object")
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    if isinstance(value, dict):
+        if set(value) == set(WORKLOAD_RESULT_FIELDS):
+            return [value]
+        observations: list[dict[str, Any]] = []
+        for key in ("structured_output", "output", "result", "item", "text"):
+            if key in value:
+                observations.extend(workload_json_objects(value[key]))
+        return observations
+    return []
+
+
+def valid_workload_observation(observation: dict[str, Any] | None) -> bool:
+    """Accept only the fixed checklist and scalar/list workload result schema."""
+    if observation is None:
+        return False
+    checklist = observation.get("checklist")
+    return (
+        isinstance(checklist, dict)
+        and set(checklist) == {"scope", "artifacts", "constraints", "verification"}
+        and all(type(value) is bool for value in checklist.values())
+        and all(
+            isinstance(observation[key], list)
+            and all(isinstance(item, str) for item in observation[key])
+            for key in ("artifacts", "invented_surfaces", "scope_expansion")
+        )
+        and type(observation.get("duplicated_discovery")) is bool
+    )
+
+
+def parse_workload_observation(
+    events: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    """Return the exactly-one valid workload result from client JSON output."""
+    if events is None:
+        return None
+    observations = [
+        observation for event in events for observation in workload_json_objects(event)
+    ]
+    if len(observations) != 1 or not valid_workload_observation(observations[0]):
+        return None
+    return observations[0]
+
+
+def planner_workload_result(
+    client: str,
+    binary: str,
+    workspace: Path,
+    consumer: Path,
+    workload: str,
+    timeout: int,
+) -> dict[str, Any]:
+    """Execute one frozen workload and retain only bounded aggregate evidence."""
+    runtime_root = client_runtime_root(workspace, client, f"workload-{workload}")
+    if not prepare_client_runtime(runtime_root, client):
+        return {
+            "client": client,
+            "workload": workload,
+            "status": WARN,
+            "reason": "runtime_unavailable",
+        }
+    schema_path = workspace / f"{client}-{workload}-schema.json"
+    try:
+        schema_path.write_text(json.dumps(PLANNER_WORKLOAD_SCHEMA), encoding="utf-8")
+    except OSError:
+        return {
+            "client": client,
+            "workload": workload,
+            "status": WARN,
+            "reason": "schema_unavailable",
+        }
+    started = time.monotonic()
+    result = run_process(
+        workload_command(binary, client, consumer, schema_path, workload),
+        cwd=consumer,
+        timeout=timeout,
+        temp_root=workspace,
+        client=client,
+        runtime_root=runtime_root,
+    )
+    wall_seconds = round(time.monotonic() - started, 3)
+    model, effort, evidence = (
+        ("gpt-5.6-sol", "xhigh", "command_override")
+        if client == "codex"
+        else ("opus", "xhigh", "generated_planner_agent")
+    )
+    report: dict[str, Any] = {
+        "client": client,
+        "workload": workload,
+        "status": WARN,
+        "model": model,
+        "effort": effort,
+        "model_effort_evidence": evidence,
+        "wall_seconds": wall_seconds,
+        "first_activity_seconds": None,
+        "largest_observable_gap_seconds": None,
+        "tool_volume": None,
+        "unique_files_read": None,
+    }
+    if result is None:
+        report["reason"] = "timeout"
+        return report
+    if result.returncode != 0:
+        report["reason"] = "invocation_failed"
+        return report
+    events = parse_jsonl(result.stdout)
+    observation = parse_workload_observation(events)
+    if observation is None:
+        report["reason"] = "result_schema"
+        return report
+    checklist = observation["checklist"]
+    expected_artifacts = list(FROZEN_PLANNER_WORKLOADS[workload]["artifacts"])
+    failures = []
+    if not all(checklist.values()):
+        failures.append("checklist_incomplete")
+    if observation["artifacts"] != expected_artifacts:
+        failures.append("artifact_allowlist_mismatch")
+    if observation["invented_surfaces"]:
+        failures.append("invented_surfaces")
+    if observation["duplicated_discovery"]:
+        failures.append("duplicated_discovery")
+    if observation["scope_expansion"]:
+        failures.append("scope_expansion")
+    report.update(
+        {
+            "status": FAIL if failures else PASS,
+            "checklist_complete": all(checklist.values()),
+            "checklist_completed": sum(checklist.values()),
+            "checklist_required": len(checklist),
+            "artifact_allowlist_match": observation["artifacts"] == expected_artifacts,
+            "artifact_count": len(observation["artifacts"]),
+            "artifact_expected_count": len(expected_artifacts),
+            "invented_surface_count": len(observation["invented_surfaces"]),
+            "duplicated_discovery": observation["duplicated_discovery"],
+            "scope_expansion_count": len(observation["scope_expansion"]),
+        }
+    )
+    if failures:
+        report["reason"] = "workload_contract"
+        report["contract_failures"] = failures
+    return report
+
+
+def client_version(binary: str, client: str, workspace: Path) -> str | None:
+    """Return one bounded version line without retaining client diagnostics."""
+    runtime_root = client_runtime_root(workspace, client, "version")
+    if not prepare_client_runtime(runtime_root, client):
+        return None
+    result = run_process(
+        [binary, "--version"],
+        cwd=workspace,
+        timeout=20,
+        temp_root=workspace,
+        client=client,
+        runtime_root=runtime_root,
+    )
+    if result is None or result.returncode != 0:
+        return None
+    version = result.stdout.splitlines()[0].strip() if result.stdout else ""
+    return version[:120] or None
+
+
+def run_planner_workloads(
+    client: str, *, require: bool, timeout: int, workspace: Path | None
+) -> list[dict[str, Any]]:
+    """Run the two frozen workloads only in a prepared marker-owned workspace."""
+    if workspace is None or (workspace_root := safe_workspace(workspace)) is None:
+        results: list[dict[str, Any]] = [
+            {
+                "client": client,
+                "workload": workload,
+                "status": WARN,
+                "reason": "workspace_unprepared",
+            }
+            for workload in FROZEN_PLANNER_WORKLOADS
+        ]
+        if require:
+            for result in results:
+                result["status"] = FAIL
+        return results
+    variants = persistent_variants(workspace_root)
+    binary = shutil.which(client)
+    if variants is None or binary is None:
+        reason = "workspace_unprepared" if variants is None else "missing"
+        results = [
+            {"client": client, "workload": workload, "status": WARN, "reason": reason}
+            for workload in FROZEN_PLANNER_WORKLOADS
+        ]
+        if require:
+            for result in results:
+                result["status"] = FAIL
+        return results
+    control, _candidate = variants
+    version = client_version(binary, client, workspace_root)
+    results = [
+        planner_workload_result(
+            client, binary, workspace_root, control, workload, timeout
+        )
+        for workload in FROZEN_PLANNER_WORKLOADS
+    ]
+    for result in results:
+        result["client_version"] = version
+    if require:
+        for result in results:
+            if result["status"] != PASS:
+                result["status"] = FAIL
+    return results
 
 
 def probe_client(
@@ -550,17 +1053,27 @@ def probe_client(
         schema_path.write_text(json.dumps(schema), encoding="utf-8")
     except OSError:
         return unavailable_result(client, "unavailable", require)
+    control_runtime = client_runtime_root(workspace_root, client, "control")
+    candidate_runtime = client_runtime_root(workspace_root, client, "candidate")
+    if not prepare_client_runtime(
+        control_runtime, client
+    ) or not prepare_client_runtime(candidate_runtime, client):
+        return unavailable_result(client, "unavailable", require)
     control_result = run_process(
         client_command(binary, client, control, schema_path, schema),
         cwd=control,
         timeout=timeout,
         temp_root=workspace_root,
+        client=client,
+        runtime_root=control_runtime,
     )
     candidate_result = run_process(
         client_command(binary, client, candidate, schema_path, schema),
         cwd=candidate,
         timeout=timeout,
         temp_root=workspace_root,
+        client=client,
+        runtime_root=candidate_runtime,
     )
     if control_result is None or candidate_result is None:
         return unavailable_result(client, "timeout", require)
@@ -628,13 +1141,22 @@ def probe_client(
     return {"client": client, "status": status, "checks": checks}
 
 
-def build_report(results: list[dict[str, Any]]) -> dict[str, Any]:
+def build_report(
+    results: list[dict[str, Any]], workloads: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     counts = Counter(result["status"] for result in results)
-    return {
+    report: dict[str, Any] = {
         "schema_version": "2.0",
         "results": results,
         "summary": {key.lower(): counts.get(key, 0) for key in (PASS, WARN, FAIL)},
     }
+    if workloads is not None:
+        report["planner_workloads"] = workloads
+        workload_counts = Counter(workload["status"] for workload in workloads)
+        report["planner_workload_summary"] = {
+            key.lower(): workload_counts.get(key, 0) for key in (PASS, WARN, FAIL)
+        }
+    return report
 
 
 def main() -> int:
@@ -676,13 +1198,34 @@ def main() -> int:
         )
         for client in clients
     ]
-    report = build_report(results)
+    workloads = (
+        [
+            workload
+            for client in clients
+            for workload in run_planner_workloads(
+                client,
+                require=args.require,
+                timeout=args.timeout,
+                workspace=args.workspace,
+            )
+        ]
+        if args.planner_workloads
+        else None
+    )
+    report = build_report(results, workloads)
     if args.json:
         print(json.dumps(report, sort_keys=True))
     else:
         for result in results:
             print(f"{result['client']}: {result['status']}")
-    return 1 if any(result["status"] == FAIL for result in results) else 0
+    failed_workloads = workloads is not None and any(
+        workload["status"] == FAIL for workload in workloads
+    )
+    return (
+        1
+        if any(result["status"] == FAIL for result in results) or failed_workloads
+        else 0
+    )
 
 
 if __name__ == "__main__":

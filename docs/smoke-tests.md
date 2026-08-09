@@ -23,10 +23,14 @@ Expected:
 - `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
 - Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Native probes must verify delivery without truncation on two supported versions.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
-- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low.
+- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. GitHub Copilot remains `Claude Opus 4.6`.
 - `coder`'s `escalate_to` (Codex: `gpt-5.6-sol`/`xhigh`) names an allow-listed model/effort pair distinct from its base tier, and the orchestrator prompt names both values verbatim — a mismatch fails validation.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.
+- Every agent prompt points to the [canonical audience-aware reporting policy](../shared/policies/agent-reporting.instructions.md);
+  prompts do not duplicate its Caveman or human-facing prose rules. The policy
+  keeps exact technical material unchanged and treats any rewrite stage as
+  optional.
 - The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
@@ -79,6 +83,17 @@ Expected:
   separate gate.
 
 ## Native Client Acceptance (Opt-In)
+
+As of 2026-08-09, `--planner-workloads` records PASS for Codex 0.147.0
+Sol/xhigh micro 23.514s (exact 2/2), bounded-full first result-schema 28.519s
+and same-workload manual rerun 33.771s (exact 3/3), and Claude Code 2.1.226
+Opus/xhigh micro 15.912s (exact 2/2), full 13.341s (exact 3/3). Both are 4/4
+with zero invented, duplicate, or scope expansion findings. Aggregate-only
+strict-schema event fields are `null` when unobservable. Marker-owned
+preparation never changes project trust or hooks. The Codex rerun followed a
+concrete transport/schema variance and argv fix; it is not an automatic retry.
+Known `compact_resume`/role-matrix WARNs can make `--require` nonzero without
+invalidating these independent workload PASS results.
 
 The deterministic checks above do not start native clients or need their
 credentials. The probe's default temporary mode is also only a structure and
@@ -141,9 +156,21 @@ Expected:
 - `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
 - `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
 - A valid score report with no matching `findings-*.json` report blocks the commit.
-- A non-documentation diff without `ponytail_reviewed: true` blocks the commit.
-- Any surviving Ponytail finding, including `MINOR`, blocks the commit.
-- A Markdown/docs-only diff does not require Ponytail fields.
+- The coder's implementation path applies Ponytail `full` once, then performs a
+  changed-scope simplification and re-verification; lifecycle output has no
+  standalone Ponytail phase.
+- The `ponytail` review profile is required for deterministic control-plane or
+  other high-risk/multi-file/dependency/script/generator work, and for
+  reviewer-selected complexity. An exemption is exactly one documentation OR
+  one mutable workflow-state file, only when no control-plane/high-risk
+  condition applies; every multi-file diff is high-risk.
+- Selecting the profile always emits `ponytail_reviewed: true` and a numeric
+  `ponytail_findings` count. New unselected reports omit both fields; optional
+  diffs can read compatible legacy `false`/`0` reports, while high-risk routing
+  requires true evidence.
+- Ponytail findings follow ordinary severity gates: `CRITICAL` blocks commit,
+  `MAJOR` blocks push/PR, and `MINOR` is advisory. There is no zero-Ponytail
+  gate.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
 - A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
 - Two findings reports for the same branch/phase select the newest by `generated_at`, not filename — a lexically-later but older clean report loses to a lexically-earlier but newer report containing a `CRITICAL` finding.

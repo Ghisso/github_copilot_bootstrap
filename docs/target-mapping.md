@@ -59,7 +59,7 @@ Claude Code:
 - `.claude/settings.json`
 - `.claude/rules/*.instructions.md` for conditional policy adapters
 
-`CLAUDE.md` is a generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
+`CLAUDE.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Agent names are identical across every target — the generator performs no per-target renaming. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
@@ -68,7 +68,7 @@ OpenAI Codex:
 - `.codex/hooks.json`
 - `.codex/agents/*.toml`
 
-`AGENTS.md` is a generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Codex discovers project guidance from the repository root down to the current working directory, with closer `AGENTS.md` files taking precedence and a default 32 KiB combined-project-document cap. This bootstrap emits nested `AGENTS.md` only when a policy owns a stable concrete directory. The Phase C policy scopes are mixed/glob/file-specific, so their non-widening Codex mapping is the corresponding shared skill rather than speculative nested guidance.
+`AGENTS.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Codex discovers project guidance from the repository root down to the current working directory, with closer `AGENTS.md` files taking precedence and a default 32 KiB combined-project-document cap. This bootstrap emits nested `AGENTS.md` only when a policy owns a stable concrete directory. The Phase C policy scopes are mixed/glob/file-specific, so their non-widening Codex mapping is the corresponding shared skill rather than speculative nested guidance.
 
 Codex custom agents are project-scoped `.codex/agents/*.toml` files with `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`. The generator places a short Codex metadata header before the exact target-transformed body of `shared/agents/<id>/prompt.md`; it does not tell the subagent to read `.claude/agents/<id>.md` at runtime. `agent.yaml` remains the metadata and model/effort source of truth, so the prompt body is not a second metadata source. The TOMLs intentionally omit `mcp_servers` and `skills.config` overrides: Codex applies the trusted project's `.codex/config.toml`, including the shared MCP and skill registrations.
 

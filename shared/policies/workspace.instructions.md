@@ -28,7 +28,10 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 
 - Plan first for non-trivial work.
 - Search before writing new code.
-- Apply the `ponytail` skill in `full` mode to every coding task.
+- During IMPLEMENT, the coder applies the `ponytail` skill in `full` mode once
+  per coding task, then performs a lightweight simplification and re-verifies
+  only the changed scope. This is coder discipline, not a separate lifecycle
+  phase.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
@@ -54,7 +57,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Classify work with the single authoritative **Task Lanes** table in
@@ -71,18 +74,18 @@ Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/
 
 ## Ponytail Coding Rule
 
-Before writing, adding, fixing, refactoring, reviewing, or designing code, or
-choosing a dependency, read `.claude/skills/ponytail/SKILL.md` and apply it in
-`full` mode for the whole task. Search for reusable code and trace the real
-flow before editing; then prefer YAGNI, existing helpers, the standard library,
-native platform features, installed dependencies, and the minimum correct
-diff, in that order.
+Before writing, adding, fixing, refactoring, or designing code, read
+`.claude/skills/ponytail/SKILL.md` and apply it once in `full` mode during
+IMPLEMENT. Search for reusable code and trace the real flow before editing;
+then prefer YAGNI, existing helpers, the standard library, native platform
+features, installed dependencies, and the minimum correct conceptual diff, in
+that order. Re-check the changed scope after simplification.
 
 Ponytail never removes required validation, data-loss protection, security,
 accessibility, root-cause investigation, or the smallest meaningful regression
-check. A user may explicitly select another Ponytail mode for implementation,
-but every non-documentation diff still requires the mandatory Ponytail review
-before commit or push.
+check. Here, minimal means the fewest necessary concepts, dependencies,
+abstractions, layers, configuration, execution paths, and behaviors; clarity
+and maintainability outrank reducing physical line count.
 
 ## Agents
 
@@ -101,16 +104,24 @@ This is the **single authoritative profile-routing table**. The unified `reviewe
 
 | Surface | Profiles |
 |---|---|
-| Python source | `code`, `security`, `ponytail` |
-| New modules/refactors | `architecture`, `ponytail` |
-| Tests | `tests`, `ponytail` |
-| APIs/services | `api`, `security`, `tests`, `ponytail` |
-| Configs | `config`, `ponytail` when executable behavior changes |
+| Python source | `code`, `security`; add `ponytail` when complexity expands |
+| New modules/refactors | `architecture`; add `ponytail` when complexity expands |
+| Tests | `tests`; add `ponytail` when complexity expands |
+| APIs/services | `api`, `security`, `tests`; add `ponytail` when complexity expands |
+| Configs | `config`; add `ponytail` when executable behavior changes or complexity expands |
 | I/O-heavy or ML-heavy paths | `performance` |
 | Docs/user-facing behavior | `documentation` |
 | Domain-specific correctness | `domain` |
 | Hooks, scripts, generators, and control-plane code | `code`, `architecture`, `security`, `tests`, `ponytail` |
-| Any pre-PR gate | `code`, `security`, `tests`, `ponytail` (minimum for non-documentation diffs) |
+| Any pre-PR gate | `code`, `security`, `tests`; add `ponytail` for control-plane/high-risk or complexity-expanding diffs |
+
+Ponytail is required for every control-plane/high-risk diff and every diff that
+introduces or substantially changes abstractions, dependencies, architecture,
+generalized infrastructure, configuration, execution paths, or behavior. It is
+optional for ordinary low-complexity work. An exemption is exactly one
+documentation OR one mutable workflow-state file, only when no
+control-plane/high-risk condition applies. Every multi-file diff is
+control-plane/high-risk and therefore is not exempt.
 
 ## Skills
 

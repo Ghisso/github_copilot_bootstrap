@@ -17,6 +17,13 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/templates/`, `shared/scripts/`, `shared/MEMORY.md`, and state README directories: source inputs rendered into the shared `.claude/` basis.
 - `shared/schemas/`: schema documentation for shared metadata.
 
+Communication guidance is centralized in
+[`shared/policies/agent-reporting.instructions.md`](../shared/policies/agent-reporting.instructions.md).
+It selects audience-appropriate prose: clear, direct language for people and
+optional compact `caveman full` handoffs between agents. Generated agent
+prompts point to this policy instead of copying its rules, while exact paths,
+identifiers, commands, logs, and other evidence remain unchanged.
+
 ### Policy applicability and native discovery
 
 Policy scope is authored once in `shared/policies/` with target-neutral
@@ -99,16 +106,26 @@ trust and credential boundaries.
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
 as a per-user plugin. Every target receives `.claude/skills/ponytail/`,
-`.claude/skills/ponytail-review/`, and the upstream license/provenance. Root
-guidance and the coder role require `full` mode for coding, so fresh consumers
-work without network access or global plugin state.
+`.claude/skills/ponytail-review/`, and the upstream license/provenance. The
+`ponytail` skill is coder-time implementation discipline: once per coding task,
+the coder applies `full` mode, then simplifies and re-verifies the changed
+scope. It is not a standalone lifecycle phase. Minimality means fewer concepts,
+dependencies, abstractions, layers, paths, and behaviors; clarity and
+maintainability outrank physical line count.
 
-The unified reviewer runs a `ponytail` profile for every non-documentation
-diff. `record_findings.py --profile ponytail` persists top-level
-`ponytail_reviewed` and `ponytail_findings` fields with the existing diff
-content hash. Commit and push gates require a fresh review with zero surviving
-Ponytail findings; any subsequent code/config/script edit invalidates it.
-Documentation-only diffs are exempt.
+The separate `ponytail-review` skill is a reviewer-facing checklist. The
+unified reviewer selects the `ponytail` profile when the authoritative routing
+table requires it: deterministic control-plane/high-risk, multi-file,
+dependency, script, generator, or similarly complex work, or when the reviewer
+identifies complexity expansion. An exemption is exactly one documentation OR
+one mutable workflow-state file, only when no control-plane/high-risk condition
+applies; every multi-file diff is high-risk. The metadata matrix is exact:
+selecting the profile always emits `ponytail_reviewed: true` and a numeric
+`ponytail_findings` count, while a new unselected report omits both. Optional
+diffs can read compatible legacy `false`/`0` reports, but high-risk routing
+requires true evidence. Ponytail findings use the ordinary gates: CRITICAL
+blocks commit, MAJOR blocks push/PR, and MINOR is advisory. There is no special
+zero-Ponytail-finding gate.
 
 Do not edit `dist/` manually. Regenerate it with:
 
@@ -199,7 +216,7 @@ branch-shape check and require acknowledgement before PR or push closeout.
 The canonical workflow is:
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:
@@ -313,9 +330,9 @@ Each agent contains:
 
 The generator derives Copilot, Claude Code, and Codex adapters from those two files. Copilot model fields are target bindings, not portable semantics. GitHub Copilot agent `model` fields must be a single supported Copilot model string. Claude and Codex adapters must not include Copilot model pins.
 
-The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`max`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`); the mechanical `verifier` runs on `haiku` with no `effort:` line, because Haiku does not support the effort field. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
+The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`xhigh`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`); the mechanical `verifier` runs on `haiku` with no `effort:` line, because Haiku does not support the effort field. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
 
-Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` files whose `developer_instructions` embed the transformed canonical `shared/agents/<id>/prompt.md` after a small Codex header. They do not read `.claude/agents/<id>.md` at runtime. `agent.yaml` remains the source for metadata and model intent; the Codex prompt is derived output, not a second editable role definition. The root Codex session is intentionally unpinned in `.codex/config.toml`, leaving the user free to choose the interactive model and effort. Each custom agent overrides both `model` and `model_reasoning_effort` from its canonical `model_intent.openai-codex`: orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. The validator requires those generated values and the exact normalized prompt body to match their canonical sources. Agent files omit MCP and skill overrides, inheriting the trusted project's registrations. Current generated instruction sizes are 3,145–8,202 bytes; no official per-agent instruction-size cap is asserted. Native probes must test full, untruncated delivery for all six roles on two supported Codex versions; see the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md) for current status. Claude's native agent files remain unchanged.
+Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` files whose `developer_instructions` embed the transformed canonical `shared/agents/<id>/prompt.md` after a small Codex header. They do not read `.claude/agents/<id>.md` at runtime. `agent.yaml` remains the source for metadata and model intent; the Codex prompt is derived output, not a second editable role definition. The root Codex session is intentionally unpinned in `.codex/config.toml`, leaving the user free to choose the interactive model and effort. Each custom agent overrides both `model` and `model_reasoning_effort` from its canonical `model_intent.openai-codex`: orchestrator Sol/xhigh, planner Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. The validator requires those generated values and the exact normalized prompt body to match their canonical sources. Agent files omit MCP and skill overrides, inheriting the trusted project's registrations. Current generated instruction sizes are 3,145–8,202 bytes; no official per-agent instruction-size cap is asserted. Native probes must test full, untruncated delivery for all six roles on two supported Codex versions; see the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md) for current status. Claude's native agent files remain unchanged.
 
 `coder`'s `model_intent.openai-codex` additionally carries an `escalate_to` key (`{ "model": "gpt-5.6-sol", "effort": "xhigh" }`), declarative-only: the generator does not emit a second adapter file for it. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent (`developers.openai.com/codex/subagents`: "explicit spawn values override `agents.default_subagent_model` and `agents.default_subagent_reasoning_effort`"), so `shared/agents/orchestrator/prompt.md` instructs the orchestrator to re-delegate a `coder` fix with those override values — instead of retrying at the base Terra/high tier — when `verifier` fails or `reviewer` surfaces a CRITICAL/MAJOR/`ponytail` finding on that diff, capped at one escalation per phase. `scripts/validate_targets.py` checks that `escalate_to`'s model/effort pair is allow-listed, differs from the base tier, and appears verbatim in the orchestrator prompt text, so the data and the instruction that acts on it cannot silently drift apart. Claude Code has no per-invocation effort override, so this lane is Codex-only.
 

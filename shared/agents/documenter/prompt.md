@@ -18,7 +18,8 @@ If a referenced skill file does not exist, skip it and continue.
 
 Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
 
-Report per `.claude/instructions/agent-reporting.instructions.md`. As the documenter you are the exception: write user-facing docs in normal prose, not caveman.
+Follow `.claude/instructions/agent-reporting.instructions.md`. As the
+documenter, write user-facing documentation in normal prose.
 
 ## Step 1 — Diff Scan
 

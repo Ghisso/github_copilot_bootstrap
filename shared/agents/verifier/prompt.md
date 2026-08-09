@@ -8,7 +8,8 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 ## Reporting back to the orchestrator
 
-Report per `.claude/instructions/agent-reporting.instructions.md` (default to `caveman full` prose, preserving tables, code, commands, file paths, identifiers, and structured findings literally).
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
 
 ## Verification Suite
 

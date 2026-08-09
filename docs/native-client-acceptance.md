@@ -34,7 +34,7 @@ If a global npm install seems to vanish, confirm the npm global `bin`
 directory is on `PATH` — `node`/`npm` are often exposed by individual symlinks
 while sibling tools are not.
 
-## The Role Matrix Passes — But The Probe Cannot Measure It
+## Codex Role Matrix Evidence — Separate From Planner Calibration
 
 **Verified 2026-08-09, Codex 0.147.0.** All six roles spawn with their
 configured model and effort. Twelve child threads across two interfaces
@@ -52,6 +52,21 @@ configuration:
 
 Evidence is client-emitted twice: the spawn events, and each child's persisted
 session record under `~/.codex/sessions` (`payload.model`, `payload.effort`).
+
+This historical role-matrix observation does not benchmark planner quality.
+Current planner workload evidence is recorded in the [dated calibration
+record](2026-08-09-planner-reliability-calibration.md): Codex Sol/xhigh micro
+23.514s (exact 2/2), bounded-full first result-schema 28.519s, then a same-
+workload manual rerun PASS at 33.771s (exact 3/3); Claude Opus/xhigh micro
+15.912s (exact 2/2), full 13.341s (exact 3/3). Both are 4/4 with zero
+invented, duplicate, or scope-expanding work. Event-derived tool/file/first-
+activity/gap fields are null when unobservable.
+
+The Codex 33.771s run followed a concrete transport/schema variance and argv
+fix. It is manual evidence, not a generic, automatic, or `max` retry policy.
+
+The historical matrix used planner `max` and documenter `gpt-5.6-terra`;
+current declarations are planner `xhigh` and documenter `gpt-5.6-luna`.
 
 **This does not make the shim removable.** Routing was verified with
 `[features.multi_agent_v2]` **present**. The candidate configuration, with the
@@ -202,6 +217,11 @@ uv run python scripts/check_native_clients.py \
 uv run python scripts/check_native_clients.py \
   --workspace /absolute/dedicated-native-client-probe \
   --client claude --require --json
+
+# Frozen planner calibration workloads in the prepared, trusted workspace.
+uv run python scripts/check_native_clients.py \
+  --workspace /absolute/dedicated-native-client-probe \
+  --client all --planner-workloads --json
 ```
 
 `--client` accepts `codex`, `claude`, or `all`; `--json` emits the
@@ -279,6 +299,20 @@ event-backed invariant failed, or `--require` promoted unresolved evidence.
 A nonzero process result is classified as unavailable/untrusted to avoid
 publishing raw client diagnostics.
 Keep the JSON report with the release evidence, not client transcripts.
+
+With `--planner-workloads`, schema v2 adds `planner_workloads` (one aggregate
+record per client/workload) and `planner_workload_summary` (PASS/WARN/FAIL
+counts). The substantive contract and artifact fields use strict allowlists;
+unknown contracts or artifacts fail validation. Event-derived tool volume,
+unique files, time to first activity, and largest observable gap are aggregate
+fields and are `null` when the client does not expose them. The workspace is
+marker-owned. Control and candidate consumers are read-only. Writable
+invocation-local HOME, XDG, client, and temporary state lives under
+`runtime/<client>/<invocation>/`; temporary files use its `tmp/` child. The
+runner refuses broad or unmarked paths and never changes trust or hook approval.
+Prompts, transcripts, credentials, and raw client output are not retained.
+Unrelated `compact_resume` or role-matrix WARNs can make `--require` nonzero
+without invalidating an individual planner-workload PASS.
 
 ## Codex Routing Removal Checklist
 

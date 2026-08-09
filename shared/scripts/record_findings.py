@@ -121,7 +121,9 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
 
 
 def load_findings(source: str) -> list[dict[str, object]]:
-    text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+    text = (
+        sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+    )
     text = text.strip()
     if not text:
         return []
@@ -133,7 +135,9 @@ def load_findings(source: str) -> list[dict[str, object]]:
             raise ValueError("each finding must be a JSON object")
         severity = finding.get("severity")
         if severity not in VALID_SEVERITIES:
-            raise ValueError(f"finding severity must be one of {sorted(VALID_SEVERITIES)}; got {severity!r}")
+            raise ValueError(
+                f"finding severity must be one of {sorted(VALID_SEVERITIES)}; got {severity!r}"
+            )
         if not finding.get("title"):
             raise ValueError("each finding must have a non-empty title")
     return findings
@@ -147,12 +151,22 @@ def count_severities(findings: list[dict[str, object]]) -> dict[str, int]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Findings recorder for the REVIEW stage's severity gate.")
+    parser = argparse.ArgumentParser(
+        description="Findings recorder for the REVIEW stage's severity gate."
+    )
     parser.add_argument("target", help="File or directory the findings apply to.")
-    parser.add_argument("--findings-json", default="-", help="Path to a JSON list of findings, or '-' for stdin.")
-    parser.add_argument("--out", type=Path, required=True, help="Write the JSON result to this path.")
+    parser.add_argument(
+        "--findings-json",
+        default="-",
+        help="Path to a JSON list of findings, or '-' for stdin.",
+    )
+    parser.add_argument(
+        "--out", type=Path, required=True, help="Write the JSON result to this path."
+    )
     parser.add_argument("--phase", default="", help="Current small-plan phase slug.")
-    parser.add_argument("--base-ref", default="dev", help="Base ref used for branch metadata.")
+    parser.add_argument(
+        "--base-ref", default="dev", help="Base ref used for branch metadata."
+    )
     parser.add_argument(
         "--profile",
         action="append",
@@ -163,10 +177,16 @@ def main() -> None:
 
     try:
         findings = load_findings(args.findings_json)
-        profiles_reviewed = sorted({profile.strip() for profile in args.profile if profile.strip()})
+        profiles_reviewed = sorted(
+            {profile.strip() for profile in args.profile if profile.strip()}
+        )
+        if not profiles_reviewed:
+            raise ValueError("at least one --profile is required")
         for finding in findings:
             profile = finding.get("profile")
-            if profiles_reviewed and profile not in profiles_reviewed:
+            if not isinstance(profile, str) or not profile:
+                raise ValueError("each finding must have a non-empty profile")
+            if profile not in profiles_reviewed:
                 raise ValueError(
                     "each finding profile must be present in the repeated --profile arguments; "
                     f"got {profile!r}"
@@ -176,21 +196,19 @@ def main() -> None:
         sys.exit(1)
 
     counts = count_severities(findings)
-    ponytail_findings = sum(1 for finding in findings if finding.get("profile") == "ponytail")
     ponytail_reviewed = "ponytail" in profiles_reviewed
-    # `counts` is serialized before `findings` so the gate's flat-text
-    # `critical`-key scanner (json_file_number_value in _lib-frontmatter.sh,
-    # which is not JSON-nesting-aware) matches counts.critical before it can
-    # reach any free-text finding title/file value that happens to contain a
-    # colliding `"critical": <digits>` substring.
+    # Keep canonical report fields first for stable, readable JSON artifacts.
     result = {
         "counts": counts,
-        "ponytail_reviewed": ponytail_reviewed,
-        "ponytail_findings": ponytail_findings,
         "profiles_reviewed": profiles_reviewed,
         "findings": findings,
         **git_metadata(Path(args.target).resolve(), args.phase, args.base_ref),
     }
+    if ponytail_reviewed:
+        result["ponytail_reviewed"] = True
+        result["ponytail_findings"] = sum(
+            1 for finding in findings if finding.get("profile") == "ponytail"
+        )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -198,8 +216,7 @@ def main() -> None:
     print(
         f"recorded {len(findings)} finding(s): "
         f"{counts['critical']} critical, {counts['major']} major, {counts['minor']} minor; "
-        f"ponytail_reviewed={str(ponytail_reviewed).lower()}, "
-        f"ponytail_findings={ponytail_findings}"
+        f"ponytail_reviewed={str(ponytail_reviewed).lower()}"
     )
     print(f"report: {args.out}")
     sys.exit(0)

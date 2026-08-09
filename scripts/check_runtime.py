@@ -130,10 +130,10 @@ def runtime_drift_errors(
     for authoring_relative in TRACKED_AUTHORING_PATHS:
         path = repo_root / authoring_relative
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        if (
-            "source of truth lives in `shared/`" not in text
-            or "review -> document -> score" not in text.lower()
-        ):
+        required_fragments: tuple[str, ...] = ("review -> document -> score",)
+        if authoring_relative == "AGENTS.md":
+            required_fragments += ("source of truth lives in `shared/`",)
+        if any(fragment not in text.lower() for fragment in required_fragments):
             errors.append(
                 drift_diagnostic(
                     authoring_relative, "shared/policies/workflow.instructions.md"
@@ -167,7 +167,9 @@ def runtime_drift_errors(
                 expected[target_relative] = authoritative_path
         if not is_root_adapter_path(target_relative):
             continue
-        if target_relative.as_posix() in TRACKED_AUTHORING_PATHS:
+        if target_relative.as_posix() in TRACKED_AUTHORING_PATHS and is_exact_tracked(
+            repo_root, target_relative
+        ):
             continue
         if not is_exact_tracked(repo_root, target_relative):
             expected[target_relative] = authoritative_path
@@ -296,8 +298,9 @@ def main() -> int:
                 )
             elif command == "uv":
                 print(
-                    "WARN optional binary missing: uv; the file-protection and git guardrails run "
-                    "in pure bash without it, and quality_score.py is the only feature that needs it"
+                    "WARN optional binary missing: uv; guardrails use Bash 3.2 orchestration and "
+                    "Python 3 standard-library JSON parsing for report reads without uv; "
+                    "quality_score.py is the only feature that needs uv"
                 )
             elif command == "context-mode":
                 print(

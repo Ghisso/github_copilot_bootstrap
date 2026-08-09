@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tomllib
@@ -35,13 +36,18 @@ from validate_targets import (  # noqa: E402
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
+    github_agent_model_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
     root_guidance_errors,
+    planner_supervision_contract_errors,
+    reporting_policy_errors,
+    reporting_prompt_errors,
     scope_matches,
     task_lane_contract_errors,
     task_lane_for,
     TaskLaneInputs,
+    workflow_reporting_errors,
     workspace_guidance_errors,
 )
 
@@ -79,7 +85,7 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
     assert codex_config_contract_errors(config, "fixture") == []
     assert CODEX_ROLE_MODEL_INTENTS == {
         "orchestrator": ("gpt-5.6-sol", "xhigh"),
-        "planner": ("gpt-5.6-sol", "max"),
+        "planner": ("gpt-5.6-sol", "xhigh"),
         "coder": ("gpt-5.6-terra", "high"),
         "reviewer": ("gpt-5.6-sol", "high"),
         "documenter": ("gpt-5.6-luna", "medium"),
@@ -103,6 +109,77 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
         )
 
 
+def test_planner_supervision_contract_requires_bounded_evidence_and_waits() -> None:
+    """Planner prompts retain the calibrated discovery and supervision contract."""
+    planner = (REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    orchestrator = (
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert planner_supervision_contract_errors(planner, orchestrator) == []
+
+    missing_packet = planner.replace("orchestrator's evidence packet", "handoff", 1)
+    errors = planner_supervision_contract_errors(missing_packet, orchestrator)
+    assert any("bounded-discovery" in error for error in errors)
+
+    missing_wait = orchestrator.replace(
+        "A pending wait means no mailbox event arrived during that polling window",
+        "A completed wait means success",
+        1,
+    )
+    errors = planner_supervision_contract_errors(planner, missing_wait)
+    assert any("planner-supervision" in error for error in errors)
+
+    stale_mandates = (
+        f"{planner}\nUses a PRD-style interview to surface unknowns before drafting.\n"
+        "Show the user the sketch and ask for confirmation before proceeding.\n"
+        "Iterate at least once based on user responses.\n"
+    )
+    errors = planner_supervision_contract_errors(stale_mandates, orchestrator)
+    assert any("stale unconditional mandate" in error for error in errors)
+
+
+def test_github_agent_model_contract_uses_frontmatter_not_body_substrings() -> None:
+    """GitHub model parity uses parsed frontmatter and rejects malformed inputs."""
+    path = Path(".github/agents/planner.agent.md")
+    valid = "---\nname: planner\nmodel: Claude Opus 4.6\n---\n\nmodel: wrong\n"
+
+    assert github_agent_model_errors(valid, "Claude Opus 4.6", path) == []
+    assert any(
+        "drifted" in error
+        for error in github_agent_model_errors(
+            valid.replace("Claude Opus 4.6", "GPT-5.4", 1),
+            "Claude Opus 4.6",
+            path,
+        )
+    )
+    assert any(
+        "missing frontmatter" in error
+        for error in github_agent_model_errors(
+            "model: Claude Opus 4.6\n", "Claude Opus 4.6", path
+        )
+    )
+
+
+def test_planner_model_intent_preserves_native_models_and_copilot_choice() -> None:
+    """Only planner effort changes; native models and Copilot intent stay fixed."""
+    planner = json.loads(
+        (REPO_ROOT / "shared" / "agents" / "planner" / "agent.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    intent = planner["model_intent"]
+
+    assert intent["github-copilot"] == "Claude Opus 4.6"
+    assert intent["claude-code"] == {"model": "opus", "effort": "xhigh"}
+    assert intent["openai-codex"] == {
+        "model": "gpt-5.6-sol",
+        "effort": "xhigh",
+    }
+
+
 def test_root_guidance_budgets_and_structural_invariants() -> None:
     """Concise root templates retain their unique sections and lifecycle."""
     claude = render_root_guidance("claude-code")
@@ -116,15 +193,54 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert "`.github/hooks/`" in codex
     assert len(claude.splitlines()) <= 200
     assert len(codex.encode()) <= 16 * 1024
+    missing_reporting_pointer = claude.replace(
+        ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
+    )
+    assert any(
+        "agent-reporting.instructions.md" in error
+        for error in root_guidance_errors("CLAUDE.md", missing_reporting_pointer)
+    )
+
+
+@pytest.mark.parametrize(
+    "target,name",
+    (("claude-code", "CLAUDE.md"), ("openai-codex", "AGENTS.md")),
+)
+@pytest.mark.parametrize(
+    "authoring_phrase",
+    (
+        "Bootstrap Guidance",
+        "reusable multi-agent bootstrap",
+        "In an installed project",
+        "Bootstrap maintainers own authoring and regeneration",
+    ),
+)
+def test_root_guidance_rejects_authoring_specific_phrases(
+    target: str, name: str, authoring_phrase: str
+) -> None:
+    """Generated root guidance stays neutral to the bootstrap authoring repo."""
+    guidance = render_root_guidance(target)
+
+    assert authoring_phrase not in guidance
+    errors = root_guidance_errors(name, f"{guidance}\n{authoring_phrase}\n")
+
+    assert any(authoring_phrase in error for error in errors)
+
+
+def test_root_guidance_allows_bootstrap_when_it_is_not_an_authoring_phrase() -> None:
+    """The regression guard rejects exact phrases, not the general word."""
+    guidance = render_root_guidance("claude-code")
+
+    assert root_guidance_errors("CLAUDE.md", f"{guidance}\nbootstrap\n") == []
 
 
 def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() -> None:
     """Structural validation rejects regressions hidden by broad substring checks."""
     guidance = render_root_guidance("claude-code")
     mutated = guidance.replace("## Map\n", "## Map\n\n## Map\n", 1).replace(
-        "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
         "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
-        "PRE-FLIGHT -> PLAN -> BRANCH -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "PRE-FLIGHT -> PLAN -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
         "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
         1,
     )
@@ -274,6 +390,16 @@ def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> Non
         "Skip planning only for:" in error for error in task_lane_contract_errors(drift)
     )
 
+    assert workflow_reporting_errors(workflow) == []
+    legacy_reporting = workflow.replace(
+        ".claude/instructions/agent-reporting.instructions.md",
+        ".claude/instructions/agent-reporting.instructions.md\n\n"
+        "Subagents reporting back to the orchestrator should use `caveman` `full`.\n"
+        "Preserve tables, code blocks, commands, and paths literally.",
+        1,
+    )
+    assert workflow_reporting_errors(legacy_reporting)
+
 
 def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:
     """Claude and Copilot derive equivalent conditional scopes from policies."""
@@ -299,6 +425,86 @@ def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:
                 scope_matches(path, copilot_instruction_paths(github)) is expected_match
             )
             assert scope_matches(path, claude_rule_paths(claude)) is expected_match
+
+
+def test_reporting_policy_and_agent_prompts_preserve_the_audience_boundary() -> None:
+    """The shared policy owns prose rules while each agent retains only a pointer."""
+    policy = (
+        REPO_ROOT / "shared" / "policies" / "agent-reporting.instructions.md"
+    ).read_text(encoding="utf-8")
+
+    assert reporting_policy_errors(policy) == []
+    reflowed_policy = policy.replace(
+        "does not claim\nformal ASD-STE100 compliance",
+        "does not claim formal ASD-STE100 compliance",
+        1,
+    ).replace(
+        "identifiers, API\nnames, commands",
+        "identifiers, API names, commands",
+        1,
+    )
+    assert reporting_policy_errors(reflowed_policy) == []
+    assert reporting_policy_errors(
+        policy.replace(
+            "does not claim\nformal ASD-STE100 compliance", "is compliant", 1
+        )
+    )
+    assert reporting_policy_errors(
+        policy.replace(
+            "Technical precision has priority", "Simple vocabulary has priority", 1
+        )
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nDefault to `caveman full` style for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is the default for user-facing communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full is the default for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full should be the default for human-facing reports.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nUse caveman full for user-facing communication.\n"
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not use caveman full for user-facing communication.\n"
+        )
+        == []
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not default to caveman full for human communication.\n"
+        )
+        == []
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is for orchestrator-facing status.\n"
+    )
+
+    for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
+        prompt = prompt_path.read_text(encoding="utf-8")
+        assert reporting_prompt_errors(prompt_path.parent.name, prompt) == []
+        assert reporting_prompt_errors(
+            prompt_path.parent.name,
+            prompt.replace("agent-reporting.instructions.md", "reporting.md", 1),
+        )
+
+    coder_prompt = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nDefault to `caveman full`.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nPreserve tables, code blocks, commands literally.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nUse active voice where practical.\n"
+    )
 
 
 def test_policy_schema_rejects_copilot_native_or_ambiguous_scope(

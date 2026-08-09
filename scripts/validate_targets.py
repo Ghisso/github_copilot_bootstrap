@@ -68,13 +68,46 @@ CODEX_ALLOWED_EFFORT = {"none", "low", "medium", "high", "xhigh", "max"}
 # current Luna/medium declaration below.
 CODEX_ROLE_MODEL_INTENTS = {
     "orchestrator": ("gpt-5.6-sol", "xhigh"),
-    "planner": ("gpt-5.6-sol", "max"),
+    "planner": ("gpt-5.6-sol", "xhigh"),
     "coder": ("gpt-5.6-terra", "high"),
     "reviewer": ("gpt-5.6-sol", "high"),
     "documenter": ("gpt-5.6-luna", "medium"),
     "verifier": ("gpt-5.6-luna", "low"),
 }
 CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
+PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
+    "orchestrator's evidence packet",
+    "exact artifacts, supplied evidence, approved decisions, constraints",
+    "genuinely unresolved questions",
+    "do not repeat broad intake, discovery, or user interview questions that the user has already answered",
+    "Bounded Discovery",
+    "Do not repeat answered discovery during a bounded full-plan revision",
+    "Do not require a fixed number of interview rounds",
+    "When genuinely unresolved decisions remain, use a focused PRD-style interview before drafting",
+    "Module Sketch (only when an unresolved interface decision needs it)",
+    "Present the sketch for confirmation only when the decision requires user input",
+    "Iterate only when a user response is needed to resolve that decision",
+)
+PLANNER_PROMPT_FORBIDDEN_FRAGMENTS = (
+    "Uses a PRD-style interview to surface unknowns before drafting.",
+    "Show the user the sketch and ask for confirmation before proceeding.",
+    "Iterate at least once based on user responses.",
+)
+ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
+    "prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions",
+    "compact, minimally scoped task and evidence packet",
+    "Keep one active planner",
+    "A pending wait means no mailbox event arrived during that polling window",
+    "does not establish success, failure, progress, or a transport outage",
+    "runtime-native agent state, recent observable activity, and actual terminal, tool, or configuration errors",
+    "Silence alone is not health evidence",
+    "at least every five minutes",
+    "30 minutes as a provisional floor before a planner health review",
+    "not an automatic interruption timer",
+    "Explicit user cancellation and an actual terminal error remain immediate exceptions",
+    "Do not add a generic `max` retry or lower the default to `high`",
+    "two matched `xhigh` runs reproduce a material checklist failure",
+)
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -178,6 +211,73 @@ ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
     "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
     "AGENTS.md": ("`.codex/`", "`.github/hooks/`"),
 }
+ROOT_GUIDANCE_AUTHORING_PHRASES = (
+    "Bootstrap Guidance",
+    "reusable multi-agent bootstrap",
+    "In an installed project",
+    "Bootstrap maintainers own authoring and regeneration",
+)
+REPORTING_POLICY_POINTER = ".claude/instructions/agent-reporting.instructions.md"
+REPORTING_POLICY_REQUIRED_FRAGMENTS = (
+    "## Human-facing communication",
+    "precise, clear, direct, natural prose",
+    "inspired by ASD-STE100 principles",
+    "does not claim formal ASD-STE100 compliance",
+    "Apply these rules strongly",
+    "Apply them lightly to commit messages",
+    "Use common words when they are as precise",
+    "Use one term consistently",
+    "short, direct sentences",
+    "active voice where practical",
+    "Avoid idioms, buzzwords, marketing language, and unnecessary abbreviations",
+    "Define an uncommon abbreviation or technical term",
+    "Technical precision has priority over simpler vocabulary",
+    "identifiers, API names, commands, paths, logs, errors, structured findings, quotations",
+    "Do not lossily rewrite",
+    "Do not make a rewrite stage mandatory",
+    "## Agent-to-agent status and handoffs",
+    "`caveman full` may be the default",
+    "not the default for user communication",
+)
+REPORTING_POLICY_FORBIDDEN_FRAGMENTS = (
+    "default to `caveman full` style",
+    "caveman is for orchestrator-facing status",
+    "caveman full for narrative/prose sections",
+)
+REPORTING_CAVEMAN_USER_DEFAULT_PATTERNS = (
+    re.compile(
+        r"(?:default to|use) [`']?caveman(?: full)?[`']?.{0,60}"
+        r"(?:user(?:-facing)?|human(?:-facing)?)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"caveman(?: full)? (?:is|as|should be|must be) (?:the )?default.{0,30}"
+        r"(?:user(?:-facing)?|human(?:-facing)?)",
+        re.IGNORECASE,
+    ),
+)
+REPORTING_PROMPT_DUPLICATE_FRAGMENTS = (
+    "default to `caveman full`",
+    "preserve tables, code blocks, commands",
+    "precise, clear, direct, natural prose",
+    "inspired by ASD-STE100 principles",
+    "use common words when",
+    "use one term consistently",
+    "short, direct sentences",
+    "active voice where practical",
+    "avoid idioms, buzzwords",
+    "define an uncommon abbreviation",
+    "keep established technical terms",
+    "technical precision has priority",
+    "do not make a rewrite stage mandatory",
+    "do not lossily rewrite",
+)
+WORKFLOW_REPORTING_FORBIDDEN_FRAGMENTS = (
+    "subagents reporting back to the orchestrator should use",
+    "preserve tables, code blocks, commands",
+    "the documenter writes normal user-facing prose",
+    "`caveman` `full`",
+)
 SHARED_GITHUB_HOOK_INVENTORY_PATHS = {
     TARGET_ROOT / "CLAUDE.md",
     TARGET_ROOT / "AGENTS.md",
@@ -237,9 +337,9 @@ class TaskLaneInputs(TypedDict, total=False):
 
 
 ROOT_LIFECYCLE_PATTERN = re.compile(
-    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
+    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
     r"SCORE|LEARN|SESSION LOG|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN|"
-    r"PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
+    r"IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
     re.IGNORECASE,
 )
 POLICY_SCOPE_FIXTURES = {
@@ -324,6 +424,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/skills/ponytail/SKILL.md",
         "score is at least 90",
         "documentation before persisting findings and score",
+        REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
         "uv run pytest tests/ -q --tb=short",
@@ -337,6 +438,11 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
     for fragment in ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS[name]:
         if fragment not in text:
             errors.append(f"{name} is missing control-plane inventory path: {fragment}")
+    for phrase in ROOT_GUIDANCE_AUTHORING_PHRASES:
+        if phrase in text:
+            errors.append(
+                f"{name} contains authoring-specific root-guidance phrase: {phrase}"
+            )
     return errors
 
 
@@ -352,6 +458,78 @@ def workspace_guidance_errors(text: str) -> list[str]:
     return errors
 
 
+def normalized_text(text: str) -> str:
+    """Collapse Markdown layout into text suitable for semantic checks."""
+    return " ".join(text.split())
+
+
+def is_negated_caveman_match(text: str, match: re.Match[str]) -> bool:
+    """Return whether a Caveman-default match is immediately negated."""
+    prefix = text[max(0, match.start() - 24) : match.start()].lower()
+    return bool(re.search(r"\b(?:do not|don't|never)\s+$", prefix))
+
+
+def has_caveman_user_default(text: str) -> bool:
+    """Detect an unnegated instruction to make Caveman user-facing default."""
+    return any(
+        not is_negated_caveman_match(text, match)
+        for pattern in REPORTING_CAVEMAN_USER_DEFAULT_PATTERNS
+        for match in pattern.finditer(text)
+    )
+
+
+def reporting_policy_errors(text: str) -> list[str]:
+    """Return missing audience-boundary requirements from the canonical policy."""
+    errors: list[str] = []
+    if text.count("# Audience-Aware Reporting Policy\n") != 1:
+        errors.append("reporting policy must contain exactly one canonical title")
+    semantic_text = normalized_text(text)
+    for fragment in REPORTING_POLICY_REQUIRED_FRAGMENTS:
+        if normalized_text(fragment) not in semantic_text:
+            errors.append(f"reporting policy is missing: {fragment}")
+    lower_text = semantic_text.lower()
+    for fragment in REPORTING_POLICY_FORBIDDEN_FRAGMENTS:
+        if normalized_text(fragment).lower() in lower_text:
+            errors.append(
+                f"reporting policy contains legacy or contradictory language: {fragment}"
+            )
+    if has_caveman_user_default(semantic_text):
+        errors.append("reporting policy makes Caveman the user-facing default")
+    return errors
+
+
+def reporting_prompt_errors(agent_id: str, text: str) -> list[str]:
+    """Return missing reporting-policy pointers from one canonical agent prompt."""
+    errors: list[str] = []
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append(f"{agent_id} prompt must point to the canonical reporting policy")
+    lower_text = normalized_text(text).lower()
+    if "caveman" in lower_text:
+        errors.append(f"{agent_id} prompt must not duplicate Caveman reporting rules")
+    for fragment in REPORTING_PROMPT_DUPLICATE_FRAGMENTS:
+        if fragment.lower() in lower_text:
+            errors.append(
+                f"{agent_id} prompt must not duplicate reporting rule: {fragment}"
+            )
+    if agent_id == "documenter" and "normal prose" not in text.lower():
+        errors.append(
+            "documenter prompt must keep user-facing documentation in normal prose"
+        )
+    return errors
+
+
+def workflow_reporting_errors(text: str) -> list[str]:
+    """Return duplicated reporting-policy rules from the workflow policy."""
+    errors: list[str] = []
+    semantic_text = normalized_text(text).lower()
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append("workflow policy must point to the canonical reporting policy")
+    for fragment in WORKFLOW_REPORTING_FORBIDDEN_FRAGMENTS:
+        if fragment.lower() in semantic_text:
+            errors.append(f"workflow policy duplicates reporting rules: {fragment}")
+    return errors
+
+
 def task_lane_contract_errors(text: str) -> list[str]:
     """Return failures for the sole normative Task Lanes policy table."""
     errors: list[str] = []
@@ -364,6 +542,31 @@ def task_lane_contract_errors(text: str) -> list[str]:
         if fragment in text:
             errors.append(
                 f"workflow Task Lanes table contains stale contradiction: {fragment}"
+            )
+    return errors
+
+
+def planner_supervision_contract_errors(
+    planner_prompt: str, orchestrator_prompt: str
+) -> list[str]:
+    """Return missing bounded-planning and single-planner supervision clauses."""
+    errors: list[str] = []
+    planner_text = " ".join(planner_prompt.split())
+    orchestrator_text = " ".join(orchestrator_prompt.split())
+    for fragment in PLANNER_PROMPT_REQUIRED_FRAGMENTS:
+        if fragment not in planner_text:
+            errors.append(
+                f"planner prompt is missing bounded-discovery contract: {fragment}"
+            )
+    for fragment in PLANNER_PROMPT_FORBIDDEN_FRAGMENTS:
+        if fragment in planner_text:
+            errors.append(
+                f"planner prompt contains stale unconditional mandate: {fragment}"
+            )
+    for fragment in ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS:
+        if fragment not in orchestrator_text:
+            errors.append(
+                f"orchestrator prompt is missing planner-supervision contract: {fragment}"
             )
     return errors
 
@@ -411,11 +614,9 @@ def task_lane_for(**inputs: Unpack[TaskLaneInputs]) -> str:
 
 def validate_task_lane_contract(errors: list[str]) -> None:
     """Validate the authoritative policy rather than duplicating it in adapters."""
-    errors.extend(
-        task_lane_contract_errors(
-            read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
-        )
-    )
+    workflow = read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
+    errors.extend(task_lane_contract_errors(workflow))
+    errors.extend(workflow_reporting_errors(workflow))
 
 
 def validate_root_guidance(errors: list[str]) -> None:
@@ -513,6 +714,17 @@ def validate_policy_adapters(errors: list[str]) -> None:
         "every conditional policy must declare a Codex skill fallback decision",
         errors,
     )
+    reporting_policy = next(
+        (
+            policy
+            for policy in policies
+            if policy.source.name == "agent-reporting.instructions.md"
+        ),
+        None,
+    )
+    check(reporting_policy is not None, "missing canonical reporting policy", errors)
+    if reporting_policy is not None:
+        errors.extend(reporting_policy_errors(reporting_policy.body))
 
     github_root = TARGET_ROOT / ".github" / "instructions"
     rules_root = TARGET_ROOT / ".claude" / "rules"
@@ -542,6 +754,11 @@ def validate_policy_adapters(errors: list[str]) -> None:
             f"missing canonical shared policy in target: {canonical_path}",
             errors,
         )
+        if (
+            policy.source.name == "agent-reporting.instructions.md"
+            and canonical_path.exists()
+        ):
+            errors.extend(reporting_policy_errors(read(canonical_path)))
         check(
             github_path.exists(),
             f"missing Copilot policy adapter: {github_path}",
@@ -1111,14 +1328,36 @@ def codex_agent_instruction_errors(
 
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
+    planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
+    orchestrator_prompt = read(
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    )
+    errors.extend(
+        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+    )
+    for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
+        errors.extend(
+            reporting_prompt_errors(prompt_path.parent.name, read(prompt_path))
+        )
     expected_count = len(shared_agents)
     check(expected_count > 0, "no shared agents found under shared/agents/", errors)
     expected_codex_intents: dict[str, tuple[object, object]] = {}
+    expected_claude_intents: dict[str, tuple[object, object]] = {}
+    expected_github_models: dict[str, object] = {}
     codex_escalations: dict[str, tuple[object, object]] = {}
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
+        expected_github_models[agent_id] = data.get("model_intent", {}).get(
+            "github-copilot"
+        )
+        claude_intent = data.get("model_intent", {}).get("claude-code")
+        if isinstance(claude_intent, dict):
+            expected_claude_intents[agent_id] = (
+                claude_intent.get("model"),
+                claude_intent.get("effort"),
+            )
         codex_intent = data.get("model_intent", {}).get("openai-codex")
         check(
             isinstance(codex_intent, dict),
@@ -1161,9 +1400,6 @@ def validate_agents(errors: list[str]) -> None:
                     (esc_model, esc_effort) != (model, effort),
                     f"{agent_id} escalate_to must differ from its base Codex tier",
                     errors,
-                )
-                orchestrator_prompt = read(
-                    REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
                 )
                 check(
                     isinstance(esc_model, str)
@@ -1303,18 +1539,23 @@ def validate_agents(errors: list[str]) -> None:
                 f"Claude agent model '{model_value}' does not support effort but sets '{effort_value}': {path}",
                 errors,
             )
-        if path.stem == "documenter":
-            check(
-                "normal prose" in text.lower() and "caveman" in text.lower(),
-                f"Documenter must explicitly keep user-facing docs in normal prose: {path}",
-                errors,
-            )
-        else:
-            check(
-                "caveman" in text.lower(),
-                f"Claude agent must report back with caveman full prose framing: {path}",
-                errors,
-            )
+        expected_model, expected_effort = expected_claude_intents.get(
+            path.stem, ("inherit", "inherit")
+        )
+        check(
+            model_value == (None if expected_model == "inherit" else expected_model),
+            f"generated Claude agent {path.stem} model drifted from canonical intent",
+            errors,
+        )
+        check(
+            effort_value == (None if expected_effort == "inherit" else expected_effort),
+            f"generated Claude agent {path.stem} effort drifted from canonical intent",
+            errors,
+        )
+        errors.extend(
+            f"generated Claude {error}: {path}"
+            for error in reporting_prompt_errors(path.stem, text)
+        )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
     check(
@@ -1372,6 +1613,10 @@ def validate_agents(errors: list[str]) -> None:
             f"Codex agent {error}: {path}"
             for error in codex_agent_instruction_errors(agent, instructions)
         )
+        errors.extend(
+            f"generated Codex {error}: {path}"
+            for error in reporting_prompt_errors(path.stem, instructions)
+        )
         if "tool-routing.instructions.md" in instructions:
             check(
                 "[mcp_servers." not in text,
@@ -1395,6 +1640,31 @@ def validate_agents(errors: list[str]) -> None:
                     f"non-Copilot review helper label leaked into {path}: {label}",
                     errors,
                 )
+
+    claude_planner = read(TARGET_ROOT / ".claude" / "agents" / "planner.md")
+    claude_orchestrator = read(TARGET_ROOT / ".claude" / "agents" / "orchestrator.md")
+    errors.extend(
+        f"generated Claude {error}"
+        for error in planner_supervision_contract_errors(
+            claude_planner, claude_orchestrator
+        )
+    )
+    codex_planner = str(
+        read_toml(TARGET_ROOT / ".codex" / "agents" / "planner.toml").get(
+            "developer_instructions", ""
+        )
+    )
+    codex_orchestrator = str(
+        read_toml(TARGET_ROOT / ".codex" / "agents" / "orchestrator.toml").get(
+            "developer_instructions", ""
+        )
+    )
+    errors.extend(
+        f"generated Codex {error}"
+        for error in planner_supervision_contract_errors(
+            codex_planner, codex_orchestrator
+        )
+    )
 
     # R-AGENTS-06: control-plane guards must use consumer paths; the authoring
     # repo's shared/ and dist/ must not leak into generated agent bodies.
@@ -1422,47 +1692,68 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    validate_github_agent_models(errors)
+    validate_github_agent_models(errors, expected_github_models)
 
 
-def validate_github_agent_models(errors: list[str]) -> None:
+def github_agent_model_errors(
+    text: str, expected_model: object, path: Path
+) -> list[str]:
+    """Return GitHub custom-agent frontmatter model contract failures."""
+    errors: list[str] = []
+    if not text.startswith("---\n"):
+        return [f"GitHub agent missing frontmatter: {path}"]
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return [f"GitHub agent frontmatter is malformed: {path}"]
+    frontmatter_lines = parts[1].splitlines()
+    model_lines = [
+        line.split(":", 1)[1].strip()
+        for line in frontmatter_lines
+        if line.startswith("model:")
+    ]
+    for index, line in enumerate(frontmatter_lines):
+        if not line.startswith("model:"):
+            continue
+        value = line.split(":", 1)[1].strip()
+        if not value:
+            errors.append(
+                f"GitHub agent model must be a single string, not a YAML list: {path}"
+            )
+            continue
+        if value not in GITHUB_ALLOWED_AGENT_MODELS:
+            errors.append(
+                f"GitHub agent model is not a current supported Copilot model string: {path}: {value}"
+            )
+        if "(copilot)" in value:
+            errors.append(
+                f"GitHub agent model must not include provider suffix: {path}"
+            )
+        if index + 1 < len(frontmatter_lines) and frontmatter_lines[
+            index + 1
+        ].lstrip().startswith("- "):
+            errors.append(f"GitHub agent model must not be a YAML sequence: {path}")
+    expected = expected_model if isinstance(expected_model, str) else "target-default"
+    if expected == "target-default":
+        if model_lines:
+            errors.append(f"generated GitHub agent must inherit its model: {path}")
+    elif model_lines != [expected]:
+        errors.append(
+            f"generated GitHub agent model drifted from canonical intent: {path}"
+        )
+    return errors
+
+
+def validate_github_agent_models(
+    errors: list[str], expected_models: dict[str, object]
+) -> None:
     agent_root = TARGET_ROOT / ".github" / "agents"
     for path in sorted(agent_root.glob("*.agent.md")):
         text = read(path)
-        if not text.startswith("---\n"):
-            errors.append(f"GitHub agent missing frontmatter: {path}")
-            continue
-        parts = text.split("---\n", 2)
-        if len(parts) != 3:
-            errors.append(f"GitHub agent frontmatter is malformed: {path}")
-            continue
-        lines = parts[1].splitlines()
-        for index, line in enumerate(lines):
-            if not line.startswith("model:"):
-                continue
-            value = line.split(":", 1)[1].strip()
-            check(
-                bool(value),
-                f"GitHub agent model must be a single string, not a YAML list: {path}",
-                errors,
+        errors.extend(
+            github_agent_model_errors(
+                text, expected_models.get(path.name.removesuffix(".agent.md")), path
             )
-            if value:
-                check(
-                    value in GITHUB_ALLOWED_AGENT_MODELS,
-                    f"GitHub agent model is not a current supported Copilot model string: {path}: {value}",
-                    errors,
-                )
-                check(
-                    "(copilot)" not in value,
-                    f"GitHub agent model must not include provider suffix: {path}",
-                    errors,
-                )
-            if index + 1 < len(lines):
-                check(
-                    not lines[index + 1].lstrip().startswith("- "),
-                    f"GitHub agent model must not be a YAML sequence: {path}",
-                    errors,
-                )
+        )
 
 
 def validate_model_leaks(errors: list[str]) -> None:
@@ -2022,7 +2313,7 @@ def run_hook_raw(
 
 def path_without_uv() -> dict[str, str]:
     """A copy of os.environ with any directory containing a `uv` binary removed
-    from PATH, so tests can exercise the pure-bash guardrail fallback."""
+    from PATH, so tests can exercise the no-uv guardrail fallback."""
     env = dict(os.environ)
     kept = [
         part
@@ -3159,24 +3450,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        write_findings(findings_report(head_sha, content_hash, ponytail_reviewed=False))
+        optional_report = findings_report(head_sha, content_hash)
+        optional_report.pop("ponytail_reviewed")
+        optional_report.pop("ponytail_findings")
+        optional_report["profiles_reviewed"] = ["code"]
+        write_findings(optional_report)
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            result.returncode != 0,
-            "commit-msg hook must block non-documentation changes without Ponytail review",
+            result.returncode == 0,
+            "commit-msg hook must allow ordinary low-complexity work without Ponytail metadata",
             errors,
         )
-        check(
-            "require a fresh Ponytail review" in result.stderr,
-            "missing-Ponytail failure must name the required review",
-            errors,
-        )
+        if result.returncode == 0:
+            git(repo, "reset", "--soft", "HEAD~1")
 
         write_findings(
             findings_report(
                 head_sha,
                 content_hash,
-                ponytail_findings=1,
                 findings=[
                     {
                         "severity": "MINOR",
@@ -3190,15 +3481,31 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            result.returncode != 0,
-            "commit-msg hook must block every surviving Ponytail finding",
+            result.returncode == 0,
+            "commit-msg hook must allow an advisory Ponytail MINOR finding",
             errors,
         )
+        if result.returncode == 0:
+            git(repo, "reset", "--soft", "HEAD~1")
+
+        write(repo / ".codex" / "config.toml", "[features]\n")
+        git(repo, "add", ".codex/config.toml")
+        head_sha, content_hash = head_and_hash()
+        write_score(score_report(head_sha, content_hash))
+        required_report = findings_report(head_sha, content_hash)
+        required_report.pop("ponytail_reviewed")
+        required_report.pop("ponytail_findings")
+        required_report["profiles_reviewed"] = ["code"]
+        write_findings(required_report)
+        result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            "unresolved Ponytail finding" in result.stderr,
-            "Ponytail-finding failure must explain that simplification is required",
+            result.returncode != 0
+            and "requires a fresh Ponytail review" in result.stderr,
+            "commit-msg hook must require Ponytail metadata for control-plane work",
             errors,
         )
+
+        write_findings(findings_report(head_sha, content_hash))
 
         write_findings(findings_report(head_sha, content_hash, content_hash="deadbeef"))
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -3560,6 +3867,66 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        write(repo / "minor-work.txt", "minor work\n")
+        git(repo, "add", "minor-work.txt")
+        write_score_report()
+        write_findings_report(
+            counts={"critical": 0, "major": 0, "minor": 1},
+            findings=[
+                {
+                    "severity": "MINOR",
+                    "title": "yagni: optional simplification",
+                    "file": "minor-work.txt",
+                    "profile": "ponytail",
+                }
+            ],
+        )
+        minor_commit = git(repo, "commit", "-m", "phase 1 advisory minor")
+        check(
+            minor_commit.returncode == 0,
+            "commit-msg hook must allow a Ponytail MINOR finding",
+            errors,
+        )
+        minor_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            minor_push.returncode == 0,
+            "pre-push hook must allow an advisory Ponytail MINOR finding",
+            errors,
+        )
+
+        write(repo / ".codex" / "config.toml", "[features]\n")
+        git(repo, "add", ".codex/config.toml")
+        write_score_report()
+        # Build the ordinary report then remove optional metadata to exercise
+        # the required-review push path without bypassing report freshness.
+        write_findings_report()
+        required_path = reports_dir / "findings-test.json"
+        required_report = json.loads(read(required_path))
+        required_report.pop("ponytail_reviewed")
+        required_report.pop("ponytail_findings")
+        required_report["profiles_reviewed"] = ["code"]
+        write(required_path, json.dumps(required_report, indent=2) + "\n")
+        git(repo, "commit", "-m", "phase 1 high-risk metadata", "--no-verify")
+        missing_metadata_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            missing_metadata_push.returncode != 0
+            and "requires a fresh Ponytail review" in missing_metadata_push.stderr,
+            "pre-push hook must require Ponytail metadata for high-risk diffs",
+            errors,
+        )
+
         # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
         # allow the commit (the commit gate only checks critical) while
         # blocking the push (the push gate additionally checks major).
@@ -3573,11 +3940,13 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                     "severity": "MAJOR",
                     "title": "unbounded query",
                     "file": "major-work.txt",
+                    "profile": "ponytail",
                 },
                 {
                     "severity": "MAJOR",
                     "title": "missing pagination",
                     "file": "major-work.txt",
+                    "profile": "ponytail",
                 },
             ],
         )
@@ -3719,8 +4088,6 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "README.md",
                 "--profile",
                 "code",
-                "--profile",
-                "ponytail",
                 "--phase",
                 "validator",
                 "--base-ref",
@@ -3736,26 +4103,113 @@ def validate_generated_scripts(errors: list[str]) -> None:
         )
         check(
             result.returncode == 0,
-            f"record_findings Ponytail metadata run failed: {result.stderr}",
+            f"record_findings optional-metadata run failed: {result.stderr}",
             errors,
         )
         if report_path.exists():
             report = json.loads(read(report_path))
             check(
+                "ponytail_reviewed" not in report,
+                "record_findings must omit Ponytail metadata when the profile did not run",
+                errors,
+            )
+            check(
+                "ponytail_findings" not in report,
+                "record_findings must omit Ponytail finding metadata when the profile did not run",
+                errors,
+            )
+            check(
+                report.get("profiles_reviewed") == ["code"],
+                "record_findings must persist sorted reviewed profiles",
+                errors,
+            )
+
+        legacy_path = Path(temp_dir) / "legacy-ponytail-findings.json"
+        legacy = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "ponytail",
+                "--phase",
+                "validator",
+                "--base-ref",
+                "dev",
+                "--out",
+                str(legacy_path),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            legacy.returncode == 0,
+            f"record_findings Ponytail metadata run failed: {legacy.stderr}",
+            errors,
+        )
+        if legacy_path.exists():
+            report = json.loads(read(legacy_path))
+            check(
                 report.get("ponytail_reviewed") is True,
-                "record_findings must persist ponytail_reviewed",
+                "record_findings must preserve Ponytail metadata when the profile ran",
                 errors,
             )
             check(
                 report.get("ponytail_findings") == 0,
-                "record_findings must persist zero Ponytail findings",
+                "record_findings must preserve zero Ponytail findings",
                 errors,
             )
-            check(
-                report.get("profiles_reviewed") == ["code", "ponytail"],
-                "record_findings must persist sorted reviewed profiles",
-                errors,
-            )
+
+        no_profile = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--phase",
+                "validator",
+                "--out",
+                str(Path(temp_dir) / "no-profile.json"),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            no_profile.returncode != 0
+            and "at least one --profile" in no_profile.stderr,
+            "record_findings must reject empty reviewed-profile lists for new reports",
+            errors,
+        )
+
+        missing_finding_profile = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "code",
+                "--phase",
+                "validator",
+                "--out",
+                str(Path(temp_dir) / "missing-finding-profile.json"),
+            ],
+            cwd=REPO_ROOT,
+            input='[{"severity": "MINOR", "title": "missing profile"}]',
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            missing_finding_profile.returncode != 0
+            and "non-empty profile" in missing_finding_profile.stderr,
+            "record_findings must reject findings without a reviewed profile",
+            errors,
+        )
 
 
 def validate_skills_and_paths(errors: list[str]) -> None:
@@ -3808,6 +4262,18 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         check(
             "v4.8.4" in provenance,
             "Ponytail provenance must pin release v4.8.4",
+            errors,
+        )
+        check(
+            "canonical\nworkflow and review-routing policies decide lifecycle placement"
+            in provenance,
+            "Ponytail provenance must preserve canonical workflow authority",
+            errors,
+        )
+        check(
+            "conditional `ponytail` review profile runs" in provenance
+            and "`ponytail-review` remains an\nimported skill" in provenance,
+            "Ponytail provenance must distinguish the review profile from the imported skill",
             errors,
         )
         check(
@@ -6318,7 +6784,7 @@ def validate_determinism(errors: list[str]) -> None:
 
 
 def validate_ponytail_diff_classifier(errors: list[str]) -> None:
-    """Documentation-only diffs skip Ponytail; mixed/code diffs require it."""
+    """Only deterministic high-risk paths require Ponytail metadata in hooks."""
     library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = Path(temp_dir) / "repo"
@@ -6326,6 +6792,7 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         subprocess.run(["git", "init", "-q", "-b", "dev", str(repo)], check=False)
         env = git_actor_env("PonytailClassifier")
         write(repo / "README.md", "# Fixture\n")
+        write(repo / ".codex" / "root-adapter.md", "# Adapter\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
         subprocess.run(
             ["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False
@@ -6337,44 +6804,225 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
             check=False,
         )
 
+        def classifier_status(*refs: str) -> int:
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; diff_requires_ponytail "$2" "${3:-}"',
+                    "_",
+                    str(library),
+                    str(repo),
+                    *refs,
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            return result.returncode
+
         write(repo / "README.md", "# Fixture\n\nDocs only.\n")
-        docs_only = subprocess.run(
-            [
-                "bash",
-                "-c",
-                '. "$1"; diff_requires_ponytail "$2"',
-                "_",
-                str(library),
-                str(repo),
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        docs_only = classifier_status()
         check(
-            docs_only.returncode != 0,
-            "Ponytail diff classifier must exempt a Markdown-only diff",
+            docs_only != 0,
+            "Ponytail diff classifier must exempt a single documentation-only diff",
             errors,
         )
+        git(repo, "checkout", "--", "README.md")
 
         write(repo / "app.py", "print('fixture')\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
-        mixed = subprocess.run(
+        ordinary = classifier_status()
+        check(
+            ordinary != 0,
+            "Ponytail diff classifier must keep one ordinary code file optional",
+            errors,
+        )
+        git(repo, "reset", "app.py")
+        (repo / "app.py").unlink()
+
+        write(repo / "scripts" / "generate.py", "print('fixture')\n")
+        git(repo, "add", "scripts/generate.py")
+        generator = classifier_status()
+        check(
+            generator == 0,
+            "Ponytail diff classifier must require review for scripts and generators",
+            errors,
+        )
+        git(repo, "reset", "scripts/generate.py")
+        (repo / "scripts" / "generate.py").unlink()
+
+        write(repo / "docs" / "guide.md", "# Guide\n")
+        write(repo / "README.md", "# Fixture\n\nSecond docs file.\n")
+        git(repo, "add", "README.md", "docs/guide.md")
+        multi_docs = classifier_status()
+        check(
+            multi_docs == 0,
+            "Ponytail diff classifier must treat a multi-file docs diff as high-risk",
+            errors,
+        )
+        git(repo, "reset", "README.md", "docs/guide.md")
+        git(repo, "checkout", "--", "README.md")
+        (repo / "docs" / "guide.md").unlink()
+
+        write(repo / "README.md", "# Fixture\n\nMixed docs.\n")
+        write(repo / "app.py", "print('mixed')\n")
+        git(repo, "add", "README.md", "app.py")
+        mixed = classifier_status()
+        check(
+            mixed == 0,
+            "Ponytail diff classifier must treat a mixed docs/code diff as high-risk",
+            errors,
+        )
+        git(repo, "reset", "README.md", "app.py")
+        git(repo, "checkout", "--", "README.md")
+        (repo / "app.py").unlink()
+
+        write(repo / "pyproject.toml", "[project]\nname = 'fixture'\n")
+        git(repo, "add", "pyproject.toml")
+        dependency = classifier_status()
+        check(
+            dependency == 0,
+            "Ponytail diff classifier must require review for dependency manifests",
+            errors,
+        )
+        git(repo, "reset", "pyproject.toml")
+        (repo / "pyproject.toml").unlink()
+
+        write(repo / "service" / "pyproject.toml", "[project]\nname = 'service'\n")
+        git(repo, "add", "service/pyproject.toml")
+        nested_dependency = classifier_status()
+        check(
+            nested_dependency == 0,
+            "Ponytail diff classifier must require review for nested dependency manifests",
+            errors,
+        )
+        git(repo, "reset", "service/pyproject.toml")
+        (repo / "service" / "pyproject.toml").unlink()
+
+        write(repo / "frontend" / "package.json", '{"name": "frontend"}\n')
+        git(repo, "add", "frontend/package.json")
+        nested_package = classifier_status()
+        check(
+            nested_package == 0,
+            "Ponytail diff classifier must require review for nested package manifests",
+            errors,
+        )
+        git(repo, "reset", "frontend/package.json")
+        (repo / "frontend" / "package.json").unlink()
+
+        write(repo / "service" / "uv.lock", "version = 1\n")
+        git(repo, "add", "service/uv.lock")
+        nested_lockfile = classifier_status()
+        check(
+            nested_lockfile == 0,
+            "Ponytail diff classifier must require review for nested lockfiles",
+            errors,
+        )
+        git(repo, "reset", "service/uv.lock")
+        (repo / "service" / "uv.lock").unlink()
+
+        write(repo / "AGENTS.md", "# Control plane\n")
+        git(repo, "add", "AGENTS.md")
+        control_plane_markdown = classifier_status()
+        check(
+            control_plane_markdown == 0,
+            "Ponytail diff classifier must not exempt a control-plane Markdown file",
+            errors,
+        )
+        git(repo, "add", "AGENTS.md")
+        subprocess.run(
             [
-                "bash",
-                "-c",
-                '. "$1"; diff_requires_ponytail "$2"',
-                "_",
-                str(library),
-                str(repo),
+                "git",
+                "commit",
+                "-q",
+                "-m",
+                "control plane fixture",
             ],
-            text=True,
-            capture_output=True,
+            cwd=repo,
+            env=env,
             check=False,
         )
         check(
-            mixed.returncode == 0,
-            "Ponytail diff classifier must require review for a mixed docs/code diff",
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must apply the same rule to a pushed diff_ref",
+            errors,
+        )
+
+        git(repo, "reset", "--hard", "dev")
+        git(repo, "mv", ".codex/root-adapter.md", "ordinary-adapter.md")
+        check(
+            classifier_status() == 0,
+            "Ponytail diff classifier must inspect both paths of a live control-plane rename",
+            errors,
+        )
+        git(repo, "reset", "--hard", "dev")
+        git(repo, "mv", ".codex/root-adapter.md", "ordinary-adapter.md")
+        git(repo, "commit", "-q", "-m", "rename control-plane adapter")
+        check(
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must inspect both paths of a pushed control-plane rename",
+            errors,
+        )
+
+        git(repo, "reset", "--hard", "dev")
+        write(repo / "service" / "pyproject.toml", "[project]\nname = 'service'\n")
+        git(repo, "add", "service/pyproject.toml")
+        git(repo, "commit", "-q", "-m", "add nested manifest")
+        check(
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must require a nested manifest in diff_ref mode",
+            errors,
+        )
+
+
+def validate_json_report_readers(errors: list[str]) -> None:
+    """Report readers must ignore nested reserved keys and key order."""
+    library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        report = Path(temp_dir) / "report.json"
+
+        def values(payload: dict[str, object]) -> list[str]:
+            write(report, json.dumps(payload) + "\n")
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; json_file_bool_value "$2" ponytail_reviewed; '
+                    'json_file_number_value "$2" counts.critical',
+                    "_",
+                    str(library),
+                    str(report),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"JSON report reader failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        nested_first = {
+            "findings": [{"ponytail_reviewed": True, "critical": 9}],
+            "ponytail_reviewed": False,
+            "counts": {"critical": 0, "major": 0, "minor": 0},
+        }
+        check(
+            values(nested_first) == ["false", "0"],
+            "nested reserved metadata must not precede top-level false/zero fields",
+            errors,
+        )
+        top_level_first = {
+            "ponytail_reviewed": True,
+            "counts": {"critical": 1, "major": 0, "minor": 0},
+            "findings": [{"ponytail_reviewed": False, "critical": 0}],
+        }
+        check(
+            values(top_level_first) == ["true", "1"],
+            "nested reserved metadata must not override top-level true/count fields",
             errors,
         )
 
@@ -6668,6 +7316,7 @@ def main() -> int:
         validate_root_source_mirror_cases(errors)
         validate_runtime_drift_cases(errors)
         validate_ponytail_diff_classifier(errors)
+        validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)
         validate_installer_commit_failure(errors)

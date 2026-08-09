@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are entrypoints and must not be hand-edited.
+It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are consumer-neutral entrypoints and must not be hand-edited.
 
 Main goals:
 
@@ -26,17 +26,18 @@ Main goals:
 
 I use a strict execution loop:
 
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 
 Core principles:
 
 - Start from `dev`, branch for each big plan, and keep plan frontmatter current.
 - Plan first for non-trivial work and split big plans into commit-sized small plans.
-- Run every coding task through Ponytail `full`: reuse first, standard library/native platform next, minimum correct diff last.
+- During IMPLEMENT, the coder applies the vendored Ponytail skill once in `full` mode, then performs a lightweight changed-scope simplification and re-verification pass.
+- Treat minimality as conceptual: prefer reuse, standard-library/native features, and the smallest correct set of concepts while clarity and maintainability outrank line count.
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
-- Ship only after score >= 90, a matching findings report with zero CRITICAL findings and zero Ponytail findings, documentation updates, learning capture, and closeout logs.
+- Ship only after score >= 90, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
 - Preserve lessons learned in memory and session logs.
 
 For the authority, privacy, and conflict rules for that shared state, read
@@ -152,8 +153,9 @@ process emits the event, not on tab closure — so the `post-commit` git hook
 (pushed after every commit) is the durable checkpoint; see [Hooks](#hooks).
 
 The source repository tracks authoring versions of files such as `AGENTS.md`,
-`.codex/config.toml`, and MCP config. After self-installing, restore those
-tracked source files and keep the generated runtime overlay local via
+`CLAUDE.md`, `.codex/config.toml`, and MCP config. During self-refresh and
+state restoration, tracked `AGENTS.md` and `CLAUDE.md` are preserved byte-for-byte;
+restore those authoring files after self-installing and keep the generated runtime overlay local via
 `.git/info/exclude` (for example `.codex/hooks.json`, `.devcontainer/`, and
 `.vscode/tasks.json`). This keeps `git status` clean while preserving the
 installed hooks and devcontainer files locally.
@@ -324,7 +326,7 @@ Interpretation:
 - Agents: canonical metadata and prompts in [shared/agents/](shared/agents/)
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
-- Ponytail: pinned MIT-licensed coding and over-engineering-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
+- Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
@@ -339,7 +341,7 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, Ponytail, implementation, verification, review, documentation, score, learn, session-log, commit protocol
+  - Pre-flight, branch, plan, implementation, verification, review, documentation, score, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
@@ -360,7 +362,20 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Routing between direct reads, `rg`, Semble, and context-mode
   - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
-  - Single home for how agents report back (caveman-full prose, structured content preserved) with the documenter's normal-prose exception
+  - Single audience-aware policy for human-facing prose and compact internal handoffs; agents point here instead of duplicating reporting rules
+
+The [audience-aware reporting policy](shared/policies/agent-reporting.instructions.md)
+is the canonical source for communication style. Human-facing answers and
+documentation use clear, direct prose; compact internal handoffs may use
+`caveman full` when it improves precision. The policy is inspired by
+ASD-STE100 principles, but this project does not claim formal compliance. It
+also protects exact technical material and does not require a separate rewrite
+stage.
+
+For example, write “The validator rejected `shared/policies/agent-reporting.instructions.md`
+because `REPORTING_POLICY_POINTER` is missing” instead of “Policy pointer
+validation failed due to an absent reporting artifact.” The clearer sentence
+keeps the exact path and identifier unchanged.
 
 ### Conditional policy applicability
 
@@ -452,19 +467,32 @@ Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its 
 | Agent | Claude model | Claude effort | Codex model | Codex effort |
 | --- | --- | --- | --- | --- |
 | orchestrator | session (`/model`) | session (`/effort`) | `gpt-5.6-sol` | `xhigh` |
-| planner | `opus` | `max` | `gpt-5.6-sol` | `max` |
+| planner | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` |
 | reviewer | `sonnet` | `xhigh` | `gpt-5.6-sol` | `high` |
 | coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
 | documenter | `sonnet` | `medium` | `gpt-5.6-luna` | `medium` |
 | verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 
-**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
+**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
 **Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed `shared/agents/<id>/prompt.md` body. `agent.yaml` remains the single source for metadata and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**, so keep it and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gate is met — the shim-removed candidate has never been exercised. Sol is reserved for coordination, planning, and review; Terra handles implementation; Luna handles documentation and mechanical verification.
 
 **Escalation on failure (Codex only):** `coder`'s `model_intent.openai-codex` also declares an `escalate_to` (`gpt-5.6-sol`/`xhigh`), documentation-only in `agent.yaml` — it is not consumed by the generator, so there is no second `.codex/agents/coder-*.toml` file. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent, so the orchestrator's own prompt carries the instruction: if `verifier` fails or `reviewer` returns a CRITICAL/MAJOR/ponytail finding on a diff `coder` just produced, re-delegate the fix to `coder` with those override values instead of retrying at the base Terra/high tier, capped at one escalation per phase. A validator check keeps the `agent.yaml` data and the prompt wording from silently drifting apart. Claude Code has no per-invocation effort override, so there is no equivalent lane on that target.
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
+
+Planner delegation uses a compact evidence packet (approved decisions,
+verified facts, exact artifacts, constraints, rejected approaches, and
+unresolved questions), one active planner, and fresh/minimal scoped context. A
+pending wait means only that no mailbox event arrived during that polling
+window. Health checks use runtime state, observable activity, and terminal/tool
+errors; silence does not trigger duplicate spawns or effort changes. Keep users
+informed at least every five minutes when no stricter cadence applies. Thirty
+minutes is a provisional health-review floor, not an automatic interruption
+timer. Retain `max` only for two matched `xhigh` checklist failures resolved by
+a matched `max` control; consider `high` only after a paired benchmark. GitHub
+Copilot remains `Claude Opus 4.6`; effort labels are not cross-vendor compute
+claims. See the [dated planner calibration record](docs/2026-08-09-planner-reliability-calibration.md).
 
 ### Task lanes
 
@@ -508,7 +536,7 @@ Orchestrator routing details:
 
 Coder skill loading:
 
-- Tier 1 (always): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`
+- Tier 1 (always for coding): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`. After implementation, the coder simplifies only the changed scope and re-verifies it; there is no standalone Ponytail lifecycle phase.
 - Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
 - An explicit request or approved plan authorizes a known control-plane change; ask only when targets, authority, or material scope are unclear.
 
@@ -585,7 +613,7 @@ Expected verification commands after implementation:
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
 - uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
-- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 
 Quality gates:
 
@@ -594,7 +622,7 @@ Quality gates:
 - < 90: blocked until implementation, verification, review, and score are rerun
 - findings report `counts.critical == 0`: required for commit
 - findings report `counts.major == 0`: additionally required for PR/push closeout
-- findings report `ponytail_reviewed == true` and `ponytail_findings == 0`: required for every non-documentation commit and push
+- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
 
 Documentation gate:
 
@@ -670,7 +698,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files
