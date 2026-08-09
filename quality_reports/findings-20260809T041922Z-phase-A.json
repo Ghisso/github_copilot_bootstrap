@@ -1,0 +1,38 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-09T04:20:56Z",
+  "branch": "guidance-and-review-calibration_implementation",
+  "head_sha": "3e1f4fbbd8f50df8048d44a77b742abfddd28aab",
+  "base_ref": "dev",
+  "merge_base_sha": "3e1f4fbbd8f50df8048d44a77b742abfddd28aab",
+  "phase": "2026-08-09_phase-A-consumer-neutral-root-guidance",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "fc1de81c450feb2e1f1ff570f7d9415116e04532",
+  "changed_files": [
+    "CLAUDE.md",
+    "README.md",
+    "docs/target-mapping.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ]
+}

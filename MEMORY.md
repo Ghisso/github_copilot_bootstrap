@@ -241,3 +241,6 @@
   where it regenerates; `check_runtime.py` naming a path "absent from generated
   target" is the signal to promote it, not to restore it again. Shared skills
   must declare `visibility: public|background`.
+- [LEARN:testing] Authoring-adapter preservation needs separate regressions for
+  installer refresh and state restoration. A passing copy/update test does not
+  prove the real restore script honors tracked root ownership.

@@ -3,7 +3,7 @@ name: 2026-08-09_phase-A-consumer-neutral-root-guidance
 type: small-plan
 parent_plan: guidance-and-review-calibration
 phase_index: 1
-status: in-progress
+status: complete
 closeout_session_log: .claude/session_logs/2026-08-09_guidance-and-review-calibration-phase-A.md
 ---
 
@@ -27,13 +27,13 @@ Make generated Claude Code and OpenAI Codex root guidance neutral to the consumi
 
 ## Steps
 
-- [ ] Confirm root `AGENTS.md` SHA-256 is `440279e04b230e856c0670475a9f578ee6eacab1a6aa208323b40e5ce1ebbc8e`.
-- [ ] Confirm root `CLAUDE.md` SHA-256 is `34416b9d55a24f2f4cb7f56e60dc47c097f4941da740ced3ea39e6f353455755`.
-- [ ] Update canonical root-guidance generation to use consumer-neutral titles, introductions, and ownership wording.
-- [ ] Add exact regression assertions rejecting `Bootstrap Guidance`, `reusable multi-agent bootstrap`, `In an installed project`, and `Bootstrap maintainers own authoring and regeneration` in generated roots without banning the word `bootstrap` globally.
-- [ ] Force-track the current root `CLAUDE.md` without changing its bytes and add it beside `AGENTS.md` in the authoring-path ownership declaration.
-- [ ] Regenerate all targets and exercise installer self-refresh and state restoration.
-- [ ] Confirm both root adapter hashes remain unchanged.
+- [x] Confirm root `AGENTS.md` SHA-256 is `440279e04b230e856c0670475a9f578ee6eacab1a6aa208323b40e5ce1ebbc8e`.
+- [x] Confirm root `CLAUDE.md` SHA-256 is `34416b9d55a24f2f4cb7f56e60dc47c097f4941da740ced3ea39e6f353455755`.
+- [x] Update canonical root-guidance generation to use consumer-neutral titles, introductions, and ownership wording.
+- [x] Add exact regression assertions rejecting `Bootstrap Guidance`, `reusable multi-agent bootstrap`, `In an installed project`, and `Bootstrap maintainers own authoring and regeneration` in generated roots without banning the word `bootstrap` globally.
+- [x] Force-track the current root `CLAUDE.md` without changing its bytes and add it beside `AGENTS.md` in the authoring-path ownership declaration.
+- [x] Regenerate all targets and exercise installer self-refresh and state restoration.
+- [x] Confirm both root adapter hashes remain unchanged.
 
 ## Verification
 
@@ -52,17 +52,17 @@ sha256sum AGENTS.md CLAUDE.md
 
 ## Acceptance Criteria
 
-- [ ] Generated `dist/multi-agent/CLAUDE.md` and `dist/multi-agent/AGENTS.md` describe a generic consumer repository.
-- [ ] Neither generated root contains any of the four rejected authoring-specific phrases.
-- [ ] Root `AGENTS.md` retains its recorded SHA-256.
-- [ ] Root `CLAUDE.md` retains its recorded SHA-256.
-- [ ] Both authoring root adapters survive generation, self-refresh, and restoration unchanged.
+- [x] Generated `dist/multi-agent/CLAUDE.md` and `dist/multi-agent/AGENTS.md` describe a generic consumer repository.
+- [x] Neither generated root contains any of the four rejected authoring-specific phrases.
+- [x] Root `AGENTS.md` retains its recorded SHA-256.
+- [x] Root `CLAUDE.md` retains its recorded SHA-256.
+- [x] Both authoring root adapters survive generation, self-refresh, and restoration unchanged.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

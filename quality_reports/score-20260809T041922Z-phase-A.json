@@ -1,0 +1,32 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "140 passed in 23.32s",
+  "mypy_summary": "Success: no issues found in 19 source files",
+  "deductions": [],
+  "generated_at": "2026-08-09T04:21:26Z",
+  "branch": "guidance-and-review-calibration_implementation",
+  "head_sha": "3e1f4fbbd8f50df8048d44a77b742abfddd28aab",
+  "base_ref": "dev",
+  "merge_base_sha": "3e1f4fbbd8f50df8048d44a77b742abfddd28aab",
+  "phase": "2026-08-09_phase-A-consumer-neutral-root-guidance",
+  "dirty": false,
+  "content_hash": "fc1de81c450feb2e1f1ff570f7d9415116e04532",
+  "changed_files": [
+    "CLAUDE.md",
+    "README.md",
+    "docs/target-mapping.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ]
+}
