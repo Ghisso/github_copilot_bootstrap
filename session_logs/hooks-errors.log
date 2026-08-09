@@ -286,3 +286,11 @@ fatal: Cannot rebase onto multiple branches.
 2026-08-09T04:10:30Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-09T04:10:30Z WARN hook fail-closed: unparseable tool payload
 2026-08-09T04:10:30Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:11:57Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:11:57Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:11:57Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:12:24Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:12:24Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:16:04Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:16:05Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:16:05Z WARN hook fail-closed: protect-files.sh exited with status 2
