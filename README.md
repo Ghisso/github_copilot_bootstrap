@@ -361,7 +361,20 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Routing between direct reads, `rg`, Semble, and context-mode
   - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
-  - Single home for how agents report back (caveman-full prose, structured content preserved) with the documenter's normal-prose exception
+  - Single audience-aware policy for human-facing prose and compact internal handoffs; agents point here instead of duplicating reporting rules
+
+The [audience-aware reporting policy](shared/policies/agent-reporting.instructions.md)
+is the canonical source for communication style. Human-facing answers and
+documentation use clear, direct prose; compact internal handoffs may use
+`caveman full` when it improves precision. The policy is inspired by
+ASD-STE100 principles, but this project does not claim formal compliance. It
+also protects exact technical material and does not require a separate rewrite
+stage.
+
+For example, write “The validator rejected `shared/policies/agent-reporting.instructions.md`
+because `REPORTING_POLICY_POINTER` is missing” instead of “Policy pointer
+validation failed due to an absent reporting artifact.” The clearer sentence
+keeps the exact path and identifier unchanged.
 
 ### Conditional policy applicability
 

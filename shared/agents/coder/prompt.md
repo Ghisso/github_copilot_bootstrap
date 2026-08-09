@@ -44,7 +44,8 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 ## Communication Style
 
-Report per `.claude/instructions/agent-reporting.instructions.md` — default to `caveman full`, keep prose evidence-first, and preserve exact code, commands, file paths, identifiers, and error text.
+Follow `.claude/instructions/agent-reporting.instructions.md` for
+audience-appropriate communication.
 
 ## Execution Rules
 

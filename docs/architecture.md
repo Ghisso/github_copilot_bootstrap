@@ -17,6 +17,13 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 - `shared/templates/`, `shared/scripts/`, `shared/MEMORY.md`, and state README directories: source inputs rendered into the shared `.claude/` basis.
 - `shared/schemas/`: schema documentation for shared metadata.
 
+Communication guidance is centralized in
+[`shared/policies/agent-reporting.instructions.md`](../shared/policies/agent-reporting.instructions.md).
+It selects audience-appropriate prose: clear, direct language for people and
+optional compact `caveman full` handoffs between agents. Generated agent
+prompts point to this policy instead of copying its rules, while exact paths,
+identifiers, commands, logs, and other evidence remain unchanged.
+
 ### Policy applicability and native discovery
 
 Policy scope is authored once in `shared/policies/` with target-neutral

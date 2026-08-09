@@ -41,10 +41,13 @@ from validate_targets import (  # noqa: E402
     pretool_routing_errors,
     root_guidance_errors,
     planner_supervision_contract_errors,
+    reporting_policy_errors,
+    reporting_prompt_errors,
     scope_matches,
     task_lane_contract_errors,
     task_lane_for,
     TaskLaneInputs,
+    workflow_reporting_errors,
     workspace_guidance_errors,
 )
 
@@ -190,6 +193,13 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert "`.github/hooks/`" in codex
     assert len(claude.splitlines()) <= 200
     assert len(codex.encode()) <= 16 * 1024
+    missing_reporting_pointer = claude.replace(
+        ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
+    )
+    assert any(
+        "agent-reporting.instructions.md" in error
+        for error in root_guidance_errors("CLAUDE.md", missing_reporting_pointer)
+    )
 
 
 @pytest.mark.parametrize(
@@ -380,6 +390,16 @@ def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> Non
         "Skip planning only for:" in error for error in task_lane_contract_errors(drift)
     )
 
+    assert workflow_reporting_errors(workflow) == []
+    legacy_reporting = workflow.replace(
+        ".claude/instructions/agent-reporting.instructions.md",
+        ".claude/instructions/agent-reporting.instructions.md\n\n"
+        "Subagents reporting back to the orchestrator should use `caveman` `full`.\n"
+        "Preserve tables, code blocks, commands, and paths literally.",
+        1,
+    )
+    assert workflow_reporting_errors(legacy_reporting)
+
 
 def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:
     """Claude and Copilot derive equivalent conditional scopes from policies."""
@@ -405,6 +425,86 @@ def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:
                 scope_matches(path, copilot_instruction_paths(github)) is expected_match
             )
             assert scope_matches(path, claude_rule_paths(claude)) is expected_match
+
+
+def test_reporting_policy_and_agent_prompts_preserve_the_audience_boundary() -> None:
+    """The shared policy owns prose rules while each agent retains only a pointer."""
+    policy = (
+        REPO_ROOT / "shared" / "policies" / "agent-reporting.instructions.md"
+    ).read_text(encoding="utf-8")
+
+    assert reporting_policy_errors(policy) == []
+    reflowed_policy = policy.replace(
+        "does not claim\nformal ASD-STE100 compliance",
+        "does not claim formal ASD-STE100 compliance",
+        1,
+    ).replace(
+        "identifiers, API\nnames, commands",
+        "identifiers, API names, commands",
+        1,
+    )
+    assert reporting_policy_errors(reflowed_policy) == []
+    assert reporting_policy_errors(
+        policy.replace(
+            "does not claim\nformal ASD-STE100 compliance", "is compliant", 1
+        )
+    )
+    assert reporting_policy_errors(
+        policy.replace(
+            "Technical precision has priority", "Simple vocabulary has priority", 1
+        )
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nDefault to `caveman full` style for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is the default for user-facing communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full is the default for user communication.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman full should be the default for human-facing reports.\n"
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nUse caveman full for user-facing communication.\n"
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not use caveman full for user-facing communication.\n"
+        )
+        == []
+    )
+    assert (
+        reporting_policy_errors(
+            f"{policy}\nDo not default to caveman full for human communication.\n"
+        )
+        == []
+    )
+    assert reporting_policy_errors(
+        f"{policy}\nCaveman is for orchestrator-facing status.\n"
+    )
+
+    for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
+        prompt = prompt_path.read_text(encoding="utf-8")
+        assert reporting_prompt_errors(prompt_path.parent.name, prompt) == []
+        assert reporting_prompt_errors(
+            prompt_path.parent.name,
+            prompt.replace("agent-reporting.instructions.md", "reporting.md", 1),
+        )
+
+    coder_prompt = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nDefault to `caveman full`.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nPreserve tables, code blocks, commands literally.\n"
+    )
+    assert reporting_prompt_errors(
+        "coder", f"{coder_prompt}\nUse active voice where practical.\n"
+    )
 
 
 def test_policy_schema_rejects_copilot_native_or_ambiguous_scope(

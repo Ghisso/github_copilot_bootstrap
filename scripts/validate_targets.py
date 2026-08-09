@@ -217,6 +217,67 @@ ROOT_GUIDANCE_AUTHORING_PHRASES = (
     "In an installed project",
     "Bootstrap maintainers own authoring and regeneration",
 )
+REPORTING_POLICY_POINTER = ".claude/instructions/agent-reporting.instructions.md"
+REPORTING_POLICY_REQUIRED_FRAGMENTS = (
+    "## Human-facing communication",
+    "precise, clear, direct, natural prose",
+    "inspired by ASD-STE100 principles",
+    "does not claim formal ASD-STE100 compliance",
+    "Apply these rules strongly",
+    "Apply them lightly to commit messages",
+    "Use common words when they are as precise",
+    "Use one term consistently",
+    "short, direct sentences",
+    "active voice where practical",
+    "Avoid idioms, buzzwords, marketing language, and unnecessary abbreviations",
+    "Define an uncommon abbreviation or technical term",
+    "Technical precision has priority over simpler vocabulary",
+    "identifiers, API names, commands, paths, logs, errors, structured findings, quotations",
+    "Do not lossily rewrite",
+    "Do not make a rewrite stage mandatory",
+    "## Agent-to-agent status and handoffs",
+    "`caveman full` may be the default",
+    "not the default for user communication",
+)
+REPORTING_POLICY_FORBIDDEN_FRAGMENTS = (
+    "default to `caveman full` style",
+    "caveman is for orchestrator-facing status",
+    "caveman full for narrative/prose sections",
+)
+REPORTING_CAVEMAN_USER_DEFAULT_PATTERNS = (
+    re.compile(
+        r"(?:default to|use) [`']?caveman(?: full)?[`']?.{0,60}"
+        r"(?:user(?:-facing)?|human(?:-facing)?)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"caveman(?: full)? (?:is|as|should be|must be) (?:the )?default.{0,30}"
+        r"(?:user(?:-facing)?|human(?:-facing)?)",
+        re.IGNORECASE,
+    ),
+)
+REPORTING_PROMPT_DUPLICATE_FRAGMENTS = (
+    "default to `caveman full`",
+    "preserve tables, code blocks, commands",
+    "precise, clear, direct, natural prose",
+    "inspired by ASD-STE100 principles",
+    "use common words when",
+    "use one term consistently",
+    "short, direct sentences",
+    "active voice where practical",
+    "avoid idioms, buzzwords",
+    "define an uncommon abbreviation",
+    "keep established technical terms",
+    "technical precision has priority",
+    "do not make a rewrite stage mandatory",
+    "do not lossily rewrite",
+)
+WORKFLOW_REPORTING_FORBIDDEN_FRAGMENTS = (
+    "subagents reporting back to the orchestrator should use",
+    "preserve tables, code blocks, commands",
+    "the documenter writes normal user-facing prose",
+    "`caveman` `full`",
+)
 SHARED_GITHUB_HOOK_INVENTORY_PATHS = {
     TARGET_ROOT / "CLAUDE.md",
     TARGET_ROOT / "AGENTS.md",
@@ -363,6 +424,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/skills/ponytail/SKILL.md",
         "score is at least 90",
         "documentation before persisting findings and score",
+        REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
         "uv run pytest tests/ -q --tb=short",
@@ -393,6 +455,78 @@ def workspace_guidance_errors(text: str) -> list[str]:
                 "workspace guidance must contain exactly one control-plane inventory path: "
                 f"{fragment}"
             )
+    return errors
+
+
+def normalized_text(text: str) -> str:
+    """Collapse Markdown layout into text suitable for semantic checks."""
+    return " ".join(text.split())
+
+
+def is_negated_caveman_match(text: str, match: re.Match[str]) -> bool:
+    """Return whether a Caveman-default match is immediately negated."""
+    prefix = text[max(0, match.start() - 24) : match.start()].lower()
+    return bool(re.search(r"\b(?:do not|don't|never)\s+$", prefix))
+
+
+def has_caveman_user_default(text: str) -> bool:
+    """Detect an unnegated instruction to make Caveman user-facing default."""
+    return any(
+        not is_negated_caveman_match(text, match)
+        for pattern in REPORTING_CAVEMAN_USER_DEFAULT_PATTERNS
+        for match in pattern.finditer(text)
+    )
+
+
+def reporting_policy_errors(text: str) -> list[str]:
+    """Return missing audience-boundary requirements from the canonical policy."""
+    errors: list[str] = []
+    if text.count("# Audience-Aware Reporting Policy\n") != 1:
+        errors.append("reporting policy must contain exactly one canonical title")
+    semantic_text = normalized_text(text)
+    for fragment in REPORTING_POLICY_REQUIRED_FRAGMENTS:
+        if normalized_text(fragment) not in semantic_text:
+            errors.append(f"reporting policy is missing: {fragment}")
+    lower_text = semantic_text.lower()
+    for fragment in REPORTING_POLICY_FORBIDDEN_FRAGMENTS:
+        if normalized_text(fragment).lower() in lower_text:
+            errors.append(
+                f"reporting policy contains legacy or contradictory language: {fragment}"
+            )
+    if has_caveman_user_default(semantic_text):
+        errors.append("reporting policy makes Caveman the user-facing default")
+    return errors
+
+
+def reporting_prompt_errors(agent_id: str, text: str) -> list[str]:
+    """Return missing reporting-policy pointers from one canonical agent prompt."""
+    errors: list[str] = []
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append(f"{agent_id} prompt must point to the canonical reporting policy")
+    lower_text = normalized_text(text).lower()
+    if "caveman" in lower_text:
+        errors.append(f"{agent_id} prompt must not duplicate Caveman reporting rules")
+    for fragment in REPORTING_PROMPT_DUPLICATE_FRAGMENTS:
+        if fragment.lower() in lower_text:
+            errors.append(
+                f"{agent_id} prompt must not duplicate reporting rule: {fragment}"
+            )
+    if agent_id == "documenter" and "normal prose" not in text.lower():
+        errors.append(
+            "documenter prompt must keep user-facing documentation in normal prose"
+        )
+    return errors
+
+
+def workflow_reporting_errors(text: str) -> list[str]:
+    """Return duplicated reporting-policy rules from the workflow policy."""
+    errors: list[str] = []
+    semantic_text = normalized_text(text).lower()
+    if REPORTING_POLICY_POINTER not in text:
+        errors.append("workflow policy must point to the canonical reporting policy")
+    for fragment in WORKFLOW_REPORTING_FORBIDDEN_FRAGMENTS:
+        if fragment.lower() in semantic_text:
+            errors.append(f"workflow policy duplicates reporting rules: {fragment}")
     return errors
 
 
@@ -480,11 +614,9 @@ def task_lane_for(**inputs: Unpack[TaskLaneInputs]) -> str:
 
 def validate_task_lane_contract(errors: list[str]) -> None:
     """Validate the authoritative policy rather than duplicating it in adapters."""
-    errors.extend(
-        task_lane_contract_errors(
-            read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
-        )
-    )
+    workflow = read(REPO_ROOT / "shared" / "policies" / "workflow.instructions.md")
+    errors.extend(task_lane_contract_errors(workflow))
+    errors.extend(workflow_reporting_errors(workflow))
 
 
 def validate_root_guidance(errors: list[str]) -> None:
@@ -582,6 +714,17 @@ def validate_policy_adapters(errors: list[str]) -> None:
         "every conditional policy must declare a Codex skill fallback decision",
         errors,
     )
+    reporting_policy = next(
+        (
+            policy
+            for policy in policies
+            if policy.source.name == "agent-reporting.instructions.md"
+        ),
+        None,
+    )
+    check(reporting_policy is not None, "missing canonical reporting policy", errors)
+    if reporting_policy is not None:
+        errors.extend(reporting_policy_errors(reporting_policy.body))
 
     github_root = TARGET_ROOT / ".github" / "instructions"
     rules_root = TARGET_ROOT / ".claude" / "rules"
@@ -611,6 +754,11 @@ def validate_policy_adapters(errors: list[str]) -> None:
             f"missing canonical shared policy in target: {canonical_path}",
             errors,
         )
+        if (
+            policy.source.name == "agent-reporting.instructions.md"
+            and canonical_path.exists()
+        ):
+            errors.extend(reporting_policy_errors(read(canonical_path)))
         check(
             github_path.exists(),
             f"missing Copilot policy adapter: {github_path}",
@@ -1187,6 +1335,10 @@ def validate_agents(errors: list[str]) -> None:
     errors.extend(
         planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
     )
+    for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
+        errors.extend(
+            reporting_prompt_errors(prompt_path.parent.name, read(prompt_path))
+        )
     expected_count = len(shared_agents)
     check(expected_count > 0, "no shared agents found under shared/agents/", errors)
     expected_codex_intents: dict[str, tuple[object, object]] = {}
@@ -1400,18 +1552,10 @@ def validate_agents(errors: list[str]) -> None:
             f"generated Claude agent {path.stem} effort drifted from canonical intent",
             errors,
         )
-        if path.stem == "documenter":
-            check(
-                "normal prose" in text.lower() and "caveman" in text.lower(),
-                f"Documenter must explicitly keep user-facing docs in normal prose: {path}",
-                errors,
-            )
-        else:
-            check(
-                "caveman" in text.lower(),
-                f"Claude agent must report back with caveman full prose framing: {path}",
-                errors,
-            )
+        errors.extend(
+            f"generated Claude {error}: {path}"
+            for error in reporting_prompt_errors(path.stem, text)
+        )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
     check(
@@ -1468,6 +1612,10 @@ def validate_agents(errors: list[str]) -> None:
         errors.extend(
             f"Codex agent {error}: {path}"
             for error in codex_agent_instruction_errors(agent, instructions)
+        )
+        errors.extend(
+            f"generated Codex {error}: {path}"
+            for error in reporting_prompt_errors(path.stem, instructions)
         )
         if "tool-routing.instructions.md" in instructions:
             check(

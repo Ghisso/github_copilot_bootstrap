@@ -92,9 +92,10 @@ Environment-variable bypasses are not supported.
 
 ---
 
-## Subagent Reporting Style
+## Reporting
 
-Subagents reporting back to the orchestrator should use `caveman` `full` for narrative report sections. Preserve tables, code blocks, commands, file paths, identifiers, and structured findings literally. The documenter writes normal user-facing prose.
+Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing
+communication and agent-to-agent status or handoffs.
 
 ---
 
