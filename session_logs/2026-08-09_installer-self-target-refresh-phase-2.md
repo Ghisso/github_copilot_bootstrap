@@ -65,6 +65,27 @@ uv run python scripts/check_runtime.py                           # 0 FAIL
 
 ## Open Questions / Next Steps
 
-- Re-test the Codex hooks natively once quota resets (2026-08-15). The guards
-  are current but have not been exercised by a real client run since the
-  refresh.
+- Native hook re-test completed early on 2026-08-09; the separate persistent-
+  thread release gates remain open as recorded below.
+
+## Follow-up Native Codex Evidence — 2026-08-09
+
+The dedicated release probe was refreshed and executed early because Codex
+quota was available:
+
+```bash
+uv run python scripts/check_native_clients.py \
+  --workspace /tmp/native-client-probe-release \
+  --client codex --require --timeout 420 --json
+```
+
+Codex CLI 0.147.0 passed project trust, root instruction, scoped instruction,
+workflow contract, hook, candidate-shim execution, and candidate sentinel
+parity checks. This closes the post-refresh native hook follow-up without
+changing project trust or approving hooks automatically.
+
+The overall `--require` result remains `FAIL` because `compact_resume`,
+`codex_role_matrix`, and `coder_escalation` are still `unexercised` through
+`codex exec`. Those are separate release-gate limitations of the non-persistent
+execution interface, not hook failures; the MultiAgent V2 removal gate remains
+open.
