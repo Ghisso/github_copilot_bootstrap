@@ -256,3 +256,13 @@
 - [LEARN:testing] Semantic prose validators should normalize whitespace and
   distinguish contradictory defaults from explicit prohibitions; literal line
   wrapping and broad keyword regexes create both false failures and false passes.
+- [LEARN:security] Optional review metadata requires structural top-level JSON
+  parsing. Flat text scans let nested finding fields forge or shadow gated
+  metadata and counts.
+- [LEARN:architecture] Conditional review routing needs deterministic hook
+  triggers for control-plane paths, scripts/generators, dependencies, renames,
+  nested manifests, and every multi-file diff; semantic complexity remains a
+  reviewer decision.
+- [LEARN:testing] Exemption tests must start from a clean fixture. A leftover
+  documentation edit can silently turn an intended single-file ordinary case
+  into the multi-file high-risk case it was supposed to distinguish.
