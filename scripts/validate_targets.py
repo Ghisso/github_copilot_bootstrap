@@ -68,13 +68,46 @@ CODEX_ALLOWED_EFFORT = {"none", "low", "medium", "high", "xhigh", "max"}
 # current Luna/medium declaration below.
 CODEX_ROLE_MODEL_INTENTS = {
     "orchestrator": ("gpt-5.6-sol", "xhigh"),
-    "planner": ("gpt-5.6-sol", "max"),
+    "planner": ("gpt-5.6-sol", "xhigh"),
     "coder": ("gpt-5.6-terra", "high"),
     "reviewer": ("gpt-5.6-sol", "high"),
     "documenter": ("gpt-5.6-luna", "medium"),
     "verifier": ("gpt-5.6-luna", "low"),
 }
 CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
+PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
+    "orchestrator's evidence packet",
+    "exact artifacts, supplied evidence, approved decisions, constraints",
+    "genuinely unresolved questions",
+    "do not repeat broad intake, discovery, or user interview questions that the user has already answered",
+    "Bounded Discovery",
+    "Do not repeat answered discovery during a bounded full-plan revision",
+    "Do not require a fixed number of interview rounds",
+    "When genuinely unresolved decisions remain, use a focused PRD-style interview before drafting",
+    "Module Sketch (only when an unresolved interface decision needs it)",
+    "Present the sketch for confirmation only when the decision requires user input",
+    "Iterate only when a user response is needed to resolve that decision",
+)
+PLANNER_PROMPT_FORBIDDEN_FRAGMENTS = (
+    "Uses a PRD-style interview to surface unknowns before drafting.",
+    "Show the user the sketch and ask for confirmation before proceeding.",
+    "Iterate at least once based on user responses.",
+)
+ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
+    "prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions",
+    "compact, minimally scoped task and evidence packet",
+    "Keep one active planner",
+    "A pending wait means no mailbox event arrived during that polling window",
+    "does not establish success, failure, progress, or a transport outage",
+    "runtime-native agent state, recent observable activity, and actual terminal, tool, or configuration errors",
+    "Silence alone is not health evidence",
+    "at least every five minutes",
+    "30 minutes as a provisional floor before a planner health review",
+    "not an automatic interruption timer",
+    "Explicit user cancellation and an actual terminal error remain immediate exceptions",
+    "Do not add a generic `max` retry or lower the default to `high`",
+    "two matched `xhigh` runs reproduce a material checklist failure",
+)
 REQUIRED_HOOK_SCRIPTS = (
     "run-hook.sh",
     "protect-files.sh",
@@ -375,6 +408,31 @@ def task_lane_contract_errors(text: str) -> list[str]:
         if fragment in text:
             errors.append(
                 f"workflow Task Lanes table contains stale contradiction: {fragment}"
+            )
+    return errors
+
+
+def planner_supervision_contract_errors(
+    planner_prompt: str, orchestrator_prompt: str
+) -> list[str]:
+    """Return missing bounded-planning and single-planner supervision clauses."""
+    errors: list[str] = []
+    planner_text = " ".join(planner_prompt.split())
+    orchestrator_text = " ".join(orchestrator_prompt.split())
+    for fragment in PLANNER_PROMPT_REQUIRED_FRAGMENTS:
+        if fragment not in planner_text:
+            errors.append(
+                f"planner prompt is missing bounded-discovery contract: {fragment}"
+            )
+    for fragment in PLANNER_PROMPT_FORBIDDEN_FRAGMENTS:
+        if fragment in planner_text:
+            errors.append(
+                f"planner prompt contains stale unconditional mandate: {fragment}"
+            )
+    for fragment in ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS:
+        if fragment not in orchestrator_text:
+            errors.append(
+                f"orchestrator prompt is missing planner-supervision contract: {fragment}"
             )
     return errors
 
@@ -1122,14 +1180,32 @@ def codex_agent_instruction_errors(
 
 def validate_agents(errors: list[str]) -> None:
     shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
+    planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
+    orchestrator_prompt = read(
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    )
+    errors.extend(
+        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+    )
     expected_count = len(shared_agents)
     check(expected_count > 0, "no shared agents found under shared/agents/", errors)
     expected_codex_intents: dict[str, tuple[object, object]] = {}
+    expected_claude_intents: dict[str, tuple[object, object]] = {}
+    expected_github_models: dict[str, object] = {}
     codex_escalations: dict[str, tuple[object, object]] = {}
 
     for metadata_path in shared_agents:
         data = json.loads(read(metadata_path))
         agent_id = data["id"]
+        expected_github_models[agent_id] = data.get("model_intent", {}).get(
+            "github-copilot"
+        )
+        claude_intent = data.get("model_intent", {}).get("claude-code")
+        if isinstance(claude_intent, dict):
+            expected_claude_intents[agent_id] = (
+                claude_intent.get("model"),
+                claude_intent.get("effort"),
+            )
         codex_intent = data.get("model_intent", {}).get("openai-codex")
         check(
             isinstance(codex_intent, dict),
@@ -1172,9 +1248,6 @@ def validate_agents(errors: list[str]) -> None:
                     (esc_model, esc_effort) != (model, effort),
                     f"{agent_id} escalate_to must differ from its base Codex tier",
                     errors,
-                )
-                orchestrator_prompt = read(
-                    REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
                 )
                 check(
                     isinstance(esc_model, str)
@@ -1314,6 +1387,19 @@ def validate_agents(errors: list[str]) -> None:
                 f"Claude agent model '{model_value}' does not support effort but sets '{effort_value}': {path}",
                 errors,
             )
+        expected_model, expected_effort = expected_claude_intents.get(
+            path.stem, ("inherit", "inherit")
+        )
+        check(
+            model_value == (None if expected_model == "inherit" else expected_model),
+            f"generated Claude agent {path.stem} model drifted from canonical intent",
+            errors,
+        )
+        check(
+            effort_value == (None if expected_effort == "inherit" else expected_effort),
+            f"generated Claude agent {path.stem} effort drifted from canonical intent",
+            errors,
+        )
         if path.stem == "documenter":
             check(
                 "normal prose" in text.lower() and "caveman" in text.lower(),
@@ -1407,6 +1493,31 @@ def validate_agents(errors: list[str]) -> None:
                     errors,
                 )
 
+    claude_planner = read(TARGET_ROOT / ".claude" / "agents" / "planner.md")
+    claude_orchestrator = read(TARGET_ROOT / ".claude" / "agents" / "orchestrator.md")
+    errors.extend(
+        f"generated Claude {error}"
+        for error in planner_supervision_contract_errors(
+            claude_planner, claude_orchestrator
+        )
+    )
+    codex_planner = str(
+        read_toml(TARGET_ROOT / ".codex" / "agents" / "planner.toml").get(
+            "developer_instructions", ""
+        )
+    )
+    codex_orchestrator = str(
+        read_toml(TARGET_ROOT / ".codex" / "agents" / "orchestrator.toml").get(
+            "developer_instructions", ""
+        )
+    )
+    errors.extend(
+        f"generated Codex {error}"
+        for error in planner_supervision_contract_errors(
+            codex_planner, codex_orchestrator
+        )
+    )
+
     # R-AGENTS-06: control-plane guards must use consumer paths; the authoring
     # repo's shared/ and dist/ must not leak into generated agent bodies.
     for path in sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md")):
@@ -1433,47 +1544,68 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    validate_github_agent_models(errors)
+    validate_github_agent_models(errors, expected_github_models)
 
 
-def validate_github_agent_models(errors: list[str]) -> None:
+def github_agent_model_errors(
+    text: str, expected_model: object, path: Path
+) -> list[str]:
+    """Return GitHub custom-agent frontmatter model contract failures."""
+    errors: list[str] = []
+    if not text.startswith("---\n"):
+        return [f"GitHub agent missing frontmatter: {path}"]
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return [f"GitHub agent frontmatter is malformed: {path}"]
+    frontmatter_lines = parts[1].splitlines()
+    model_lines = [
+        line.split(":", 1)[1].strip()
+        for line in frontmatter_lines
+        if line.startswith("model:")
+    ]
+    for index, line in enumerate(frontmatter_lines):
+        if not line.startswith("model:"):
+            continue
+        value = line.split(":", 1)[1].strip()
+        if not value:
+            errors.append(
+                f"GitHub agent model must be a single string, not a YAML list: {path}"
+            )
+            continue
+        if value not in GITHUB_ALLOWED_AGENT_MODELS:
+            errors.append(
+                f"GitHub agent model is not a current supported Copilot model string: {path}: {value}"
+            )
+        if "(copilot)" in value:
+            errors.append(
+                f"GitHub agent model must not include provider suffix: {path}"
+            )
+        if index + 1 < len(frontmatter_lines) and frontmatter_lines[
+            index + 1
+        ].lstrip().startswith("- "):
+            errors.append(f"GitHub agent model must not be a YAML sequence: {path}")
+    expected = expected_model if isinstance(expected_model, str) else "target-default"
+    if expected == "target-default":
+        if model_lines:
+            errors.append(f"generated GitHub agent must inherit its model: {path}")
+    elif model_lines != [expected]:
+        errors.append(
+            f"generated GitHub agent model drifted from canonical intent: {path}"
+        )
+    return errors
+
+
+def validate_github_agent_models(
+    errors: list[str], expected_models: dict[str, object]
+) -> None:
     agent_root = TARGET_ROOT / ".github" / "agents"
     for path in sorted(agent_root.glob("*.agent.md")):
         text = read(path)
-        if not text.startswith("---\n"):
-            errors.append(f"GitHub agent missing frontmatter: {path}")
-            continue
-        parts = text.split("---\n", 2)
-        if len(parts) != 3:
-            errors.append(f"GitHub agent frontmatter is malformed: {path}")
-            continue
-        lines = parts[1].splitlines()
-        for index, line in enumerate(lines):
-            if not line.startswith("model:"):
-                continue
-            value = line.split(":", 1)[1].strip()
-            check(
-                bool(value),
-                f"GitHub agent model must be a single string, not a YAML list: {path}",
-                errors,
+        errors.extend(
+            github_agent_model_errors(
+                text, expected_models.get(path.name.removesuffix(".agent.md")), path
             )
-            if value:
-                check(
-                    value in GITHUB_ALLOWED_AGENT_MODELS,
-                    f"GitHub agent model is not a current supported Copilot model string: {path}: {value}",
-                    errors,
-                )
-                check(
-                    "(copilot)" not in value,
-                    f"GitHub agent model must not include provider suffix: {path}",
-                    errors,
-                )
-            if index + 1 < len(lines):
-                check(
-                    not lines[index + 1].lstrip().startswith("- "),
-                    f"GitHub agent model must not be a YAML sequence: {path}",
-                    errors,
-                )
+        )
 
 
 def validate_model_leaks(errors: list[str]) -> None:

@@ -35,7 +35,7 @@ The historical runtime probe recorded documenter as `gpt-5.6-terra` /
 `medium`. The current declared contract intentionally uses `gpt-5.6-luna` /
 `medium`; the historical result is evidence for the shim, not the current role
 tier. The six current declarations are: orchestrator Sol/xhigh, planner
-Sol/max, coder Terra/high, reviewer Sol/high, documenter Luna/medium, and
+Sol/xhigh, coder Terra/high, reviewer Sol/high, documenter Luna/medium, and
 verifier Luna/low. Coder alone may escalate to Sol/xhigh.
 
 Phase I adds the opt-in `scripts/check_native_clients.py` acceptance runner.
@@ -125,3 +125,13 @@ supported versions:
    loss of the configuration-level bound is explicitly approved.
 5. Review the recorded nesting evidence separately before changing the
    generator or validator contract.
+
+Planner workload PASS evidence is recorded separately: Codex Sol/xhigh micro
+23.514s (exact 2/2), bounded-full first result-schema 28.519s and same-workload
+manual rerun 33.771s (exact 3/3); Claude Opus/xhigh micro 15.912s (exact 2/2)
+and full 13.341s (exact 3/3). Both are 4/4 with zero invented, duplicate, or
+scope-expanding work. The aggregate-only
+strict schema reports unobservable event fields as `null`; marker-owned
+preparation never changes trust or hooks. `compact_resume` and role-matrix
+WARNs can make `--require` nonzero without invalidating these workload PASS
+results. See the [dated planner reliability calibration record](2026-08-09-planner-reliability-calibration.md).

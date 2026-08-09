@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tomllib
@@ -35,9 +36,11 @@ from validate_targets import (  # noqa: E402
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
+    github_agent_model_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
     root_guidance_errors,
+    planner_supervision_contract_errors,
     scope_matches,
     task_lane_contract_errors,
     task_lane_for,
@@ -79,7 +82,7 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
     assert codex_config_contract_errors(config, "fixture") == []
     assert CODEX_ROLE_MODEL_INTENTS == {
         "orchestrator": ("gpt-5.6-sol", "xhigh"),
-        "planner": ("gpt-5.6-sol", "max"),
+        "planner": ("gpt-5.6-sol", "xhigh"),
         "coder": ("gpt-5.6-terra", "high"),
         "reviewer": ("gpt-5.6-sol", "high"),
         "documenter": ("gpt-5.6-luna", "medium"),
@@ -101,6 +104,77 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
         assert any(
             key in error for error in codex_config_contract_errors(invalid, "fixture")
         )
+
+
+def test_planner_supervision_contract_requires_bounded_evidence_and_waits() -> None:
+    """Planner prompts retain the calibrated discovery and supervision contract."""
+    planner = (REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    orchestrator = (
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert planner_supervision_contract_errors(planner, orchestrator) == []
+
+    missing_packet = planner.replace("orchestrator's evidence packet", "handoff", 1)
+    errors = planner_supervision_contract_errors(missing_packet, orchestrator)
+    assert any("bounded-discovery" in error for error in errors)
+
+    missing_wait = orchestrator.replace(
+        "A pending wait means no mailbox event arrived during that polling window",
+        "A completed wait means success",
+        1,
+    )
+    errors = planner_supervision_contract_errors(planner, missing_wait)
+    assert any("planner-supervision" in error for error in errors)
+
+    stale_mandates = (
+        f"{planner}\nUses a PRD-style interview to surface unknowns before drafting.\n"
+        "Show the user the sketch and ask for confirmation before proceeding.\n"
+        "Iterate at least once based on user responses.\n"
+    )
+    errors = planner_supervision_contract_errors(stale_mandates, orchestrator)
+    assert any("stale unconditional mandate" in error for error in errors)
+
+
+def test_github_agent_model_contract_uses_frontmatter_not_body_substrings() -> None:
+    """GitHub model parity uses parsed frontmatter and rejects malformed inputs."""
+    path = Path(".github/agents/planner.agent.md")
+    valid = "---\nname: planner\nmodel: Claude Opus 4.6\n---\n\nmodel: wrong\n"
+
+    assert github_agent_model_errors(valid, "Claude Opus 4.6", path) == []
+    assert any(
+        "drifted" in error
+        for error in github_agent_model_errors(
+            valid.replace("Claude Opus 4.6", "GPT-5.4", 1),
+            "Claude Opus 4.6",
+            path,
+        )
+    )
+    assert any(
+        "missing frontmatter" in error
+        for error in github_agent_model_errors(
+            "model: Claude Opus 4.6\n", "Claude Opus 4.6", path
+        )
+    )
+
+
+def test_planner_model_intent_preserves_native_models_and_copilot_choice() -> None:
+    """Only planner effort changes; native models and Copilot intent stay fixed."""
+    planner = json.loads(
+        (REPO_ROOT / "shared" / "agents" / "planner" / "agent.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    intent = planner["model_intent"]
+
+    assert intent["github-copilot"] == "Claude Opus 4.6"
+    assert intent["claude-code"] == {"model": "opus", "effort": "xhigh"}
+    assert intent["openai-codex"] == {
+        "model": "gpt-5.6-sol",
+        "effort": "xhigh",
+    }
 
 
 def test_root_guidance_budgets_and_structural_invariants() -> None:

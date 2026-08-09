@@ -23,7 +23,7 @@ Expected:
 - `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
 - Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Native probes must verify delivery without truncation on two supported versions.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
-- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/max, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low.
+- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. GitHub Copilot remains `Claude Opus 4.6`.
 - `coder`'s `escalate_to` (Codex: `gpt-5.6-sol`/`xhigh`) names an allow-listed model/effort pair distinct from its base tier, and the orchestrator prompt names both values verbatim — a mismatch fails validation.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.
@@ -79,6 +79,17 @@ Expected:
   separate gate.
 
 ## Native Client Acceptance (Opt-In)
+
+As of 2026-08-09, `--planner-workloads` records PASS for Codex 0.147.0
+Sol/xhigh micro 23.514s (exact 2/2), bounded-full first result-schema 28.519s
+and same-workload manual rerun 33.771s (exact 3/3), and Claude Code 2.1.226
+Opus/xhigh micro 15.912s (exact 2/2), full 13.341s (exact 3/3). Both are 4/4
+with zero invented, duplicate, or scope expansion findings. Aggregate-only
+strict-schema event fields are `null` when unobservable. Marker-owned
+preparation never changes project trust or hooks. The Codex rerun followed a
+concrete transport/schema variance and argv fix; it is not an automatic retry.
+Known `compact_resume`/role-matrix WARNs can make `--require` nonzero without
+invalidating these independent workload PASS results.
 
 The deterministic checks above do not start native clients or need their
 credentials. The probe's default temporary mode is also only a structure and

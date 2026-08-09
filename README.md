@@ -453,19 +453,32 @@ Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its 
 | Agent | Claude model | Claude effort | Codex model | Codex effort |
 | --- | --- | --- | --- | --- |
 | orchestrator | session (`/model`) | session (`/effort`) | `gpt-5.6-sol` | `xhigh` |
-| planner | `opus` | `max` | `gpt-5.6-sol` | `max` |
+| planner | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` |
 | reviewer | `sonnet` | `xhigh` | `gpt-5.6-sol` | `high` |
 | coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
 | documenter | `sonnet` | `medium` | `gpt-5.6-luna` | `medium` |
 | verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 
-**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
+**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
 **Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed `shared/agents/<id>/prompt.md` body. `agent.yaml` remains the single source for metadata and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**, so keep it and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gate is met — the shim-removed candidate has never been exercised. Sol is reserved for coordination, planning, and review; Terra handles implementation; Luna handles documentation and mechanical verification.
 
 **Escalation on failure (Codex only):** `coder`'s `model_intent.openai-codex` also declares an `escalate_to` (`gpt-5.6-sol`/`xhigh`), documentation-only in `agent.yaml` — it is not consumed by the generator, so there is no second `.codex/agents/coder-*.toml` file. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent, so the orchestrator's own prompt carries the instruction: if `verifier` fails or `reviewer` returns a CRITICAL/MAJOR/ponytail finding on a diff `coder` just produced, re-delegate the fix to `coder` with those override values instead of retrying at the base Terra/high tier, capped at one escalation per phase. A validator check keeps the `agent.yaml` data and the prompt wording from silently drifting apart. Claude Code has no per-invocation effort override, so there is no equivalent lane on that target.
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
+
+Planner delegation uses a compact evidence packet (approved decisions,
+verified facts, exact artifacts, constraints, rejected approaches, and
+unresolved questions), one active planner, and fresh/minimal scoped context. A
+pending wait means only that no mailbox event arrived during that polling
+window. Health checks use runtime state, observable activity, and terminal/tool
+errors; silence does not trigger duplicate spawns or effort changes. Keep users
+informed at least every five minutes when no stricter cadence applies. Thirty
+minutes is a provisional health-review floor, not an automatic interruption
+timer. Retain `max` only for two matched `xhigh` checklist failures resolved by
+a matched `max` control; consider `high` only after a paired benchmark. GitHub
+Copilot remains `Claude Opus 4.6`; effort labels are not cross-vendor compute
+claims. See the [dated planner calibration record](docs/2026-08-09-planner-reliability-calibration.md).
 
 ### Task lanes
 

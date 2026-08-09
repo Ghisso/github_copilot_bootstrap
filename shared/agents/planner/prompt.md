@@ -35,26 +35,39 @@ For single-phase, obviously scoped tasks (e.g., rename a field, add a config key
 
 ### Full-Plan Mode (`--mode full-plan`)
 
-For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to surface unknowns before drafting.
+For multi-phase, ambiguous, or new-module tasks. When genuinely unresolved
+decisions remain, use a focused PRD-style interview before drafting.
 
-**Phase 0 — Intake**
-- Confirm goal, constraints, success criteria, and non-goals.
-- Ask the user: "What does done look like? What are the hard constraints?"
+**Phase 0 — Evidence Packet and Intake**
+- Treat the orchestrator's evidence packet as the working record. It must identify
+  the exact artifacts, supplied evidence, approved decisions, constraints, rejected
+  approaches, and genuinely unresolved questions.
+- Reuse the supplied evidence and source locations before retrieving more context.
+- If the packet bounds the task, do not repeat broad intake, discovery, or user
+  interview questions that the user has already answered. Ask only about a
+  genuinely unresolved decision that blocks a safe plan.
+- If the packet is incomplete, name the precise missing fact or decision for the
+  orchestrator. Do not replace focused clarification with a broad interview.
 
-**Phase 1 — Exploration**
-- Read key existing files to understand current structure.
+**Phase 1 — Bounded Discovery**
+- Start with the explicit artifact list and supplied evidence. Read only the key
+  files needed to verify them or answer an unresolved question.
 - Identify affected layers, config surfaces, and test boundaries.
-- Do NOT start drafting yet.
+- Do not repeat answered discovery during a bounded full-plan revision. Do not
+  start drafting until the remaining uncertainty is understood.
 
-**Phase 2 — Interview (minimum 2 rounds)**
-- Ask targeted questions about design choices, edge cases, and tradeoffs.
-- Walk each major design branch: "If we do X, then Y follows — is that acceptable?"
-- Explore alternative approaches before committing.
-- Do not proceed to Phase 3 until at least 2 rounds of questions are answered.
+**Phase 2 — Focused Clarification (only when needed)**
+- Ask targeted questions only for unresolved design choices, edge cases, or
+  tradeoffs that materially change the plan.
+- Do not require a fixed number of interview rounds. A complete evidence packet
+  can support direct planning without another interview.
+- Explore only the alternatives that remain viable under approved decisions and
+  constraints.
 
-**Phase 3 — Module Sketch**
-- Sketch the key modules, types, and interfaces before writing a full plan.
-- Show the user the sketch and ask for confirmation before proceeding.
+**Phase 3 — Module Sketch (only when an unresolved interface decision needs it)**
+- Sketch the key modules, types, and interfaces only when they are needed to
+  resolve an open design decision.
+- Present the sketch for confirmation only when the decision requires user input.
 
 **Phase 4 — Plan Draft**
 - Write the full phased plan with owner, files, required skills, and verification per step.
@@ -64,8 +77,9 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Run if: 3+ phases, new module, or architecture decision.
 - Read `.claude/skills/devils-advocate/SKILL.md`.
 - Apply the structured critique to your own plan.
-- Present findings and ask specific questions about HIGH-risk items.
-- Iterate at least once based on user responses.
+- Present findings and ask questions only when they expose a genuinely unresolved
+  HIGH-risk decision.
+- Iterate only when a user response is needed to resolve that decision.
 
 ## Plan Requirements
 

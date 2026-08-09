@@ -29,7 +29,7 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
-3. **PLAN:** Delegate to `planner`; save each concrete small plan under `.claude/plans/`.
+3. **PLAN:** Prepare the planner evidence packet, delegate to one planner, and save each concrete small plan under `.claude/plans/`.
 4. **PONYTAIL:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task and pass it explicitly to coding delegates.
 5. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 6. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
@@ -66,12 +66,33 @@ fix loop and report the failure to the user instead of retrying further.
 
 ## Delegation Rules
 
-- Spawn every typed role (`planner`, `coder`, `reviewer`, `verifier`, `documenter`) **fresh**: give it a compact task (paths, symbols, failing checks, surviving finding IDs, artifact paths) rather than inheriting the parent's full conversation history. A typed role cannot be created from a full-history fork — on Codex this is an error (`fork_turns: "all"` inherits the parent agent type, so a typed spawn must use `fork_turns: "none"` or a bounded turn count), and on other runtimes a fresh, artifact-scoped spawn is both cheaper and less error-prone.
+- Before planner delegation, prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions. Keep raw logs and broad retrieval output in dated evidence; pass derived facts and source locations to the planner.
+- Spawn every typed role (`planner`, `coder`, `reviewer`, `verifier`, `documenter`) **fresh** when appropriate: give it a compact, minimally scoped task and evidence packet (paths, symbols, failing checks, surviving finding IDs, artifact paths) rather than inheriting the parent's full conversation history. A typed role cannot be created from a full-history fork — on Codex this is an error (`fork_turns: "all"` inherits the parent agent type, so a typed spawn must use `fork_turns: "none"` or a bounded turn count), and on other runtimes a fresh, artifact-scoped spawn is both cheaper and less error-prone.
 - Prefer parallel delegation only when tasks touch disjoint files.
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.
 - If the planner specifies required skills or review profiles per step, pass that list to the implementing or reviewing agent.
 - Instruct subagents to report per `.claude/instructions/agent-reporting.instructions.md` (`caveman full`, structured content preserved).
+
+## Planner Supervision
+
+- Keep one active planner for a planning task. Do not create a second planner to
+  compensate for silence, and do not raise effort or restart work merely because
+  a wait timed out.
+- A pending wait means no mailbox event arrived during that polling window. It
+  does not establish success, failure, progress, or a transport outage.
+- Assess planner health from runtime-native agent state, recent observable
+  activity, and actual terminal, tool, or configuration errors. Silence alone is
+  not health evidence.
+- Give the user regular progress updates at the host's required cadence and at
+  least every five minutes when the host has no stricter cadence.
+- Use 30 minutes as a provisional floor before a planner health review, not an
+  automatic interruption timer. Explicit user cancellation and an actual terminal
+  error remain immediate exceptions.
+- Do not add a generic `max` retry or lower the default to `high`. Keep `max`
+  only after two matched `xhigh` runs reproduce a material checklist failure and
+  a matched `max` control resolves it; consider `high` only through a later paired
+  benchmark.
 
 ## Quality Gates
 
