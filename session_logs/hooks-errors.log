@@ -274,3 +274,15 @@ fatal: Cannot rebase onto multiple branches.
 2026-08-09T01:51:37.000Z state-sync: push failed; continuing.
 2026-08-09T04:06:28Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-09T04:06:28Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:07:26Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:07:26Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:07:26Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:08:12Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:08:12Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:08:12Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:08:44Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:08:44Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:08:44Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-09T04:10:30Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-09T04:10:30Z WARN hook fail-closed: unparseable tool payload
+2026-08-09T04:10:30Z WARN hook fail-closed: protect-files.sh exited with status 2
