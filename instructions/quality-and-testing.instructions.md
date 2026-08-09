@@ -164,15 +164,18 @@ report. A findings report must match the current branch and phase, be as
 fresh as the score report (push gates accept a report generated for an
 ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
-`counts.major == 0` (push/PR). Ponytail metadata is present only when the
-conditional profile ran; when it did not run, metadata is optional and legacy
-reports remain compatible. The authoritative review-routing table selects
-Ponytail for deterministic control-plane/high-risk, multi-file, dependency,
-script, generator, or reviewer-selected complexity. Ordinary low-complexity
-and single-document or state-only diffs do not require it unless high-risk
-precedence applies. Ponytail findings use the ordinary severity gates: CRITICAL
-blocks commit, MAJOR blocks push/PR, and MINOR is advisory. There is no special
-zero-Ponytail gate.
+`counts.major == 0` (push/PR). The metadata matrix is exact: selecting the
+`ponytail` profile always emits `ponytail_reviewed: true` and a numeric
+`ponytail_findings` count; a new report for an unselected profile omits both
+fields. Optional diffs may still read compatible legacy reports containing
+`false`/`0`, but a routed high-risk review requires true evidence. The
+authoritative routing table selects Ponytail for deterministic
+control-plane/high-risk, multi-file, dependency, script, generator, or
+reviewer-selected complexity. Ordinary low-complexity and exactly one
+documentation OR exactly one mutable workflow-state file do not require it unless
+control-plane/high-risk precedence applies. Ponytail findings use the ordinary
+severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
+advisory. There is no special zero-Ponytail gate.
 
 ---
 

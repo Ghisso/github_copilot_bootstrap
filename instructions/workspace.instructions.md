@@ -118,9 +118,10 @@ This is the **single authoritative profile-routing table**. The unified `reviewe
 Ponytail is required for every control-plane/high-risk diff and every diff that
 introduces or substantially changes abstractions, dependencies, architecture,
 generalized infrastructure, configuration, execution paths, or behavior. It is
-optional for ordinary low-complexity work. A documentation-only diff is exactly
-one documentation or mutable workflow-state file; a control-plane/high-risk
-path or any multi-file diff takes precedence and is not documentation-only.
+optional for ordinary low-complexity work. An exemption is exactly one
+documentation OR one mutable workflow-state file, only when no
+control-plane/high-risk condition applies. Every multi-file diff is
+control-plane/high-risk and therefore is not exempt.
 
 ## Skills
 
