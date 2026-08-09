@@ -60,8 +60,8 @@ reject the report as dirty. This is a recorded lesson.
 
 - [ ] `README.md` (modify): update the commit-invariant and push-invariant
       bullets (around lines 589 and 590) to describe cancelled-phase handling,
-      the completed-phase commit count, the last-completed-phase findings
-      binding, and `cancellations_acknowledged`.
+      the completed-phase commit count, and the last-completed-phase findings
+      binding.
 - [ ] `docs/plan-deterministic-commit-gate.md` (modify): update the
       blocked-state bullet (around line 97) to include the cancelled-phase
       cases, including the stale-pointer commit refusal.
@@ -76,8 +76,8 @@ reject the report as dirty. This is a recorded lesson.
       mechanism claim propagates across files otherwise.
 - [ ] `.claude/plans/graphify-structural-code-intelligence.md` (modify): set
       `status: cancelled`; add `cancelled_at`, `cancelled_reason` recording that
-      the Phase 0 gate returned NO-GO, `cancelled_evidence` pointing at the
-      evidence artifact, and `cancellations_acknowledged: true`. In the body,
+      the Phase 0 gate returned NO-GO, and `cancelled_evidence` pointing at the
+      evidence artifact. In the body,
       delete the sentence stating that `complete` is the only terminal status
       the validator accepts, which this plan makes false, and replace the
       "complete in lifecycle terms only" paragraph with a plain statement that
@@ -129,10 +129,10 @@ reject the report as dirty. This is a recorded lesson.
       Graphify files.
 - [ ] The Graphify shape is covered as a fixture scenario in
       `scripts/validate_targets.py` (added in Phase D): seven phases, one
-      complete, six cancelled with evidence, one commit,
-      `cancellations_acknowledged: true`, and a findings report bound to the
-      completed phase. That scenario is the pushability proof. Do not push the
-      real branch: push is the user's decision and is out of scope here.
+      complete, six cancelled with evidence, one commit, and a findings report
+      bound to the completed phase. That scenario is the pushability proof. Do
+      not push the real branch: push is the user's decision and is out of scope
+      here.
 - [ ] `bash .claude/hooks/scripts/state-sync.sh status` reports `rebase: none`.
 
 ## Verification
@@ -183,8 +183,8 @@ rm -rf /tmp/dist-gen-a
 - [ ] `docs/2026-08-09-state-sync-rebase-recovery.md` records the measured
       evidence, the causal chain, and the unverified-cause assumption.
 - [ ] The Graphify big plan reads `status: cancelled` with a reason, timestamp,
-      evidence pointer, and acknowledgement, and no longer contains the false
-      sentence about `complete` being the only terminal status.
+      and evidence pointer, and no longer contains the false sentence about
+      `complete` being the only terminal status.
 - [ ] Graphify phases A through F read `status: cancelled` with full evidence;
       Phase 0 is untouched at `complete`.
 - [ ] No fabricated closeout log, findings report, or score exists for any

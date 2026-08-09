@@ -17,8 +17,7 @@ commit per listed phase, and binds its final findings report to the last listed
 phase. All three are wrong once a phase can be legitimately cancelled. This
 phase accepts `cancelled` phases that carry full evidence, counts commits
 against completed phases only, binds the findings report to the last completed
-phase, requires at least one completed phase and a big-plan
-`cancellations_acknowledged: true` before push, blocks a commit whose
+phase, requires at least one completed phase before push, blocks a commit whose
 `current_phase` points at a cancelled phase, and makes the closeout hook skip
 cancelled phases when advancing the pointer.
 
@@ -82,9 +81,10 @@ cancelled phases when advancing the pointer.
       last completed phase instead of `${phases[${#phases[@]}-1]}`. Keep the
       Bash 3.2 indexing style. Update the surrounding comment to explain that a
       cancelled trailing phase has no findings report and never will.
-- [ ] `assert_push_invariants` (modify): when any phase is `cancelled`, require
-      big-plan `cancellations_acknowledged: true`, with a message mirroring the
-      existing bypass-acknowledgement wording.
+- [ ] Must not add a branch-level acknowledgement flag. The per-phase evidence
+      contract is the whole anti-abuse mechanism; a second big-plan flag was
+      considered and deliberately rejected as bookkeeping without new
+      information.
 - [ ] `shared/hooks/scripts/record-commit-closeout.sh` (modify): when advancing
       `current_phase`, skip forward over phases whose small-plan `status` is
       `cancelled`. When no non-cancelled phase remains, clear `current_phase`,
@@ -107,7 +107,7 @@ cancelled phases when advancing the pointer.
 In `scripts/validate_targets.py`, driven by `tests/test_validate_targets.py`:
 
 - [ ] Push accepted for a branch mixing completed and cancelled phases when all
-      four conditions hold.
+      three conditions hold.
 - [ ] Push refused when a cancelled phase is missing `cancelled_at`,
       `cancelled_reason`, or `cancelled_evidence` (one case each).
 - [ ] Push refused when the evidence file does not exist.
@@ -115,7 +115,6 @@ In `scripts/validate_targets.py`, driven by `tests/test_validate_targets.py`:
       `**Status:** CANCELLED`.
 - [ ] Push refused when every phase is cancelled, with the "certifies no work"
       message.
-- [ ] Push refused when `cancellations_acknowledged` is absent or `false`.
 - [ ] Commit-count check satisfied by completed phases only: a branch with one
       completed phase, six cancelled phases, and one commit passes.
 - [ ] Findings report bound to the last completed phase: a report for the last
@@ -178,13 +177,12 @@ rm -rf /tmp/dist-gen-a
   three explicit tests cover skip, clear-and-complete, and
   do-not-overwrite-cancelled.
 - Relaxing a push gate is the highest-risk edit in this plan. Every relaxation is
-  paired with a new requirement: cancelled phases must carry evidence, at least
-  one phase must be complete, and the branch must carry an explicit
-  acknowledgement.
-- `cancellations_acknowledged` is a second acknowledgement alongside the
-  per-phase evidence. It is deliberate: the evidence records the decision when it
-  was made, the flag records acceptance at merge time, matching the existing
-  `bypass_acknowledged` precedent.
+  paired with a new requirement: cancelled phases must carry evidence, and at
+  least one phase must be complete.
+- The per-phase evidence contract is the only anti-abuse mechanism here, so it
+  carries the full weight. A branch-level acknowledgement flag was considered
+  and rejected; if review finds the evidence contract too weak, strengthen the
+  evidence contract rather than adding a second flag beside it.
 
 ## Acceptance Criteria
 
@@ -193,8 +191,6 @@ rm -rf /tmp/dist-gen-a
 - [ ] A cancelled phase missing any part of its evidence contract blocks push
       with a distinct message.
 - [ ] A branch whose phases are all cancelled is refused.
-- [ ] `cancellations_acknowledged: true` is required whenever any phase is
-      cancelled.
 - [ ] Commit count is measured against completed phases only.
 - [ ] The final findings report binds to the last completed phase.
 - [ ] A commit whose `current_phase` is cancelled is refused with a distinct,

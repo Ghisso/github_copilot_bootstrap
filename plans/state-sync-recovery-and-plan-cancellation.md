@@ -175,12 +175,12 @@ Cancellation is cheaper than doing the work, which is correct, but it is not
 cheaper than being honest about not doing the work, which is the property that
 matters.
 
-### Is a branch with cancelled phases pushable? Yes, under four conditions
+### Is a branch with cancelled phases pushable? Yes, under three conditions
 
 Refusing to push would strand completed, reviewed, committed work on a dead
 branch, which is the exact failure that motivated this plan. Refusing does not
 protect quality; it only creates pressure to falsify records. So the branch
-becomes pushable when all four hold:
+becomes pushable when all three hold:
 
 1. **At least one phase is `complete`.** A branch where every phase is cancelled
    produced no certified work; there is nothing to merge and the branch should
@@ -192,12 +192,11 @@ becomes pushable when all four hold:
    requires at least one commit per listed phase; it must require at least one
    commit per completed phase, or cancellation would demand commits for work
    that never happened.
-4. **The big plan carries `cancellations_acknowledged: true`.** This mirrors the
-   existing `bypass_acknowledged` gate. The per-phase evidence was written when
-   the decision was made, possibly long before the PR. This flag is a separate
-   assertion made at push time: "I accept that this branch ships without those
-   phases." One frontmatter line, placed where the human is actually deciding to
-   merge.
+
+A branch-level acknowledgement flag was considered and deliberately rejected.
+The per-phase evidence contract already forces a reasoned, artifact-backed
+record for every cancelled phase; a second big-plan flag would add bookkeeping
+without adding information the reviewer does not already have in front of them.
 
 One further correction falls out of the same change: the push gate today binds
 its final findings report to `phases[last]`. If the last listed phase is
@@ -326,7 +325,7 @@ Before big-plan closeout:
 | Phases A and B change a script this very session executes, so a defect could silently stop AI state publishing - the same class of failure being fixed. | Warn-never-fail keeps a defect from blocking sessions. Phase A adds a `rebase:` line to `cmd_status`, making `state-sync.sh status` a real health probe. Phases A, B, and E each require running it as an explicit verification step. |
 | Dropping `--autostash` in Phase B could regress a caller that relied on it to absorb a dirty tree. | All three callers already guarantee a clean tree: `cmd_setup` and `cmd_pull` commit first, `cmd_publish` refuses when dirty. Phase B additionally calls `commit_local_state` inside `reconcile_committed_state` immediately before the rebase. The existing `test_publish_refuses_dirty_state_without_committing_or_publishing` must keep passing unchanged, as an explicit must-not. |
 | A regression test that passes under both old and new code proves nothing. | Recorded lesson. Every Phase A and B test asserts on a marker unique to the fixed path (the `--quit` recovery warning, the latched-state warning) and on the absence of the old path's marker, never on outcome alone. |
-| `cancelled` becomes a quiet way to skip reviewed work. | Three required fields plus an evidence file that must exist and contain `**Status:** CANCELLED`; at least one phase must be `complete` for the branch to be pushable; a separate `cancellations_acknowledged: true` at push time. |
+| `cancelled` becomes a quiet way to skip reviewed work. | Three required fields plus an evidence file that must exist and contain `**Status:** CANCELLED`, and at least one phase must be `complete` for the branch to be pushable. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |
 | The dogfood refresh (`install_bootstrap.py . --allow-self --local-only`) applies new hook behavior to the live session mid-plan. | Run it only after the phase's verification passes, then immediately re-run `state-sync.sh status` as a health check. |

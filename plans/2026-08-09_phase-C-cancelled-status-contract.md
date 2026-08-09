@@ -81,8 +81,7 @@ templates document a status the validator refuses.
       as a `#` comment line inside the frontmatter and add the commented
       cancellation field block. The frontmatter parser skips lines whose first
       non-space character is `#`, so comments are safe there.
-- [ ] `shared/templates/plan-big.md` (modify): same treatment, plus the
-      `cancellations_acknowledged` field that Phase D's push gate reads.
+- [ ] `shared/templates/plan-big.md` (modify): same treatment.
 - [ ] `shared/templates/session-log.md` (modify): add the `**Status:** CANCELLED`
       variant beside `**Status:** COMPLETED`, with one line each saying when to
       use which.
@@ -94,7 +93,7 @@ templates document a status the validator refuses.
       plan or phase" subsection under Branch Lifecycle. State what cancellation
       means, the three required fields and the evidence marker, that a cancelled
       phase requires no commit or closeout artifacts, that `cancelled` on a big
-      plan is terminal and cannot start a branch, and the four conditions under
+      plan is terminal and cannot start a branch, and the three conditions under
       which a branch carrying cancelled phases becomes pushable. Amend the
       existing bullet "Open a PR to `dev` only after every small plan in the big
       plan is complete" to read "complete or cancelled".
