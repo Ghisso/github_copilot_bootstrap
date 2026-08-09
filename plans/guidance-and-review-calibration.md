@@ -10,7 +10,7 @@ phases:
   - 2026-08-09_phase-B-planner-reliability-calibration
   - 2026-08-09_phase-C-human-facing-writing-guidance
   - 2026-08-09_phase-D-ponytail-authority-calibration
-current_phase: 2026-08-09_phase-C-human-facing-writing-guidance
+current_phase: 2026-08-09_phase-D-ponytail-authority-calibration
 bypass_acknowledged: false
 ---
 

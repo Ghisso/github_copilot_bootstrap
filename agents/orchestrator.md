@@ -19,7 +19,7 @@ edits remain with the main agent and create no lifecycle artifacts.
 
 You MUST maintain a todo list throughout the entire workflow:
 
-1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, PONYTAIL, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
+1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
 2. **Loop task:** Include a parameterized task for `VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY/SCORE - repeat until score >= 90`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
@@ -36,23 +36,24 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
 3. **PLAN:** Prepare the planner evidence packet, delegate to one planner, and save each concrete small plan under `.claude/plans/`.
-4. **PONYTAIL:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task and pass it explicitly to coding delegates.
-5. **IMPLEMENT:** Delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
-6. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
-7. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas. Every non-documentation diff includes `ponytail`; resolve all Ponytail findings on the code before the final report is persisted at SCORE.
-8. **DOCUMENT:** Delegate to `documenter` after the code review converges and **before** the persisted SCORE, so the documenter's tracked edits stay inside the content the score/findings reports bind to (documenting after SCORE stales both). Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
-9. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
-10. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
-11. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
-12. **COMMIT:** Commit exactly one completed small plan after all gates pass.
-13. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
+4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
+5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
+6. **REVIEW:** Run `reviewer` with targeted profiles based on changed areas. Add `ponytail` for control-plane/high-risk or complexity-expanding diffs; it is optional for ordinary low-complexity work and unnecessary for documentation-only diffs.
+7. **DOCUMENT:** Delegate to `documenter` after the code review converges and **before** the persisted SCORE, so the documenter's tracked edits stay inside the content the score/findings reports bind to (documenting after SCORE stales both). Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
+8. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
+9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
+10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
+11. **COMMIT:** Commit exactly one completed small plan after all gates pass.
+12. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ## Reviewer Routing
 
 Select reviewer profiles from the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section) based on the surface area changed. Run `reviewer` once with all relevant profiles unless the plan explicitly separates independent review scopes.
 
-For every non-documentation diff, `ponytail` is mandatory and its surviving
-finding count must be zero before the review report is persisted.
+Ponytail is mandatory for control-plane/high-risk and complexity-expanding
+diffs. It is optional for ordinary low-complexity work and unnecessary for
+documentation-only diffs. Its findings use the same severity gates as every
+other profile.
 
 **Lane-specific review:**
 
@@ -63,7 +64,7 @@ finding count must be zero before the review report is persisted.
 
 On OpenAI Codex only (spawn-time model/effort overrides are a Codex capability;
 Claude Code has no per-invocation effort override): if `verifier` fails, or
-`reviewer` returns a CRITICAL/MAJOR finding or any surviving `ponytail` finding,
+`reviewer` returns a CRITICAL/MAJOR finding,
 on a diff `coder` just produced, re-delegate the fix to `coder` with explicit
 spawn overrides `model = gpt-5.6-sol`, `model_reasoning_effort = xhigh` instead
 of retrying at its configured `gpt-5.6-terra`/`high` tier. Escalate at most once

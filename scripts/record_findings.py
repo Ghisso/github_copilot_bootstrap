@@ -176,7 +176,6 @@ def main() -> None:
         sys.exit(1)
 
     counts = count_severities(findings)
-    ponytail_findings = sum(1 for finding in findings if finding.get("profile") == "ponytail")
     ponytail_reviewed = "ponytail" in profiles_reviewed
     # `counts` is serialized before `findings` so the gate's flat-text
     # `critical`-key scanner (json_file_number_value in _lib-frontmatter.sh,
@@ -185,12 +184,15 @@ def main() -> None:
     # colliding `"critical": <digits>` substring.
     result = {
         "counts": counts,
-        "ponytail_reviewed": ponytail_reviewed,
-        "ponytail_findings": ponytail_findings,
         "profiles_reviewed": profiles_reviewed,
         "findings": findings,
         **git_metadata(Path(args.target).resolve(), args.phase, args.base_ref),
     }
+    if ponytail_reviewed:
+        result["ponytail_reviewed"] = True
+        result["ponytail_findings"] = sum(
+            1 for finding in findings if finding.get("profile") == "ponytail"
+        )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -198,8 +200,7 @@ def main() -> None:
     print(
         f"recorded {len(findings)} finding(s): "
         f"{counts['critical']} critical, {counts['major']} major, {counts['minor']} minor; "
-        f"ponytail_reviewed={str(ponytail_reviewed).lower()}, "
-        f"ponytail_findings={ponytail_findings}"
+        f"ponytail_reviewed={str(ponytail_reviewed).lower()}"
     )
     print(f"report: {args.out}")
     sys.exit(0)

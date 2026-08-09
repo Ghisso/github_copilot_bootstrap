@@ -1,4 +1,4 @@
-# Workflow: Pre-Flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit Adapter
+# Workflow: Pre-Flight -> Branch -> Plan -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit Adapter
 
 This Copilot instruction file is a native discovery adapter. Read and follow the canonical shared instruction at `.claude/instructions/workflow.instructions.md`.
 

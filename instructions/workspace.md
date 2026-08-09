@@ -54,7 +54,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Classify work with the single authoritative **Task Lanes** table in
@@ -80,9 +80,9 @@ diff, in that order.
 
 Ponytail never removes required validation, data-loss protection, security,
 accessibility, root-cause investigation, or the smallest meaningful regression
-check. A user may explicitly select another Ponytail mode for implementation,
-but every non-documentation diff still requires the mandatory Ponytail review
-before commit or push.
+check. Here, minimal means the fewest necessary concepts, dependencies,
+abstractions, layers, configuration, execution paths, and behaviors; clarity
+and maintainability outrank reducing physical line count.
 
 ## Agents
 
@@ -101,16 +101,16 @@ This is the **single authoritative profile-routing table**. The unified `reviewe
 
 | Surface | Profiles |
 |---|---|
-| Python source | `code`, `security`, `ponytail` |
-| New modules/refactors | `architecture`, `ponytail` |
-| Tests | `tests`, `ponytail` |
-| APIs/services | `api`, `security`, `tests`, `ponytail` |
-| Configs | `config`, `ponytail` when executable behavior changes |
+| Python source | `code`, `security`; add `ponytail` when complexity expands |
+| New modules/refactors | `architecture`; add `ponytail` when complexity expands |
+| Tests | `tests`; add `ponytail` when complexity expands |
+| APIs/services | `api`, `security`, `tests`; add `ponytail` when complexity expands |
+| Configs | `config`; add `ponytail` when executable behavior changes or complexity expands |
 | I/O-heavy or ML-heavy paths | `performance` |
 | Docs/user-facing behavior | `documentation` |
 | Domain-specific correctness | `domain` |
 | Hooks, scripts, generators, and control-plane code | `code`, `architecture`, `security`, `tests`, `ponytail` |
-| Any pre-PR gate | `code`, `security`, `tests`, `ponytail` (minimum for non-documentation diffs) |
+| Any pre-PR gate | `code`, `security`, `tests`; add `ponytail` for control-plane/high-risk or complexity-expanding diffs |
 
 ## Skills
 

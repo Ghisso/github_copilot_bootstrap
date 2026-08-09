@@ -66,14 +66,15 @@ audience-appropriate communication.
 - You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out`. The `verifier` is the single owner of the persisted score report — do not write score reports from the coder.
 - If checks fail, fix and re-run before returning.
 
-## Ponytail Simplification (Mandatory)
+## Changed-Scope Simplification
 
-After all edits pass verification, you MUST simplify the changed code before returning to the calling agent:
+After all edits pass verification, re-read the changed scope for one lightweight
+simplification check before returning:
 
-1. Re-read the modified files.
-2. Apply `ponytail-review/SKILL.md`, then local clarity and consistency refinements using `code-style/SKILL.md` and `refactor/SKILL.md` where relevant.
-3. Keep behavior unchanged and avoid unrelated refactors.
-4. Re-run verification commands after simplification.
-5. If verification fails after simplification, fix and re-verify.
+1. Remove only clearly unnecessary complexity while preserving behavior,
+   clarity, and maintainability.
+2. Do not invoke a second `ponytail-review` or `refactor` ceremony.
+3. Re-run relevant verification if this check changes code.
 
-Only return to the calling agent after simplification is complete and verification passes.
+Only return to the calling agent after this check is complete and any affected
+verification passes.
