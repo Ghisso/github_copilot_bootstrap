@@ -411,3 +411,8 @@ fatal: Cannot rebase onto multiple branches.
 2026-08-09T08:27:51Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-09T08:27:51Z WARN hook fail-closed: unparseable tool payload
 2026-08-09T08:27:51Z WARN hook fail-closed: protect-files.sh exited with status 2
+From https://github.com/Ghisso/github_copilot_bootstrap
+ * branch            ai-state   -> FETCH_HEAD
+fatal: Cannot rebase onto multiple branches.
+2026-08-09T08:45:20.000Z state-sync: reconciliation with origin/ai-state failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
+2026-08-09T08:45:20.000Z state-sync: pull failed; continuing.

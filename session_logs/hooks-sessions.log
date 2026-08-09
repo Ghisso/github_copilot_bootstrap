@@ -94,3 +94,4 @@
 2026-08-09T04:58:33.000Z,event=Stop,target=openai-codex,sessionId=019fe4a8-48ac-74a1-895c-6bd3eb137b00
 2026-08-09T08:30:55.000Z,event=Stop,target=openai-codex,sessionId=019fe4a8-48ac-74a1-895c-6bd3eb137b00
 2026-08-09T08:41:44.000Z,event=Stop,target=openai-codex,sessionId=019fe4a8-48ac-74a1-895c-6bd3eb137b00
+2026-08-09T08:45:11.000Z,event=SessionStart,target=claude-code,sessionId=178a5d38-9c7c-42ff-92b0-1b71c38d70d6,source=startup
