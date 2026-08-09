@@ -43,7 +43,8 @@ For single-phase, obviously scoped tasks (e.g., rename a field, add a config key
 
 ### Full-Plan Mode (`--mode full-plan`)
 
-For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to surface unknowns before drafting.
+For multi-phase, ambiguous, or new-module tasks. When genuinely unresolved
+decisions remain, use a focused PRD-style interview before drafting.
 
 **Phase 0 — Evidence Packet and Intake**
 - Treat the orchestrator's evidence packet as the working record. It must identify
@@ -71,9 +72,10 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Explore only the alternatives that remain viable under approved decisions and
   constraints.
 
-**Phase 3 — Module Sketch**
-- Sketch the key modules, types, and interfaces before writing a full plan.
-- Show the user the sketch and ask for confirmation before proceeding.
+**Phase 3 — Module Sketch (only when an unresolved interface decision needs it)**
+- Sketch the key modules, types, and interfaces only when they are needed to
+  resolve an open design decision.
+- Present the sketch for confirmation only when the decision requires user input.
 
 **Phase 4 — Plan Draft**
 - Write the full phased plan with owner, files, required skills, and verification per step.
@@ -83,8 +85,9 @@ For multi-phase, ambiguous, or new-module tasks. Uses a PRD-style interview to s
 - Run if: 3+ phases, new module, or architecture decision.
 - Read `.claude/skills/devils-advocate/SKILL.md`.
 - Apply the structured critique to your own plan.
-- Present findings and ask specific questions about HIGH-risk items.
-- Iterate at least once based on user responses.
+- Present findings and ask questions only when they expose a genuinely unresolved
+  HIGH-risk decision.
+- Iterate only when a user response is needed to resolve that decision.
 
 ## Plan Requirements
 
