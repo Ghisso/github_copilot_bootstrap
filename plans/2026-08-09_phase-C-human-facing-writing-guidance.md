@@ -3,7 +3,7 @@ name: 2026-08-09_phase-C-human-facing-writing-guidance
 type: small-plan
 parent_plan: guidance-and-review-calibration
 phase_index: 3
-status: in-progress
+status: complete
 closeout_session_log: .claude/session_logs/2026-08-09_guidance-and-review-calibration-phase-C.md
 ---
 
@@ -27,14 +27,14 @@ Define one canonical audience-aware reporting policy: clear, precise, direct, na
 
 ## Steps
 
-- [ ] Split the central reporting policy into explicit human-facing and agent-to-agent modes.
-- [ ] State that the human-facing rules are inspired by ASD-STE100 principles but do not claim formal compliance.
-- [ ] Require precise, clear, direct, natural prose with observable terminology, sentence, abbreviation, jargon, and active-voice rules; technical precision outranks simpler vocabulary.
-- [ ] Apply the standard strongly to user answers, plans, explanations, reviews, reports, summaries, and documentation; lightly to commit messages.
-- [ ] Protect identifiers, API names, commands, paths, logs, errors, structured findings, quotations, source code, and other exact material from lossy rewriting.
-- [ ] Retain Caveman compression for compact internal agent status/handoffs, not default user communication.
-- [ ] Point canonical agent prompts to the single policy without duplicating it; preserve the documenter's normal-prose requirement.
-- [ ] Update generation, validators, tests, README, and examples for the audience distinction and jargon-to-clear-prose boundary.
+- [x] Split the central reporting policy into explicit human-facing and agent-to-agent modes.
+- [x] State that the human-facing rules are inspired by ASD-STE100 principles but do not claim formal compliance.
+- [x] Require precise, clear, direct, natural prose with observable terminology, sentence, abbreviation, jargon, and active-voice rules; technical precision outranks simpler vocabulary.
+- [x] Apply the standard strongly to user answers, plans, explanations, reviews, reports, summaries, and documentation; lightly to commit messages.
+- [x] Protect identifiers, API names, commands, paths, logs, errors, structured findings, quotations, source code, and other exact material from lossy rewriting.
+- [x] Retain Caveman compression for compact internal agent status/handoffs, not default user communication.
+- [x] Point canonical agent prompts to the single policy without duplicating it; preserve the documenter's normal-prose requirement.
+- [x] Update generation, validators, tests, README, and examples for the audience distinction and jargon-to-clear-prose boundary.
 
 ## Verification
 
@@ -52,19 +52,19 @@ uv run python scripts/check_runtime.py
 
 ## Acceptance Criteria
 
-- [ ] The policy is explicitly ASD-STE100-inspired and explicitly disclaims formal compliance.
-- [ ] Human-facing communication uses the defined precise, clear, direct, natural prose rules.
-- [ ] Caveman remains available internally but is not the user-facing default.
-- [ ] Technical precision takes priority over simpler vocabulary.
-- [ ] Exact technical material is protected from lossy rewriting.
-- [ ] No duplicate communication policy or mandatory rewrite stage exists.
-- [ ] Canonical sources, generated targets, prompts, validators, tests, and docs agree.
+- [x] The policy is explicitly ASD-STE100-inspired and explicitly disclaims formal compliance.
+- [x] Human-facing communication uses the defined precise, clear, direct, natural prose rules.
+- [x] Caveman remains available internally but is not the user-facing default.
+- [x] Technical precision takes priority over simpler vocabulary.
+- [x] Exact technical material is protected from lossy rewriting.
+- [x] No duplicate communication policy or mandatory rewrite stage exists.
+- [x] Canonical sources, generated targets, prompts, validators, tests, and docs agree.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

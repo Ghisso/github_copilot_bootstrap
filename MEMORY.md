@@ -250,3 +250,9 @@
 - [LEARN:testing] Structured output is only transport validity. A planner
   workload passes only when every checklist item is true, artifacts match an
   exact frozen allowlist, and invented, duplicate, and expanded scope are zero.
+- [LEARN:architecture] Audience-aware writing rules need one canonical policy
+  with prompt pointers. Duplicating Caveman, exact-content, or documenter rules
+  in workflow or agent prompts recreates contradictory authority.
+- [LEARN:testing] Semantic prose validators should normalize whitespace and
+  distinguish contradictory defaults from explicit prohibitions; literal line
+  wrapping and broad keyword regexes create both false failures and false passes.
