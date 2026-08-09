@@ -26,17 +26,18 @@ Main goals:
 
 I use a strict execution loop:
 
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 
 Core principles:
 
 - Start from `dev`, branch for each big plan, and keep plan frontmatter current.
 - Plan first for non-trivial work and split big plans into commit-sized small plans.
-- Run every coding task through Ponytail `full`: reuse first, standard library/native platform next, minimum correct diff last.
+- During IMPLEMENT, the coder applies the vendored Ponytail skill once in `full` mode, then performs a lightweight changed-scope simplification and re-verification pass.
+- Treat minimality as conceptual: prefer reuse, standard-library/native features, and the smallest correct set of concepts while clarity and maintainability outrank line count.
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
-- Ship only after score >= 90, a matching findings report with zero CRITICAL findings and zero Ponytail findings, documentation updates, learning capture, and closeout logs.
+- Ship only after score >= 90, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
 - Preserve lessons learned in memory and session logs.
 
 For the authority, privacy, and conflict rules for that shared state, read
@@ -325,7 +326,7 @@ Interpretation:
 - Agents: canonical metadata and prompts in [shared/agents/](shared/agents/)
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
-- Ponytail: pinned MIT-licensed coding and over-engineering-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
+- Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
@@ -340,7 +341,7 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, Ponytail, implementation, verification, review, documentation, score, learn, session-log, commit protocol
+  - Pre-flight, branch, plan, implementation, verification, review, documentation, score, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
@@ -535,7 +536,7 @@ Orchestrator routing details:
 
 Coder skill loading:
 
-- Tier 1 (always): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`
+- Tier 1 (always for coding): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`. After implementation, the coder simplifies only the changed scope and re-verifies it; there is no standalone Ponytail lifecycle phase.
 - Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
 - An explicit request or approved plan authorizes a known control-plane change; ask only when targets, authority, or material scope are unclear.
 
@@ -612,7 +613,7 @@ Expected verification commands after implementation:
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
 - uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
-- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 
 Quality gates:
 
@@ -621,7 +622,7 @@ Quality gates:
 - < 90: blocked until implementation, verification, review, and score are rerun
 - findings report `counts.critical == 0`: required for commit
 - findings report `counts.major == 0`: additionally required for PR/push closeout
-- findings report `ponytail_reviewed == true` and `ponytail_findings == 0`: required for every non-documentation commit and push
+- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
 
 Documentation gate:
 
@@ -697,7 +698,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

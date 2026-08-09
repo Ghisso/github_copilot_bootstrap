@@ -47,7 +47,7 @@ Rather than duplicating checks, extract the **ceremony** body of `enforce-commit
 - `enforce-commit-gate.sh` (PreToolUse): classify Bash command → if commit → wrong branch adds a failure (unchanged) → if not bypass, `assert_commit_invariants` → emit `deny` JSON.
 - `commit-msg` git hook: read subject from `$1` → **not an `_implementation` branch → `exit 0` (passthrough)** → bypass subject → `exit 0` (skip ceremony; branch already valid) → else `assert_commit_invariants` → `exit 1` with the joined reason on failure.
 
-This is a **single-homing win** aligned with the review's `R-LIB-01`: the plan/score/closeout/LEARN contract gets exactly one definition and the two entry points cannot drift, while the intentional branch-scope difference stays visible in the callers rather than hidden in a flag. All ceremony helpers are pure-shell (`json_file_*` via awk, `file_mtime` with GNU→BSD→python3 fallback), so the git hook works **without `uv`** — strictly more robust than the PreToolUse path.
+This is a **single-homing win** aligned with the review's `R-LIB-01`: the plan/score/closeout/LEARN contract gets exactly one definition and the two entry points cannot drift, while the intentional branch-scope difference stays visible in the callers rather than hidden in a flag. Bash 3.2 remains the orchestration baseline, while a small Python 3 standard-library helper performs top-level and `counts` JSON traversal. The helper is invoked by Bash and has no `uv` dependency, so the git hook remains enforceable without a project environment.
 
 ### D4 — Branch scope of the git-layer mirror *(decided — Option B)*
 

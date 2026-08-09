@@ -1,8 +1,10 @@
 # Ponytail Review Profile
 
-Use for every non-documentation diff. This profile reviews only unnecessary
-complexity; combine it with the normal correctness, security, test, and
-architecture profiles.
+Use according to the authoritative routing table in
+`.claude/instructions/workspace.instructions.md`, including its
+control-plane/high-risk, complexity-expansion, and documentation-only
+precedence rules. This profile reviews only unnecessary complexity; combine it
+with the normal correctness, security, test, and architecture profiles.
 
 ## Checklist
 
@@ -29,8 +31,9 @@ Prefix the title with one of:
 - `yagni:` name the speculative abstraction or flexibility.
 - `shrink:` state the smaller equivalent.
 
-Every finding must use `profile: "ponytail"`. All surviving Ponytail findings
-must be resolved before commit, regardless of severity.
+Every finding must use `profile: "ponytail"`. Ponytail findings use the ordinary
+severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
+advisory.
 
 ## Severity
 
@@ -38,4 +41,3 @@ must be resolved before commit, regardless of severity.
 - Major: A dependency, abstraction, or duplicate implementation materially
   increases ownership or creates divergent behavior.
 - Minor: A safe deletion or direct simplification remains.
-

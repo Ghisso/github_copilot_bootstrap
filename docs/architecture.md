@@ -106,16 +106,26 @@ trust and credential boundaries.
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
 as a per-user plugin. Every target receives `.claude/skills/ponytail/`,
-`.claude/skills/ponytail-review/`, and the upstream license/provenance. Root
-guidance and the coder role require `full` mode for coding, so fresh consumers
-work without network access or global plugin state.
+`.claude/skills/ponytail-review/`, and the upstream license/provenance. The
+`ponytail` skill is coder-time implementation discipline: once per coding task,
+the coder applies `full` mode, then simplifies and re-verifies the changed
+scope. It is not a standalone lifecycle phase. Minimality means fewer concepts,
+dependencies, abstractions, layers, paths, and behaviors; clarity and
+maintainability outrank physical line count.
 
-The unified reviewer runs a `ponytail` profile for every non-documentation
-diff. `record_findings.py --profile ponytail` persists top-level
-`ponytail_reviewed` and `ponytail_findings` fields with the existing diff
-content hash. Commit and push gates require a fresh review with zero surviving
-Ponytail findings; any subsequent code/config/script edit invalidates it.
-Documentation-only diffs are exempt.
+The separate `ponytail-review` skill is a reviewer-facing checklist. The
+unified reviewer selects the `ponytail` profile when the authoritative routing
+table requires it: deterministic control-plane/high-risk, multi-file,
+dependency, script, generator, or similarly complex work, or when the reviewer
+identifies complexity expansion. An exemption is exactly one documentation OR
+one mutable workflow-state file, only when no control-plane/high-risk condition
+applies; every multi-file diff is high-risk. The metadata matrix is exact:
+selecting the profile always emits `ponytail_reviewed: true` and a numeric
+`ponytail_findings` count, while a new unselected report omits both. Optional
+diffs can read compatible legacy `false`/`0` reports, but high-risk routing
+requires true evidence. Ponytail findings use the ordinary gates: CRITICAL
+blocks commit, MAJOR blocks push/PR, and MINOR is advisory. There is no special
+zero-Ponytail-finding gate.
 
 Do not edit `dist/` manually. Regenerate it with:
 
@@ -206,7 +216,7 @@ branch-shape check and require acknowledgement before PR or push closeout.
 The canonical workflow is:
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:

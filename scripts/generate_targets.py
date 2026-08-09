@@ -92,7 +92,7 @@ TARGET_PATH_REPLACEMENTS = {
 }
 
 ROOT_GUIDANCE_WORKFLOW = (
-    "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+    "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
     "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
 )
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
@@ -728,7 +728,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Verify, then run profile-driven review until clean. Update required documentation before persisting findings and score.
-- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail findings are zero, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete.
+- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
 
 ## Exact Commands

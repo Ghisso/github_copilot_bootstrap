@@ -3,7 +3,7 @@ description: "Always-on: Workflow protocol, branch lifecycle, session logging, c
 applicability: always
 ---
 
-# Workflow: Pre-Flight -> Branch -> Plan -> Ponytail -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
+# Workflow: Pre-Flight -> Branch -> Plan -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
 
 ---
 
@@ -56,24 +56,23 @@ Control-plane/high-risk work always uses a full plan.
 ## Canonical Orchestrator Loop
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
 ```
 
 For each small plan:
 
 1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
-2. **PONYTAIL:** Load `.claude/skills/ponytail/SKILL.md` in `full` mode and pass that requirement to every code-writing delegate.
-3. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work).
-4. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
-5. **REVIEW:** Delegate to `reviewer`; for every non-documentation diff include the `ponytail` profile alongside the normal correctness/security profiles. It runs its own primary and verification passes and returns the surviving findings as JSON (it has no `execute` capability, so it cannot persist them itself). Resolve every surviving Ponytail finding, even `MINOR`, then repeat IMPLEMENT/VERIFY/REVIEW until the review is clean on the code. Do not persist findings yet — persistence happens at step 7 (after DOCUMENT) so the report binds to the final code+docs content.
-6. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal. DOCUMENT runs before the persisted SCORE/FINDINGS so the documenter's tracked edits are inside the content those reports are bound to — otherwise a post-score doc change stales both.
-7. **SCORE & PERSIST:** After documentation is final, persist the converged findings with `record_findings.py --profile ponytail --phase <current_phase> --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<timestamp>.json` and run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`. Both artifacts now bind to the final code+docs `content_hash`. Doc-only changes from DOCUMENT are not re-reviewed — the code review already converged; persisting here simply keeps the reports fresh against the committed content. Re-run REVIEW only if a later fix changes code.
-8. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE, and repeat until score is >= 90, the findings report has `counts.critical == 0`, and a required Ponytail review has zero surviving Ponytail findings.
-9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
-10. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
-11. **COMMIT:** Commit the completed small plan atomically.
+2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
+3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
+4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
+5. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal. DOCUMENT runs before the persisted SCORE/FINDINGS so the documenter's tracked edits are inside the content those reports are bound to — otherwise a post-score doc change stales both.
+6. **SCORE & PERSIST:** After documentation is final, persist the converged findings with one `--profile <name>` for each profile that ran, then run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`. Both artifacts bind to the final code+docs `content_hash`. Doc-only changes from DOCUMENT are not re-reviewed — the code review already converged; persisting here simply keeps the reports fresh against the committed content. Re-run REVIEW only if a later fix changes code.
+7. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE, and repeat until score is >= 90 and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory.
+8. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
+9. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
+10. **COMMIT:** Commit the completed small plan atomically.
 
-**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. For non-documentation diffs the report must also have `ponytail_reviewed: true` and `ponytail_findings: 0`.**
+**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
 
 ---
 
@@ -138,7 +137,7 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 [ ] Big plan and current small plan saved under .claude/plans/
 [ ] TodoWrite reflects canonical workflow and current loop
 [ ] Verification passed (pytest + mypy + ruff)
-[ ] Review passed; findings persisted via record_findings.py (including ponytail_reviewed + zero Ponytail findings for non-documentation diffs)
+[ ] Review passed; findings persisted via record_findings.py (including Ponytail metadata when the profile was required)
 [ ] Score >= 90 with persisted matching quality report
 [ ] Docs updated or explicitly skipped as pure-internal
 [ ] Learn entries flushed or explicit no-lessons marker recorded
@@ -170,8 +169,8 @@ Some behaviors are automated by hooks. Others are still manual.
 - Protected file edits are denied.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
-- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence, and DOCUMENT/LEARN/session-log evidence.
-- PR creation/push is gated on all small plans complete, bypass acknowledgement, required Ponytail review evidence, and the findings report additionally having `counts.major == 0`.
+- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence.
+- PR creation/push is gated on all small plans complete, bypass acknowledgement, required Ponytail review evidence where applicable, and the findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.

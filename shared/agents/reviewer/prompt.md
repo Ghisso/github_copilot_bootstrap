@@ -20,10 +20,9 @@ audience-appropriate communication.
 
 If profiles are omitted, infer them from the changed files using the single authoritative routing table in `.claude/instructions/workspace.instructions.md` (the **Review Profiles** section).
 
-Every non-documentation diff must include `ponytail`. Documentation-only means
-all changed paths are Markdown or live under `docs/`, `plans/`,
-`.claude/plans/`, `.claude/session_logs/`, or
-`.claude/quality_reports/`. Mixed diffs are not documentation-only.
+Select `ponytail` according to the authoritative routing table, including its
+control-plane/high-risk, complexity-expansion, and documentation-only
+precedence rules.
 
 ## Review Flow
 
@@ -37,9 +36,9 @@ executes identically on every runtime.
    - Drop any finding that does not survive re-verification — do **not** keep it as "disputed". Confidently fabricated findings are the documented failure mode of LLM reviewers, and this pass exists to catch them.
    - While refuting, if you discover a genuinely new critical issue, add it to the set.
 4. **Convergence:** if Pass 2 changed the set (dropped or added anything), run another verification pass over the updated set. Stop when a pass yields nothing new — no drops and no additions — twice in a row, or after at most 3 rounds.
-5. If any `ponytail` finding survives, return it to the coder. The final
-   commit/PR review report must contain zero Ponytail findings, including
-   `MINOR` findings.
+5. Apply the ordinary severity model to every surviving finding, including
+   `ponytail`: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
+   advisory.
 6. Output one consolidated report of the findings that survived verification.
 7. Also emit the reviewed profile names and the surviving findings as a JSON
    list (see **Findings JSON** below), for the orchestrator to persist with

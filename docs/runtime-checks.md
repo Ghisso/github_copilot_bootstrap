@@ -123,8 +123,10 @@ only marker-owned probe children. It never writes a trust setting, approves a
 hook, or forces a safety bypass; trust remains an explicit operator action.
 
 Ponytail does not add a runtime binary requirement. Its portable skills are
-vendored into `.claude/skills/`; the bootstrap's existing reviewer and pure
-Bash git gates enforce the fresh zero-finding Ponytail review. Node.js is used
+vendored into `.claude/`. The coder applies `ponytail` `full` once during
+IMPLEMENT; the reviewer selects the separate `ponytail` profile only when the
+authoritative routing table requires it. Selected findings use the ordinary
+CRITICAL/MAJOR/MINOR gates, with no special zero-Ponytail gate. Node.js is used
 elsewhere by the managed devcontainer, but is not required solely for this
 Ponytail integration.
 
@@ -220,14 +222,17 @@ without claiming that it changed hooks. If sync is not progressing after you
 approve updated hooks, run `state-sync.sh status` and inspect
 `.claude/session_logs/hooks-errors.log`.
 
-Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins, and the gate is written to be `uv`-independent — the pure-bash guardrails still enforce even when `uv` is absent (only `quality_score.py` itself needs `uv`).
+Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Commit gates read persisted JSON reports, not terminal output, and require matching branch, phase, base ref, merge-base SHA, and current HEAD SHA. The report must also record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), must target a repo-relative path, and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. The newest report by `generated_at` wins. Gate orchestration is Bash 3.2 plus Python 3 standard-library JSON parsing; it has no `uv` dependency and remains enforceable when `uv` is absent. Only the optional `quality_score.py` command needs the project environment.
 
-For non-documentation diffs, the matching findings report must also contain
-`ponytail_reviewed: true` and `ponytail_findings: 0`. `record_findings.py`
-receives `--profile ponytail`; its existing content hash invalidates the
-review after any real source, test, script, hook, config, manifest, template,
-container, or generator edit. All-Markdown and documented workflow-state
-diffs are exempt.
+When routing selects the `ponytail` profile, `record_findings.py --profile
+ponytail` always emits `ponytail_reviewed: true` and a numeric
+`ponytail_findings` count; a new unselected report omits both. Its content hash
+invalidates the review after any real source, test, script, hook, config,
+manifest, template, container, or generator edit. Optional diffs may read
+compatible legacy `false`/`0` reports, but high-risk routing requires true
+evidence. An exemption is exactly one documentation OR one mutable
+workflow-state file, only when no control-plane/high-risk condition applies;
+every multi-file diff is high-risk.
 
 ## Two Layers, Two Invariants: Commit And Push Enforcement
 
@@ -242,7 +247,13 @@ Two workflow invariants are each enforced twice, from a single shared contract p
 
 Both git-hook layers are installed by setting `git config core.hooksPath .claude/hooks/git-hooks` (done by `install_bootstrap.py` and, for containers, by `post-start.sh`).
 
-The hooks and their shared library (`_lib-frontmatter.sh`) are pure bash with no dependency on `uv`, and are written to the **bash 3.2** baseline — the version macOS still ships as `/bin/bash` — so no bash-4-only builtins (`mapfile`/`readarray`), associative arrays, or negative array indices. This keeps the gates working identically on a stock macOS consumer machine and on the `macos-latest` CI runner (`.github/workflows/validate.yml`), which is where `_lib-frontmatter.sh`'s GNU-vs-BSD `stat`/`find` fallbacks are actually exercised.
+Gate orchestration uses Bash 3.2 plus Python 3 standard-library JSON parsing,
+with no dependency on `uv`; the surrounding hook scripts are not all pure Bash.
+The Bash baseline avoids bash-4-only builtins (`mapfile`/`readarray`),
+associative arrays, and negative array indices. This keeps the gates working
+identically on a stock macOS consumer machine and on the `macos-latest` CI
+runner (`.github/workflows/validate.yml`), where `_lib-frontmatter.sh`'s
+GNU-vs-BSD `stat`/`find` fallbacks are exercised.
 
 `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored, a fresh clone has no `.claude/hooks/git-hooks/` until it is checked out — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`). That window shrank when AI state moved from a Hugging Face bucket to a nested git repo (`plans/adr-002-git-backed-state-sync.md`): `post-start.sh` now checks `.claude/` out via `state-sync.sh setup` using the same git credentials as the code checkout, with no separate authenticated pull to wait on, and sets `core.hooksPath` immediately after.
 

@@ -156,9 +156,21 @@ Expected:
 - `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
 - `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
 - A valid score report with no matching `findings-*.json` report blocks the commit.
-- A non-documentation diff without `ponytail_reviewed: true` blocks the commit.
-- Any surviving Ponytail finding, including `MINOR`, blocks the commit.
-- A Markdown/docs-only diff does not require Ponytail fields.
+- The coder's implementation path applies Ponytail `full` once, then performs a
+  changed-scope simplification and re-verification; lifecycle output has no
+  standalone Ponytail phase.
+- The `ponytail` review profile is required for deterministic control-plane or
+  other high-risk/multi-file/dependency/script/generator work, and for
+  reviewer-selected complexity. An exemption is exactly one documentation OR
+  one mutable workflow-state file, only when no control-plane/high-risk
+  condition applies; every multi-file diff is high-risk.
+- Selecting the profile always emits `ponytail_reviewed: true` and a numeric
+  `ponytail_findings` count. New unselected reports omit both fields; optional
+  diffs can read compatible legacy `false`/`0` reports, while high-risk routing
+  requires true evidence.
+- Ponytail findings follow ordinary severity gates: `CRITICAL` blocks commit,
+  `MAJOR` blocks push/PR, and `MINOR` is advisory. There is no zero-Ponytail
+  gate.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
 - A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
 - Two findings reports for the same branch/phase select the newest by `generated_at`, not filename — a lexically-later but older clean report loses to a lexically-earlier but newer report containing a `CRITICAL` finding.

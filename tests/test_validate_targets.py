@@ -238,9 +238,9 @@ def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() ->
     """Structural validation rejects regressions hidden by broad substring checks."""
     guidance = render_root_guidance("claude-code")
     mutated = guidance.replace("## Map\n", "## Map\n\n## Map\n", 1).replace(
-        "PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
         "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
-        "PRE-FLIGHT -> PLAN -> BRANCH -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "PRE-FLIGHT -> PLAN -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
         "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
         1,
     )

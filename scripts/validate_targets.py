@@ -337,9 +337,9 @@ class TaskLaneInputs(TypedDict, total=False):
 
 
 ROOT_LIFECYCLE_PATTERN = re.compile(
-    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
+    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
     r"SCORE|LEARN|SESSION LOG|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN|"
-    r"PONYTAIL|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
+    r"IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
     re.IGNORECASE,
 )
 POLICY_SCOPE_FIXTURES = {
@@ -2313,7 +2313,7 @@ def run_hook_raw(
 
 def path_without_uv() -> dict[str, str]:
     """A copy of os.environ with any directory containing a `uv` binary removed
-    from PATH, so tests can exercise the pure-bash guardrail fallback."""
+    from PATH, so tests can exercise the no-uv guardrail fallback."""
     env = dict(os.environ)
     kept = [
         part
@@ -3450,24 +3450,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        write_findings(findings_report(head_sha, content_hash, ponytail_reviewed=False))
+        optional_report = findings_report(head_sha, content_hash)
+        optional_report.pop("ponytail_reviewed")
+        optional_report.pop("ponytail_findings")
+        optional_report["profiles_reviewed"] = ["code"]
+        write_findings(optional_report)
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            result.returncode != 0,
-            "commit-msg hook must block non-documentation changes without Ponytail review",
+            result.returncode == 0,
+            "commit-msg hook must allow ordinary low-complexity work without Ponytail metadata",
             errors,
         )
-        check(
-            "require a fresh Ponytail review" in result.stderr,
-            "missing-Ponytail failure must name the required review",
-            errors,
-        )
+        if result.returncode == 0:
+            git(repo, "reset", "--soft", "HEAD~1")
 
         write_findings(
             findings_report(
                 head_sha,
                 content_hash,
-                ponytail_findings=1,
                 findings=[
                     {
                         "severity": "MINOR",
@@ -3481,15 +3481,31 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            result.returncode != 0,
-            "commit-msg hook must block every surviving Ponytail finding",
+            result.returncode == 0,
+            "commit-msg hook must allow an advisory Ponytail MINOR finding",
             errors,
         )
+        if result.returncode == 0:
+            git(repo, "reset", "--soft", "HEAD~1")
+
+        write(repo / ".codex" / "config.toml", "[features]\n")
+        git(repo, "add", ".codex/config.toml")
+        head_sha, content_hash = head_and_hash()
+        write_score(score_report(head_sha, content_hash))
+        required_report = findings_report(head_sha, content_hash)
+        required_report.pop("ponytail_reviewed")
+        required_report.pop("ponytail_findings")
+        required_report["profiles_reviewed"] = ["code"]
+        write_findings(required_report)
+        result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
-            "unresolved Ponytail finding" in result.stderr,
-            "Ponytail-finding failure must explain that simplification is required",
+            result.returncode != 0
+            and "requires a fresh Ponytail review" in result.stderr,
+            "commit-msg hook must require Ponytail metadata for control-plane work",
             errors,
         )
+
+        write_findings(findings_report(head_sha, content_hash))
 
         write_findings(findings_report(head_sha, content_hash, content_hash="deadbeef"))
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -3851,6 +3867,66 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        write(repo / "minor-work.txt", "minor work\n")
+        git(repo, "add", "minor-work.txt")
+        write_score_report()
+        write_findings_report(
+            counts={"critical": 0, "major": 0, "minor": 1},
+            findings=[
+                {
+                    "severity": "MINOR",
+                    "title": "yagni: optional simplification",
+                    "file": "minor-work.txt",
+                    "profile": "ponytail",
+                }
+            ],
+        )
+        minor_commit = git(repo, "commit", "-m", "phase 1 advisory minor")
+        check(
+            minor_commit.returncode == 0,
+            "commit-msg hook must allow a Ponytail MINOR finding",
+            errors,
+        )
+        minor_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            minor_push.returncode == 0,
+            "pre-push hook must allow an advisory Ponytail MINOR finding",
+            errors,
+        )
+
+        write(repo / ".codex" / "config.toml", "[features]\n")
+        git(repo, "add", ".codex/config.toml")
+        write_score_report()
+        # Build the ordinary report then remove optional metadata to exercise
+        # the required-review push path without bypassing report freshness.
+        write_findings_report()
+        required_path = reports_dir / "findings-test.json"
+        required_report = json.loads(read(required_path))
+        required_report.pop("ponytail_reviewed")
+        required_report.pop("ponytail_findings")
+        required_report["profiles_reviewed"] = ["code"]
+        write(required_path, json.dumps(required_report, indent=2) + "\n")
+        git(repo, "commit", "-m", "phase 1 high-risk metadata", "--no-verify")
+        missing_metadata_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            missing_metadata_push.returncode != 0
+            and "requires a fresh Ponytail review" in missing_metadata_push.stderr,
+            "pre-push hook must require Ponytail metadata for high-risk diffs",
+            errors,
+        )
+
         # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
         # allow the commit (the commit gate only checks critical) while
         # blocking the push (the push gate additionally checks major).
@@ -3864,11 +3940,13 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                     "severity": "MAJOR",
                     "title": "unbounded query",
                     "file": "major-work.txt",
+                    "profile": "ponytail",
                 },
                 {
                     "severity": "MAJOR",
                     "title": "missing pagination",
                     "file": "major-work.txt",
+                    "profile": "ponytail",
                 },
             ],
         )
@@ -4010,8 +4088,6 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "README.md",
                 "--profile",
                 "code",
-                "--profile",
-                "ponytail",
                 "--phase",
                 "validator",
                 "--base-ref",
@@ -4027,26 +4103,113 @@ def validate_generated_scripts(errors: list[str]) -> None:
         )
         check(
             result.returncode == 0,
-            f"record_findings Ponytail metadata run failed: {result.stderr}",
+            f"record_findings optional-metadata run failed: {result.stderr}",
             errors,
         )
         if report_path.exists():
             report = json.loads(read(report_path))
             check(
+                "ponytail_reviewed" not in report,
+                "record_findings must omit Ponytail metadata when the profile did not run",
+                errors,
+            )
+            check(
+                "ponytail_findings" not in report,
+                "record_findings must omit Ponytail finding metadata when the profile did not run",
+                errors,
+            )
+            check(
+                report.get("profiles_reviewed") == ["code"],
+                "record_findings must persist sorted reviewed profiles",
+                errors,
+            )
+
+        legacy_path = Path(temp_dir) / "legacy-ponytail-findings.json"
+        legacy = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "ponytail",
+                "--phase",
+                "validator",
+                "--base-ref",
+                "dev",
+                "--out",
+                str(legacy_path),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            legacy.returncode == 0,
+            f"record_findings Ponytail metadata run failed: {legacy.stderr}",
+            errors,
+        )
+        if legacy_path.exists():
+            report = json.loads(read(legacy_path))
+            check(
                 report.get("ponytail_reviewed") is True,
-                "record_findings must persist ponytail_reviewed",
+                "record_findings must preserve Ponytail metadata when the profile ran",
                 errors,
             )
             check(
                 report.get("ponytail_findings") == 0,
-                "record_findings must persist zero Ponytail findings",
+                "record_findings must preserve zero Ponytail findings",
                 errors,
             )
-            check(
-                report.get("profiles_reviewed") == ["code", "ponytail"],
-                "record_findings must persist sorted reviewed profiles",
-                errors,
-            )
+
+        no_profile = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--phase",
+                "validator",
+                "--out",
+                str(Path(temp_dir) / "no-profile.json"),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            no_profile.returncode != 0
+            and "at least one --profile" in no_profile.stderr,
+            "record_findings must reject empty reviewed-profile lists for new reports",
+            errors,
+        )
+
+        missing_finding_profile = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "code",
+                "--phase",
+                "validator",
+                "--out",
+                str(Path(temp_dir) / "missing-finding-profile.json"),
+            ],
+            cwd=REPO_ROOT,
+            input='[{"severity": "MINOR", "title": "missing profile"}]',
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            missing_finding_profile.returncode != 0
+            and "non-empty profile" in missing_finding_profile.stderr,
+            "record_findings must reject findings without a reviewed profile",
+            errors,
+        )
 
 
 def validate_skills_and_paths(errors: list[str]) -> None:
@@ -4099,6 +4262,18 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         check(
             "v4.8.4" in provenance,
             "Ponytail provenance must pin release v4.8.4",
+            errors,
+        )
+        check(
+            "canonical\nworkflow and review-routing policies decide lifecycle placement"
+            in provenance,
+            "Ponytail provenance must preserve canonical workflow authority",
+            errors,
+        )
+        check(
+            "conditional `ponytail` review profile runs" in provenance
+            and "`ponytail-review` remains an\nimported skill" in provenance,
+            "Ponytail provenance must distinguish the review profile from the imported skill",
             errors,
         )
         check(
@@ -6609,7 +6784,7 @@ def validate_determinism(errors: list[str]) -> None:
 
 
 def validate_ponytail_diff_classifier(errors: list[str]) -> None:
-    """Documentation-only diffs skip Ponytail; mixed/code diffs require it."""
+    """Only deterministic high-risk paths require Ponytail metadata in hooks."""
     library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = Path(temp_dir) / "repo"
@@ -6617,6 +6792,7 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         subprocess.run(["git", "init", "-q", "-b", "dev", str(repo)], check=False)
         env = git_actor_env("PonytailClassifier")
         write(repo / "README.md", "# Fixture\n")
+        write(repo / ".codex" / "root-adapter.md", "# Adapter\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
         subprocess.run(
             ["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False
@@ -6628,44 +6804,225 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
             check=False,
         )
 
+        def classifier_status(*refs: str) -> int:
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; diff_requires_ponytail "$2" "${3:-}"',
+                    "_",
+                    str(library),
+                    str(repo),
+                    *refs,
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            return result.returncode
+
         write(repo / "README.md", "# Fixture\n\nDocs only.\n")
-        docs_only = subprocess.run(
-            [
-                "bash",
-                "-c",
-                '. "$1"; diff_requires_ponytail "$2"',
-                "_",
-                str(library),
-                str(repo),
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        docs_only = classifier_status()
         check(
-            docs_only.returncode != 0,
-            "Ponytail diff classifier must exempt a Markdown-only diff",
+            docs_only != 0,
+            "Ponytail diff classifier must exempt a single documentation-only diff",
             errors,
         )
+        git(repo, "checkout", "--", "README.md")
 
         write(repo / "app.py", "print('fixture')\n")
         subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
-        mixed = subprocess.run(
+        ordinary = classifier_status()
+        check(
+            ordinary != 0,
+            "Ponytail diff classifier must keep one ordinary code file optional",
+            errors,
+        )
+        git(repo, "reset", "app.py")
+        (repo / "app.py").unlink()
+
+        write(repo / "scripts" / "generate.py", "print('fixture')\n")
+        git(repo, "add", "scripts/generate.py")
+        generator = classifier_status()
+        check(
+            generator == 0,
+            "Ponytail diff classifier must require review for scripts and generators",
+            errors,
+        )
+        git(repo, "reset", "scripts/generate.py")
+        (repo / "scripts" / "generate.py").unlink()
+
+        write(repo / "docs" / "guide.md", "# Guide\n")
+        write(repo / "README.md", "# Fixture\n\nSecond docs file.\n")
+        git(repo, "add", "README.md", "docs/guide.md")
+        multi_docs = classifier_status()
+        check(
+            multi_docs == 0,
+            "Ponytail diff classifier must treat a multi-file docs diff as high-risk",
+            errors,
+        )
+        git(repo, "reset", "README.md", "docs/guide.md")
+        git(repo, "checkout", "--", "README.md")
+        (repo / "docs" / "guide.md").unlink()
+
+        write(repo / "README.md", "# Fixture\n\nMixed docs.\n")
+        write(repo / "app.py", "print('mixed')\n")
+        git(repo, "add", "README.md", "app.py")
+        mixed = classifier_status()
+        check(
+            mixed == 0,
+            "Ponytail diff classifier must treat a mixed docs/code diff as high-risk",
+            errors,
+        )
+        git(repo, "reset", "README.md", "app.py")
+        git(repo, "checkout", "--", "README.md")
+        (repo / "app.py").unlink()
+
+        write(repo / "pyproject.toml", "[project]\nname = 'fixture'\n")
+        git(repo, "add", "pyproject.toml")
+        dependency = classifier_status()
+        check(
+            dependency == 0,
+            "Ponytail diff classifier must require review for dependency manifests",
+            errors,
+        )
+        git(repo, "reset", "pyproject.toml")
+        (repo / "pyproject.toml").unlink()
+
+        write(repo / "service" / "pyproject.toml", "[project]\nname = 'service'\n")
+        git(repo, "add", "service/pyproject.toml")
+        nested_dependency = classifier_status()
+        check(
+            nested_dependency == 0,
+            "Ponytail diff classifier must require review for nested dependency manifests",
+            errors,
+        )
+        git(repo, "reset", "service/pyproject.toml")
+        (repo / "service" / "pyproject.toml").unlink()
+
+        write(repo / "frontend" / "package.json", '{"name": "frontend"}\n')
+        git(repo, "add", "frontend/package.json")
+        nested_package = classifier_status()
+        check(
+            nested_package == 0,
+            "Ponytail diff classifier must require review for nested package manifests",
+            errors,
+        )
+        git(repo, "reset", "frontend/package.json")
+        (repo / "frontend" / "package.json").unlink()
+
+        write(repo / "service" / "uv.lock", "version = 1\n")
+        git(repo, "add", "service/uv.lock")
+        nested_lockfile = classifier_status()
+        check(
+            nested_lockfile == 0,
+            "Ponytail diff classifier must require review for nested lockfiles",
+            errors,
+        )
+        git(repo, "reset", "service/uv.lock")
+        (repo / "service" / "uv.lock").unlink()
+
+        write(repo / "AGENTS.md", "# Control plane\n")
+        git(repo, "add", "AGENTS.md")
+        control_plane_markdown = classifier_status()
+        check(
+            control_plane_markdown == 0,
+            "Ponytail diff classifier must not exempt a control-plane Markdown file",
+            errors,
+        )
+        git(repo, "add", "AGENTS.md")
+        subprocess.run(
             [
-                "bash",
-                "-c",
-                '. "$1"; diff_requires_ponytail "$2"',
-                "_",
-                str(library),
-                str(repo),
+                "git",
+                "commit",
+                "-q",
+                "-m",
+                "control plane fixture",
             ],
-            text=True,
-            capture_output=True,
+            cwd=repo,
+            env=env,
             check=False,
         )
         check(
-            mixed.returncode == 0,
-            "Ponytail diff classifier must require review for a mixed docs/code diff",
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must apply the same rule to a pushed diff_ref",
+            errors,
+        )
+
+        git(repo, "reset", "--hard", "dev")
+        git(repo, "mv", ".codex/root-adapter.md", "ordinary-adapter.md")
+        check(
+            classifier_status() == 0,
+            "Ponytail diff classifier must inspect both paths of a live control-plane rename",
+            errors,
+        )
+        git(repo, "reset", "--hard", "dev")
+        git(repo, "mv", ".codex/root-adapter.md", "ordinary-adapter.md")
+        git(repo, "commit", "-q", "-m", "rename control-plane adapter")
+        check(
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must inspect both paths of a pushed control-plane rename",
+            errors,
+        )
+
+        git(repo, "reset", "--hard", "dev")
+        write(repo / "service" / "pyproject.toml", "[project]\nname = 'service'\n")
+        git(repo, "add", "service/pyproject.toml")
+        git(repo, "commit", "-q", "-m", "add nested manifest")
+        check(
+            classifier_status("HEAD") == 0,
+            "Ponytail diff classifier must require a nested manifest in diff_ref mode",
+            errors,
+        )
+
+
+def validate_json_report_readers(errors: list[str]) -> None:
+    """Report readers must ignore nested reserved keys and key order."""
+    library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        report = Path(temp_dir) / "report.json"
+
+        def values(payload: dict[str, object]) -> list[str]:
+            write(report, json.dumps(payload) + "\n")
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; json_file_bool_value "$2" ponytail_reviewed; '
+                    'json_file_number_value "$2" counts.critical',
+                    "_",
+                    str(library),
+                    str(report),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"JSON report reader failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        nested_first = {
+            "findings": [{"ponytail_reviewed": True, "critical": 9}],
+            "ponytail_reviewed": False,
+            "counts": {"critical": 0, "major": 0, "minor": 0},
+        }
+        check(
+            values(nested_first) == ["false", "0"],
+            "nested reserved metadata must not precede top-level false/zero fields",
+            errors,
+        )
+        top_level_first = {
+            "ponytail_reviewed": True,
+            "counts": {"critical": 1, "major": 0, "minor": 0},
+            "findings": [{"ponytail_reviewed": False, "critical": 0}],
+        }
+        check(
+            values(top_level_first) == ["true", "1"],
+            "nested reserved metadata must not override top-level true/count fields",
             errors,
         )
 
@@ -6959,6 +7316,7 @@ def main() -> int:
         validate_root_source_mirror_cases(errors)
         validate_runtime_drift_cases(errors)
         validate_ponytail_diff_classifier(errors)
+        validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)
         validate_installer_commit_failure(errors)

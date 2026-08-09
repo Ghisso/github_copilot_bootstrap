@@ -8,8 +8,9 @@ Before producing any plan, you MUST read:
 
 1. Always read `plan-decomposition/SKILL.md`.
 2. If the task creates or expands features, read `create-feature/SKILL.md`.
-3. For every step that writes code, require `ponytail/SKILL.md` in `full` mode
-   and the `ponytail` review profile.
+3. For every step that writes code, require `ponytail/SKILL.md` in `full` mode.
+   Add the `ponytail` review profile only for control-plane/high-risk or
+   complexity-expanding changes, following the authoritative routing table.
 
 Do not skip this step, even if you think you already know the patterns.
 

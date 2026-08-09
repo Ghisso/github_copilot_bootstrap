@@ -298,8 +298,9 @@ def main() -> int:
                 )
             elif command == "uv":
                 print(
-                    "WARN optional binary missing: uv; the file-protection and git guardrails run "
-                    "in pure bash without it, and quality_score.py is the only feature that needs it"
+                    "WARN optional binary missing: uv; guardrails use Bash 3.2 orchestration and "
+                    "Python 3 standard-library JSON parsing for report reads without uv; "
+                    "quality_score.py is the only feature that needs uv"
                 )
             elif command == "context-mode":
                 print(
