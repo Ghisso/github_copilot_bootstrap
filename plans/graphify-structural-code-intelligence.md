@@ -188,6 +188,17 @@ performance/size/churn budgets in the Phase 0 plan. Any mandatory failure is
 NO-GO. NO-GO records evidence and stops Phases A-F; it does not trigger an
 adapter workaround or a different Graphify version.
 
+After the initial bootstrap-only gate returned NO-GO, the user authorized one
+supplementary applicability test against the refreshed consumer projects
+`/home/ghisso/work/RAG` and
+`/home/ghisso/work/git_projects/industrial-inspection`. This does not erase or
+reclassify the original result. A cross-project override may authorize Phase A
+only when both consumers independently add source-confirmed structural value
+on at least two of three predefined questions, accept zero known material false
+relationships, remain within the Phase 0 cold/query/size budgets, and leave
+both already-dirty consumer worktrees byte-for-byte and status-for-status
+unchanged. Failure in either consumer preserves NO-GO and stops Phases A-F.
+
 ### Phase D RETAIN
 
 Retention requires the Phase 0 value result to survive the generated consumer

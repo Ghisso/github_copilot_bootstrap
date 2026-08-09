@@ -26,6 +26,14 @@ update semantics are unverified until this phase records them. A NO-GO result
 stops Phases A-F; it does not justify another Graphify version, a custom state
 engine, or a tracked workaround.
 
+The initial bootstrap-only experiment returned NO-GO. Before closeout, the
+user authorized one supplementary read-only applicability test against two
+refreshed consumer projects: `/home/ghisso/work/RAG` and
+`/home/ghisso/work/git_projects/industrial-inspection`. Preserve the original
+result as a separate record. The supplement may change the final adoption
+decision only through the explicit cross-project override in Step 7; it must
+not weaken or rewrite the original measurements and limitations.
+
 ## Ownership
 
 - `coder`: execute only the disposable experiment and write the single gate
@@ -159,7 +167,7 @@ it here.
   path that is materially less direct to assemble from the baseline; file
   discovery alone does not count.
 
-### 6. Measure budgets and issue GO or NO-GO
+### 6. Measure budgets and issue the initial bootstrap decision
 
 - **Owner:** verifier, then reviewer and orchestrator
 - **Files:** finalize the gate evidence only.
@@ -185,9 +193,72 @@ it here.
   mandatory failure is NO-GO. Do not average away a failed correctness or
   privacy check.
 - **Verification:** reviewer performs primary and adversarial passes over the
-  full evidence. Orchestrator records `Decision: GO` or `Decision: NO-GO`, the
-  exact reasons, the verified raw CLI contract table, and whether Phases A-F
-  are authorized to proceed.
+  full evidence. Orchestrator records the initial bootstrap `Decision: GO` or
+  `Decision: NO-GO`, the exact reasons, and the verified raw CLI contract
+  table. When the user has authorized Step 7, later-phase authorization remains
+  deferred until that supplement is verified and reviewed.
+
+### 7. Test applicability on two real consumer projects
+
+- **Owner:** coder, then verifier and reviewer.
+- **Files:** read both consumer repositories; append a clearly separated
+  supplement to
+  `.claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md`.
+  All Graphify output, caches, copies, and timing data remain under `/tmp`.
+- **Required Skills:**
+  `.claude/skills/integration-gate-spike/SKILL.md`,
+  `.claude/skills/testing-patterns/SKILL.md`.
+- **Review Profiles:** `architecture`, `security`, `tests`, `documentation`,
+  `performance`.
+- **Write boundary:** treat both consumer projects as read-only. Record exact
+  initial and final branch, HEAD, `git status --short`, staged/unstaged diffs,
+  and nested `.claude` status. Preserve all pre-existing dirty files. Mount
+  source read-only for network-denied Graphify runs and place every output in a
+  writable `/tmp` mount. Do not run application imports, services, tests,
+  dependency synchronization, bootstrap refresh, Graphify update, or any
+  Graphify installer/hook/MCP/LLM operation. Never read or index `.env*`,
+  credentials, data/model directories, dependency environments, caches,
+  generated adapters, or mutable `.claude` state.
+- **RAG questions:**
+  1. From `RAGService.query`, how does `mode="mixed"` activate semantic and
+     graph retrieval, and where do the two document streams join before the API
+     response?
+  2. From `src.create_index.main`, how do injected dependencies select import
+     versus chunk/embed mode, guarantee indexing, and allow storage push only
+     after success?
+  3. Which module owns `TextGraphBuilder`, how do compatibility imports preserve
+     object identity, and how does the owner refer back through the public shim?
+     Record that `src/graph/build/**` is live but hidden by the existing
+     unanchored `build/` ignore rule. Do not use `--no-gitignore` or edit the
+     consumer ignore file to rescue this question.
+- **Industrial-inspection questions:**
+  1. How do CLI, benchmark, and Gradio requests converge on
+     `AgentInspectionRuntime`, and exactly when is a submitted verdict trusted
+     versus replaced by heuristic fallback?
+  2. How do MVTec masks become stable `cc_n` identities and flow through
+     manifests, benchmark cases, grounding comparison, and aggregate metrics?
+  3. Across repeated ground/count calls, which evidence stays raw, becomes the
+     selected overlap cluster, is count-only NMS-deduplicated, and drives
+     verdicts, overlays, or benchmark grounding-hit?
+- **Comparison contract:** for every question record the literal Graphify
+  command/query, elapsed time, output size, candidate nodes/edges/files,
+  omissions, noise/truncation, and every material false or ambiguous result.
+  Compare with direct reads and `rg`, plus Semble when available. Confirm every
+  accepted relationship against the source paths and lines identified during
+  read-only discovery. File discovery alone does not count as structural value.
+- **Cross-project override:** both projects must independently add material,
+  source-confirmed connectivity value on at least two of three questions; all
+  accepted relationships must have zero known material falsehoods; each cold
+  extraction must remain `<= 180 s`, each measured query `<= 10 s`, and each
+  raw output tree `<= 50 MiB`; network denial and read-only write boundaries
+  must pass; ignored/sensitive/generated paths must remain absent; and initial
+  and final consumer statuses must match exactly. If either project fails any
+  mandatory condition, final decision remains NO-GO and Phases A-F stop.
+- **Verification:** verifier reproduces the decisive question scoring and
+  source citations, checks Docker mount/network evidence, searches graph output
+  for forbidden paths/secrets, compares before/after statuses, and confirms all
+  task-created `/tmp` paths are removed. Reviewer runs primary and adversarial
+  passes over the combined original and supplementary evidence.
 
 ## Dependencies and Risks
 
@@ -201,6 +272,9 @@ it here.
 - Phase 0 must leave the outer repository unchanged. Its closeout is one atomic
   nested AI-state checkpoint for evidence and lifecycle state, not an empty
   outer commit.
+- Both consumer projects have pre-existing dirty worktrees. The supplement must
+  preserve their exact contents and statuses; any consumer write is a mandatory
+  failure, not cleanup work for this plan.
 
 ## Verification
 
@@ -224,6 +298,8 @@ uv run python .claude/scripts/quality_score.py . --phase 2026-08-09_phase-0-grap
 - [ ] `.gitignore` is honored; `.claude/`, `dist/`, ignored secrets, and non-code content are absent.
 - [ ] Dirty edits, rename/delete, branch changes, graph-missing, corruption, and missing-tool fallback are measured.
 - [ ] Three real questions are compared with `rg`, direct reads, and Semble when available.
+- [ ] Six supplementary real-project questions are compared across RAG and industrial-inspection without writing either consumer.
+- [ ] Any cross-project override satisfies at least two of three questions independently in each project and every other Step 7 condition.
 - [ ] Every material Graphify claim is checked in source.
 - [ ] Cold, warm, no-op, size, and churn budgets have reproducible measurements.
 - [ ] The artifact contains one unambiguous GO or NO-GO decision.
