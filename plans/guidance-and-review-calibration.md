@@ -20,8 +20,8 @@ bypass_acknowledged: false
 The attached review correctly identifies three related guidance problems:
 
 1. Generated root `AGENTS.md` and `CLAUDE.md` files describe every consumer repository as a reusable multi-agent bootstrap, which is inaccurate.
-2. The current reporting convention defaults both orchestrator-facing and user-facing reports to `caveman full`, although terse compressed prose is not the right default for communication with a user.
-3. Ponytail has accumulated more authority than a simplification aid needs: it is a named lifecycle phase, a mandatory pre-coding load, a required review profile for broad classes of work, and a special commit/push gate where even a minor Ponytail finding blocks progress.
+2. The current reporting policy declares that it applies to reports sent to either the orchestrator or the user, but its concrete `caveman full` instructions are used mainly by specialist agents reporting to the orchestrator. User-facing documentation is already normal prose, and primary-agent responses are not consistently caveman in practice. The actual gap is an ambiguous audience boundary and the absence of a positive, testable standard for clear human-facing technical communication.
+3. Ponytail has accumulated more authority than a simplification aid needs: it is a named lifecycle phase, a mandatory implementation discipline, a second coder simplification pass, a required review profile for every non-documentation change, and a special commit/push gate where even a minor Ponytail finding blocks progress.
 
 These concerns belong in one big plan because they calibrate how generated agents describe a project, communicate with people, and apply simplification guidance. Each concern remains an independently verifiable, commit-sized phase.
 
@@ -31,11 +31,13 @@ The root `AGENTS.md` and `CLAUDE.md` in this authoring repository correctly desc
 
 - Make generated Claude Code and OpenAI Codex root guidance neutral to the consuming project's purpose.
 - Keep the authoring repository's root `AGENTS.md` and `CLAUDE.md` bytes unchanged across generation, installer self-refresh, and state restoration.
-- Make clear, direct, normal prose the default for user-facing responses and documentation.
+- Add an ASD-STE100-inspired human-facing technical-writing standard without claiming formal ASD-STE100 compliance.
+- Make precise, clear, direct, natural prose the default for user-facing responses, plans, explanations, reviews, reports, summaries, and documentation.
 - Restrict `caveman` compression to agent-to-agent status/reporting where it provides value.
-- Remove Ponytail as a standalone lifecycle phase and universal pre-coding requirement.
+- Remove Ponytail as a standalone lifecycle phase while retaining it once as a coder implementation discipline.
 - Retain Ponytail as a conditional simplification/review capability for diffs with meaningful complexity risk.
 - Gate Ponytail findings by the ordinary severity model so minor suggestions are advisory.
+- Define simplicity in terms of unnecessary concepts, dependencies, abstractions, layers, configuration, execution paths, and speculative behavior—not minimum physical line count.
 
 ## Design Overview
 
@@ -45,24 +47,39 @@ Update `render_root_guidance()` in `scripts/generate_targets.py` so generated ad
 
 Root `AGENTS.md` is currently Git-tracked and preserved during self-refresh, while root `CLAUDE.md` is ignored and untracked. Force-track the existing `CLAUDE.md` without changing its content and add it beside `AGENTS.md` in `TRACKED_AUTHORING_PATHS`, allowing the existing installer/restorer ownership rules to preserve both files consistently.
 
-### Human-facing writing
+### STE-inspired human-facing writing
 
-Evolve `shared/policies/agent-reporting.instructions.md`; do not create a competing communication policy. Define two audiences:
+Evolve `shared/policies/agent-reporting.instructions.md` as the single communication authority; do not create a competing policy file. State explicitly that the project borrows useful principles from ASD-STE100 but does not claim formal compliance.
 
-- User-facing responses and user-facing documentation use clear, direct, natural prose, with detail calibrated to the task.
-- Agent-to-agent status and handoff messages may default to `caveman full`, while preserving code, commands, paths, identifiers, structured data, and exact evidence.
+Define two audiences:
 
-Align canonical agent prompts, generated adapters, README documentation, and validation assertions with that audience boundary. Keep `humanize` optional rather than adding a mandatory rewrite stage.
+- Human-facing communication optimizes for technical precision and comprehension. This includes answers to the user, plans, architecture explanations, review reports, quality reports, session summaries, and documentation.
+- Agent-to-agent status and handoff messages optimize for precision and token efficiency and may default to `caveman full`.
+
+The human-facing standard will require agents to:
+
+- Prefer common words when they are as precise as uncommon words.
+- Use one term consistently for one concept and avoid unnecessary synonyms.
+- Use short, direct sentences and active voice where practical.
+- Avoid idioms, buzzwords, marketing language, and unnecessary abbreviations.
+- Define uncommon abbreviations and technical terms when first introduced.
+- Keep established software terms when they are the most precise words.
+- Split complex explanations into smaller statements.
+- Keep code identifiers, API names, commands, file names, logs, errors, structured findings, and quoted external text exact.
+- Treat technical precision as more important than vocabulary simplification.
+
+Apply the standard lightly to commit messages and do not impose it on source code or compact internal agent communication. Align canonical agent prompts, generated adapters, README documentation, and validation assertions with this audience boundary. Keep `humanize` optional rather than adding a mandatory rewrite stage.
 
 ### Ponytail authority
 
 Use this bounded model:
 
 - The canonical lifecycle becomes `PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT`; Ponytail is no longer a separate phase.
-- Loading Ponytail `full` before every coding task is no longer mandatory. Its reusable principles—reuse first, prefer native capabilities, and choose the minimum correct diff—remain implementation guidance.
+- The coder loads/uses Ponytail once as an implementation discipline: reuse first, prefer native capabilities, and choose the minimum correct solution. Remove the separate mandatory `ponytail-review`/refactor ceremony after coding; retain a lightweight changed-scope self-check followed by re-verification.
 - Ponytail review is conditional: require/select it for control-plane or high-risk work and when a diff introduces or substantially changes abstractions, dependencies, architecture, generalized infrastructure, or similar complexity. It is optional for ordinary low-complexity work and unnecessary for documentation-only changes.
 - Remove the special hook rule requiring zero Ponytail findings. If Ponytail runs, its findings remain in the unified findings report and obey existing severity gates: CRITICAL blocks commit, MAJOR blocks push, and MINOR is advisory.
 - Preserve report-field compatibility where practical, but stop requiring `ponytail_reviewed` and `ponytail_findings` for diffs where the profile is not applicable.
+- Add an explicit local interpretation of `minimal`: clarity and maintainability take priority over reducing line count. Minimum means the fewest necessary concepts, dependencies, abstractions, layers, configuration, execution paths, and behaviors—not the fewest physical lines.
 
 ## Non-Goals
 
@@ -70,7 +87,7 @@ Use this bounded model:
 - Do not redesign the complete generated guidance hierarchy.
 - Do not remove, fork, or rewrite the vendored Ponytail skills.
 - Do not weaken the ordinary code, architecture, security, tests, documentation, score, or severity gates.
-- Do not add a second writing policy or mandate `humanize` as a workflow stage.
+- Do not claim formal ASD-STE100 compliance, add a second writing policy, or mandate `humanize` as a workflow stage.
 - Do not bundle Graphify, ast-grep, Serena, capability registry, telemetry, LLM evaluation, diagnostic expansion, or external-tool version pinning.
 - Do not open a PR, push, or merge without explicit user instruction.
 
@@ -93,40 +110,46 @@ Acceptance criteria:
 - Root `CLAUDE.md` retains SHA-256 `34416b9d55a24f2f4cb7f56e60dc47c097f4941da740ced3ea39e6f353455755`.
 - Both authoring root adapters survive generation, self-refresh, and restoration unchanged.
 
-### Phase B: Human-facing writing guidance
+### Phase B: STE-inspired human-facing writing guidance
 
-1. Change the central reporting policy from a universal caveman default to an explicit audience-based rule.
-2. Update canonical agent prompts so user-facing answers use clear natural prose and internal status/handoffs may use caveman compression.
-3. Update generated guidance and validators that currently require caveman wording from every non-documenter agent.
-4. Update README documentation and examples to describe the new communication boundary.
+1. Correct the central reporting policy's ambiguous scope by defining separate human-facing and agent-to-agent communication modes.
+2. Add the project-specific ASD-STE100-inspired rules from the design section, including the no-formal-compliance statement and the technical-precision priority.
+3. Apply the human-facing standard strongly to user answers, plans, architecture explanations, review and quality reports, session summaries, and documentation; apply it lightly to commit messages; exempt exact technical material, source code, quoted text, and compact internal communication.
+4. Update canonical agent prompts so they point to the single policy without duplicating its rules. Preserve the documenter's existing normal-prose requirement.
+5. Update generated guidance and validators to check the audience distinction, the STE-inspired clarity rules, exact-content protection, and policy pointers.
+6. Update README documentation and examples to describe the new communication boundary and give at least one jargon-to-clear-prose example.
 
 Acceptance criteria:
 
-- User-facing responses and documentation are explicitly governed by clear, direct, natural prose.
+- The policy says it is inspired by ASD-STE100 principles and explicitly disclaims formal ASD-STE100 compliance.
+- Human-facing communication is explicitly governed by precise, clear, direct, natural prose and the listed terminology, sentence, abbreviation, jargon, and active-voice rules.
 - Caveman remains available for internal agent status/handoffs but is not the default for user communication.
-- Exact technical material is protected from lossy rewriting.
+- Technical precision explicitly takes priority over simpler vocabulary.
+- Code identifiers, API names, commands, file names, logs, errors, structured findings, and quoted text are protected from lossy rewriting.
 - No duplicate communication policy or mandatory rewrite step is introduced.
 - Canonical sources, generated targets, and validation tests agree on the same audience distinction.
 
 ### Phase C: Ponytail authority calibration
 
 1. Remove `PONYTAIL` from the canonical lifecycle in policies, generated root guidance, README documentation, and lifecycle validators.
-2. Replace the universal `ponytail full` pre-coding requirement with concise implementation principles plus explicit conditional triggers for loading/reviewing with Ponytail.
-3. Update reviewer/profile guidance so Ponytail is required for control-plane/high-risk or complexity-expanding changes and optional otherwise.
-4. Remove the special zero-Ponytail-findings hook gate while retaining unified severity gates.
-5. Make Ponytail-specific report metadata optional when the profile did not run, retaining backward compatibility for existing reports and tools.
-6. Update commit/push, report-recording, diff-classification, generated-target, and policy tests for required, optional, advisory, and blocking cases.
-7. Update README and architecture/workflow documentation affected by the authority change.
+2. Keep the main Ponytail skill as a once-per-coding-task implementation discipline, but remove the separate mandatory post-implementation `ponytail-review`/refactor invocation. Retain a lightweight changed-scope simplification self-check and re-verification.
+3. Add the local definition of minimality that protects clarity and maintainability and rejects line-count minimization.
+4. Update reviewer/profile guidance so Ponytail is required for control-plane/high-risk or complexity-expanding changes and optional otherwise.
+5. Remove the special zero-Ponytail-findings hook gate while retaining unified severity gates.
+6. Make Ponytail-specific report metadata optional when the profile did not run, retaining backward compatibility for existing reports and tools.
+7. Update commit/push, report-recording, diff-classification, generated-target, and policy tests for required, optional, advisory, and blocking cases.
+8. Update README and architecture/workflow documentation affected by the authority change.
 
 Acceptance criteria:
 
 - The canonical lifecycle contains no standalone Ponytail phase.
-- Ordinary coding tasks do not require loading Ponytail before implementation.
+- The coder uses the main Ponytail skill once as an implementation discipline; it does not automatically invoke a second standalone Ponytail-review/refactor pass.
 - Ponytail remains discoverable and required/selected for the documented high-risk and complexity triggers.
 - A MINOR Ponytail finding is recorded but does not block commit or push.
 - A Ponytail CRITICAL finding blocks commit and a Ponytail MAJOR finding blocks push through the ordinary severity gates.
 - Documentation-only and non-applicable diffs do not require Ponytail metadata.
 - Existing valid findings reports remain consumable where compatibility is promised.
+- Policies explicitly state that clarity and maintainability outrank line-count reduction and define minimum scope by necessary concepts and behavior.
 
 ## Cross-Phase Verification
 
@@ -153,4 +176,3 @@ Before big-plan closeout:
 - **Conditional Ponytail use could drift:** centralize triggers in workflow/review guidance and test representative required, optional, and exempt cases.
 - **Metadata changes could break old reports:** prefer optional/backward-compatible readers and fixtures rather than deleting fields immediately.
 - **Policy and generated output could diverge:** update canonical sources first, regenerate all targets, and validate exact lifecycle/reporting fragments.
-
