@@ -1,0 +1,49 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-09T06:36:38Z",
+  "branch": "guidance-and-review-calibration_implementation",
+  "head_sha": "9084d04debba5c22722ec98c0ca7fae3d7b60c85",
+  "base_ref": "dev",
+  "merge_base_sha": "3e1f4fbbd8f50df8048d44a77b742abfddd28aab",
+  "phase": "2026-08-09_phase-B-planner-reliability-calibration",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "6884cc3059242e1839d1ba8df28425625bbcdec9",
+  "changed_files": [
+    "CLAUDE.md",
+    "README.md",
+    "docs/2026-08-08-codex-routing-compatibility.md",
+    "docs/2026-08-09-planner-reliability-calibration.md",
+    "docs/architecture.md",
+    "docs/native-client-acceptance.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/check_native_clients.py",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/agents/planner/agent.yaml",
+    "shared/agents/planner/prompt.md",
+    "tests/test_check_native_clients.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ]
+}

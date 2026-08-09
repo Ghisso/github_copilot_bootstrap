@@ -244,3 +244,9 @@
 - [LEARN:testing] Authoring-adapter preservation needs separate regressions for
   installer refresh and state restoration. A passing copy/update test does not
   prove the real restore script honors tracked root ownership.
+- [LEARN:security] Native probes need explicit human authorization plus
+  marker-owned writable HOME/XDG/client/tmp state around read-only generated
+  inputs. Cleanup must unlink symlinks without chmod-following external auth.
+- [LEARN:testing] Structured output is only transport validity. A planner
+  workload passes only when every checklist item is true, artifacts match an
+  exact frozen allowlist, and invented, duplicate, and expanded scope are zero.
