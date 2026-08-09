@@ -546,3 +546,16 @@ valuable there.
 2026-08-09T11:30:34.000Z state-sync: reconciliation with origin/ai-state failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
 2026-08-09T11:30:34.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
 2026-08-09T11:30:34.000Z state-sync: publish failed; continuing.
+From https://github.com/Ghisso/github_copilot_bootstrap
+ * branch            ai-state   -> FETCH_HEAD
+fatal: It seems that there is already a rebase-merge directory, and
+I wonder if you are in the middle of another rebase.  If that is the
+case, please try
+	git rebase (--continue | --abort | --skip)
+If that is not the case, please
+	rm -fr ".git/rebase-merge"
+and run me again.  I am stopping in case you still have something
+valuable there.
+2026-08-09T11:31:53.000Z state-sync: reconciliation with origin/ai-state failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
+2026-08-09T11:31:53.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
+2026-08-09T11:31:53.000Z state-sync: push failed; continuing.
