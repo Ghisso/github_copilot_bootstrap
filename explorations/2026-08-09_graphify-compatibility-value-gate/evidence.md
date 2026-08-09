@@ -20,6 +20,11 @@ Phases A through F are **not authorized**. Do not add an adapter, dependency,
 routing surface, generated output, hook, MCP configuration, or workaround for
 this result.
 
+> **Later addition.** A user-authorized two-consumer supplement was afterwards
+> executed under Step 7. It also failed: see
+> "Step 7 cross-project applicability supplement — EXECUTED". The decision on
+> this line is unchanged and is now supported by two independent results.
+
 ## Frozen boundary
 
 | Item | Observed value |
@@ -359,16 +364,47 @@ container image. No other version was used.
 
 Every Graphify invocation used `--network none`, mounted consumer source at
 `/src` read-only, mounted a task-owned writable output dir at `/out`, and used
-a task-owned writable `/work` as the working directory:
+a task-owned writable `/work` as the working directory. The two literal
+extraction commands were:
 
 ```text
 docker run --rm --network none \
-  -v <consumer>:/src:ro -v <task-tmp>/out:/out -v <task-tmp>/work:/work -w /work \
-  graphify-gate:0.9.35 \
+  -v /home/ghisso/work/RAG:/src:ro \
+  -v /tmp/graphify-step7-run/RAG/out:/out \
+  -v /tmp/graphify-step7-run/RAG/work:/work \
+  -w /work graphify-gate:0.9.35 \
+  graphify extract /src --code-only --no-cluster --out /out
+
+docker run --rm --network none \
+  -v /home/ghisso/work/git_projects/industrial-inspection:/src:ro \
+  -v /tmp/graphify-step7-run/II/out:/out \
+  -v /tmp/graphify-step7-run/II/work:/work \
+  -w /work graphify-gate:0.9.35 \
   graphify extract /src --code-only --no-cluster --out /out
 ```
 
-Queries reused the same shape with `graphify <op> ... --graph /out/graphify-out/graph.json`.
+Every query reused that exact mount set, replacing the trailing program with
+`graphify <op> ... --graph /out/graphify-out/graph.json`. The literal `<op>`
+arguments per question are recorded verbatim in each question's section below.
+
+**Positive controls for the two boundaries.** Both were re-run inside the same
+pinned image rather than inferred from exit codes:
+
+```text
+$ docker run --rm --network none graphify-gate:0.9.35 \
+    python -c "import socket; socket.create_connection(('pypi.org',443),timeout=5)"
+PROBE-RESULT: BLOCKED OSError: [Errno -3] Temporary failure in name resolution
+
+$ docker run --rm --network none -v /home/ghisso/work/RAG:/src:ro ... \
+    graphify-gate:0.9.35 sh -c "touch /src/WRITE_PROBE; echo rc=$?"
+touch: cannot touch '/src/WRITE_PROBE': Read-only file system
+rc=1
+```
+
+The first proves the container could not reach the network even when it tried;
+the second proves the consumer mount rejected a write attempt. The image is
+reproducible: an independent rebuild from the same Dockerfile produced the
+identical digest `sha256:199e272a8eab6ea1b4d86d5ef38e8f12a959aa90c7423473bb2283daf5887028`.
 
 No consumer was written, no branch was switched, no `graphify update` ran
 against a consumer, `--no-gitignore` was never used, and no installer, hook,
@@ -377,11 +413,16 @@ dependency synchronization ran.
 
 **Refinement of the earlier cwd lesson.** The prior run observed Graphify
 creating `graphify-out/cache/stat-index.json` in the process working directory.
-With `--out DIR` supplied, both consumer runs left the working directory
-completely empty (`work_bytes=0`); `stat-index.json` was written under
-`/out/graphify-out/cache/` instead. The operational rule still stands — always
-run from a task-owned working directory — but the cwd artifact is a consequence
-of omitting `--out`, not unconditional behavior.
+In both consumer runs here, every `extract` passed `--out` and the working
+directory was left completely empty (`work_bytes=0`), with `stat-index.json`
+written under `/out/graphify-out/cache/` instead.
+
+This narrows the observed behavior but does **not** establish the cause. Only
+`extract` accepts `--out`; `update`, `query`, `path`, and `affected` do not, so
+the earlier artifact cannot be attributed to "omitting `--out`" without knowing
+which command produced it, and that command was not recorded. The operational
+rule is unchanged and still mandatory: always run Graphify from a task-owned
+working directory, never with a consumer repository as cwd.
 
 ### Measurements
 
@@ -414,9 +455,18 @@ Both graphs were scanned for forbidden paths and secret-shaped content.
   datasets or model weights. The flag was a false positive of the scan pattern,
   not an exclusion failure. No dataset, model, or binary artifact was indexed.
 
-Network denial passed: every run executed under `--network none` and exited 0.
-The read-only write boundary passed: consumer mounts were `:ro` and all output
-landed in task-owned `/tmp` mounts.
+Network denial passed, established by the positive control above rather than by
+exit codes alone: a deliberate outbound connection from inside the pinned image
+under `--network none` failed with `OSError [Errno -3]`. Every Graphify run used
+that same flag.
+
+The read-only write boundary passed, established by three independent
+observations: a deliberate `touch /src/WRITE_PROBE` was refused with
+`Read-only file system`; both working-directory mounts finished at
+`work_bytes=0`; and both consumers' full state captures are byte-identical
+before and after. One limit is stated plainly: no kernel-level syscall audit was
+run, so this is a strong behavioral result, not a formal proof that no write was
+attempted anywhere.
 
 ### RAG — 0 of 3 questions add material connectivity value
 
@@ -427,7 +477,15 @@ so the entire live first-party directory `src/graph/build/**` is absent from the
 graph. The rule was not edited and `--no-gitignore` was not used.
 
 **Q1 — `RAGService.query` mixed routing and document join: FAIL.**
-`graphify query "..."` returned 873 candidate nodes in 1.390 s and truncated to
+Literal commands:
+
+```text
+graphify query "From RAGService.query how does mode mixed activate semantic and graph retrieval and where do the two document streams join before the API response"
+graphify query "result_joiner joiner document join priority" --context call --budget 4000
+graphify path "RAGService" "GraphRetriever"
+```
+
+The first returned 873 candidate nodes in 1.390 s and truncated to
 73 at the default budget, warning that the answer might be among the 800 cut
 nodes. Narrowing with `--context call --budget 4000` (1.170 s) returned 23
 nodes still dominated by noise. `graphify path "RAGService" "GraphRetriever"`
@@ -449,16 +507,67 @@ not model. Material false lead: `join_prefix()` at
 lexical token "join" and is unrelated to document joining. It was identified as
 false and **not accepted**.
 
-**Q2 — `src.create_index.main` injected lifecycle and success-gated push: FAIL.**
-`graphify query "..." --budget 4000` ran 2.099 s, found 270 nodes, truncated to
-151, and returned **zero edges**. The result is a node listing with no
-connectivity. It did surface relevant names (`import_embedded_chunks()`,
-`create_index.py`, `push_csv_to_hub.py`, `StorageConfig`, `hf_sync.py`) and one
-docstring node describing injected dependencies, but per the Step 7 comparison
-contract file and symbol discovery alone scores zero.
+**Q2 — `src.create_index.main` injected lifecycle and success-gated push: FAIL
+(after escalation).**
+
+First attempt, literal command:
+
+```text
+graphify query "From create_index main how do injected dependencies select import versus chunk embed mode guarantee indexing and allow storage push only after success" --budget 4000
+```
+
+It ran 2.099 s, found 270 nodes, truncated to 151, and returned **zero edges**.
+
+Because that looked like the same generic budget truncation that a larger budget
+fixed for industrial-inspection, Q2 was re-attempted with the same escalation
+path used there, rather than being scored on the first result. The graph was
+rebuilt first and reproduced exactly (8 302 nodes, 17 739 edges, 18 770 292 B,
+10.504 s versus the original 10.401 s). Literal escalation commands and results:
+
+| Command | Elapsed | Edges |
+| --- | --- | --- |
+| `graphify query "<same question text>" --budget 30000` | 1.206 s | 553 |
+| `graphify affected "main()" --depth 3` | 0.785 s | 0 |
+| `graphify affected "import_embedded_chunks()" --depth 3` | 0.636 s | 0 |
+| `graphify path "main()" "push_csv_to_hub.py"` | 1.189 s | 0 |
+
+What escalation did produce, all source-confirmed: the injected-dependency
+entrypoints imported at `src/create_index.py:19-24`
+(`run_create_index_with_dependencies`, `run_index_pipeline_with_dependencies`,
+`_load_chunks_from_jsonl`, `sync_from_storage_config`,
+`push_from_storage_config`), matching the real call at `src/create_index.py:49`
+with those functions passed as parameters at `:66-68`; plus two `indirect_call`
+edges from `affected "import_embedded_chunks()"` —
+`main()` at `src/create_index.py:L63` and `run_index_pipeline()` at
+`src/corpus/indexing/pipeline_runner.py:L94`.
+
+What it still missed — the decisive part of the question. The success gate is
+`src/corpus/indexing/cli.py:212-218`: inside a `finally` block,
+`if pipeline_succeeded and validated_cfg.storage.push_on_complete and
+validated_cfg.storage.backend != "local"`, with the push itself at `:220`.
+Graphify named the push helper but never reached the `pipeline_succeeded`
+guard, and produced nothing about import-versus-chunk/embed mode selection.
+`affected "main()"` failed outright with `No unique node match for main()` —
+a real usability limit, since `main()` is defined in many modules and the tool
+offers no way to disambiguate by file. `path` found no directed route.
+
+**Scoring note, recorded because it is borderline.** The 553-edge result is
+mostly module-level `imports` inventory from one file, which is close to the
+file-and-symbol discovery that Step 7 scores as zero; the two `indirect_call`
+edges are genuine connectivity. Judged against the question actually asked —
+three behaviors, of which mode selection and success gating are unanswered —
+this is scored **FAIL**. The overall decision does not depend on this call: had
+Q2 been scored PASS, RAG would reach 1/3, still below the required 2/3, and the
+cross-project override would still fail.
 
 **Q3 — `TextGraphBuilder` ownership, identity, public shim: FAIL.**
-`graphify query "..." --budget 4000` ran 1.189 s over 49 nodes. It located the
+Literal command:
+
+```text
+graphify query "Which module owns TextGraphBuilder and how do compatibility imports preserve object identity through the public shim" --budget 4000
+```
+
+It ran 1.189 s over 49 nodes. It located the
 shim `src/graph/build_text_graph.py` and its docstring, but the only edges it
 produced from that file were `imports sys` and `imports_from importlib`.
 
@@ -490,6 +599,18 @@ truncation (550, 525, and 537 candidates cut to about 125 each). Raising to
 `--budget 30000` changed the outcome materially, producing 257 and 264 edges.
 The default budget is therefore the binding limitation for this repository, not
 the extractor.
+
+Literal commands for the three questions (each also run at `--budget 4000`
+first, then escalated to `--budget 30000`):
+
+```text
+graphify query "How do CLI benchmark and Gradio requests converge on AgentInspectionRuntime and when is a submitted verdict trusted versus replaced by heuristic fallback" --budget 4000
+graphify query "How do MVTec masks become stable cc_n identities and flow through manifests benchmark cases grounding comparison and aggregate metrics" --budget 30000
+graphify query "Which evidence stays raw becomes selected overlap cluster is count-only NMS deduplicated and drives verdicts overlays or benchmark grounding hit" --budget 30000
+graphify path "AgentInspectionRuntime" "_run_heuristic_fallback()"
+graphify affected "AgentInspectionRuntime" --depth 3
+graphify affected "_select_highest_overlap_cluster()" --depth 3
+```
 
 **Q1 — runtime convergence and verdict authority: PASS.**
 `graphify path "AgentInspectionRuntime" "_run_heuristic_fallback()"` (0.643 s)
@@ -563,8 +684,8 @@ false relationship was accepted for this project.
 | Cold extraction `<= 180 s` | PASS (10.400 s) | PASS (2.785 s) |
 | Every measured query `<= 10 s` | PASS (max 2.099 s) | PASS (max 0.722 s) |
 | Raw output `<= 50 MiB` | PASS (17.90 MiB) | PASS (3.46 MiB) |
-| Network denial | PASS | PASS |
-| Read-only write boundary | PASS | PASS |
+| Network denial | PASS (positive control: probe blocked) | PASS (same image and flag) |
+| Read-only write boundary | PASS (positive control: write to `/src` refused; `work_bytes=0`; consumer state byte-identical) | PASS (same controls) |
 | Ignored/sensitive/generated/mutable-state paths absent | PASS | PASS |
 | Initial and final consumer state identical | PASS | PASS |
 
@@ -600,12 +721,22 @@ initial and final captures are byte-identical by `diff`, covering branch, HEAD,
 | `/home/ghisso/work/RAG` | `gliner2-graph-improvements` / `b48613f480ad87a3fa5e76975d37bc9ce5139fec` | 6 files, all hashes identical | `ai-state` / `9015859053a1cd0ec060125669b1e39b810ed9d3`, clean |
 | `/home/ghisso/work/git_projects/industrial-inspection` | `2026-07-21_haystack-3-agent-refactor_implementation` / `28378951c91c08abdb136f549ab6136e6919b7d6` | 2 files, all hashes identical | `ai-state` / `efdb0af25dfd32b7fc434d68e624751db687d742`, clean |
 
-Task-created temporary paths removed at closeout: `/tmp/graphify-step7-run`
-(all extraction output, caches, logs, and state captures), plus the two paths
-left by the blocked attempt, `/tmp/graphify-step7-cache.pJalTD` and
-`/tmp/graphify-step7-tools.lX35JD`, which contained only uv metadata. The
-disposable image `graphify-gate:0.9.35` was removed. Removal used these exact
-paths, never a broad glob. Pre-existing `/tmp` paths from earlier phases
-(`/tmp/graphify-plan-uv-cache`, `/tmp/graphify_plan_uv_cache`,
-`/tmp/graphify-plan-amend-uv-cache`) were not created by this step and were left
-untouched.
+Cleanup happened in two rounds, because review findings required re-running part
+of the experiment after the first cleanup.
+
+Round one removed `/tmp/graphify-step7-run` (all extraction output, caches,
+logs, and state captures), plus the two paths left by the blocked attempt,
+`/tmp/graphify-step7-cache.pJalTD` and `/tmp/graphify-step7-tools.lX35JD`, which
+contained only uv metadata, and the disposable image `graphify-gate:0.9.35`.
+
+Round two was created to satisfy the review findings on Q2 escalation and
+boundary controls: the image was rebuilt from the same Dockerfile (identical
+digest) and `/tmp/graphify-step7-fix` held the re-extraction and probe output.
+Both were removed again at closeout, and the consumers were re-captured a third
+time — branch, HEAD, status, diffs, nested `.claude`, and every dirty-file
+SHA-256 still match the pre-flight table exactly.
+
+All removals used exact paths, never a broad glob. Pre-existing `/tmp` paths
+from earlier phases (`/tmp/graphify-plan-uv-cache`, `/tmp/graphify_plan_uv_cache`,
+`/tmp/graphify-plan-amend-uv-cache`) were not created by this step, were
+verified still present after both rounds, and were left untouched.

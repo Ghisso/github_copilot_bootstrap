@@ -266,3 +266,33 @@
 - [LEARN:testing] Exemption tests must start from a clean fixture. A leftover
   documentation edit can silently turn an intended single-file ordinary case
   into the multi-file high-risk case it was supposed to distinguish.
+- [LEARN:architecture] An AST symbol graph answers structural questions only
+  where the relationship is a static call or import between named symbols. It
+  cannot represent string-keyed pipeline wiring
+  (`pipeline.add_component("result_joiner", ...)`), `import_module()` shims with
+  `sys.modules[__name__]` rebinding, or identities built inside f-strings. Judge
+  such a tool against the idioms the target repositories actually use, not
+  against a generic call graph.
+- [LEARN:quality] Score a candidate tool per question at its best reasonable
+  effort, not at its default. Graphify returned zero edges on every
+  mid-sized-repo question at the default `--budget 2000`; a 15x budget produced
+  250+ edges. Applying escalation to one project but not another silently
+  biases the comparison, which is exactly what review caught here.
+- [LEARN:quality] A gate result is stronger when it states its own robustness.
+  Recording that the decision is unchanged even if the single borderline
+  question were scored the other way removes the incentive to argue that
+  question and keeps the conclusion falsifiable.
+- [LEARN:security] Prove a sandbox boundary with a positive control, not with
+  an exit code. `--network none` plus a successful run only shows the tool never
+  needed the network; a deliberate connect attempt failing with
+  `OSError [Errno -3]`, and a deliberate `touch` refused with
+  `Read-only file system`, are the actual evidence.
+- [LEARN:workflow] Never write a cleanup or completion claim before performing
+  the action. Ordering the write first creates false provenance even when the
+  action follows immediately, and this artifact had already been corrected once
+  for exactly that defect.
+- [LEARN:tooling] The fail-closed Bash guard rejects multi-line shell with
+  `for`/`while`/`{ }`/heredocs by raising `AmbiguousCommand` (exit 2). That is
+  the classifier working as designed, not a broken hook. Put complex logic in a
+  script file and invoke it as `bash script.sh`, which stays classifiable and
+  keeps the guard active rather than routing around it.

@@ -1,0 +1,71 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 3,
+    "minor": 2
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "documentation",
+    "performance",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MAJOR",
+      "title": "Unqualified network-denial/write-boundary PASS claims in Step 7 EXECUTED lack the evidentiary rigor (complete mount inventory, positive network-denial probe) the original section required for itself",
+      "file": ".claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md",
+      "line": 417,
+      "profile": "security",
+      "status": "resolved",
+      "resolution": "Re-ran both boundaries as positive controls inside the pinned image: outbound connect blocked with OSError [Errno -3]; touch /src refused with Read-only file system. Ledger rows now name their evidence and the artifact states the remaining limit (no kernel syscall audit)."
+    },
+    {
+      "severity": "MAJOR",
+      "title": "Literal per-question Graphify commands/queries and exact Docker invocation are not preserved for Step 7, undisclosed recurrence of 'incomplete reproduction information'",
+      "file": ".claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md",
+      "line": 360,
+      "profile": "documentation",
+      "status": "resolved",
+      "resolution": "Replaced the templated docker invocation with the two literal extraction commands including real mount paths, and added the literal query/path/affected argv for all six questions plus the Q2 escalation table."
+    },
+    {
+      "severity": "MAJOR",
+      "title": "RAG Q2 scored FAIL without the same budget-escalation/alternate-command rigor applied to other questions, undermining the pivotal RAG 0/3 result",
+      "file": ".claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md",
+      "line": 452,
+      "profile": "tests",
+      "status": "resolved",
+      "resolution": "Rebuilt the graph (reproduced exactly) and re-ran Q2 at --budget 30000 plus affected x2 and path. Recorded what escalation produced (553 edges, injected entrypoints, two indirect_call edges) and what it still missed (the pipeline_succeeded guard at cli.py:212-218, mode selection). Score remains FAIL with an explicit borderline note; decision shown robust either way since 1/3 is still below 2/3."
+    },
+    {
+      "severity": "MINOR",
+      "title": "'Refinement of the earlier cwd lesson' attributes a prior incident to omitting --out, but query/path/affected/update never accept --out, so the causal claim is unsupported",
+      "file": ".claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md",
+      "line": 378,
+      "profile": "architecture",
+      "status": "resolved",
+      "resolution": "Removed the causal attribution. The section now records only the observed behavior, states that the causing command was not recorded so the cause cannot be established, and retains the mandatory operational rule."
+    },
+    {
+      "severity": "MINOR",
+      "title": "Top-level Decision block does not cross-reference the later Step 7 cross-project override outcome",
+      "file": ".claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md",
+      "line": 3,
+      "profile": "documentation",
+      "status": "resolved",
+      "resolution": "Added a 'Later addition' pointer under the top-level decision referencing the EXECUTED supplement, without altering the original decision text."
+    }
+  ],
+  "generated_at": "2026-08-09T11:10:09Z",
+  "branch": "graphify-structural-code-intelligence_implementation",
+  "head_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "base_ref": "dev",
+  "merge_base_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "phase": "2026-08-09_phase-0-graphify-compatibility-and-value-gate",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+  "changed_files": []
+}

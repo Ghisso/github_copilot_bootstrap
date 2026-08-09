@@ -1,0 +1,21 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "156 passed in 35.95s",
+  "mypy_summary": "Success: no issues found in 19 source files",
+  "deductions": [],
+  "generated_at": "2026-08-09T11:10:49Z",
+  "branch": "graphify-structural-code-intelligence_implementation",
+  "head_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "base_ref": "dev",
+  "merge_base_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "phase": "2026-08-09_phase-0-graphify-compatibility-and-value-gate",
+  "dirty": false,
+  "content_hash": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+  "changed_files": []
+}
