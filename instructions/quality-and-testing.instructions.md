@@ -107,7 +107,7 @@ The reviewer runs its primary + verification passes as usual (see the
 no `execute` capability, so **the orchestrator** persists that JSON:
 
 ```bash
-uv run python .claude/scripts/record_findings.py src/ --profile code --profile security --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 ```
 
 An empty findings list (`[]`) is valid and yields all-zero counts — the normal
@@ -164,11 +164,15 @@ report. A findings report must match the current branch and phase, be as
 fresh as the score report (push gates accept a report generated for an
 ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
-`counts.major == 0` (push/PR). Ponytail metadata is present only when that
-profile ran. The authoritative review-routing table defines when Ponytail
-metadata is required; ordinary low-complexity and documentation-only diffs do
-not require it. Ponytail findings use the same severity gates as every other
-profile.
+`counts.major == 0` (push/PR). Ponytail metadata is present only when the
+conditional profile ran; when it did not run, metadata is optional and legacy
+reports remain compatible. The authoritative review-routing table selects
+Ponytail for deterministic control-plane/high-risk, multi-file, dependency,
+script, generator, or reviewer-selected complexity. Ordinary low-complexity
+and single-document or state-only diffs do not require it unless high-risk
+precedence applies. Ponytail findings use the ordinary severity gates: CRITICAL
+blocks commit, MAJOR blocks push/PR, and MINOR is advisory. There is no special
+zero-Ponytail gate.
 
 ---
 

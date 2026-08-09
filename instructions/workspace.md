@@ -28,7 +28,10 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 
 - Plan first for non-trivial work.
 - Search before writing new code.
-- Apply the `ponytail` skill in `full` mode to every coding task.
+- During IMPLEMENT, the coder applies the `ponytail` skill in `full` mode once
+  per coding task, then performs a lightweight simplification and re-verifies
+  only the changed scope. This is coder discipline, not a separate lifecycle
+  phase.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
@@ -71,12 +74,12 @@ Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/
 
 ## Ponytail Coding Rule
 
-Before writing, adding, fixing, refactoring, reviewing, or designing code, or
-choosing a dependency, read `.claude/skills/ponytail/SKILL.md` and apply it in
-`full` mode for the whole task. Search for reusable code and trace the real
-flow before editing; then prefer YAGNI, existing helpers, the standard library,
-native platform features, installed dependencies, and the minimum correct
-diff, in that order.
+Before writing, adding, fixing, refactoring, or designing code, read
+`.claude/skills/ponytail/SKILL.md` and apply it once in `full` mode during
+IMPLEMENT. Search for reusable code and trace the real flow before editing;
+then prefer YAGNI, existing helpers, the standard library, native platform
+features, installed dependencies, and the minimum correct conceptual diff, in
+that order. Re-check the changed scope after simplification.
 
 Ponytail never removes required validation, data-loss protection, security,
 accessibility, root-cause investigation, or the smallest meaningful regression

@@ -62,7 +62,7 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCO
 For each small plan:
 
 1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
-2. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode once for every coding task, then delegate to `coder` (including Gradio/Streamlit UI work).
+2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
 3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
 5. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal. DOCUMENT runs before the persisted SCORE/FINDINGS so the documenter's tracked edits are inside the content those reports are bound to — otherwise a post-score doc change stales both.
@@ -72,7 +72,7 @@ For each small plan:
 9. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
 10. **COMMIT:** Commit the completed small plan atomically.
 
-**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. When Ponytail review ran, its metadata is recorded; required-review work must record `ponytail_reviewed: true`.**
+**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
 
 ---
 
