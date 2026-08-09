@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are entrypoints and must not be hand-edited.
+It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are consumer-neutral entrypoints and must not be hand-edited.
 
 Main goals:
 
@@ -152,8 +152,9 @@ process emits the event, not on tab closure — so the `post-commit` git hook
 (pushed after every commit) is the durable checkpoint; see [Hooks](#hooks).
 
 The source repository tracks authoring versions of files such as `AGENTS.md`,
-`.codex/config.toml`, and MCP config. After self-installing, restore those
-tracked source files and keep the generated runtime overlay local via
+`CLAUDE.md`, `.codex/config.toml`, and MCP config. During self-refresh and
+state restoration, tracked `AGENTS.md` and `CLAUDE.md` are preserved byte-for-byte;
+restore those authoring files after self-installing and keep the generated runtime overlay local via
 `.git/info/exclude` (for example `.codex/hooks.json`, `.devcontainer/`, and
 `.vscode/tasks.json`). This keeps `git status` clean while preserving the
 installed hooks and devcontainer files locally.

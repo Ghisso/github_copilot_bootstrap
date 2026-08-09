@@ -178,6 +178,12 @@ ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS = {
     "CLAUDE.md": ("`.claude/hooks/`", "`.github/hooks/`"),
     "AGENTS.md": ("`.codex/`", "`.github/hooks/`"),
 }
+ROOT_GUIDANCE_AUTHORING_PHRASES = (
+    "Bootstrap Guidance",
+    "reusable multi-agent bootstrap",
+    "In an installed project",
+    "Bootstrap maintainers own authoring and regeneration",
+)
 SHARED_GITHUB_HOOK_INVENTORY_PATHS = {
     TARGET_ROOT / "CLAUDE.md",
     TARGET_ROOT / "AGENTS.md",
@@ -337,6 +343,11 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
     for fragment in ROOT_GUIDANCE_CONTROL_PLANE_FRAGMENTS[name]:
         if fragment not in text:
             errors.append(f"{name} is missing control-plane inventory path: {fragment}")
+    for phrase in ROOT_GUIDANCE_AUTHORING_PHRASES:
+        if phrase in text:
+            errors.append(
+                f"{name} contains authoring-specific root-guidance phrase: {phrase}"
+            )
     return errors
 
 

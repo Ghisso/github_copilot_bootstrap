@@ -118,6 +118,38 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert len(codex.encode()) <= 16 * 1024
 
 
+@pytest.mark.parametrize(
+    "target,name",
+    (("claude-code", "CLAUDE.md"), ("openai-codex", "AGENTS.md")),
+)
+@pytest.mark.parametrize(
+    "authoring_phrase",
+    (
+        "Bootstrap Guidance",
+        "reusable multi-agent bootstrap",
+        "In an installed project",
+        "Bootstrap maintainers own authoring and regeneration",
+    ),
+)
+def test_root_guidance_rejects_authoring_specific_phrases(
+    target: str, name: str, authoring_phrase: str
+) -> None:
+    """Generated root guidance stays neutral to the bootstrap authoring repo."""
+    guidance = render_root_guidance(target)
+
+    assert authoring_phrase not in guidance
+    errors = root_guidance_errors(name, f"{guidance}\n{authoring_phrase}\n")
+
+    assert any(authoring_phrase in error for error in errors)
+
+
+def test_root_guidance_allows_bootstrap_when_it_is_not_an_authoring_phrase() -> None:
+    """The regression guard rejects exact phrases, not the general word."""
+    guidance = render_root_guidance("claude-code")
+
+    assert root_guidance_errors("CLAUDE.md", f"{guidance}\nbootstrap\n") == []
+
+
 def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() -> None:
     """Structural validation rejects regressions hidden by broad substring checks."""
     guidance = render_root_guidance("claude-code")

@@ -125,6 +125,24 @@ def test_copy_preserves_genuine_tracked_copilot_authoring(tmp_path: Path) -> Non
     assert authored_agent.read_text() == "project-authored\n"
 
 
+def test_copy_preserves_tracked_authoring_root_adapters(tmp_path: Path) -> None:
+    """Dogfood refreshes never overwrite either tracked root adapter."""
+    source = tmp_path / "generated"
+    target = tmp_path / "bootstrap-authoring"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        (source / name).parent.mkdir(parents=True, exist_ok=True)
+        (source / name).write_text(f"generated {name}\n")
+        (target / name).write_text(f"authoring {name}\n")
+        assert _git(target, "add", name).returncode == 0
+
+    copy_generated_tree(source, target, dry_run=False)
+
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        assert (target / name).read_text() == f"authoring {name}\n"
+
+
 @pytest.mark.parametrize(
     "relation", ("equal", "source-inside-target", "target-inside-source")
 )

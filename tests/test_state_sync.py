@@ -341,6 +341,29 @@ def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(
     assert (root / ".codex" / "agents" / "coder.toml").read_text() == "new agent\n"
 
 
+def test_restore_root_adapters_preserves_tracked_root_guidance(
+    tmp_path: Path,
+) -> None:
+    """Tracked authoring guidance wins over differing restored root copies."""
+    root = tmp_path / "bootstrap-authoring"
+    source = root / ".claude" / "bootstrap-root"
+    _write_restore_manifest(root, "AGENTS.md", "CLAUDE.md")
+    source.mkdir(parents=True)
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        (root / name).write_text(f"authoring {name}\n")
+        (source / name).write_text(f"generated {name}\n")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "add", "AGENTS.md", "CLAUDE.md"], check=True
+    )
+
+    result = _restore(root)
+
+    assert result.returncode == 0, result.stderr
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        assert (root / name).read_text() == f"authoring {name}\n"
+
+
 @pytest.mark.parametrize(
     "record",
     (

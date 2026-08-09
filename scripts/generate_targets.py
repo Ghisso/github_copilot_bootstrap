@@ -672,7 +672,7 @@ def render_codex_hooks(path: Path) -> None:
 
 def render_root_guidance(target: str) -> str:
     if target == "claude-code":
-        title = "Claude Code Bootstrap Guidance"
+        title = "Claude Code Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
             "`.mcp.json`, and `.devcontainer/`"
@@ -682,7 +682,7 @@ def render_root_guidance(target: str) -> str:
             "`.claude/skills/` natively. Keep the configured hooks enabled."
         )
     elif target == "openai-codex":
-        title = "OpenAI Codex Bootstrap Guidance"
+        title = "OpenAI Codex Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, "
             "`.mcp.json`, and `.devcontainer/`"
@@ -699,7 +699,7 @@ def render_root_guidance(target: str) -> str:
 
     return f"""# {title}
 
-This is the entrypoint for a reusable multi-agent bootstrap for Python AI engineering. In an installed project, `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
+This is the repository entrypoint for Python AI engineering guidance. `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
 **Project:** [TODO: project name and one-liner description]
 **Python:** 3.12+ | **Package Manager:** uv
@@ -746,7 +746,7 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 - Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
 - Control-plane files include {control_plane_paths}. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
-- Keep `.claude/` as the canonical runtime basis. Bootstrap maintainers own authoring and regeneration; consumers should customize only their project context and consumer-owned state.
+- Keep `.claude/` as the canonical runtime basis. Treat generated adapters as managed runtime files; customize only project context and consumer-owned state.
 
 ## Map
 

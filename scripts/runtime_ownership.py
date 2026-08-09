@@ -10,10 +10,10 @@ from __future__ import annotations
 from pathlib import PurePath, PurePosixPath
 
 
-# The source repository deliberately keeps this concise adapter tracked.  It
-# describes authoring the bootstrap, so it is validated by required invariants
-# rather than compared byte-for-byte with a consumer's generated AGENTS.md.
-TRACKED_AUTHORING_PATHS = ("AGENTS.md",)
+# The source repository deliberately keeps concise root adapters tracked. They
+# describe bootstrap authoring, so they are validated by required invariants
+# rather than compared byte-for-byte with a consumer's generated adapters.
+TRACKED_AUTHORING_PATHS = ("AGENTS.md", "CLAUDE.md")
 
 # These root paths are generated in consumer repositories and copied into the
 # nested ai-state repository for restoration on a fresh machine.
