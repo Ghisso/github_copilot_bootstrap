@@ -331,3 +331,281 @@ same account usage limit, with an instruction not to work around it. They are
 the only remaining temporary paths; no consumer or bootstrap path is a
 cleanup target. A permitted cleanup action must remove them before phase
 closeout.
+
+## Step 7 cross-project applicability supplement — EXECUTED
+
+**Supplement decision: cross-project override FAILED. The final Phase 0
+decision remains NO-GO and Phases A-F remain unauthorized.**
+
+This section supersedes the BLOCKED section above only on execution status.
+The blocking cause was an external control (sandbox DNS plus an approval-service
+usage limit), not a Graphify result, and that section's measurements stand as
+written. Network access was available in this session, so the same pinned
+package was acquired and all six required questions were executed.
+
+### Acquisition and execution boundary
+
+`graphifyy==0.9.35` was acquired from PyPI and pinned into one disposable
+container image. No other version was used.
+
+| Item | Observed value |
+| --- | --- |
+| Package | `graphifyy==0.9.35`, `requires_python >=3.10` |
+| Wheel | `graphifyy-0.9.35-py3-none-any.whl`, 1 243 046 bytes, sha256 `97f5aa68a2779fe0bf14ce0419c3bfa42afeca2f4dc0c3db93b922c191f6967f` |
+| Reported CLI version | `graphify 0.9.35` |
+| Base image | `python:3.12-slim`, non-root user `gate` (uid 1000) |
+| Extras installed | none; base deps are `networkx`, `numpy`, `rapidfuzz`, and tree-sitter grammars only — no MCP, LLM, document, or media backend |
+| Docker | `Docker version 28.3.1, build 38b7060` |
+
+Every Graphify invocation used `--network none`, mounted consumer source at
+`/src` read-only, mounted a task-owned writable output dir at `/out`, and used
+a task-owned writable `/work` as the working directory:
+
+```text
+docker run --rm --network none \
+  -v <consumer>:/src:ro -v <task-tmp>/out:/out -v <task-tmp>/work:/work -w /work \
+  graphify-gate:0.9.35 \
+  graphify extract /src --code-only --no-cluster --out /out
+```
+
+Queries reused the same shape with `graphify <op> ... --graph /out/graphify-out/graph.json`.
+
+No consumer was written, no branch was switched, no `graphify update` ran
+against a consumer, `--no-gitignore` was never used, and no installer, hook,
+MCP, LLM, or media operation ran. No application import, test, service, or
+dependency synchronization ran.
+
+**Refinement of the earlier cwd lesson.** The prior run observed Graphify
+creating `graphify-out/cache/stat-index.json` in the process working directory.
+With `--out DIR` supplied, both consumer runs left the working directory
+completely empty (`work_bytes=0`); `stat-index.json` was written under
+`/out/graphify-out/cache/` instead. The operational rule still stands — always
+run from a task-owned working directory — but the cwd artifact is a consequence
+of omitting `--out`, not unconditional behavior.
+
+### Measurements
+
+| Metric | RAG | industrial-inspection | Budget |
+| --- | --- | --- | --- |
+| Cold extraction, exit code | 10.400 s, exit 0 | 2.785 s, exit 0 | `<= 180 s` — PASS |
+| Slowest measured query | 2.099 s | 0.722 s | `<= 10 s` — PASS |
+| Raw output tree | 18 770 292 B (17.90 MiB) | 3 624 560 B (3.46 MiB) | `<= 50 MiB` — PASS |
+| `graph.json` | 9 135 881 B | 1 793 675 B | n/a |
+| Graph size | 8 302 nodes, 17 739 edges | 1 390 nodes, 3 591 edges | n/a |
+| Code files indexed | 451 | 126 | n/a |
+| Distinct source files in graph | 446 | 120 | n/a |
+| Working-dir artifacts | 0 B | 0 B | none — PASS |
+
+Edge confidence in the RAG graph was `EXTRACTED` 15 637 and `INFERRED` 2 102.
+
+### Exclusion and privacy result
+
+Both graphs were scanned for forbidden paths and secret-shaped content.
+
+- No `.env*`, `.claude/`, `.git/`, `credentials`, `secret`, `.venv/`,
+  `node_modules`, `dist/`, `.pem`, or `.key` path appeared in either graph.
+- No value matched `hf_[A-Za-z0-9]{20,}`, `sk-[A-Za-z0-9]{20,}`,
+  `AKIA[0-9A-Z]{16}`, or a private-key header.
+- Both consumers list `.env.example` among files Graphify skipped as
+  unclassified. It was named in stdout but not indexed.
+- An initial automated scan flagged ten industrial-inspection paths under
+  `src/industrial_inspection/data/`, `src/configs/data/`, and `tests/data/`.
+  These are first-party `.py` modules under a directory named `data`, not
+  datasets or model weights. The flag was a false positive of the scan pattern,
+  not an exclusion failure. No dataset, model, or binary artifact was indexed.
+
+Network denial passed: every run executed under `--network none` and exited 0.
+The read-only write boundary passed: consumer mounts were `:ro` and all output
+landed in task-owned `/tmp` mounts.
+
+### RAG — 0 of 3 questions add material connectivity value
+
+Ignore-rule limitation, recorded and not defeated: `.gitignore:11` contains the
+unanchored rule `build/`, confirmed by
+`git check-ignore -v src/graph/build/text_graph_builder.py`. Graphify honored it,
+so the entire live first-party directory `src/graph/build/**` is absent from the
+graph. The rule was not edited and `--no-gitignore` was not used.
+
+**Q1 — `RAGService.query` mixed routing and document join: FAIL.**
+`graphify query "..."` returned 873 candidate nodes in 1.390 s and truncated to
+73 at the default budget, warning that the answer might be among the 800 cut
+nodes. Narrowing with `--context call --budget 4000` (1.170 s) returned 23
+nodes still dominated by noise. `graphify path "RAGService" "GraphRetriever"`
+(1.280 s) returned a true but uninformative 3-hop chain
+`RAGService --references--> service --imports_from--> bootstrap.py --imports--> GraphRetriever`,
+which is file-level import discovery.
+
+Source-confirmed ground truth that Graphify never produced: mixed mode is gated
+at `src/retrieval/query_runner.py:212` and `:226` (`mode in {"graph","mixed"}`)
+and `:778`; the join is `result_joiner`/`joiner` selected at
+`src/retrieval/core/pipeline_builder.py:288` and `:298`, with final document
+priority `ranker > result_joiner > joiner > retriever` at
+`src/retrieval/query_runner.py:962-968`.
+
+Root cause: the join is dynamic, string-keyed Haystack wiring
+(`pipeline.add_component("result_joiner", ...)`), which an AST symbol graph does
+not model. Material false lead: `join_prefix()` at
+`.devcontainer/hf-ai-sync.py:L171` ranked into both traversals purely on the
+lexical token "join" and is unrelated to document joining. It was identified as
+false and **not accepted**.
+
+**Q2 — `src.create_index.main` injected lifecycle and success-gated push: FAIL.**
+`graphify query "..." --budget 4000` ran 2.099 s, found 270 nodes, truncated to
+151, and returned **zero edges**. The result is a node listing with no
+connectivity. It did surface relevant names (`import_embedded_chunks()`,
+`create_index.py`, `push_csv_to_hub.py`, `StorageConfig`, `hf_sync.py`) and one
+docstring node describing injected dependencies, but per the Step 7 comparison
+contract file and symbol discovery alone scores zero.
+
+**Q3 — `TextGraphBuilder` ownership, identity, public shim: FAIL.**
+`graphify query "..." --budget 4000` ran 1.189 s over 49 nodes. It located the
+shim `src/graph/build_text_graph.py` and its docstring, but the only edges it
+produced from that file were `imports sys` and `imports_from importlib`.
+
+The owner cannot be reached for two independent reasons, both confirmed in
+source. The shim is:
+
+```python
+"""Temporary compatibility alias for moved graph build owner."""
+
+import sys
+from importlib import import_module
+
+_owner_module = import_module("src.graph.build.build_text_graph")
+sys.modules[__name__] = _owner_module
+```
+
+First, the owner `src/graph/build/**` is gitignored and absent from the graph.
+Second, the link is a dynamic `import_module("...")` string and the identity
+guarantee is the `sys.modules[__name__] = _owner_module` rebinding — neither is
+a static import edge. Even with the ignore rule removed, an AST import graph
+would not represent this relationship.
+
+**RAG result: 0/3.** Below the required 2/3. No false relationship was accepted.
+
+### industrial-inspection — 2 of 3 questions add material connectivity value
+
+At the default budget all three questions returned **zero edges** with heavy
+truncation (550, 525, and 537 candidates cut to about 125 each). Raising to
+`--budget 30000` changed the outcome materially, producing 257 and 264 edges.
+The default budget is therefore the binding limitation for this repository, not
+the extractor.
+
+**Q1 — runtime convergence and verdict authority: PASS.**
+`graphify path "AgentInspectionRuntime" "_run_heuristic_fallback()"` (0.643 s)
+returned a 2-hop chain naming the mediating method:
+`AgentInspectionRuntime --method--> ._resolve_verdict() --calls--> _run_heuristic_fallback()`.
+`graphify affected "AgentInspectionRuntime" --depth 3` (0.559 s) returned the
+convergence set.
+
+All accepted relationships confirmed in source:
+
+- `src/industrial_inspection/app/runtime.py:21,31` — `build_inspection_runtime()`
+  returns `AgentInspectionRuntime(cfg)`, the single shared builder.
+- `src/industrial_inspection/cli/infer.py:166`,
+  `src/industrial_inspection/cli/gradio.py:39`, and
+  `src/industrial_inspection/eval/benchmark_runner.py:36`
+  (`BenchmarkRunner.from_config`) each call that builder — the three converging
+  entrypoints.
+- `src/industrial_inspection/agent/inspection_runtime.py:341-380` —
+  `_resolve_verdict` falls back at `:355` (agent error), `:359` (no verdict),
+  `:363` (below `agent_confidence_threshold`), `:368` (counting task with
+  missing or mismatched tool count), and `:372` (non-counting task that used the
+  count tool); the submitted verdict is trusted only at `:374-376`.
+
+Value beyond `rg`: the traversal named `_resolve_verdict` as the mediating
+member and enumerated the three entrypoints in one call. Noise cost was high —
+roughly 70 % of the `affected` output is test callers.
+
+**Q2 — MVTec masks to `cc_n` identity through to aggregate metrics: FAIL.**
+`--budget 30000` (0.704 s) produced 264 edges, but they are predominantly
+`contains` file-to-symbol inventory plus test edges. The decisive step was
+missed: the `cc_n` identity is constructed as an f-string at
+`src/industrial_inspection/grounding/falcon_client.py:238-239`
+(`f"q{query_index}_pred{prediction_index}_cc_{component_index}"`). The literal
+token `cc_n` does not occur anywhere in the repository. Graphify surfaced
+`grounding/types.py` and a mask-splitting test but never the construction site,
+because an identity built inside a format string is invisible to an AST symbol
+graph. The manifest to benchmark-case to grounding to metrics chain was not
+produced as connected edges.
+
+**Q3 — raw versus selected versus count-deduplicated evidence: PASS.**
+`graphify query "..." --budget 30000` (0.722 s, 257 edges) and
+`graphify affected "_select_highest_overlap_cluster()" --depth 3` (0.526 s)
+produced three distinct, source-confirmed evidence paths:
+
+- Count-only NMS dedup: `build_count_tool() --calls--> nms_dedup()` at
+  `src/industrial_inspection/agent/tools.py:145`, confirmed in source, with
+  `nms_dedup --calls--> compute_iou()` at
+  `src/industrial_inspection/agent/dedup.py:31`. Confirmed that dedup is scoped
+  to the count tool.
+- Selected overlap cluster: `aggregate_grounding_results() --calls-->
+  _select_highest_overlap_cluster()` at
+  `src/industrial_inspection/grounding/aggregation.py:108` (definition at
+  `:138`), reached from `inspection_runtime.py` `.run()`/`._run_locked()`.
+- Benchmark grounding-hit: `compute_grounding_hit()` at
+  `src/industrial_inspection/eval/region_matching.py:13` calling
+  `_load_ground_truth_region_masks` `:39`, `_build_predicted_region_mask` `:50`,
+  and `_compute_mask_iou` `:58`, consumed by `.run_case()` at
+  `src/industrial_inspection/eval/benchmark_runner.py:123`.
+
+Every relationship above was verified against the cited paths and lines. No
+false relationship was accepted for this project.
+
+**industrial-inspection result: 2/3.** Meets its own threshold.
+
+### Cross-project override ledger
+
+| Mandatory condition | RAG | industrial-inspection |
+| --- | --- | --- |
+| `>= 2/3` questions add material source-confirmed connectivity | **FAIL (0/3)** | PASS (2/3) |
+| Zero accepted material false relationships | PASS | PASS |
+| Cold extraction `<= 180 s` | PASS (10.400 s) | PASS (2.785 s) |
+| Every measured query `<= 10 s` | PASS (max 2.099 s) | PASS (max 0.722 s) |
+| Raw output `<= 50 MiB` | PASS (17.90 MiB) | PASS (3.46 MiB) |
+| Network denial | PASS | PASS |
+| Read-only write boundary | PASS | PASS |
+| Ignored/sensitive/generated/mutable-state paths absent | PASS | PASS |
+| Initial and final consumer state identical | PASS | PASS |
+
+The override required **both** projects to pass independently. RAG fails the
+value condition, so the override fails. Per Step 7, the final Phase 0 decision
+remains **NO-GO** and Phases A-F stop.
+
+### What the supplement adds beyond the bootstrap result
+
+The bootstrap-only test scored 1/3; RAG scored 0/3 and industrial-inspection
+2/3. The spread is explained by repository shape rather than by tool defect:
+
+- Graphify performs acceptably where relationships are static call and import
+  edges between named symbols (industrial-inspection Q1 and Q3).
+- It fails where connectivity is expressed dynamically — string-keyed pipeline
+  wiring, `import_module` shims, `sys.modules` rebinding, or identities built in
+  f-strings (RAG Q1 and Q3, industrial-inspection Q2). Both bootstrap consumers
+  under test rely on those idioms in exactly the places a structural question
+  targets.
+- The default `--budget 2000` truncates aggressively enough to return zero edges
+  on mid-sized graphs. Useful output required a 15x budget increase, which
+  raises the per-question context cost the routing contract was meant to reduce.
+
+### Final consumer status and cleanup
+
+Both consumers were recaptured after all runs using the same command set. The
+initial and final captures are byte-identical by `diff`, covering branch, HEAD,
+`git status --short`, staged and unstaged diff names, untracked files, nested
+`.claude` branch/HEAD/status, and the SHA-256 of every pre-existing dirty file.
+
+| Consumer | Branch / HEAD unchanged | Dirty files unchanged | Nested `.claude` |
+| --- | --- | --- | --- |
+| `/home/ghisso/work/RAG` | `gliner2-graph-improvements` / `b48613f480ad87a3fa5e76975d37bc9ce5139fec` | 6 files, all hashes identical | `ai-state` / `9015859053a1cd0ec060125669b1e39b810ed9d3`, clean |
+| `/home/ghisso/work/git_projects/industrial-inspection` | `2026-07-21_haystack-3-agent-refactor_implementation` / `28378951c91c08abdb136f549ab6136e6919b7d6` | 2 files, all hashes identical | `ai-state` / `efdb0af25dfd32b7fc434d68e624751db687d742`, clean |
+
+Task-created temporary paths removed at closeout: `/tmp/graphify-step7-run`
+(all extraction output, caches, logs, and state captures), plus the two paths
+left by the blocked attempt, `/tmp/graphify-step7-cache.pJalTD` and
+`/tmp/graphify-step7-tools.lX35JD`, which contained only uv metadata. The
+disposable image `graphify-gate:0.9.35` was removed. Removal used these exact
+paths, never a broad glob. Pre-existing `/tmp` paths from earlier phases
+(`/tmp/graphify-plan-uv-cache`, `/tmp/graphify_plan_uv_cache`,
+`/tmp/graphify-plan-amend-uv-cache`) were not created by this step and were left
+untouched.
