@@ -1,7 +1,7 @@
 ---
 name: guidance-and-review-calibration
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: guidance-and-review-calibration_implementation
 started_at: 2026-08-09T02:13:42Z
@@ -10,7 +10,7 @@ phases:
   - 2026-08-09_phase-B-planner-reliability-calibration
   - 2026-08-09_phase-C-human-facing-writing-guidance
   - 2026-08-09_phase-D-ponytail-authority-calibration
-current_phase:
+current_phase: 2026-08-09_phase-A-consumer-neutral-root-guidance
 bypass_acknowledged: false
 ---
 
