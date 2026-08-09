@@ -607,17 +607,17 @@ diff_requires_ponytail() {
   if [[ -n "$diff_ref" ]]; then
     while IFS= read -r path; do
       [[ -n "$path" ]] && paths+=("$path")
-    done < <(git -C "$repo_root" diff --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" "$diff_ref" 2>/dev/null)
   else
     while IFS= read -r path; do
       [[ -n "$path" ]] && paths+=("$path")
-    done < <(git -C "$repo_root" diff --name-only "$merge_base" 2>/dev/null)
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" 2>/dev/null)
   fi
 
   [[ "${#paths[@]}" -gt 1 ]] && return 0
   for path in "${paths[@]}"; do
     case "$path" in
-      .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|scripts/*|shared/scripts/*|pyproject.toml|uv.lock|requirements*.txt|Pipfile|Pipfile.lock|poetry.lock|package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|Cargo.toml|Cargo.lock|go.mod|go.sum) return 0 ;;
+      .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|scripts/*|shared/scripts/*|pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|requirements*.txt|*/requirements*.txt|Pipfile|*/Pipfile|Pipfile.lock|*/Pipfile.lock|poetry.lock|*/poetry.lock|package.json|*/package.json|package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|Cargo.toml|*/Cargo.toml|Cargo.lock|*/Cargo.lock|go.mod|*/go.mod|go.sum|*/go.sum) return 0 ;;
     esac
   done
   return 1
