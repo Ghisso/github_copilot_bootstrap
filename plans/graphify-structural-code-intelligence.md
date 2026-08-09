@@ -1,10 +1,10 @@
 ---
 name: graphify-structural-code-intelligence
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: graphify-structural-code-intelligence_implementation
-started_at:
+started_at: 2026-08-09T09:54:10Z
 phases:
   - 2026-08-09_phase-0-graphify-compatibility-and-value-gate
   - 2026-08-09_phase-A-graphify-managed-dependency-and-thin-adapter
@@ -13,7 +13,7 @@ phases:
   - 2026-08-09_phase-D-graphify-dogfood-and-retention
   - 2026-08-09_phase-E-graphify-runtime-diagnostics
   - 2026-08-09_phase-F-graphify-optional-persistence-gate
-current_phase:
+current_phase: 2026-08-09_phase-0-graphify-compatibility-and-value-gate
 ---
 
 # Big Plan: graphify-structural-code-intelligence
