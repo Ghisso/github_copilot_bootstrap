@@ -130,3 +130,4 @@
 2026-08-11T17:34:16.000Z,event=Stop,target=claude-code,sessionId=a10f8f98-0939-4120-89af-bad749e90b4b
 2026-08-11T17:36:42.000Z,event=Stop,target=claude-code,sessionId=a10f8f98-0939-4120-89af-bad749e90b4b
 2026-08-11T17:39:08.000Z,event=Stop,target=claude-code,sessionId=a10f8f98-0939-4120-89af-bad749e90b4b
+2026-08-11T17:46:01.000Z,event=SessionStart,target=claude-code,sessionId=a10f8f98-0939-4120-89af-bad749e90b4b,source=compact
