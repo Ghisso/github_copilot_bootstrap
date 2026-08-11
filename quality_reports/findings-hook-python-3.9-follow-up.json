@@ -1,0 +1,24 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "code"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-11T17:58:27Z",
+  "branch": "hook-python-3.9-follow-up_implementation",
+  "head_sha": "b1d74457a69e4638e1a5eb06e14e3af7dc008592",
+  "base_ref": "dev",
+  "merge_base_sha": "b1d74457a69e4638e1a5eb06e14e3af7dc008592",
+  "phase": "hook-python-3.9-follow-up",
+  "target": "shared/policies/workspace.instructions.md",
+  "dirty": false,
+  "content_hash": "544086a335d93de48318cf989add8fd55002a78d",
+  "changed_files": [
+    ".github/workflows/validate.yml",
+    "shared/policies/workspace.instructions.md"
+  ]
+}

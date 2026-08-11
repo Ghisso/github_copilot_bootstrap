@@ -1,0 +1,26 @@
+{
+  "score": 80,
+  "gate": "BLOCKED",
+  "target": "shared/policies/workspace.instructions.md",
+  "ruff_violations": 0,
+  "mypy_errors": 1,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "813 passed in 48.26s",
+  "mypy_summary": "Found 1 error in 1 file (errors prevented further checking)",
+  "deductions": [
+    "mypy: 1 error(s)  [-20]"
+  ],
+  "generated_at": "2026-08-11T17:58:11Z",
+  "branch": "hook-python-3.9-follow-up_implementation",
+  "head_sha": "b1d74457a69e4638e1a5eb06e14e3af7dc008592",
+  "base_ref": "dev",
+  "merge_base_sha": "b1d74457a69e4638e1a5eb06e14e3af7dc008592",
+  "phase": "hook-python-3.9-follow-up",
+  "dirty": false,
+  "content_hash": "544086a335d93de48318cf989add8fd55002a78d",
+  "changed_files": [
+    ".github/workflows/validate.yml",
+    "shared/policies/workspace.instructions.md"
+  ]
+}
