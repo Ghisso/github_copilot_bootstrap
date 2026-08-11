@@ -316,3 +316,15 @@
 - [LEARN:diagnostics] Follow-on warnings must describe the broad failure class
   accurately. Preserve cause-specific diagnostics instead of overwriting them
   with a generic message that falsely claims a conflict.
+- [LEARN:security] Hand-parsed YAML-like lifecycle frontmatter needs semantic
+  validation after syntax parsing. Validate real calendar/time values, reject
+  multiline and YAML collection/list/comment/block-header shapes for prose,
+  and pair adversarial rejects with accepted lookalike prose to prevent
+  overblocking.
+- [LEARN:quality] Treat cancellation evidence as an untrusted artifact chain:
+  path construction, resolution, containment, symlink targets, file type,
+  UTF-8 decoding, and exact same-line markers must all fail closed as
+  accumulated validation errors rather than escaping as exceptions.
+- [LEARN:documentation] Lifecycle templates and policies must state the exact
+  constraints enforced by their validator; run DOCUMENT after review to
+  reconcile the final hardened contract before score and closeout.

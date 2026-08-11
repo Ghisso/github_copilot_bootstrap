@@ -3,8 +3,8 @@ name: 2026-08-09_phase-C-cancelled-status-contract
 type: small-plan
 parent_plan: state-sync-recovery-and-plan-cancellation
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-11_cancelled-status-contract-phase-C.md
 ---
 
 # Small Plan: 2026-08-09_phase-C-cancelled-status-contract
@@ -59,16 +59,16 @@ review policy; it is not a return to universal Ponytail review for every diff.
 
 ## Steps
 
-- [ ] `scripts/validate_plan_frontmatter.py` (modify): lift the two status
+- [x] `scripts/validate_plan_frontmatter.py` (modify): lift the two status
       allow-lists into module-level constants and add
       `CANCELLED_FIELDS = ("cancelled_at", "cancelled_reason",
       "cancelled_evidence")`. Big-plan statuses become
       `{planning, in-progress, complete, cancelled}`; small-plan statuses become
       `{in-progress, complete, cancelled}`.
-- [ ] Keep `started_at` required only for `in-progress` and `complete`, and
+- [x] Keep `started_at` required only for `in-progress` and `complete`, and
       `current_phase` required only for `in-progress`. A `cancelled` big plan
       requires neither: a plan can be called off before its branch exists.
-- [ ] Add
+- [x] Add
       `validate_cancellation(path: Path, data: dict[str, Any], errors: list[str]) -> None`
       (create). It requires all three `CANCELLED_FIELDS` present and non-empty;
       requires `cancelled_at` to match `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`;
@@ -76,24 +76,24 @@ review policy; it is not a return to universal Ponytail review for every diff.
       requires that file to exist and to contain a line matching
       `^\*\*Status:\*\*\s+CANCELLED\b`. Call it from both
       `validate_big_plan` and `validate_small_plan` when status is `cancelled`.
-- [ ] Guard the evidence-file read so a missing or unreadable file becomes a
+- [x] Guard the evidence-file read so a missing or unreadable file becomes a
       clean accumulated failure, not an uncaught exception. This is a recorded
       lesson about unconditional `read()` on a required-but-maybe-missing file.
-- [ ] A `cancelled` small plan must not require `closeout_session_log`. A
+- [x] A `cancelled` small plan must not require `closeout_session_log`. A
       cancelled phase has no closeout.
-- [ ] `shared/templates/plan-small.md` (modify): document the status vocabulary
+- [x] `shared/templates/plan-small.md` (modify): document the status vocabulary
       as a `#` comment line inside the frontmatter and add the commented
       cancellation field block. The frontmatter parser skips lines whose first
       non-space character is `#`, so comments are safe there.
-- [ ] `shared/templates/plan-big.md` (modify): same treatment.
-- [ ] `shared/templates/session-log.md` (modify): add the `**Status:** CANCELLED`
+- [x] `shared/templates/plan-big.md` (modify): same treatment.
+- [x] `shared/templates/session-log.md` (modify): add the `**Status:** CANCELLED`
       variant beside `**Status:** COMPLETED`, with one line each saying when to
       use which.
-- [ ] `shared/plans/README.md` (modify): document both status vocabularies, the
+- [x] `shared/plans/README.md` (modify): document both status vocabularies, the
       three cancellation fields, and the rule that a cancelled phase needs no
       commit, findings report, score, or closeout log but does need the
       evidence artifact.
-- [ ] `shared/policies/workflow.instructions.md` (modify): add a "Cancelling a
+- [x] `shared/policies/workflow.instructions.md` (modify): add a "Cancelling a
       plan or phase" subsection under Branch Lifecycle. State what cancellation
       means, the three required fields and the evidence marker, that a cancelled
       phase requires no commit or closeout artifacts, that `cancelled` on a big
@@ -101,28 +101,28 @@ review policy; it is not a return to universal Ponytail review for every diff.
       which a branch carrying cancelled phases becomes pushable. Amend the
       existing bullet "Open a PR to `dev` only after every small plan in the big
       plan is complete" to read "complete or cancelled".
-- [ ] `tests/test_validate_plan_frontmatter.py` (create): the accept/reject
+- [x] `tests/test_validate_plan_frontmatter.py` (create): the accept/reject
       matrix below. There is no test module for this validator today.
-- [ ] Regenerate targets.
+- [x] Regenerate targets.
 
 ## Test Scenarios
 
-- [ ] Accepts a small plan with `status: cancelled`, all three fields, and an
+- [x] Accepts a small plan with `status: cancelled`, all three fields, and an
       evidence file containing `**Status:** CANCELLED`.
-- [ ] Rejects `cancelled` with each of the three fields missing in turn
+- [x] Rejects `cancelled` with each of the three fields missing in turn
       (parameterized over `CANCELLED_FIELDS`).
-- [ ] Rejects a malformed `cancelled_at` (missing `Z`, date only, free text).
-- [ ] Rejects `cancelled_evidence` pointing at a path that does not exist.
-- [ ] Rejects `cancelled_evidence` pointing at an existing file that lacks the
+- [x] Rejects a malformed `cancelled_at` (missing `Z`, date only, free text).
+- [x] Rejects `cancelled_evidence` pointing at a path that does not exist.
+- [x] Rejects `cancelled_evidence` pointing at an existing file that lacks the
       `**Status:** CANCELLED` line.
-- [ ] Accepts a big plan with `status: cancelled` and no `started_at` and no
+- [x] Accepts a big plan with `status: cancelled` and no `started_at` and no
       `current_phase`.
-- [ ] Rejects the near-miss spellings `canceled` and `abandoned` as invalid
+- [x] Rejects the near-miss spellings `canceled` and `abandoned` as invalid
       statuses, proving the single-literal rule fails loudly.
-- [ ] Regression: existing `planning`, `in-progress`, and `complete` behavior is
+- [x] Regression: existing `planning`, `in-progress`, and `complete` behavior is
       unchanged, including that a `complete` small plan still requires
       `closeout_session_log`.
-- [ ] Regression: `uv run python scripts/validate_plan_frontmatter.py` with no
+- [x] Regression: `uv run python scripts/validate_plan_frontmatter.py` with no
       arguments still passes over every current file in `.claude/plans/`.
 
 ## Verification
@@ -169,22 +169,22 @@ rm -rf /tmp/dist-gen-a
 
 ## Acceptance Criteria
 
-- [ ] `cancelled` is a valid status for both plan types.
-- [ ] A `cancelled` plan without all three fields fails validation.
-- [ ] A `cancelled` plan whose evidence file is missing or lacks
+- [x] `cancelled` is a valid status for both plan types.
+- [x] A `cancelled` plan without all three fields fails validation.
+- [x] A `cancelled` plan whose evidence file is missing or lacks
       `**Status:** CANCELLED` fails validation.
-- [ ] A `cancelled` big plan needs no `started_at` and no `current_phase`.
-- [ ] A `cancelled` small plan needs no `closeout_session_log`.
-- [ ] `canceled` and `abandoned` are rejected as invalid statuses.
-- [ ] Templates, session-log template, plans README, and the workflow policy all
+- [x] A `cancelled` big plan needs no `started_at` and no `current_phase`.
+- [x] A `cancelled` small plan needs no `closeout_session_log`.
+- [x] `canceled` and `abandoned` are rejected as invalid statuses.
+- [x] Templates, session-log template, plans README, and the workflow policy all
       describe the same contract.
-- [ ] Every existing plan file still validates unchanged.
+- [x] Every existing plan file still validates unchanged.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
