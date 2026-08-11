@@ -17,10 +17,44 @@ FILTER_SCRIPT="$SCRIPT_DIR/context-mode-mcp-filter.mjs"
 # file. See configure_storage below.
 PROVENANCE_SECRET_FILE="$REPO_ROOT/.context-mode-provenance.secret"
 
+# Prints the installed package version of a direct `context-mode` executable.
+#
+# Context Mode 1.0.169 has no `--version`/`-v`/`version` flag (all three exit 0
+# printing nothing), and `doctor` is slow, ANSI-decorated, and performs a network
+# npm check, so neither is usable as a per-hook-event gate. The executable is an
+# npm bin symlink into the installed package directory, so resolve it and read
+# the owning package.json: offline, deterministic, and independent of the
+# bundle's internals. The name is checked too, so a nested dependency manifest
+# can never be mistaken for Context Mode's own.
+direct_context_mode_version() {
+  local exe="$1" resolved dir manifest
+  resolved="$(readlink -f "$exe" 2>/dev/null)" || return 1
+  [[ -n "$resolved" && -f "$resolved" ]] || return 1
+  dir="$(dirname "$resolved")"
+  while :; do
+    manifest="$dir/package.json"
+    if [[ -f "$manifest" ]] \
+      && grep -Eq '"name"[[:space:]]*:[[:space:]]*"context-mode"' "$manifest"; then
+      sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -1
+      return 0
+    fi
+    [[ "$dir" == "/" || -z "$dir" ]] && return 1
+    dir="$(dirname "$dir")"
+  done
+}
+
+# A direct binary is used only when it is provably the pinned version. The `npx`
+# fallback needs no such check because its version is pinned in the command
+# itself, so it is correct by construction.
 resolve_context_mode() {
-  if command -v context-mode >/dev/null 2>&1; then
-    printf 'context-mode'
-    return 0
+  local exe version
+  if exe="$(command -v context-mode 2>/dev/null)" && [[ -n "$exe" ]]; then
+    if version="$(direct_context_mode_version "$exe")" \
+      && [[ "$version" == "$PINNED_CONTEXT_MODE_VERSION" ]]; then
+      printf 'context-mode'
+      return 0
+    fi
+    warn "ignoring context-mode on PATH at $exe: requires exactly $PINNED_CONTEXT_MODE_VERSION, found ${version:-undeterminable}"
   fi
   if command -v npx >/dev/null 2>&1; then
     printf 'npx'
@@ -55,20 +89,19 @@ canonical_storage_path() {
   printf '%s%s' "$(cd "$ancestor" && pwd -P)" "$suffix"
 }
 
+# The bootstrap owns exactly one cache location: the project-local
+# $DEFAULT_CONTEXT_MODE_DIR subtree. Any override resolving elsewhere -- another
+# path inside the repository, or anywhere outside it -- is refused.
+#
+# This is an ownership boundary, not just a safety check. configure_storage
+# quarantines an unaudited cache by *renaming the directory*, so honouring an
+# arbitrary external override would let the bootstrap reorganize user-owned
+# state outside the repository. Refusing the override means such a path is never
+# stamped, renamed, or otherwise touched.
 storage_override_is_allowed() {
-  local requested="$1" canonical="$2"
-  case "$requested" in
-    "$REPO_ROOT"|"$REPO_ROOT/"*)
-      case "$canonical" in
-        "$DEFAULT_CONTEXT_MODE_DIR"|"$DEFAULT_CONTEXT_MODE_DIR/"*) ;;
-        *) return 1 ;;
-      esac
-      ;;
-  esac
-  case "$canonical" in
+  case "$1" in
     "$DEFAULT_CONTEXT_MODE_DIR"|"$DEFAULT_CONTEXT_MODE_DIR/"*) return 0 ;;
-    "$REPO_ROOT"|"$REPO_ROOT/"*) return 1 ;;
-    *) return 0 ;;
+    *) return 1 ;;
   esac
 }
 
@@ -88,8 +121,8 @@ select_storage_root() {
     printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
     return 0
   fi
-  if ! storage_override_is_allowed "$requested" "$canonical"; then
-    warn "ignoring tracked or protected in-project CONTEXT_MODE_DIR; using project-local cache"
+  if ! storage_override_is_allowed "$canonical"; then
+    warn "ignoring unsupported CONTEXT_MODE_DIR '$requested': only $DEFAULT_CONTEXT_MODE_DIR and paths beneath it are bootstrap-owned; using the project-local cache and leaving that path untouched"
     printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
     return 0
   fi
@@ -195,17 +228,42 @@ probe_storage() {
 }
 
 self_check() {
-  local command_path=""
-  if command_path="$(resolve_context_mode)"; then
-    if [[ "$command_path" == "npx" ]]; then
-      warn "context-mode not found on PATH; npx fallback is available"
+  local command_path="" exe="" observed=""
+  printf 'PASS context-mode-dispatch: required-version=%s\n' "$PINNED_CONTEXT_MODE_VERSION"
+
+  # Report the observed version of whatever is actually on PATH before deciding
+  # anything, so the self-check proves the version contract instead of merely
+  # restating the pin.
+  if exe="$(command -v context-mode 2>/dev/null)" && [[ -n "$exe" ]]; then
+    printf 'PASS context-mode-dispatch: resolved-path=%s\n' "$exe"
+    if observed="$(direct_context_mode_version "$exe")" && [[ -n "$observed" ]]; then
+      printf 'PASS context-mode-dispatch: observed-version=%s\n' "$observed"
     else
-      printf 'PASS context-mode-dispatch: launcher=%s\n' "$command_path"
+      observed=""
+      warn "observed-version=undeterminable for $exe"
     fi
   else
-    warn "context-mode and npx are unavailable; hook events will be skipped"
+    printf 'PASS context-mode-dispatch: resolved-path=none-on-PATH\n'
   fi
-  printf 'PASS context-mode-dispatch: required-version=%s\n' "$PINNED_CONTEXT_MODE_VERSION"
+
+  if command_path="$(resolve_context_mode 2>/dev/null)"; then
+    printf 'PASS context-mode-dispatch: launcher=%s\n' "$command_path"
+    if [[ "$command_path" == "npx" ]]; then
+      printf 'PASS context-mode-dispatch: version-contract=pinned-via-npx@%s\n' \
+        "$PINNED_CONTEXT_MODE_VERSION"
+      if [[ -n "$exe" ]]; then
+        warn "context-mode on PATH does not satisfy the version contract; using pinned npx instead"
+      fi
+    else
+      printf 'PASS context-mode-dispatch: version-contract=pinned-direct-binary\n'
+    fi
+  else
+    if [[ -n "$exe" ]]; then
+      warn "version-contract=FAIL; context-mode on PATH is ${observed:-undeterminable}, npx is unavailable, so hook events will be skipped"
+    else
+      warn "context-mode and npx are unavailable; hook events will be skipped"
+    fi
+  fi
   printf 'PASS context-mode-dispatch: filter=%s\n' "$FILTER_SCRIPT"
 
   probe_storage \

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -28,16 +29,39 @@ def installed_dispatcher(tmp_path: Path) -> tuple[Path, Path]:
     return root, dispatcher
 
 
-def _fake_context_mode(tmp_path: Path) -> tuple[Path, Path]:
+def _fake_context_mode(
+    tmp_path: Path,
+    *,
+    version: str | None = "1.0.169",
+    manifest_name: str = "context-mode",
+) -> tuple[Path, Path]:
+    """A fake `context-mode` mirroring the real npm install layout.
+
+    The dispatcher reads the owning package.json to prove the pinned version,
+    because Context Mode 1.0.169 has no working `--version` flag. So the fake
+    must be a bin symlink pointing into a package directory, exactly like a real
+    global install. `version=None` omits the manifest entirely, modelling a
+    binary whose version cannot be determined.
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
+    package_dir = tmp_path / "pkg"
+    package_dir.mkdir(exist_ok=True)
     trace = tmp_path / "trace"
-    executable = bin_dir / "context-mode"
-    executable.write_text(
+    script = package_dir / "cli.bundle.mjs"
+    script.write_text(
         "#!/usr/bin/env bash\n"
         'printf \'%s|%s\\n\' "$CONTEXT_MODE_DIR" "$*" >> "$CONTEXT_MODE_TRACE"\n'
     )
-    executable.chmod(0o755)
+    script.chmod(0o755)
+    if version is not None:
+        (package_dir / "package.json").write_text(
+            json.dumps({"name": manifest_name, "version": version}, indent=2)
+        )
+    executable = bin_dir / "context-mode"
+    if executable.is_symlink() or executable.exists():
+        executable.unlink()
+    executable.symlink_to(script)
     return bin_dir, trace
 
 
@@ -188,7 +212,7 @@ def test_absolute_traversal_override_falls_back_without_creating_destination(
     assert not (root / ".claude/plans/escaped").exists()
 
 
-def test_approved_cache_subtree_and_external_absolute_override_are_preserved(
+def test_approved_cache_subtree_override_is_preserved(
     installed_dispatcher: tuple[Path, Path], tmp_path: Path
 ) -> None:
     root, dispatcher = installed_dispatcher
@@ -196,13 +220,173 @@ def test_approved_cache_subtree_and_external_absolute_override_are_preserved(
     approved = root / ".claude/.cache/context-mode/alternate"
     env["CONTEXT_MODE_DIR"] = str(approved)
     assert _run(dispatcher, "claude-code", "sessionstart", env=env).returncode == 0
-    external = tmp_path / "external-cache"
+    assert trace.read_text().split("|", 1)[0] == str(approved.resolve())
+
+
+def test_external_override_falls_back_and_never_touches_that_path(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """An absolute external CONTEXT_MODE_DIR is refused, not adopted.
+
+    configure_storage quarantines an unaudited cache by renaming the directory,
+    so adopting an arbitrary external path would let the bootstrap reorganize
+    user-owned state outside the repository. The external path must be left
+    exactly as it was: not created, not stamped with a provenance marker, and
+    not renamed to a `.untrusted.*` sibling.
+    """
+    root, dispatcher = installed_dispatcher
+    env, trace = _hook_env(tmp_path)
+    external = tmp_path / "user-owned-cache"
+    external.mkdir()
+    (external / "user-data.txt").write_text("owned by the user")
     env["CONTEXT_MODE_DIR"] = str(external)
+
+    result = _run(dispatcher, "claude-code", "sessionstart", env=env)
+
+    assert result.returncode == 0
+    assert "unsupported CONTEXT_MODE_DIR" in result.stderr
+    # Fell back to the project-local cache.
+    assert trace.read_text().split("|", 1)[0] == str(
+        (root / ".claude/.cache/context-mode").resolve()
+    )
+    # The external directory is untouched: same contents, no marker, no rename.
+    assert (external / "user-data.txt").read_text() == "owned by the user"
+    assert not (external / ".bootstrap-provenance").exists()
+    assert sorted(p.name for p in external.iterdir()) == ["user-data.txt"]
+    assert not list(tmp_path.glob("user-owned-cache.untrusted.*"))
+
+
+def test_external_override_is_not_created_when_absent(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """Refusing an external override must not bring it into existence."""
+    _, dispatcher = installed_dispatcher
+    env, _ = _hook_env(tmp_path)
+    external = tmp_path / "never-created"
+    env["CONTEXT_MODE_DIR"] = str(external)
+
     assert _run(dispatcher, "claude-code", "sessionstart", env=env).returncode == 0
-    assert [line.split("|", 1)[0] for line in trace.read_text().splitlines()] == [
-        str(approved.resolve()),
-        str(external.resolve()),
-    ]
+    assert not external.exists()
+
+
+def test_hook_uses_direct_binary_only_at_the_exact_pinned_version(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, dispatcher = installed_dispatcher
+    bin_dir, trace = _fake_context_mode(tmp_path, version="1.0.169")
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "CONTEXT_MODE_TRACE": str(trace)}
+
+    result = _run(dispatcher, "claude-code", "sessionstart", env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert "hook claude-code sessionstart" in trace.read_text()
+
+
+@pytest.mark.parametrize(
+    ("version", "manifest_name"),
+    [
+        ("1.0.170", "context-mode"),
+        ("1.0.168", "context-mode"),
+        ("0.9.0", "context-mode"),
+        # A nested dependency's manifest must never be mistaken for Context
+        # Mode's own, even when its version happens to be the pinned string.
+        ("1.0.169", "some-other-package"),
+    ],
+)
+def test_hook_refuses_a_direct_binary_that_is_not_the_pinned_version(
+    installed_dispatcher: tuple[Path, Path],
+    tmp_path: Path,
+    version: str,
+    manifest_name: str,
+) -> None:
+    """A mismatched direct binary must never be executed, and hooks must still
+    fail open (exit 0) rather than breaking the session."""
+    _, dispatcher = installed_dispatcher
+    bin_dir, trace = _fake_context_mode(
+        tmp_path, version=version, manifest_name=manifest_name
+    )
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "CONTEXT_MODE_TRACE": str(trace)}
+
+    result = _run(dispatcher, "claude-code", "sessionstart", env=env)
+
+    assert result.returncode == 0
+    assert "requires exactly 1.0.169" in result.stderr
+    assert not trace.exists(), "a non-pinned context-mode binary was executed"
+
+
+def test_hook_refuses_a_direct_binary_with_an_undeterminable_version(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """No manifest means the version cannot be proven, so the binary must be
+    skipped rather than trusted."""
+    _, dispatcher = installed_dispatcher
+    bin_dir, trace = _fake_context_mode(tmp_path, version=None)
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "CONTEXT_MODE_TRACE": str(trace)}
+
+    result = _run(dispatcher, "claude-code", "sessionstart", env=env)
+
+    assert result.returncode == 0
+    assert "undeterminable" in result.stderr
+    assert not trace.exists()
+
+
+def test_hook_falls_back_to_pinned_npx_when_direct_binary_is_rejected(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """A rejected direct binary must not disable Context Mode: the pinned npx
+    fallback is correct by construction and must still be used."""
+    _, dispatcher = installed_dispatcher
+    bin_dir, trace = _fake_context_mode(tmp_path, version="1.0.170")
+    npx_dir = tmp_path / "npx-bin"
+    npx_dir.mkdir()
+    npx_trace = tmp_path / "npx-trace"
+    npx = npx_dir / "npx"
+    npx.write_text('#!/usr/bin/env bash\nprintf \'%s\\n\' "$*" >> "$NPX_TRACE"\n')
+    npx.chmod(0o755)
+    env = {
+        "PATH": f"{bin_dir}:{npx_dir}:/usr/bin:/bin",
+        "CONTEXT_MODE_TRACE": str(trace),
+        "NPX_TRACE": str(npx_trace),
+    }
+
+    result = _run(dispatcher, "claude-code", "sessionstart", env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert not trace.exists(), "the rejected direct binary was executed"
+    assert (
+        npx_trace.read_text().strip()
+        == "-y context-mode@1.0.169 hook claude-code sessionstart"
+    )
+
+
+def test_self_check_reports_the_observed_version_and_contract_result(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """--self-check must prove the version contract, not merely restate the pin."""
+    _, dispatcher = installed_dispatcher
+    bin_dir, _ = _fake_context_mode(tmp_path, version="1.0.169")
+
+    ok = _run(dispatcher, "--self-check", env={"PATH": f"{bin_dir}:/usr/bin:/bin"})
+
+    assert ok.returncode == 0
+    assert "required-version=1.0.169" in ok.stdout
+    assert f"resolved-path={bin_dir / 'context-mode'}" in ok.stdout
+    assert "observed-version=1.0.169" in ok.stdout
+    assert "version-contract=pinned-direct-binary" in ok.stdout
+
+
+def test_self_check_reports_a_failing_version_contract(
+    installed_dispatcher: tuple[Path, Path], tmp_path: Path
+) -> None:
+    _, dispatcher = installed_dispatcher
+    bin_dir, _ = _fake_context_mode(tmp_path, version="1.0.170")
+
+    bad = _run(dispatcher, "--self-check", env={"PATH": f"{bin_dir}:/usr/bin:/bin"})
+
+    assert bad.returncode == 0
+    assert "observed-version=1.0.170" in bad.stdout
+    assert "version-contract=pinned-direct-binary" not in bad.stdout
+    assert "version-contract=FAIL" in bad.stderr
 
 
 def test_self_check_is_nondestructive_for_fresh_and_existing_storage(
