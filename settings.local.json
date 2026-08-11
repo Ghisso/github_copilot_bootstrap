@@ -2,5 +2,10 @@
   "enabledMcpjsonServers": [
     "semble",
     "context-mode"
-  ]
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)"
+    ]
+  }
 }
