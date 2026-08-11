@@ -21,3 +21,28 @@ jobs:
 
       - name: Validate targets
         run: uv run python scripts/validate_targets.py
+
+  python_39_hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Run standalone hook compatibility tests with Python 3.9
+        run: |
+          # Test that protect-files.py compiles under Python 3.9
+          python3 -m py_compile shared/hooks/scripts/protect-files.py
+
+          # Verify that the hook script works with Python 3.9
+          # Test 1: Harmless command should pass
+          echo '{"tool_name":"Bash","tool_input":{"command":"ls -la /tmp"}}' | bash shared/hooks/scripts/protect-files.sh test-session
+
+          # Test 2: Protected file mutation should be denied
+          echo '{"tool_name":"Bash","tool_input":{"command":"touch .env"}}' | bash shared/hooks/scripts/protect-files.sh test-session | grep -q "deny" || exit 1
+
+          # Test 3: Malformed input should fail closed
+          echo "{bad json" | bash shared/hooks/scripts/protect-files.sh test-session | grep -q "deny" || exit 1
