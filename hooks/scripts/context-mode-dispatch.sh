@@ -122,15 +122,18 @@ read_or_create_provenance_secret() {
     # invocation -- winner or loser -- always cats that same, single result.
     tmp_secret="$PROVENANCE_SECRET_FILE.tmp.$$"
     # Clean the temp file up even if this shell is interrupted between the
-    # write and the rename; a leftover `.tmp.<pid>` is secret-bearing.
-    trap 'rm -f "$tmp_secret"' RETURN INT TERM
+    # write and the rename; a leftover `.tmp.<pid>` is secret-bearing. The
+    # handler reads a script-scope variable with a `:-` default, never a
+    # function local, so it stays safe under `set -u` on every path.
+    PROVENANCE_TMP="$tmp_secret"
+    trap 'rm -f "${PROVENANCE_TMP:-}"' RETURN INT TERM
     if ! (umask 077; printf '%s' "$secret" > "$tmp_secret"); then
+      # RETURN is function-scoped, but INT/TERM are process-wide, so reset them
+      # on this early path too or a later signal re-fires a stale handler.
+      trap - INT TERM
       return 1
     fi
     mv -n "$tmp_secret" "$PROVENANCE_SECRET_FILE" 2>/dev/null || true
-    # RETURN is function-scoped, but INT/TERM are process-wide: leaving them set
-    # would re-fire this handler later against an out-of-scope local and abort
-    # under `set -u` instead of exiting cleanly on a signal.
     trap - INT TERM
   fi
   cat "$PROVENANCE_SECRET_FILE"
