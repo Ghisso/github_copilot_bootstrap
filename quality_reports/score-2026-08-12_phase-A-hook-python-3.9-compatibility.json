@@ -9,9 +9,17 @@
   "pytest_summary": "813 passed in 49.22s",
   "mypy_summary": "Success: no issues found in 1 source file",
   "deductions": [],
-  "generated_at": "2026-08-12T17:50:00Z",
+  "generated_at": "2026-08-12T17:55:00Z",
   "branch": "hook-python-3.9-compatibility_implementation",
-  "head_sha": "current",
+  "head_sha": "dcf07deb3e42c7c8e659720d4a4c25f1263344d6",
   "base_ref": "dev",
-  "phase": "2026-08-12_phase-A-hook-python-3.9-compatibility"
+  "merge_base_sha": "dcf07deb3e42c7c8e659720d4a4c25f1263344d6",
+  "phase": "2026-08-12_phase-A-hook-python-3.9-compatibility",
+  "dirty": true,
+  "content_hash": "2e94dfdbad6fd5a5f23fc20ec99188a8d63fe5b654fc2d936c5e67770da3f144",
+  "changed_files": [
+    "shared/hooks/scripts/protect-files.py",
+    "shared/hooks/scripts/protect-files.sh",
+    "tests/test_hook_gates.py"
+  ]
 }

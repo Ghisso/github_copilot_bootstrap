@@ -1,7 +1,9 @@
 {
   "target": "shared/hooks/scripts/protect-files.py",
   "phase": "2026-08-12_phase-A-hook-python-3.9-compatibility",
-  "profiles": ["code"],
+  "profiles": [
+    "code"
+  ],
   "base_ref": "dev",
   "counts": {
     "critical": 0,
@@ -9,5 +11,6 @@
     "minor": 0,
     "info": 0
   },
-  "findings": []
+  "findings": [],
+  "ponytail_reviewed": false
 }
