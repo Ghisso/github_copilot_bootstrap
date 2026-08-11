@@ -39,6 +39,42 @@ configure_storage() {
   export CONTEXT_MODE_DIR
 }
 
+select_storage_root() {
+  local requested="${CONTEXT_MODE_DIR:-}"
+  if [[ -n "$requested" && "$requested" != /* ]]; then
+    warn "ignoring non-absolute CONTEXT_MODE_DIR; using project-local cache"
+    requested=""
+  fi
+  printf '%s' "${requested:-$DEFAULT_CONTEXT_MODE_DIR}"
+}
+
+probe_storage() {
+  local storage_root parent next_parent
+  storage_root="$(select_storage_root)"
+  printf 'PASS context-mode-dispatch: storage-root=%s\n' "$storage_root"
+  if [[ -d "$storage_root" ]]; then
+    if [[ -w "$storage_root" ]]; then
+      printf 'PASS context-mode-dispatch: storage=writable\n'
+      return 0
+    fi
+    return 1
+  fi
+
+  parent="$storage_root"
+  while [[ ! -e "$parent" ]]; do
+    next_parent="$(dirname "$parent")"
+    if [[ "$next_parent" == "$parent" ]]; then
+      return 1
+    fi
+    parent="$next_parent"
+  done
+  if [[ -d "$parent" && -w "$parent" ]]; then
+    printf 'PASS context-mode-dispatch: storage=creatable\n'
+    return 0
+  fi
+  return 1
+}
+
 self_check() {
   local command_path=""
   if command_path="$(resolve_context_mode)"; then
@@ -51,12 +87,8 @@ self_check() {
     warn "context-mode and npx are unavailable; hook events will be skipped"
   fi
 
-  if configure_storage; then
-    printf 'PASS context-mode-dispatch: storage-root=%s\n' "$CONTEXT_MODE_DIR"
-    printf 'PASS context-mode-dispatch: storage=writable\n'
-  else
-    warn "storage root is not writable or creatable: ${CONTEXT_MODE_DIR:-$DEFAULT_CONTEXT_MODE_DIR}"
-  fi
+  probe_storage \
+    || warn "storage root is not writable or creatable: $(select_storage_root)"
 
   if [[ -d "$REPO_ROOT/.claude/.git" ]]; then
     if git -C "$REPO_ROOT/.claude" check-ignore -q .cache/context-mode 2>/dev/null; then
