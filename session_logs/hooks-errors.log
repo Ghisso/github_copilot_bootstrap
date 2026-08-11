@@ -716,3 +716,8 @@ valuable there.
 2026-08-11T08:54:48Z WARN hook fail-closed: protected-file classifier exited with status 2
 2026-08-11T08:54:48Z WARN hook fail-closed: unparseable tool payload
 2026-08-11T08:54:48Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-11T08:57:53Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-11T08:57:54Z WARN hook fail-closed: unparseable tool payload
+2026-08-11T08:57:54Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-11T08:58:33Z WARN hook fail-closed: protected-file classifier exited with status 2
+2026-08-11T08:58:33Z WARN hook fail-closed: protect-files.sh exited with status 2
