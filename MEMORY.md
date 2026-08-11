@@ -398,3 +398,16 @@
   legitimate when the shipped copy must run without dependencies, but it needs
   both a recorded rationale and a test pinning the shared rules; otherwise it is
   indistinguishable from drift waiting to happen.
+- [LEARN:security] Enforcing a version pin on one transport does not pin the
+  dependency. A stdio `serverInfo.version` handshake made the Context Mode pin
+  look complete while hook mode still executed whatever was on `PATH`. Enumerate
+  every path that launches a pinned dependency, not just the one with the
+  obvious handshake.
+- [LEARN:security] A self-check that restates configuration proves nothing. It
+  reported the required version as a PASS without ever observing the installed
+  binary. Report the observed value alongside an explicit contract result, so the
+  two can visibly disagree.
+- [LEARN:architecture] Ownership follows the destructive operation. Accepting an
+  arbitrary external cache path was harmless until quarantine started renaming
+  directories; the remediation mechanism defines how far ownership may extend.
+  Scope a renameable/writable location to what the tool created itself.
