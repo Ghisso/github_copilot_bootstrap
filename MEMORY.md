@@ -50,12 +50,21 @@
   `exit 0` so hooks never block Codex shutdown. The same guard now applies to
   `cmd_migrate` via `commit_and_reconcile` returning non-zero on merge abort
   (phase-3); `cmd_setup` keeps ignoring that result since it never pushes.
+- [LEARN:security] Automated recovery must distinguish state that existed at
+  entry from state created by the current operation. Auto-clean only an exact,
+  observed orphan shape; preserve valid or unknown pre-existing state without
+  mutation, and reserve broader abort/fallback cleanup for state the operation
+  can prove it owns.
 - [LEARN:testing] A regression test for a bug fix must FAIL if the fix is
   reverted. When the buggy code was "harmless" only because a lower layer
   already blocked the bad outcome (e.g. git rejecting a non-fast-forward push
   either way), assert on a marker unique to the fixed path (a new warning
   string) and on the absence of the old path's marker — outcome-only
   assertions can pass under both old and new code and prove nothing.
+- [LEARN:testing] Recovery and control-flow regressions must also record the
+  actual command invocations in a side channel or trace and assert their exact
+  order. A successful outcome or shared diagnostic can pass when the old path
+  still runs or when required fallback steps never execute.
 - [LEARN:domain] AI-state durability must not depend on a `Stop` event: browser/
   editor tab closure does not guarantee Stop fires. The durable checkpoints are
   the `post-commit` git hook (best-effort push after every outer commit) and the

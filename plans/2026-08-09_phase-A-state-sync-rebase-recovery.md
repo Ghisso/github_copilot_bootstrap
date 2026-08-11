@@ -3,8 +3,8 @@ name: 2026-08-09_phase-A-state-sync-rebase-recovery
 type: small-plan
 parent_plan: state-sync-recovery-and-plan-cancellation
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-11_state-sync-recovery-phase-A.md
 ---
 
 # Small Plan: 2026-08-09_phase-A-state-sync-rebase-recovery
@@ -252,9 +252,9 @@ rm -rf /tmp/dist-gen-a
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
