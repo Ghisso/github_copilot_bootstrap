@@ -48,7 +48,9 @@ invisible because state sync is deliberately warn-never-fail.
 
 `git rebase --quit` is the correct recovery for the half-initialized case: it
 clears the rebase state without moving `HEAD`, which is exactly what `--abort`
-cannot do when `head-name` is missing.
+cannot do when `head-name` is missing. That does not make every pre-existing
+rebase state sync's property: a structurally valid or unknown pre-existing
+rebase is preserved for the operator rather than aborted or quit automatically.
 
 The same log also holds 5 `Cannot rebase onto multiple branches` lines from an
 earlier period. That trigger could NOT be reproduced. The nested remote is now
@@ -92,8 +94,12 @@ wiring. It does not introduce another retrieval system.
 
 ## Goals
 
-- Recover reliably from a partially-initialized rebase (`--abort`, then `--quit`
-  as fallback) and never discard the recovery's own failure.
+- Recover the observed pre-existing orphaned-autostash state with `--quit` only,
+  while preserving a structurally valid or unknown pre-existing rebase with
+  explicit operator guidance.
+- For a rebase known to have been started by the current pull, recover with
+  `--abort`, then `--quit` as fallback, and never discard either recovery
+  failure output.
 - Detect pre-existing rebase state and report it as a distinct, latched
   condition, so an operator can tell a stuck sync from a one-off conflict.
 - Close the self-write race so ordinary log churn cannot create orphan rebase
@@ -163,6 +169,20 @@ tooling roadmap. It fixes a concrete Context Mode policy/runtime mismatch that
 uses the same hook and `.claude/` state surfaces. Keeping it here avoids a
 second big plan for a small control-plane correction while still giving it one
 atomic small-plan commit.
+
+### Rebase cleanup ownership boundary
+
+A rebase present before reconciliation starts is not automatically owned by
+state sync. Only the exact observed orphaned-autostash shape is cleaned
+automatically, using `--quit` without first running `--abort`. A structurally
+valid or unknown pre-existing rebase is left intact with explicit commands for
+the operator to inspect and resolve or quit it. Tests snapshot and compare
+`HEAD`, the logical index, the worktree, and rebase metadata on this path.
+
+After that preflight proves no rebase was active, a failed pull owns any new
+rebase state it created. That path may use `--abort`, then `--quit` as fallback;
+the test double emits distinct failure output for each command and the suite
+asserts that both outputs are retained.
 
 ### Status name: `cancelled`
 
@@ -414,7 +434,7 @@ Before big-plan closeout:
 |---|---|
 | Phases A and B change a script this very session executes, so a defect could silently stop AI state publishing - the same class of failure being fixed. | Warn-never-fail keeps a defect from blocking sessions. Phase A adds a `rebase:` line to `cmd_status`, making `state-sync.sh status` a real health probe. Phases A, B, and E each require running it as an explicit verification step. |
 | Dropping `--autostash` in Phase B could regress a caller that relied on it to absorb a dirty tree. | All three callers already guarantee a clean tree: `cmd_setup` and `cmd_pull` commit first, `cmd_publish` refuses when dirty. Phase B additionally calls `commit_local_state` inside `reconcile_committed_state` immediately before the rebase. The existing `test_publish_refuses_dirty_state_without_committing_or_publishing` must keep passing unchanged, as an explicit must-not. |
-| A regression test that passes under both old and new code proves nothing. | Recorded lesson. Every Phase A and B test asserts on a marker unique to the fixed path (the `--quit` recovery warning, the latched-state warning) and on the absence of the old path's marker, never on outcome alone. |
+| A regression test that passes under both old and new code proves nothing. | Recorded lesson. Phase A asserts the `--quit`-only orphan path, preservation of valid pre-existing rebase state, and distinct retained abort/quit failure outputs for current-pull cleanup. Phase B likewise uses markers unique to its fixed paths rather than outcome alone. |
 | `cancelled` becomes a quiet way to skip reviewed work. | Three required fields plus an evidence file that must exist and contain `**Status:** CANCELLED`, and at least one phase must be `complete` for the branch to be pushable. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |

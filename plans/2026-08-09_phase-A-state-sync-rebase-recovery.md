@@ -17,10 +17,14 @@ with `git rebase --abort 2>/dev/null || true`. When git left a
 `.git/rebase-merge/` directory containing only `autostash` and no `head-name`,
 `--abort` cannot succeed, `|| true` throws the failure away, and every later
 sync fails with `fatal: It seems that there is already a rebase-merge
-directory`. This phase adds `--quit` as the fallback recovery, detects
-pre-existing rebase state before starting and reports it as a distinct latched
-condition, and surfaces it in `state-sync.sh status` so the failure is visible
-instead of silent. The warn-never-fail contract does not change.
+directory`. This phase adds ownership-aware recovery. A pre-existing
+half-initialized state matching the observed orphaned-autostash shape is cleared
+with `--quit` only; a structurally valid or unknown pre-existing rebase is left
+intact with explicit operator guidance. A rebase known to have been created by
+the current pull may use `--abort`, then `--quit` as fallback. Pre-existing
+state is reported as a distinct latched condition and surfaced in
+`state-sync.sh status` so the failure is visible instead of silent. The
+warn-never-fail contract does not change.
 
 ## Ownership
 
@@ -61,26 +65,37 @@ review policy; it is not a return to universal Ponytail review for every diff.
       1 otherwise. Must use a plain directory test and run no git subprocess:
       the check has to work in exactly the state where git itself refuses to
       operate.
-- [ ] Add `clear_rebase_state()` (create). Contract: run
+- [ ] Add the narrow classifier needed to recognize the observed orphaned
+      pre-existing state (create): `.git/rebase-merge/autostash` exists while
+      `.git/rebase-merge/head-name` does not. Treat every other pre-existing
+      `rebase-merge` or `rebase-apply` shape as valid or unknown; do not infer
+      that state belongs to state sync.
+- [ ] Add `clear_current_pull_rebase_state()` (create). This helper is only for
+      a rebase known to have been started by the current pull. Contract: run
       `git -C "$CLAUDE_DIR" rebase --abort` capturing combined output; if that
       exits non-zero, run `git -C "$CLAUDE_DIR" rebase --quit` capturing
       combined output. Return 0 when either succeeded, non-zero when both
       failed, after passing both captured outputs to `append_error_output`.
       Must not use `|| true`. Must not use `2>/dev/null` to hide the failure.
-      Must not move `HEAD`.
 - [ ] In `reconcile_committed_state` (modify), before the remote-ref check: when
-      `nested_rebase_in_progress` is true, `warn` with a message that names this
-      as leftover rebase state from a previous sync. The wording must be
-      distinct from the existing conflict warning, so a latched failure and a
-      one-off conflict are separable by grep in
-      `.claude/session_logs/hooks-errors.log`. Then call `clear_rebase_state`.
-      When clearing fails, `warn` again with the exact manual command
-      `git -C "$CLAUDE_DIR" rebase --quit` and `return 1`.
+      `nested_rebase_in_progress` is true, branch on ownership. For the exact
+      orphaned-autostash shape, `warn` that leftover state was detected and run
+      `git -C "$CLAUDE_DIR" rebase --quit` directly, capturing and logging any
+      failure; never run `--abort` on this pre-existing path. For a structurally
+      valid or unknown pre-existing rebase, run neither `--abort` nor `--quit`:
+      warn that state sync will not alter an ambiguous rebase, give explicit
+      commands to inspect and resolve or quit it, and `return 1`. Both warnings
+      must be distinct from the existing conflict warning so the conditions are
+      separable by grep in `.claude/session_logs/hooks-errors.log`. The valid or
+      unknown path must leave `HEAD`, the logical index, the worktree, and the
+      rebase metadata unchanged.
 - [ ] Replace the recovery on the failed-pull path (currently line ~248) with
-      `clear_rebase_state` (modify). When it returns non-zero, emit a second
-      distinct warning naming the leftover state and the manual command, then
-      keep the existing `return 1`. Preserve the existing conflict warning text
-      and its manual resolution instructions unchanged.
+      `clear_current_pull_rebase_state` (modify). This path runs only after the
+      pre-existing-state check proved no rebase was already active, so the
+      failed pull owns any new rebase metadata. When cleanup returns non-zero,
+      emit a second distinct warning naming the leftover state and the manual
+      command, then keep the existing `return 1`. Preserve the existing
+      conflict warning text and its manual resolution instructions unchanged.
 - [ ] Add a `rebase:` line to `cmd_status` output (modify), value `in-progress`
       or `none`, printed with the other repository fields and before
       `error-log:`. This makes a latched failure visible from a single
@@ -102,16 +117,28 @@ path's marker. Outcome-only assertions can pass under both old and new code.
 - [ ] `test_pull_clears_half_initialized_rebase_state`: build a nested repo,
       create `.git/rebase-merge/` containing only an `autostash` file and no
       `head-name`, run `pull`. Assert exit code 0; assert the latched-state
-      warning appears; assert `.git/rebase-merge` no longer exists; assert a
-      following `pull` succeeds.
+      warning and the `--quit`-only marker appear; assert no `--abort` marker
+      appears; assert `.git/rebase-merge` no longer exists; assert a following
+      `pull` succeeds.
 - [ ] `test_rebase_abort_alone_cannot_clear_half_initialized_state`: assert
       directly that `git rebase --abort` fails on that fixture. This validates
       the fixture against git itself and makes the suite fail if the `--quit`
       fallback is reverted.
-- [ ] `test_clear_rebase_state_reports_when_both_recoveries_fail`: force both
-      recoveries to fail, assert the warning names the manual
-      `git -C <dir> rebase --quit` command, assert the failure reaches
-      `hooks-errors.log`, and assert the process still exits 0.
+- [ ] `test_pull_preserves_valid_preexisting_rebase`: create a real, valid
+      in-progress rebase before invoking `pull`. Snapshot `HEAD`, the logical
+      index (including unmerged stages), worktree contents/status, and rebase
+      metadata. Assert the command remains warn-never-fail, gives explicit
+      operator guidance, invokes neither `--abort` nor `--quit`, does not start
+      reconciliation, and leaves every snapshot byte-for-byte or logically
+      identical as appropriate.
+- [ ] `test_current_pull_recovery_reports_distinct_abort_and_quit_failures`:
+      exercise the failed-pull path after proving no rebase existed before that
+      pull, force `--abort` to emit a unique abort-failure marker and `--quit`
+      to emit a different quit-failure marker, and make both fail. Assert both
+      markers independently in `hooks-errors.log`, assert the warning names the
+      manual `git -C <dir> rebase --quit` command, and assert the public command
+      still exits 0. A shared failure string is forbidden because it cannot
+      prove that both recovery commands ran and both outputs were retained.
 - [ ] `test_status_reports_rebase_state`: assert `status` prints
       `rebase: in-progress` with the fixture present and `rebase: none` without
       it.
@@ -159,21 +186,30 @@ rm -rf /tmp/dist-gen-a
 - This phase edits a script the live session executes. Mitigation: warn-never-fail
   keeps any defect from blocking a session, the dogfood refresh runs only after
   verification passes, and `state-sync.sh status` runs immediately after it.
-- `clear_rebase_state` must not move `HEAD`. `--quit` is chosen precisely
-  because it clears state without moving `HEAD`; a test asserts `HEAD` is
-  unchanged across recovery.
+- A pre-existing rebase may represent active operator work rather than failed
+  state sync. Mitigation: only the observed orphaned-autostash shape is cleaned
+  automatically, with `--quit` only. Valid or unknown pre-existing state is
+  preserved, and a real-rebase fixture asserts that `HEAD`, index, worktree,
+  and rebase metadata are unchanged.
 
 ## Acceptance Criteria
 
-- [ ] A half-initialized `.git/rebase-merge` is cleared automatically and the
-      next sync succeeds.
+- [ ] A half-initialized `.git/rebase-merge` matching the observed
+      orphaned-autostash shape is cleared automatically with `--quit` only, and
+      the next sync succeeds.
+- [ ] A structurally valid or unknown pre-existing rebase is not aborted or
+      quit automatically. State sync gives explicit operator guidance and
+      preserves `HEAD`, the logical index, the worktree, and rebase metadata.
+- [ ] A rebase known to have been created by the current pull uses `--abort`,
+      then `--quit` only as fallback.
 - [ ] Recovery failure is warned and logged, never swallowed by `|| true`.
+- [ ] When current-pull abort and quit recovery both fail, their distinct
+      outputs are both retained and asserted independently.
 - [ ] Pre-existing rebase state produces a warning distinct from an ordinary
       conflict warning.
 - [ ] `state-sync.sh status` reports `rebase: in-progress` or `rebase: none`.
 - [ ] Every state-sync entry point still exits 0 on failure; no sync problem
       blocks a session.
-- [ ] `HEAD` in the nested repository is unchanged by recovery.
 - [ ] Regeneration is deterministic and both installed `state-sync.sh` copies
       stay byte-identical.
 

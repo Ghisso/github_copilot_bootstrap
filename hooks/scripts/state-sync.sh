@@ -172,7 +172,11 @@ nested_rebase_in_progress() {
   [[ -d "$CLAUDE_DIR/.git/rebase-merge" || -d "$CLAUDE_DIR/.git/rebase-apply" ]]
 }
 
-clear_rebase_state() {
+orphaned_preexisting_autostash() {
+  [[ -e "$CLAUDE_DIR/.git/rebase-merge/autostash" && ! -e "$CLAUDE_DIR/.git/rebase-merge/head-name" ]]
+}
+
+clear_current_pull_rebase_state() {
   local abort_output abort_status quit_output quit_status
   set +e
   abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)"
@@ -235,9 +239,21 @@ reconcile_committed_state() {
   fi
 
   if nested_rebase_in_progress; then
-    warn "leftover rebase state from a previous sync detected; attempting recovery before reconciliation."
-    if ! clear_rebase_state; then
-      warn "leftover rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    if orphaned_preexisting_autostash; then
+      local quit_output quit_status
+      warn "orphaned autostash rebase state from a previous sync detected; clearing it with rebase --quit before reconciliation."
+      set +e
+      quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+      quit_status=$?
+      set -e
+      append_error_output "$quit_output"
+      if [[ $quit_status -ne 0 ]]; then
+        warn "orphaned autostash rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+        return 1
+      fi
+    else
+      # Do not call warn here: it appends to the active operator's worktree.
+      printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
       return 1
     fi
   fi
@@ -278,7 +294,7 @@ reconcile_committed_state() {
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
     append_error_output "$output"
     if nested_rebase_in_progress; then
-      if ! clear_rebase_state; then
+      if ! clear_current_pull_rebase_state; then
         warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
       fi
     fi
@@ -330,6 +346,14 @@ cmd_pull() {
   fi
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; nothing to pull from."
+    return 0
+  fi
+  if nested_rebase_in_progress; then
+    # The pre-existing-state path emits its own operator guidance. Do not add a
+    # second logged warning, which would alter an active rebase worktree.
+    if ! reconcile_committed_state; then
+      return 0
+    fi
     return 0
   fi
   # Commit any local edits first so the rebase below runs against a clean tree
