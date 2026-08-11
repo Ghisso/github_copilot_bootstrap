@@ -588,6 +588,57 @@ def test_bash_safety_wrapper_uses_ordered_isolated_children(tmp_path: Path) -> N
     assert malformed.returncode == 2
 
 
+def test_protect_files_python_3_9_compatibility() -> None:
+    """Regression test for Python 3.9 compatibility.
+
+    Verifies that protect-files.py:
+    - Imports successfully without type-annotation syntax errors
+    - Classifies harmless commands normally
+    - Denies protected-file mutations
+    - Fails closed on malformed input
+    """
+    # Test 1: protect-files.py imports successfully (compile check)
+    result = subprocess.run(
+        [
+            "python3",
+            "-m",
+            "py_compile",
+            str(SCRIPT_SRC / "protect-files.py"),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, f"Compilation failed: {result.stderr}"
+
+    # Test 2: Harmless Bash command should pass classifier
+    harmless = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "ls -la /tmp"}}
+    )
+    assert harmless.returncode == 0, harmless.stderr
+    assert harmless.stdout.strip() == "", "Harmless command should produce no output"
+
+    # Test 3: Protected file mutation should be denied
+    protected = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "touch .env"}}
+    )
+    assert protected.returncode == 0, protected.stderr
+    assert '"permissionDecision":"deny"' in protected.stdout
+
+    # Test 4: Malformed payload should fail closed
+    malformed = subprocess.run(
+        ["bash", str(SCRIPT_SRC / "protect-files.sh"), "openai-codex"],
+        cwd=REPO_ROOT,
+        input="{bad json",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert malformed.returncode == 2, "Malformed payload should fail closed"
+    assert '"permissionDecision":"deny"' in malformed.stdout
+
+
 if __name__ == "__main__":
     test_git_targets_nested_claude_detects_nested_claude_paths()
     test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands()
