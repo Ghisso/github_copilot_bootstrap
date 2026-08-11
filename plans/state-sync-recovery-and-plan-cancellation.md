@@ -12,7 +12,7 @@ phases:
   - 2026-08-09_phase-D-cancelled-phase-gates
   - 2026-08-09_phase-E-docs-and-graphify-remediation
   - 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
-current_phase: 2026-08-09_phase-B-state-sync-race-and-refspec-hardening
+current_phase: 2026-08-09_phase-C-cancelled-status-contract
 bypass_acknowledged: false
 ---
 

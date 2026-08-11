@@ -48,8 +48,28 @@ Control-plane/high-risk work always uses a full plan.
 - Big plans live at `.claude/plans/<plan_name>.md` and must use `type: big-plan` frontmatter.
 - Small plans live at `.claude/plans/<phase_slug>.md` and must use `type: small-plan` frontmatter.
 - Commit once per completed small plan after DOCUMENT, LEARN, session log, and score gates pass.
-- Open a PR to `dev` only after every small plan in the big plan is complete and only when the user explicitly asks for a PR.
+- Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
+
+### Cancelling a plan or phase
+
+`cancelled` means an authorized decision was made that a plan or phase will
+never run. It is distinct from `complete` and requires `cancelled_at` as a real
+UTC calendar date and time in exact `YYYY-MM-DDTHH:MM:SSZ` format; a meaningful
+`cancelled_reason` written as plain single-line scalar prose without leading
+quotes, YAML block headers, collections, list markers, or comment-only values;
+and a repository-relative `cancelled_evidence` path that stays inside the
+repository and resolves to an existing regular, readable UTF-8 text artifact
+containing the same-line prefix `**Status:** CANCELLED`.
+
+A cancelled phase requires no commit, findings report, score, or closeout
+session log. A cancelled big plan is terminal and cannot start an implementation
+branch. A branch containing cancelled phases becomes pushable only when at
+least one phase is complete, every cancelled phase has the full evidence
+contract, and commit-count checks count completed phases only. Gate support for
+these conditions is separate from the status contract. Until Phase D implements
+that behavior, the existing push gate remains strict and a branch containing a
+cancelled phase remains blocked.
 
 ---
 
