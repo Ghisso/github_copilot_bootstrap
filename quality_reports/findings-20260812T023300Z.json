@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0,
+  "profiles_reviewed": [
+    "code",
+    "ponytail"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-12T02:33:00Z",
+  "branch": "hook-python-3.9-compatibility_implementation",
+  "head_sha": "aaf98b4c089c79c4cf1e049db7049f9340a9a9fa",
+  "base_ref": "dev",
+  "merge_base_sha": "2e1fd9efd6bd2b07b3b3e803a5e469971faa012e",
+  "phase": "2026-08-12_phase-A-hook-python-3.9-compatibility",
+  "target": "shared/hooks/scripts/protect-files.py",
+  "dirty": false,
+  "content_hash": "b9a7d5f8e6c3a2f1d4e5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5a6",
+  "changed_files": [
+    "shared/hooks/scripts/protect-files.py",
+    "shared/hooks/scripts/protect-files.sh",
+    "tests/test_hook_gates.py"
+  ]
+}
