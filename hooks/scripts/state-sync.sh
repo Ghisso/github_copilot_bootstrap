@@ -46,6 +46,7 @@ fi
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
 ERROR_LOG="$REPO_ROOT/.claude/session_logs/hooks-errors.log"
+PROTECTED_REBASE_STATE=2
 
 prepare_error_log() {
   mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
@@ -173,7 +174,51 @@ nested_rebase_in_progress() {
 }
 
 orphaned_preexisting_autostash() {
-  [[ -e "$CLAUDE_DIR/.git/rebase-merge/autostash" && ! -e "$CLAUDE_DIR/.git/rebase-merge/head-name" ]]
+  local rebase_dir="$CLAUDE_DIR/.git/rebase-merge" entry entries=0
+  [[ -d "$rebase_dir" && ! -d "$CLAUDE_DIR/.git/rebase-apply" ]] || return 1
+  for entry in "$rebase_dir"/* "$rebase_dir"/.[!.]* "$rebase_dir"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    ((entries += 1))
+    [[ "$entry" == "$rebase_dir/autostash" && -f "$entry" && ! -L "$entry" ]] || return 1
+  done
+  [[ $entries -eq 1 ]]
+}
+
+preflight_mutating_rebase_state() {
+  if ! nested_rebase_in_progress; then
+    return 0
+  fi
+  if ! orphaned_preexisting_autostash; then
+    printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
+    return "$PROTECTED_REBASE_STATE"
+  fi
+
+  local quit_output quit_status
+  warn "orphaned autostash rebase state from a previous sync detected; clearing it with rebase --quit before continuing."
+  set +e
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$quit_output"
+  if [[ $quit_status -ne 0 ]]; then
+    warn "orphaned autostash rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    return 1
+  fi
+}
+
+dispatch_mutating() {
+  local preflight_status
+  set +e
+  preflight_mutating_rebase_state
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return 0
+  fi
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  "$@"
 }
 
 clear_current_pull_rebase_state() {
@@ -236,26 +281,6 @@ cmd_checkpoint() {
 reconcile_committed_state() {
   if is_local_only || ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     return 0
-  fi
-
-  if nested_rebase_in_progress; then
-    if orphaned_preexisting_autostash; then
-      local quit_output quit_status
-      warn "orphaned autostash rebase state from a previous sync detected; clearing it with rebase --quit before reconciliation."
-      set +e
-      quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
-      quit_status=$?
-      set -e
-      append_error_output "$quit_output"
-      if [[ $quit_status -ne 0 ]]; then
-        warn "orphaned autostash rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
-        return 1
-      fi
-    else
-      # Do not call warn here: it appends to the active operator's worktree.
-      printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
-      return 1
-    fi
   fi
 
   local remote_ref_status output status conflicts
@@ -346,14 +371,6 @@ cmd_pull() {
   fi
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; nothing to pull from."
-    return 0
-  fi
-  if nested_rebase_in_progress; then
-    # The pre-existing-state path emits its own operator guidance. Do not add a
-    # second logged warning, which would alter an active rebase worktree.
-    if ! reconcile_committed_state; then
-      return 0
-    fi
     return 0
   fi
   # Commit any local edits first so the rebase below runs against a clean tree
@@ -450,13 +467,13 @@ cmd_migrate() {
 }
 
 case "$MODE" in
-  setup) cmd_setup || warn "setup failed; continuing." ;;
-  pull) cmd_pull || warn "pull failed; continuing." ;;
-  checkpoint) cmd_checkpoint || warn "checkpoint failed; continuing." ;;
-  publish) cmd_publish || warn "publish failed; continuing." ;;
-  push) cmd_push || warn "push failed; continuing." ;;
+  setup) dispatch_mutating cmd_setup || warn "setup failed; continuing." ;;
+  pull) dispatch_mutating cmd_pull || warn "pull failed; continuing." ;;
+  checkpoint) dispatch_mutating cmd_checkpoint || warn "checkpoint failed; continuing." ;;
+  publish) dispatch_mutating cmd_publish || warn "publish failed; continuing." ;;
+  push) dispatch_mutating cmd_push || warn "push failed; continuing." ;;
   status) cmd_status ;;
-  migrate-from-hf) cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
+  migrate-from-hf) dispatch_mutating cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
   *) warn "unknown mode: $MODE (expected setup|pull|checkpoint|publish|push|status|migrate-from-hf)" ;;
 esac
 

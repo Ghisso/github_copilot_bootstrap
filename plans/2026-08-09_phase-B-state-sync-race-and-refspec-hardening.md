@@ -17,9 +17,11 @@ being synced, so the working tree can be re-dirtied between the caller's commit
 and the start of the rebase. `--autostash` reacts to that by creating the
 autostash commit and the `rebase-merge` directory before discovering the tree is
 dirty again, which is what turns a transient failure into a latched one. This
-phase commits local churn immediately before the rebase, removes `--autostash`
-so any residual race fails cleanly with no rebase directory created, and
-idempotently re-pins the nested remote's fetch and push refspecs.
+phase re-runs Phase A's common active-rebase preflight immediately before it
+commits local churn, then removes `--autostash` so any residual dirty-tree race
+fails cleanly with no rebase directory created. It also idempotently re-pins
+the nested remote's fetch and push refspecs. No pre-rebase checkpoint may stage
+or commit an active operator rebase.
 
 ## Ownership
 
@@ -54,10 +56,17 @@ review policy; it is not a return to universal Ponytail review for every diff.
 ## Steps
 
 - [ ] In `reconcile_committed_state` in
-      `shared/hooks/scripts/state-sync.sh` (modify), call `commit_local_state`
-      immediately before the pull. It is idempotent: on a clean tree with an
-      existing `HEAD` it commits nothing. This absorbs log churn written between
-      the caller's own commit and the rebase.
+      `shared/hooks/scripts/state-sync.sh` (modify), re-run Phase A's common
+      mutating-entrypoint preflight immediately before `commit_local_state`,
+      then call `commit_local_state` immediately before the pull. The second
+      preflight is mandatory because active rebase state can appear after the
+      entrypoint-level check. If it reports valid or unknown state, propagate
+      the protected-state outcome through `reconcile_committed_state`, its
+      caller, and top-level dispatch without `warn`, checkpointing, pull, push,
+      or any persistent log write. Otherwise, `commit_local_state` remains
+      idempotent: on a clean tree with an existing `HEAD` it commits nothing.
+      This absorbs log churn written between the caller's own commit and the
+      rebase without staging an active operator rebase.
 - [ ] Remove `--autostash` from the pull invocation (modify), leaving
       `git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH"`. Add a comment
       recording why: `--autostash` writes the autostash commit and the
@@ -82,8 +91,10 @@ review policy; it is not a return to universal Ponytail review for every diff.
       check runs before `reconcile_committed_state` and keeps its current
       behavior, message, and return value. The new `commit_local_state` inside
       reconcile must not become a back door that publishes a dirty tree.
-- [ ] Must not change the top-level dispatch. Every mode stays
-      `cmd_x || warn ...` followed by `exit 0`.
+- [ ] Preserve Phase A's top-level dispatch contract. In particular, do not
+      restore an unconditional `cmd_x || warn ...` for the protected-state
+      outcome. Every public mode still exits 0, while valid or unknown active
+      rebase state produces stderr-only guidance and no persistent warning.
 - [ ] Add regression tests to `tests/test_state_sync.py` (modify), listed under
       Test Scenarios below.
 - [ ] Add structural assertions to `scripts/validate_targets.py` (modify): the
@@ -106,6 +117,13 @@ review policy; it is not a return to universal Ponytail review for every diff.
 - [ ] `test_dirty_tree_race_fails_without_leaving_rebase_state`: force the tree
       dirty at the moment of the rebase, assert the failure is warned, assert
       exit code 0, and assert no `.git/rebase-merge` directory was created.
+- [ ] `test_pre_rebase_checkpoint_rechecks_active_rebase`: begin with no active
+      rebase so the entrypoint preflight passes, then introduce a valid rebase
+      before the new pre-rebase checkpoint boundary. Assert the second common
+      preflight catches it; the public command exits 0 with empty stdout and
+      stderr-only guidance; Git trace or an invocation side channel records no
+      subsequent add, commit, pull, or push; and `HEAD`, index, worktree,
+      rebase metadata, remote state, and persistent error log are unchanged.
 - [ ] Regression, must pass unchanged:
       `test_publish_refuses_dirty_state_without_committing_or_publishing`,
       `test_push_after_rebase_conflict_does_not_push`,
@@ -148,6 +166,10 @@ rm -rf /tmp/dist-gen-a
   fails cleanly and transiently and retries on the next sync, instead of
   latching. Phase A's detection and recovery cover the case where it somehow
   still latches.
+- An operator rebase can start after Phase A's entrypoint preflight but before
+  Phase B's new `commit_local_state`. Mitigation: re-run the same common
+  preflight immediately before staging and propagate its protected-state
+  outcome without warnings or publication.
 - Removing `--autostash` could regress a caller that depended on it. All three
   callers already guarantee a clean tree, and the existing publish-dirty test is
   listed as a required regression precisely to catch this.
@@ -162,12 +184,16 @@ rm -rf /tmp/dist-gen-a
 
 - [ ] Concurrent log writes during a pull are committed, not stashed, and leave
       no rebase directory behind.
+- [ ] The pre-rebase checkpoint runs only after the common preflight confirms
+      no valid or unknown active rebase. A protected rebase is not staged,
+      committed, reconciled, published, or persistently logged.
 - [ ] `--autostash` no longer appears in either installed `state-sync.sh` copy.
 - [ ] A wildcard fetch refspec is repaired to the single pinned refspec on the
       next sync.
 - [ ] `cmd_publish` still refuses a dirty worktree with its existing behavior and
       message.
-- [ ] Every state-sync entry point still exits 0 on failure.
+- [ ] Every state-sync entry point still exits 0 at the public script boundary;
+      protected-state propagation never triggers a persistent fallback warning.
 - [ ] Regeneration is deterministic and both installed copies stay
       byte-identical.
 
