@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: "End-to-end verification agent for Python AI projects. Validates tests, typing, linting, formatting, imports, deprecations, runtime wiring, and quality gates."
-tools: Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
+tools: Bash, Read, Grep, Glob, mcp__semble
 model: haiku
 ---
 
@@ -11,7 +11,7 @@ You are the Verifier — the final quality gate before code ships. Run every che
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 ## Reporting back to the orchestrator
 

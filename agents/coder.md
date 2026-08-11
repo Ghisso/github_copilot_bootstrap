@@ -1,7 +1,7 @@
 ---
 name: coder
 description: "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting."
-tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, TodoWrite, WebFetch, WebSearch
+tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, TodoWrite, WebFetch, WebSearch
 model: sonnet
 effort: xhigh
 ---
@@ -40,7 +40,7 @@ data-loss protection, root-cause handling, or a meaningful regression check.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 ## Coding Standards
 

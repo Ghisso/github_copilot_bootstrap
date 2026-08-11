@@ -80,18 +80,20 @@ is finished", not "all phases shipped", because `complete` is the only terminal
 status the frontmatter validator accepts. The audit trail is currently
 inaccurate, and the missing vocabulary is why.
 
-**Adjacent control-plane issue - Context Mode local indexing is being classified
-too broadly.** Current guidance can cause agents to treat `ctx_index` as if it
-were an external indexing service and refuse ordinary repository indexing. That
-is not the intended boundary. Context Mode's index is local SQLite/FTS5 state;
-the security requirement is to prevent protected files from being indexed and
-to prevent derived cache data from entering `ai-state`, not to block approved
-local processing.
+**Adjacent control-plane issue - Context Mode local indexing needs an
+enforceable repository boundary.** The approved design initially treated
+`ctx_index` as safe local SQLite/FTS5 processing when protected deny rules were
+present. Implementation-time inspection of installed Context Mode 1.0.169
+invalidated that assumption: the `ctx_index` path handler does not apply the
+package's project-containment guard, and absolute paths flow directly to
+indexing. Deny patterns are defense in depth, not repository containment.
 
-This is included in the same big plan because the fix is small and touches the
-same control-plane surfaces already being changed here: hook dispatch, nested
-`.claude/` state hygiene, tool routing, runtime validation, and generated MCP
-wiring. It does not introduce another retrieval system.
+This remains in the same big plan because the enforceable correction is small
+and touches the same control-plane surfaces already being changed here: hook
+dispatch, nested `.claude/` state hygiene, tool routing, runtime validation,
+and generated MCP wiring. Phase F removes Context Mode MCP access, retains its
+optional lifecycle hooks, and hardens the derived cache. It does not introduce
+an MCP proxy or another retrieval system.
 
 ## Goals
 
@@ -118,17 +120,19 @@ wiring. It does not introduce another retrieval system.
   falsifying any record.
 - Correct the Graphify records using the new vocabulary rather than fabricated
   closeouts.
-- Allow approved Context Mode `ctx_index` use on non-protected project content
-  and state explicitly that local indexing is not external disclosure.
-- Keep Context Mode's project index as local derived state under
+- Do not expose Context Mode `ctx_index` until project containment is enforced
+  at the MCP request boundary; remove Context Mode from generated MCP configs
+  and route repository retrieval to direct reads, `rg`, and Semble.
+- Keep Context Mode hook/session cache as local derived state under
   `.claude/.cache/context-mode/`; it must never be committed or published on
   `ai-state`.
 - Preserve the existing protected-read boundary (`.env*`, secrets,
-  credentials, and equivalent denied paths) and make that boundary win over
-  local-index permission.
+  credentials, and equivalent denied paths) as defense in depth while MCP
+  indexing remains disabled.
 - Extend the existing Context Mode self-check/runtime validation just enough to
-  prove the launcher, cache path, ignore rule, and generated MCP wiring are
-  coherent. Do not create a new diagnostics subsystem.
+  prove the hook launcher, cache path, ignore rule, and generated absence of
+  Context Mode MCP wiring are coherent. Do not create a new diagnostics
+  subsystem.
 
 ## Non-Goals
 
@@ -144,6 +148,9 @@ wiring. It does not introduce another retrieval system.
   trial.
 - No new retrieval tools in this plan (`ast-grep`, Serena, another code graph,
   or another memory/index service).
+- No repository-owned MCP/JSON-RPC proxy, installed-package patch, or copied
+  Context Mode implementation. Re-enablement requires a separate approved plan
+  and executable upstream/request-boundary containment evidence.
 - No capability registry, telemetry platform, full LLM evaluation harness, MCP
   gateway, or broad dependency-version project. Those ideas remain deferred
   until repeated real-world friction justifies them.
@@ -307,36 +314,45 @@ blocks, with a message saying the pointer is stale and must be advanced. Phase D
 also makes `record-commit-closeout.sh` skip cancelled phases when it advances
 the pointer, so the stale-pointer state should not arise in normal use.
 
-### Context Mode: local index, derived cache
+### Context Mode: hook-only derived cache until containment is proved
 
-`ctx_index` is classified as approved local processing when it indexes
-non-protected content inside the current project. It is not treated as remote
-disclosure merely because the operation is called "index".
+Phase F's original upstream assumption failed. Installed Context Mode 1.0.169
+contains a project-containment helper and uses it for `ctx_execute_file`, but
+its `ctx_index` path branch only applies read-deny patterns before resolving the
+path. An absolute input wins unchanged. The bootstrap cannot claim that
+`ctx_index` is limited to the repository and cannot rely on agent instructions
+as the security control.
 
-The default bootstrap storage root for Context Mode becomes the absolute project
-path `.claude/.cache/context-mode/`. Context Mode requires
-`CONTEXT_MODE_DIR` to be absolute, so the existing dispatch script resolves the
-repository root and exports that value before launching either the MCP server or
-hook subcommands.
+The minimum enforceable design removes Context Mode from every generated MCP
+configuration. Direct reads, `rg`, and Semble remain available. Context Mode's
+optional lifecycle hooks stay installed because they do not expose the
+uncontained MCP tool and because missing-hook tooling already fails open.
+
+The hook dispatcher's default storage root becomes the canonical absolute
+project path `.claude/.cache/context-mode/`. An explicit absolute override may
+remain outside the repository. Inside the repository, only the canonical
+default-cache subtree is accepted; relative, tracked, protected, traversal, and
+symlink-escaping overrides fall back with a warning.
 
 The cache is derived state, not AI authority:
 
 - canonical plans, memory, reports, and session records stay as normal files in
   the nested `ai-state` repository;
-- Context Mode may index those non-protected text files for local retrieval;
-- `.claude/.cache/` is ignored by the nested repository and must never be
-  committed, synced, used as cancellation evidence, or treated as a source of
-  truth;
-- protected read-deny rules remain authoritative. Local processing does not
-  grant permission to index `.env*`, `secrets/**`,
-  `config/credentials.json`, or any other denied path;
-- `ctx_fetch_and_index` remains an external-fetch operation. This local-index
-  permission does not broaden network policy or approve repository upload to
-  another service.
+- `.claude/.cache/` is ignored and untracked before checkpoint, checked again
+  after successful remote reconciliation, and never published, used as
+  cancellation evidence, or treated as a source of truth;
+- protected read-deny rules remain authoritative defense in depth, but they do
+  not substitute for repository containment;
+- neither `ctx_index` nor `ctx_fetch_and_index` is authorized by Phase F.
 
-The implementation extends the existing `context-mode-dispatch.sh`,
-`state-sync.sh`, tool-routing policy, generated MCP config, and runtime checks.
-It must not introduce a second Context Mode launcher or a new cache manager.
+A repository-owned MCP proxy was considered and rejected for this phase. The
+repository has no existing per-tool filter or proxy, and a shell launcher cannot
+inspect stdio MCP parameters. A correct proxy would own JSON-RPC framing,
+request/response correlation, errors, shutdown, backpressure, and three-target
+acceptance. That is a new control-plane subsystem, not a bounded launcher edit.
+Re-enablement therefore requires a separate approved plan or an upstream
+version whose request-boundary containment passes executable absolute,
+traversal, and symlink-out regressions.
 
 ## Design Overview
 
@@ -346,13 +362,14 @@ flowchart TD
     C["Phase C: cancelled status in validator, templates, policy"] --> D["Phase D: gates for commit, push, closeout advance, branch state"]
     B --> E["Phase E: docs and Graphify record remediation"]
     D --> E
-    E --> F["Phase F: Context Mode local indexing and derived-cache boundary"]
+    E --> F["Phase F: disable unsafe Context Mode MCP and harden derived cache"]
 ```
 
 Phases A and B are one workstream; C and D are the other. E closes those two
 repairs and corrects the Graphify audit trail. F is a bounded adjacent hardening
-phase for local Context Mode indexing. It runs after E to avoid concurrent edits
-to `state-sync.sh`, generated wiring, README documentation, and validation
+phase that disables an uncontained Context Mode MCP surface while retaining
+hook-only derived-cache behavior. It runs after E to avoid concurrent edits to
+`state-sync.sh`, generated wiring, README documentation, and validation
 fixtures.
 
 ## Phases
@@ -378,10 +395,11 @@ fixtures.
 - **E after B and D.** E writes documentation and remediates the Graphify
   records, so it describes behavior that both repair workstreams have already
   shipped.
-- **F after E.** F modifies the Context Mode dispatcher, nested-state ignore
-  behavior, generated MCP wiring, runtime validation, and README documentation.
-  Running it last keeps those control-plane edits out of the state-sync repair
-  commits and gives the local-index change one clean review boundary.
+- **F after E.** F narrows the Context Mode dispatcher to optional hooks,
+  hardens nested-state cache exclusion, removes generated Context Mode MCP
+  wiring, and aligns validation and documentation. Running it last keeps those
+  control-plane edits out of the state-sync repair commits and gives the
+  containment response one clean review boundary.
 - A/B and C/D are otherwise independent and may be reordered as pairs.
 
 ## Hard Constraint: Where Edits Go
@@ -452,7 +470,11 @@ Before big-plan closeout:
 - `uv run python scripts/validate_plan_frontmatter.py` passes over every file in
   `.claude/plans/`, including the remediated Graphify records.
 - `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports the
-  project-local Context Mode storage root and does not require network access.
+  project-local hook storage root and does not require network access or start
+  an MCP server.
+- Generated GitHub Copilot, Claude Code, and Codex MCP configurations contain no
+  Context Mode server or `ctx_index` exposure; Semble and Context7 remain
+  unchanged.
 - `.claude/.cache/context-mode/` is ignored by the nested repository:
   creating a sentinel file there leaves `git -C .claude status --porcelain`
   unchanged.
@@ -468,9 +490,10 @@ Before big-plan closeout:
 | `cancelled` becomes a quiet way to skip reviewed work. | Phase C and the push-time Phase D helper both enforce the full timestamp/reason/repository-contained UTF-8 evidence contract, including canonical symlink containment and a same-line `**Status:** CANCELLED` marker; at least one phase must also be `complete`. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |
-| Local Context Mode indexing is mistaken for permission to expose protected repository data. | Phase F separates local processing from disclosure in the routing policy. Existing read-deny rules remain authoritative across targets, and tests assert they stay present in generated settings. |
-| The Context Mode SQLite/FTS5 cache is accidentally added to `ai-state` by `git add -A`. | Store it under `.claude/.cache/context-mode/`, add an idempotent nested ignore rule before checkpoints, and test with a sentinel cache file that nested Git remains clean. |
-| Project-local Context Mode storage works for hooks but not the MCP server, creating two indexes. | Route both server startup and hook dispatch through the same `context-mode-dispatch.sh` storage setup and validate all generated MCP targets. |
+| Context Mode `ctx_index` escapes the repository despite protected deny rules. | Remove Context Mode from every generated MCP configuration. Policy text cannot substitute for an enforceable request-boundary check. |
+| Disabling Context Mode MCP removes otherwise-safe tools. | Accept the bounded capability loss and use direct reads, `rg`, and Semble. Do not build an unproved proxy inside Phase F. |
+| The Context Mode SQLite/FTS5 cache is accidentally added to `ai-state` by `git add -A` or restored by reconciliation. | Store hook state under `.claude/.cache/context-mode/`, add an idempotent nested ignore rule, untrack before checkpoint and after every successful reconciliation, and test local and remote tracked-cache fixtures. |
+| An explicit storage override selects tracked or protected repository state. | Canonicalize it and accept in-repository values only inside the approved `.claude/.cache/context-mode/` subtree; cover traversal and symlinks. |
 | The dogfood refresh (`install_bootstrap.py . --allow-self --local-only`) applies new hook behavior to the live session mid-plan. | Run it only after the phase's verification passes, then immediately re-run `state-sync.sh status` as a health check. |
 
 ## Verification

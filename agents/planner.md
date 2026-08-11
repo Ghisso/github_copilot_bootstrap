@@ -1,7 +1,7 @@
 ---
 name: planner
 description: "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles."
-tools: Task, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, TodoWrite, WebFetch, WebSearch
+tools: Task, Bash, Read, Grep, Glob, mcp__semble, TodoWrite, WebFetch, WebSearch
 model: opus
 effort: xhigh
 ---
@@ -24,7 +24,7 @@ Do not skip this step, even if you think you already know the patterns.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 ## Planning Modes
 

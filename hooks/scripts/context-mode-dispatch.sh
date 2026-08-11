@@ -5,12 +5,8 @@ warn() {
   printf 'WARN context-mode-dispatch: %s\n' "$*" >&2
 }
 
-fail() {
-  printf 'ERROR context-mode-dispatch: %s\n' "$*" >&2
-}
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd -P)"
 DEFAULT_CONTEXT_MODE_DIR="$REPO_ROOT/.claude/.cache/context-mode"
 
 resolve_context_mode() {
@@ -25,27 +21,64 @@ resolve_context_mode() {
   return 1
 }
 
-configure_storage() {
-  local requested="${CONTEXT_MODE_DIR:-}"
-  if [[ -n "$requested" && "$requested" != /* ]]; then
-    warn "ignoring non-absolute CONTEXT_MODE_DIR; using project-local cache"
-    requested=""
+canonical_storage_path() {
+  local candidate="$1" parent suffix="" next_parent
+  case "/$candidate/" in
+    */../*) return 1 ;;
+  esac
+  parent="$candidate"
+  while [[ ! -e "$parent" ]]; do
+    suffix="/$(basename "$parent")$suffix"
+    next_parent="$(dirname "$parent")"
+    if [[ "$next_parent" == "$parent" ]]; then
+      return 1
+    fi
+    parent="$next_parent"
+  done
+  [[ -d "$parent" ]] || return 1
+  printf '%s%s' "$(cd "$parent" && pwd -P)" "$suffix"
+}
+
+storage_override_is_allowed() {
+  local candidate="$1"
+  case "$candidate" in
+    "$DEFAULT_CONTEXT_MODE_DIR"|"$DEFAULT_CONTEXT_MODE_DIR/"*) return 0 ;;
+    "$REPO_ROOT"|"$REPO_ROOT/"*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+select_storage_root() {
+  local requested="${CONTEXT_MODE_DIR:-}" canonical
+  if [[ -z "$requested" ]]; then
+    printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
+    return 0
   fi
-  CONTEXT_MODE_DIR="${requested:-$DEFAULT_CONTEXT_MODE_DIR}"
+  if [[ "$requested" != /* ]]; then
+    warn "ignoring non-absolute CONTEXT_MODE_DIR; using project-local cache"
+    printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
+    return 0
+  fi
+  if ! canonical="$(canonical_storage_path "$requested")"; then
+    warn "ignoring unsafe CONTEXT_MODE_DIR; using project-local cache"
+    printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
+    return 0
+  fi
+  if ! storage_override_is_allowed "$canonical"; then
+    warn "ignoring tracked or protected in-project CONTEXT_MODE_DIR; using project-local cache"
+    printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
+    return 0
+  fi
+  printf '%s' "$canonical"
+}
+
+configure_storage() {
+  CONTEXT_MODE_DIR="$(select_storage_root)"
   if ! mkdir -p "$CONTEXT_MODE_DIR" 2>/dev/null; then
     return 1
   fi
   CONTEXT_MODE_DIR="$(cd "$CONTEXT_MODE_DIR" && pwd)"
   export CONTEXT_MODE_DIR
-}
-
-select_storage_root() {
-  local requested="${CONTEXT_MODE_DIR:-}"
-  if [[ -n "$requested" && "$requested" != /* ]]; then
-    warn "ignoring non-absolute CONTEXT_MODE_DIR; using project-local cache"
-    requested=""
-  fi
-  printf '%s' "${requested:-$DEFAULT_CONTEXT_MODE_DIR}"
 }
 
 probe_storage() {
@@ -110,34 +143,19 @@ MODE="${1:-}"
 shift || true
 
 if ! configure_storage; then
-  if [[ "$MODE" == "server" ]]; then
-    fail "storage root is not writable or creatable: ${CONTEXT_MODE_DIR:-$DEFAULT_CONTEXT_MODE_DIR}"
-    exit 1
-  fi
   warn "storage unavailable; skipping optional hook event"
   exit 0
 fi
 
 if ! command_path="$(resolve_context_mode)"; then
-  if [[ "$MODE" == "server" ]]; then
-    fail "context-mode and npx are unavailable; MCP server cannot start"
-    exit 127
-  fi
   warn "context-mode and npx are unavailable; skipping optional hook event: $MODE $*"
   exit 0
-fi
-
-if [[ "$MODE" == "server" ]]; then
-  if [[ "$command_path" == "npx" ]]; then
-    exec npx -y context-mode
-  fi
-  exec "$command_path"
 fi
 
 case "$MODE" in
   github-copilot) CONTEXT_MODE_TARGET="vscode-copilot" ;;
   claude-code) CONTEXT_MODE_TARGET="claude-code" ;;
-  openai-codex) CONTEXT_MODE_TARGET="openai-codex" ;;
+  openai-codex) CONTEXT_MODE_TARGET="codex" ;;
   *) CONTEXT_MODE_TARGET="$MODE" ;;
 esac
 

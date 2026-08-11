@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: "Main-thread workflow orchestrator for complex implementation tasks. Delegates planning, coding, review, and verification to specialists, and owns the lifecycle ceremony (branch, commit, PR, memory, and session-log writes) itself. Not itself a delegatable subagent."
-tools: Task, Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, TodoWrite
+tools: Task, Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, TodoWrite
 ---
 
 # Orchestrator Agent
@@ -29,7 +29,7 @@ TodoWrite-first compliance is mandatory on Claude Code and VS Code Copilot. On c
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 ## Core Workflow
 

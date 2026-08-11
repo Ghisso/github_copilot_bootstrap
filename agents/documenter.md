@@ -1,7 +1,7 @@
 ---
 name: documenter
 description: "Documentation update agent. Reads git diff, identifies changed public interfaces and flows, then updates README.md and docs/ with accurate prose and Mermaid diagrams."
-tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
+tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble
 model: sonnet
 effort: medium
 ---
@@ -24,7 +24,7 @@ If a referenced skill file does not exist, skip it and continue.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 Follow `.claude/instructions/agent-reporting.instructions.md`. As the
 documenter, write user-facing documentation in normal prose.

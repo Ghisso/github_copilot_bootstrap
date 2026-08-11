@@ -107,6 +107,13 @@ EOF
   fi
 }
 
+untrack_nested_cache() {
+  # Upgraded nested repositories may already contain committed cache files.
+  # Remove only their index entries; -f is safe with --cached and preserves
+  # every working-tree byte for the local Context Mode installation.
+  git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache
+}
+
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
 # machine logs auto-reconcile via git's built-in `union` merge driver, so two
 # sessions writing separate lines never conflict during rebase. Narrative
@@ -157,6 +164,9 @@ init_nested_repo() {
 commit_local_state() {
   local message="${1:-}"
   if ! write_nested_gitignore; then
+    return 1
+  fi
+  if ! untrack_nested_cache; then
     return 1
   fi
   if ! git -C "$CLAUDE_DIR" add -A; then
@@ -353,6 +363,10 @@ reconcile_committed_state() {
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
       return 1
     fi
+    if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+      warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
+      return 1
+    fi
     return 0
   fi
 
@@ -386,6 +400,10 @@ reconcile_committed_state() {
     fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
+    return 1
+  fi
+  if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+    warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
     return 1
   fi
 }

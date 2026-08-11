@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: "Unified review agent for code, architecture, security, tests, APIs, configs, performance, documentation, and domain checks. Selects one or more review profiles and runs two sequential passes itself."
-tools: Read, Grep, Glob, mcp__semble, mcp__context-mode
+tools: Read, Grep, Glob, mcp__semble
 model: sonnet
 effort: xhigh
 ---
@@ -19,7 +19,7 @@ The caller must provide:
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, context-mode for large outputs and session continuity, `rg` for exact literals, and direct reads for known paths. Fall back gracefully if an MCP server is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode is hook-only; fall back gracefully if Semble is unavailable.
 
 ## Reporting back to the orchestrator
 

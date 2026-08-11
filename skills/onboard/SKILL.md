@@ -3,8 +3,8 @@ name: onboard
 visibility: public
 description: |
   Build or refresh this session's understanding of the project: read
-  README/docs, cross-check claims against the real code with Semble and
-  context-mode, then persist the findings so future agents don't have to
+  README/docs, cross-check claims against the real code with direct reads,
+  exact search, and Semble, then persist the findings so future agents don't have to
   redo the discovery. Use when asked to "get oriented", "understand this
   project", "refresh project context", or after README/docs/architecture
   changed significantly.
@@ -33,17 +33,15 @@ session hooks).
 - `.claude/instructions/project-context.instructions.md` if it already
   exists — treat it as prior findings to refresh, not to redo from zero.
 
-### 2. Cross-check against the real code (Semble + context-mode)
+### 2. Cross-check against the real code
 
-Per `.claude/instructions/tool-routing.instructions.md`: Semble for
-semantic "where is X actually implemented" discovery; context-mode to
-index docs/code for compaction-safe retrieval this session. Don't run
-both for the same question — only reach for context-mode when Semble or a
-direct read leaves a concrete gap.
+Per `.claude/instructions/tool-routing.instructions.md`: use direct reads for
+known files, `rg` for exact claims, and Semble for semantic "where is X
+actually implemented" discovery. Context Mode MCP and `ctx_index` are disabled
+until request-boundary containment is proved.
 
 ```
 mcp__semble__search(repo=<project root>, query="<key behavior claimed in the docs>")
-mcp__context-mode__ctx_index(path=<project root>, source="<project> repo")
 ```
 
 Confirm each major doc claim (entry points, key modules, config,
@@ -112,7 +110,7 @@ git -C .claude status --short   # confirm the .claude/ nested repo sees the chan
 ```
 Onboarding refreshed:
   Read: README.md + docs/ ([N] files)
-  Verified against code via: Semble ([N] queries), context-mode (indexed)
+  Verified against code via: direct/rg reads ([N]), Semble ([N] queries)
   Findings: .claude/instructions/project-context.instructions.md
   MEMORY.md: [LEARN:domain] entry added/updated
   Project State slot filled: CLAUDE.md, AGENTS.md, workspace.md, workspace.instructions.md
