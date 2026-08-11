@@ -52,17 +52,52 @@ Review is mandatory here because this phase changes control-plane/high-risk
 lifecycle code. This use of the Ponytail profile follows the current calibrated
 review policy; it is not a return to universal Ponytail review for every diff.
 
+## Cancellation Validation Authority
+
+Phase C made the cancellation contract stricter than the original Phase D
+draft. The Python frontmatter validator remains the authoring/pre-flight check,
+but the push gate must independently enforce the same contract at action time.
+Plan and evidence files are mutable after an earlier validator run, so relying
+on that earlier result would create a time-of-check/time-of-use bypass.
+
+`assert_cancellation_evidence` therefore repeats the full Phase C semantics. It
+uses Bash 3.2-compatible orchestration and a fail-closed `python3` standard-
+library probe for semantic date/time, raw frontmatter scalar shape, canonical
+path, regular-file, UTF-8, and marker validation. Python 3 is already the
+bootstrap runtime baseline and this adds no dependency. Missing Python, an
+exception, malformed probe output, or any validation failure becomes a
+distinct accumulated gate failure; none may escape or silently pass.
+
 ## Steps
 
 - [ ] Add `assert_cancellation_evidence <plan_file> <phase_label>` to
       `shared/hooks/scripts/_lib-frontmatter.sh` (create). It follows the file's
       existing dynamic-scoping convention: it appends to a `failures` array the
-      caller declares. It requires `cancelled_at`, `cancelled_reason`, and
-      `cancelled_evidence` non-empty; resolves `cancelled_evidence` against
-      `$repo_root` when not absolute; requires that file to exist and to contain
-      a line matching `^\*\*Status:\*\*[[:space:]]+CANCELLED\b`. Each failure
-      gets its own distinct message naming the phase. Must be Bash 3.2
-      compatible: no `mapfile`, no `readarray`, no negative array indices.
+      caller declares. Each failure gets its own distinct message naming the
+      phase. Must be Bash 3.2 compatible: no `mapfile`, no `readarray`, no
+      negative array indices.
+- [ ] The helper must repeat Phase C timestamp and reason semantics rather than
+      trust an earlier validator run. `cancelled_at` is non-empty, matches exact
+      `YYYY-MM-DDTHH:MM:SSZ` UTC syntax, and is a real calendar date/time.
+      `cancelled_reason` is meaningful plain single-line scalar prose: reject
+      empty/whitespace/quoted-empty values, YAML block-scalar headers including
+      modifiers and comment suffixes, list/object-like values, and indented
+      continuation or multiline forms. Preserve accepted lookalike prose such
+      as `| useful reason` and `>+9 prose`.
+- [ ] The helper must require non-empty `cancelled_evidence` to be a
+      repository-relative path. Reject absolute paths and any lexical `..`
+      component before filesystem access. Canonically resolve the repository
+      root and evidence target, follow symlinks, and reject any target outside
+      the repository. Require an existing regular readable file whose complete
+      contents decode as UTF-8; directories, missing files, symlink loops,
+      outside symlinks, unreadable files, and decode errors all fail closed.
+- [ ] Evidence must contain a line matching
+      `^\*\*Status:\*\*[ \t]+CANCELLED\b`: horizontal whitespace only and the
+      marker on one physical line. Split-line, vertical-whitespace, misspelled,
+      lowercase, and word-character suffix near-misses must fail. The helper's
+      standard-library probe must return a fixed machine-readable result that
+      shell maps to distinct accumulated messages; missing Python, unexpected
+      output, or an exception is itself a blocking failure.
 - [ ] `assert_commit_invariants` (modify): when the current phase's small-plan
       status is `cancelled`, replace the generic
       "must have status: complete before commit" failure with a distinct message
@@ -117,6 +152,16 @@ In `scripts/validate_targets.py`, driven by `tests/test_validate_targets.py`:
 - [ ] Push refused when the evidence file does not exist.
 - [ ] Push refused when the evidence file exists but lacks
       `**Status:** CANCELLED`.
+- [ ] Push refused for absolute evidence paths, any lexical `..` traversal,
+      canonical escape through an outside symlink, a symlink loop, a directory,
+      an unreadable file where portable, and invalid UTF-8. Use unique paths so
+      each scenario proves its intended branch rather than a prior failure.
+- [ ] Push refused for malformed or impossible `cancelled_at` and for
+      whitespace, YAML block-header/comment, collection/list, or multiline
+      `cancelled_reason` values that Phase C rejects.
+- [ ] Push refused for split-line or vertical-whitespace cancellation markers
+      and other near misses; a same-line marker separated by spaces or tabs
+      passes.
 - [ ] Push refused when every phase is cancelled, with the "certifies no work"
       message.
 - [ ] Commit-count check satisfied by completed phases only: a branch with one
@@ -139,6 +184,13 @@ In `tests/test_hook_gates.py`:
 - [ ] `assert_cancellation_evidence` accepts a fully-formed cancelled plan.
 - [ ] `assert_cancellation_evidence` produces a distinct failure for each
       missing field, a missing evidence file, and a marker-less evidence file.
+- [ ] Direct helper coverage rejects malformed/impossible timestamps; invalid
+      reason scalar shapes; absolute, traversal, outside-symlink, loop,
+      directory, unreadable, and invalid-UTF-8 evidence; and split-line or
+      vertical-whitespace markers. It also accepts ordinary reason prose that
+      merely begins like a block header and a tab-separated same-line marker.
+- [ ] A missing `python3`, a standard-library probe exception, and malformed
+      probe output each fail closed with the phase name in the message.
 
 ## Verification
 
@@ -169,10 +221,11 @@ rm -rf /tmp/dist-gen-a
 ## Risks
 
 - Two layers now read the same cancellation contract: the Python validator from
-  Phase C and this shell gate. Silent drift between them would let a plan pass
-  one and fail the other. Mitigation: one field triple and one marker literal,
-  asserted in both test suites, with the shell helper as the single home for the
-  shell-side check.
+  Phase C and this shell gate. Silent drift or relying on a stale earlier
+  validation would let a plan mutate into a push-time bypass. Mitigation: the
+  shell helper repeats the full semantic contract at action time through one
+  fail-closed Python-standard-library probe, with parity cases asserted in both
+  suites and the helper as the single shell-side home.
 - These gates run on macOS CI where `/bin/bash` is 3.2. No `mapfile`, no
   `readarray`, no negative array indices, matching the existing comments in
   `_lib-frontmatter.sh`.
@@ -194,6 +247,9 @@ rm -rf /tmp/dist-gen-a
       push gate without any falsified record.
 - [ ] A cancelled phase missing any part of its evidence contract blocks push
       with a distinct message.
+- [ ] The push-time helper rejects every timestamp, reason, path, file, decode,
+      and marker shape rejected by the committed Phase C validator, including
+      absolute/traversal/outside-symlink evidence and YAML-like reasons.
 - [ ] A branch whose phases are all cancelled is refused.
 - [ ] Commit count is measured against completed phases only.
 - [ ] The final findings report binds to the last completed phase.

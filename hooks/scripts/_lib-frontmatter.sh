@@ -804,30 +804,193 @@ print('; '.join(titles))
 " "$file" "$severity" 2>/dev/null || true
 }
 
+# One fail-closed standard-library probe repeats Phase C's complete cancellation
+# contract at push time. It emits only fixed result codes, one per line.
+cancellation_validation_probe() {
+  local repo_root="$1"
+  local plan_file="$2"
+  command -v python3 >/dev/null 2>&1 || return 127
+  python3 - "$repo_root" "$plan_file" <<'PY'
+import re
+import stat
+import sys
+from datetime import datetime
+from pathlib import Path
+
+TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+BLOCK_REASON = re.compile(r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?(?:[ \t]*#.*)?$")
+STATUS = re.compile(r"^\*\*Status:\*\*[ \t]+CANCELLED\b", re.MULTILINE)
+
+
+def frontmatter(path):
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return {}
+    data = {}
+    current_key = ""
+    for raw_line in parts[1].splitlines():
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("  - ") and current_key:
+            value = data.get(current_key)
+            if not isinstance(value, list):
+                value = [] if value in (None, "") else [str(value)]
+                data[current_key] = value
+            value.append(line[4:].strip())
+            continue
+        if line.startswith((" ", "\t")) and current_key == "cancelled_reason":
+            data[current_key] = [data.get(current_key), line.strip()]
+            continue
+        if ":" in line and not line.startswith(" "):
+            key, value = line.split(":", 1)
+            current_key = key.strip()
+            data[current_key] = value.strip().strip('"').strip("'")
+    return data
+
+
+def validate(repo_root, plan_file):
+    errors = []
+    data = frontmatter(plan_file)
+
+    cancelled_at = data.get("cancelled_at", "")
+    if cancelled_at in ("", []):
+        errors.append("MISSING_CANCELLED_AT")
+    elif not isinstance(cancelled_at, str) or not TIMESTAMP.fullmatch(cancelled_at):
+        errors.append("INVALID_CANCELLED_AT")
+    else:
+        try:
+            datetime.strptime(cancelled_at, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            errors.append("INVALID_CANCELLED_AT")
+
+    reason = data.get("cancelled_reason", "")
+    if reason in ("", []):
+        errors.append("MISSING_CANCELLED_REASON")
+    elif (
+        not isinstance(reason, str)
+        or not reason.strip()
+        or BLOCK_REASON.fullmatch(reason.strip())
+        or reason.lstrip().startswith(("[", "{", "- ", "#"))
+    ):
+        errors.append("INVALID_CANCELLED_REASON")
+
+    evidence = data.get("cancelled_evidence", "")
+    if evidence in ("", []):
+        errors.append("MISSING_CANCELLED_EVIDENCE")
+        return errors
+    if not isinstance(evidence, str):
+        errors.append("INVALID_EVIDENCE_SCALAR")
+        return errors
+
+    evidence_path = Path(evidence)
+    if evidence_path.is_absolute():
+        errors.append("ABSOLUTE_EVIDENCE")
+        return errors
+    if ".." in evidence_path.parts:
+        errors.append("TRAVERSAL_EVIDENCE")
+        return errors
+
+    try:
+        canonical_root = repo_root.resolve(strict=True)
+        canonical_evidence = (canonical_root / evidence_path).resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        errors.append("EVIDENCE_RESOLUTION_FAILED")
+        return errors
+    if not canonical_evidence.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_EVIDENCE")
+        return errors
+    try:
+        canonical_evidence = canonical_evidence.resolve(strict=True)
+    except FileNotFoundError:
+        errors.append("MISSING_EVIDENCE_FILE")
+        return errors
+    except (OSError, RuntimeError, ValueError):
+        errors.append("EVIDENCE_RESOLUTION_FAILED")
+        return errors
+    if not canonical_evidence.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_EVIDENCE")
+        return errors
+    try:
+        mode = canonical_evidence.stat().st_mode
+    except OSError:
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    if not stat.S_ISREG(mode):
+        errors.append("NON_REGULAR_EVIDENCE")
+        return errors
+    if not mode & (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH):
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    try:
+        content = canonical_evidence.read_text(encoding="utf-8")
+    except UnicodeError:
+        errors.append("INVALID_UTF8_EVIDENCE")
+        return errors
+    except OSError:
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    if not STATUS.search(content):
+        errors.append("INVALID_EVIDENCE_MARKER")
+    return errors
+
+
+try:
+    result = validate(Path(sys.argv[1]), Path(sys.argv[2]))
+except Exception:
+    print("PROBE_EXCEPTION")
+else:
+    print("\n".join(result) if result else "OK")
+PY
+}
+
 # Validate the artifact-backed audit contract for a cancelled plan. Appends
 # distinct failure messages to the caller's dynamically scoped `failures`
 # array, matching assert_commit_invariants and assert_push_invariants.
 assert_cancellation_evidence() {
   local plan_file="$1"
   local phase_label="$2"
-  local cancelled_at cancelled_reason cancelled_evidence evidence_path
-  cancelled_at="$(fm_read "$plan_file" "cancelled_at" || true)"
-  cancelled_reason="$(fm_read "$plan_file" "cancelled_reason" || true)"
-  cancelled_evidence="$(fm_read "$plan_file" "cancelled_evidence" || true)"
-
-  [[ -n "$cancelled_at" ]] || failures+=("$phase_label cancelled plan must set cancelled_at")
-  [[ -n "$cancelled_reason" ]] || failures+=("$phase_label cancelled plan must set cancelled_reason")
-  if [[ -z "$cancelled_evidence" ]]; then
-    failures+=("$phase_label cancelled plan must set cancelled_evidence")
+  local probe_output="" probe_status=0 probe_code="" malformed=0
+  probe_output="$(cancellation_validation_probe "$repo_root" "$plan_file" 2>/dev/null)" || probe_status=$?
+  if [[ "$probe_status" -eq 127 ]]; then
+    failures+=("$phase_label cancellation validation requires python3")
+    return
+  elif [[ "$probe_status" -ne 0 ]]; then
+    failures+=("$phase_label cancellation validation probe failed")
+    return
+  elif [[ "$probe_output" == "OK" ]]; then
+    return
+  elif [[ -z "$probe_output" ]]; then
+    failures+=("$phase_label cancellation validation probe returned malformed output")
     return
   fi
 
-  evidence_path="$cancelled_evidence"
-  [[ "$evidence_path" = /* ]] || evidence_path="$repo_root/$evidence_path"
-  if [[ ! -f "$evidence_path" ]]; then
-    failures+=("$phase_label cancelled evidence file is missing: $evidence_path")
-  elif ! grep -Eq '^\*\*Status:\*\*[[:space:]]+CANCELLED\b' "$evidence_path"; then
-    failures+=("$phase_label cancelled evidence must contain exact line prefix: **Status:** CANCELLED")
+  while IFS= read -r probe_code; do
+    case "$probe_code" in
+      MISSING_CANCELLED_AT) failures+=("$phase_label cancelled plan must set cancelled_at") ;;
+      INVALID_CANCELLED_AT) failures+=("$phase_label cancelled_at must be a real UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format") ;;
+      MISSING_CANCELLED_REASON) failures+=("$phase_label cancelled plan must set cancelled_reason") ;;
+      INVALID_CANCELLED_REASON) failures+=("$phase_label cancelled_reason must be meaningful plain single-line scalar prose") ;;
+      MISSING_CANCELLED_EVIDENCE) failures+=("$phase_label cancelled plan must set cancelled_evidence") ;;
+      INVALID_EVIDENCE_SCALAR) failures+=("$phase_label cancelled_evidence must be a plain path scalar") ;;
+      ABSOLUTE_EVIDENCE) failures+=("$phase_label cancelled_evidence must be repository-relative") ;;
+      TRAVERSAL_EVIDENCE) failures+=("$phase_label cancelled_evidence must not contain .. traversal") ;;
+      EVIDENCE_RESOLUTION_FAILED) failures+=("$phase_label cancelled evidence path could not be resolved safely") ;;
+      OUTSIDE_EVIDENCE) failures+=("$phase_label cancelled evidence must stay inside the repository") ;;
+      MISSING_EVIDENCE_FILE) failures+=("$phase_label cancelled evidence file is missing") ;;
+      NON_REGULAR_EVIDENCE) failures+=("$phase_label cancelled evidence must be a regular file") ;;
+      UNREADABLE_EVIDENCE) failures+=("$phase_label cancelled evidence must be readable") ;;
+      INVALID_UTF8_EVIDENCE) failures+=("$phase_label cancelled evidence must be valid UTF-8 text") ;;
+      INVALID_EVIDENCE_MARKER) failures+=("$phase_label cancelled evidence must contain exact same-line prefix: **Status:** CANCELLED") ;;
+      PROBE_EXCEPTION) failures+=("$phase_label cancellation validation probe raised an exception") ;;
+      *) malformed=1 ;;
+    esac
+  done <<< "$probe_output"
+  if [[ "$malformed" -eq 1 ]]; then
+    failures+=("$phase_label cancellation validation probe returned malformed output")
   fi
 }
 

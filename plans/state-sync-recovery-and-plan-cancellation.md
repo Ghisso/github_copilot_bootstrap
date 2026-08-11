@@ -238,10 +238,21 @@ A cancelled phase requires no commit, no findings report, no score, and no
 closeout session log. In exchange it must carry three frontmatter fields, and
 the third must point at a real artifact:
 
-- `cancelled_at` - UTC timestamp, `YYYY-MM-DDTHH:MM:SSZ`.
-- `cancelled_reason` - non-empty single-line prose.
-- `cancelled_evidence` - a repository-relative path that must resolve to an
-  existing file containing the line prefix `**Status:** CANCELLED`.
+- `cancelled_at` - a real UTC calendar date/time in exact
+  `YYYY-MM-DDTHH:MM:SSZ` syntax.
+- `cancelled_reason` - meaningful plain single-line scalar prose, not an empty,
+  multiline, collection/list, comment-only, or YAML block-header form.
+- `cancelled_evidence` - a repository-relative path with no `..` component that
+  canonically stays inside the repository and resolves to an existing regular,
+  readable UTF-8 text file containing a same-line
+  `**Status:**[horizontal whitespace]CANCELLED` prefix.
+
+Phase C's Python validator checks this contract during authoring and pre-flight.
+Phase D repeats the same semantics inside the push gate because plan and
+evidence files can change after an earlier validation. The shell helper uses
+Bash 3.2-compatible orchestration plus Python's existing standard library and
+fails closed on missing runtime, malformed output, exceptions, or any semantic
+mismatch; no third-party dependency is added.
 
 The evidence requirement is the crux. It mirrors the existing
 `closeout_session_log` contract, which already requires an existing file
@@ -453,7 +464,7 @@ Before big-plan closeout:
 | Dropping `--autostash` in Phase B could regress a caller that relied on it to absorb a dirty tree. | All three callers already guarantee a clean tree: `cmd_setup` and `cmd_pull` commit first, `cmd_publish` refuses when dirty. Phase B re-runs Phase A's common preflight before its added `commit_local_state` inside `reconcile_committed_state`; the existing publish-dirty regression and the new active-rebase preservation test must pass. |
 | State sync stages, commits, publishes, or logs into an active operator rebase before it classifies ownership. | Phase A guards every mutating mode before dispatch and uses stderr-only guidance for valid or unknown state. Phase B re-runs the same guard at its new checkpoint boundary. Parameterized tests preserve repository, remote, and persistent-log snapshots across direct, Stop-used, and post-commit-used modes. |
 | A regression test that passes under both old and new code proves nothing. | Recorded lesson. Phase A records actual fake-Git/trace invocations, asserts the exact quit-only orphan path and abort-then-quit current-pull path, and rejects extra-entry orphan fixtures. Phase B asserts no add, commit, pull, or push occurs after its second preflight protects an active rebase. |
-| `cancelled` becomes a quiet way to skip reviewed work. | Three required fields plus an evidence file that must exist and contain `**Status:** CANCELLED`, and at least one phase must be `complete` for the branch to be pushable. |
+| `cancelled` becomes a quiet way to skip reviewed work. | Phase C and the push-time Phase D helper both enforce the full timestamp/reason/repository-contained UTF-8 evidence contract, including canonical symlink containment and a same-line `**Status:** CANCELLED` marker; at least one phase must also be `complete`. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |
 | Local Context Mode indexing is mistaken for permission to expose protected repository data. | Phase F separates local processing from disclosure in the routing policy. Existing read-deny rules remain authoritative across targets, and tests assert they stay present in generated settings. |
