@@ -39,6 +39,300 @@ def _git_targets_nested_claude(command: str, subcommand: str) -> int:
     return int(result.stdout.strip())
 
 
+def _write_cancelled_plan(
+    root: Path,
+    *,
+    missing_field: str = "",
+    cancelled_at: str = "2026-08-11T07:00:00Z",
+    reason: str = "The phase is no longer authorized",
+    evidence: str = "evidence.md",
+) -> Path:
+    fields = {
+        "cancelled_at": cancelled_at,
+        "cancelled_reason": reason,
+        "cancelled_evidence": evidence,
+    }
+    fields.pop(missing_field, None)
+    plan = root / "phase-cancelled.md"
+    plan.write_text(
+        "---\n"
+        "name: phase-cancelled\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 2\n"
+        "status: cancelled\n"
+        + "".join(f"{key}: {value}\n" for key, value in fields.items())
+        + "---\n",
+        encoding="utf-8",
+    )
+    return plan
+
+
+def _cancellation_failures(
+    root: Path, plan: Path, *, probe_override: str = ""
+) -> list[str]:
+    expression = (
+        f"repo_root={shlex.quote(str(root))}; {probe_override} failures=(); "
+        f"assert_cancellation_evidence {shlex.quote(str(plan))} phase-cancelled; "
+        'if [[ "${#failures[@]}" -gt 0 ]]; then printf \'%s\\n\' "${failures[@]}"; fi'
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.splitlines()
+
+
+@pytest.mark.parametrize(
+    "statuses",
+    [
+        ("cancelled", "complete"),
+        ("complete", "cancelled"),
+        ("complete", "complete"),
+    ],
+)
+def test_unique_status_reader_rejects_duplicate_keys(
+    tmp_path: Path, statuses: tuple[str, str]
+) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text(
+        f"---\nstatus: {statuses[0]}\nstatus: {statuses[1]}\n---\n",
+        encoding="utf-8",
+    )
+
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"fm_read_unique_status {shlex.quote(str(plan))}",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "__DUPLICATE_FRONTMATTER_STATUS__"
+
+
+def test_unique_status_reader_preserves_single_status(tmp_path: Path) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text("---\nstatus: complete\n---\n", encoding="utf-8")
+
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"fm_read_unique_status {shlex.quote(str(plan))}",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "complete"
+
+
+def test_cancellation_evidence_accepts_complete_artifact(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** CANCELLED\n", encoding="utf-8"
+    )
+
+    assert _cancellation_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    "missing_field", ("cancelled_at", "cancelled_reason", "cancelled_evidence")
+)
+def test_cancellation_evidence_names_each_missing_field(
+    tmp_path: Path, missing_field: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, missing_field=missing_field)
+    if missing_field != "cancelled_evidence":
+        (tmp_path / "evidence.md").write_text(
+            "**Status:** CANCELLED\n", encoding="utf-8"
+        )
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        f"phase-cancelled cancelled plan must set {missing_field}"
+    ]
+
+
+def test_cancellation_evidence_names_missing_file(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path, evidence="unique-missing-evidence.md")
+
+    failures = _cancellation_failures(tmp_path, plan)
+
+    assert failures == ["phase-cancelled cancelled evidence file is missing"]
+
+
+def test_cancellation_evidence_rejects_markerless_file(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    (tmp_path / "evidence.md").write_text(
+        "# Decision\n\n**Status:** IN-PROGRESS\n", encoding="utf-8"
+    )
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must contain exact same-line prefix: "
+        "**Status:** CANCELLED"
+    ]
+
+
+@pytest.mark.parametrize(
+    "cancelled_at", ("2026-08-11T07:00:00", "2026-02-30T07:00:00Z")
+)
+def test_cancellation_evidence_rejects_invalid_timestamp(
+    tmp_path: Path, cancelled_at: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, cancelled_at=cancelled_at)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled_at must be a real UTC timestamp in "
+        "YYYY-MM-DDTHH:MM:SSZ format"
+    ]
+
+
+@pytest.mark.parametrize(
+    "reason",
+    (
+        '"   "',
+        "|- # folded",
+        "[not, prose]",
+        "{decision: cancelled}",
+        "- list item",
+        "First line\n  continued line",
+    ),
+)
+def test_cancellation_evidence_rejects_yaml_like_reason(
+    tmp_path: Path, reason: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, reason=reason)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled_reason must be meaningful plain single-line "
+        "scalar prose"
+    ]
+
+
+@pytest.mark.parametrize("reason", ("| useful reason", ">+9 prose"))
+def test_cancellation_evidence_accepts_block_header_lookalike_prose(
+    tmp_path: Path, reason: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, reason=reason)
+    (tmp_path / "evidence.md").write_text("**Status:**\tCANCELLED\n", encoding="utf-8")
+
+    assert _cancellation_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    ("evidence", "expected"),
+    (
+        ("/tmp/outside.md", "must be repository-relative"),
+        ("nested/../evidence.md", "must not contain .. traversal"),
+    ),
+)
+def test_cancellation_evidence_rejects_absolute_and_traversal_paths(
+    tmp_path: Path, evidence: str, expected: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path, evidence=evidence)
+
+    assert any(
+        expected in failure for failure in _cancellation_failures(tmp_path, plan)
+    )
+
+
+def test_cancellation_evidence_rejects_outside_symlink(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    (tmp_path / "evidence.md").symlink_to(outside)
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must stay inside the repository"
+    ]
+
+
+def test_cancellation_evidence_rejects_symlink_loop(tmp_path: Path) -> None:
+    (tmp_path / "evidence.md").symlink_to("evidence.md")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence path could not be resolved safely"
+    ]
+
+
+def test_cancellation_evidence_rejects_directory(tmp_path: Path) -> None:
+    (tmp_path / "evidence").mkdir()
+    plan = _write_cancelled_plan(tmp_path, evidence="evidence")
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be a regular file"
+    ]
+
+
+def test_cancellation_evidence_rejects_unreadable_file(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    evidence.chmod(0)
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be readable"
+    ]
+
+
+def test_cancellation_evidence_rejects_invalid_utf8(tmp_path: Path) -> None:
+    (tmp_path / "evidence.md").write_bytes(b"\xff\xfe")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must be valid UTF-8 text"
+    ]
+
+
+@pytest.mark.parametrize(
+    "marker", ("**Status:**\nCANCELLED\n", "**Status:**\vCANCELLED\n")
+)
+def test_cancellation_evidence_rejects_split_or_vertical_marker(
+    tmp_path: Path, marker: str
+) -> None:
+    (tmp_path / "evidence.md").write_text(marker, encoding="utf-8")
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert _cancellation_failures(tmp_path, plan) == [
+        "phase-cancelled cancelled evidence must contain exact same-line prefix: "
+        "**Status:** CANCELLED"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("probe_override", "expected"),
+    (
+        (
+            "cancellation_validation_probe() { printf PROBE_EXCEPTION; };",
+            "probe raised an exception",
+        ),
+        (
+            "cancellation_validation_probe() { printf UNEXPECTED; };",
+            "probe returned malformed output",
+        ),
+    ),
+)
+def test_cancellation_evidence_probe_failures_block(
+    tmp_path: Path, probe_override: str, expected: str
+) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+
+    assert any(
+        expected in failure
+        for failure in _cancellation_failures(
+            tmp_path, plan, probe_override=probe_override
+        )
+    )
+
+
+def test_cancellation_evidence_missing_python_blocks(tmp_path: Path) -> None:
+    plan = _write_cancelled_plan(tmp_path)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+
+    assert _cancellation_failures(
+        tmp_path,
+        plan,
+        probe_override=f"PATH={shlex.quote(str(empty_path))};",
+    ) == ["phase-cancelled cancellation validation requires python3"]
+
+
 def test_git_targets_nested_claude_detects_nested_claude_paths() -> None:
     assert _git_targets_nested_claude("git -C .claude commit -m hi", "commit") == 0
     assert (

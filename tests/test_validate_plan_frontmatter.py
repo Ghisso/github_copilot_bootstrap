@@ -464,6 +464,30 @@ def test_complete_small_plan_still_requires_closeout_log(tmp_path: Path) -> None
 
 
 @pytest.mark.parametrize(
+    "statuses",
+    [
+        ("cancelled", "complete"),
+        ("complete", "cancelled"),
+        ("complete", "complete"),
+    ],
+)
+@pytest.mark.parametrize("kind", ["small", "big"])
+def test_rejects_duplicate_status_fields(
+    tmp_path: Path, statuses: tuple[str, str], kind: str
+) -> None:
+    first, second = statuses
+    frontmatter = small_plan(first) if kind == "small" else big_plan(first)
+    frontmatter = frontmatter.replace(
+        f"status: {first}", f"status: {first}\nstatus: {second}", 1
+    )
+    plan = write_plan(tmp_path / f"{kind}.md", frontmatter)
+
+    assert validation_errors(plan) == [
+        f"{plan}: duplicate status fields are not allowed"
+    ]
+
+
+@pytest.mark.parametrize(
     ("status", "extra"),
     [
         ("planning", ""),

@@ -56,6 +56,23 @@ def parse_frontmatter(path: Path) -> dict[str, Any]:
     return data
 
 
+def frontmatter_key_count(path: Path, key: str) -> int:
+    """Count top-level key occurrences in the hand-parsed frontmatter."""
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return 0
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return 0
+    return sum(
+        1
+        for line in parts[1].splitlines()
+        if not line.startswith((" ", "\t"))
+        and ":" in line
+        and line.split(":", 1)[0].strip() == key
+    )
+
+
 def require_fields(
     path: Path, data: dict[str, Any], fields: Sequence[str], errors: list[str]
 ) -> None:
@@ -167,6 +184,9 @@ def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> 
 
 def validate_plan(path: Path, errors: list[str]) -> None:
     data = parse_frontmatter(path)
+    if frontmatter_key_count(path, "status") > 1:
+        errors.append(f"{path}: duplicate status fields are not allowed")
+        return
     plan_type = str(data.get("type", ""))
     if plan_type == "big-plan":
         validate_big_plan(path, data, errors)

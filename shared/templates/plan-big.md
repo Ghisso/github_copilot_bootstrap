@@ -1,7 +1,7 @@
 ---
 name: <slug>
 type: big-plan
-# status: planning | in-progress | complete | cancelled
+# status must occur exactly once: planning | in-progress | complete | cancelled
 status: planning
 originating_branch: dev
 implementation_branch: <slug>_implementation

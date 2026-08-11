@@ -37,6 +37,8 @@ Required big-plan fields:
 Big-plan status vocabulary is `planning`, `in-progress`, `complete`, or
 `cancelled`. `complete` means the authorized work shipped; `cancelled` means
 the plan itself was called off and remaining phases will never be authorized.
+The top-level `status` field must occur exactly once; duplicate status keys are
+invalid even when their values match.
 
 Required small-plan fields:
 
@@ -48,6 +50,7 @@ Required small-plan fields:
 - `closeout_session_log` once complete
 
 Small-plan status vocabulary is `in-progress`, `complete`, or `cancelled`.
+The same exactly-once `status` rule applies to small plans.
 
 Cancelled big plans and small plans require all three of these fields:
 

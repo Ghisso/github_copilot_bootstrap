@@ -2613,6 +2613,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
 
     validate_lifecycle_hook_guardrails(errors)
+    validate_cancelled_phase_gate_cases(errors)
     validate_commit_msg_git_hook(errors)
     validate_pre_push_git_hook(errors)
 
@@ -2677,21 +2678,27 @@ def setup_hook_repo(temp_root: Path) -> Path:
 
 
 def write_big_plan(
-    repo: Path, status: str = "planning", phases: tuple[str, ...] = ("phase-one",)
+    repo: Path,
+    status: str = "planning",
+    phases: tuple[str, ...] = ("phase-one",),
+    *,
+    current_phase: str = "",
+    duplicate_status: str = "",
 ) -> None:
     phase_lines = "\n".join(f"  - {phase}" for phase in phases)
+    duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
     write(
         repo / ".claude" / "plans" / "foo.md",
         f"""---
 name: foo
 type: big-plan
 status: {status}
-originating_branch: dev
+{duplicate_status_line}originating_branch: dev
 implementation_branch: foo_implementation
 started_at:
 phases:
 {phase_lines}
-current_phase:
+current_phase: {current_phase}
 ---
 
 # Foo
@@ -2699,21 +2706,64 @@ current_phase:
     )
 
 
-def write_small_plan(repo: Path, status: str = "in-progress") -> None:
+def write_small_plan(
+    repo: Path,
+    status: str = "in-progress",
+    *,
+    phase: str = "phase-one",
+    missing_cancellation_field: str = "",
+    cancelled_at: str = "2026-08-11T07:00:00Z",
+    cancelled_reason: str = "The phase is no longer authorized",
+    cancelled_evidence: str = "",
+    evidence_exists: bool = True,
+    evidence_marker: bool = True,
+    duplicate_status: str = "",
+) -> None:
+    closeout = (
+        ""
+        if status == "cancelled"
+        else f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+    )
+    if not cancelled_evidence:
+        cancelled_evidence = f".claude/session_logs/{phase}-cancelled.md"
+    cancellation_values = {
+        "cancelled_at": cancelled_at,
+        "cancelled_reason": cancelled_reason,
+        "cancelled_evidence": cancelled_evidence,
+    }
+    cancellation_values.pop(missing_cancellation_field, None)
+    cancellation = ""
+    if status == "cancelled":
+        cancellation = "".join(
+            f"{key}: {value}\n" for key, value in cancellation_values.items()
+        )
+    duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
     write(
-        repo / ".claude" / "plans" / "phase-one.md",
+        repo / ".claude" / "plans" / f"{phase}.md",
         f"""---
-name: phase-one
+name: {phase}
 type: small-plan
 parent_plan: foo
 phase_index: 1
 status: {status}
-closeout_session_log: .claude/session_logs/phase-one-closeout.md
----
+{duplicate_status_line}{closeout}{cancellation}---
 
-# Phase One
+# {phase}
 """,
     )
+    if (
+        status == "cancelled"
+        and evidence_exists
+        and "cancelled_evidence" in cancellation_values
+    ):
+        marker = "**Status:** CANCELLED\n" if evidence_marker else "Status: stopped\n"
+        evidence_path = Path(cancellation_values["cancelled_evidence"])
+        if not evidence_path.is_absolute():
+            evidence_path = repo / evidence_path
+        write(
+            evidence_path,
+            f"# Cancellation\n\n{marker}",
+        )
 
 
 def lifecycle_script(repo: Path, name: str) -> Path:
@@ -3276,6 +3326,552 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(
             '"permissionDecision":"deny"' in stdout,
             "PR gate must deny --base main",
+            errors,
+        )
+
+
+def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
+    """Exercise the cancellation-specific lifecycle gate contract."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = setup_hook_repo(Path(temp_dir))
+        git(repo, "checkout", "-b", "foo_implementation")
+        write(repo / "phase-work.txt", "certified work\n")
+        git(repo, "add", "phase-work.txt")
+        git(repo, "commit", "-m", "phase work")
+        library = lifecycle_script(repo, "_lib-frontmatter.sh")
+        trace = repo / ".claude" / "findings-phase.trace"
+        dummy_report = repo / ".claude" / "quality_reports" / "findings.json"
+        write(dummy_report, "{}\n")
+
+        def push_failures(probe_override: str = "") -> list[str]:
+            trace.unlink(missing_ok=True)
+            local_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            expression = f"""
+. {shlex.quote(str(library))}
+{probe_override}
+select_fresh_report() {{ printf '%s' "$4" > {shlex.quote(str(trace))}; printf '%s' {shlex.quote(str(dummy_report))}; }}
+assert_report_freshness() {{ :; }}
+json_file_number_value() {{ printf '0'; }}
+assert_required_ponytail_review() {{ :; }}
+failures=()
+assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
+"""
+            result = subprocess.run(
+                ["bash", "-lc", expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"cancelled push invariant fixture failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        duplicate_status_pairs = (
+            ("cancelled", "complete"),
+            ("complete", "cancelled"),
+            ("complete", "complete"),
+        )
+        write_big_plan(repo, status="in-progress", phases=("phase-duplicate",))
+        for first_status, second_status in duplicate_status_pairs:
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-duplicate",
+                duplicate_status=second_status,
+            )
+            check(
+                any(
+                    "exactly one status field" in failure for failure in push_failures()
+                ),
+                f"push gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        phases = ("phase-complete",) + tuple(
+            f"phase-cancelled-{index}" for index in range(1, 7)
+        )
+        write_big_plan(repo, status="in-progress", phases=phases)
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        for phase in phases[1:]:
+            write_small_plan(repo, status="cancelled", phase=phase)
+        check(
+            push_failures() == [],
+            "push gate must accept one completed phase plus six evidenced cancelled phases with one commit",
+            errors,
+        )
+        check(
+            trace.exists() and read(trace) == "phase-complete",
+            "push findings report must bind to the last completed phase, not a cancelled tail",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-cancelled"),
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        for field in ("cancelled_at", "cancelled_reason", "cancelled_evidence"):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                missing_cancellation_field=field,
+            )
+            check(
+                any(field in failure for failure in push_failures()),
+                f"push gate must name missing cancellation field: {field}",
+                errors,
+            )
+
+        evidence_path = (
+            repo / ".claude" / "session_logs" / "phase-cancelled-cancelled.md"
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_exists=False,
+        )
+        evidence_path.unlink(missing_ok=True)
+        check(
+            any("evidence file is missing" in failure for failure in push_failures()),
+            "push gate must reject a missing cancellation evidence file",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_marker=False,
+        )
+        check(
+            any("same-line prefix" in failure for failure in push_failures()),
+            "push gate must reject cancellation evidence without the CANCELLED marker",
+            errors,
+        )
+
+        for cancelled_at in (
+            "2026-08-11T07:00:00",
+            "2026-02-30T07:00:00Z",
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_at=cancelled_at,
+            )
+            check(
+                any("real UTC timestamp" in failure for failure in push_failures()),
+                f"push gate must reject invalid cancelled_at: {cancelled_at}",
+                errors,
+            )
+
+        for reason in (
+            '"   "',
+            "|- # folded",
+            "[not, prose]",
+            "First line\n  continued line",
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_reason=reason,
+            )
+            check(
+                any(
+                    "single-line scalar prose" in failure for failure in push_failures()
+                ),
+                f"push gate must reject invalid cancelled_reason: {reason!r}",
+                errors,
+            )
+
+        for evidence, expected in (
+            ("/tmp/phase-d-absolute-evidence.md", "repository-relative"),
+            ("nested/../evidence.md", "must not contain .. traversal"),
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_evidence=evidence,
+                evidence_exists=False,
+            )
+            check(
+                any(expected in failure for failure in push_failures()),
+                f"push gate must reject unsafe cancellation evidence path: {evidence}",
+                errors,
+            )
+
+        outside = Path(temp_dir) / "outside-cancellation.md"
+        write(outside, "**Status:** CANCELLED\n")
+        outside_link = repo / ".claude" / "session_logs" / "outside-link.md"
+        outside_link.unlink(missing_ok=True)
+        outside_link.symlink_to(outside)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/outside-link.md",
+            evidence_exists=False,
+        )
+        check(
+            any("stay inside the repository" in failure for failure in push_failures()),
+            "push gate must reject cancellation evidence symlinked outside the repo",
+            errors,
+        )
+
+        loop_link = repo / ".claude" / "session_logs" / "loop.md"
+        loop_link.unlink(missing_ok=True)
+        loop_link.symlink_to("loop.md")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/loop.md",
+            evidence_exists=False,
+        )
+        check(
+            any("resolved safely" in failure for failure in push_failures()),
+            "push gate must reject a cancellation evidence symlink loop",
+            errors,
+        )
+
+        evidence_directory = repo / ".claude" / "session_logs" / "evidence-dir"
+        evidence_directory.mkdir(exist_ok=True)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/evidence-dir",
+            evidence_exists=False,
+        )
+        check(
+            any("regular file" in failure for failure in push_failures()),
+            "push gate must reject a directory as cancellation evidence",
+            errors,
+        )
+
+        invalid_utf8 = repo / ".claude" / "session_logs" / "invalid-utf8.md"
+        invalid_utf8.write_bytes(b"\xff\xfe")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/invalid-utf8.md",
+            evidence_exists=False,
+        )
+        check(
+            any("valid UTF-8" in failure for failure in push_failures()),
+            "push gate must reject invalid-UTF-8 cancellation evidence",
+            errors,
+        )
+
+        unreadable = repo / ".claude" / "session_logs" / "unreadable.md"
+        write(unreadable, "**Status:** CANCELLED\n")
+        unreadable.chmod(0)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/unreadable.md",
+            evidence_exists=False,
+        )
+        check(
+            any("must be readable" in failure for failure in push_failures()),
+            "push gate must reject unreadable cancellation evidence",
+            errors,
+        )
+
+        split_marker = repo / ".claude" / "session_logs" / "split-marker.md"
+        write(split_marker, "**Status:**\nCANCELLED\n")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/split-marker.md",
+            evidence_exists=False,
+        )
+        check(
+            any("same-line prefix" in failure for failure in push_failures()),
+            "push gate must reject a split-line cancellation marker",
+            errors,
+        )
+
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        for probe_override, expected in (
+            ("cancellation_validation_probe() { return 127; }", "requires python3"),
+            (
+                "cancellation_validation_probe() { printf PROBE_EXCEPTION; }",
+                "probe raised an exception",
+            ),
+            (
+                "cancellation_validation_probe() { printf UNEXPECTED; }",
+                "probe returned malformed output",
+            ),
+        ):
+            check(
+                any(
+                    expected in failure
+                    for failure in push_failures(probe_override=probe_override)
+                ),
+                f"push gate must fail closed for probe condition: {expected}",
+                errors,
+            )
+
+        write_big_plan(repo, status="in-progress", phases=("phase-cancelled",))
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        all_cancelled_failures = push_failures()
+        check(
+            any(
+                "certifies no completed work" in failure
+                for failure in all_cancelled_failures
+            ),
+            "push gate must refuse a branch whose every phase is cancelled",
+            errors,
+        )
+        check(
+            not trace.exists(),
+            "all-cancelled push must not look for a findings report",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete",),
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        check(
+            push_failures() == [],
+            "existing all-complete push scenario must still pass unchanged",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-cancelled",),
+            current_phase="phase-cancelled",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        commit_expression = f"""
+. {shlex.quote(str(library))}
+select_fresh_report() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(repo))} foo_implementation
+printf '%s\\n' "${{failures[@]}}"
+"""
+        commit_result = subprocess.run(
+            ["bash", "-lc", commit_expression],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            "cancelled phase never certifies a commit" in commit_result.stdout
+            and "advance current_phase past it" in commit_result.stdout,
+            "commit gate must emit the distinct cancelled stale-pointer message",
+            errors,
+        )
+        for first_status, second_status in duplicate_status_pairs:
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-cancelled",
+                duplicate_status=second_status,
+            )
+            commit_result = subprocess.run(
+                ["bash", "-lc", commit_expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                "exactly one status field before commit" in commit_result.stdout,
+                f"commit gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        def run_closeout() -> None:
+            returncode, _, stderr = run_hook(
+                lifecycle_script(repo, "record-commit-closeout.sh"),
+                {
+                    "tool_name": "Bash",
+                    "tool_input": {"command": 'git commit -m "phase work"'},
+                },
+                "github-copilot",
+                cwd=repo,
+            )
+            check(
+                returncode == 0,
+                f"cancelled closeout fixture failed: {stderr}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(repo, status="complete", phase="phase-one")
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-two",
+                duplicate_status=second_status,
+            )
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance past duplicate candidate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-one",
+                duplicate_status=second_status,
+            )
+            write_small_plan(repo, status="in-progress", phase="phase-two")
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance a duplicate current status: {first_status}, {second_status}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status=first_status,
+                duplicate_status=second_status,
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(repo, status="complete", phase="phase-one")
+            write_small_plan(repo, status="in-progress", phase="phase-two")
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance a duplicate big-plan status: {first_status}, {second_status}",
+                errors,
+            )
+
+        closeout_phases = ("phase-one", "phase-two", "phase-three")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=closeout_phases,
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="complete", phase="phase-one")
+        write_small_plan(repo, status="cancelled", phase="phase-two")
+        write_small_plan(repo, status="in-progress", phase="phase-three")
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: phase-three" in big_plan_text,
+            "closeout advance must skip a cancelled next phase",
+            errors,
+        )
+
+        tail_phases = ("phase-one", "phase-two")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=tail_phases,
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-two")
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: \n" in big_plan_text
+            and "status: complete" in big_plan_text,
+            "closeout advance past a cancelled tail must clear current_phase and complete the big plan",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="cancelled",
+            phases=tail_phases,
+            current_phase="phase-one",
+        )
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: \n" in big_plan_text
+            and "status: cancelled" in big_plan_text,
+            "closeout advance must not overwrite an already-cancelled big plan",
+            errors,
+        )
+
+        git(repo, "checkout", "dev")
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(repo, status=first_status, duplicate_status=second_status)
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-branch-state.sh"),
+                {
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "git checkout -b foo_implementation"},
+                },
+                "github-copilot",
+                cwd=repo,
+            )
+            check(
+                returncode == 0,
+                f"duplicate-status branch fixture failed to run: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout
+                and "exactly one status field" in stdout,
+                f"branch gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        write_big_plan(repo, status="cancelled")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-branch-state.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            returncode == 0,
+            f"cancelled branch denial fixture failed: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout
+            and "cancelled is terminal" in stdout,
+            "branch creation must deny a cancelled big plan with the terminal-status message",
             errors,
         )
 

@@ -3,7 +3,7 @@ name: <YYYY-MM-DD_phase-X-slug>
 type: small-plan
 parent_plan: <big-plan-slug>
 phase_index: 1
-# status: in-progress | complete | cancelled
+# status must occur exactly once: in-progress | complete | cancelled
 status: in-progress
 closeout_session_log:
 # Cancellation fields (required only when status is cancelled):
