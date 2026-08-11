@@ -64,7 +64,7 @@ if [[ "$PLAN_TYPE" != "big-plan" ]]; then
 fi
 
 if [[ "$STATUS" != "planning" && "$STATUS" != "in-progress" ]]; then
-  deny_pretool "$BIG_PLAN status must be planning or in-progress before branch creation"
+  deny_pretool "$BIG_PLAN status must be planning or in-progress before branch creation; cancelled is terminal and cannot start an implementation branch"
   exit 0
 fi
 

@@ -804,6 +804,33 @@ print('; '.join(titles))
 " "$file" "$severity" 2>/dev/null || true
 }
 
+# Validate the artifact-backed audit contract for a cancelled plan. Appends
+# distinct failure messages to the caller's dynamically scoped `failures`
+# array, matching assert_commit_invariants and assert_push_invariants.
+assert_cancellation_evidence() {
+  local plan_file="$1"
+  local phase_label="$2"
+  local cancelled_at cancelled_reason cancelled_evidence evidence_path
+  cancelled_at="$(fm_read "$plan_file" "cancelled_at" || true)"
+  cancelled_reason="$(fm_read "$plan_file" "cancelled_reason" || true)"
+  cancelled_evidence="$(fm_read "$plan_file" "cancelled_evidence" || true)"
+
+  [[ -n "$cancelled_at" ]] || failures+=("$phase_label cancelled plan must set cancelled_at")
+  [[ -n "$cancelled_reason" ]] || failures+=("$phase_label cancelled plan must set cancelled_reason")
+  if [[ -z "$cancelled_evidence" ]]; then
+    failures+=("$phase_label cancelled plan must set cancelled_evidence")
+    return
+  fi
+
+  evidence_path="$cancelled_evidence"
+  [[ "$evidence_path" = /* ]] || evidence_path="$repo_root/$evidence_path"
+  if [[ ! -f "$evidence_path" ]]; then
+    failures+=("$phase_label cancelled evidence file is missing: $evidence_path")
+  elif ! grep -Eq '^\*\*Status:\*\*[[:space:]]+CANCELLED\b' "$evidence_path"; then
+    failures+=("$phase_label cancelled evidence must contain exact line prefix: **Status:** CANCELLED")
+  fi
+}
+
 # Single home for the plan/score/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
@@ -835,7 +862,9 @@ assert_commit_invariants() {
   local small_status closeout_log=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
     small_status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$small_status" != "complete" ]]; then
+    if [[ "$small_status" == "cancelled" ]]; then
+      failures+=("$small_plan is cancelled; a cancelled phase never certifies a commit, so advance current_phase past it")
+    elif [[ "$small_status" != "complete" ]]; then
       failures+=("$small_plan must have status: complete before commit")
     fi
     closeout_log="$(fm_read "$small_plan" "closeout_session_log" || true)"
@@ -978,7 +1007,7 @@ assert_push_invariants() {
     return
   fi
 
-  local phase small_plan status
+  local phase small_plan status completed_count=0 last_completed_phase=""
   for phase in "${phases[@]}"; do
     small_plan="$repo_root/.claude/plans/$phase.md"
     if [[ ! -f "$small_plan" ]]; then
@@ -986,15 +1015,24 @@ assert_push_invariants() {
       continue
     fi
     status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$status" != "complete" ]]; then
+    if [[ "$status" == "complete" ]]; then
+      completed_count=$((completed_count + 1))
+      last_completed_phase="$phase"
+    elif [[ "$status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$small_plan" "$phase"
+    else
       failures+=("all small plans must be complete before PR/push; $phase is ${status:-missing-status}")
     fi
   done
 
+  if [[ "$completed_count" -eq 0 ]]; then
+    failures+=("implementation branch certifies no completed work and should be deleted rather than pushed")
+  fi
+
   local commit_count
   commit_count="$(git -C "$repo_root" rev-list --count "dev..$local_sha" 2>/dev/null || echo 0)"
-  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "${#phases[@]}" ]]; then
-    failures+=("implementation branch must have at least one commit per small plan before PR/push")
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "$completed_count" ]]; then
+    failures+=("implementation branch must have at least one commit per completed small plan before PR/push")
   fi
 
   local started_at bypass_ack
@@ -1014,19 +1052,17 @@ assert_push_invariants() {
 
   # R-SCORE-03: the push tier of the severity gate additionally requires
   # counts.major == 0 (the commit gate already required counts.critical == 0
-  # before any commit could land). Checked against the FINAL phase - by push
-  # time every phase must be complete (checked above), so the final phase's
-  # findings report is the one that certifies the branch as a whole.
-  # `${phases[${#phases[@]}-1]}` (not `${phases[-1]}`) because macOS's
-  # default /usr/bin/bash is 3.2, which has no negative array indices, and
-  # this must run on macos-latest CI (R-CI-01).
-  local final_phase="${phases[${#phases[@]}-1]}"
+  # before any commit could land). Bind to the last COMPLETED phase because a
+  # cancelled trailing phase has no findings report and never will.
+  local final_phase="$last_completed_phase"
   local findings_file=""
-  findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
+  if [[ -n "$final_phase" ]]; then
+    findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
+  fi
 
-  if [[ -z "$findings_file" ]]; then
+  if [[ -n "$final_phase" && -z "$findings_file" ]]; then
     failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
-  else
+  elif [[ -n "$findings_file" ]]; then
     local findings_regen_hint="re-run record_findings.py with the profiles that ran: uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
 
