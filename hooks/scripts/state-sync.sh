@@ -277,8 +277,10 @@ reconcile_committed_state() {
   if [[ $status -ne 0 ]]; then
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
     append_error_output "$output"
-    if ! clear_rebase_state; then
-      warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    if nested_rebase_in_progress; then
+      if ! clear_rebase_state; then
+        warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+      fi
     fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
