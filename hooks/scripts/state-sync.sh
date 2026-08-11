@@ -88,7 +88,8 @@ resolve_remote() {
 }
 
 write_nested_gitignore() {
-  cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
+  if [[ ! -f "$CLAUDE_DIR/.gitignore" ]]; then
+    cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
 # Local convenience only; never synced (D5 in plans/plan-git-state-sync.md).
 settings.local.json
 *.local.*
@@ -100,6 +101,10 @@ __pycache__/
 # never let migrate-from-hf commit it into ai-state history.
 .state_backups/
 EOF
+  fi
+  if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
+    printf '\n# Derived local caches; never synced.\n.cache/\n' >> "$CLAUDE_DIR/.gitignore"
+  fi
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -151,6 +156,9 @@ init_nested_repo() {
 # so the working tree is clean when the rebase starts.
 commit_local_state() {
   local message="${1:-}"
+  if ! write_nested_gitignore; then
+    return 1
+  fi
   if ! git -C "$CLAUDE_DIR" add -A; then
     return 1
   fi

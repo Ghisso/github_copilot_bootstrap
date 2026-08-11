@@ -13,6 +13,8 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 - Use `rg` or equivalent exact search for literals, symbols, error text, config keys, and filenames.
 - Use Semble for semantic repository discovery: behavior ownership, related-code lookup, architectural neighbors, and "where is this implemented?" questions.
 - Use context-mode for large outputs, logs, generated prose, long markdown artifacts, session continuity, and compaction-safe retrieval.
+- Local `ctx_index` of non-protected project content is allowed: it writes only to the project-scoped SQLite/FTS5 cache. This does not authorize remote upload, a remote embedding/vector service, `ctx_fetch_and_index`, or any other network disclosure.
+- Protected-path deny rules always win. Do not index `.env`, `.env.*`, `secrets/**`, `config/credentials.json`, or any path denied by the repository's Claude-format permissions.
 - Use context7 for current external library API documentation (fast-moving stacks like Haystack, BentoML, Hydra, Gradio go stale in training data quickly); it is not a substitute for Semble (repo code), `rg` (literals), or context-mode (long outputs).
 - Avoid running broad Semble and context-mode retrieval for the same question unless the first pass leaves a concrete gap.
 
@@ -22,6 +24,8 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 2. Use Semble when semantic relationships matter more than exact text.
 3. Use context-mode when the task depends on large artifacts, conversational continuity, or content likely to be lost during compaction.
 4. Inside the generated devcontainer, Semble and context-mode are installed as required tools. Outside that managed environment, if retrieval helpers are unavailable, continue with direct reads and `rg`; missing optional binaries are warnings, not blockers.
+
+Context Mode hooks and MCP startup share `.claude/hooks/scripts/context-mode-dispatch.sh`. By default it exports the absolute project-local cache root `<repo>/.claude/.cache/context-mode`; an explicitly supplied absolute `CONTEXT_MODE_DIR` is preserved. The cache is derived local state: never commit, sync, restore, or cite it as lifecycle evidence.
 
 ## Do Not Use Optional Retrieval For
 
