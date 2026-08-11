@@ -128,6 +128,10 @@ read_or_create_provenance_secret() {
       return 1
     fi
     mv -n "$tmp_secret" "$PROVENANCE_SECRET_FILE" 2>/dev/null || true
+    # RETURN is function-scoped, but INT/TERM are process-wide: leaving them set
+    # would re-fire this handler later against an out-of-scope local and abort
+    # under `set -u` instead of exiting cleanly on a signal.
+    trap - INT TERM
   fi
   cat "$PROVENANCE_SECRET_FILE"
 }

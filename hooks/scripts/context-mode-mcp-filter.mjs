@@ -111,10 +111,14 @@ function handleClient(message, raw) {
       send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
       return;
     }
-    // An id whose response is never list-shaped never decrements, so bound the
-    // map rather than trusting upstream to answer every tracked id in kind.
-    if (listIds.size >= MAX_PENDING_LIST_IDS) {
-      listIds.delete(listIds.keys().next().value);
+    // An id whose response is never list-shaped never decrements, so the map
+    // needs a bound. Refuse new ids at capacity instead of evicting a tracked
+    // one: evicting would untrack a genuinely pending tools/list, and its later
+    // response would then be written through unfiltered. Reused ids only
+    // increment an existing entry, so they never grow the map.
+    if (listIds.size >= MAX_PENDING_LIST_IDS && !listIds.has(key)) {
+      send(process.stdout, errorResponse(message.id, -32000, "too many pending tools/list requests"));
+      return;
     }
     listIds.set(key, (listIds.get(key) || 0) + 1);
   }
@@ -211,11 +215,14 @@ upstream.on("error", () => {
 });
 upstream.on("exit", (code, signal) => {
   if (process.exitCode === undefined) process.exitCode = signal ? 1 : (code ?? 1);
-  // The swallowed stdin EPIPE keeps the filter alive after upstream dies, so
-  // close our own stdout: the client sees an immediate EOF instead of waiting
-  // forever for a response that can never arrive.
-  process.stdout.end();
 });
+// "close" rather than "exit": exit can fire while upstream.stdout still has
+// buffered data to deliver, and ending our stdout early would drop an
+// already-valid filtered response. The swallowed stdin EPIPE keeps this process
+// alive after upstream dies, so closing stdout here gives the client an
+// immediate EOF instead of waiting forever for a response that cannot arrive.
+upstream.on("close", () => process.stdout.end());
+process.stdout.on("error", () => {});
 process.stdin.on("end", () => upstream.stdin.end());
 
 // Terminate the spawned upstream deterministically on every exit path
