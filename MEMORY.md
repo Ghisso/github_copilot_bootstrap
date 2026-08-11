@@ -391,3 +391,10 @@
   scoped: `RETURN` is function-local but `INT`/`TERM` are process-wide, so a
   handler referencing a function `local` survives the frame and aborts under
   `set -u`. Reset signal traps on every exit path, including early returns.
+- [LEARN:tests] A comment asserting that a test guards an invariant is a claim
+  that must be made true. When documenting deliberate duplication, add the
+  equality test in the same change and prove it fails when one copy drifts.
+- [LEARN:architecture] Duplication between shipped and authoring-only code is
+  legitimate when the shipped copy must run without dependencies, but it needs
+  both a recorded rationale and a test pinning the shared rules; otherwise it is
+  indistinguishable from drift waiting to happen.

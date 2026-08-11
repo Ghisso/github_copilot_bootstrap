@@ -152,6 +152,21 @@ deliberately small public-stdio filter exposing only guarded `ctx_index`,
   Codex for VS Code and re-approve the project hooks before relying on the
   refreshed lifecycle hooks.
 
+## Post-Commit Whole-Branch Correction
+
+The big-plan closeout review of `dev...HEAD` passed with zero critical and zero
+major findings and one minor: the cancellation-evidence contract is implemented
+twice — `validate_cancellation` in `scripts/validate_plan_frontmatter.py`
+(authoring-only) and `cancellation_validation_probe` in
+`shared/hooks/scripts/_lib-frontmatter.sh` (ships to consumers and must run on a
+stock `python3`) — with nothing documenting the split or forcing the copies to
+agree. The duplication is justified, so it was documented rather than removed,
+and `tests/test_validate_plan_frontmatter.py` now pins the shared timestamp,
+block-scalar, and evidence-status rules plus the required field names across
+both copies. Confirmed load-bearing: perturbing the shipped `TIMESTAMP` pattern
+fails the new test with a drift message. Suite is 801 passed, score 100/100,
+findings 0/0/0. Committed separately from Phase F rather than amended in.
+
 ## Open Questions / Next Steps
 
 - Phase F is complete. Proceed to big-plan closeout for
