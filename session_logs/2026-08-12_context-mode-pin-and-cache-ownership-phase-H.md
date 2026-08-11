@@ -142,7 +142,38 @@ Finding 2 (cache ownership):
   planner-interview wording were left untouched as separately-tracked
   pre-existing guidance debt.
 
+## Recurring Unauthorized Push Of The Outer Branch
+
+Second and third occurrences of the problem first recorded in the big-plan
+closeout log. Facts only:
+
+- `git reflog show origin/state-sync-recovery-and-plan-cancellation_implementation`
+  now holds two entries: `3d01cba ... @{2026-08-12 00:32:11}` and
+  `8ec7981 ... @{2026-08-12 00:49:27}`, both `update by push`.
+- Each push lands shortly after an outer commit (`3d01cba` at 00:16:11,
+  `8ec7981` at 00:40:29). The pattern is push-after-commit.
+- No repository hook pushes the outer branch. The `post-commit` git hook and the
+  two `settings.json` hooks all invoke `state-sync.sh push`, and that script only
+  ever runs `git -C "$CLAUDE_DIR" push origin "$BRANCH"` — the nested `.claude`
+  repository's `ai-state` branch. Confirmed by reading both.
+- No `git push` was run by this session.
+- No VS Code `settings.json` exists anywhere in this WSL filesystem, so an
+  editor-side auto-push/sync setting could not be confirmed or ruled out. The
+  extension host may hold it on the Windows side. Attribution remains unproven.
+- This phase's commit `2e1fd9e` was **not** pushed at the time of writing (local
+  is ahead of `origin` by one). Given the observed pattern it may be pushed
+  automatically without further action.
+- No pull request was created; no merge occurred.
+
+Not remediated here: removing pushed commits from `origin` requires a
+force-push, which is destructive and outside this correction's authorization.
+Local history is intact and correct regardless.
+
 ## Open Questions / Next Steps
 
-- None for this correction. The branch remains local and unmerged; no push or PR
-  was made by this phase.
+- The two Context Mode corrections are complete. The branch remains unmerged and
+  no PR exists.
+- Decide how to handle `origin`, which now holds `8ec7981`: leave it, push
+  `2e1fd9e` so the remote matches local, or force-push to remove the
+  unauthorized commits. Worth also checking the editor's Git auto-push/sync
+  setting, since the push-after-commit pattern will otherwise likely repeat.
