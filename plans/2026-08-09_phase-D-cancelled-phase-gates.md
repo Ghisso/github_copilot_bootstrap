@@ -3,8 +3,8 @@ name: 2026-08-09_phase-D-cancelled-phase-gates
 type: small-plan
 parent_plan: state-sync-recovery-and-plan-cancellation
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-11_cancelled-phase-gates-phase-D.md
 ---
 
 # Small Plan: 2026-08-09_phase-D-cancelled-phase-gates
@@ -70,13 +70,13 @@ distinct accumulated gate failure; none may escape or silently pass.
 
 ## Steps
 
-- [ ] Add `assert_cancellation_evidence <plan_file> <phase_label>` to
+- [x] Add `assert_cancellation_evidence <plan_file> <phase_label>` to
       `shared/hooks/scripts/_lib-frontmatter.sh` (create). It follows the file's
       existing dynamic-scoping convention: it appends to a `failures` array the
       caller declares. Each failure gets its own distinct message naming the
       phase. Must be Bash 3.2 compatible: no `mapfile`, no `readarray`, no
       negative array indices.
-- [ ] The helper must repeat Phase C timestamp and reason semantics rather than
+- [x] The helper must repeat Phase C timestamp and reason semantics rather than
       trust an earlier validator run. `cancelled_at` is non-empty, matches exact
       `YYYY-MM-DDTHH:MM:SSZ` UTC syntax, and is a real calendar date/time.
       `cancelled_reason` is meaningful plain single-line scalar prose: reject
@@ -84,21 +84,21 @@ distinct accumulated gate failure; none may escape or silently pass.
       modifiers and comment suffixes, list/object-like values, and indented
       continuation or multiline forms. Preserve accepted lookalike prose such
       as `| useful reason` and `>+9 prose`.
-- [ ] The helper must require non-empty `cancelled_evidence` to be a
+- [x] The helper must require non-empty `cancelled_evidence` to be a
       repository-relative path. Reject absolute paths and any lexical `..`
       component before filesystem access. Canonically resolve the repository
       root and evidence target, follow symlinks, and reject any target outside
       the repository. Require an existing regular readable file whose complete
       contents decode as UTF-8; directories, missing files, symlink loops,
       outside symlinks, unreadable files, and decode errors all fail closed.
-- [ ] Evidence must contain a line matching
+- [x] Evidence must contain a line matching
       `^\*\*Status:\*\*[ \t]+CANCELLED\b`: horizontal whitespace only and the
       marker on one physical line. Split-line, vertical-whitespace, misspelled,
       lowercase, and word-character suffix near-misses must fail. The helper's
       standard-library probe must return a fixed machine-readable result that
       shell maps to distinct accumulated messages; missing Python, unexpected
       output, or an exception is itself a blocking failure.
-- [ ] `assert_commit_invariants` (modify): when the current phase's small-plan
+- [x] `assert_commit_invariants` (modify): when the current phase's small-plan
       status is `cancelled`, replace the generic
       "must have status: complete before commit" failure with a distinct message
       saying the phase is cancelled, that a commit is never certified by a
@@ -106,90 +106,90 @@ distinct accumulated gate failure; none may escape or silently pass.
       every other check unchanged. Do not add a commit path for cancelled
       phases: `.claude/` is ignored by the outer repository, so recording a
       cancellation produces no outer commit and needs none.
-- [ ] `assert_push_invariants` (modify), phase loop: accept `complete` or
+- [x] `assert_push_invariants` (modify), phase loop: accept `complete` or
       `cancelled`. Track `completed_count` and the slug of the last completed
       phase. For each `cancelled` phase, call `assert_cancellation_evidence`.
       For any other status, keep the current failure message.
-- [ ] `assert_push_invariants` (modify): fail when `completed_count` is 0, with
+- [x] `assert_push_invariants` (modify): fail when `completed_count` is 0, with
       a message saying the branch certifies no work and should be deleted rather
       than pushed.
-- [ ] `assert_push_invariants` (modify): change the commit-count comparison from
+- [x] `assert_push_invariants` (modify): change the commit-count comparison from
       `${#phases[@]}` to `completed_count`, and update the message to say "one
       commit per completed small plan".
-- [ ] `assert_push_invariants` (modify): bind the final findings report to the
+- [x] `assert_push_invariants` (modify): bind the final findings report to the
       last completed phase instead of `${phases[${#phases[@]}-1]}`. Keep the
       Bash 3.2 indexing style. Update the surrounding comment to explain that a
       cancelled trailing phase has no findings report and never will.
-- [ ] Must not add a branch-level acknowledgement flag. The per-phase evidence
+- [x] Must not add a branch-level acknowledgement flag. The per-phase evidence
       contract is the whole anti-abuse mechanism; a second big-plan flag was
       considered and deliberately rejected as bookkeeping without new
       information.
-- [ ] `shared/hooks/scripts/record-commit-closeout.sh` (modify): when advancing
+- [x] `shared/hooks/scripts/record-commit-closeout.sh` (modify): when advancing
       `current_phase`, skip forward over phases whose small-plan `status` is
       `cancelled`. When no non-cancelled phase remains, clear `current_phase`,
       and write `status: complete` only when the big plan's current status is
       not already `cancelled`, so the hook never overwrites a recorded human
       cancellation. Preserve the existing `additional_context` warn-on-miss
       paths so the phase machine never stalls silently.
-- [ ] `shared/hooks/scripts/enforce-branch-state.sh` (modify): keep the existing
+- [x] `shared/hooks/scripts/enforce-branch-state.sh` (modify): keep the existing
       `planning`/`in-progress` allow-list and extend the denial message to name
       `cancelled` explicitly as a terminal, non-startable status.
-- [ ] Add adversarial scenarios to `scripts/validate_targets.py` (modify),
+- [x] Add adversarial scenarios to `scripts/validate_targets.py` (modify),
       extending the existing `write_small_plan` helper with a `cancelled`
       variant that writes the three fields and its evidence file.
-- [ ] Add direct unit coverage to `tests/test_hook_gates.py` (modify) using the
+- [x] Add direct unit coverage to `tests/test_hook_gates.py` (modify) using the
       existing `_bash_source` harness.
-- [ ] Regenerate targets.
+- [x] Regenerate targets.
 
 ## Test Scenarios
 
 In `scripts/validate_targets.py`, driven by `tests/test_validate_targets.py`:
 
-- [ ] Push accepted for a branch mixing completed and cancelled phases when all
+- [x] Push accepted for a branch mixing completed and cancelled phases when all
       three conditions hold.
-- [ ] Push refused when a cancelled phase is missing `cancelled_at`,
+- [x] Push refused when a cancelled phase is missing `cancelled_at`,
       `cancelled_reason`, or `cancelled_evidence` (one case each).
-- [ ] Push refused when the evidence file does not exist.
-- [ ] Push refused when the evidence file exists but lacks
+- [x] Push refused when the evidence file does not exist.
+- [x] Push refused when the evidence file exists but lacks
       `**Status:** CANCELLED`.
-- [ ] Push refused for absolute evidence paths, any lexical `..` traversal,
+- [x] Push refused for absolute evidence paths, any lexical `..` traversal,
       canonical escape through an outside symlink, a symlink loop, a directory,
       an unreadable file where portable, and invalid UTF-8. Use unique paths so
       each scenario proves its intended branch rather than a prior failure.
-- [ ] Push refused for malformed or impossible `cancelled_at` and for
+- [x] Push refused for malformed or impossible `cancelled_at` and for
       whitespace, YAML block-header/comment, collection/list, or multiline
       `cancelled_reason` values that Phase C rejects.
-- [ ] Push refused for split-line or vertical-whitespace cancellation markers
+- [x] Push refused for split-line or vertical-whitespace cancellation markers
       and other near misses; a same-line marker separated by spaces or tabs
       passes.
-- [ ] Push refused when every phase is cancelled, with the "certifies no work"
+- [x] Push refused when every phase is cancelled, with the "certifies no work"
       message.
-- [ ] Commit-count check satisfied by completed phases only: a branch with one
+- [x] Commit-count check satisfied by completed phases only: a branch with one
       completed phase, six cancelled phases, and one commit passes.
-- [ ] Findings report bound to the last completed phase: a report for the last
+- [x] Findings report bound to the last completed phase: a report for the last
       completed phase satisfies the gate even though the last listed phase is
       cancelled.
-- [ ] Commit refused with the distinct stale-pointer message when
+- [x] Commit refused with the distinct stale-pointer message when
       `current_phase` names a cancelled phase.
-- [ ] Closeout advance skips a cancelled next phase and lands on the following
+- [x] Closeout advance skips a cancelled next phase and lands on the following
       non-cancelled phase.
-- [ ] Closeout advance past a cancelled tail clears `current_phase` and sets
+- [x] Closeout advance past a cancelled tail clears `current_phase` and sets
       `status: complete`, and leaves an already-`cancelled` big plan alone.
-- [ ] Branch creation denied for a `cancelled` big plan, with the new message.
-- [ ] Regression: a branch with no cancelled phases behaves exactly as today.
+- [x] Branch creation denied for a `cancelled` big plan, with the new message.
+- [x] Regression: a branch with no cancelled phases behaves exactly as today.
       Assert an existing all-complete scenario still passes unchanged.
 
 In `tests/test_hook_gates.py`:
 
-- [ ] `assert_cancellation_evidence` accepts a fully-formed cancelled plan.
-- [ ] `assert_cancellation_evidence` produces a distinct failure for each
+- [x] `assert_cancellation_evidence` accepts a fully-formed cancelled plan.
+- [x] `assert_cancellation_evidence` produces a distinct failure for each
       missing field, a missing evidence file, and a marker-less evidence file.
-- [ ] Direct helper coverage rejects malformed/impossible timestamps; invalid
+- [x] Direct helper coverage rejects malformed/impossible timestamps; invalid
       reason scalar shapes; absolute, traversal, outside-symlink, loop,
       directory, unreadable, and invalid-UTF-8 evidence; and split-line or
       vertical-whitespace markers. It also accepts ordinary reason prose that
       merely begins like a block header and a tab-separated same-line marker.
-- [ ] A missing `python3`, a standard-library probe exception, and malformed
+- [x] A missing `python3`, a standard-library probe exception, and malformed
       probe output each fail closed with the phase name in the message.
 
 ## Verification
@@ -243,28 +243,28 @@ rm -rf /tmp/dist-gen-a
 
 ## Acceptance Criteria
 
-- [ ] A branch with completed and fully-evidenced cancelled phases passes the
+- [x] A branch with completed and fully-evidenced cancelled phases passes the
       push gate without any falsified record.
-- [ ] A cancelled phase missing any part of its evidence contract blocks push
+- [x] A cancelled phase missing any part of its evidence contract blocks push
       with a distinct message.
-- [ ] The push-time helper rejects every timestamp, reason, path, file, decode,
+- [x] The push-time helper rejects every timestamp, reason, path, file, decode,
       and marker shape rejected by the committed Phase C validator, including
       absolute/traversal/outside-symlink evidence and YAML-like reasons.
-- [ ] A branch whose phases are all cancelled is refused.
-- [ ] Commit count is measured against completed phases only.
-- [ ] The final findings report binds to the last completed phase.
-- [ ] A commit whose `current_phase` is cancelled is refused with a distinct,
+- [x] A branch whose phases are all cancelled is refused.
+- [x] Commit count is measured against completed phases only.
+- [x] The final findings report binds to the last completed phase.
+- [x] A commit whose `current_phase` is cancelled is refused with a distinct,
       actionable message.
-- [ ] Closeout advance skips cancelled phases and never overwrites a recorded
+- [x] Closeout advance skips cancelled phases and never overwrites a recorded
       big-plan cancellation.
-- [ ] A `cancelled` big plan cannot start an implementation branch.
-- [ ] Branches with no cancelled phases behave identically to today.
+- [x] A `cancelled` big plan cannot start an implementation branch.
+- [x] Branches with no cancelled phases behave identically to today.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

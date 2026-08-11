@@ -328,3 +328,14 @@
 - [LEARN:documentation] Lifecycle templates and policies must state the exact
   constraints enforced by their validator; run DOCUMENT after review to
   reconcile the final hardened contract before score and closeout.
+- [LEARN:security] Action-time gates must revalidate mutable lifecycle evidence
+  immediately before granting commit, push, closeout, or branch actions; an
+  earlier validator pass is not authorization for frontmatter or artifacts
+  that can change afterward.
+- [LEARN:security] When lifecycle state crosses multiple parsers, ambiguous
+  duplicate gate keys must be rejected everywhere rather than resolved by
+  first-wins versus last-wins behavior; one unique-key contract prevents a
+  parser differential from bypassing obligations or advancing state.
+- [LEARN:security] A gate that delegates validation to a runtime helper must
+  fail closed on a missing runtime, exceptions, nonzero exits, and malformed
+  protocol output, with a distinct regression test for every failure mode.

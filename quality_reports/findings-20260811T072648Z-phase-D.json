@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-11T07:27:15Z",
+  "branch": "state-sync-recovery-and-plan-cancellation_implementation",
+  "head_sha": "b684d65b24d6a13b7ca162dc8fa3881f75ab1ea5",
+  "base_ref": "dev",
+  "merge_base_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "phase": "2026-08-09_phase-D-cancelled-phase-gates",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "efd98c6d9fba5d6fe976e3941710fab988319bc8",
+  "changed_files": [
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/hooks/scripts/enforce-branch-state.sh",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/plans/README.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/templates/plan-big.md",
+    "shared/templates/plan-small.md",
+    "shared/templates/session-log.md",
+    "tests/test_hook_gates.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_plan_frontmatter.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
