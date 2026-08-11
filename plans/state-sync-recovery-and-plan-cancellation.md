@@ -81,19 +81,19 @@ status the frontmatter validator accepts. The audit trail is currently
 inaccurate, and the missing vocabulary is why.
 
 **Adjacent control-plane issue - Context Mode local indexing needs an
-enforceable repository boundary.** The approved design initially treated
-`ctx_index` as safe local SQLite/FTS5 processing when protected deny rules were
-present. Implementation-time inspection of installed Context Mode 1.0.169
-invalidated that assumption: the `ctx_index` path handler does not apply the
-package's project-containment guard, and absolute paths flow directly to
-indexing. Deny patterns are defense in depth, not repository containment.
+enforceable repository boundary without removing the useful MCP surface.**
+Installed Context Mode 1.0.169 applies configured `Read(...)` deny rules to
+`ctx_index`, including resolved/canonical and per-file directory checks, but it
+does not apply the project-containment guard used by `ctx_execute_file`.
+Protected-read enforcement and repository containment are distinct boundaries.
 
 This remains in the same big plan because the enforceable correction is small
 and touches the same control-plane surfaces already being changed here: hook
 dispatch, nested `.claude/` state hygiene, tool routing, runtime validation,
-and generated MCP wiring. Phase F removes Context Mode MCP access, retains its
-optional lifecycle hooks, and hardens the derived cache. It does not introduce
-an MCP proxy or another retrieval system.
+and generated MCP wiring. Phase F retains hooks and a deliberately filtered MCP
+surface through the same dispatcher, pins the audited upstream version, guards
+`ctx_index`, and hardens the derived cache. It does not introduce another
+retrieval system or a general MCP gateway.
 
 ## Goals
 
@@ -120,19 +120,25 @@ an MCP proxy or another retrieval system.
   falsifying any record.
 - Correct the Graphify records using the new vocabulary rather than fabricated
   closeouts.
-- Do not expose Context Mode `ctx_index` until project containment is enforced
-  at the MCP request boundary; remove Context Mode from generated MCP configs
-  and route repository retrieval to direct reads, `rg`, and Semble.
+- Keep Context Mode hooks and MCP available through one dispatcher and one
+  project-local storage environment; expose only guarded `ctx_index`,
+  `ctx_search`, `ctx_stats`, and `ctx_doctor` through a small public-stdio
+  allowlist filter.
+- Enforce repository containment and bounded file/directory options before
+  forwarding `ctx_index`, while retaining pinned upstream `Read`-deny checks as
+  a separate gate.
+- Keep direct reads, `rg`, and Semble as normal retrieval routes and fallbacks,
+  not replacements for the filtered Context Mode capabilities.
 - Keep Context Mode hook/session cache as local derived state under
   `.claude/.cache/context-mode/`; it must never be committed or published on
   `ai-state`.
 - Preserve the existing protected-read boundary (`.env*`, secrets,
-  credentials, and equivalent denied paths) as defense in depth while MCP
-  indexing remains disabled.
+  credentials, and equivalent denied paths) and verify it independently from
+  filter-owned repository containment.
 - Extend the existing Context Mode self-check/runtime validation just enough to
-  prove the hook launcher, cache path, ignore rule, and generated absence of
-  Context Mode MCP wiring are coherent. Do not create a new diagnostics
-  subsystem.
+  prove the shared launcher, filtered capability set, exact upstream version,
+  cache path/provenance, ignore rule, and generated MCP wiring are coherent.
+  Do not create a new diagnostics subsystem.
 
 ## Non-Goals
 
@@ -148,9 +154,12 @@ an MCP proxy or another retrieval system.
   trial.
 - No new retrieval tools in this plan (`ast-grep`, Serena, another code graph,
   or another memory/index service).
-- No repository-owned MCP/JSON-RPC proxy, installed-package patch, or copied
-  Context Mode implementation. Re-enablement requires a separate approved plan
-  and executable upstream/request-boundary containment evidence.
+- No private Context Mode deep imports, installed-package patch, copied upstream
+  implementation, or general MCP gateway. The repository filter may mediate
+  only public stdio `tools/list` and `tools/call`, including `ctx_index`
+  validation and exact-version enforcement.
+- No Context Mode capabilities beyond `ctx_index`, `ctx_search`, `ctx_stats`,
+  and `ctx_doctor` through the end of this big plan.
 - No capability registry, telemetry platform, full LLM evaluation harness, MCP
   gateway, or broad dependency-version project. Those ideas remain deferred
   until repeated real-world friction justifies them.
@@ -314,45 +323,53 @@ blocks, with a message saying the pointer is stale and must be advanced. Phase D
 also makes `record-commit-closeout.sh` skip cancelled phases when it advances
 the pointer, so the stale-pointer state should not arise in normal use.
 
-### Context Mode: hook-only derived cache until containment is proved
+### Context Mode: one dispatcher, filtered MCP, derived cache
 
-Phase F's original upstream assumption failed. Installed Context Mode 1.0.169
-contains a project-containment helper and uses it for `ctx_execute_file`, but
-its `ctx_index` path branch only applies read-deny patterns before resolving the
-path. An absolute input wins unchanged. The bootstrap cannot claim that
-`ctx_index` is limited to the repository and cannot rely on agent instructions
-as the security control.
+Phase F pins the audited Context Mode version to exactly `1.0.169` across the
+devcontainer, documented npm install, dispatcher `npx` fallback, runtime
+contract, and capability tests. Version drift exposes no tools; a later upgrade
+requires the same capability/security audit rather than an unpinned latest
+install.
 
-The minimum enforceable design removes Context Mode from every generated MCP
-configuration. Direct reads, `rg`, and Semble remain available. Context Mode's
-optional lifecycle hooks stay installed because they do not expose the
-uncontained MCP tool and because missing-hook tooling already fails open.
+Hooks and MCP share `context-mode-dispatch.sh`, the canonical repository
+identity, and one absolute project-local `CONTEXT_MODE_DIR`. Hook failures stay
+fail-open. MCP startup fails clearly when the pinned runtime, filter, storage,
+or provenance contract cannot be established.
 
-The hook dispatcher's default storage root becomes the canonical absolute
-project path `.claude/.cache/context-mode/`. An explicit absolute override may
-remain outside the repository. Inside the repository, only the canonical
-default-cache subtree is accepted; relative, tracked, protected, traversal, and
-symlink-escaping overrides fall back with a warning.
+A small Node standard-library filter uses only Context Mode's public stdio MCP
+surface. It passes unrelated protocol traffic through, filters `tools/list`, and
+validates/rejects `tools/call`. The exact allowlist is guarded `ctx_index`,
+`ctx_search`, `ctx_stats`, and `ctx_doctor`. Execute, file-execute, batch,
+network-fetch, upgrade, purge, insight, unknown, and future tools are hidden and
+rejected before upstream. Private `_registeredTools` and deep imports are
+forbidden.
+
+For `ctx_index`, the filter owns canonical repository containment and bounded
+input options. Content and regular in-repository files are supported. Directory
+indexing is retained only if it can reuse pinned upstream walking with a
+canonical in-repository root, Git ignore enabled, symlink following disabled,
+fixed maximum depth/files, unavoidable derived/vendor exclusions, and upstream
+per-file `Read` deny checks. If proving that contract materially expands the
+filter, Phase F ships content/regular-file indexing first and documents the
+temporary directory limitation.
 
 The cache is derived state, not AI authority:
 
-- canonical plans, memory, reports, and session records stay as normal files in
-  the nested `ai-state` repository;
-- `.claude/.cache/` is ignored and untracked before checkpoint, checked again
-  after successful remote reconciliation, and never published, used as
-  cancellation evidence, or treated as a source of truth;
-- protected read-deny rules remain authoritative defense in depth, but they do
-  not substitute for repository containment;
-- neither `ctx_index` nor `ctx_fetch_and_index` is authorized by Phase F.
+- canonical plans, memory, reports, and session records stay in `ai-state`;
+- MCP search uses only a fresh guarded namespace or locally audited provenance
+  bound to the canonical repository, filter contract, and exact upstream
+  version; legacy or remote-restored cache is never silently trusted;
+- `.claude/.cache/` is ignored and untracked before checkpoint and again after
+  both successful reconciliation shapes, and is never published, restored as
+  authority, used as cancellation evidence, or treated as source of truth;
+- unsafe storage overrides fall back, while approved-subtree/external absolute
+  overrides must still satisfy provenance;
+- protected `Read` deny rules remain a separate upstream gate and are tested
+  independently from filter-owned containment.
 
-A repository-owned MCP proxy was considered and rejected for this phase. The
-repository has no existing per-tool filter or proxy, and a shell launcher cannot
-inspect stdio MCP parameters. A correct proxy would own JSON-RPC framing,
-request/response correlation, errors, shutdown, backpressure, and three-target
-acceptance. That is a new control-plane subsystem, not a bounded launcher edit.
-Re-enablement therefore requires a separate approved plan or an upstream
-version whose request-boundary containment passes executable absolute,
-traversal, and symlink-out regressions.
+Context Mode hook guidance, generated prompts, policy, and docs may advertise
+only the four tools actually returned by filtered `tools/list`. Direct reads,
+`rg`, and Semble remain normal routes and fallbacks. Context7 stays unchanged.
 
 ## Design Overview
 
@@ -362,15 +379,15 @@ flowchart TD
     C["Phase C: cancelled status in validator, templates, policy"] --> D["Phase D: gates for commit, push, closeout advance, branch state"]
     B --> E["Phase E: docs and Graphify record remediation"]
     D --> E
-    E --> F["Phase F: disable unsafe Context Mode MCP and harden derived cache"]
+    E --> F["Phase F: filtered Context Mode MCP and guarded derived cache"]
 ```
 
 Phases A and B are one workstream; C and D are the other. E closes those two
 repairs and corrects the Graphify audit trail. F is a bounded adjacent hardening
-phase that disables an uncontained Context Mode MCP surface while retaining
-hook-only derived-cache behavior. It runs after E to avoid concurrent edits to
-`state-sync.sh`, generated wiring, README documentation, and validation
-fixtures.
+phase that keeps Context Mode hooks/MCP while filtering capabilities, guarding
+index containment, and isolating derived cache. It runs after E to avoid
+concurrent edits to `state-sync.sh`, generated wiring, README documentation,
+and validation fixtures.
 
 ## Phases
 
@@ -395,11 +412,11 @@ fixtures.
 - **E after B and D.** E writes documentation and remediates the Graphify
   records, so it describes behavior that both repair workstreams have already
   shipped.
-- **F after E.** F narrows the Context Mode dispatcher to optional hooks,
-  hardens nested-state cache exclusion, removes generated Context Mode MCP
-  wiring, and aligns validation and documentation. Running it last keeps those
-  control-plane edits out of the state-sync repair commits and gives the
-  containment response one clean review boundary.
+- **F after E.** F routes Context Mode hooks and filtered MCP through one
+  dispatcher, pins the audited dependency, guards indexing, hardens cache
+  exclusion/provenance, and aligns generated routing, validation, and docs.
+  Running it last keeps those control-plane edits out of the state-sync repair
+  commits and gives the capability boundary one clean review boundary.
 - A/B and C/D are otherwise independent and may be reordered as pairs.
 
 ## Hard Constraint: Where Edits Go
@@ -417,10 +434,13 @@ Files edited directly in this plan, by category:
   `shared/hooks/scripts/record-commit-closeout.sh`,
   `shared/hooks/scripts/enforce-branch-state.sh`,
   `shared/hooks/scripts/context-mode-dispatch.sh`,
+  `shared/hooks/scripts/context-mode-mcp-filter.mjs`,
   `shared/templates/plan-small.md`, `shared/templates/plan-big.md`,
   `shared/templates/session-log.md`, `shared/plans/README.md`,
   `shared/policies/workflow.instructions.md`,
-  `shared/policies/tool-routing.instructions.md`, `shared/mcp/servers.json`.
+  `shared/policies/tool-routing.instructions.md`, `shared/mcp/servers.json`,
+  `shared/devcontainer/Dockerfile`, and affected `shared/agents/*/prompt.md` and
+  `shared/skills/onboard/SKILL.md` retrieval guidance.
 - **Authoring-repo tooling (edited directly, not generated):**
   `scripts/validate_plan_frontmatter.py`, `scripts/validate_targets.py`,
   `scripts/check_runtime.py`, `tests/*.py`, `README.md`, `docs/*.md`.
@@ -470,11 +490,12 @@ Before big-plan closeout:
 - `uv run python scripts/validate_plan_frontmatter.py` passes over every file in
   `.claude/plans/`, including the remediated Graphify records.
 - `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports the
-  project-local hook storage root and does not require network access or start
-  an MCP server.
-- Generated GitHub Copilot, Claude Code, and Codex MCP configurations contain no
-  Context Mode server or `ctx_index` exposure; Semble and Context7 remain
-  unchanged.
+  project-local guarded storage/provenance root and exact `1.0.169` runtime
+  contract without network access.
+- Generated GitHub Copilot, Claude Code, and Codex MCP configurations route
+  Context Mode through dispatcher `server` mode. Public `tools/list` exposes
+  exactly guarded `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`;
+  Semble and Context7 remain unchanged.
 - `.claude/.cache/context-mode/` is ignored by the nested repository:
   creating a sentinel file there leaves `git -C .claude status --porcelain`
   unchanged.
@@ -490,10 +511,13 @@ Before big-plan closeout:
 | `cancelled` becomes a quiet way to skip reviewed work. | Phase C and the push-time Phase D helper both enforce the full timestamp/reason/repository-contained UTF-8 evidence contract, including canonical symlink containment and a same-line `**Status:** CANCELLED` marker; at least one phase must also be `complete`. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |
-| Context Mode `ctx_index` escapes the repository despite protected deny rules. | Remove Context Mode from every generated MCP configuration. Policy text cannot substitute for an enforceable request-boundary check. |
-| Disabling Context Mode MCP removes otherwise-safe tools. | Accept the bounded capability loss and use direct reads, `rg`, and Semble. Do not build an unproved proxy inside Phase F. |
-| The Context Mode SQLite/FTS5 cache is accidentally added to `ai-state` by `git add -A` or restored by reconciliation. | Store hook state under `.claude/.cache/context-mode/`, add an idempotent nested ignore rule, untrack before checkpoint and after every successful reconciliation, and test local and remote tracked-cache fixtures. |
+| Context Mode `ctx_index` escapes the repository despite protected deny rules. | Pin audited `1.0.169`; enforce canonical containment/bounds in the public-stdio filter before forwarding, then rely on upstream `Read` deny as a separate per-file gate. |
+| The filter grows into a general gateway or binds to private upstream internals. | Allowlist only four tools, mediate only `tools/list`/`tools/call`, use Node standard library/public stdio, and reject all unknown tools. |
+| Safe directory indexing requires reimplementing the walker. | Reuse pinned upstream only under stricter bounds; otherwise ship guarded content/regular files and document the temporary limitation. |
+| The Context Mode SQLite/FTS5 cache is accidentally added to `ai-state`, restored by reconciliation, or trusted after unfiltered indexing. | Require fresh/local audited provenance; add an idempotent nested ignore rule; untrack before checkpoint and after every successful reconciliation; test legacy and hostile two-clone cache fixtures. |
 | An explicit storage override selects tracked or protected repository state. | Canonicalize it and accept in-repository values only inside the approved `.claude/.cache/context-mode/` subtree; cover traversal and symlinks. |
+| Unpinned Docker/npm/npx installs invalidate the capability audit. | Pin all paths to exactly `1.0.169`, reject runtime mismatch, and require capability/security tests for any later pin change. |
+| Hook guidance advertises tools that the filter blocks. | Validate/suppress or replace guidance so only the exact filtered `tools/list` set is named. |
 | The dogfood refresh (`install_bootstrap.py . --allow-self --local-only`) applies new hook behavior to the live session mid-plan. | Run it only after the phase's verification passes, then immediately re-run `state-sync.sh status` as a health check. |
 
 ## Verification
