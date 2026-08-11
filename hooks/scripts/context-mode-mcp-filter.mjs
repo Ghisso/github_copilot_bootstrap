@@ -19,6 +19,11 @@ const upstream = spawn(argv[separator + 1], argv.slice(separator + 2), {
   env: process.env,
   stdio: ["pipe", "pipe", "pipe"],
 });
+// A killed/exited upstream (e.g. after a pinned-version mismatch) leaves a
+// broken pipe. Any method not gated on `versionAccepted` still reaches
+// `upstream.stdin.write` below; without this handler the resulting EPIPE is
+// unhandled and crashes the filter instead of failing closed (MINOR 8).
+upstream.stdin.on("error", () => {});
 const initializeIds = new Set();
 // Counts, not a Set: two requests that reuse the same id must each be
 // filtered on their own matching response, or the second response would be
@@ -144,21 +149,25 @@ function handleUpstream(message, raw) {
     }
     versionAccepted = true;
   }
-  // Decrement/delete the pending count on every matching response so N
-  // requests that reused one id each get their own filtered response;
-  // Set.delete() would only consume the id once (MAJOR 3).
+  // Decrement/delete the pending count only once a response is structurally
+  // confirmed to be the actual tools/list result. A client may reuse one id
+  // across a pending tools/list and another concurrently outstanding
+  // request (e.g. a tools/call); if that other response arrives first it
+  // must not consume the counter, or the later genuine tools/list response
+  // would find nothing pending and fall through unfiltered (MAJOR 5). N
+  // requests that reused one id each still get their own filtered response
+  // because the count, not a one-shot Set entry, is decremented per match
+  // (MAJOR 3).
   const pendingListResponses = listIds.get(key);
-  if (pendingListResponses) {
+  if (pendingListResponses && Array.isArray(message.result?.tools)) {
     if (pendingListResponses <= 1) {
       listIds.delete(key);
     } else {
       listIds.set(key, pendingListResponses - 1);
     }
-    if (Array.isArray(message.result?.tools)) {
-      message.result.tools = message.result.tools.filter((tool) => ALLOWED_TOOLS.has(tool?.name));
-      send(process.stdout, message);
-      return;
-    }
+    message.result.tools = message.result.tools.filter((tool) => ALLOWED_TOOLS.has(tool?.name));
+    send(process.stdout, message);
+    return;
   }
   process.stdout.write(raw);
 }

@@ -105,7 +105,7 @@ select_storage_root() {
 # a matching secret.
 read_or_create_provenance_secret() {
   if [[ ! -s "$PROVENANCE_SECRET_FILE" ]]; then
-    local secret=""
+    local secret="" tmp_secret
     if command -v openssl >/dev/null 2>&1; then
       secret="$(openssl rand -hex 32 2>/dev/null || true)"
     fi
@@ -113,8 +113,20 @@ read_or_create_provenance_secret() {
       secret="$(od -An -tx1 -N32 /dev/urandom 2>/dev/null | tr -d ' \n' || true)"
     fi
     [[ -n "$secret" ]] || return 1
-    if ! (umask 077; printf '%s' "$secret" > "$PROVENANCE_SECRET_FILE"); then
+    # Write to a sibling temp file, then atomically no-clobber rename it into
+    # place. Two dispatcher invocations racing on first run each land here
+    # concurrently; without this, each generates its own value and each
+    # overwrites the file directly, so a racing invocation can cat back a
+    # different secret than the one that ultimately lands on disk. With
+    # `mv -n`, at most one temp file ever becomes the real file, and every
+    # invocation -- winner or loser -- always cats that same, single result.
+    tmp_secret="$PROVENANCE_SECRET_FILE.tmp.$$"
+    if ! (umask 077; printf '%s' "$secret" > "$tmp_secret"); then
+      rm -f "$tmp_secret"
       return 1
+    fi
+    if ! mv -n "$tmp_secret" "$PROVENANCE_SECRET_FILE" 2>/dev/null; then
+      rm -f "$tmp_secret"
     fi
   fi
   cat "$PROVENANCE_SECRET_FILE"
