@@ -7,6 +7,7 @@ const PINNED_VERSION = "1.0.169";
 const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats", "ctx_doctor"]);
 const INDEX_ARGS = new Set(["content", "path", "source"]);
 const MAX_SOURCE_LENGTH = 200;
+const MAX_PENDING_LIST_IDS = 256;
 const argv = process.argv.slice(2);
 const separator = argv.indexOf("--");
 if (separator < 0 || separator === argv.length - 1) {
@@ -110,6 +111,11 @@ function handleClient(message, raw) {
       send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
       return;
     }
+    // An id whose response is never list-shaped never decrements, so bound the
+    // map rather than trusting upstream to answer every tracked id in kind.
+    if (listIds.size >= MAX_PENDING_LIST_IDS) {
+      listIds.delete(listIds.keys().next().value);
+    }
     listIds.set(key, (listIds.get(key) || 0) + 1);
   }
   if (message.method === "tools/call") {
@@ -205,6 +211,10 @@ upstream.on("error", () => {
 });
 upstream.on("exit", (code, signal) => {
   if (process.exitCode === undefined) process.exitCode = signal ? 1 : (code ?? 1);
+  // The swallowed stdin EPIPE keeps the filter alive after upstream dies, so
+  // close our own stdout: the client sees an immediate EOF instead of waiting
+  // forever for a response that can never arrive.
+  process.stdout.end();
 });
 process.stdin.on("end", () => upstream.stdin.end());
 

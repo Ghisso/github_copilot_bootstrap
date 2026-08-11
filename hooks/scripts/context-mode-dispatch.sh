@@ -121,13 +121,13 @@ read_or_create_provenance_secret() {
     # `mv -n`, at most one temp file ever becomes the real file, and every
     # invocation -- winner or loser -- always cats that same, single result.
     tmp_secret="$PROVENANCE_SECRET_FILE.tmp.$$"
+    # Clean the temp file up even if this shell is interrupted between the
+    # write and the rename; a leftover `.tmp.<pid>` is secret-bearing.
+    trap 'rm -f "$tmp_secret"' RETURN INT TERM
     if ! (umask 077; printf '%s' "$secret" > "$tmp_secret"); then
-      rm -f "$tmp_secret"
       return 1
     fi
-    if ! mv -n "$tmp_secret" "$PROVENANCE_SECRET_FILE" 2>/dev/null; then
-      rm -f "$tmp_secret"
-    fi
+    mv -n "$tmp_secret" "$PROVENANCE_SECRET_FILE" 2>/dev/null || true
   fi
   cat "$PROVENANCE_SECRET_FILE"
 }
