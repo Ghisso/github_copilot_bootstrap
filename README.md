@@ -329,7 +329,7 @@ Interpretation:
 - Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
-- MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
+- MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
@@ -359,7 +359,7 @@ These are the source files that render into `.claude/instructions/` in every gen
 - [deployment.instructions.md](shared/policies/deployment.instructions.md)
   - Pre-deploy checks, Bento build/container workflow, health checks
 - [tool-routing.instructions.md](shared/policies/tool-routing.instructions.md)
-  - Routing between direct reads, `rg`, Semble, and context-mode
+  - Routing between direct reads, `rg`, Semble, and the four guarded Context Mode MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`), alongside its lifecycle hooks
   - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
   - Single audience-aware policy for human-facing prose and compact internal handoffs; agents point here instead of duplicating reporting rules
@@ -633,16 +633,18 @@ Documentation gate:
 VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.json):
 
 - `semble` uses `uvx --from "semble[mcp]" semble`.
-- `context-mode` uses the portable bare `context-mode` command.
+- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. `ctx_index` currently accepts content and a single guarded regular file only; directory indexing is rejected with an actionable message as a temporary limitation.
 
 **Inside the devcontainer**, Node.js 22 and `context-mode` are pre-installed — no extra setup needed.
 
-**Outside the devcontainer**, hook events go through `.claude/hooks/scripts/context-mode-dispatch.sh`, which maps the calling target id to the context-mode target name, falls back to `npx -y context-mode hook ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
+Hook events and the MCP server use the canonical absolute project-local cache at `.claude/.cache/context-mode/` by default. In-repository overrides are accepted only under that subtree; external absolute overrides remain supported. The nested state repository ignores and untracks `.cache/`, so cache state is never committed or published from this repository's own writes — but because `.cache/` is only untracked, not deleted, bytes committed to `ai-state` history by a hostile or compromised remote can still land on disk during reconciliation before being untracked again. To keep that scenario from ever becoming a trusted cache, `configure_storage` in the dispatcher gates every cache directory on a random secret generated once and stored at `.context-mode-provenance.secret`, outside the nested `ai-state` working tree, where `state-sync.sh` never adds, commits, or restores anything. Any cache directory missing or mismatching that secret (along with the repository/version/filter fields) is quarantined next to it as `<cache>.untrusted.<timestamp>.<pid>` and never deleted, and a fresh, empty guarded cache is created instead — so no cache is ever searched or cited as lifecycle evidence unless the dispatcher produced it locally itself. When Context Mode is unavailable or its version does not match the pin, hooks warn and fail open and the MCP server warns clearly and exits nonzero; fall back to direct reads, `rg`, and Semble, which remain normal retrieval routes rather than replacements for Context Mode.
 
-Install `context-mode` with npm when Node.js is already available:
+**Outside the devcontainer**, the dispatcher falls back to `npx -y context-mode hook ...` when `context-mode` is unavailable. Missing tools or cache failures warn and fail open for optional hooks.
+
+Install `context-mode` with npm when Node.js is already available. The dispatcher, devcontainer, and runtime checks all pin the exact same version:
 
 ```bash
-npm install -g context-mode
+npm install -g context-mode@1.0.169
 context-mode --help
 ```
 
@@ -657,7 +659,7 @@ tar -xJf "/tmp/${NODE_DIST}.tar.xz" -C "$HOME/.local/nodejs"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/node" "$HOME/.local/bin/node"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npm" "$HOME/.local/bin/npm"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npx" "$HOME/.local/bin/npx"
-"$HOME/.local/bin/npm" install -g context-mode
+"$HOME/.local/bin/npm" install -g context-mode@1.0.169
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/context-mode" "$HOME/.local/bin/context-mode"
 ```
 

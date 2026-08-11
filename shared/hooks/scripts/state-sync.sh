@@ -88,7 +88,8 @@ resolve_remote() {
 }
 
 write_nested_gitignore() {
-  cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
+  if [[ ! -f "$CLAUDE_DIR/.gitignore" ]]; then
+    cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
 # Local convenience only; never synced (D5 in plans/plan-git-state-sync.md).
 settings.local.json
 *.local.*
@@ -100,6 +101,17 @@ __pycache__/
 # never let migrate-from-hf commit it into ai-state history.
 .state_backups/
 EOF
+  fi
+  if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
+    printf '\n# Derived local caches; never synced.\n.cache/\n' >> "$CLAUDE_DIR/.gitignore"
+  fi
+}
+
+untrack_nested_cache() {
+  # Upgraded nested repositories may already contain committed cache files.
+  # Remove only their index entries; -f is safe with --cached and preserves
+  # every working-tree byte for the local Context Mode installation.
+  git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -151,6 +163,12 @@ init_nested_repo() {
 # so the working tree is clean when the rebase starts.
 commit_local_state() {
   local message="${1:-}"
+  if ! write_nested_gitignore; then
+    return 1
+  fi
+  if ! untrack_nested_cache; then
+    return 1
+  fi
   if ! git -C "$CLAUDE_DIR" add -A; then
     return 1
   fi
@@ -273,7 +291,8 @@ restore_root_adapters() {
 # standalone, not just after an explicit `setup` call.
 cmd_setup() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    return 0
+    write_nested_gitignore
+    return $?
   fi
   init_nested_repo
   if ! commit_local_state "bootstrap: init ai-state"; then
@@ -344,6 +363,10 @@ reconcile_committed_state() {
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
       return 1
     fi
+    if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+      warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
+      return 1
+    fi
     return 0
   fi
 
@@ -377,6 +400,10 @@ reconcile_committed_state() {
     fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
+    return 1
+  fi
+  if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+    warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
     return 1
   fi
 }

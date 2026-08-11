@@ -75,7 +75,7 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode`
+- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`)
 - `npx`
 - `gh`
 - `uv`

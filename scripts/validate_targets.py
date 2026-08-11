@@ -128,6 +128,20 @@ REQUIRED_HOOK_SCRIPTS = (
     "claude-stop.sh",
     "codex-stop.sh",
 )
+# Approved Context Mode capability contract (Phase F). The allowlist is exact
+# and closed; a new upstream tool needs a later approved plan before it can
+# join CONTEXT_MODE_ALLOWED_TOOLS.
+CONTEXT_MODE_PINNED_VERSION = "1.0.169"
+CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
+CONTEXT_MODE_BLOCKED_TOOLS = (
+    "ctx_execute",
+    "ctx_execute_file",
+    "ctx_batch_execute",
+    "ctx_fetch_and_index",
+    "ctx_upgrade",
+    "ctx_purge",
+    "ctx_insight",
+)
 REQUIRED_HOOK_LIBRARIES = ("_lib-frontmatter.sh",)
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
@@ -1497,7 +1511,7 @@ def validate_agents(errors: list[str]) -> None:
             errors,
         )
         # An agent told to route through tool-routing.instructions.md (which
-        # says "use Semble"/"use context-mode") but whose own tools: allowlist
+        # names Semble and Context Mode) but whose own tools: allowlist
         # omits the matching mcp__ wildcard physically cannot follow that
         # instruction — tools: is an explicit allowlist, not additive to
         # defaults. Caught this exact bug once already (every generated
@@ -1509,7 +1523,7 @@ def validate_agents(errors: list[str]) -> None:
             )
             check(
                 "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
-                f"Claude agent routes retrieval through tool-routing.instructions.md but its tools: allowlist omits mcp__semble/mcp__context-mode, so it cannot follow that instruction: {path}",
+                f"Claude agent must allow both Semble and Context Mode MCP: {path}",
                 errors,
             )
         # Per-agent model/effort tiering: validate any emitted frontmatter fields
@@ -1627,8 +1641,9 @@ def validate_agents(errors: list[str]) -> None:
             mcp_servers = codex_config.get("mcp_servers", {})
             check(
                 isinstance(mcp_servers, dict)
-                and {"semble", "context-mode"} <= set(mcp_servers),
-                f"Codex agent requires Semble/context-mode but config does not provide inherited MCP access: {path}",
+                and "semble" in mcp_servers
+                and "context-mode" in mcp_servers,
+                f"Codex agent requires both Semble and Context Mode MCP from inherited config: {path}",
                 errors,
             )
     for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
@@ -1774,20 +1789,72 @@ def validate_model_leaks(errors: list[str]) -> None:
                     )
 
 
+# Every generated target must carry the identical Semble, Context7, and
+# Context Mode MCP server entries from shared/mcp/servers.json. Iterating this
+# tuple per server (rather than one combined boolean) is what lets a single
+# server's drift or absence fail independently of the others.
+MCP_PARITY_SERVERS = ("semble", "context7", "context-mode")
+
+
+def mcp_server_parity_errors(
+    servers: dict[str, object],
+    shared_mcp: dict[str, object],
+    label: str,
+    server_names: tuple[str, ...] = MCP_PARITY_SERVERS,
+) -> list[str]:
+    """Return one failure per drifted/missing MCP server, never a combined check."""
+    errors: list[str] = []
+    for server in server_names:
+        if server not in servers:
+            errors.append(f"{label} missing MCP server: {server}")
+            continue
+        if servers.get(server) != shared_mcp.get(server):
+            errors.append(f"{label} MCP server drifted from shared source: {server}")
+    return errors
+
+
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
-    for server in ("semble", "context-mode", "context7"):
-        check(
-            server in github_mcp.get("servers", {}),
-            f"github missing MCP server: {server}",
-            errors,
-        )
-        check(
-            server in claude_mcp.get("mcpServers", {}),
-            f"claude missing MCP server: {server}",
-            errors,
-        )
+    shared_mcp = json.loads(read(REPO_ROOT / "shared" / "mcp" / "servers.json"))[
+        "servers"
+    ]
+    check(
+        shared_mcp.get("context-mode")
+        == {
+            "command": "bash",
+            "args": [
+                "-c",
+                'REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; exec "$REPO_ROOT/.claude/hooks/scripts/context-mode-dispatch.sh" server',
+            ],
+        },
+        "shared Context Mode MCP server must route through an absolute-REPO_ROOT dispatcher server command, not a bare workspace-relative path",
+        errors,
+    )
+    context_dispatcher = read(
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-dispatch.sh"
+    )
+    check(
+        'openai-codex) CONTEXT_MODE_TARGET="codex"' in context_dispatcher,
+        "Context Mode dispatcher must map OpenAI Codex hooks to upstream target id 'codex'",
+        errors,
+    )
+    check(
+        f'PINNED_CONTEXT_MODE_VERSION="{CONTEXT_MODE_PINNED_VERSION}"'
+        in context_dispatcher,
+        f"Context Mode dispatcher must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        errors,
+    )
+    check(
+        '"$MODE" == "server"' in context_dispatcher,
+        "Context Mode dispatcher must support the MCP server route",
+        errors,
+    )
+    for servers, label in (
+        (github_mcp.get("servers", {}), "github"),
+        (claude_mcp.get("mcpServers", {}), "claude"),
+    ):
+        errors.extend(mcp_server_parity_errors(servers, shared_mcp, label))
     check(
         "servers" not in claude_mcp,
         "Claude .mcp.json must use mcpServers, not servers",
@@ -1819,6 +1886,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     errors.extend(codex_config_contract_errors(codex_config_data, "Codex config"))
+    codex_servers = codex_config_data.get("mcp_servers", {})
+    if isinstance(codex_servers, dict):
+        errors.extend(mcp_server_parity_errors(codex_servers, shared_mcp, "codex"))
+    else:
+        errors.append("Codex config mcp_servers must be a table")
     authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
     errors.extend(
         codex_config_contract_errors(
@@ -1842,6 +1914,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "Codex config missing context7 MCP server",
         errors,
     )
+    for deny_rule in (
+        "Read(./.env)",
+        "Read(./.env.*)",
+        "Read(./secrets/**)",
+        "Read(./config/credentials.json)",
+    ):
+        check(
+            deny_rule in read(TARGET_ROOT / ".claude" / "settings.json"),
+            f"protected Context Mode deny rule missing: {deny_rule}",
+            errors,
+        )
     check(
         "../.claude/skills/" in codex_config,
         "Codex config must point skills at .claude/skills",
@@ -2296,6 +2379,55 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     validate_hook_guardrails(errors)
     validate_generated_scripts(errors)
+
+
+# Every routing/permission surface that can actually advertise or grant an MCP
+# tool. Narrative policy/doc prose (e.g. tool-routing.instructions.md) is
+# reconciled by the documenter separately and is deliberately not a member of
+# this list: it is guidance text, not a place a client discovers callable
+# tools.
+CONTEXT_MODE_ROUTING_SURFACE_FILES = (
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".codex/config.toml",
+    ".claude/hooks/scripts/context-mode-dispatch.sh",
+    ".claude/hooks/scripts/context-mode-mcp-filter.mjs",
+)
+
+
+def validate_context_mode_tool_surface(errors: list[str]) -> None:
+    """Assert the advertised Context Mode tool surface is exactly the approved
+    four-tool allowlist and that no blocked tool name reaches any generated
+    routing or permission surface (agent tool grants, MCP server configs,
+    hook scripts)."""
+    filter_text = read(
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs"
+    )
+    allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+    check(
+        f"new Set([{allowed}])" in filter_text,
+        "Context Mode MCP filter allowlist must be exactly the four approved tools",
+        errors,
+    )
+    check(
+        f'"{CONTEXT_MODE_PINNED_VERSION}"' in filter_text,
+        f"Context Mode MCP filter must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        errors,
+    )
+    surfaces = [
+        *sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md")),
+        *sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml")),
+        *sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md")),
+        *(TARGET_ROOT / relative for relative in CONTEXT_MODE_ROUTING_SURFACE_FILES),
+    ]
+    for path in surfaces:
+        text = read(path)
+        for blocked in CONTEXT_MODE_BLOCKED_TOOLS:
+            check(
+                blocked not in text,
+                f"generated Context Mode routing surface names blocked tool {blocked}: {path}",
+                errors,
+            )
 
 
 def run_hook(
@@ -5117,11 +5249,14 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md"
     ).lower()
     check(
-        "devcontainer" in tool_routing_text
-        and "required" in tool_routing_text
-        and "semble" in tool_routing_text
-        and "context-mode" in tool_routing_text,
-        "tool-routing instructions must distinguish required devcontainer tooling from outside-devcontainer fallbacks",
+        "semble" in tool_routing_text
+        and "context mode" in tool_routing_text
+        and all(tool in tool_routing_text for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+        and "hook-only" not in tool_routing_text
+        and "does not expose mcp tools" not in tool_routing_text,
+        "tool-routing instructions must name all four allowed Context Mode "
+        "tools and must not claim Context Mode is hook-only or exposes no "
+        "MCP tools",
         errors,
     )
 
@@ -5542,8 +5677,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
         check(
-            "npm install -g context-mode" in dockerfile,
-            "devcontainer Dockerfile must install context-mode",
+            f"npm install -g context-mode@{CONTEXT_MODE_PINNED_VERSION}" in dockerfile,
+            f"devcontainer Dockerfile must install context-mode pinned to {CONTEXT_MODE_PINNED_VERSION}",
             errors,
         )
         check(
@@ -5824,6 +5959,12 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 "explorations",
                 "session_logs",
                 "quality_reports",
+                # Derived machine-local hook state. It is always untracked/ignored,
+                # never git-committed like the other consumer-state roots above, so
+                # it is exercised by the dedicated cache-preservation coverage in
+                # validate_state_sync/validate_local_only_state_sync instead of the
+                # git-add/commit fixture below.
+                ".cache",
                 "instructions/project-context.instructions.md",
                 "settings.local.json",
             ),
@@ -7928,6 +8069,7 @@ def main() -> int:
         validate_agents(errors)
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
+        validate_context_mode_tool_surface(errors)
         validate_skills_and_paths(errors)
         validate_docs_parity(errors)
         validate_memory_security_authority(errors)

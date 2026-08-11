@@ -31,12 +31,16 @@ from generate_targets import (  # noqa: E402
 from validate_targets import (  # noqa: E402
     CODEX_CODER_ESCALATION,
     CODEX_ROLE_MODEL_INTENTS,
+    CONTEXT_MODE_ALLOWED_TOOLS,
+    CONTEXT_MODE_BLOCKED_TOOLS,
+    CONTEXT_MODE_PINNED_VERSION,
     POLICY_SCOPE_FIXTURES,
     codex_agent_instruction_errors,
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
     github_agent_model_errors,
+    mcp_server_parity_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
     root_guidance_errors,
@@ -535,6 +539,75 @@ def test_validate_targets() -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS generated target is structurally valid" in result.stdout
+
+
+def test_mcp_server_parity_errors_fail_independently() -> None:
+    """A single drifted/missing server must fail on its own, never bundled
+    with, or masked by, an unrelated server's result."""
+    shared_mcp = {
+        "semble": {"command": "uvx", "args": ["semble"]},
+        "context7": {"command": "npx", "args": ["context7"]},
+        "context-mode": {"command": "bash", "args": ["dispatch.sh", "server"]},
+    }
+
+    only_semble_drifted = dict(shared_mcp, semble={"command": "uvx", "args": ["WRONG"]})
+    assert mcp_server_parity_errors(only_semble_drifted, shared_mcp, "target") == [
+        "target MCP server drifted from shared source: semble"
+    ]
+
+    only_context7_missing = {
+        key: value for key, value in shared_mcp.items() if key != "context7"
+    }
+    assert mcp_server_parity_errors(only_context7_missing, shared_mcp, "target") == [
+        "target missing MCP server: context7"
+    ]
+
+    only_context_mode_drifted = dict(
+        shared_mcp, **{"context-mode": {"command": "node", "args": []}}
+    )
+    assert mcp_server_parity_errors(
+        only_context_mode_drifted, shared_mcp, "target"
+    ) == ["target MCP server drifted from shared source: context-mode"]
+
+    assert mcp_server_parity_errors(shared_mcp, shared_mcp, "target") == []
+
+
+def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:
+    """The approved allowlist is exact and closed: exactly four tools, pinned
+    to 1.0.169, and no blocked tool name reaches any generated routing or
+    permission surface (agent tool grants, MCP server configs, hook
+    scripts)."""
+    assert CONTEXT_MODE_ALLOWED_TOOLS == (
+        "ctx_index",
+        "ctx_search",
+        "ctx_stats",
+        "ctx_doctor",
+    )
+    assert CONTEXT_MODE_PINNED_VERSION == "1.0.169"
+
+    target_root = REPO_ROOT / "dist" / "multi-agent"
+    surfaces = [
+        *sorted((target_root / ".claude" / "agents").glob("*.md")),
+        *sorted((target_root / ".codex" / "agents").glob("*.toml")),
+        *sorted((target_root / ".github" / "agents").glob("*.agent.md")),
+        target_root / ".mcp.json",
+        target_root / ".vscode" / "mcp.json",
+        target_root / ".codex" / "config.toml",
+        target_root / ".claude" / "hooks" / "scripts" / "context-mode-dispatch.sh",
+        target_root / ".claude" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs",
+    ]
+    for path in surfaces:
+        text = path.read_text()
+        for blocked in CONTEXT_MODE_BLOCKED_TOOLS:
+            assert blocked not in text, (
+                f"{path} names blocked Context Mode tool {blocked}"
+            )
+
+    filter_text = (
+        REPO_ROOT / "shared/hooks/scripts/context-mode-mcp-filter.mjs"
+    ).read_text()
+    allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+    assert f"new Set([{allowed}])" in filter_text
 
 
 def test_memory_security_authority_contract_requires_headings_and_links() -> None:

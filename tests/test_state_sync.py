@@ -23,6 +23,7 @@ from runtime_ownership import render_restore_script  # noqa: E402
 
 SCRIPT_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "state-sync.sh"
 RESTORE_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "restore-root-adapters.sh"
+DISPATCH_SRC = REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-dispatch.sh"
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -273,6 +274,198 @@ def test_checkpoint_commits_locally_without_remote_io(
     assert _local_show(writer, "plans/checkpoint.md") == "checkpointed\n"
     assert not _remote_show(remote, "plans/checkpoint.md")
     assert _traced_remote_commands(trace_path) == []
+
+
+def test_checkpoint_upgrades_gitignore_and_never_tracks_context_cache(
+    script: Path, tmp_path: Path
+) -> None:
+    """Existing nested repos preserve user ignores and exclude derived cache."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "cache-ignore")
+    gitignore = writer / ".claude/.gitignore"
+    gitignore.write_text("user-sentinel/\n")
+    cache_file = writer / ".claude/.cache/context-mode/content/index.db"
+    cache_file.parent.mkdir(parents=True)
+    cache_file.write_text("derived")
+    _write(writer, "MEMORY.md", "tracked\n")
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0, result.stderr
+    ignore_text = gitignore.read_text()
+    assert "user-sentinel/" in ignore_text
+    assert ignore_text.splitlines().count(".cache/") == 1
+    assert _git(writer / ".claude", "ls-files", ".cache").stdout == ""
+
+    second = _sync(script, writer, remote, "checkpoint")
+    assert second.returncode == 0, second.stderr
+    assert gitignore.read_text().splitlines().count(".cache/") == 1
+
+
+def test_setup_upgrades_existing_nested_gitignore_without_overwriting_user_entries(
+    script: Path, tmp_path: Path
+) -> None:
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "setup-ignore")
+    gitignore = writer / ".claude/.gitignore"
+    gitignore.write_text("user-sentinel/\n")
+
+    result = _sync(script, writer, remote, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert gitignore.read_text().splitlines() == [
+        "user-sentinel/",
+        "",
+        "# Derived local caches; never synced.",
+        ".cache/",
+    ]
+
+
+def test_checkpoint_untracks_previously_committed_cache_without_deleting_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """Upgrade removes cache from history while preserving local cache bytes."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "tracked-cache")
+    cache_file = writer / ".claude/.cache/context-mode/content/index.db"
+    cache_file.parent.mkdir(parents=True)
+    cache_file.write_text("local-derived-data")
+    assert (
+        _git(
+            writer / ".claude", "add", "-f", ".cache/context-mode/content/index.db"
+        ).returncode
+        == 0
+    )
+    assert (
+        _git(writer / ".claude", "commit", "-qm", "legacy tracked cache").returncode
+        == 0
+    )
+    assert _git(writer / ".claude", "push", "-q").returncode == 0
+    assert (
+        _remote_show(remote, ".cache/context-mode/content/index.db")
+        == "local-derived-data"
+    )
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0, result.stderr
+    assert cache_file.read_text() == "local-derived-data"
+    assert _git(writer / ".claude", "ls-files", ".cache").stdout == ""
+    assert _sync(script, writer, remote, "publish").returncode == 0
+    assert _remote_show(remote, ".cache/context-mode/content/index.db") == ""
+
+
+@pytest.mark.parametrize("reconcile_shape", ["unrelated", "common-history"])
+def test_remote_tracked_cache_is_untracked_after_every_successful_reconcile(
+    script: Path, tmp_path: Path, reconcile_shape: str
+) -> None:
+    """A remote cache survives locally but cannot remain tracked or republish."""
+    remote = _bare_remote(tmp_path)
+    writer_a = _new_writer(script, tmp_path, remote, "remote-cache-a")
+    writer_b = None
+    if reconcile_shape == "common-history":
+        writer_b = _new_writer(script, tmp_path, remote, "remote-cache-b")
+
+    cache_rel = ".cache/context-mode/content/remote.db"
+    cache_a = writer_a / ".claude" / cache_rel
+    cache_a.parent.mkdir(parents=True)
+    cache_a.write_text("remote-derived-data")
+    assert _git(writer_a / ".claude", "add", "-f", cache_rel).returncode == 0
+    assert (
+        _git(writer_a / ".claude", "commit", "-qm", "hostile remote cache").returncode
+        == 0
+    )
+    assert _git(writer_a / ".claude", "push", "-q").returncode == 0
+
+    if writer_b is None:
+        writer_b = _new_writer(script, tmp_path, remote, "remote-cache-b")
+    else:
+        result = _sync(script, writer_b, remote, "pull")
+        assert result.returncode == 0, result.stderr
+
+    cache_b = writer_b / ".claude" / cache_rel
+    assert cache_b.read_text() == "remote-derived-data"
+    assert _git(writer_b / ".claude", "ls-files", ".cache").stdout == ""
+    assert _sync(script, writer_b, remote, "publish").returncode == 0
+    assert _remote_show(remote, cache_rel) == ""
+
+
+def _install_dispatcher(root: Path) -> Path:
+    """Copy the real context-mode dispatcher into a writer's ``.claude/``."""
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    dispatcher = scripts / "context-mode-dispatch.sh"
+    shutil.copy(DISPATCH_SRC, dispatcher)
+    return dispatcher
+
+
+def test_hostile_remote_cache_with_forged_marker_is_quarantined_not_trusted(
+    script: Path, tmp_path: Path
+) -> None:
+    """A hostile/compromised ai-state remote can restore a poisoned cache
+    directory together with a forged plaintext provenance marker (correct,
+    guessable repository/version/filter fields), but it can never learn the
+    local-only secret the dispatcher also requires. The restored cache must
+    be quarantined, never trusted or searched live."""
+    remote = _bare_remote(tmp_path)
+    writer_a = _new_writer(script, tmp_path, remote, "hostile-cache-a")
+    writer_b_root = tmp_path / "hostile-cache-b"
+
+    cache_root_rel = ".cache/context-mode"
+    poisoned_rel = f"{cache_root_rel}/content/remote.db"
+    marker_rel = f"{cache_root_rel}/.bootstrap-provenance"
+
+    poisoned = writer_a / ".claude" / poisoned_rel
+    poisoned.parent.mkdir(parents=True)
+    poisoned.write_text("poisoned-cache-bytes")
+    marker = writer_a / ".claude" / marker_rel
+    marker.write_text(
+        f"repository={writer_b_root.resolve()}\n"
+        "context-mode=1.0.169\n"
+        "filter=ctx-index-file-content-v1\n"
+        "secret=guessed-by-attacker\n"
+    )
+    assert (
+        _git(writer_a / ".claude", "add", "-f", poisoned_rel, marker_rel).returncode
+        == 0
+    )
+    assert (
+        _git(
+            writer_a / ".claude", "commit", "-qm", "hostile cache + forged marker"
+        ).returncode
+        == 0
+    )
+    assert _git(writer_a / ".claude", "push", "-q").returncode == 0
+
+    writer_b = _new_writer(script, tmp_path, remote, "hostile-cache-b")
+    cache_root = writer_b / ".claude" / cache_root_rel
+    assert (cache_root / "content" / "remote.db").read_text() == "poisoned-cache-bytes"
+    assert _git(writer_b / ".claude", "ls-files", ".cache").stdout == ""
+
+    dispatcher = _install_dispatcher(writer_b)
+    result = subprocess.run(
+        ["bash", str(dispatcher), "claude-code", "sessionstart"],
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "PATH": "/usr/bin:/bin"},
+    )
+    assert result.returncode == 0, result.stderr
+
+    # The poisoned bytes must never become the live, searchable cache...
+    assert not (cache_root / "content" / "remote.db").exists()
+    # ...they must survive only inside a quarantined sibling directory...
+    quarantines = list(
+        (writer_b / ".claude" / ".cache").glob("context-mode.untrusted.*")
+    )
+    assert len(quarantines) == 1
+    assert (
+        quarantines[0] / "content" / "remote.db"
+    ).read_text() == "poisoned-cache-bytes"
+    # ...and the freshly (re)created marker must not carry the attacker's guess.
+    fresh_marker = (cache_root / ".bootstrap-provenance").read_text()
+    assert "secret=guessed-by-attacker" not in fresh_marker
+    assert "secret=" in fresh_marker
 
 
 def test_publish_sends_checkpoint_without_another_commit_and_is_idempotent(

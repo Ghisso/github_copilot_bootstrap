@@ -48,13 +48,14 @@ Expected:
 
 Expected:
 
-- GitHub and Claude JSON MCP files include `semble`, `context-mode`, and `context7`.
-- Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context-mode]`, and `[mcp_servers.context7]`.
+- GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`).
+- Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context7]`, and `[mcp_servers.context-mode]`, all three targets sharing the same dispatcher route.
+- The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`; every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
 - Tool-routing policy preserves:
   - direct reads for known paths
   - `rg` for exact literals
   - Semble for semantic discovery
-  - context-mode for long outputs and continuity
+  - the four guarded Context Mode MCP tools alongside its lifecycle hooks, both routed through the dispatcher and pinned to `1.0.169`
   - context7 for current external library API documentation
   - no duplicate broad searches
 
