@@ -57,9 +57,14 @@ if [[ ! -f "$BIG_PLAN" ]]; then
 fi
 
 PLAN_TYPE="$(fm_read "$BIG_PLAN" "type" || true)"
-STATUS="$(fm_read "$BIG_PLAN" "status" || true)"
+STATUS="$(fm_read_unique_status "$BIG_PLAN" || true)"
 if [[ "$PLAN_TYPE" != "big-plan" ]]; then
   deny_pretool "$BIG_PLAN must have type: big-plan frontmatter"
+  exit 0
+fi
+
+if [[ "$STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+  deny_pretool "$BIG_PLAN must contain exactly one status field before branch creation"
   exit 0
 fi
 

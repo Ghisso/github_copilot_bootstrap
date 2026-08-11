@@ -60,8 +60,23 @@ SLUG="${CURRENT_BRANCH%_implementation}"
 BIG_PLAN="$REPO_ROOT/.claude/plans/$SLUG.md"
 [[ -f "$BIG_PLAN" ]] || exit 0
 
+BIG_STATUS="$(fm_read_unique_status "$BIG_PLAN" || true)"
+if [[ "$BIG_STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+  additional_context "PostToolUse" "commit closeout not recorded because the big plan must contain exactly one status field"
+  exit 0
+fi
+
 CURRENT_PHASE="$(fm_read "$BIG_PLAN" "current_phase" || true)"
 [[ -n "$CURRENT_PHASE" ]] || exit 0
+
+CURRENT_PLAN="$REPO_ROOT/.claude/plans/$CURRENT_PHASE.md"
+if [[ -f "$CURRENT_PLAN" ]]; then
+  CURRENT_STATUS="$(fm_read_unique_status "$CURRENT_PLAN" || true)"
+  if [[ "$CURRENT_STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    additional_context "PostToolUse" "commit closeout not recorded because the current phase plan must contain exactly one status field"
+    exit 0
+  fi
+fi
 
 # macOS's default /bin/bash is 3.2 and has no `mapfile`/`readarray`; accumulate
 # with a `while read` loop instead (mirrors _lib-frontmatter.sh).
@@ -86,8 +101,11 @@ for index in ${phases[@]+"${!phases[@]}"}; do
       additional_context "PostToolUse" "commit closeout not recorded because next phase plan is missing: .claude/plans/$candidate_phase.md"
       exit 0
     fi
-    candidate_status="$(fm_read "$candidate_plan" "status" || true)"
-    if [[ "$candidate_status" != "cancelled" ]]; then
+    candidate_status="$(fm_read_unique_status "$candidate_plan" || true)"
+    if [[ "$candidate_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      additional_context "PostToolUse" "commit closeout not recorded because the next phase plan must contain exactly one status field: .claude/plans/$candidate_phase.md"
+      exit 0
+    elif [[ "$candidate_status" != "cancelled" ]]; then
       next_phase="$candidate_phase"
       break
     fi
@@ -103,7 +121,6 @@ if [[ -n "$next_phase" ]]; then
   fm_write "$BIG_PLAN" "current_phase" "$next_phase"
 else
   fm_write "$BIG_PLAN" "current_phase" ""
-  BIG_STATUS="$(fm_read "$BIG_PLAN" "status" || true)"
   if [[ "$BIG_STATUS" != "cancelled" ]]; then
     fm_write "$BIG_PLAN" "status" "complete"
   fi

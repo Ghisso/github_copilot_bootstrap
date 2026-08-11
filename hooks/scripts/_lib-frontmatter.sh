@@ -247,6 +247,34 @@ fm_read() {
   ' "$file"
 }
 
+readonly DUPLICATE_STATUS_VALUE="__DUPLICATE_FRONTMATTER_STATUS__"
+
+# Read status only when it occurs exactly once in frontmatter. Callers compare
+# the sentinel explicitly so duplicate same-value and conflicting-value keys
+# fail closed without changing fm_read semantics for any other field.
+fm_read_unique_status() {
+  local file="$1"
+  [[ -f "$file" ]] || return 1
+  awk -v duplicate_value="$DUPLICATE_STATUS_VALUE" '
+    NR == 1 && $0 == "---" { in_fm = 1; next }
+    in_fm && $0 == "---" {
+      if (count > 1) {
+        print duplicate_value
+      } else if (count == 1) {
+        print value
+      }
+      exit
+    }
+    in_fm && $0 ~ "^status[[:space:]]*:" {
+      line = $0
+      sub("^[^:]*:[[:space:]]*", "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      value = line
+      count++
+    }
+  ' "$file"
+}
+
 fm_write() {
   local file="$1"
   local key="$2"
@@ -1024,8 +1052,10 @@ assert_commit_invariants() {
 
   local small_status closeout_log=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
-    small_status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$small_status" == "cancelled" ]]; then
+    small_status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$small_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before commit")
+    elif [[ "$small_status" == "cancelled" ]]; then
       failures+=("$small_plan is cancelled; a cancelled phase never certifies a commit, so advance current_phase past it")
     elif [[ "$small_status" != "complete" ]]; then
       failures+=("$small_plan must have status: complete before commit")
@@ -1177,8 +1207,10 @@ assert_push_invariants() {
       failures+=("missing small-plan file: .claude/plans/$phase.md")
       continue
     fi
-    status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$status" == "complete" ]]; then
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before PR/push")
+    elif [[ "$status" == "complete" ]]; then
       completed_count=$((completed_count + 1))
       last_completed_phase="$phase"
     elif [[ "$status" == "cancelled" ]]; then
