@@ -437,6 +437,388 @@ def test_pull_clears_half_initialized_rebase_state(
     assert "leftover rebase state from a previous sync" not in following_pull.stderr
 
 
+def test_pull_absorbs_log_churn_without_creating_rebase_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """Pull checkpoints log churn written after the former caller boundary."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "log-churn")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    before_count = _local_commit_count(writer)
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "log-churn-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "log-churn-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "${3:-}" == "merge-base" && ! -e "$LOG_CHURN_WRITTEN" ]]; then\n'
+        '  : > "$LOG_CHURN_WRITTEN"\n'
+        '  mkdir -p "$2/session_logs"\n'
+        '  printf "post-old-checkpoint churn\\n" >> "$2/session_logs/phase-b-churn.log"\n'
+        "  printf 'log-churn-written\\n' >> \"$GIT_INVOCATIONS\"\n"
+        "fi\n"
+        'if [[ "${3:-}" == "commit" ]]; then\n'
+        "  printf 'phase-b-churn-checkpoint-commit\\n' >> \"$GIT_INVOCATIONS\"\n"
+        "fi\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "LOG_CHURN_WRITTEN": str(tmp_path / "log-churn-written"),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    invocation_lines = invocations.read_text().splitlines()
+    churn_index = invocation_lines.index("log-churn-written")
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert (
+        _local_show(writer, "session_logs/phase-b-churn.log")
+        == "post-old-checkpoint churn\n"
+    )
+    assert _local_commit_count(writer) == before_count + 1
+    assert invocation_lines.index("phase-b-churn-checkpoint-commit") > churn_index
+    assert not (writer / ".claude" / ".git" / "rebase-merge").exists()
+    assert not (writer / ".claude" / ".git" / "rebase-apply").exists()
+
+
+def test_reconcile_repins_wildcard_fetch_refspec(script: Path, tmp_path: Path) -> None:
+    """Every reconciliation repairs a legacy wildcard fetch refspec."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "refspec-repair")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    nested = writer / ".claude"
+    assert (
+        _git(
+            nested,
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/*:refs/remotes/origin/*",
+        ).returncode
+        == 0
+    )
+
+    result = _sync(script, writer, remote, "pull")
+
+    assert result.returncode == 0
+    assert _git(
+        nested, "config", "--get-all", "remote.origin.fetch"
+    ).stdout.splitlines() == ["+refs/heads/ai-state:refs/remotes/origin/ai-state"]
+    assert _git(
+        nested, "config", "--get-all", "remote.origin.push"
+    ).stdout.splitlines() == ["refs/heads/ai-state:refs/heads/ai-state"]
+
+
+@pytest.mark.parametrize("refspec", ("remote.origin.fetch", "remote.origin.push"))
+def test_refspec_write_failure_skips_remote_reconciliation(
+    script: Path, tmp_path: Path, refspec: str
+) -> None:
+    """A failed pin write warns publicly without attempting pull or push."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(
+        script, tmp_path, remote, f"refspec-failure-{refspec.rsplit('.', 1)[1]}"
+    )
+    assert _sync(script, writer, remote, "push").returncode == 0
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "refspec-failure-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "refspec-failure-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s %s\\n" "${3:-}" "${4:-}" "${5:-}" >> "$GIT_INVOCATIONS"\n'
+        'if [[ "${3:-}" == "config" && "${4:-}" == "--replace-all" && "${5:-}" == "$FAIL_REFSPEC" ]]; then\n'
+        '  printf "forced refspec write failure\\n" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "FAIL_REFSPEC": refspec,
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    commands = [
+        line.split(maxsplit=1)[0] for line in invocations.read_text().splitlines()
+    ]
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "configuring pinned origin refspecs failed" in result.stderr
+    assert "pull: up to date" not in result.stderr
+    assert "pull" not in commands
+    assert "push" not in commands
+
+
+@pytest.mark.parametrize("failed_command", ("add", "commit"))
+def test_checkpoint_failure_skips_publication(
+    script: Path, tmp_path: Path, failed_command: str
+) -> None:
+    """A failed local checkpoint warns publicly without remote publication."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(
+        script, tmp_path, remote, f"checkpoint-failure-{failed_command}"
+    )
+    _write(writer, "session_logs/checkpoint-failure.log", "must stay local\n")
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "checkpoint-failure-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "checkpoint-failure-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        'if [[ "${3:-}" == "$FAIL_COMMAND" ]]; then\n'
+        '  printf "forced checkpoint failure\\n" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "push",
+        extra_env={
+            "FAIL_COMMAND": failed_command,
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    commands = [
+        line.split(maxsplit=1)[0] for line in invocations.read_text().splitlines()
+    ]
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "checkpoint failed" in result.stderr
+    assert "push failed" in result.stderr
+    assert "pull" not in commands
+    assert "push" not in commands
+
+
+@pytest.mark.parametrize("failed_command", ("add", "commit"))
+def test_reconcile_checkpoint_failure_skips_pull(
+    script: Path, tmp_path: Path, failed_command: str
+) -> None:
+    """An initialized pull stops at its post-fetch local checkpoint failure."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(
+        script, tmp_path, remote, f"reconcile-checkpoint-failure-{failed_command}"
+    )
+    assert _sync(script, writer, remote, "push").returncode == 0
+    _write(writer, "session_logs/reconcile-checkpoint-failure.log", "pending\n")
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "reconcile-checkpoint-failure-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "reconcile-checkpoint-failure-invocations.log"
+    boundary = tmp_path / "reconcile-checkpoint-boundary"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "${3:-}" == "merge-base" ]]; then\n'
+        '  : > "$RECONCILE_CHECKPOINT_BOUNDARY"\n'
+        "  printf 'reconcile-checkpoint-boundary\\n' >> \"$GIT_INVOCATIONS\"\n"
+        "fi\n"
+        'if [[ -e "$RECONCILE_CHECKPOINT_BOUNDARY" && "${3:-}" == "$FAIL_COMMAND" ]]; then\n'
+        "  printf 'reconcile-checkpoint-failed\\n' >> \"$GIT_INVOCATIONS\"\n"
+        '  printf "forced reconciliation checkpoint failure\\n" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "FAIL_COMMAND": failed_command,
+            "GIT_INVOCATIONS": str(invocations),
+            "RECONCILE_CHECKPOINT_BOUNDARY": str(boundary),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    invocation_lines = invocations.read_text().splitlines()
+    boundary_index = invocation_lines.index("reconcile-checkpoint-boundary")
+    failure_index = invocation_lines.index("reconcile-checkpoint-failed")
+    commands_after_boundary = [
+        line.split(maxsplit=1)[0] for line in invocation_lines[boundary_index + 1 :]
+    ]
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "local state checkpoint failed" in result.stderr
+    assert "pull failed" in result.stderr
+    assert "pull: up to date" not in result.stderr
+    assert any(line.startswith("fetch ") for line in invocation_lines[:boundary_index])
+    assert failure_index > boundary_index
+    assert "pull" not in commands_after_boundary
+    assert "push" not in commands_after_boundary
+
+
+def test_dirty_tree_race_fails_without_leaving_rebase_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """A write immediately before pull fails transiently without rebase state."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "dirty-race")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    peer = _new_writer(script, tmp_path, remote, "dirty-race-peer")
+    _write(peer, "session_logs/peer-update.log", "remote update\n")
+    assert _sync(script, peer, remote, "push").returncode == 0
+    _write(writer, "session_logs/local-update.log", "local update\n")
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "dirty-race-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "${3:-}" == "pull" ]]; then\n'
+        '  printf "race write\\n" >> "$2/session_logs/local-update.log"\n'
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "reconciliation with origin/ai-state failed" in result.stderr
+    assert (writer / ".claude" / "session_logs" / "local-update.log").read_text() == (
+        "local update\nrace write\n"
+    )
+    assert not (writer / ".claude" / ".git" / "rebase-merge").exists()
+    assert not (writer / ".claude" / ".git" / "rebase-apply").exists()
+
+
+def test_pre_rebase_checkpoint_rechecks_active_rebase(
+    script: Path, tmp_path: Path
+) -> None:
+    """The checkpoint guard protects a rebase started after dispatch begins."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "late-operator-rebase")
+    rebase_file = "plans/late-operator-rebase.md"
+    _write(writer, rebase_file, "base\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    nested = writer / ".claude"
+    assert _git(nested, "checkout", "-qb", "late-operator-work").returncode == 0
+    _write(writer, rebase_file, "operator\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "late operator").returncode == 0
+    assert _git(nested, "checkout", "-q", "ai-state").returncode == 0
+    _write(writer, rebase_file, "sync\n")
+    assert _git(nested, "add", "-A").returncode == 0
+    assert _git(nested, "commit", "-qm", "late sync").returncode == 0
+    assert _git(nested, "checkout", "-q", "late-operator-work").returncode == 0
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    error_log = nested / "session_logs" / "hooks-errors.log"
+    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "late-rebase-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "late-rebase-invocations.log"
+    protected_head = tmp_path / "protected-head"
+    protected_index = tmp_path / "protected-index"
+    protected_worktree = tmp_path / "protected-worktree"
+    protected_rebase = tmp_path / "protected-rebase"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "${3:-}" == "merge-base" && ! -e "$LATE_REBASE_STARTED" ]]; then\n'
+        '  : > "$LATE_REBASE_STARTED"\n'
+        f'  "{actual_git}" -C "$2" rebase ai-state >/dev/null 2>&1 || true\n'
+        f'  "{actual_git}" -C "$2" rev-parse HEAD > "$PROTECTED_HEAD"\n'
+        f'  "{actual_git}" -C "$2" ls-files --stage > "$PROTECTED_INDEX"\n'
+        f'  cp "$2/{rebase_file}" "$PROTECTED_WORKTREE"\n'
+        '  cp -a "$2/.git/rebase-merge" "$PROTECTED_REBASE_DIR"\n'
+        "  printf 'rebase-started\\n' >> \"$GIT_INVOCATIONS\"\n"
+        "fi\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "LATE_REBASE_STARTED": str(tmp_path / "late-rebase-started"),
+            "PROTECTED_HEAD": str(protected_head),
+            "PROTECTED_INDEX": str(protected_index),
+            "PROTECTED_WORKTREE": str(protected_worktree),
+            "PROTECTED_REBASE_DIR": str(protected_rebase),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    invocation_lines = invocations.read_text().splitlines()
+    rebase_start = invocation_lines.index("rebase-started")
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert not any(
+        line.split(maxsplit=1)[0] in {"add", "commit", "pull", "push"}
+        for line in invocation_lines[rebase_start + 1 :]
+    )
+    assert _local_head(writer) == protected_head.read_text().strip()
+    assert _git(nested, "ls-files", "--stage").stdout == protected_index.read_text()
+    assert (nested / rebase_file).read_bytes() == protected_worktree.read_bytes()
+    actual_rebase = nested / ".git" / "rebase-merge"
+    assert {path.relative_to(actual_rebase) for path in actual_rebase.rglob("*")} == {
+        path.relative_to(protected_rebase) for path in protected_rebase.rglob("*")
+    }
+    for path in protected_rebase.rglob("*"):
+        if path.is_file():
+            assert (
+                actual_rebase / path.relative_to(protected_rebase)
+            ).read_bytes() == (path.read_bytes())
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    if before_error_log is None:
+        assert not error_log.exists()
+    else:
+        assert error_log.read_bytes() == before_error_log
+
+
 def test_rebase_abort_alone_cannot_clear_half_initialized_state(
     script: Path, tmp_path: Path
 ) -> None:

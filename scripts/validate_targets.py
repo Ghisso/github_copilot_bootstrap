@@ -2058,6 +2058,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             "state-sync.sh must not silently discard failed rebase aborts",
             errors,
         )
+        check(
+            "--autostash" not in state_sync_text,
+            "state-sync.sh must not contain --autostash",
+            errors,
+        )
+        check(
+            'output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"'
+            in state_sync_text,
+            "state-sync.sh must use the exact rebase pull invocation",
+            errors,
+        )
 
     # Run generated Stop wrappers instead of relying on text searches: Codex
     # needs one JSON response, while Claude must leave stdout empty.

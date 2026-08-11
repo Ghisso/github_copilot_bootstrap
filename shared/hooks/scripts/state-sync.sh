@@ -147,19 +147,34 @@ init_nested_repo() {
 }
 
 # Commits whatever is currently uncommitted under .claude/ as a session
-# snapshot. Both cmd_push and cmd_pull call this before touching the remote so
-# the working tree is clean before `git pull --rebase`: a clean tree means the
-# only reachable pull failure is a rebase conflict (which we abort cleanly),
-# never an --autostash pop conflict that would leave the tree half-merged
-# (F4 in §9 of plans/plan-git-state-sync.md).
+# snapshot. Reconciliation calls this immediately before `git pull --rebase`
+# so the working tree is clean when the rebase starts.
 commit_local_state() {
   local message="${1:-}"
-  git -C "$CLAUDE_DIR" add -A
+  if ! git -C "$CLAUDE_DIR" add -A; then
+    return 1
+  fi
   if ! git -C "$CLAUDE_DIR" diff --cached --quiet \
     || [[ -z "$(git -C "$CLAUDE_DIR" log -1 --format=%H 2>/dev/null || true)" ]]; then
     local ts
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown-timestamp)"
-    git -C "$CLAUDE_DIR" commit -q --allow-empty -m "${message:-session: $ts}"
+    if ! git -C "$CLAUDE_DIR" commit -q --allow-empty -m "${message:-session: $ts}"; then
+      return 1
+    fi
+  fi
+}
+
+# Older nested repositories retain Git's default wildcard fetch refspec even
+# though init_nested_repo now pins state sync to one branch. Re-pin it on every
+# reconciliation so drift is repaired without requiring a reinstall.
+# ASSUMPTION: wildcard refspecs caused historical "Cannot rebase onto multiple
+# branches" failures; this needs empirical verification.
+ensure_pinned_refspecs() {
+  if ! git -C "$CLAUDE_DIR" config --replace-all "remote.origin.fetch" "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
+    return 1
+  fi
+  if ! git -C "$CLAUDE_DIR" config --replace-all "remote.origin.push" "refs/heads/$BRANCH:refs/heads/$BRANCH"; then
+    return 1
   fi
 }
 
@@ -207,7 +222,7 @@ preflight_mutating_rebase_state() {
 }
 
 dispatch_mutating() {
-  local preflight_status
+  local preflight_status command_status
   set +e
   preflight_mutating_rebase_state
   preflight_status=$?
@@ -218,7 +233,14 @@ dispatch_mutating() {
   if [[ $preflight_status -ne 0 ]]; then
     return "$preflight_status"
   fi
+  set +e
   "$@"
+  command_status=$?
+  set -e
+  if [[ $command_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return 0
+  fi
+  return "$command_status"
 }
 
 clear_current_pull_rebase_state() {
@@ -254,8 +276,17 @@ cmd_setup() {
     return 0
   fi
   init_nested_repo
-  commit_local_state "bootstrap: init ai-state"
-  reconcile_committed_state || true
+  if ! commit_local_state "bootstrap: init ai-state"; then
+    return 1
+  fi
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
 
   # D5 / F1 (§9): once .claude/ is first materialised here, restore the
   # root-level adapter files that live outside .claude/ (carried in
@@ -283,7 +314,12 @@ reconcile_committed_state() {
     return 0
   fi
 
-  local remote_ref_status output status conflicts
+  if ! ensure_pinned_refspecs; then
+    warn "configuring pinned origin refspecs failed; local commits are intact and will retry on the next sync."
+    return 1
+  fi
+
+  local remote_ref_status output status conflicts preflight_status
   set +e
   git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
   remote_ref_status=$?
@@ -311,8 +347,24 @@ reconcile_committed_state() {
     return 0
   fi
 
+  # Re-check immediately before staging: an operator rebase can begin after
+  # the entrypoint guard, while hook logging can dirty the tree before pull.
   set +e
-  output="$(git -C "$CLAUDE_DIR" pull --rebase --autostash origin "$BRANCH" 2>&1)"
+  preflight_mutating_rebase_state
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  if ! commit_local_state; then
+    warn "local state checkpoint failed; reconciliation will retry on the next sync."
+    return 1
+  fi
+
+  set +e
+  # Git's autostash mode writes rebase metadata before discovering renewed log
+  # churn; without it, this residual race fails cleanly and retries next sync.
+  output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"
   status=$?
   set -e
   if [[ $status -ne 0 ]]; then
@@ -346,7 +398,15 @@ cmd_publish() {
     warn "no state remote configured; local checkpoint remains unpublished."
     return 0
   fi
-  if ! reconcile_committed_state; then
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
+  if [[ $reconcile_status -ne 0 ]]; then
     warn "publish skipped: reconciliation with origin/$BRANCH failed. Local commits are safe and will retry once the conflict is resolved."
     return 1
   fi
@@ -364,7 +424,14 @@ cmd_publish() {
 }
 
 cmd_pull() {
+  local setup_status reconcile_status
+  set +e
   cmd_setup
+  setup_status=$?
+  set -e
+  if [[ $setup_status -ne 0 ]]; then
+    return "$setup_status"
+  fi
   if is_local_only; then
     info "pull: local-only mode; bootstrap complete, remote sync skipped."
     return 0
@@ -373,12 +440,12 @@ cmd_pull() {
     warn "no state remote configured; nothing to pull from."
     return 0
   fi
-  # Commit any local edits first so the rebase below runs against a clean tree
-  # (F4): removes the --autostash-pop-conflict path entirely.
-  commit_local_state
-
-  if ! reconcile_committed_state; then
-    return 1
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -ne 0 ]]; then
+    return "$reconcile_status"
   fi
   info "pull: up to date with origin/$BRANCH"
 }
@@ -442,12 +509,19 @@ cmd_migrate() {
   # of truth at migration time. If a bucket has newer state, pull it manually
   # with the old hf-ai-sync.py before running this, one last time.
   init_nested_repo
-  commit_local_state "migrate: import pre-git state"
-  if ! reconcile_committed_state; then
-    # Reconciliation aborted on conflict (not a network problem): the migrated
-    # state is committed locally, but pushing now would be a doomed
-    # non-fast-forward. Skip the push and point at the manual resolution.
-    warn "migration state committed locally but reconciliation with origin/$BRANCH conflicts; not pushing. Resolve the conflict as described above, then: git -C $CLAUDE_DIR push origin $BRANCH."
+  if ! commit_local_state "migrate: import pre-git state"; then
+    return 1
+  fi
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
+  if [[ $reconcile_status -ne 0 ]]; then
+    warn "migration state committed locally but reconciliation with origin/$BRANCH failed; not pushing. Resolve the reported issue, then: git -C $CLAUDE_DIR push origin $BRANCH."
   elif ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     local output status
     set +e
