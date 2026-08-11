@@ -3,8 +3,8 @@ name: 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
 type: small-plan
 parent_plan: state-sync-recovery-and-plan-cancellation
 phase_index: 6
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-11_context-mode-local-cache-phase-F.md
 ---
 
 # Small Plan: 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
@@ -224,22 +224,22 @@ rm -rf /tmp/dist-gen-a
 
 ## Done Criteria
 
-- [ ] Hooks and filtered MCP use one dispatcher, repository identity, and guarded local cache.
-- [ ] Exactly four Context Mode tools are advertised; every other tool is locally rejected.
-- [ ] Guarded `ctx_index` passes containment, bounds, provenance, and upstream `Read` deny tests.
-- [ ] Context Mode is exactly `1.0.169` across install, fallback, runtime, and tests.
-- [ ] Cache cannot be restored as trusted state, tracked, published, or used as lifecycle evidence.
-- [ ] All generated MCP routes are coherent; per-server parity validation is correct.
-- [ ] Direct reads, `rg`, Semble, and Context7 behavior remain available and accurately documented.
-- [ ] Full verification, two-pass review, documentation, findings, score, learn, session log, and atomic Phase F commit gates pass.
+- [x] Hooks and filtered MCP use one dispatcher, repository identity, and guarded local cache.
+- [x] Exactly four Context Mode tools are advertised; every other tool is locally rejected.
+- [x] Guarded `ctx_index` passes containment, bounds, provenance, and upstream `Read` deny tests.
+- [x] Context Mode is exactly `1.0.169` across install, fallback, runtime, and tests.
+- [x] Cache cannot be restored as trusted state, tracked, published, or used as lifecycle evidence.
+- [x] All generated MCP routes are coherent; per-server parity validation is correct.
+- [x] Direct reads, `rg`, Semble, and Context7 behavior remain available and accurately documented.
+- [x] Full verification, two-pass review, documentation, findings, score, learn, session log, and atomic Phase F commit gates pass.
 
 The next action after approval is coder Step 1 against the frozen partial diff.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

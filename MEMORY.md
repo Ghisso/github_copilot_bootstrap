@@ -362,3 +362,32 @@
 - [LEARN:documentation] Reconstruct incident duration from durable timestamped
   logs or reflogs, not planning estimates. Keep the exact volatile timeline in
   its dated incident record rather than portable MEMORY.
+- [LEARN:security] A protocol allowlist must key on the method alone, never on
+  `method && has(id)`. Gating on request shape leaves notifications and batch
+  arrays falling through to the unvalidated forward path: a `tools/call`
+  notification reached upstream with no allowlist and no version gate at all.
+  Default-deny on message shape first, then dispatch on method.
+- [LEARN:security] Bounding a security-relevant tracking map by evicting the
+  oldest entry is fail-open: eviction untracks a still-pending request, so its
+  later response bypasses the filter that entry existed to apply. Refuse new
+  entries at capacity instead. I introduced exactly this regression while
+  fixing an unbounded-growth note, and review caught it.
+- [LEARN:security] Anti-forgery state must live outside every channel that can
+  restore it. A provenance marker made only of public constants and a
+  predictable path, stored inside the synced working tree, is forgeable by a
+  hostile remote; bind it to a locally generated secret kept outside that tree,
+  and ignore the secret's temp-file glob too, not just its final name.
+- [LEARN:tests] An assertion that cannot fail is worse than no assertion,
+  because it advertises coverage. `process.stderr.read(0)` always returns `""`,
+  so a "must not be logged" check passed unconditionally. Prove a new guard by
+  running its test against the pre-fix code and watching it fail.
+- [LEARN:tests] When a regression's failure mode is a silent hang, assert with
+  a bounded wait rather than a blocking read, so a future regression fails
+  cleanly instead of stalling the suite.
+- [LEARN:verification] Reconcile agent claims against the artifact, not the
+  report. A subagent described this phase's own changed files as "pre-existing
+  unrelated drift"; `check_runtime.py` disagreed, and it was a required gate.
+- [LEARN:security] `trap ... RETURN INT TERM` in one bash call is not uniformly
+  scoped: `RETURN` is function-local but `INT`/`TERM` are process-wide, so a
+  handler referencing a function `local` survives the frame and aborts under
+  `set -u`. Reset signal traps on every exit path, including early returns.
