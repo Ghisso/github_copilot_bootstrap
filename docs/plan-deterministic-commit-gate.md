@@ -94,7 +94,7 @@ Each phase is one small plan, in dependency order; each leaves the tree green (`
 ### Phase 4 — `R-HOOKS-07d`: adversarial validator cases
 
 - **Change:** in [validate_targets.py](../scripts/validate_targets.py), add throwaway-repo cases that set `core.hooksPath` to the generated dir and run real `git commit`s. All commits below are on a `<plan>_implementation` branch unless stated:
-  - invalid state (no score / score < 90 / stale `content_hash` / small-plan not `complete` / missing closeout `**Status:** COMPLETED` / missing LEARN) → **blocked** (`git commit` exits non-zero).
+  - invalid state (no score / score < 90 / stale `content_hash` / small-plan not `complete` / current phase is `cancelled` / missing closeout `**Status:** COMPLETED` / missing LEARN) → **blocked** (`git commit` exits non-zero). A cancelled current phase gets a distinct stale-pointer message because cancellation never certifies a commit.
   - fully valid state → **allowed**.
   - **alias evasion** (`git config alias.ci commit; git ci -m ...`) with invalid state → **blocked** — the residual the layer exists to close, caught here because the commit lands on an implementation branch.
   - `git -C <path> commit` with invalid state → **blocked**.
@@ -112,6 +112,12 @@ Each phase is one small plan, in dependency order; each leaves the tree green (`
 ---
 
 ## 5. What this closes vs. leaves open
+
+The later cancellation extension keeps this commit invariant strict and changes
+only the phase-machine and push contract. Closeout skips cancelled phases. Push
+accepts a mix of completed and fully evidenced cancelled phases only when at
+least one phase completed; it counts commits for completed phases and binds the
+findings report to the last completed phase.
 
 **Closes**, for every commit reaching a `<plan>_implementation` branch: human/IDE/script commits ungated (#1), git-alias evasion (#2 — `git ci` now hits the same gate), Copilot timeout-fail-open for the commit invariant (#3, git hooks have no such timeout), and cross-runtime stdout-convention dependence for commits (#4).
 

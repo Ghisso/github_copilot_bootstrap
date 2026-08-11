@@ -139,7 +139,7 @@ Expected:
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
-- PR creation uses `--base dev`, and implementation-branch pushes are blocked until all phases are complete.
+- PR creation uses `--base dev`, and implementation-branch pushes are blocked until every phase is complete or fully evidenced as cancelled and at least one phase is complete.
 - SessionStart hooks in a configured consumer retain `state-sync.sh pull` for mutable AI state on the git-backed `ai-state` branch. Codex and Claude Stop each use one sequential wrapper: session log, session-log check, `checkpoint`, then best-effort `publish`; no event uses concurrent checkpoint/publish handlers. Codex emits one valid JSON response with no child stdout; Claude emits no wrapper stdout.
 - Codex and Claude `UserPromptSubmit` use compatible `push` as a 60-second checkpoint-and-publish retry. Codex delayed, best-effort `SessionEnd` uses only network-free `checkpoint` with timeout `3`; Claude `StopFailure` also checkpoints locally, while Claude `SessionEnd` uses compatible `push` with timeout `60`. Failed publication preserves the local commit for a later retry.
 - The generated `post-commit` git hook retains `state-sync.sh push` after every successful outer-repo commit; git ignores its exit status, so a sync failure never blocks or fails the commit. `checkpoint` is the explicit network-free local durability operation.
@@ -151,7 +151,7 @@ Expected:
 - Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
 - `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
 - `.claude/hooks/git-hooks/pre-push` exists and is executable in generated output; it shares `assert_push_invariants` with `enforce-pr-gate.sh`.
-- With `core.hooksPath` set to the generated `git-hooks` directory, pushing a `<plan_name>_implementation` ref with an incomplete small plan, a missing commit-per-phase, or an unacknowledged bypass log is rejected by git and names the phase; a push after all phases are complete succeeds.
+- With `core.hooksPath` set to the generated `git-hooks` directory, pushing a `<plan_name>_implementation` ref with an incomplete or invalidly cancelled small plan, no completed phase, too few commits for completed phases, or an unacknowledged bypass log is rejected by git and names the phase; a push with at least one completed phase and full evidence for every cancelled phase succeeds, and findings bind to the last completed phase.
 - Pushing `dev`/`main`, or deleting a branch (`git push origin :foo_implementation`), passes through `pre-push` regardless of ceremony state.
 - `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
 - `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
