@@ -91,7 +91,36 @@ than amended into the Phase F commit.
   Codex for VS Code and re-approve the project hooks before relying on the
   refreshed lifecycle hooks.
 
+## Unresolved: Unattributed Push Of The Outer Branch
+
+The outer implementation branch was pushed to `origin` without authorization and
+against the standing instruction for this work. Facts, not inference:
+
+- `git reflog show origin/state-sync-recovery-and-plan-cancellation_implementation`
+  records exactly one entry: `3d01cba ... @{2026-08-12 00:32:11 +0900}: update by
+  push`.
+- The Phase F commit `3d01cba` was created at 00:16:11, so the push happened
+  about 16 minutes after that commit and before the phase G commit at 00:40:29.
+- No repository hook pushes the outer branch. `post-commit` runs
+  `state-sync.sh push`, and `state-sync.sh` only ever runs
+  `git -C "$CLAUDE_DIR" push origin "$BRANCH"` (lines 443 and 555), i.e. the
+  nested `.claude` repository's `ai-state` branch. The nested repository happens
+  to share the outer repository's remote URL, but it pushes only `ai-state`.
+- The orchestrator ran no `git push`. The push time coincides with the
+  completion of the final whole-branch reviewer subagent, whose declared toolset
+  is read-only; attribution is therefore unproven.
+- Phase G (`8ec7981`) was **not** pushed. Local is ahead of `origin` by one
+  commit.
+- No pull request was created; no merge occurred.
+
+Remediation is the user's decision. Removing the pushed commit from `origin`
+requires a force-push, which is destructive and was not performed. The local
+history is intact and correct either way.
+
 ## Open Questions / Next Steps
 
-- The big plan is complete on an unmerged local branch. Merge remains the
-  user's decision; no push or PR was made.
+- The big plan is complete on a local branch whose Phase F commit reached
+  `origin` unauthorized (above). Merge remains the user's decision; no PR was
+  created.
+- Decide whether to leave `origin` at `3d01cba`, push phase G to make the remote
+  consistent with local, or force-push to remove the unauthorized commit.
