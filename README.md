@@ -329,7 +329,7 @@ Interpretation:
 - Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
-- MCP config: shared Semble and context-mode server definitions in [shared/mcp/](shared/mcp/)
+- MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
 - Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
@@ -359,7 +359,7 @@ These are the source files that render into `.claude/instructions/` in every gen
 - [deployment.instructions.md](shared/policies/deployment.instructions.md)
   - Pre-deploy checks, Bento build/container workflow, health checks
 - [tool-routing.instructions.md](shared/policies/tool-routing.instructions.md)
-  - Routing between direct reads, `rg`, Semble, and context-mode
+  - Routing between direct reads, `rg`, Semble, and the four guarded Context Mode MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`), alongside its lifecycle hooks
   - Single authoritative home for retrieval-tool choice; agents point here instead of restating it
 - [agent-reporting.instructions.md](shared/policies/agent-reporting.instructions.md)
   - Single audience-aware policy for human-facing prose and compact internal handoffs; agents point here instead of duplicating reporting rules
@@ -567,7 +567,7 @@ Configured events:
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
 - SessionStart
-  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` first records local nested state, then reconciles it with the configured `ai-state` remote. A genuine conflict aborts cleanly, prints recovery guidance, and leaves local state intact; a sync problem never blocks a session from starting.
+  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` first records local nested state, then reconciles it with the configured `ai-state` remote. A genuine conflict aborts cleanly, prints recovery guidance, and leaves local state intact; a sync problem never blocks a session from starting. The dated [state-sync rebase recovery record](docs/2026-08-09-state-sync-rebase-recovery.md) describes the observed latched-rebase incident and its repairs.
 - Stop
   - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
   - `state-sync.sh push` remains the compatible checkpoint-then-publish flow: it commits local nested changes, reconciles committed state, then publishes it when safe. Publication refuses a dirty nested worktree, preserving it for the next checkpoint; reconciliation conflicts skip publication rather than force a non-fast-forward push. Operational diagnostics go to stderr, and failures are also recorded in `.claude/session_logs/hooks-errors.log`; sync remains warn-never-fail and drains stdin with a two-second timeout. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
@@ -586,8 +586,8 @@ Configured events:
 
 Two layers, two invariants, one shared contract each:
 
-- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh), covering the small-plan/closeout/score/LEARN checks.
-- **Push invariant** — `enforce-pr-gate.sh` (`PreToolUse`) and `pre-push` (git hook) both call `assert_push_invariants` in the same file, covering the big-plan/phase-completeness/commit-count/bypass-acknowledgment checks. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `gh pr create --base dev` has no push-hook analog and stays `PreToolUse`-only.
+- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh), covering the small-plan/closeout/score/LEARN checks. A cancelled phase never certifies a commit; if `current_phase` points to one, the commit is blocked until the pointer advances.
+- **Push invariant** — `enforce-pr-gate.sh` (`PreToolUse`) and `pre-push` (git hook) both call `assert_push_invariants` in the same file. Every phase must be complete or carry the full cancellation evidence contract, and at least one phase must be complete. Commit counts include completed phases only, and the final findings report binds to the last completed phase. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `gh pr create --base dev` has no push-hook analog and stays `PreToolUse`-only.
 
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
 
@@ -633,16 +633,20 @@ Documentation gate:
 VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.json):
 
 - `semble` uses `uvx --from "semble[mcp]" semble`.
-- `context-mode` uses the portable bare `context-mode` command.
+- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. `ctx_index` currently accepts content and a single guarded regular file only; directory indexing is rejected with an actionable message as a temporary limitation.
 
 **Inside the devcontainer**, Node.js 22 and `context-mode` are pre-installed — no extra setup needed.
 
-**Outside the devcontainer**, hook events go through `.claude/hooks/scripts/context-mode-dispatch.sh`, which maps the calling target id to the context-mode target name, falls back to `npx -y context-mode hook ...` when `npx` is available, and otherwise prints `WARN` while exiting successfully.
+Hook events and the MCP server use the canonical absolute project-local cache at `.claude/.cache/context-mode/`. That subtree is the only cache location the bootstrap owns: a `CONTEXT_MODE_DIR` override is honoured only when it resolves at or beneath it, and any other value — elsewhere in the repository, or anywhere outside it — is refused with a warning while the project-local cache is used instead. External paths are deliberately not adopted, because quarantine works by renaming the cache directory, and renaming user-owned state outside the repository is not the bootstrap's to do; a refused path is never created, stamped, renamed, or otherwise modified. The nested state repository ignores and untracks `.cache/`, so cache state is never committed or published from this repository's own writes — but because `.cache/` is only untracked, not deleted, bytes committed to `ai-state` history by a hostile or compromised remote can still land on disk during reconciliation before being untracked again. To keep that scenario from ever becoming a trusted cache, `configure_storage` in the dispatcher gates every cache directory on a random secret generated once and stored at `.context-mode-provenance.secret`, outside the nested `ai-state` working tree, where `state-sync.sh` never adds, commits, or restores anything. Any cache directory missing or mismatching that secret (along with the repository/version/filter fields) is quarantined next to it as `<cache>.untrusted.<timestamp>.<pid>` and never deleted, and a fresh, empty guarded cache is created instead — so no cache is ever searched or cited as lifecycle evidence unless the dispatcher produced it locally itself. When Context Mode is unavailable or its version does not match the pin, hooks warn and fail open and the MCP server warns clearly and exits nonzero; fall back to direct reads, `rg`, and Semble, which remain normal retrieval routes rather than replacements for Context Mode.
 
-Install `context-mode` with npm when Node.js is already available:
+**Version pinning applies to hook mode too, not just MCP.** The MCP filter proves the pin over the wire by checking `serverInfo.version`, but a `context-mode` executable on `PATH` is not asked its version by that path, so the dispatcher verifies it before running it: it resolves the executable and reads the owning package manifest's `name`/`version`. Context Mode 1.0.169 has no working `--version` flag and its `doctor` command is slow and performs a network npm check, so neither is usable as a per-hook-event gate. A binary that is not provably exactly `1.0.169` — wrong version, or a version that cannot be determined — is never executed. `--self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result, so the check proves the pin rather than restating it.
+
+**Outside the devcontainer**, the dispatcher falls back to `npx -y context-mode@1.0.169 hook ...` when no pinned `context-mode` executable is available, including when one is present but fails the version check; the fallback names the version in the command, so it is pinned by construction. Missing tools or cache failures warn and fail open for optional hooks.
+
+Install `context-mode` with npm when Node.js is already available. The dispatcher, devcontainer, and runtime checks all pin the exact same version:
 
 ```bash
-npm install -g context-mode
+npm install -g context-mode@1.0.169
 context-mode --help
 ```
 
@@ -657,7 +661,7 @@ tar -xJf "/tmp/${NODE_DIST}.tar.xz" -C "$HOME/.local/nodejs"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/node" "$HOME/.local/bin/node"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npm" "$HOME/.local/bin/npm"
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/npx" "$HOME/.local/bin/npx"
-"$HOME/.local/bin/npm" install -g context-mode
+"$HOME/.local/bin/npm" install -g context-mode@1.0.169
 ln -sf "$HOME/.local/nodejs/${NODE_DIST}/bin/context-mode" "$HOME/.local/bin/context-mode"
 ```
 

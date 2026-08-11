@@ -3,8 +3,13 @@ name: <YYYY-MM-DD_phase-X-slug>
 type: small-plan
 parent_plan: <big-plan-slug>
 phase_index: 1
+# status must occur exactly once: in-progress | complete | cancelled
 status: in-progress
 closeout_session_log:
+# Cancellation fields (required only when status is cancelled):
+# cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
+# cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
+# cancelled_evidence: <repository-relative readable UTF-8 CANCELLED artifact>
 ---
 
 # Small Plan: <YYYY-MM-DD_phase-X-slug>

@@ -29,6 +29,7 @@ REQUIRED_FILES = (
     "dist/multi-agent/.devcontainer/state-sync.sh",
     "dist/multi-agent/.devcontainer/restore-root-adapters.sh",
     "dist/multi-agent/.claude/hooks/scripts/state-sync.sh",
+    "dist/multi-agent/.claude/hooks/scripts/context-mode-dispatch.sh",
     "dist/multi-agent/.claude/hooks/scripts/claude-stop.sh",
     "dist/multi-agent/.claude/hooks/scripts/codex-stop.sh",
     "dist/multi-agent/.claude/hooks/scripts/restore-root-adapters.sh",
@@ -200,6 +201,8 @@ def runtime_drift_errors(
             relative = path.relative_to(claude_root)
             if (
                 (relative.parts and relative.parts[0] == ".git")
+                or relative == Path(".gitignore")
+                or (relative.parts and relative.parts[0] == ".cache")
                 or is_consumer_state_path(relative)
                 or (relative.parts and relative.parts[0] == "bootstrap-root")
             ):
@@ -277,6 +280,40 @@ def python_baseline_warning() -> str | None:
     return None
 
 
+def context_mode_dispatch_errors() -> list[str]:
+    """Run the generated launcher's local, network-free cache self-check."""
+    dispatcher = (
+        DIST_ROOT / "multi-agent/.claude/hooks/scripts/context-mode-dispatch.sh"
+    )
+    if not dispatcher.is_file():
+        return []  # REQUIRED_FILES reports the missing artifact.
+    result = subprocess.run(
+        [str(dispatcher), "--self-check"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="", file=sys.stderr)
+    expected = str((DIST_ROOT / "multi-agent/.claude/.cache/context-mode").resolve())
+    errors: list[str] = []
+    if result.returncode != 0:
+        errors.append(f"Context Mode dispatcher self-check exited {result.returncode}")
+    if f"storage-root={expected}" not in result.stdout:
+        errors.append(
+            "Context Mode dispatcher did not report the generated target's absolute local cache root"
+        )
+    if not any(
+        marker in result.stdout for marker in ("storage=writable", "storage=creatable")
+    ):
+        errors.append(
+            "Context Mode dispatcher did not confirm writable or creatable local cache storage"
+        )
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
@@ -328,6 +365,7 @@ def main() -> int:
         print("PASS documented Python baseline matches pyproject requires-python")
 
     errors.extend(runtime_drift_errors())
+    errors.extend(context_mode_dispatch_errors())
 
     if errors:
         for error in errors:

@@ -60,8 +60,23 @@ SLUG="${CURRENT_BRANCH%_implementation}"
 BIG_PLAN="$REPO_ROOT/.claude/plans/$SLUG.md"
 [[ -f "$BIG_PLAN" ]] || exit 0
 
+BIG_STATUS="$(fm_read_unique_status "$BIG_PLAN" || true)"
+if [[ "$BIG_STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+  additional_context "PostToolUse" "commit closeout not recorded because the big plan must contain exactly one status field"
+  exit 0
+fi
+
 CURRENT_PHASE="$(fm_read "$BIG_PLAN" "current_phase" || true)"
 [[ -n "$CURRENT_PHASE" ]] || exit 0
+
+CURRENT_PLAN="$REPO_ROOT/.claude/plans/$CURRENT_PHASE.md"
+if [[ -f "$CURRENT_PLAN" ]]; then
+  CURRENT_STATUS="$(fm_read_unique_status "$CURRENT_PLAN" || true)"
+  if [[ "$CURRENT_STATUS" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    additional_context "PostToolUse" "commit closeout not recorded because the current phase plan must contain exactly one status field"
+    exit 0
+  fi
+fi
 
 # macOS's default /bin/bash is 3.2 and has no `mapfile`/`readarray`; accumulate
 # with a `while read` loop instead (mirrors _lib-frontmatter.sh).
@@ -72,14 +87,28 @@ while IFS= read -r _phase_line; do
 done < <(fm_read_list "$BIG_PLAN" "phases")
 next_phase=""
 found=0
+after_current=0
 for index in ${phases[@]+"${!phases[@]}"}; do
-  if [[ "${phases[$index]}" == "$CURRENT_PHASE" ]]; then
+  if [[ "$after_current" -eq 0 && "${phases[$index]}" == "$CURRENT_PHASE" ]]; then
     found=1
-    next_index=$((index + 1))
-    if [[ "$next_index" -lt "${#phases[@]}" ]]; then
-      next_phase="${phases[$next_index]}"
+    after_current=1
+    continue
+  fi
+  if [[ "$after_current" -eq 1 ]]; then
+    candidate_phase="${phases[$index]}"
+    candidate_plan="$REPO_ROOT/.claude/plans/$candidate_phase.md"
+    if [[ ! -f "$candidate_plan" ]]; then
+      additional_context "PostToolUse" "commit closeout not recorded because next phase plan is missing: .claude/plans/$candidate_phase.md"
+      exit 0
     fi
-    break
+    candidate_status="$(fm_read_unique_status "$candidate_plan" || true)"
+    if [[ "$candidate_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      additional_context "PostToolUse" "commit closeout not recorded because the next phase plan must contain exactly one status field: .claude/plans/$candidate_phase.md"
+      exit 0
+    elif [[ "$candidate_status" != "cancelled" ]]; then
+      next_phase="$candidate_phase"
+      break
+    fi
   fi
 done
 
@@ -92,7 +121,9 @@ if [[ -n "$next_phase" ]]; then
   fm_write "$BIG_PLAN" "current_phase" "$next_phase"
 else
   fm_write "$BIG_PLAN" "current_phase" ""
-  fm_write "$BIG_PLAN" "status" "complete"
+  if [[ "$BIG_STATUS" != "cancelled" ]]; then
+    fm_write "$BIG_PLAN" "status" "complete"
+  fi
 fi
 
 exit 0

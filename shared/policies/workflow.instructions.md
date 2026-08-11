@@ -48,8 +48,28 @@ Control-plane/high-risk work always uses a full plan.
 - Big plans live at `.claude/plans/<plan_name>.md` and must use `type: big-plan` frontmatter.
 - Small plans live at `.claude/plans/<phase_slug>.md` and must use `type: small-plan` frontmatter.
 - Commit once per completed small plan after DOCUMENT, LEARN, session log, and score gates pass.
-- Open a PR to `dev` only after every small plan in the big plan is complete and only when the user explicitly asks for a PR.
+- Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
+
+### Cancelling a plan or phase
+
+`cancelled` means an authorized decision was made that a plan or phase will
+never run. It is distinct from `complete` and requires `cancelled_at` as a real
+UTC calendar date and time in exact `YYYY-MM-DDTHH:MM:SSZ` format; a meaningful
+`cancelled_reason` written as plain single-line scalar prose without leading
+quotes, YAML block headers, collections, list markers, or comment-only values;
+and a repository-relative `cancelled_evidence` path that stays inside the
+repository and resolves to an existing regular, readable UTF-8 text artifact
+containing the same-line prefix `**Status:** CANCELLED`.
+
+A cancelled phase requires no commit, findings report, score, or closeout
+session log. A cancelled big plan is terminal and cannot start an implementation
+branch. A branch containing cancelled phases becomes pushable only when at
+least one phase is complete, every cancelled phase has the full evidence
+contract, and commit-count checks count completed phases only. The push gate
+binds findings to the last completed phase. Commit closeout skips cancelled
+phases when advancing `current_phase`, while a commit whose current phase is
+cancelled remains blocked.
 
 ---
 
@@ -170,7 +190,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
 - Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence.
-- PR creation/push is gated on all small plans complete, bypass acknowledgement, required Ponytail review evidence where applicable, and the findings report additionally having `counts.major == 0`.
+- PR creation/push is gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.

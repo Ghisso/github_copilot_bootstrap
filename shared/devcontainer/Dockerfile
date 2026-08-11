@@ -27,7 +27,7 @@ RUN apt-get update \
         sudo \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g context-mode \
+RUN npm install -g context-mode@1.0.169 \
     && command -v context-mode \
     && context-mode --help >/dev/null
 
