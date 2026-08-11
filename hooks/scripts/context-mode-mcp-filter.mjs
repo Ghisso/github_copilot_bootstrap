@@ -6,6 +6,7 @@ import path from "node:path";
 const PINNED_VERSION = "1.0.169";
 const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats", "ctx_doctor"]);
 const INDEX_ARGS = new Set(["content", "path", "source"]);
+const MAX_SOURCE_LENGTH = 200;
 const argv = process.argv.slice(2);
 const separator = argv.indexOf("--");
 if (separator < 0 || separator === argv.length - 1) {
@@ -19,7 +20,10 @@ const upstream = spawn(argv[separator + 1], argv.slice(separator + 2), {
   stdio: ["pipe", "pipe", "pipe"],
 });
 const initializeIds = new Set();
-const listIds = new Set();
+// Counts, not a Set: two requests that reuse the same id must each be
+// filtered on their own matching response, or the second response would be
+// written through raw and leak the unfiltered tool list (MAJOR 3).
+const listIds = new Map();
 let versionAccepted = false;
 
 function idKey(id) {
@@ -42,6 +46,12 @@ function validateIndex(args) {
   const input = args && typeof args === "object" && !Array.isArray(args) ? args : {};
   const extra = Object.keys(input).find((key) => !INDEX_ARGS.has(key));
   if (extra) return `ctx_index argument ${extra} is not allowed by repository policy`;
+  if (
+    Object.hasOwn(input, "source") &&
+    (typeof input.source !== "string" || input.source.length > MAX_SOURCE_LENGTH)
+  ) {
+    return `ctx_index source must be a string of at most ${MAX_SOURCE_LENGTH} characters`;
+  }
   const hasContent = typeof input.content === "string";
   const hasPath = typeof input.path === "string" && input.path.length > 0;
   if (hasContent === hasPath) {
@@ -69,20 +79,39 @@ function validateIndex(args) {
   return null;
 }
 
+// Default-deny: only a single JSON-RPC object is ever a candidate for
+// forwarding. A batch array (CRITICAL 1b) or any other non-object shape is
+// dropped before any method/id is inspected.
 function handleClient(message, raw) {
-  if (!message || typeof message !== "object") return;
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    process.stderr.write("context-mode-filter: dropped a non-object/array client message\n");
+    return;
+  }
+  const hasId = Object.hasOwn(message, "id");
   const key = idKey(message.id);
-  if (message.method === "initialize" && Object.hasOwn(message, "id")) {
+  if (message.method === "initialize" && hasId) {
     initializeIds.add(key);
   }
-  if (message.method === "tools/list" && Object.hasOwn(message, "id")) {
+  // The allowlist, version gate, and ctx_index validation below gate on
+  // `method` alone (CRITICAL 1a). A notification-shaped tools/list or
+  // tools/call (no `id`) has nobody to answer, so it is dropped rather than
+  // forwarded, instead of falling through unchecked to the upstream write.
+  if (message.method === "tools/list") {
+    if (!hasId) {
+      process.stderr.write("context-mode-filter: dropped a tools/list notification\n");
+      return;
+    }
     if (!versionAccepted) {
       send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
       return;
     }
-    listIds.add(key);
+    listIds.set(key, (listIds.get(key) || 0) + 1);
   }
-  if (message.method === "tools/call" && Object.hasOwn(message, "id")) {
+  if (message.method === "tools/call") {
+    if (!hasId) {
+      process.stderr.write("context-mode-filter: dropped a tools/call notification\n");
+      return;
+    }
     if (!versionAccepted) {
       send(process.stdout, errorResponse(message.id, -32001, "pinned Context Mode runtime is not initialized"));
       return;
@@ -115,10 +144,21 @@ function handleUpstream(message, raw) {
     }
     versionAccepted = true;
   }
-  if (listIds.delete(key) && Array.isArray(message.result?.tools)) {
-    message.result.tools = message.result.tools.filter((tool) => ALLOWED_TOOLS.has(tool?.name));
-    send(process.stdout, message);
-    return;
+  // Decrement/delete the pending count on every matching response so N
+  // requests that reused one id each get their own filtered response;
+  // Set.delete() would only consume the id once (MAJOR 3).
+  const pendingListResponses = listIds.get(key);
+  if (pendingListResponses) {
+    if (pendingListResponses <= 1) {
+      listIds.delete(key);
+    } else {
+      listIds.set(key, pendingListResponses - 1);
+    }
+    if (Array.isArray(message.result?.tools)) {
+      message.result.tools = message.result.tools.filter((tool) => ALLOWED_TOOLS.has(tool?.name));
+      send(process.stdout, message);
+      return;
+    }
   }
   process.stdout.write(raw);
 }
@@ -158,3 +198,13 @@ upstream.on("exit", (code, signal) => {
   if (process.exitCode === undefined) process.exitCode = signal ? 1 : (code ?? 1);
 });
 process.stdin.on("end", () => upstream.stdin.end());
+
+// Terminate the spawned upstream deterministically on every exit path
+// instead of relying on it noticing a closed stdin (MINOR 7).
+process.on("exit", () => upstream.kill());
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.on(signal, () => {
+    upstream.kill();
+    process.exit(0);
+  });
+}

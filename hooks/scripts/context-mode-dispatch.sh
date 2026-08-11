@@ -11,6 +11,11 @@ DEFAULT_CONTEXT_MODE_DIR="$REPO_ROOT/.claude/.cache/context-mode"
 PINNED_CONTEXT_MODE_VERSION="1.0.169"
 FILTER_CONTRACT="ctx-index-file-content-v1"
 FILTER_SCRIPT="$SCRIPT_DIR/context-mode-mcp-filter.mjs"
+# Outside the ai-state working tree (.claude/) on purpose: state-sync.sh never
+# adds, commits, or restores anything at $REPO_ROOT other than under .claude/,
+# so a hostile/compromised ai-state remote can never read or overwrite this
+# file. See configure_storage below.
+PROVENANCE_SECRET_FILE="$REPO_ROOT/.context-mode-provenance.secret"
 
 resolve_context_mode() {
   if command -v context-mode >/dev/null 2>&1; then
@@ -24,22 +29,30 @@ resolve_context_mode() {
   return 1
 }
 
-canonical_storage_path() {
-  local candidate="$1" parent suffix="" next_parent
-  case "/$candidate/" in
-    */../*) return 1 ;;
-  esac
-  parent="$candidate"
+# Walk up from $1 until an existing path is found and print it. Shared by
+# canonical_storage_path (needs the remaining suffix too) and probe_storage
+# (only needs the ancestor itself).
+nearest_existing_ancestor() {
+  local parent="$1" next_parent
   while [[ ! -e "$parent" ]]; do
-    suffix="/$(basename "$parent")$suffix"
     next_parent="$(dirname "$parent")"
     if [[ "$next_parent" == "$parent" ]]; then
       return 1
     fi
     parent="$next_parent"
   done
-  [[ -d "$parent" ]] || return 1
-  printf '%s%s' "$(cd "$parent" && pwd -P)" "$suffix"
+  printf '%s' "$parent"
+}
+
+canonical_storage_path() {
+  local candidate="$1" ancestor suffix
+  case "/$candidate/" in
+    */../*) return 1 ;;
+  esac
+  ancestor="$(nearest_existing_ancestor "$candidate")" || return 1
+  [[ -d "$ancestor" ]] || return 1
+  suffix="${candidate#"$ancestor"}"
+  printf '%s%s' "$(cd "$ancestor" && pwd -P)" "$suffix"
 }
 
 storage_override_is_allowed() {
@@ -83,13 +96,42 @@ select_storage_root() {
   printf '%s' "$canonical"
 }
 
+# Generates (once) and returns a random secret stored at
+# $PROVENANCE_SECRET_FILE, outside the nested ai-state repository. Comparing
+# this value is what makes the on-disk provenance marker unforgeable by a
+# hostile ai-state remote: the three plaintext fields it also checks
+# (repository, pinned version, filter contract) are public/predictable, but
+# the remote can never read or write this file, so it cannot learn or plant
+# a matching secret.
+read_or_create_provenance_secret() {
+  if [[ ! -s "$PROVENANCE_SECRET_FILE" ]]; then
+    local secret=""
+    if command -v openssl >/dev/null 2>&1; then
+      secret="$(openssl rand -hex 32 2>/dev/null || true)"
+    fi
+    if [[ -z "$secret" ]]; then
+      secret="$(od -An -tx1 -N32 /dev/urandom 2>/dev/null | tr -d ' \n' || true)"
+    fi
+    [[ -n "$secret" ]] || return 1
+    if ! (umask 077; printf '%s' "$secret" > "$PROVENANCE_SECRET_FILE"); then
+      return 1
+    fi
+  fi
+  cat "$PROVENANCE_SECRET_FILE"
+}
+
 configure_storage() {
   CONTEXT_MODE_DIR="$(select_storage_root)"
-  local provenance="$CONTEXT_MODE_DIR/.bootstrap-provenance" quarantine
+  local provenance="$CONTEXT_MODE_DIR/.bootstrap-provenance" quarantine secret
+  if ! secret="$(read_or_create_provenance_secret)"; then
+    warn "unable to establish a local Context Mode provenance secret"
+    return 1
+  fi
   if [[ -d "$CONTEXT_MODE_DIR" ]] && ! {
     grep -Fqx "repository=$REPO_ROOT" "$provenance" 2>/dev/null \
       && grep -Fqx "context-mode=$PINNED_CONTEXT_MODE_VERSION" "$provenance" 2>/dev/null \
-      && grep -Fqx "filter=$FILTER_CONTRACT" "$provenance" 2>/dev/null
+      && grep -Fqx "filter=$FILTER_CONTRACT" "$provenance" 2>/dev/null \
+      && grep -Fqx "secret=$secret" "$provenance" 2>/dev/null
   }; then
     quarantine="$CONTEXT_MODE_DIR.untrusted.$(date -u +%Y%m%dT%H%M%SZ).$$"
     if ! mv "$CONTEXT_MODE_DIR" "$quarantine"; then
@@ -103,8 +145,8 @@ configure_storage() {
   CONTEXT_MODE_DIR="$(cd "$CONTEXT_MODE_DIR" && pwd)"
   provenance="$CONTEXT_MODE_DIR/.bootstrap-provenance"
   if [[ ! -f "$provenance" ]]; then
-    if ! printf 'repository=%s\ncontext-mode=%s\nfilter=%s\n' \
-      "$REPO_ROOT" "$PINNED_CONTEXT_MODE_VERSION" "$FILTER_CONTRACT" > "$provenance"; then
+    if ! printf 'repository=%s\ncontext-mode=%s\nfilter=%s\nsecret=%s\n' \
+      "$REPO_ROOT" "$PINNED_CONTEXT_MODE_VERSION" "$FILTER_CONTRACT" "$secret" > "$provenance"; then
       return 1
     fi
   fi
@@ -114,7 +156,7 @@ configure_storage() {
 }
 
 probe_storage() {
-  local storage_root parent next_parent
+  local storage_root parent
   storage_root="$(select_storage_root)"
   printf 'PASS context-mode-dispatch: storage-root=%s\n' "$storage_root"
   if [[ -d "$storage_root" ]]; then
@@ -125,14 +167,7 @@ probe_storage() {
     return 1
   fi
 
-  parent="$storage_root"
-  while [[ ! -e "$parent" ]]; do
-    next_parent="$(dirname "$parent")"
-    if [[ "$next_parent" == "$parent" ]]; then
-      return 1
-    fi
-    parent="$next_parent"
-  done
+  parent="$(nearest_existing_ancestor "$storage_root")" || return 1
   if [[ -d "$parent" && -w "$parent" ]]; then
     printf 'PASS context-mode-dispatch: storage=creatable\n'
     return 0

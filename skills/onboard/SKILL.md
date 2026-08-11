@@ -37,8 +37,10 @@ session hooks).
 
 Per `.claude/instructions/tool-routing.instructions.md`: use direct reads for
 known files, `rg` for exact claims, and Semble for semantic "where is X
-actually implemented" discovery. Context Mode MCP and `ctx_index` are disabled
-until request-boundary containment is proved.
+actually implemented" discovery. The Context Mode MCP server exposes exactly
+four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`);
+`ctx_index` currently indexes content and single guarded regular files only,
+not directories.
 
 ```
 mcp__semble__search(repo=<project root>, query="<key behavior claimed in the docs>")
