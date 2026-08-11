@@ -281,7 +281,8 @@ restore_root_adapters() {
 # standalone, not just after an explicit `setup` call.
 cmd_setup() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    return 0
+    write_nested_gitignore
+    return $?
   fi
   init_nested_repo
   if ! commit_local_state "bootstrap: init ai-state"; then
