@@ -834,6 +834,14 @@ print('; '.join(titles))
 
 # One fail-closed standard-library probe repeats Phase C's complete cancellation
 # contract at push time. It emits only fixed result codes, one per line.
+#
+# This deliberately duplicates `validate_cancellation` in
+# scripts/validate_plan_frontmatter.py rather than importing it: this copy ships
+# into consumer `.claude/hooks/scripts/` and must run with nothing but a stock
+# python3, while that one is authoring-repo-only tooling that never ships. The
+# two are one contract in two places, so a change to the timestamp,
+# block-scalar, or evidence-status rules here must be mirrored there.
+# tests/test_validate_plan_frontmatter.py asserts the shared rules stay equal.
 cancellation_validation_probe() {
   local repo_root="$1"
   local plan_file="$2"

@@ -82,7 +82,16 @@ def require_fields(
 
 
 def validate_cancellation(path: Path, data: dict[str, Any], errors: list[str]) -> None:
-    """Validate the audit evidence required for a cancelled plan."""
+    """Validate the audit evidence required for a cancelled plan.
+
+    This contract is intentionally implemented twice. The shipped copy is
+    ``cancellation_validation_probe`` in
+    ``shared/hooks/scripts/_lib-frontmatter.sh``, which enforces it at push time
+    inside consumer repositories and therefore may depend on nothing but a stock
+    ``python3``. This copy is authoring-repo-only tooling and never ships. A
+    change to the timestamp, block-scalar, or evidence-status rules here must be
+    mirrored there; the equality test below guards that.
+    """
     require_fields(path, data, CANCELLED_FIELDS, errors)
 
     cancelled_at = str(data.get("cancelled_at", ""))

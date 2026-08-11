@@ -518,3 +518,40 @@ def test_rejects_evidence_outside_repository(
     errors = validation_errors(plan)
 
     assert any("repository" in error for error in errors)
+
+
+# The cancellation contract is implemented twice on purpose: this module is
+# authoring-repo-only tooling, while `cancellation_validation_probe` in
+# shared/hooks/scripts/_lib-frontmatter.sh ships into consumer repositories and
+# must run on a stock python3 with no imports. Nothing forces the two to agree,
+# so pin the shared rules here; tightening one copy alone fails this test.
+@pytest.mark.parametrize(
+    ("validator_pattern", "probe_name"),
+    [
+        ("CANCELLED_AT_PATTERN", "TIMESTAMP"),
+        ("CANCELLED_REASON_BLOCK_PATTERN", "BLOCK_REASON"),
+        ("CANCELLED_STATUS_PATTERN", "STATUS"),
+    ],
+)
+def test_shipped_probe_shares_the_cancellation_rules(
+    validator_pattern: str, probe_name: str
+) -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    expected = getattr(validator, validator_pattern).pattern
+    assert f'{probe_name} = re.compile(r"{expected}"' in library, (
+        f"{probe_name} in the shipped push-time probe no longer matches "
+        f"{validator_pattern}; the cancellation contract has drifted"
+    )
+
+
+def test_shipped_probe_shares_the_cancellation_fields() -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    for field in validator.CANCELLED_FIELDS:
+        assert field in library, (
+            f"required cancellation field {field} is not enforced by the "
+            "shipped push-time probe"
+        )
