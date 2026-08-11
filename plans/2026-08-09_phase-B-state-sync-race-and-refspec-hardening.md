@@ -47,6 +47,10 @@ idempotently re-pins the nested remote's fetch and push refspecs.
 - `.claude/review-profiles/tests.md`
 - `.claude/review-profiles/ponytail.md`
 
+Review is mandatory here because this phase changes control-plane/high-risk
+lifecycle code. This use of the Ponytail profile follows the current calibrated
+review policy; it is not a return to universal Ponytail review for every diff.
+
 ## Steps
 
 - [ ] In `reconcile_committed_state` in

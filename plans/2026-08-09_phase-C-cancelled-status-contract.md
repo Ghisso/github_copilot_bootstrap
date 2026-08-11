@@ -53,6 +53,10 @@ templates document a status the validator refuses.
 - `.claude/review-profiles/ponytail.md`
 - `.claude/review-profiles/documentation.md`
 
+Review is mandatory here because this phase changes control-plane/high-risk
+lifecycle code. This use of the Ponytail profile follows the current calibrated
+review policy; it is not a return to universal Ponytail review for every diff.
+
 ## Steps
 
 - [ ] `scripts/validate_plan_frontmatter.py` (modify): lift the two status

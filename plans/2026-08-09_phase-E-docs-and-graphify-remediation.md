@@ -14,11 +14,18 @@ closeout_session_log:
 Document both repairs and use the new vocabulary to correct the records that
 motivated it. The Graphify big plan currently claims `status: complete` while
 its own body admits the status is inaccurate and explains that the validator
-left no alternative. With `cancelled` available, that plan and its six
-never-authorized phases get accurate statuses backed by the evidence artifact
-that already exists. This phase also writes the single dated record of the
-state-sync incident, so the volatile detail lives in one place and every other
-file points at it.
+left no alternative. Phase 0 measured too little value to justify bootstrap
+integration and returned NO-GO. With `cancelled` available, that plan and its
+six never-authorized phases get accurate statuses backed by the evidence
+artifact that already exists.
+
+This is record remediation only. Do not add Graphify dependencies, routing,
+runtime support, persistence, another benchmark, or a follow-up adoption plan.
+Historical evidence stays intact. Active documentation must not imply that a
+Graphify retry is scheduled or expected.
+
+This phase also writes the single dated record of the state-sync incident, so
+the volatile detail lives in one place and every other file points at it.
 
 ## Ownership
 
@@ -37,6 +44,9 @@ file points at it.
 - `.claude/skills/run-tests/SKILL.md` for the verifier.
 - `.claude/skills/learn/SKILL.md` and `.claude/skills/commit/SKILL.md` at
   closeout.
+- Human-facing documentation follows the already-shipped
+  `shared/policies/agent-reporting.instructions.md` clarity rules. Do not add a
+  second writing policy or claim formal ASD-STE100 compliance.
 
 ## Review Profiles
 
@@ -46,6 +56,10 @@ file points at it.
 - `.claude/review-profiles/tests.md`
 - `.claude/review-profiles/ponytail.md`
 - `.claude/review-profiles/documentation.md`
+
+This phase is multi-file control-plane/state remediation, so the full review
+set remains justified under the current calibrated routing. The Ponytail
+profile is not being reinstated as a universal documentation gate.
 
 ## Sequencing Constraint
 
@@ -81,8 +95,12 @@ reject the report as dirty. This is a recorded lesson.
       delete the sentence stating that `complete` is the only terminal status
       the validator accepts, which this plan makes false, and replace the
       "complete in lifecycle terms only" paragraph with a plain statement that
-      the plan was cancelled at the Phase 0 gate. Quote the removed sentence in
-      the new `docs/` record so the reason it existed is preserved.
+      the plan was cancelled at the Phase 0 gate because measured value did not
+      justify bootstrap integration. Remove or neutralize active wording that
+      presents another Graphify trial as the expected next step. Do not rewrite
+      historical gate criteria or measured evidence. Quote the removed
+      lifecycle-vocabulary sentence in the new `docs/` record so the reason it
+      existed is preserved.
 - [ ] The six Graphify phase files
       `2026-08-09_phase-A-graphify-managed-dependency-and-thin-adapter.md`
       through `2026-08-09_phase-F-graphify-optional-persistence-gate.md`
@@ -94,11 +112,19 @@ reject the report as dirty. This is a recorded lesson.
       `.claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md`.
       If that file is not the right home, create a dated session log under
       `.claude/session_logs/` and point `cancelled_evidence` there instead.
-      Perform the edit before writing any statement that it was done; never
-      order the claim ahead of the action.
+      The marker/reason must state that the compatibility/value gate returned
+      NO-GO because measured value did not justify integration. Perform the edit
+      before writing any statement that it was done; never order the claim
+      ahead of the action.
 - [ ] `2026-08-09_phase-0-graphify-compatibility-and-value-gate.md`: leave
       unchanged at `status: complete`. Phase 0 genuinely ran, shipped, and
       produced the gate result.
+- [ ] Search active bootstrap source/configuration for Graphify references.
+      `shared/`, generated MCP configuration, the devcontainer, and runtime
+      routing must contain no active Graphify dependency or integration path.
+      Historical plans/evidence may retain Graphify references. Correct only
+      stale documentation or log wording that incorrectly presents adoption as
+      pending.
 - [ ] `.claude/MEMORY.md` (modify): record the `[LEARN]` entries listed below.
 - [ ] Regenerate targets and run the full verification set.
 
@@ -121,6 +147,8 @@ reject the report as dirty. This is a recorded lesson.
 - Relaxing a gate is safe only when paired with a new requirement. Cancellation
   buys exemption from commit, score, findings, and closeout by paying an
   artifact-backed reason.
+- A NO-GO gate is a valid final result. Low measured value is a reason to stop,
+  not a reason to add more integration machinery or schedule another trial.
 
 ## Test Scenarios
 
@@ -134,6 +162,9 @@ reject the report as dirty. This is a recorded lesson.
       not push the real branch: push is the user's decision and is out of scope
       here.
 - [ ] `bash .claude/hooks/scripts/state-sync.sh status` reports `rebase: none`.
+- [ ] Active bootstrap configuration contains no Graphify executable,
+      dependency, MCP server, routing rule, or persistence path. Historical
+      plan/evidence references remain allowed.
 
 ## Verification
 
@@ -187,6 +218,10 @@ rm -rf /tmp/dist-gen-a
       `complete` being the only terminal status.
 - [ ] Graphify phases A through F read `status: cancelled` with full evidence;
       Phase 0 is untouched at `complete`.
+- [ ] The Graphify plan/evidence state records the low-value NO-GO accurately
+      and does not schedule or imply a renewed integration attempt.
+- [ ] Active bootstrap source/configuration contains no Graphify integration;
+      only historical planning/evidence references remain.
 - [ ] No fabricated closeout log, findings report, or score exists for any
       cancelled phase.
 - [ ] `validate_plan_frontmatter.py` passes over every plan file.

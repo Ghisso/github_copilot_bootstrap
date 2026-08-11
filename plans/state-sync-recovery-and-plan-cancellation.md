@@ -11,6 +11,7 @@ phases:
   - 2026-08-09_phase-C-cancelled-status-contract
   - 2026-08-09_phase-D-cancelled-phase-gates
   - 2026-08-09_phase-E-docs-and-graphify-remediation
+  - 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
 current_phase:
 bypass_acknowledged: false
 ---
@@ -76,6 +77,19 @@ is finished", not "all phases shipped", because `complete` is the only terminal
 status the frontmatter validator accepts. The audit trail is currently
 inaccurate, and the missing vocabulary is why.
 
+**Adjacent control-plane issue - Context Mode local indexing is being classified
+too broadly.** Current guidance can cause agents to treat `ctx_index` as if it
+were an external indexing service and refuse ordinary repository indexing. That
+is not the intended boundary. Context Mode's index is local SQLite/FTS5 state;
+the security requirement is to prevent protected files from being indexed and
+to prevent derived cache data from entering `ai-state`, not to block approved
+local processing.
+
+This is included in the same big plan because the fix is small and touches the
+same control-plane surfaces already being changed here: hook dispatch, nested
+`.claude/` state hygiene, tool routing, runtime validation, and generated MCP
+wiring. It does not introduce another retrieval system.
+
 ## Goals
 
 - Recover reliably from a partially-initialized rebase (`--abort`, then `--quit`
@@ -94,6 +108,17 @@ inaccurate, and the missing vocabulary is why.
   falsifying any record.
 - Correct the Graphify records using the new vocabulary rather than fabricated
   closeouts.
+- Allow approved Context Mode `ctx_index` use on non-protected project content
+  and state explicitly that local indexing is not external disclosure.
+- Keep Context Mode's project index as local derived state under
+  `.claude/.cache/context-mode/`; it must never be committed or published on
+  `ai-state`.
+- Preserve the existing protected-read boundary (`.env*`, secrets,
+  credentials, and equivalent denied paths) and make that boundary win over
+  local-index permission.
+- Extend the existing Context Mode self-check/runtime validation just enough to
+  prove the launcher, cache path, ignore rule, and generated MCP wiring are
+  coherent. Do not create a new diagnostics subsystem.
 
 ## Non-Goals
 
@@ -103,7 +128,18 @@ inaccurate, and the missing vocabulary is why.
   push, `MINOR` advisory) and no new bypass class.
 - No change to the Hugging Face retirement path, `cmd_migrate` semantics, or the
   durable checkpoint story (`post-commit` hook plus the manual VS Code task).
-- No reopening of the Graphify adoption decision. Phase E corrects records only.
+- No reopening of the Graphify adoption decision. The measured Phase 0 value was
+  too low to justify integration. Phase E corrects stale records and wording
+  only; it must not add Graphify dependencies, routing, persistence, or another
+  trial.
+- No new retrieval tools in this plan (`ast-grep`, Serena, another code graph,
+  or another memory/index service).
+- No capability registry, telemetry platform, full LLM evaluation harness, MCP
+  gateway, or broad dependency-version project. Those ideas remain deferred
+  until repeated real-world friction justifies them.
+- No reimplementation of the completed `guidance-and-review-calibration` work.
+  Its short root guidance, STE-inspired human-facing writing rules, and
+  calibrated Ponytail/review policy are the baseline for this plan.
 
 ## Design Decisions
 
@@ -121,6 +157,12 @@ create a merge-order dependency for no benefit.
 The workstreams stay independent at the code level, so phases A and B can land
 and ship on their own timetable inside this plan without waiting for C, D, or E.
 That is the practical advantage of one plan with ordered phases over two plans.
+
+Phase F is intentionally bounded. It does not turn this plan into a general
+tooling roadmap. It fixes a concrete Context Mode policy/runtime mismatch that
+uses the same hook and `.claude/` state surfaces. Keeping it here avoids a
+second big plan for a small control-plane correction while still giving it one
+atomic small-plan commit.
 
 ### Status name: `cancelled`
 
@@ -217,6 +259,37 @@ blocks, with a message saying the pointer is stale and must be advanced. Phase D
 also makes `record-commit-closeout.sh` skip cancelled phases when it advances
 the pointer, so the stale-pointer state should not arise in normal use.
 
+### Context Mode: local index, derived cache
+
+`ctx_index` is classified as approved local processing when it indexes
+non-protected content inside the current project. It is not treated as remote
+disclosure merely because the operation is called "index".
+
+The default bootstrap storage root for Context Mode becomes the absolute project
+path `.claude/.cache/context-mode/`. Context Mode requires
+`CONTEXT_MODE_DIR` to be absolute, so the existing dispatch script resolves the
+repository root and exports that value before launching either the MCP server or
+hook subcommands.
+
+The cache is derived state, not AI authority:
+
+- canonical plans, memory, reports, and session records stay as normal files in
+  the nested `ai-state` repository;
+- Context Mode may index those non-protected text files for local retrieval;
+- `.claude/.cache/` is ignored by the nested repository and must never be
+  committed, synced, used as cancellation evidence, or treated as a source of
+  truth;
+- protected read-deny rules remain authoritative. Local processing does not
+  grant permission to index `.env*`, `secrets/**`,
+  `config/credentials.json`, or any other denied path;
+- `ctx_fetch_and_index` remains an external-fetch operation. This local-index
+  permission does not broaden network policy or approve repository upload to
+  another service.
+
+The implementation extends the existing `context-mode-dispatch.sh`,
+`state-sync.sh`, tool-routing policy, generated MCP config, and runtime checks.
+It must not introduce a second Context Mode launcher or a new cache manager.
+
 ## Design Overview
 
 ```mermaid
@@ -225,11 +298,14 @@ flowchart TD
     C["Phase C: cancelled status in validator, templates, policy"] --> D["Phase D: gates for commit, push, closeout advance, branch state"]
     B --> E["Phase E: docs and Graphify record remediation"]
     D --> E
+    E --> F["Phase F: Context Mode local indexing and derived-cache boundary"]
 ```
 
-Phases A and B are one workstream; C and D are the other. E closes both. A and B
-are independent of C and D, so the state-sync repair can land and ship first if
-that is wanted.
+Phases A and B are one workstream; C and D are the other. E closes those two
+repairs and corrects the Graphify audit trail. F is a bounded adjacent hardening
+phase for local Context Mode indexing. It runs after E to avoid concurrent edits
+to `state-sync.sh`, generated wiring, README documentation, and validation
+fixtures.
 
 ## Phases
 
@@ -238,6 +314,7 @@ that is wanted.
 - [ ] `2026-08-09_phase-C-cancelled-status-contract`
 - [ ] `2026-08-09_phase-D-cancelled-phase-gates`
 - [ ] `2026-08-09_phase-E-docs-and-graphify-remediation`
+- [ ] `2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary`
 
 ## Dependency Ordering
 
@@ -249,8 +326,13 @@ that is wanted.
   be marked cancelled and pass validation while the push gate still refuses it,
   which errs strict. The reverse order would let gates accept a status the
   validator rejects.
-- **E last.** E writes documentation and remediates the Graphify records, both
-  of which describe behavior that C and D must already have shipped.
+- **E after B and D.** E writes documentation and remediates the Graphify
+  records, so it describes behavior that both repair workstreams have already
+  shipped.
+- **F after E.** F modifies the Context Mode dispatcher, nested-state ignore
+  behavior, generated MCP wiring, runtime validation, and README documentation.
+  Running it last keeps those control-plane edits out of the state-sync repair
+  commits and gives the local-index change one clean review boundary.
 - A/B and C/D are otherwise independent and may be reordered as pairs.
 
 ## Hard Constraint: Where Edits Go
@@ -267,12 +349,14 @@ Files edited directly in this plan, by category:
   `shared/hooks/scripts/state-sync.sh`, `shared/hooks/scripts/_lib-frontmatter.sh`,
   `shared/hooks/scripts/record-commit-closeout.sh`,
   `shared/hooks/scripts/enforce-branch-state.sh`,
+  `shared/hooks/scripts/context-mode-dispatch.sh`,
   `shared/templates/plan-small.md`, `shared/templates/plan-big.md`,
   `shared/templates/session-log.md`, `shared/plans/README.md`,
-  `shared/policies/workflow.instructions.md`.
+  `shared/policies/workflow.instructions.md`,
+  `shared/policies/tool-routing.instructions.md`, `shared/mcp/servers.json`.
 - **Authoring-repo tooling (edited directly, not generated):**
   `scripts/validate_plan_frontmatter.py`, `scripts/validate_targets.py`,
-  `tests/*.py`, `README.md`, `docs/*.md`.
+  `scripts/check_runtime.py`, `tests/*.py`, `README.md`, `docs/*.md`.
 - **Consumer-owned mutable state (edited directly, not generated):**
   `.claude/plans/*.md`, `.claude/MEMORY.md`, `.claude/session_logs/*.md`.
 
@@ -290,6 +374,7 @@ uv run python scripts/generate_targets.py --all
 uv run python scripts/validate_targets.py
 uv run python scripts/validate_plan_frontmatter.py
 uv run python scripts/check_runtime.py
+bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check
 ```
 
 Generator determinism, run after all edits for the phase have settled, because a
@@ -311,12 +396,17 @@ this repository actually ran.
 
 Before big-plan closeout:
 
-- All five small plans complete and committed independently.
+- All six small plans complete and committed independently.
 - Full regeneration and verification from a clean worktree.
 - `bash .claude/hooks/scripts/state-sync.sh status` reports `rebase: none` and a
   `last-error` consistent with a healthy sync.
 - `uv run python scripts/validate_plan_frontmatter.py` passes over every file in
   `.claude/plans/`, including the remediated Graphify records.
+- `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports the
+  project-local Context Mode storage root and does not require network access.
+- `.claude/.cache/context-mode/` is ignored by the nested repository:
+  creating a sentinel file there leaves `git -C .claude status --porcelain`
+  unchanged.
 
 ## Risks and Mitigations
 
@@ -328,6 +418,9 @@ Before big-plan closeout:
 | `cancelled` becomes a quiet way to skip reviewed work. | Three required fields plus an evidence file that must exist and contain `**Status:** CANCELLED`, and at least one phase must be `complete` for the branch to be pushable. |
 | The `Cannot rebase onto multiple branches` cause is unverified, so a fix could target a phantom. | Phase B adds only an idempotent re-pin of the two refspecs, which is correct regardless of that error's cause, and marks the causal link as an assumption in both the plan and the code comment. |
 | A phase whose only changes live under `.claude/` produces an empty outer-repo diff, so the commit gate's `content_hash` and `changed_files` cannot bind. | Phase E is the only phase touching `.claude/` records, and it also changes `README.md` and `docs/`, which are tracked. Stated as a sequencing constraint in that phase. |
+| Local Context Mode indexing is mistaken for permission to expose protected repository data. | Phase F separates local processing from disclosure in the routing policy. Existing read-deny rules remain authoritative across targets, and tests assert they stay present in generated settings. |
+| The Context Mode SQLite/FTS5 cache is accidentally added to `ai-state` by `git add -A`. | Store it under `.claude/.cache/context-mode/`, add an idempotent nested ignore rule before checkpoints, and test with a sentinel cache file that nested Git remains clean. |
+| Project-local Context Mode storage works for hooks but not the MCP server, creating two indexes. | Route both server startup and hook dispatch through the same `context-mode-dispatch.sh` storage setup and validate all generated MCP targets. |
 | The dogfood refresh (`install_bootstrap.py . --allow-self --local-only`) applies new hook behavior to the live session mid-plan. | Run it only after the phase's verification passes, then immediately re-run `state-sync.sh status` as a health check. |
 
 ## Verification

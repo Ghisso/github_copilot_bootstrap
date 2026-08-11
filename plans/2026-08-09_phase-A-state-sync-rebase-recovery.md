@@ -49,6 +49,10 @@ instead of silent. The warn-never-fail contract does not change.
 - `.claude/review-profiles/tests.md`
 - `.claude/review-profiles/ponytail.md`
 
+Review is mandatory here because this phase changes control-plane/high-risk
+lifecycle code. This use of the Ponytail profile follows the current calibrated
+review policy; it is not a return to universal Ponytail review for every diff.
+
 ## Steps
 
 - [ ] Add `nested_rebase_in_progress()` to

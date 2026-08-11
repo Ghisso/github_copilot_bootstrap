@@ -48,6 +48,10 @@ cancelled phases when advancing the pointer.
 - `.claude/review-profiles/tests.md`
 - `.claude/review-profiles/ponytail.md`
 
+Review is mandatory here because this phase changes control-plane/high-risk
+lifecycle code. This use of the Ponytail profile follows the current calibrated
+review policy; it is not a return to universal Ponytail review for every diff.
+
 ## Steps
 
 - [ ] Add `assert_cancellation_evidence <plan_file> <phase_label>` to
