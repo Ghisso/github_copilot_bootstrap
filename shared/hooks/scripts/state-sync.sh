@@ -46,6 +46,7 @@ fi
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
 ERROR_LOG="$REPO_ROOT/.claude/session_logs/hooks-errors.log"
+PROTECTED_REBASE_STATE=2
 
 prepare_error_log() {
   mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
@@ -168,6 +169,77 @@ append_error_output() {
   printf '%s\n' "$1" >> "$ERROR_LOG" 2>/dev/null || true
 }
 
+nested_rebase_in_progress() {
+  [[ -d "$CLAUDE_DIR/.git/rebase-merge" || -d "$CLAUDE_DIR/.git/rebase-apply" ]]
+}
+
+orphaned_preexisting_autostash() {
+  local rebase_dir="$CLAUDE_DIR/.git/rebase-merge" entry entries=0
+  [[ -d "$rebase_dir" && ! -d "$CLAUDE_DIR/.git/rebase-apply" ]] || return 1
+  for entry in "$rebase_dir"/* "$rebase_dir"/.[!.]* "$rebase_dir"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    ((entries += 1))
+    [[ "$entry" == "$rebase_dir/autostash" && -f "$entry" && ! -L "$entry" ]] || return 1
+  done
+  [[ $entries -eq 1 ]]
+}
+
+preflight_mutating_rebase_state() {
+  if ! nested_rebase_in_progress; then
+    return 0
+  fi
+  if ! orphaned_preexisting_autostash; then
+    printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
+    return "$PROTECTED_REBASE_STATE"
+  fi
+
+  local quit_output quit_status
+  warn "orphaned autostash rebase state from a previous sync detected; clearing it with rebase --quit before continuing."
+  set +e
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$quit_output"
+  if [[ $quit_status -ne 0 ]]; then
+    warn "orphaned autostash rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    return 1
+  fi
+}
+
+dispatch_mutating() {
+  local preflight_status
+  set +e
+  preflight_mutating_rebase_state
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return 0
+  fi
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  "$@"
+}
+
+clear_current_pull_rebase_state() {
+  local abort_output abort_status quit_output quit_status
+  set +e
+  abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)"
+  abort_status=$?
+  if [[ $abort_status -eq 0 ]]; then
+    set -e
+    append_error_output "$abort_output"
+    return 0
+  fi
+
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$abort_output"
+  append_error_output "$quit_output"
+  return "$quit_status"
+}
+
 restore_root_adapters() {
   local restore="$SCRIPT_DIR/restore-root-adapters.sh"
   if [[ -f "$restore" ]]; then
@@ -245,8 +317,12 @@ reconcile_committed_state() {
   set -e
   if [[ $status -ne 0 ]]; then
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-    git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
     append_error_output "$output"
+    if nested_rebase_in_progress; then
+      if ! clear_current_pull_rebase_state; then
+        warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+      fi
+    fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
     return 1
@@ -317,9 +393,9 @@ cmd_push() {
 
 cmd_status() {
   if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
-    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\n'
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\n'
   else
-    local worktree remote tracking ahead behind
+    local worktree remote tracking ahead behind rebase
     if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
       worktree="dirty"
     else
@@ -336,7 +412,11 @@ cmd_status() {
       read -r ahead behind < <(git -C "$CLAUDE_DIR" rev-list --left-right --count "HEAD...origin/$BRANCH")
       tracking="ahead=$ahead behind=$behind"
     fi
-    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\n' "$worktree" "$remote" "$tracking"
+    rebase="none"
+    if nested_rebase_in_progress; then
+      rebase="in-progress"
+    fi
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\n' "$worktree" "$remote" "$tracking" "$rebase"
   fi
   printf 'error-log: %s\n' "$ERROR_LOG"
   if [[ -f "$ERROR_LOG" ]]; then
@@ -387,13 +467,13 @@ cmd_migrate() {
 }
 
 case "$MODE" in
-  setup) cmd_setup || warn "setup failed; continuing." ;;
-  pull) cmd_pull || warn "pull failed; continuing." ;;
-  checkpoint) cmd_checkpoint || warn "checkpoint failed; continuing." ;;
-  publish) cmd_publish || warn "publish failed; continuing." ;;
-  push) cmd_push || warn "push failed; continuing." ;;
+  setup) dispatch_mutating cmd_setup || warn "setup failed; continuing." ;;
+  pull) dispatch_mutating cmd_pull || warn "pull failed; continuing." ;;
+  checkpoint) dispatch_mutating cmd_checkpoint || warn "checkpoint failed; continuing." ;;
+  publish) dispatch_mutating cmd_publish || warn "publish failed; continuing." ;;
+  push) dispatch_mutating cmd_push || warn "push failed; continuing." ;;
   status) cmd_status ;;
-  migrate-from-hf) cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
+  migrate-from-hf) dispatch_mutating cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
   *) warn "unknown mode: $MODE (expected setup|pull|checkpoint|publish|push|status|migrate-from-hf)" ;;
 esac
 

@@ -42,6 +42,7 @@ def _sync(
     mode: str,
     *args: str,
     trace_path: Path | None = None,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Invoke the copied ``state-sync.sh`` for one writer against ``remote``."""
     env = {
@@ -62,6 +63,8 @@ def _sync(
         env["AI_STATE_REMOTE"] = str(remote)
     if trace_path is not None:
         env["GIT_TRACE2_EVENT"] = str(trace_path)
+    if extra_env is not None:
+        env.update(extra_env)
     return subprocess.run(
         ["bash", str(script), mode, *args],
         text=True,
@@ -192,6 +195,68 @@ def _local_commit_count(root: Path) -> int:
     return int(_git(root / ".claude", "rev-list", "--count", "HEAD").stdout)
 
 
+def _half_initialized_rebase(root: Path) -> Path:
+    """Create the incomplete rebase state Git can only clear with ``--quit``."""
+    rebase_dir = root / ".claude" / ".git" / "rebase-merge"
+    rebase_dir.mkdir()
+    (rebase_dir / "autostash").write_text("deadbeef\n")
+    return rebase_dir
+
+
+def _rebase_metadata(root: Path) -> dict[str, bytes]:
+    """Return the active rebase metadata as byte snapshots by relative path."""
+    git_dir = root / ".claude" / ".git"
+    snapshot: dict[str, bytes] = {}
+    for rebase_dir in (git_dir / "rebase-merge", git_dir / "rebase-apply"):
+        if not rebase_dir.is_dir():
+            continue
+        for path in sorted(rebase_dir.rglob("*")):
+            key = path.relative_to(git_dir).as_posix()
+            if path.is_symlink():
+                snapshot[key] = b"symlink:" + os.readlink(path).encode()
+            elif path.is_dir():
+                snapshot[key] = b"directory"
+            else:
+                snapshot[key] = b"file:" + path.read_bytes()
+    return snapshot
+
+
+def _worktree_snapshot(root: Path) -> dict[str, bytes]:
+    """Return every non-Git worktree file as a byte snapshot."""
+    worktree = root / ".claude"
+    return {
+        path.relative_to(worktree).as_posix(): path.read_bytes()
+        for path in sorted(worktree.rglob("*"))
+        if path.is_file() and ".git" not in path.relative_to(worktree).parts
+    }
+
+
+def _valid_preexisting_rebase(
+    script: Path, tmp_path: Path, remote: Path, name: str
+) -> tuple[Path, str]:
+    """Create a real conflicted rebase that represents active operator work."""
+    writer = _new_writer(script, tmp_path, remote, name)
+    rebase_file = "plans/operator-rebase.md"
+    assert _git(writer / ".claude", "config", "user.name", "Test").returncode == 0
+    assert (
+        _git(writer / ".claude", "config", "user.email", "test@example.com").returncode
+        == 0
+    )
+    _write(writer, rebase_file, "base\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    assert _git(writer / ".claude", "checkout", "-qb", "operator-work").returncode == 0
+    _write(writer, rebase_file, "operator\n")
+    assert _git(writer / ".claude", "add", "-A").returncode == 0
+    assert _git(writer / ".claude", "commit", "-qm", "operator").returncode == 0
+    assert _git(writer / ".claude", "checkout", "-q", "ai-state").returncode == 0
+    _write(writer, rebase_file, "sync\n")
+    assert _git(writer / ".claude", "add", "-A").returncode == 0
+    assert _git(writer / ".claude", "commit", "-qm", "sync").returncode == 0
+    assert _git(writer / ".claude", "checkout", "-q", "operator-work").returncode == 0
+    assert _git(writer / ".claude", "rebase", "ai-state").returncode != 0
+    return writer, rebase_file
+
+
 def test_checkpoint_commits_locally_without_remote_io(
     script: Path, tmp_path: Path
 ) -> None:
@@ -300,6 +365,7 @@ def test_status_is_local_only_credential_safe_and_reports_cached_state(
     assert "worktree: clean" in clean.stdout
     assert "remote: configured" in clean.stdout
     assert "tracking: unavailable" in clean.stdout
+    assert "rebase: none" in clean.stdout
     assert _traced_remote_commands(clean_trace) == []
 
     _write(writer, "plans/dirty.md", "dirty\n")
@@ -312,6 +378,314 @@ def test_status_is_local_only_credential_safe_and_reports_cached_state(
     assert _sync(script, writer, remote, "checkpoint").returncode == 0
     ahead = _sync(script, writer, remote, "status")
     assert "tracking: ahead=1 behind=0" in ahead.stdout
+
+
+def test_pull_clears_half_initialized_rebase_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """Pull clears leftover rebase metadata before starting remote reconciliation."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "half-initialized")
+    assert _sync(script, writer, remote, "checkpoint").returncode == 0
+    rebase_dir = _half_initialized_rebase(writer)
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "git-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        'if [[ "$3" == "rebase" && "$4" == "--quit" ]]; then\n'
+        "  printf 'orphaned-autostash-quit-invoked\\n' >&2\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    recovered = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+
+    assert recovered.returncode == 0
+    assert (
+        "orphaned autostash rebase state from a previous sync detected"
+        in recovered.stderr
+    )
+    assert "reconciliation with origin/ai-state failed" not in recovered.stderr
+    assert not rebase_dir.exists()
+    assert "orphaned-autostash-quit-invoked" in error_log.read_text()
+    rebase_invocations = [
+        line
+        for line in invocations.read_text().splitlines()
+        if line.startswith("rebase ")
+    ]
+    assert rebase_invocations == ["rebase --quit"]
+
+    following_pull = _sync(script, writer, remote, "pull")
+
+    assert following_pull.returncode == 0
+    assert "leftover rebase state from a previous sync" not in following_pull.stderr
+
+
+def test_rebase_abort_alone_cannot_clear_half_initialized_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """The fixture matches the Git state that requires ``rebase --quit``."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "abort-only")
+    rebase_dir = _half_initialized_rebase(writer)
+
+    result = _git(writer / ".claude", "rebase", "--abort")
+
+    assert result.returncode != 0
+    assert rebase_dir.exists()
+
+
+@pytest.mark.parametrize(
+    "shape", ("extra-file", "subdirectory", "symlink", "rebase-apply")
+)
+def test_extra_or_nonfile_rebase_metadata_is_preserved(
+    script: Path, tmp_path: Path, shape: str
+) -> None:
+    """Only the observed one-file orphan shape is safe to clear automatically."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, shape)
+    rebase_dir = _half_initialized_rebase(writer)
+    if shape == "extra-file":
+        (rebase_dir / "extra").write_text("metadata\n")
+    elif shape == "subdirectory":
+        (rebase_dir / "metadata").mkdir()
+    elif shape == "symlink":
+        target = tmp_path / "autostash-target"
+        target.write_text("metadata\n")
+        (rebase_dir / "autostash").unlink()
+        (rebase_dir / "autostash").symlink_to(target)
+    else:
+        (writer / ".claude" / ".git" / "rebase-apply").mkdir()
+    before_metadata = _rebase_metadata(writer)
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "git-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert not invocations.exists()
+    assert _rebase_metadata(writer) == before_metadata
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ("setup", "pull", "checkpoint", "publish", "push", "migrate-from-hf"),
+)
+def test_mutating_entrypoints_preserve_valid_preexisting_rebase(
+    script: Path, tmp_path: Path, mode: str
+) -> None:
+    """Every mutating entry point leaves an active operator rebase untouched."""
+    remote = _bare_remote(tmp_path)
+    writer, rebase_file = _valid_preexisting_rebase(script, tmp_path, remote, mode)
+
+    before_head = _local_head(writer)
+    before_index = _git(writer / ".claude", "ls-files", "--stage").stdout
+    before_status = _git(writer / ".claude", "status", "--porcelain=v1", "-z").stdout
+    before_content = (writer / ".claude" / rebase_file).read_bytes()
+    before_worktree = _worktree_snapshot(writer)
+    before_metadata = _rebase_metadata(writer)
+    before_remote = _git(remote, "rev-parse", "ai-state").stdout
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+    before_error_log = error_log.read_bytes() if error_log.exists() else None
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "git-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        mode,
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "pre-existing rebase state is ambiguous" in result.stderr
+    assert not invocations.exists()
+    assert _local_head(writer) == before_head
+    assert _git(writer / ".claude", "ls-files", "--stage").stdout == before_index
+    assert (
+        _git(writer / ".claude", "status", "--porcelain=v1", "-z").stdout
+        == before_status
+    )
+    assert (writer / ".claude" / rebase_file).read_bytes() == before_content
+    assert _worktree_snapshot(writer) == before_worktree
+    assert _rebase_metadata(writer) == before_metadata
+    assert _git(remote, "rev-parse", "ai-state").stdout == before_remote
+    if before_error_log is None:
+        assert not error_log.exists()
+    else:
+        assert error_log.read_bytes() == before_error_log
+
+
+def test_current_pull_recovery_reports_distinct_abort_and_quit_failures(
+    script: Path, tmp_path: Path
+) -> None:
+    """Current-pull recovery preserves both abort and quit diagnostics."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "recovery-failure")
+    _write(writer, "plans/published.md", "published\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    assert not (writer / ".claude" / ".git" / "rebase-merge").exists()
+    assert not (writer / ".claude" / ".git" / "rebase-apply").exists()
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    invocations = tmp_path / "git-invocations.log"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf "%s %s\\n" "${3:-}" "${4:-}" >> "$GIT_INVOCATIONS"\n'
+        'if [[ "$3" == "pull" ]]; then\n'
+        '  mkdir -p "$2/.git/rebase-merge"\n'
+        '  printf "current-pull\\n" > "$2/.git/rebase-merge/head-name"\n'
+        "  printf 'forced current pull failure\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+        'if [[ "$3" == "rebase" && "$4" == "--abort" ]]; then\n'
+        "  printf 'forced abort recovery failure\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+        'if [[ "$3" == "rebase" && "$4" == "--quit" ]]; then\n'
+        "  printf 'forced quit recovery failure\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={
+            "GIT_INVOCATIONS": str(invocations),
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        },
+    )
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+
+    assert result.returncode == 0
+    assert (
+        "leftover rebase state from a failed reconciliation could not be cleared"
+        in result.stderr
+    )
+    assert f"git -C {writer / '.claude'} rebase --quit" in result.stderr
+    assert "pull: up to date" not in result.stderr
+    assert error_log.exists()
+    assert "forced abort recovery failure" in error_log.read_text()
+    assert "forced quit recovery failure" in error_log.read_text()
+    rebase_invocations = [
+        line
+        for line in invocations.read_text().splitlines()
+        if line.startswith("rebase ")
+    ]
+    assert rebase_invocations == ["rebase --abort", "rebase --quit"]
+
+
+def test_failed_pull_without_rebase_does_not_attempt_recovery(
+    script: Path, tmp_path: Path
+) -> None:
+    """An ordinary failed pull does not report or log nonexistent rebase recovery."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "ordinary-pull-failure")
+    _write(writer, "plans/published.md", "published\n")
+    assert _sync(script, writer, remote, "push").returncode == 0
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "$3" == "pull" ]]; then\n'
+        "  printf 'forced ordinary pull failure\\n' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        script,
+        writer,
+        remote,
+        "pull",
+        extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+
+    assert result.returncode == 0
+    assert "reconciliation with origin/ai-state failed" in result.stderr
+    assert "leftover rebase state" not in result.stderr
+    assert "forced ordinary pull failure" in error_log.read_text()
+    assert "No rebase in progress" not in error_log.read_text()
+
+
+def test_status_reports_rebase_state(script: Path, tmp_path: Path) -> None:
+    """Status exposes leftover rebase state without invoking Git recovery."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "status-rebase")
+    rebase_dir = _half_initialized_rebase(writer)
+
+    in_progress = _sync(script, writer, remote, "status")
+    shutil.rmtree(rebase_dir)
+    clear = _sync(script, writer, remote, "status")
+
+    assert "rebase: in-progress" in in_progress.stdout
+    assert "rebase: none" in clear.stdout
 
 
 def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(

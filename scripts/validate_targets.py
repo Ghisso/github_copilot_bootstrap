@@ -2046,6 +2046,18 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "the two installed state-sync.sh copies must be byte-identical",
         errors,
     )
+    if state_sync_claude.exists():
+        state_sync_text = read(state_sync_claude)
+        check(
+            'git -C "$CLAUDE_DIR" rebase --quit' in state_sync_text,
+            "state-sync.sh must use the literal rebase --quit recovery invocation",
+            errors,
+        )
+        check(
+            "rebase --abort 2>/dev/null || true" not in state_sync_text,
+            "state-sync.sh must not silently discard failed rebase aborts",
+            errors,
+        )
 
     # Run generated Stop wrappers instead of relying on text searches: Codex
     # needs one JSON response, while Claude must leave stdout empty.
