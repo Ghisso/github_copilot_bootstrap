@@ -1,0 +1,47 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-11T07:54:40Z",
+  "branch": "state-sync-recovery-and-plan-cancellation_implementation",
+  "head_sha": "a7774db82aa335a7cc66fd6afcb8f9ab803f4cde",
+  "base_ref": "dev",
+  "merge_base_sha": "6373f67cd327f07d539a31df8170bcc6c8d7a86a",
+  "phase": "2026-08-09_phase-E-docs-and-graphify-remediation",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "2921a5655c2e5d8fb1fa04d5c353d6759eb600c8",
+  "changed_files": [
+    "README.md",
+    "docs/2026-08-09-state-sync-rebase-recovery.md",
+    "docs/architecture.md",
+    "docs/plan-deterministic-commit-gate.md",
+    "docs/smoke-tests.md",
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/hooks/scripts/enforce-branch-state.sh",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/plans/README.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/templates/plan-big.md",
+    "shared/templates/plan-small.md",
+    "shared/templates/session-log.md",
+    "tests/test_hook_gates.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_plan_frontmatter.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

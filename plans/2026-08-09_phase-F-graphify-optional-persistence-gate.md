@@ -3,7 +3,10 @@ name: 2026-08-09_phase-F-graphify-optional-persistence-gate
 type: small-plan
 parent_plan: graphify-structural-code-intelligence
 phase_index: 6
-status: in-progress
+status: cancelled
+cancelled_at: 2026-08-11T07:37:06Z
+cancelled_reason: Phase 0 returned NO-GO because measured value did not justify bootstrap integration
+cancelled_evidence: .claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md
 closeout_session_log:
 ---
 

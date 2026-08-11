@@ -3,8 +3,8 @@ name: 2026-08-09_phase-E-docs-and-graphify-remediation
 type: small-plan
 parent_plan: state-sync-recovery-and-plan-cancellation
 phase_index: 5
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-11_docs-graphify-remediation-phase-E.md
 ---
 
 # Small Plan: 2026-08-09_phase-E-docs-and-graphify-remediation
@@ -72,14 +72,14 @@ reject the report as dirty. This is a recorded lesson.
 
 ## Steps
 
-- [ ] `README.md` (modify): update the commit-invariant and push-invariant
+- [x] `README.md` (modify): update the commit-invariant and push-invariant
       bullets (around lines 589 and 590) to describe cancelled-phase handling,
       the completed-phase commit count, and the last-completed-phase findings
       binding.
-- [ ] `docs/plan-deterministic-commit-gate.md` (modify): update the
+- [x] `docs/plan-deterministic-commit-gate.md` (modify): update the
       blocked-state bullet (around line 97) to include the cancelled-phase
       cases, including the stale-pointer commit refusal.
-- [ ] `docs/2026-08-09-state-sync-rebase-recovery.md` (create): the single dated
+- [x] `docs/2026-08-09-state-sync-rebase-recovery.md` (create): the single dated
       record of the incident. Include the measured evidence counts from
       `.claude/session_logs/hooks-errors.log` (1 `Created autostash`, 9
       `already a rebase-merge`, 5 unreproduced
@@ -88,7 +88,7 @@ reject the report as dirty. This is a recorded lesson.
       `--autostash` was removed, and an explicit assumption marker on the
       refspec defence. Other files point here instead of restating it; a wrong
       mechanism claim propagates across files otherwise.
-- [ ] `.claude/plans/graphify-structural-code-intelligence.md` (modify): set
+- [x] `.claude/plans/graphify-structural-code-intelligence.md` (modify): set
       `status: cancelled`; add `cancelled_at`, `cancelled_reason` recording that
       the Phase 0 gate returned NO-GO, and `cancelled_evidence` pointing at the
       evidence artifact. In the body,
@@ -101,13 +101,13 @@ reject the report as dirty. This is a recorded lesson.
       historical gate criteria or measured evidence. Quote the removed
       lifecycle-vocabulary sentence in the new `docs/` record so the reason it
       existed is preserved.
-- [ ] The six Graphify phase files
+- [x] The six Graphify phase files
       `2026-08-09_phase-A-graphify-managed-dependency-and-thin-adapter.md`
       through `2026-08-09_phase-F-graphify-optional-persistence-gate.md`
       (modify): set `status: cancelled` and add the three cancellation fields.
       Leave `parent_plan`, `phase_index`, and the bodies unchanged. Leave
       `closeout_session_log` empty; a cancelled phase has no closeout.
-- [ ] Add the `**Status:** CANCELLED` marker and the list of cancelled phases to
+- [x] Add the `**Status:** CANCELLED` marker and the list of cancelled phases to
       the evidence artifact at
       `.claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md`.
       If that file is not the right home, create a dated session log under
@@ -116,17 +116,17 @@ reject the report as dirty. This is a recorded lesson.
       NO-GO because measured value did not justify integration. Perform the edit
       before writing any statement that it was done; never order the claim
       ahead of the action.
-- [ ] `2026-08-09_phase-0-graphify-compatibility-and-value-gate.md`: leave
+- [x] `2026-08-09_phase-0-graphify-compatibility-and-value-gate.md`: leave
       unchanged at `status: complete`. Phase 0 genuinely ran, shipped, and
       produced the gate result.
-- [ ] Search active bootstrap source/configuration for Graphify references.
+- [x] Search active bootstrap source/configuration for Graphify references.
       `shared/`, generated MCP configuration, the devcontainer, and runtime
       routing must contain no active Graphify dependency or integration path.
       Historical plans/evidence may retain Graphify references. Correct only
       stale documentation or log wording that incorrectly presents adoption as
       pending.
-- [ ] `.claude/MEMORY.md` (modify): record the `[LEARN]` entries listed below.
-- [ ] Regenerate targets and run the full verification set.
+- [x] `.claude/MEMORY.md` (modify): record the `[LEARN]` entries listed below.
+- [x] Regenerate targets and run the full verification set.
 
 ## LEARN Entries To Record
 
@@ -138,9 +138,9 @@ reject the report as dirty. This is a recorded lesson.
   rebase directory before it discovers the tree is dirty again, so on a
   self-writing repository it manufactures the latched state it was meant to
   avoid.
-- A warn-never-fail subsystem needs a health surface. Nine hours and eleven
-  unpublished commits passed unnoticed because nothing reported the latched
-  state; `status` now does.
+- A warn-never-fail subsystem needs a health surface. The latch persisted for
+  approximately 58 minutes across eleven unpublished commits because nothing
+  reported it; `status` now does.
 - A lifecycle vocabulary gap forces falsification. With no `cancelled` status,
   the only ways to clear the gate were to fabricate six closeouts or to write an
   inaccurate `complete`; the second actually happened and documented itself.
@@ -152,17 +152,17 @@ reject the report as dirty. This is a recorded lesson.
 
 ## Test Scenarios
 
-- [ ] `uv run python scripts/validate_plan_frontmatter.py` with no arguments
+- [x] `uv run python scripts/validate_plan_frontmatter.py` with no arguments
       passes over every file in `.claude/plans/`, including the seven remediated
       Graphify files.
-- [ ] The Graphify shape is covered as a fixture scenario in
+- [x] The Graphify shape is covered as a fixture scenario in
       `scripts/validate_targets.py` (added in Phase D): seven phases, one
       complete, six cancelled with evidence, one commit, and a findings report
       bound to the completed phase. That scenario is the pushability proof. Do
       not push the real branch: push is the user's decision and is out of scope
       here.
-- [ ] `bash .claude/hooks/scripts/state-sync.sh status` reports `rebase: none`.
-- [ ] Active bootstrap configuration contains no Graphify executable,
+- [x] `bash .claude/hooks/scripts/state-sync.sh status` reports `rebase: none`.
+- [x] Active bootstrap configuration contains no Graphify executable,
       dependency, MCP server, routing rule, or persistence path. Historical
       plan/evidence references remain allowed.
 
@@ -209,31 +209,31 @@ rm -rf /tmp/dist-gen-a
 
 ## Acceptance Criteria
 
-- [ ] `README.md` and `docs/plan-deterministic-commit-gate.md` describe the
+- [x] `README.md` and `docs/plan-deterministic-commit-gate.md` describe the
       cancelled-phase gate behavior accurately.
-- [ ] `docs/2026-08-09-state-sync-rebase-recovery.md` records the measured
+- [x] `docs/2026-08-09-state-sync-rebase-recovery.md` records the measured
       evidence, the causal chain, and the unverified-cause assumption.
-- [ ] The Graphify big plan reads `status: cancelled` with a reason, timestamp,
+- [x] The Graphify big plan reads `status: cancelled` with a reason, timestamp,
       and evidence pointer, and no longer contains the false sentence about
       `complete` being the only terminal status.
-- [ ] Graphify phases A through F read `status: cancelled` with full evidence;
+- [x] Graphify phases A through F read `status: cancelled` with full evidence;
       Phase 0 is untouched at `complete`.
-- [ ] The Graphify plan/evidence state records the low-value NO-GO accurately
+- [x] The Graphify plan/evidence state records the low-value NO-GO accurately
       and does not schedule or imply a renewed integration attempt.
-- [ ] Active bootstrap source/configuration contains no Graphify integration;
+- [x] Active bootstrap source/configuration contains no Graphify integration;
       only historical planning/evidence references remain.
-- [ ] No fabricated closeout log, findings report, or score exists for any
+- [x] No fabricated closeout log, findings report, or score exists for any
       cancelled phase.
-- [ ] `validate_plan_frontmatter.py` passes over every plan file.
-- [ ] The Graphify-shaped fixture scenario proves the branch is pushable under
+- [x] `validate_plan_frontmatter.py` passes over every plan file.
+- [x] The Graphify-shaped fixture scenario proves the branch is pushable under
       the new gates without falsification.
-- [ ] `[LEARN]` entries are recorded in `.claude/MEMORY.md`.
+- [x] `[LEARN]` entries are recorded in `.claude/MEMORY.md`.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`

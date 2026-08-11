@@ -1,7 +1,10 @@
 ---
 name: graphify-structural-code-intelligence
 type: big-plan
-status: complete
+status: cancelled
+cancelled_at: 2026-08-11T07:37:06Z
+cancelled_reason: Phase 0 returned NO-GO because measured value did not justify bootstrap integration
+cancelled_evidence: .claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md
 originating_branch: dev
 implementation_branch: graphify-structural-code-intelligence_implementation
 started_at: 2026-08-09T09:54:10Z
@@ -20,11 +23,10 @@ current_phase: 2026-08-09_phase-0-graphify-compatibility-and-value-gate
 
 ## Outcome: STOPPED AT PHASE 0 — NO-GO
 
-This plan is closed as **complete in lifecycle terms only**. Phase 0 was the
-authorized gate and it returned NO-GO, which by design terminates the plan.
-**Phases A through F were never authorized and were never implemented.**
-`status: complete` here means "this plan is finished", not "all phases shipped";
-`complete` is the only terminal status the frontmatter validator accepts.
+This plan was cancelled at the Phase 0 gate because measured value did not
+justify bootstrap integration. Phase 0 was the authorized gate and it returned
+NO-GO, which by design terminates the plan. **Phases A through F were never
+authorized and were never implemented.**
 
 Evidence:
 `.claude/explorations/2026-08-09_graphify-compatibility-value-gate/evidence.md`.
@@ -32,8 +34,11 @@ The bootstrap-only test scored 1/3 real questions. The user-authorized
 cross-project supplement then scored RAG 0/3 and industrial-inspection 2/3;
 since the override required both consumers to independently reach 2/3, it
 failed. Do not add an adapter, dependency, routing surface, generated output,
-hook, MCP configuration, or workaround on the strength of this plan. Reopening
-adoption requires a new plan and a fresh gate.
+hook, MCP configuration, or workaround on the strength of this plan. No retry
+or adoption work is scheduled.
+
+The remaining goals, design, phase criteria, and risks below are the preserved
+historical proposal. They do not authorize implementation or a new trial.
 
 ## Context
 

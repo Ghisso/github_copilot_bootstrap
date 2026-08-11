@@ -12,7 +12,7 @@ phases:
   - 2026-08-09_phase-D-cancelled-phase-gates
   - 2026-08-09_phase-E-docs-and-graphify-remediation
   - 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
-current_phase: 2026-08-09_phase-D-cancelled-phase-gates
+current_phase: 2026-08-09_phase-E-docs-and-graphify-remediation
 bypass_acknowledged: false
 ---
 
@@ -43,8 +43,9 @@ survived, and every later sync failed with
 
 Measured evidence in `.claude/session_logs/hooks-errors.log`: 1
 `Created autostash` line and 9 `already a rebase-merge` lines. The failure
-latched for roughly nine hours across eleven unpublished commits and stayed
-invisible because state sync is deliberately warn-never-fail.
+latched at 10:35:57Z, repeated through 11:31:53Z, and publication resumed at
+about 11:33:51Z: approximately 58 minutes across eleven unpublished commits.
+It stayed invisible because state sync is deliberately warn-never-fail.
 
 `git rebase --quit` is the correct recovery for the half-initialized case: it
 clears the rebase state without moving `HEAD`, which is exactly what `--abort`

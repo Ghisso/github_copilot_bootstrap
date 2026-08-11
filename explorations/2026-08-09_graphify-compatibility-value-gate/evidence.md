@@ -2,6 +2,19 @@
 
 ## Decision: NO-GO
 
+**Status:** CANCELLED
+
+The compatibility and value gate returned NO-GO because measured value did not
+justify bootstrap integration. This artifact is the cancellation evidence for
+the Graphify integration plan and these six never-authorized phases:
+
+- `2026-08-09_phase-A-graphify-managed-dependency-and-thin-adapter`
+- `2026-08-09_phase-B-graphify-routing-and-agent-integration`
+- `2026-08-09_phase-C-graphify-generation-and-safe-install`
+- `2026-08-09_phase-D-graphify-dogfood-and-retention`
+- `2026-08-09_phase-E-graphify-runtime-diagnostics`
+- `2026-08-09_phase-F-graphify-optional-persistence-gate`
+
 `graphifyy==0.9.35` has a usable local AST extraction path, honors the tested
 ignore rules, and passed a network-denied code-only run. It does **not** meet
 the Phase 0 adoption gate: only one of the three required real questions gave

@@ -339,3 +339,26 @@
 - [LEARN:security] A gate that delegates validation to a runtime helper must
   fail closed on a missing runtime, exceptions, nonzero exits, and malformed
   protocol output, with a distinct regression test for every failure mode.
+- [LEARN:recovery] A recovery that swallows its own failure converts a
+  transient fault into a permanent one. `git rebase --abort 2>/dev/null ||
+  true` cannot clear a half-initialized rebase; `--quit` can because it clears
+  state without moving `HEAD`.
+- [LEARN:recovery] `--autostash` is not free insurance. It can write the
+  autostash commit and rebase directory before discovering new dirty state, so
+  a self-writing repository can manufacture the latch it meant to avoid.
+- [LEARN:observability] A warn-never-fail subsystem needs a health surface.
+  Otherwise failure can remain invisible while unpublished work accumulates;
+  `state-sync.sh status` now exposes the condition. See the dated incident
+  record at `docs/2026-08-09-state-sync-rebase-recovery.md`.
+- [LEARN:workflow] A lifecycle vocabulary gap forces falsification. Without
+  `cancelled`, clearing a stopped plan required fabricated closeouts or an
+  inaccurate `complete`; the Graphify record used the inaccurate status.
+- [LEARN:security] Relaxing a gate is safe only when paired with a new
+  requirement. Cancellation exempts commit, score, findings, and closeout only
+  when an artifact-backed reason records the decision.
+- [LEARN:planning] A NO-GO gate is a valid final result. Low measured value is
+  a reason to stop, not a reason to add integration machinery or schedule
+  another trial.
+- [LEARN:documentation] Reconstruct incident duration from durable timestamped
+  logs or reflogs, not planning estimates. Keep the exact volatile timeline in
+  its dated incident record rather than portable MEMORY.
