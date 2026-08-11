@@ -1,10 +1,10 @@
 ---
 name: state-sync-recovery-and-plan-cancellation
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: state-sync-recovery-and-plan-cancellation_implementation
-started_at:
+started_at: 2026-08-11T04:05:52Z
 phases:
   - 2026-08-09_phase-A-state-sync-rebase-recovery
   - 2026-08-09_phase-B-state-sync-race-and-refspec-hardening
@@ -12,7 +12,7 @@ phases:
   - 2026-08-09_phase-D-cancelled-phase-gates
   - 2026-08-09_phase-E-docs-and-graphify-remediation
   - 2026-08-11_phase-F-context-mode-local-indexing-and-cache-boundary
-current_phase:
+current_phase: 2026-08-09_phase-A-state-sync-rebase-recovery
 bypass_acknowledged: false
 ---
 

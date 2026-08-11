@@ -168,6 +168,29 @@ append_error_output() {
   printf '%s\n' "$1" >> "$ERROR_LOG" 2>/dev/null || true
 }
 
+nested_rebase_in_progress() {
+  [[ -d "$CLAUDE_DIR/.git/rebase-merge" || -d "$CLAUDE_DIR/.git/rebase-apply" ]]
+}
+
+clear_rebase_state() {
+  local abort_output abort_status quit_output quit_status
+  set +e
+  abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)"
+  abort_status=$?
+  if [[ $abort_status -eq 0 ]]; then
+    set -e
+    append_error_output "$abort_output"
+    return 0
+  fi
+
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$abort_output"
+  append_error_output "$quit_output"
+  return "$quit_status"
+}
+
 restore_root_adapters() {
   local restore="$SCRIPT_DIR/restore-root-adapters.sh"
   if [[ -f "$restore" ]]; then
@@ -211,6 +234,14 @@ reconcile_committed_state() {
     return 0
   fi
 
+  if nested_rebase_in_progress; then
+    warn "leftover rebase state from a previous sync detected; attempting recovery before reconciliation."
+    if ! clear_rebase_state; then
+      warn "leftover rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+      return 1
+    fi
+  fi
+
   local remote_ref_status output status conflicts
   set +e
   git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
@@ -245,8 +276,10 @@ reconcile_committed_state() {
   set -e
   if [[ $status -ne 0 ]]; then
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-    git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
     append_error_output "$output"
+    if ! clear_rebase_state; then
+      warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
     return 1
@@ -317,9 +350,9 @@ cmd_push() {
 
 cmd_status() {
   if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
-    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\n'
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\n'
   else
-    local worktree remote tracking ahead behind
+    local worktree remote tracking ahead behind rebase
     if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
       worktree="dirty"
     else
@@ -336,7 +369,11 @@ cmd_status() {
       read -r ahead behind < <(git -C "$CLAUDE_DIR" rev-list --left-right --count "HEAD...origin/$BRANCH")
       tracking="ahead=$ahead behind=$behind"
     fi
-    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\n' "$worktree" "$remote" "$tracking"
+    rebase="none"
+    if nested_rebase_in_progress; then
+      rebase="in-progress"
+    fi
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\n' "$worktree" "$remote" "$tracking" "$rebase"
   fi
   printf 'error-log: %s\n' "$ERROR_LOG"
   if [[ -f "$ERROR_LOG" ]]; then
