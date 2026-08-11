@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: "Main-thread workflow orchestrator for complex implementation tasks. Delegates planning, coding, review, and verification to specialists, and owns the lifecycle ceremony (branch, commit, PR, memory, and session-log writes) itself. Not itself a delegatable subagent."
-tools: Task, Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, TodoWrite
+tools: Task, Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, TodoWrite
 ---
 
 # Orchestrator Agent

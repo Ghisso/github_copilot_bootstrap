@@ -1,7 +1,7 @@
 ---
 name: documenter
 description: "Documentation update agent. Reads git diff, identifies changed public interfaces and flows, then updates README.md and docs/ with accurate prose and Mermaid diagrams."
-tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble
+tools: Edit, MultiEdit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
 model: sonnet
 effort: medium
 ---
