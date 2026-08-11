@@ -46,6 +46,7 @@ fi
 CLAUDE_DIR="$REPO_ROOT/.claude"
 BRANCH="${AI_STATE_BRANCH:-ai-state}"
 ERROR_LOG="$REPO_ROOT/.claude/session_logs/hooks-errors.log"
+PROTECTED_REBASE_STATE=2
 
 prepare_error_log() {
   mkdir -p "$(dirname "$ERROR_LOG")" 2>/dev/null || true
@@ -87,7 +88,8 @@ resolve_remote() {
 }
 
 write_nested_gitignore() {
-  cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
+  if [[ ! -f "$CLAUDE_DIR/.gitignore" ]]; then
+    cat > "$CLAUDE_DIR/.gitignore" <<'EOF'
 # Local convenience only; never synced (D5 in plans/plan-git-state-sync.md).
 settings.local.json
 *.local.*
@@ -99,6 +101,17 @@ __pycache__/
 # never let migrate-from-hf commit it into ai-state history.
 .state_backups/
 EOF
+  fi
+  if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
+    printf '\n# Derived local caches; never synced.\n.cache/\n' >> "$CLAUDE_DIR/.gitignore"
+  fi
+}
+
+untrack_nested_cache() {
+  # Upgraded nested repositories may already contain committed cache files.
+  # Remove only their index entries; -f is safe with --cached and preserves
+  # every working-tree byte for the local Context Mode installation.
+  git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -146,19 +159,40 @@ init_nested_repo() {
 }
 
 # Commits whatever is currently uncommitted under .claude/ as a session
-# snapshot. Both cmd_push and cmd_pull call this before touching the remote so
-# the working tree is clean before `git pull --rebase`: a clean tree means the
-# only reachable pull failure is a rebase conflict (which we abort cleanly),
-# never an --autostash pop conflict that would leave the tree half-merged
-# (F4 in §9 of plans/plan-git-state-sync.md).
+# snapshot. Reconciliation calls this immediately before `git pull --rebase`
+# so the working tree is clean when the rebase starts.
 commit_local_state() {
   local message="${1:-}"
-  git -C "$CLAUDE_DIR" add -A
+  if ! write_nested_gitignore; then
+    return 1
+  fi
+  if ! untrack_nested_cache; then
+    return 1
+  fi
+  if ! git -C "$CLAUDE_DIR" add -A; then
+    return 1
+  fi
   if ! git -C "$CLAUDE_DIR" diff --cached --quiet \
     || [[ -z "$(git -C "$CLAUDE_DIR" log -1 --format=%H 2>/dev/null || true)" ]]; then
     local ts
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown-timestamp)"
-    git -C "$CLAUDE_DIR" commit -q --allow-empty -m "${message:-session: $ts}"
+    if ! git -C "$CLAUDE_DIR" commit -q --allow-empty -m "${message:-session: $ts}"; then
+      return 1
+    fi
+  fi
+}
+
+# Older nested repositories retain Git's default wildcard fetch refspec even
+# though init_nested_repo now pins state sync to one branch. Re-pin it on every
+# reconciliation so drift is repaired without requiring a reinstall.
+# ASSUMPTION: wildcard refspecs caused historical "Cannot rebase onto multiple
+# branches" failures; this needs empirical verification.
+ensure_pinned_refspecs() {
+  if ! git -C "$CLAUDE_DIR" config --replace-all "remote.origin.fetch" "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"; then
+    return 1
+  fi
+  if ! git -C "$CLAUDE_DIR" config --replace-all "remote.origin.push" "refs/heads/$BRANCH:refs/heads/$BRANCH"; then
+    return 1
   fi
 }
 
@@ -166,6 +200,84 @@ append_error_output() {
   [[ -n "$1" ]] || return 0
   prepare_error_log
   printf '%s\n' "$1" >> "$ERROR_LOG" 2>/dev/null || true
+}
+
+nested_rebase_in_progress() {
+  [[ -d "$CLAUDE_DIR/.git/rebase-merge" || -d "$CLAUDE_DIR/.git/rebase-apply" ]]
+}
+
+orphaned_preexisting_autostash() {
+  local rebase_dir="$CLAUDE_DIR/.git/rebase-merge" entry entries=0
+  [[ -d "$rebase_dir" && ! -d "$CLAUDE_DIR/.git/rebase-apply" ]] || return 1
+  for entry in "$rebase_dir"/* "$rebase_dir"/.[!.]* "$rebase_dir"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    ((entries += 1))
+    [[ "$entry" == "$rebase_dir/autostash" && -f "$entry" && ! -L "$entry" ]] || return 1
+  done
+  [[ $entries -eq 1 ]]
+}
+
+preflight_mutating_rebase_state() {
+  if ! nested_rebase_in_progress; then
+    return 0
+  fi
+  if ! orphaned_preexisting_autostash; then
+    printf 'WARN state-sync: pre-existing rebase state is ambiguous; state sync will not alter it. Inspect with: git -C %s status. Resolve with: git -C %s rebase --continue, or quit with: git -C %s rebase --quit\n' "$CLAUDE_DIR" "$CLAUDE_DIR" "$CLAUDE_DIR" >&2
+    return "$PROTECTED_REBASE_STATE"
+  fi
+
+  local quit_output quit_status
+  warn "orphaned autostash rebase state from a previous sync detected; clearing it with rebase --quit before continuing."
+  set +e
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$quit_output"
+  if [[ $quit_status -ne 0 ]]; then
+    warn "orphaned autostash rebase state from a previous sync could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+    return 1
+  fi
+}
+
+dispatch_mutating() {
+  local preflight_status command_status
+  set +e
+  preflight_mutating_rebase_state
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return 0
+  fi
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  set +e
+  "$@"
+  command_status=$?
+  set -e
+  if [[ $command_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return 0
+  fi
+  return "$command_status"
+}
+
+clear_current_pull_rebase_state() {
+  local abort_output abort_status quit_output quit_status
+  set +e
+  abort_output="$(git -C "$CLAUDE_DIR" rebase --abort 2>&1)"
+  abort_status=$?
+  if [[ $abort_status -eq 0 ]]; then
+    set -e
+    append_error_output "$abort_output"
+    return 0
+  fi
+
+  quit_output="$(git -C "$CLAUDE_DIR" rebase --quit 2>&1)"
+  quit_status=$?
+  set -e
+  append_error_output "$abort_output"
+  append_error_output "$quit_output"
+  return "$quit_status"
 }
 
 restore_root_adapters() {
@@ -179,11 +291,21 @@ restore_root_adapters() {
 # standalone, not just after an explicit `setup` call.
 cmd_setup() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    return 0
+    write_nested_gitignore
+    return $?
   fi
   init_nested_repo
-  commit_local_state "bootstrap: init ai-state"
-  reconcile_committed_state || true
+  if ! commit_local_state "bootstrap: init ai-state"; then
+    return 1
+  fi
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
 
   # D5 / F1 (§9): once .claude/ is first materialised here, restore the
   # root-level adapter files that live outside .claude/ (carried in
@@ -211,7 +333,12 @@ reconcile_committed_state() {
     return 0
   fi
 
-  local remote_ref_status output status conflicts
+  if ! ensure_pinned_refspecs; then
+    warn "configuring pinned origin refspecs failed; local commits are intact and will retry on the next sync."
+    return 1
+  fi
+
+  local remote_ref_status output status conflicts preflight_status
   set +e
   git -C "$CLAUDE_DIR" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1
   remote_ref_status=$?
@@ -236,19 +363,47 @@ reconcile_committed_state() {
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
       return 1
     fi
+    if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+      warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
+      return 1
+    fi
     return 0
   fi
 
+  # Re-check immediately before staging: an operator rebase can begin after
+  # the entrypoint guard, while hook logging can dirty the tree before pull.
   set +e
-  output="$(git -C "$CLAUDE_DIR" pull --rebase --autostash origin "$BRANCH" 2>&1)"
+  preflight_mutating_rebase_state
+  preflight_status=$?
+  set -e
+  if [[ $preflight_status -ne 0 ]]; then
+    return "$preflight_status"
+  fi
+  if ! commit_local_state; then
+    warn "local state checkpoint failed; reconciliation will retry on the next sync."
+    return 1
+  fi
+
+  set +e
+  # Git's autostash mode writes rebase metadata before discovering renewed log
+  # churn; without it, this residual race fails cleanly and retries next sync.
+  output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"
   status=$?
   set -e
   if [[ $status -ne 0 ]]; then
     conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
-    git -C "$CLAUDE_DIR" rebase --abort 2>/dev/null || true
     append_error_output "$output"
+    if nested_rebase_in_progress; then
+      if ! clear_current_pull_rebase_state; then
+        warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
+      fi
+    fi
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
+    return 1
+  fi
+  if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
+    warn "post-reconcile cache cleanup failed; publication is blocked until the cache is untracked."
     return 1
   fi
 }
@@ -270,7 +425,15 @@ cmd_publish() {
     warn "no state remote configured; local checkpoint remains unpublished."
     return 0
   fi
-  if ! reconcile_committed_state; then
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
+  if [[ $reconcile_status -ne 0 ]]; then
     warn "publish skipped: reconciliation with origin/$BRANCH failed. Local commits are safe and will retry once the conflict is resolved."
     return 1
   fi
@@ -288,7 +451,14 @@ cmd_publish() {
 }
 
 cmd_pull() {
+  local setup_status reconcile_status
+  set +e
   cmd_setup
+  setup_status=$?
+  set -e
+  if [[ $setup_status -ne 0 ]]; then
+    return "$setup_status"
+  fi
   if is_local_only; then
     info "pull: local-only mode; bootstrap complete, remote sync skipped."
     return 0
@@ -297,12 +467,12 @@ cmd_pull() {
     warn "no state remote configured; nothing to pull from."
     return 0
   fi
-  # Commit any local edits first so the rebase below runs against a clean tree
-  # (F4): removes the --autostash-pop-conflict path entirely.
-  commit_local_state
-
-  if ! reconcile_committed_state; then
-    return 1
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -ne 0 ]]; then
+    return "$reconcile_status"
   fi
   info "pull: up to date with origin/$BRANCH"
 }
@@ -317,9 +487,9 @@ cmd_push() {
 
 cmd_status() {
   if [[ ! -d "$CLAUDE_DIR/.git" ]]; then
-    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\n'
+    printf 'repository: uninitialized\nworktree: uninitialized\nremote: unavailable\ntracking: unavailable\nrebase: none\n'
   else
-    local worktree remote tracking ahead behind
+    local worktree remote tracking ahead behind rebase
     if [[ -n "$(git -C "$CLAUDE_DIR" status --porcelain)" ]]; then
       worktree="dirty"
     else
@@ -336,7 +506,11 @@ cmd_status() {
       read -r ahead behind < <(git -C "$CLAUDE_DIR" rev-list --left-right --count "HEAD...origin/$BRANCH")
       tracking="ahead=$ahead behind=$behind"
     fi
-    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\n' "$worktree" "$remote" "$tracking"
+    rebase="none"
+    if nested_rebase_in_progress; then
+      rebase="in-progress"
+    fi
+    printf 'repository: initialized\nworktree: %s\nremote: %s\ntracking: %s\nrebase: %s\n' "$worktree" "$remote" "$tracking" "$rebase"
   fi
   printf 'error-log: %s\n' "$ERROR_LOG"
   if [[ -f "$ERROR_LOG" ]]; then
@@ -362,12 +536,19 @@ cmd_migrate() {
   # of truth at migration time. If a bucket has newer state, pull it manually
   # with the old hf-ai-sync.py before running this, one last time.
   init_nested_repo
-  commit_local_state "migrate: import pre-git state"
-  if ! reconcile_committed_state; then
-    # Reconciliation aborted on conflict (not a network problem): the migrated
-    # state is committed locally, but pushing now would be a doomed
-    # non-fast-forward. Skip the push and point at the manual resolution.
-    warn "migration state committed locally but reconciliation with origin/$BRANCH conflicts; not pushing. Resolve the conflict as described above, then: git -C $CLAUDE_DIR push origin $BRANCH."
+  if ! commit_local_state "migrate: import pre-git state"; then
+    return 1
+  fi
+  local reconcile_status
+  set +e
+  reconcile_committed_state
+  reconcile_status=$?
+  set -e
+  if [[ $reconcile_status -eq $PROTECTED_REBASE_STATE ]]; then
+    return "$reconcile_status"
+  fi
+  if [[ $reconcile_status -ne 0 ]]; then
+    warn "migration state committed locally but reconciliation with origin/$BRANCH failed; not pushing. Resolve the reported issue, then: git -C $CLAUDE_DIR push origin $BRANCH."
   elif ! is_local_only && git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     local output status
     set +e
@@ -387,13 +568,13 @@ cmd_migrate() {
 }
 
 case "$MODE" in
-  setup) cmd_setup || warn "setup failed; continuing." ;;
-  pull) cmd_pull || warn "pull failed; continuing." ;;
-  checkpoint) cmd_checkpoint || warn "checkpoint failed; continuing." ;;
-  publish) cmd_publish || warn "publish failed; continuing." ;;
-  push) cmd_push || warn "push failed; continuing." ;;
+  setup) dispatch_mutating cmd_setup || warn "setup failed; continuing." ;;
+  pull) dispatch_mutating cmd_pull || warn "pull failed; continuing." ;;
+  checkpoint) dispatch_mutating cmd_checkpoint || warn "checkpoint failed; continuing." ;;
+  publish) dispatch_mutating cmd_publish || warn "publish failed; continuing." ;;
+  push) dispatch_mutating cmd_push || warn "push failed; continuing." ;;
   status) cmd_status ;;
-  migrate-from-hf) cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
+  migrate-from-hf) dispatch_mutating cmd_migrate || warn "migrate-from-hf failed; continuing." ;;
   *) warn "unknown mode: $MODE (expected setup|pull|checkpoint|publish|push|status|migrate-from-hf)" ;;
 esac
 

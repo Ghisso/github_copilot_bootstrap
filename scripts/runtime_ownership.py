@@ -43,6 +43,9 @@ CONSUMER_STATE_PATHS = (
     "explorations",
     "session_logs",
     "quality_reports",
+    # Derived machine-local hook state. It is ignored/untracked by state sync
+    # and must never be restored, compared, or deleted by bootstrap refreshes.
+    ".cache",
     "instructions/project-context.instructions.md",
     # Machine-local client settings the bootstrap never generates. Without this
     # every install deleted the consumer's own settings as an obsolete owned
@@ -68,6 +71,13 @@ def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
         "AGENTS.md",
         "CLAUDE.md",
         ".uv-cache/",
+        # Anti-forgery secret for the Context Mode cache provenance marker
+        # (context-mode-dispatch.sh), created at the consumer repository
+        # root, outside .claude/. It must never enter the consumer's main
+        # history via a routine `git add -A`. The glob also covers the
+        # `.tmp.<pid>` sibling the dispatcher writes before renaming, which a
+        # signal between write and rename can leave behind.
+        ".context-mode-provenance.secret*",
     )
     if not commit_copilot_surface:
         return patterns

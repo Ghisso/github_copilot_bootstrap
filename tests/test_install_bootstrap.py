@@ -392,3 +392,49 @@ def test_local_client_settings_are_consumer_state() -> None:
     from runtime_ownership import is_consumer_state_path
 
     assert is_consumer_state_path("settings.local.json")
+    assert is_consumer_state_path(".cache/context-mode/sessions/local.db")
+
+
+def test_refresh_preserves_local_context_mode_cache_bytes(tmp_path: Path) -> None:
+    source = tmp_path / "generated"
+    target = tmp_path / "consumer"
+    (source / ".claude/hooks").mkdir(parents=True)
+    (source / ".claude/hooks/generated.txt").write_text("generated\n")
+    cache = target / ".claude/.cache/context-mode/sessions/local.db"
+    cache.parent.mkdir(parents=True)
+    cache.write_bytes(b"local-cache\x00bytes")
+
+    copy_generated_tree(source, target, dry_run=False)
+
+    assert cache.read_bytes() == b"local-cache\x00bytes"
+
+
+def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> None:
+    """context-mode-dispatch.sh creates its anti-forgery provenance secret
+    (`.context-mode-provenance.secret`) at the consumer repository root,
+    outside `.claude/`. A freshly-installed `.gitignore` must exclude it, or
+    a routine `git add -A` at the consumer root commits the secret into the
+    consumer's main history (MAJOR finding)."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    gitignore = (target / ".gitignore").read_text(encoding="utf-8")
+    assert ".context-mode-provenance.secret" in gitignore

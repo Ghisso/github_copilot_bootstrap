@@ -15,6 +15,10 @@ __pycache__/
 .uv-cache/
 
 .context-mode/
+# Local-only Context Mode cache provenance secret (context-mode-dispatch.sh);
+# never commit it, and never restore it from anywhere but this machine. The
+# glob also covers the `.tmp.<pid>` sibling written before the rename.
+.context-mode-provenance.secret*
 
 # BEGIN multi-agent bootstrap generated/private AI content
 .claude/
@@ -29,4 +33,5 @@ __pycache__/
 AGENTS.md
 CLAUDE.md
 .uv-cache/
+.context-mode-provenance.secret*
 # END multi-agent bootstrap generated/private AI content

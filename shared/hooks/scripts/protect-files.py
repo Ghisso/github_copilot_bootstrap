@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Classify protected-file mutations from one PreToolUse payload."""
 
+from __future__ import annotations
+
 import json
 import posixpath
 import re

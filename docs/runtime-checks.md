@@ -75,7 +75,7 @@ regenerate/reinstall command.
 
 Optional helpers:
 
-- `context-mode`
+- `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
 - `npx`
 - `gh`
 - `uv`

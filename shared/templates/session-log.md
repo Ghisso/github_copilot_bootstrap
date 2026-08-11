@@ -2,7 +2,10 @@
 
 **Date:** YYYY-MM-DD
 **Plan:** [link to small-plan file]
-**Status:** IN-PROGRESS | COMPLETED | BLOCKED
+**Status:** IN-PROGRESS | COMPLETED | CANCELLED | BLOCKED
+
+Use `**Status:** COMPLETED` when the planned work finished and passed closeout.
+Use `**Status:** CANCELLED` when an authorized plan or phase will never run.
 
 ## Goal
 

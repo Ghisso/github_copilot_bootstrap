@@ -24,15 +24,18 @@ SHARED_BASIS_NAMESPACE = ".claude"
 
 # Every agent prompt (shared/agents/*/prompt.md) carries the identical line
 # "Choose retrieval tools per .../tool-routing.instructions.md: Semble for
-# semantic and related-code discovery, context-mode for large outputs..." —
-# the "search" capability is this bootstrap's whole retrieval toolkit (grep
-# AND semantic/long-output retrieval), not just literal-text grep. Without
+# semantic and related-code discovery..." — the "search" capability is this
+# bootstrap's whole retrieval toolkit, not just literal-text grep. Without
 # the mcp__<server> wildcards below, every subagent's `tools:` allowlist
 # (an explicit list, not additive to defaults) silently omitted all
-# mcp__semble__*/mcp__context-mode__* tools, so a subagent told by its own
+# mcp__semble__* tools, so a subagent told by its own
 # prompt to "use Semble" had no such tool to call. `mcp__<server>` /
 # `mcp__<server>__*` grants every tool from that MCP server (Claude Code
 # subagent frontmatter `tools:` field: code.claude.com/docs/en/subagents.md).
+# mcp__context-mode is included for the same reason: the dispatcher-backed
+# server only ever advertises its filtered ctx_index/ctx_search/ctx_stats/
+# ctx_doctor allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
+# granting the whole server here cannot expose a blocked tool.
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
     "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode"],
@@ -49,7 +52,7 @@ CLAUDE_TOOL_MAP = {
 # KNOWN GAP: unlike CLAUDE_TOOL_MAP above, this map has no MCP entry for
 # "search" — Copilot custom-agent `tools:` also filters MCP-sourced tools
 # (same explicit-allowlist semantics as Claude), so generated Copilot agents
-# have the identical bug (their prompt says "use Semble"/"use context-mode"
+# have the identical bug (their prompt says "use Semble"
 # but neither is in their tools: list). Left unfixed deliberately: Copilot's
 # exact tool-name convention for MCP-sourced tools (bare server name? a
 # "server.tool" form? the raw tool name, which could collide with the
@@ -449,7 +452,7 @@ def render_codex_config(path: Path) -> None:
     lines = [
         "# Generated from shared/mcp/servers.json.",
         "# Skills are sourced from the shared .claude basis; project trust is required.",
-        "# Semble and context-mode are optional; missing binaries should warn, not block.",
+        "# Semble and Context Mode hooks are optional; missing binaries should warn, not block.",
         "# Hooks are enabled by default in current Codex, so no flat features block is emitted.",
         "# Preserve the MultiAgent V2 routing shim until trusted native probes prove removal.",
         "# See docs/2026-08-08-codex-routing-compatibility.md in the bootstrap source.",
@@ -710,7 +713,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
-- Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode for large outputs or compaction-safe continuity. Missing optional retrieval helpers are warnings, not hard failures.
+- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. Missing optional helpers are warnings, not hard failures.
 
 ## Task Lanes
 

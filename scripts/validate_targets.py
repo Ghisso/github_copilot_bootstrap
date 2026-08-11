@@ -128,6 +128,20 @@ REQUIRED_HOOK_SCRIPTS = (
     "claude-stop.sh",
     "codex-stop.sh",
 )
+# Approved Context Mode capability contract (Phase F). The allowlist is exact
+# and closed; a new upstream tool needs a later approved plan before it can
+# join CONTEXT_MODE_ALLOWED_TOOLS.
+CONTEXT_MODE_PINNED_VERSION = "1.0.169"
+CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
+CONTEXT_MODE_BLOCKED_TOOLS = (
+    "ctx_execute",
+    "ctx_execute_file",
+    "ctx_batch_execute",
+    "ctx_fetch_and_index",
+    "ctx_upgrade",
+    "ctx_purge",
+    "ctx_insight",
+)
 REQUIRED_HOOK_LIBRARIES = ("_lib-frontmatter.sh",)
 REQUIRED_GIT_HOOKS = (
     "commit-msg",
@@ -1497,7 +1511,7 @@ def validate_agents(errors: list[str]) -> None:
             errors,
         )
         # An agent told to route through tool-routing.instructions.md (which
-        # says "use Semble"/"use context-mode") but whose own tools: allowlist
+        # names Semble and Context Mode) but whose own tools: allowlist
         # omits the matching mcp__ wildcard physically cannot follow that
         # instruction — tools: is an explicit allowlist, not additive to
         # defaults. Caught this exact bug once already (every generated
@@ -1509,7 +1523,7 @@ def validate_agents(errors: list[str]) -> None:
             )
             check(
                 "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
-                f"Claude agent routes retrieval through tool-routing.instructions.md but its tools: allowlist omits mcp__semble/mcp__context-mode, so it cannot follow that instruction: {path}",
+                f"Claude agent must allow both Semble and Context Mode MCP: {path}",
                 errors,
             )
         # Per-agent model/effort tiering: validate any emitted frontmatter fields
@@ -1627,8 +1641,9 @@ def validate_agents(errors: list[str]) -> None:
             mcp_servers = codex_config.get("mcp_servers", {})
             check(
                 isinstance(mcp_servers, dict)
-                and {"semble", "context-mode"} <= set(mcp_servers),
-                f"Codex agent requires Semble/context-mode but config does not provide inherited MCP access: {path}",
+                and "semble" in mcp_servers
+                and "context-mode" in mcp_servers,
+                f"Codex agent requires both Semble and Context Mode MCP from inherited config: {path}",
                 errors,
             )
     for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
@@ -1774,20 +1789,72 @@ def validate_model_leaks(errors: list[str]) -> None:
                     )
 
 
+# Every generated target must carry the identical Semble, Context7, and
+# Context Mode MCP server entries from shared/mcp/servers.json. Iterating this
+# tuple per server (rather than one combined boolean) is what lets a single
+# server's drift or absence fail independently of the others.
+MCP_PARITY_SERVERS = ("semble", "context7", "context-mode")
+
+
+def mcp_server_parity_errors(
+    servers: dict[str, object],
+    shared_mcp: dict[str, object],
+    label: str,
+    server_names: tuple[str, ...] = MCP_PARITY_SERVERS,
+) -> list[str]:
+    """Return one failure per drifted/missing MCP server, never a combined check."""
+    errors: list[str] = []
+    for server in server_names:
+        if server not in servers:
+            errors.append(f"{label} missing MCP server: {server}")
+            continue
+        if servers.get(server) != shared_mcp.get(server):
+            errors.append(f"{label} MCP server drifted from shared source: {server}")
+    return errors
+
+
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
-    for server in ("semble", "context-mode", "context7"):
-        check(
-            server in github_mcp.get("servers", {}),
-            f"github missing MCP server: {server}",
-            errors,
-        )
-        check(
-            server in claude_mcp.get("mcpServers", {}),
-            f"claude missing MCP server: {server}",
-            errors,
-        )
+    shared_mcp = json.loads(read(REPO_ROOT / "shared" / "mcp" / "servers.json"))[
+        "servers"
+    ]
+    check(
+        shared_mcp.get("context-mode")
+        == {
+            "command": "bash",
+            "args": [
+                "-c",
+                'REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; exec "$REPO_ROOT/.claude/hooks/scripts/context-mode-dispatch.sh" server',
+            ],
+        },
+        "shared Context Mode MCP server must route through an absolute-REPO_ROOT dispatcher server command, not a bare workspace-relative path",
+        errors,
+    )
+    context_dispatcher = read(
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-dispatch.sh"
+    )
+    check(
+        'openai-codex) CONTEXT_MODE_TARGET="codex"' in context_dispatcher,
+        "Context Mode dispatcher must map OpenAI Codex hooks to upstream target id 'codex'",
+        errors,
+    )
+    check(
+        f'PINNED_CONTEXT_MODE_VERSION="{CONTEXT_MODE_PINNED_VERSION}"'
+        in context_dispatcher,
+        f"Context Mode dispatcher must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        errors,
+    )
+    check(
+        '"$MODE" == "server"' in context_dispatcher,
+        "Context Mode dispatcher must support the MCP server route",
+        errors,
+    )
+    for servers, label in (
+        (github_mcp.get("servers", {}), "github"),
+        (claude_mcp.get("mcpServers", {}), "claude"),
+    ):
+        errors.extend(mcp_server_parity_errors(servers, shared_mcp, label))
     check(
         "servers" not in claude_mcp,
         "Claude .mcp.json must use mcpServers, not servers",
@@ -1819,6 +1886,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     errors.extend(codex_config_contract_errors(codex_config_data, "Codex config"))
+    codex_servers = codex_config_data.get("mcp_servers", {})
+    if isinstance(codex_servers, dict):
+        errors.extend(mcp_server_parity_errors(codex_servers, shared_mcp, "codex"))
+    else:
+        errors.append("Codex config mcp_servers must be a table")
     authoring_config = read_toml(REPO_ROOT / ".codex" / "config.toml")
     errors.extend(
         codex_config_contract_errors(
@@ -1842,6 +1914,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "Codex config missing context7 MCP server",
         errors,
     )
+    for deny_rule in (
+        "Read(./.env)",
+        "Read(./.env.*)",
+        "Read(./secrets/**)",
+        "Read(./config/credentials.json)",
+    ):
+        check(
+            deny_rule in read(TARGET_ROOT / ".claude" / "settings.json"),
+            f"protected Context Mode deny rule missing: {deny_rule}",
+            errors,
+        )
     check(
         "../.claude/skills/" in codex_config,
         "Codex config must point skills at .claude/skills",
@@ -2046,6 +2129,29 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "the two installed state-sync.sh copies must be byte-identical",
         errors,
     )
+    if state_sync_claude.exists():
+        state_sync_text = read(state_sync_claude)
+        check(
+            'git -C "$CLAUDE_DIR" rebase --quit' in state_sync_text,
+            "state-sync.sh must use the literal rebase --quit recovery invocation",
+            errors,
+        )
+        check(
+            "rebase --abort 2>/dev/null || true" not in state_sync_text,
+            "state-sync.sh must not silently discard failed rebase aborts",
+            errors,
+        )
+        check(
+            "--autostash" not in state_sync_text,
+            "state-sync.sh must not contain --autostash",
+            errors,
+        )
+        check(
+            'output="$(git -C "$CLAUDE_DIR" pull --rebase origin "$BRANCH" 2>&1)"'
+            in state_sync_text,
+            "state-sync.sh must use the exact rebase pull invocation",
+            errors,
+        )
 
     # Run generated Stop wrappers instead of relying on text searches: Codex
     # needs one JSON response, while Claude must leave stdout empty.
@@ -2273,6 +2379,55 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     validate_hook_guardrails(errors)
     validate_generated_scripts(errors)
+
+
+# Every routing/permission surface that can actually advertise or grant an MCP
+# tool. Narrative policy/doc prose (e.g. tool-routing.instructions.md) is
+# reconciled by the documenter separately and is deliberately not a member of
+# this list: it is guidance text, not a place a client discovers callable
+# tools.
+CONTEXT_MODE_ROUTING_SURFACE_FILES = (
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".codex/config.toml",
+    ".claude/hooks/scripts/context-mode-dispatch.sh",
+    ".claude/hooks/scripts/context-mode-mcp-filter.mjs",
+)
+
+
+def validate_context_mode_tool_surface(errors: list[str]) -> None:
+    """Assert the advertised Context Mode tool surface is exactly the approved
+    four-tool allowlist and that no blocked tool name reaches any generated
+    routing or permission surface (agent tool grants, MCP server configs,
+    hook scripts)."""
+    filter_text = read(
+        REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-mcp-filter.mjs"
+    )
+    allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+    check(
+        f"new Set([{allowed}])" in filter_text,
+        "Context Mode MCP filter allowlist must be exactly the four approved tools",
+        errors,
+    )
+    check(
+        f'"{CONTEXT_MODE_PINNED_VERSION}"' in filter_text,
+        f"Context Mode MCP filter must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        errors,
+    )
+    surfaces = [
+        *sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md")),
+        *sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml")),
+        *sorted((TARGET_ROOT / ".github" / "agents").glob("*.agent.md")),
+        *(TARGET_ROOT / relative for relative in CONTEXT_MODE_ROUTING_SURFACE_FILES),
+    ]
+    for path in surfaces:
+        text = read(path)
+        for blocked in CONTEXT_MODE_BLOCKED_TOOLS:
+            check(
+                blocked not in text,
+                f"generated Context Mode routing surface names blocked tool {blocked}: {path}",
+                errors,
+            )
 
 
 def run_hook(
@@ -2590,6 +2745,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         )
 
     validate_lifecycle_hook_guardrails(errors)
+    validate_cancelled_phase_gate_cases(errors)
     validate_commit_msg_git_hook(errors)
     validate_pre_push_git_hook(errors)
 
@@ -2654,21 +2810,27 @@ def setup_hook_repo(temp_root: Path) -> Path:
 
 
 def write_big_plan(
-    repo: Path, status: str = "planning", phases: tuple[str, ...] = ("phase-one",)
+    repo: Path,
+    status: str = "planning",
+    phases: tuple[str, ...] = ("phase-one",),
+    *,
+    current_phase: str = "",
+    duplicate_status: str = "",
 ) -> None:
     phase_lines = "\n".join(f"  - {phase}" for phase in phases)
+    duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
     write(
         repo / ".claude" / "plans" / "foo.md",
         f"""---
 name: foo
 type: big-plan
 status: {status}
-originating_branch: dev
+{duplicate_status_line}originating_branch: dev
 implementation_branch: foo_implementation
 started_at:
 phases:
 {phase_lines}
-current_phase:
+current_phase: {current_phase}
 ---
 
 # Foo
@@ -2676,21 +2838,64 @@ current_phase:
     )
 
 
-def write_small_plan(repo: Path, status: str = "in-progress") -> None:
+def write_small_plan(
+    repo: Path,
+    status: str = "in-progress",
+    *,
+    phase: str = "phase-one",
+    missing_cancellation_field: str = "",
+    cancelled_at: str = "2026-08-11T07:00:00Z",
+    cancelled_reason: str = "The phase is no longer authorized",
+    cancelled_evidence: str = "",
+    evidence_exists: bool = True,
+    evidence_marker: bool = True,
+    duplicate_status: str = "",
+) -> None:
+    closeout = (
+        ""
+        if status == "cancelled"
+        else f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+    )
+    if not cancelled_evidence:
+        cancelled_evidence = f".claude/session_logs/{phase}-cancelled.md"
+    cancellation_values = {
+        "cancelled_at": cancelled_at,
+        "cancelled_reason": cancelled_reason,
+        "cancelled_evidence": cancelled_evidence,
+    }
+    cancellation_values.pop(missing_cancellation_field, None)
+    cancellation = ""
+    if status == "cancelled":
+        cancellation = "".join(
+            f"{key}: {value}\n" for key, value in cancellation_values.items()
+        )
+    duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
     write(
-        repo / ".claude" / "plans" / "phase-one.md",
+        repo / ".claude" / "plans" / f"{phase}.md",
         f"""---
-name: phase-one
+name: {phase}
 type: small-plan
 parent_plan: foo
 phase_index: 1
 status: {status}
-closeout_session_log: .claude/session_logs/phase-one-closeout.md
----
+{duplicate_status_line}{closeout}{cancellation}---
 
-# Phase One
+# {phase}
 """,
     )
+    if (
+        status == "cancelled"
+        and evidence_exists
+        and "cancelled_evidence" in cancellation_values
+    ):
+        marker = "**Status:** CANCELLED\n" if evidence_marker else "Status: stopped\n"
+        evidence_path = Path(cancellation_values["cancelled_evidence"])
+        if not evidence_path.is_absolute():
+            evidence_path = repo / evidence_path
+        write(
+            evidence_path,
+            f"# Cancellation\n\n{marker}",
+        )
 
 
 def lifecycle_script(repo: Path, name: str) -> Path:
@@ -3253,6 +3458,552 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(
             '"permissionDecision":"deny"' in stdout,
             "PR gate must deny --base main",
+            errors,
+        )
+
+
+def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
+    """Exercise the cancellation-specific lifecycle gate contract."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = setup_hook_repo(Path(temp_dir))
+        git(repo, "checkout", "-b", "foo_implementation")
+        write(repo / "phase-work.txt", "certified work\n")
+        git(repo, "add", "phase-work.txt")
+        git(repo, "commit", "-m", "phase work")
+        library = lifecycle_script(repo, "_lib-frontmatter.sh")
+        trace = repo / ".claude" / "findings-phase.trace"
+        dummy_report = repo / ".claude" / "quality_reports" / "findings.json"
+        write(dummy_report, "{}\n")
+
+        def push_failures(probe_override: str = "") -> list[str]:
+            trace.unlink(missing_ok=True)
+            local_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+            expression = f"""
+. {shlex.quote(str(library))}
+{probe_override}
+select_fresh_report() {{ printf '%s' "$4" > {shlex.quote(str(trace))}; printf '%s' {shlex.quote(str(dummy_report))}; }}
+assert_report_freshness() {{ :; }}
+json_file_number_value() {{ printf '0'; }}
+assert_required_ponytail_review() {{ :; }}
+failures=()
+assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
+"""
+            result = subprocess.run(
+                ["bash", "-lc", expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"cancelled push invariant fixture failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        duplicate_status_pairs = (
+            ("cancelled", "complete"),
+            ("complete", "cancelled"),
+            ("complete", "complete"),
+        )
+        write_big_plan(repo, status="in-progress", phases=("phase-duplicate",))
+        for first_status, second_status in duplicate_status_pairs:
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-duplicate",
+                duplicate_status=second_status,
+            )
+            check(
+                any(
+                    "exactly one status field" in failure for failure in push_failures()
+                ),
+                f"push gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        phases = ("phase-complete",) + tuple(
+            f"phase-cancelled-{index}" for index in range(1, 7)
+        )
+        write_big_plan(repo, status="in-progress", phases=phases)
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        for phase in phases[1:]:
+            write_small_plan(repo, status="cancelled", phase=phase)
+        check(
+            push_failures() == [],
+            "push gate must accept one completed phase plus six evidenced cancelled phases with one commit",
+            errors,
+        )
+        check(
+            trace.exists() and read(trace) == "phase-complete",
+            "push findings report must bind to the last completed phase, not a cancelled tail",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-cancelled"),
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        for field in ("cancelled_at", "cancelled_reason", "cancelled_evidence"):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                missing_cancellation_field=field,
+            )
+            check(
+                any(field in failure for failure in push_failures()),
+                f"push gate must name missing cancellation field: {field}",
+                errors,
+            )
+
+        evidence_path = (
+            repo / ".claude" / "session_logs" / "phase-cancelled-cancelled.md"
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_exists=False,
+        )
+        evidence_path.unlink(missing_ok=True)
+        check(
+            any("evidence file is missing" in failure for failure in push_failures()),
+            "push gate must reject a missing cancellation evidence file",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_marker=False,
+        )
+        check(
+            any("same-line prefix" in failure for failure in push_failures()),
+            "push gate must reject cancellation evidence without the CANCELLED marker",
+            errors,
+        )
+
+        for cancelled_at in (
+            "2026-08-11T07:00:00",
+            "2026-02-30T07:00:00Z",
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_at=cancelled_at,
+            )
+            check(
+                any("real UTC timestamp" in failure for failure in push_failures()),
+                f"push gate must reject invalid cancelled_at: {cancelled_at}",
+                errors,
+            )
+
+        for reason in (
+            '"   "',
+            "|- # folded",
+            "[not, prose]",
+            "First line\n  continued line",
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_reason=reason,
+            )
+            check(
+                any(
+                    "single-line scalar prose" in failure for failure in push_failures()
+                ),
+                f"push gate must reject invalid cancelled_reason: {reason!r}",
+                errors,
+            )
+
+        for evidence, expected in (
+            ("/tmp/phase-d-absolute-evidence.md", "repository-relative"),
+            ("nested/../evidence.md", "must not contain .. traversal"),
+        ):
+            write_small_plan(
+                repo,
+                status="cancelled",
+                phase="phase-cancelled",
+                cancelled_evidence=evidence,
+                evidence_exists=False,
+            )
+            check(
+                any(expected in failure for failure in push_failures()),
+                f"push gate must reject unsafe cancellation evidence path: {evidence}",
+                errors,
+            )
+
+        outside = Path(temp_dir) / "outside-cancellation.md"
+        write(outside, "**Status:** CANCELLED\n")
+        outside_link = repo / ".claude" / "session_logs" / "outside-link.md"
+        outside_link.unlink(missing_ok=True)
+        outside_link.symlink_to(outside)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/outside-link.md",
+            evidence_exists=False,
+        )
+        check(
+            any("stay inside the repository" in failure for failure in push_failures()),
+            "push gate must reject cancellation evidence symlinked outside the repo",
+            errors,
+        )
+
+        loop_link = repo / ".claude" / "session_logs" / "loop.md"
+        loop_link.unlink(missing_ok=True)
+        loop_link.symlink_to("loop.md")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/loop.md",
+            evidence_exists=False,
+        )
+        check(
+            any("resolved safely" in failure for failure in push_failures()),
+            "push gate must reject a cancellation evidence symlink loop",
+            errors,
+        )
+
+        evidence_directory = repo / ".claude" / "session_logs" / "evidence-dir"
+        evidence_directory.mkdir(exist_ok=True)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/evidence-dir",
+            evidence_exists=False,
+        )
+        check(
+            any("regular file" in failure for failure in push_failures()),
+            "push gate must reject a directory as cancellation evidence",
+            errors,
+        )
+
+        invalid_utf8 = repo / ".claude" / "session_logs" / "invalid-utf8.md"
+        invalid_utf8.write_bytes(b"\xff\xfe")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/invalid-utf8.md",
+            evidence_exists=False,
+        )
+        check(
+            any("valid UTF-8" in failure for failure in push_failures()),
+            "push gate must reject invalid-UTF-8 cancellation evidence",
+            errors,
+        )
+
+        unreadable = repo / ".claude" / "session_logs" / "unreadable.md"
+        write(unreadable, "**Status:** CANCELLED\n")
+        unreadable.chmod(0)
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/unreadable.md",
+            evidence_exists=False,
+        )
+        check(
+            any("must be readable" in failure for failure in push_failures()),
+            "push gate must reject unreadable cancellation evidence",
+            errors,
+        )
+
+        split_marker = repo / ".claude" / "session_logs" / "split-marker.md"
+        write(split_marker, "**Status:**\nCANCELLED\n")
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            cancelled_evidence=".claude/session_logs/split-marker.md",
+            evidence_exists=False,
+        )
+        check(
+            any("same-line prefix" in failure for failure in push_failures()),
+            "push gate must reject a split-line cancellation marker",
+            errors,
+        )
+
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        for probe_override, expected in (
+            ("cancellation_validation_probe() { return 127; }", "requires python3"),
+            (
+                "cancellation_validation_probe() { printf PROBE_EXCEPTION; }",
+                "probe raised an exception",
+            ),
+            (
+                "cancellation_validation_probe() { printf UNEXPECTED; }",
+                "probe returned malformed output",
+            ),
+        ):
+            check(
+                any(
+                    expected in failure
+                    for failure in push_failures(probe_override=probe_override)
+                ),
+                f"push gate must fail closed for probe condition: {expected}",
+                errors,
+            )
+
+        write_big_plan(repo, status="in-progress", phases=("phase-cancelled",))
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        all_cancelled_failures = push_failures()
+        check(
+            any(
+                "certifies no completed work" in failure
+                for failure in all_cancelled_failures
+            ),
+            "push gate must refuse a branch whose every phase is cancelled",
+            errors,
+        )
+        check(
+            not trace.exists(),
+            "all-cancelled push must not look for a findings report",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete",),
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        check(
+            push_failures() == [],
+            "existing all-complete push scenario must still pass unchanged",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-cancelled",),
+            current_phase="phase-cancelled",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        commit_expression = f"""
+. {shlex.quote(str(library))}
+select_fresh_report() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(repo))} foo_implementation
+printf '%s\\n' "${{failures[@]}}"
+"""
+        commit_result = subprocess.run(
+            ["bash", "-lc", commit_expression],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            "cancelled phase never certifies a commit" in commit_result.stdout
+            and "advance current_phase past it" in commit_result.stdout,
+            "commit gate must emit the distinct cancelled stale-pointer message",
+            errors,
+        )
+        for first_status, second_status in duplicate_status_pairs:
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-cancelled",
+                duplicate_status=second_status,
+            )
+            commit_result = subprocess.run(
+                ["bash", "-lc", commit_expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                "exactly one status field before commit" in commit_result.stdout,
+                f"commit gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        def run_closeout() -> None:
+            returncode, _, stderr = run_hook(
+                lifecycle_script(repo, "record-commit-closeout.sh"),
+                {
+                    "tool_name": "Bash",
+                    "tool_input": {"command": 'git commit -m "phase work"'},
+                },
+                "github-copilot",
+                cwd=repo,
+            )
+            check(
+                returncode == 0,
+                f"cancelled closeout fixture failed: {stderr}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(repo, status="complete", phase="phase-one")
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-two",
+                duplicate_status=second_status,
+            )
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance past duplicate candidate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(
+                repo,
+                status=first_status,
+                phase="phase-one",
+                duplicate_status=second_status,
+            )
+            write_small_plan(repo, status="in-progress", phase="phase-two")
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance a duplicate current status: {first_status}, {second_status}",
+                errors,
+            )
+
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(
+                repo,
+                status=first_status,
+                duplicate_status=second_status,
+                phases=("phase-one", "phase-two"),
+                current_phase="phase-one",
+            )
+            write_small_plan(repo, status="complete", phase="phase-one")
+            write_small_plan(repo, status="in-progress", phase="phase-two")
+            run_closeout()
+            check(
+                "current_phase: phase-one"
+                in read(repo / ".claude" / "plans" / "foo.md"),
+                f"closeout must not advance a duplicate big-plan status: {first_status}, {second_status}",
+                errors,
+            )
+
+        closeout_phases = ("phase-one", "phase-two", "phase-three")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=closeout_phases,
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="complete", phase="phase-one")
+        write_small_plan(repo, status="cancelled", phase="phase-two")
+        write_small_plan(repo, status="in-progress", phase="phase-three")
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: phase-three" in big_plan_text,
+            "closeout advance must skip a cancelled next phase",
+            errors,
+        )
+
+        tail_phases = ("phase-one", "phase-two")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=tail_phases,
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-two")
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: \n" in big_plan_text
+            and "status: complete" in big_plan_text,
+            "closeout advance past a cancelled tail must clear current_phase and complete the big plan",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="cancelled",
+            phases=tail_phases,
+            current_phase="phase-one",
+        )
+        run_closeout()
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "current_phase: \n" in big_plan_text
+            and "status: cancelled" in big_plan_text,
+            "closeout advance must not overwrite an already-cancelled big plan",
+            errors,
+        )
+
+        git(repo, "checkout", "dev")
+        for first_status, second_status in duplicate_status_pairs:
+            write_big_plan(repo, status=first_status, duplicate_status=second_status)
+            returncode, stdout, stderr = run_hook(
+                lifecycle_script(repo, "enforce-branch-state.sh"),
+                {
+                    "tool_name": "Bash",
+                    "tool_input": {"command": "git checkout -b foo_implementation"},
+                },
+                "github-copilot",
+                cwd=repo,
+            )
+            check(
+                returncode == 0,
+                f"duplicate-status branch fixture failed to run: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout
+                and "exactly one status field" in stdout,
+                f"branch gate must reject duplicate status fields: {first_status}, {second_status}",
+                errors,
+            )
+
+        write_big_plan(repo, status="cancelled")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-branch-state.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git checkout -b foo_implementation"},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            returncode == 0,
+            f"cancelled branch denial fixture failed: {stderr}",
+            errors,
+        )
+        check(
+            '"permissionDecision":"deny"' in stdout
+            and "cancelled is terminal" in stdout,
+            "branch creation must deny a cancelled big plan with the terminal-status message",
             errors,
         )
 
@@ -4498,11 +5249,14 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         TARGET_ROOT / ".claude" / "instructions" / "tool-routing.instructions.md"
     ).lower()
     check(
-        "devcontainer" in tool_routing_text
-        and "required" in tool_routing_text
-        and "semble" in tool_routing_text
-        and "context-mode" in tool_routing_text,
-        "tool-routing instructions must distinguish required devcontainer tooling from outside-devcontainer fallbacks",
+        "semble" in tool_routing_text
+        and "context mode" in tool_routing_text
+        and all(tool in tool_routing_text for tool in CONTEXT_MODE_ALLOWED_TOOLS)
+        and "hook-only" not in tool_routing_text
+        and "does not expose mcp tools" not in tool_routing_text,
+        "tool-routing instructions must name all four allowed Context Mode "
+        "tools and must not claim Context Mode is hook-only or exposes no "
+        "MCP tools",
         errors,
     )
 
@@ -4923,8 +5677,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
         check(
-            "npm install -g context-mode" in dockerfile,
-            "devcontainer Dockerfile must install context-mode",
+            f"npm install -g context-mode@{CONTEXT_MODE_PINNED_VERSION}" in dockerfile,
+            f"devcontainer Dockerfile must install context-mode pinned to {CONTEXT_MODE_PINNED_VERSION}",
             errors,
         )
         check(
@@ -5205,6 +5959,12 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 "explorations",
                 "session_logs",
                 "quality_reports",
+                # Derived machine-local hook state. It is always untracked/ignored,
+                # never git-committed like the other consumer-state roots above, so
+                # it is exercised by the dedicated cache-preservation coverage in
+                # validate_state_sync/validate_local_only_state_sync instead of the
+                # git-add/commit fixture below.
+                ".cache",
                 "instructions/project-context.instructions.md",
                 "settings.local.json",
             ),
@@ -7309,6 +8069,7 @@ def main() -> int:
         validate_agents(errors)
         validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
+        validate_context_mode_tool_surface(errors)
         validate_skills_and_paths(errors)
         validate_docs_parity(errors)
         validate_memory_security_authority(errors)

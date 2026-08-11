@@ -247,6 +247,34 @@ fm_read() {
   ' "$file"
 }
 
+readonly DUPLICATE_STATUS_VALUE="__DUPLICATE_FRONTMATTER_STATUS__"
+
+# Read status only when it occurs exactly once in frontmatter. Callers compare
+# the sentinel explicitly so duplicate same-value and conflicting-value keys
+# fail closed without changing fm_read semantics for any other field.
+fm_read_unique_status() {
+  local file="$1"
+  [[ -f "$file" ]] || return 1
+  awk -v duplicate_value="$DUPLICATE_STATUS_VALUE" '
+    NR == 1 && $0 == "---" { in_fm = 1; next }
+    in_fm && $0 == "---" {
+      if (count > 1) {
+        print duplicate_value
+      } else if (count == 1) {
+        print value
+      }
+      exit
+    }
+    in_fm && $0 ~ "^status[[:space:]]*:" {
+      line = $0
+      sub("^[^:]*:[[:space:]]*", "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      value = line
+      count++
+    }
+  ' "$file"
+}
+
 fm_write() {
   local file="$1"
   local key="$2"
@@ -804,6 +832,204 @@ print('; '.join(titles))
 " "$file" "$severity" 2>/dev/null || true
 }
 
+# One fail-closed standard-library probe repeats Phase C's complete cancellation
+# contract at push time. It emits only fixed result codes, one per line.
+#
+# This deliberately duplicates `validate_cancellation` in
+# scripts/validate_plan_frontmatter.py rather than importing it: this copy ships
+# into consumer `.claude/hooks/scripts/` and must run with nothing but a stock
+# python3, while that one is authoring-repo-only tooling that never ships. The
+# two are one contract in two places, so a change to the timestamp,
+# block-scalar, or evidence-status rules here must be mirrored there.
+# tests/test_validate_plan_frontmatter.py asserts the shared rules stay equal.
+cancellation_validation_probe() {
+  local repo_root="$1"
+  local plan_file="$2"
+  command -v python3 >/dev/null 2>&1 || return 127
+  python3 - "$repo_root" "$plan_file" <<'PY'
+import re
+import stat
+import sys
+from datetime import datetime
+from pathlib import Path
+
+TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+BLOCK_REASON = re.compile(r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?(?:[ \t]*#.*)?$")
+STATUS = re.compile(r"^\*\*Status:\*\*[ \t]+CANCELLED\b", re.MULTILINE)
+
+
+def frontmatter(path):
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return {}
+    data = {}
+    current_key = ""
+    for raw_line in parts[1].splitlines():
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("  - ") and current_key:
+            value = data.get(current_key)
+            if not isinstance(value, list):
+                value = [] if value in (None, "") else [str(value)]
+                data[current_key] = value
+            value.append(line[4:].strip())
+            continue
+        if line.startswith((" ", "\t")) and current_key == "cancelled_reason":
+            data[current_key] = [data.get(current_key), line.strip()]
+            continue
+        if ":" in line and not line.startswith(" "):
+            key, value = line.split(":", 1)
+            current_key = key.strip()
+            data[current_key] = value.strip().strip('"').strip("'")
+    return data
+
+
+def validate(repo_root, plan_file):
+    errors = []
+    data = frontmatter(plan_file)
+
+    cancelled_at = data.get("cancelled_at", "")
+    if cancelled_at in ("", []):
+        errors.append("MISSING_CANCELLED_AT")
+    elif not isinstance(cancelled_at, str) or not TIMESTAMP.fullmatch(cancelled_at):
+        errors.append("INVALID_CANCELLED_AT")
+    else:
+        try:
+            datetime.strptime(cancelled_at, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            errors.append("INVALID_CANCELLED_AT")
+
+    reason = data.get("cancelled_reason", "")
+    if reason in ("", []):
+        errors.append("MISSING_CANCELLED_REASON")
+    elif (
+        not isinstance(reason, str)
+        or not reason.strip()
+        or BLOCK_REASON.fullmatch(reason.strip())
+        or reason.lstrip().startswith(("[", "{", "- ", "#"))
+    ):
+        errors.append("INVALID_CANCELLED_REASON")
+
+    evidence = data.get("cancelled_evidence", "")
+    if evidence in ("", []):
+        errors.append("MISSING_CANCELLED_EVIDENCE")
+        return errors
+    if not isinstance(evidence, str):
+        errors.append("INVALID_EVIDENCE_SCALAR")
+        return errors
+
+    evidence_path = Path(evidence)
+    if evidence_path.is_absolute():
+        errors.append("ABSOLUTE_EVIDENCE")
+        return errors
+    if ".." in evidence_path.parts:
+        errors.append("TRAVERSAL_EVIDENCE")
+        return errors
+
+    try:
+        canonical_root = repo_root.resolve(strict=True)
+        canonical_evidence = (canonical_root / evidence_path).resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        errors.append("EVIDENCE_RESOLUTION_FAILED")
+        return errors
+    if not canonical_evidence.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_EVIDENCE")
+        return errors
+    try:
+        canonical_evidence = canonical_evidence.resolve(strict=True)
+    except FileNotFoundError:
+        errors.append("MISSING_EVIDENCE_FILE")
+        return errors
+    except (OSError, RuntimeError, ValueError):
+        errors.append("EVIDENCE_RESOLUTION_FAILED")
+        return errors
+    if not canonical_evidence.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_EVIDENCE")
+        return errors
+    try:
+        mode = canonical_evidence.stat().st_mode
+    except OSError:
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    if not stat.S_ISREG(mode):
+        errors.append("NON_REGULAR_EVIDENCE")
+        return errors
+    if not mode & (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH):
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    try:
+        content = canonical_evidence.read_text(encoding="utf-8")
+    except UnicodeError:
+        errors.append("INVALID_UTF8_EVIDENCE")
+        return errors
+    except OSError:
+        errors.append("UNREADABLE_EVIDENCE")
+        return errors
+    if not STATUS.search(content):
+        errors.append("INVALID_EVIDENCE_MARKER")
+    return errors
+
+
+try:
+    result = validate(Path(sys.argv[1]), Path(sys.argv[2]))
+except Exception:
+    print("PROBE_EXCEPTION")
+else:
+    print("\n".join(result) if result else "OK")
+PY
+}
+
+# Validate the artifact-backed audit contract for a cancelled plan. Appends
+# distinct failure messages to the caller's dynamically scoped `failures`
+# array, matching assert_commit_invariants and assert_push_invariants.
+assert_cancellation_evidence() {
+  local plan_file="$1"
+  local phase_label="$2"
+  local probe_output="" probe_status=0 probe_code="" malformed=0
+  probe_output="$(cancellation_validation_probe "$repo_root" "$plan_file" 2>/dev/null)" || probe_status=$?
+  if [[ "$probe_status" -eq 127 ]]; then
+    failures+=("$phase_label cancellation validation requires python3")
+    return
+  elif [[ "$probe_status" -ne 0 ]]; then
+    failures+=("$phase_label cancellation validation probe failed")
+    return
+  elif [[ "$probe_output" == "OK" ]]; then
+    return
+  elif [[ -z "$probe_output" ]]; then
+    failures+=("$phase_label cancellation validation probe returned malformed output")
+    return
+  fi
+
+  while IFS= read -r probe_code; do
+    case "$probe_code" in
+      MISSING_CANCELLED_AT) failures+=("$phase_label cancelled plan must set cancelled_at") ;;
+      INVALID_CANCELLED_AT) failures+=("$phase_label cancelled_at must be a real UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format") ;;
+      MISSING_CANCELLED_REASON) failures+=("$phase_label cancelled plan must set cancelled_reason") ;;
+      INVALID_CANCELLED_REASON) failures+=("$phase_label cancelled_reason must be meaningful plain single-line scalar prose") ;;
+      MISSING_CANCELLED_EVIDENCE) failures+=("$phase_label cancelled plan must set cancelled_evidence") ;;
+      INVALID_EVIDENCE_SCALAR) failures+=("$phase_label cancelled_evidence must be a plain path scalar") ;;
+      ABSOLUTE_EVIDENCE) failures+=("$phase_label cancelled_evidence must be repository-relative") ;;
+      TRAVERSAL_EVIDENCE) failures+=("$phase_label cancelled_evidence must not contain .. traversal") ;;
+      EVIDENCE_RESOLUTION_FAILED) failures+=("$phase_label cancelled evidence path could not be resolved safely") ;;
+      OUTSIDE_EVIDENCE) failures+=("$phase_label cancelled evidence must stay inside the repository") ;;
+      MISSING_EVIDENCE_FILE) failures+=("$phase_label cancelled evidence file is missing") ;;
+      NON_REGULAR_EVIDENCE) failures+=("$phase_label cancelled evidence must be a regular file") ;;
+      UNREADABLE_EVIDENCE) failures+=("$phase_label cancelled evidence must be readable") ;;
+      INVALID_UTF8_EVIDENCE) failures+=("$phase_label cancelled evidence must be valid UTF-8 text") ;;
+      INVALID_EVIDENCE_MARKER) failures+=("$phase_label cancelled evidence must contain exact same-line prefix: **Status:** CANCELLED") ;;
+      PROBE_EXCEPTION) failures+=("$phase_label cancellation validation probe raised an exception") ;;
+      *) malformed=1 ;;
+    esac
+  done <<< "$probe_output"
+  if [[ "$malformed" -eq 1 ]]; then
+    failures+=("$phase_label cancellation validation probe returned malformed output")
+  fi
+}
+
 # Single home for the plan/score/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
@@ -834,8 +1060,12 @@ assert_commit_invariants() {
 
   local small_status closeout_log=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
-    small_status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$small_status" != "complete" ]]; then
+    small_status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$small_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before commit")
+    elif [[ "$small_status" == "cancelled" ]]; then
+      failures+=("$small_plan is cancelled; a cancelled phase never certifies a commit, so advance current_phase past it")
+    elif [[ "$small_status" != "complete" ]]; then
       failures+=("$small_plan must have status: complete before commit")
     fi
     closeout_log="$(fm_read "$small_plan" "closeout_session_log" || true)"
@@ -978,23 +1208,34 @@ assert_push_invariants() {
     return
   fi
 
-  local phase small_plan status
+  local phase small_plan status completed_count=0 last_completed_phase=""
   for phase in "${phases[@]}"; do
     small_plan="$repo_root/.claude/plans/$phase.md"
     if [[ ! -f "$small_plan" ]]; then
       failures+=("missing small-plan file: .claude/plans/$phase.md")
       continue
     fi
-    status="$(fm_read "$small_plan" "status" || true)"
-    if [[ "$status" != "complete" ]]; then
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before PR/push")
+    elif [[ "$status" == "complete" ]]; then
+      completed_count=$((completed_count + 1))
+      last_completed_phase="$phase"
+    elif [[ "$status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$small_plan" "$phase"
+    else
       failures+=("all small plans must be complete before PR/push; $phase is ${status:-missing-status}")
     fi
   done
 
+  if [[ "$completed_count" -eq 0 ]]; then
+    failures+=("implementation branch certifies no completed work and should be deleted rather than pushed")
+  fi
+
   local commit_count
   commit_count="$(git -C "$repo_root" rev-list --count "dev..$local_sha" 2>/dev/null || echo 0)"
-  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "${#phases[@]}" ]]; then
-    failures+=("implementation branch must have at least one commit per small plan before PR/push")
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "$completed_count" ]]; then
+    failures+=("implementation branch must have at least one commit per completed small plan before PR/push")
   fi
 
   local started_at bypass_ack
@@ -1014,19 +1255,17 @@ assert_push_invariants() {
 
   # R-SCORE-03: the push tier of the severity gate additionally requires
   # counts.major == 0 (the commit gate already required counts.critical == 0
-  # before any commit could land). Checked against the FINAL phase - by push
-  # time every phase must be complete (checked above), so the final phase's
-  # findings report is the one that certifies the branch as a whole.
-  # `${phases[${#phases[@]}-1]}` (not `${phases[-1]}`) because macOS's
-  # default /usr/bin/bash is 3.2, which has no negative array indices, and
-  # this must run on macos-latest CI (R-CI-01).
-  local final_phase="${phases[${#phases[@]}-1]}"
+  # before any commit could land). Bind to the last COMPLETED phase because a
+  # cancelled trailing phase has no findings report and never will.
+  local final_phase="$last_completed_phase"
   local findings_file=""
-  findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
+  if [[ -n "$final_phase" ]]; then
+    findings_file="$(select_fresh_report "$repo_root/.claude/quality_reports" "findings-*.json" "$branch" "$final_phase")"
+  fi
 
-  if [[ -z "$findings_file" ]]; then
+  if [[ -n "$final_phase" && -z "$findings_file" ]]; then
     failures+=("no matching findings report found for phase $final_phase - run uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json")
-  else
+  elif [[ -n "$findings_file" ]]; then
     local findings_regen_hint="re-run record_findings.py with the profiles that ran: uv run python .claude/scripts/record_findings.py <target> --profile <reviewed-profile> --phase $final_phase --base-ref dev --findings-json <path> --out .claude/quality_reports/findings-<ts>.json"
     assert_report_freshness "$findings_file" "$repo_root" "$local_sha" "ancestor" "$local_sha" "findings report" "$findings_regen_hint"
 

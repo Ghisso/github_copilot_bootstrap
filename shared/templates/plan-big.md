@@ -1,6 +1,7 @@
 ---
 name: <slug>
 type: big-plan
+# status must occur exactly once: planning | in-progress | complete | cancelled
 status: planning
 originating_branch: dev
 implementation_branch: <slug>_implementation
@@ -9,6 +10,10 @@ phases:
   - <small-plan-slug-1>
   - <small-plan-slug-2>
 current_phase:
+# Cancellation fields (required only when status is cancelled):
+# cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
+# cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
+# cancelled_evidence: <repository-relative readable UTF-8 CANCELLED artifact>
 ---
 
 # Big Plan: <slug>
