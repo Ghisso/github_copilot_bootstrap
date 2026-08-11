@@ -305,3 +305,14 @@
   the classifier working as designed, not a broken hook. Put complex logic in a
   script file and invoke it as `bash script.sh`, which stays classifiable and
   keeps the guard active rather than routing around it.
+- [LEARN:shell] Bash `errexit` is not reliable inside a function invoked from a
+  status-tested context such as `if ! function_name`; explicitly guard each
+  fallible command and return its failure so a later successful command cannot
+  mask it.
+- [LEARN:testing] When a fix moves an operation past an old control-flow
+  boundary, arm fault injection only after a marker at that former boundary.
+  Otherwise the test can fail an earlier invocation and never prove the timing
+  change; also assert the marker precedes the fault and no downstream action ran.
+- [LEARN:diagnostics] Follow-on warnings must describe the broad failure class
+  accurately. Preserve cause-specific diagnostics instead of overwriting them
+  with a generic message that falsely claims a conflict.
