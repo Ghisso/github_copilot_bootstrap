@@ -1,0 +1,13 @@
+2026-08-11T17:33:57Z,branch=hook-python-3.9-compatibility_implementation,subject=chore(typo): fix Python 3.9 incompatibility in hook type annotations
+
+Fixes TypeError from PEP 604 union syntax in protect-files.py on macOS
+system Python 3.9.6 by adding 'from __future__ import annotations'.
+
+- protect-files.py: defer annotation evaluation
+- protect-files.sh: improve error diagnostics  
+- bootstrap-runtime.instructions.md: document Python >= 3.9 contract
+- test_hook_gates.py: add Python 3.9 regression test
+
+All 813 tests pass, quality score 100/100, targets regenerated.
+
+Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>,target=claude-code
