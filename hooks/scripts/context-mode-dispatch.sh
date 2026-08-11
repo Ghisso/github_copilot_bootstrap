@@ -40,8 +40,16 @@ canonical_storage_path() {
 }
 
 storage_override_is_allowed() {
-  local candidate="$1"
-  case "$candidate" in
+  local requested="$1" canonical="$2"
+  case "$requested" in
+    "$REPO_ROOT"|"$REPO_ROOT/"*)
+      case "$canonical" in
+        "$DEFAULT_CONTEXT_MODE_DIR"|"$DEFAULT_CONTEXT_MODE_DIR/"*) ;;
+        *) return 1 ;;
+      esac
+      ;;
+  esac
+  case "$canonical" in
     "$DEFAULT_CONTEXT_MODE_DIR"|"$DEFAULT_CONTEXT_MODE_DIR/"*) return 0 ;;
     "$REPO_ROOT"|"$REPO_ROOT/"*) return 1 ;;
     *) return 0 ;;
@@ -64,7 +72,7 @@ select_storage_root() {
     printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
     return 0
   fi
-  if ! storage_override_is_allowed "$canonical"; then
+  if ! storage_override_is_allowed "$requested" "$canonical"; then
     warn "ignoring tracked or protected in-project CONTEXT_MODE_DIR; using project-local cache"
     printf '%s' "$DEFAULT_CONTEXT_MODE_DIR"
     return 0
