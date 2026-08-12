@@ -410,6 +410,8 @@ def test_protect_files_python_pass_ignores_slashy_free_text() -> None:
         "stat uv.lock",
         "git diff uv.lock",
         "git show HEAD:uv.lock",
+        "git -C . diff uv.lock",
+        "git -C . status",
     ),
 )
 def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
@@ -458,6 +460,12 @@ def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
         "git restore .env",
         "git checkout -- .env",
         'TARGET=.env rm "$TARGET"',
+        "git diff --output=.env",
+        "git diff --output .env",
+        "git show --output=.env HEAD",
+        "git log --output=.env -1",
+        "git -C . rm .env",
+        "git --work-tree=. checkout -- .env",
     ),
 )
 def test_protect_files_blocks_mutation_targets(command: str) -> None:
