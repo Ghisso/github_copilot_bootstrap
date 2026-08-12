@@ -407,6 +407,9 @@ def test_protect_files_python_pass_ignores_slashy_free_text() -> None:
         "wc -l .codex/config.toml 2>/dev/null",
         "cat .codex/config.toml 2>/dev/null",
         "sed -n '1,10p' .codex/config.toml 2>/dev/null",
+        "stat uv.lock",
+        "git diff uv.lock",
+        "git show HEAD:uv.lock",
     ),
 )
 def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
@@ -451,6 +454,10 @@ def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
         "cp .env public-example.env",
         "touch nested/../.claude/settings.json",
         "cat README.md\ntouch .env",
+        "git rm .env",
+        "git restore .env",
+        "git checkout -- .env",
+        'TARGET=.env rm "$TARGET"',
     ),
 )
 def test_protect_files_blocks_mutation_targets(command: str) -> None:
@@ -477,6 +484,71 @@ def test_protect_files_blocks_native_edits(payload: dict) -> None:
     process = _run_protect_files(payload)
     assert process.returncode == 0, process.stderr
     assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "FOO=bar\nrg something .",
+        "FOO=bar\nBAR=baz\nrg something .",
+        'ROOT="$(pwd)"\nrg something "$ROOT"',
+        "some-valid-but-unsupported-shell-syntax",
+        "rg something .;",
+        "chmod 600",
+    ),
+)
+def test_protect_files_allows_valid_syntax_the_classifier_cannot_fully_model(
+    command: str,
+) -> None:
+    """Assignment-only segments, trailing separators, and other syntax our
+    lightweight parser cannot fully model must not become a blanket denial
+    when no protected resource is involved."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_resolves_tracked_variable_before_blocking_mutation() -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": 'TARGET=.env\nrm "$TARGET"'}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_resolves_tracked_variable_before_allowing_normal_target() -> (
+    None
+):
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'TARGET=normal.txt\nrm "$TARGET"'},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_denies_ambiguous_protected_reference_without_infra_failure() -> (
+    None
+):
+    """An unsupported command touching a protected literal (via a tracked
+    variable) must become a normal, reasoned safety denial - not the
+    'protect-files.sh exited with status 2' infrastructure-failure path."""
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'TARGET=".env"\nsome-unsupported-command "$TARGET"'
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+    assert "exited with status" not in process.stdout
 
 
 def test_protect_files_fails_closed_for_malformed_command_and_without_uv() -> None:
