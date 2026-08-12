@@ -179,6 +179,6 @@ Standalone bootstrap hooks execute with bare system `python3` (not `uv run` or a
 Hook Python code is limited to:
 - Standard library modules available in Python 3.9 (`json`, `re`, `sys`, `pathlib`, `datetime`, `stat`)
 - No external packages or project dependencies
-- No runtime-evaluated syntax or stdlib feature that requires Python newer than 3.9; use `from __future__ import annotations` when newer annotation syntax (e.g. `X | Y`) is otherwise safe to parse on Python 3.9
+- Must not runtime-evaluate syntax or stdlib features that require Python newer than 3.9. Use `from __future__ import annotations` when newer annotation syntax (e.g. `X | Y`) is otherwise safe to parse on Python 3.9
 
 When adding new hook Python code, verify it compiles under Python 3.9 with `python3 -m py_compile` and add regression coverage to the test suite (see `tests/test_hook_gates.py`).
