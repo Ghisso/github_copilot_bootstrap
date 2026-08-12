@@ -53,6 +53,10 @@ GIT_READ_ONLY_SUBCOMMANDS = {
     "rev-parse",
     "describe",
 }
+# git global options that take a value, so the subcommand scan can skip past
+# them (e.g. `git -C .claude status`) instead of misreading their value as
+# the subcommand. Not the full git CLI grammar - just common dev usage.
+GIT_GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree"}
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
 PROTECTED_LITERAL = re.compile(
@@ -276,9 +280,46 @@ def target_directory(tokens: list[str]) -> str | None:
 
 
 def git_subcommand(args: list[str]) -> str | None:
-    for token in args:
+    """Return git's subcommand, skipping global options that precede it.
+
+    Handles -C/-c/--git-dir/--work-tree in both "--opt value" and
+    "--opt=value" forms (e.g. `git -C .claude status`), and safely skips any
+    other flag-only global option. Not the full git CLI grammar - only
+    enough to find the subcommand for common development usage.
+    """
+    index = 0
+    while index < len(args):
+        token = args[index]
         if not token.startswith("-"):
             return token
+        if token in GIT_GLOBAL_VALUE_OPTIONS:
+            index += 2
+            continue
+        name, _, value = token.partition("=")
+        if value and name in GIT_GLOBAL_VALUE_OPTIONS:
+            index += 1
+            continue
+        index += 1
+    return None
+
+
+def git_output_target(args: list[str]) -> str | None:
+    """Return the value of git's `--output`/`--output=<path>` option, if any.
+
+    A handful of otherwise read-only subcommands (diff, show, log, ...) can
+    still write directly to a file via --output; that destination must not
+    bypass protected-file protection.
+    """
+    for index, token in enumerate(args):
+        if token == "--output":
+            if index + 1 == len(args):
+                raise AmbiguousCommand("git --output has no target")
+            return args[index + 1]
+        if token.startswith("--output="):
+            target = token.partition("=")[2]
+            if not target:
+                raise AmbiguousCommand("git --output has no target")
+            return target
     return None
 
 
@@ -372,6 +413,13 @@ def segment_targets(
         if git_subcommand(args) not in GIT_READ_ONLY_SUBCOMMANDS:
             uncertain.extend(token for token in args if protected(token, ""))
             uncertain.extend(protected_literals(" ".join(args)))
+        else:
+            # Even a read-only subcommand can write directly to a file via
+            # --output; that destination is a confirmed target, not a
+            # merely-uncertain one.
+            output_target = git_output_target(args)
+            if output_target is not None:
+                confirmed.append(output_target)
     elif command not in READ_ONLY:
         # Unknown interpreters and archive tools are not proven read-only, but
         # nor is a mutation confirmed: flag any protected literal as uncertain
