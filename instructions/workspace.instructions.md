@@ -169,3 +169,16 @@ Quality gates:
 
 - Default to `uv run` for project Python commands, including scripts, module entrypoints, test runs, linters, formatters, and type checkers.
 - Avoid bare `python`, `python3`, `pip`, `pytest`, `ruff`, or `mypy` invocations in normal workflow unless explicitly required by the user or by tooling outside uv's control.
+
+## Bootstrap Hooks Runtime Contract
+
+Standalone bootstrap hooks execute with bare system `python3` (not `uv run` or a project-managed environment) to function before project infrastructure initializes.
+
+**Minimum Python version:** 3.9
+
+Hook Python code is limited to:
+- Standard library modules available in Python 3.9 (`json`, `re`, `sys`, `pathlib`, `datetime`, `stat`)
+- No external packages or project dependencies
+- Must not runtime-evaluate syntax or stdlib features that require Python newer than 3.9. Use `from __future__ import annotations` when newer annotation syntax (e.g. `X | Y`) is otherwise safe to parse on Python 3.9
+
+When adding new hook Python code, verify it compiles under Python 3.9 with `python3 -m py_compile` and add regression coverage to the test suite (see `tests/test_hook_gates.py`).

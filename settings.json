@@ -37,11 +37,23 @@
     "PreToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write",
-        "hooks": []
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" protect-files.sh claude-code",
+            "timeout": 10
+          }
+        ]
       },
       {
         "matcher": "Bash",
-        "hooks": []
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" pretool-bash-guard.sh claude-code",
+            "timeout": 10
+          }
+        ]
       },
       {
         "matcher": "*",

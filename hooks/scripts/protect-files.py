@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Classify protected-file mutations from one PreToolUse payload."""
 
+from __future__ import annotations
+
 import json
 import posixpath
 import re
@@ -34,7 +36,25 @@ PATCH_PREFIXES = (
 OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
 REDIRECTS = {">", ">>", ">|", "&>", "1>", "1>>", "2>", "2>>"}
 SIMPLE_MUTATORS = {"rm", "rmdir", "touch", "mkdir", "truncate", "tee", "ln"}
-READ_ONLY = {"cat", "wc", "rg", "grep", "head", "tail", "sed"}
+READ_ONLY = {"cat", "wc", "rg", "grep", "head", "tail", "sed", "stat"}
+# git subcommands that cannot write to a path they merely reference. Anything
+# else routes through the generic unknown-command handling below: git has too
+# many mutating subcommands to enumerate, so we do not assume the rest are safe.
+GIT_READ_ONLY_SUBCOMMANDS = {
+    "diff",
+    "show",
+    "log",
+    "status",
+    "blame",
+    "grep",
+    "cat-file",
+    "ls-files",
+    "ls-tree",
+    "rev-parse",
+    "describe",
+}
+ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
 PROTECTED_LITERAL = re.compile(
     r"(?:\.env(?:\.[\w.-]+)?|uv\.lock|credentials[^\s/'\"]*|[^\s/'\"]*secret[^\s/'\"]*|[^\s/'\"]+\.(?:pem|key)|(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|\.claude/settings\.json|\.codex/(?:config\.toml|hooks\.json))",
     re.IGNORECASE,
@@ -62,7 +82,20 @@ OPTION_VALUES = {
 
 
 class AmbiguousCommand(ValueError):
-    """The safety classifier cannot identify all mutation targets."""
+    """Valid shell syntax the classifier cannot fully model.
+
+    Not a crash: callers resolve this against protected-resource evidence
+    (allow if none is present, conservative deny if some is) rather than
+    failing the whole hook closed.
+    """
+
+
+class UnparseableCommand(AmbiguousCommand):
+    """The shell text itself could not be tokenized (e.g. an unterminated quote).
+
+    Unlike AmbiguousCommand, this is genuinely malformed input, not valid
+    syntax our lightweight parser fails to model, so it stays fail-closed.
+    """
 
 
 def normalize(path: str, repo_root: str) -> str:
@@ -123,7 +156,7 @@ def split_segments(command: str) -> list[list[str]]:
         lexer.whitespace_split = True
         tokens = list(lexer)
     except ValueError as error:
-        raise AmbiguousCommand("shell command could not be parsed") from error
+        raise UnparseableCommand("shell command could not be parsed") from error
     if not tokens:
         return []
     segments: list[list[str]] = [[]]
@@ -135,20 +168,60 @@ def split_segments(command: str) -> list[list[str]]:
         else:
             segments[-1].append(token)
     if not segments[-1]:
-        raise AmbiguousCommand("trailing shell command separator")
+        # A trailing separator ("rg foo .;") is valid Bash, not an error.
+        segments.pop()
     return segments
 
 
-def command_name(tokens: list[str]) -> tuple[str, int]:
+def record_assignment(token: str, variables: dict[str, str]) -> None:
+    """Track a bare `NAME=value` token's literal value, if it has one.
+
+    Values that embed further expansion (`$`, backticks) are not "obvious"
+    per the scoped fix, so the variable is left/marked unresolved rather than
+    guessed.
+    """
+    match = ASSIGNMENT.match(token)
+    if not match:
+        return
+    name, value = match.groups()
+    if "$" in value or "`" in value:
+        variables.pop(name, None)
+        return
+    variables[name] = value
+
+
+def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
+    """Replace whole-token `$NAME`/`${NAME}` references with tracked values."""
+    resolved = []
+    for token in tokens:
+        match = VARIABLE_REFERENCE.fullmatch(token)
+        if match and match.group(1) in variables:
+            resolved.append(variables[match.group(1)])
+        else:
+            resolved.append(token)
+    return resolved
+
+
+def command_name(
+    tokens: list[str], variables: dict[str, str]
+) -> tuple[str, int] | None:
+    """Return (command, args-start-index) and record leading assignments.
+
+    Records any leading `NAME=value` tokens (including ones after a
+    sudo/env/command wrapper) into `variables` as a side effect. Returns None
+    for a segment consisting entirely of assignments (`FOO=bar`): that is
+    valid Bash with no command to classify, not an ambiguity.
+    """
     index = 0
     while (
         index < len(tokens)
         and "=" in tokens[index]
         and not tokens[index].startswith("-")
     ):
+        record_assignment(tokens[index], variables)
         index += 1
     if index == len(tokens):
-        raise AmbiguousCommand("shell segment has no command")
+        return None
     while index < len(tokens) and tokens[index] in {"sudo", "env", "command"}:
         index += 1
         while index < len(tokens) and tokens[index].startswith("-"):
@@ -158,6 +231,7 @@ def command_name(tokens: list[str]) -> tuple[str, int]:
             and "=" in tokens[index]
             and not tokens[index].startswith("-")
         ):
+            record_assignment(tokens[index], variables)
             index += 1
     if index == len(tokens):
         raise AmbiguousCommand("shell wrapper has no command")
@@ -201,8 +275,32 @@ def target_directory(tokens: list[str]) -> str | None:
     return None
 
 
-def segment_targets(tokens: list[str]) -> list[str]:
-    targets: list[str] = []
+def git_subcommand(args: list[str]) -> str | None:
+    for token in args:
+        if not token.startswith("-"):
+            return token
+    return None
+
+
+def segment_targets(
+    tokens: list[str],
+    variables: dict[str, str],
+    confirmed: list[str],
+    uncertain: list[str],
+) -> None:
+    """Classify one segment's mutation targets into `confirmed` or `uncertain`.
+
+    `confirmed` holds targets a known mutation mechanism (redirection, rm,
+    cp/mv, etc.) definitely operates on. `uncertain` holds protected-looking
+    literals seen only because the command itself is not provably safe; it is
+    a softer, still-denied signal, not a confirmed mutation.
+    """
+    # command_name() records this segment's leading NAME=value assignments as
+    # a side effect, so it must run on the raw tokens before substitute():
+    # otherwise a same-segment `TARGET=.env rm "$TARGET"` would substitute
+    # "$TARGET" using not-yet-recorded variables and leave it unresolved.
+    command_info = command_name(tokens, variables)
+    tokens = substitute(tokens, variables)
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -210,23 +308,25 @@ def segment_targets(tokens: list[str]) -> list[str]:
             index += 1
             if index == len(tokens) or tokens[index] in REDIRECTS:
                 raise AmbiguousCommand("redirection has no target")
-            targets.append(tokens[index])
+            confirmed.append(tokens[index])
         index += 1
 
-    command, start = command_name(tokens)
+    if command_info is None:
+        return
+    command, start = command_info
     args = tokens[start:]
     if command in SIMPLE_MUTATORS:
-        targets.extend(operands(args, OPTION_VALUES.get(command, set())))
+        confirmed.extend(operands(args, OPTION_VALUES.get(command, set())))
     elif command in {"cp", "install"}:
         directory = target_directory(args)
         candidates = operands(
             args, OPTION_VALUES[command] | {"-t", "--target-directory"}
         )
         if directory:
-            targets.extend(candidates)
-            targets.append(directory)
+            confirmed.extend(candidates)
+            confirmed.append(directory)
         elif candidates:
-            targets.extend(candidates)
+            confirmed.extend(candidates)
         else:
             raise AmbiguousCommand(f"{command} has no destination")
     elif command == "mv":
@@ -235,17 +335,17 @@ def segment_targets(tokens: list[str]) -> list[str]:
             args, OPTION_VALUES[command] | {"-t", "--target-directory"}
         )
         if directory:
-            targets.extend(candidates)
-            targets.append(directory)
+            confirmed.extend(candidates)
+            confirmed.append(directory)
         elif len(candidates) >= 2:
-            targets.extend(candidates)
+            confirmed.extend(candidates)
         else:
             raise AmbiguousCommand("mv has no source and destination")
     elif command in {"chmod", "chown"}:
         candidates = operands(args, OPTION_VALUES[command])
         if len(candidates) < 2:
             raise AmbiguousCommand(f"{command} has no path operand")
-        targets.extend(candidates[1:])
+        confirmed.extend(candidates[1:])
     elif command in {"sed", "perl"}:
         candidates = operands(args, OPTION_VALUES[command])
         inplace = any(
@@ -259,26 +359,47 @@ def segment_targets(tokens: list[str]) -> list[str]:
             required = 1 if command == "perl" else 2
             if len(candidates) < required:
                 raise AmbiguousCommand(f"{command} -i has no file target")
-            targets.extend(candidates if command == "perl" else candidates[1:])
+            confirmed.extend(candidates if command == "perl" else candidates[1:])
     elif command == "dd":
-        targets.extend(
+        confirmed.extend(
             arg.partition("=")[2]
             for arg in args
             if arg.startswith("of=") and arg.partition("=")[2]
         )
+    elif command == "git":
+        # git has too many mutating subcommands to enumerate safely, so only
+        # the provably read-only ones are cleared; everything else is uncertain.
+        if git_subcommand(args) not in GIT_READ_ONLY_SUBCOMMANDS:
+            uncertain.extend(token for token in args if protected(token, ""))
+            uncertain.extend(protected_literals(" ".join(args)))
     elif command not in READ_ONLY:
-        # Unknown interpreters and archive tools are not proven read-only. Any
-        # protected literal therefore fails safe without guessing their syntax.
-        targets.extend(token for token in args if protected(token, ""))
-        targets.extend(protected_literals(" ".join(args)))
-    return targets
+        # Unknown interpreters and archive tools are not proven read-only, but
+        # nor is a mutation confirmed: flag any protected literal as uncertain
+        # rather than guessing the command's syntax or failing the hook closed.
+        uncertain.extend(token for token in args if protected(token, ""))
+        uncertain.extend(protected_literals(" ".join(args)))
 
 
-def shell_targets(command: str) -> list[str]:
-    targets: list[str] = []
+def shell_targets(command: str) -> tuple[list[str], list[str]]:
+    """Return (confirmed_targets, uncertain_targets) for a whole command line.
+
+    A segment the classifier cannot fully model (AmbiguousCommand) does not
+    abort the scan: it falls back to a conservative literal scan of that
+    segment, so an ambiguity elsewhere in the command cannot hide a real
+    mutation, while an ambiguity with no protected-resource evidence at all
+    resolves to "nothing found" instead of an internal-error status.
+    """
+    confirmed: list[str] = []
+    uncertain: list[str] = []
+    variables: dict[str, str] = {}
     for segment in split_segments(command):
-        targets.extend(segment_targets(segment))
-    return targets
+        try:
+            segment_targets(segment, variables, confirmed, uncertain)
+        except AmbiguousCommand:
+            resolved = substitute(segment, variables)
+            uncertain.extend(token for token in resolved if protected(token, ""))
+            uncertain.extend(protected_literals(" ".join(resolved)))
+    return confirmed, uncertain
 
 
 def native_targets(value: object, paths: list[str], key: str | None = None) -> None:
@@ -297,10 +418,15 @@ def native_targets(value: object, paths: list[str], key: str | None = None) -> N
         paths.append(value)
 
 
-def emit(target_id: str, repo_root: str, paths: list[str]) -> None:
+def emit(
+    target_id: str, repo_root: str, paths: list[str], uncertain: list[str]
+) -> None:
     hits = [result for path in paths if (result := protected(path, repo_root))]
     hooks = sorted({path for path, is_hook in hits if is_hook})
     sensitive = sorted({path for path, is_hook in hits if not is_hook})
+    uncertain_hits = sorted(
+        {result[0] for path in uncertain if (result := protected(path, repo_root))}
+    )
     if hooks:
         decision = "deny" if target_id == "openai-codex" else "ask"
         reason = (
@@ -312,6 +438,14 @@ def emit(target_id: str, repo_root: str, paths: list[str]) -> None:
         decision, reason = (
             "deny",
             "Protected file blocked by policy: " + ", ".join(sensitive),
+        )
+    elif uncertain_hits:
+        decision, reason = (
+            "deny",
+            "Command references protected file(s) "
+            + ", ".join(uncertain_hits)
+            + ", but the hook could not determine whether the command may"
+            " modify them.",
         )
     else:
         return
@@ -339,14 +473,16 @@ def main() -> int:
     if not isinstance(tool_input, dict):
         raise AmbiguousCommand("tool input is not an object")
     paths: list[str] = []
+    uncertain: list[str] = []
     if tool_name in {"bash", "shell"} or tool_name.endswith("bash") or not tool_name:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise AmbiguousCommand("Bash payload has no command")
-        paths.extend(shell_targets(command))
+        confirmed, uncertain = shell_targets(command)
+        paths.extend(confirmed)
     else:
         native_targets(tool_input, paths)
-    emit(target_id, repo_root, paths)
+    emit(target_id, repo_root, paths, uncertain)
     return 0
 
 
