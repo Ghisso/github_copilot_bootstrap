@@ -453,16 +453,24 @@ The specialist flow for standard and high-risk implementation work is:
 
 - orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
 
-Current agents:
+Universal agents:
 
-- orchestrator
-- planner
-- coder
-- reviewer
-- verifier
-- documenter
+- `orchestrator`
+- `planner`
+- `coder`
+- `reviewer`
+- `verifier`
+- `documenter`
 
-Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its own model pins):
+Codex-only agents:
+
+- `luna_coder`
+- `sol_coder`
+
+Claude Code and GitHub Copilot keep the six universal agents. Codex generates
+those six plus the two bounded implementation specialists. Claude Code and
+Codex both carry per-agent model/effort tiers for their eligible agents
+(Copilot uses its own model pins):
 
 | Agent | Claude model | Claude effort | Codex model | Codex effort |
 | --- | --- | --- | --- | --- |
@@ -472,12 +480,49 @@ Claude Code and Codex both carry per-agent model/effort tiers (Copilot uses its 
 | coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
 | documenter | `sonnet` | `medium` | `gpt-5.6-luna` | `medium` |
 | verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
+| luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
+| sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
 
 **Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
-**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed `shared/agents/<id>/prompt.md` body. `agent.yaml` remains the single source for metadata and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**, so keep it and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gate is met — the shim-removed candidate has never been exercised. Sol is reserved for coordination, planning, and review; Terra handles implementation; Luna handles documentation and mechanical verification.
+**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed role prompt. `agent.yaml` remains the single source for metadata, target eligibility, and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**; that dated observation does not include the two current Codex-only specialists. Keep the shim and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gates are met. The shim-removed candidate has never been exercised. The current declarations use Sol for coordination, planning, review, and final implementation recovery; Terra for the normal coder; and Luna for documentation, mechanical verification, and bounded implementation.
 
-**Escalation on failure (Codex only):** `coder`'s `model_intent.openai-codex` also declares an `escalate_to` (`gpt-5.6-sol`/`xhigh`), documentation-only in `agent.yaml` — it is not consumed by the generator, so there is no second `.codex/agents/coder-*.toml` file. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent, so the orchestrator's own prompt carries the instruction: if `verifier` fails or `reviewer` returns a CRITICAL/MAJOR/ponytail finding on a diff `coder` just produced, re-delegate the fix to `coder` with those override values instead of retrying at the base Terra/high tier, capped at one escalation per phase. A validator check keeps the `agent.yaml` data and the prompt wording from silently drifting apart. Claude Code has no per-invocation effort override, so there is no equivalent lane on that target.
+**Experimental bounded implementation route (Codex only):** for each approved
+implementation step, the orchestrator builds a compact packet with the goal and
+plan-step identity, relevant code or failures, constraints, rejected approaches
+when relevant, required skills, acceptance checks, verification commands, and
+room for the coder to choose the smallest maintainable implementation. It uses
+`luna_coder` only when the outcome, code locations, constraints, verification,
+and decision boundaries are already clear; otherwise it starts with `coder`.
+The route uses named agents and no spawn-time model or effort override:
+
+```mermaid
+flowchart LR
+    O[Orchestrator] --> P{Packet ready?}
+    P -->|Yes| L[luna_coder]
+    P -->|No| C[coder]
+    L -->|Block or fail| C
+    C -->|Attributed failure| S[sol_coder]
+    S -->|Failure| X[Stop and report]
+```
+
+`luna_coder` can return a prompt-enforced escalation object with `status`, one
+of six bounded `reason` values, `workspace_changed`, `evidence`, and `needed`.
+The orchestrator passes that object and the current diff to `coder`, which
+preserves and takes ownership of useful prior work. Before advancing from the
+Terra coder to `sol_coder`, the orchestrator classifies existing verifier and
+reviewer evidence as `implementation`, `environment`, `baseline`, or
+`indeterminate`. Only `implementation` advances one tier automatically;
+environment and baseline failures stop model escalation, and indeterminate
+evidence returns to orchestrator judgment. A Sol failure stops the route. The
+route does not retry a tier, jump directly from Luna to Sol, or let a subagent
+choose its successor.
+
+`visibility: hidden` on `luna_coder` and `sol_coder` is an internal
+orchestration convention, not a guarantee that native Codex user interfaces
+hide them. Optional route facts such as `initial-coder`, `fallback`, and
+`reason` may be written to an existing closeout or session log. They do not
+create a telemetry schema, token tracker, new artifact, or quality gate.
 
 The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
 

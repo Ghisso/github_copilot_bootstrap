@@ -34,9 +34,21 @@ MultiAgent V2 shim or `max_depth` can be removed.
 The historical runtime probe recorded documenter as `gpt-5.6-terra` /
 `medium`. The current declared contract intentionally uses `gpt-5.6-luna` /
 `medium`; the historical result is evidence for the shim, not the current role
-tier. The six current declarations are: orchestrator Sol/xhigh, planner
-Sol/xhigh, coder Terra/high, reviewer Sol/high, documenter Luna/medium, and
-verifier Luna/low. Coder alone may escalate to Sol/xhigh.
+tier. The six universal current declarations are orchestrator Sol/xhigh,
+planner Sol/xhigh, coder Terra/high, reviewer Sol/high, documenter Luna/medium,
+and verifier Luna/low. Codex now also declares `luna_coder` Luna/xhigh and
+`sol_coder` Sol/xhigh. Those two specialists are not part of the historical
+runtime observation.
+
+The experimental named implementation route is
+`luna_coder -> coder -> sol_coder`. Each tier uses its own project agent TOML;
+the orchestrator does not supply a spawn-time model or effort override. Luna is
+selected only for a complete bounded packet, Terra owns the normal or fallback
+implementation, and Sol is the final recovery tier. Automatic Terra-to-Sol
+recovery requires implementation-attributable verifier or reviewer evidence;
+environment and baseline failures stop escalation, while indeterminate
+evidence returns to orchestrator judgment. `visibility: hidden` is an internal
+orchestration convention, not evidence of native UI invisibility.
 
 Phase I adds the opt-in `scripts/check_native_clients.py` acceptance runner.
 It uses schema v2 instruction sentinels in separate ephemeral, read-only control
@@ -48,6 +60,11 @@ event is never routing proof. Current compact/resume and coder-escalation
 checks are intentionally unexercised WARNs. These results do not retroactively
 turn the historical entries above into current PASS results. See [Native Client
 Acceptance](native-client-acceptance.md).
+
+The runner's current declared matrix may be exercised in a future optional
+persistent-thread probe across all eight roles. Phase E does not require that
+run, change the evidence classifications above, or claim measured cost or
+quality improvement.
 
 ## Status as of 2026-08-09 (Codex 0.147.0)
 

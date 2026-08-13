@@ -65,8 +65,23 @@ activity/gap fields are null when unobservable.
 The Codex 33.771s run followed a concrete transport/schema variance and argv
 fix. It is manual evidence, not a generic, automatic, or `max` retry policy.
 
-The historical matrix used planner `max` and documenter `gpt-5.6-terra`;
-current declarations are planner `xhigh` and documenter `gpt-5.6-luna`.
+The historical matrix used planner `max` and documenter `gpt-5.6-terra`.
+It also predates the two Codex-only coder roles. The current declared matrix is:
+
+| Role | Model | Effort | Eligibility |
+| --- | --- | --- | --- |
+| orchestrator | `gpt-5.6-sol` | xhigh | universal |
+| planner | `gpt-5.6-sol` | xhigh | universal |
+| coder | `gpt-5.6-terra` | high | universal |
+| reviewer | `gpt-5.6-sol` | high | universal |
+| documenter | `gpt-5.6-luna` | medium | universal |
+| verifier | `gpt-5.6-luna` | low | universal |
+| luna_coder | `gpt-5.6-luna` | xhigh | Codex only |
+| sol_coder | `gpt-5.6-sol` | xhigh | Codex only |
+
+This declaration is not new native evidence. Future optional probes may test
+all eight roles through a persistent-thread interface, but Phase E requires no
+client run and makes no quality or cost claim.
 
 **This does not make the shim removable.** Routing was verified with
 `[features.multi_agent_v2]` **present**. The candidate configuration, with the
@@ -268,11 +283,12 @@ sentinels are the only structured final output accepted. The candidate has a
 separate execution result; a successful launch does not alone prove equivalent
 routing.
 
-For Codex, exact six-role type/model/reasoning-effort evidence is accepted only
-from explicit JSONL agent/thread/subagent events—not final-answer prose. If the
-installed client does not document or emit such events, role routing is `WARN`
-and `unexercised`, not a PASS or a failure inferred from silence. Claude has no
-Codex role-matrix requirement.
+For Codex, exact type/model/reasoning-effort evidence for the current eight-role
+declaration is accepted only from explicit JSONL agent/thread/subagent
+events—not final-answer prose. The dated 2026-08-09 evidence remains a separate
+six-role observation. If the installed client does not document or emit such
+events, role routing is `WARN` and `unexercised`, not a PASS or a failure
+inferred from silence. Claude has no Codex role-matrix requirement.
 
 Compact/resume and coder escalation are currently `WARN`/`unexercised` unless a
 separate supported native exercise is added and recorded. A candidate execution

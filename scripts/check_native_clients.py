@@ -122,7 +122,7 @@ FROZEN_PLANNER_WORKLOADS: dict[str, FrozenPlannerWorkload] = {
     },
 }
 
-CODEX_ROLES = {
+CODEX_UNIVERSAL_ROLES = {
     "orchestrator": ("orchestrator", "gpt-5.6-sol", "xhigh"),
     "planner": ("planner", "gpt-5.6-sol", "xhigh"),
     "coder": ("coder", "gpt-5.6-terra", "high"),
@@ -130,6 +130,14 @@ CODEX_ROLES = {
     "documenter": ("documenter", "gpt-5.6-luna", "medium"),
     "verifier": ("verifier", "gpt-5.6-luna", "low"),
 }
+CODEX_ONLY_ROLES = {
+    "luna_coder": ("coder", "gpt-5.6-luna", "xhigh"),
+    "sol_coder": ("coder", "gpt-5.6-sol", "xhigh"),
+}
+# This is the declared current matrix for optional future persistent-thread
+# probes. Historical native observations remain six universal roles and keep
+# their original evidence class; do not reinterpret them as an eight-role run.
+CODEX_ROLES = {**CODEX_UNIVERSAL_ROLES, **CODEX_ONLY_ROLES}
 SENTINEL_FIELDS = (
     "root_instruction",
     "scoped_instruction",
@@ -646,16 +654,29 @@ def collaboration_attempted_without_spawn(events: list[dict[str, Any]] | None) -
 
 
 def valid_role_matrix(records: list[dict[str, str]]) -> bool:
-    if len(records) != len(CODEX_ROLES):
+    """Validate the declared current eight-role Codex matrix exactly."""
+    return valid_role_records(records, CODEX_ROLES)
+
+
+def valid_universal_role_matrix(records: list[dict[str, str]]) -> bool:
+    """Validate dated six-role native evidence without upgrading its scope."""
+    return valid_role_records(records, CODEX_UNIVERSAL_ROLES)
+
+
+def valid_role_records(
+    records: list[dict[str, str]], expected_roles: dict[str, tuple[str, str, str]]
+) -> bool:
+    """Validate one exact role/model/effort matrix from native event metadata."""
+    if len(records) != len(expected_roles):
         return False
     names = [record.get("role") for record in records]
-    if len(set(names)) != len(names) or set(names) != set(CODEX_ROLES):
+    if len(set(names)) != len(names) or set(names) != set(expected_roles):
         return False
     return all(
         (record.get("type"), record.get("model"), record.get("reasoning_effort"))
         == expected
         for record in records
-        if (expected := CODEX_ROLES.get(record["role"])) is not None
+        if (expected := expected_roles.get(record["role"])) is not None
     )
 
 

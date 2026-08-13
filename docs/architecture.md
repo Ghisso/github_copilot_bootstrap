@@ -325,16 +325,97 @@ Custom agents are source-controlled under `shared/agents/<agent-id>/`.
 
 Each agent contains:
 
-- `agent.yaml`: stable metadata, capabilities, visibility, delegates, and per-target model/effort intent.
-- `prompt.md`: target-neutral behavior.
+- `agent.yaml`: stable metadata, capabilities, visibility, delegates, target
+  eligibility, prompt composition, and per-target model/effort intent.
+- `prompt.md`: target-neutral behavior for a normal agent or prompt base.
+- `prompt.openai-codex.md`: an optional Codex-only supplement. Derived agents
+  use it with `prompt_base` instead of copying the base `prompt.md`.
 
-The generator derives Copilot, Claude Code, and Codex adapters from those two files. Copilot model fields are target bindings, not portable semantics. GitHub Copilot agent `model` fields must be a single supported Copilot model string. Claude and Codex adapters must not include Copilot model pins.
+The shared loader validates all metadata before any target renders. Omitted
+`targets` means all supported targets, which keeps the six universal agents
+eligible for GitHub Copilot, Claude Code, and Codex. `luna_coder` and
+`sol_coder` explicitly declare only `openai-codex`, so they never generate a
+Claude or Copilot adapter. The loader also rejects empty, duplicated, unknown,
+or model-inconsistent targets. Copilot model fields are target bindings, not
+portable semantics. GitHub Copilot agent `model` fields must be one supported
+Copilot model string. Claude and Codex adapters must not include Copilot model
+pins.
 
 The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`xhigh`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`); the mechanical `verifier` runs on `haiku` with no `effort:` line, because Haiku does not support the effort field. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
 
-Agent names are identical across every target — the generator performs no per-target renaming. Codex agents are generated as project-scoped `.codex/agents/*.toml` files whose `developer_instructions` embed the transformed canonical `shared/agents/<id>/prompt.md` after a small Codex header. They do not read `.claude/agents/<id>.md` at runtime. `agent.yaml` remains the source for metadata and model intent; the Codex prompt is derived output, not a second editable role definition. The root Codex session is intentionally unpinned in `.codex/config.toml`, leaving the user free to choose the interactive model and effort. Each custom agent overrides both `model` and `model_reasoning_effort` from its canonical `model_intent.openai-codex`: orchestrator Sol/xhigh, planner Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. The validator requires those generated values and the exact normalized prompt body to match their canonical sources. Agent files omit MCP and skill overrides, inheriting the trusted project's registrations. Current generated instruction sizes are 3,145–8,202 bytes; no official per-agent instruction-size cap is asserted. Native probes must test full, untruncated delivery for all six roles on two supported Codex versions; see the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md) for current status. Claude's native agent files remain unchanged.
+Agent names are identical wherever an agent is eligible; the generator performs
+no per-target renaming. Codex agents are project-scoped
+`.codex/agents/*.toml` files. Each file is self-contained: a generated metadata
+header is followed by the exact target-transformed role body, and the agent does
+not read `.claude/agents/<id>.md` at runtime. A normal role body is its own
+`prompt.md`, optionally followed by exactly one derived role-supplement
+delimiter and its Codex supplement. A derived role body is exactly one
+target-transformed base `prompt.md`, the same delimiter, and its supplement.
+The loader permits only one inheritance level, rejects self-reference,
+multi-level inheritance, cycles, missing bases or supplements, duplicate
+delimiters, and supplements that copy the complete base prompt.
 
-`coder`'s `model_intent.openai-codex` additionally carries an `escalate_to` key (`{ "model": "gpt-5.6-sol", "effort": "xhigh" }`), declarative-only: the generator does not emit a second adapter file for it. Codex subagent spawning supports explicit per-call `model`/`model_reasoning_effort` overrides on an existing named agent (`developers.openai.com/codex/subagents`: "explicit spawn values override `agents.default_subagent_model` and `agents.default_subagent_reasoning_effort`"), so `shared/agents/orchestrator/prompt.md` instructs the orchestrator to re-delegate a `coder` fix with those override values — instead of retrying at the base Terra/high tier — when `verifier` fails or `reviewer` surfaces a CRITICAL/MAJOR/`ponytail` finding on that diff, capped at one escalation per phase. `scripts/validate_targets.py` checks that `escalate_to`'s model/effort pair is allow-listed, differs from the base tier, and appears verbatim in the orchestrator prompt text, so the data and the instruction that acts on it cannot silently drift apart. Claude Code has no per-invocation effort override, so this lane is Codex-only.
+`agent.yaml` remains the source for metadata, eligibility, composition, and
+model intent; the Codex prompt is derived output, not a second editable role
+definition. The root Codex session is intentionally unpinned in
+`.codex/config.toml`, leaving the user free to choose the interactive model and
+effort. The six universal Codex agents are orchestrator Sol/xhigh, planner
+Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and
+verifier Luna/low. The two Codex-only agents are `luna_coder` Luna/xhigh and
+`sol_coder` Sol/xhigh. Agent files omit per-agent MCP and skill overrides and
+inherit the trusted project's registrations. Structural size measurements are
+observability only; no official per-agent instruction-size cap is asserted.
+The dated 2026-08-09 native evidence covers the historical six-role matrix, not
+the two newly declared specialists. Future optional persistent-thread probes
+may exercise the current eight roles, but this feature does not require a
+native run. Claude and Copilot retain their existing six-agent output.
+
+The orchestrator's own `prompt.openai-codex.md` is also target-scoped. It adds
+the experimental bounded implementation policy only to the generated Codex
+orchestrator; Claude and Copilot keep their existing behavior. For every
+approved step, the orchestrator builds a packet containing the goal and
+plan-step identity, relevant code or failures, constraints, rejected approaches
+when relevant, required skills, acceptance criteria, verification commands,
+and freedom to choose the smallest maintainable implementation. It chooses
+`luna_coder` only when five conditions establish a clear outcome, known code
+locations, known constraints, objective verification, and no unresolved
+architecture, interface, root-cause, migration, security, or ownership
+decision. Otherwise it chooses `coder` directly.
+
+The named Codex route is shown below. Every tier has a fixed model in its own
+self-contained agent TOML; spawning does not supply a model or effort override.
+
+```mermaid
+flowchart LR
+    O[Orchestrator] --> P{Packet ready?}
+    P -->|Yes| L[luna_coder]
+    P -->|No| C[coder]
+    L -->|Block or fail| C
+    C -->|Implementation| S[sol_coder]
+    S -->|Failure| X[Stop and report]
+```
+
+Before editing where possible, `luna_coder` validates the packet. If it cannot
+proceed, it returns only a prompt-enforced object with `status`, one of six
+exact `reason` values, `workspace_changed`, `evidence`, and `needed`. This is a
+handoff contract, not a native typed protocol. If Luna changed the workspace,
+`coder` inspects the current diff and preserves useful prior work instead of
+restarting blindly. The declared escalation graph is exactly
+`luna_coder -> coder -> sol_coder`; Sol has no successor, and the route never
+retries or skips a tier.
+
+Before automatic Terra-to-Sol recovery, the orchestrator classifies the
+existing verifier commands/results and reviewer findings as exactly one of
+`implementation`, `environment`, `baseline`, or `indeterminate`. Only an
+implementation-attributable failure advances automatically. Environment and
+baseline failures stop model escalation and are reported. Indeterminate
+evidence returns to orchestrator judgment with no automatic escalation. A
+verifier failure alone is not implementation attribution, and the orchestrator
+must not invent evidence. `visibility: hidden` on the two specialists is an
+internal orchestration convention, not a native Codex invisibility guarantee.
+Optional `initial-coder`, `fallback`, and `reason` facts may use an existing
+closeout or session log; they do not introduce telemetry, a token tracker, a
+new artifact, or a gate.
 
 Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), uses the documented `agents.max_concurrent_threads_per_session = 6`, and does not restate the enabled-by-default `agents.enabled`. It retains `max_depth = 1` independently and sets `hide_spawn_agent_metadata = false` with `tool_namespace = "agents"` so named model/effort profiles are selectable. Measured against Codex 0.147.0 on 2026-08-09, `tool_namespace` has **no observable effect** — the collaboration tools are exposed as `collaboration.spawn_agent`, `followup_task`, `send_message`, `interrupt_agent`, `list_agents`, and `wait_agent`, with nothing under `agents.*`. Named routing was nonetheless verified correct with the block present, so this records an inert key, not a removable shim. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md) distinguishes the historical 0.144.x runtime result, local alpha parsing evidence, and current official documentation; static validation protects the configuration, while native probes remain the only removal gate for the shim or `max_depth`. Routing itself was verified on 2026-08-09 with the shim present; the shim-removed candidate is still untested.
 

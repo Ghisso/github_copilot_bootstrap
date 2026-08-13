@@ -5629,6 +5629,98 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     return ""
 
 
+def readme_agent_contract_errors(
+    readme_text: str, canonical_agents: list[tuple[dict[str, Any], Path]]
+) -> list[str]:
+    """Return README role-list and Codex-tier drift from canonical eligibility."""
+    target_agents = {
+        target: {
+            agent["id"]
+            for agent, _agent_dir in canonical_agents
+            if target in agent["targets"]
+        }
+        for target in SUPPORTED_AGENT_TARGETS
+    }
+    universal_agents = set.intersection(*target_agents.values())
+    codex_only_agents = target_agents["openai-codex"] - (
+        target_agents["github-copilot"] | target_agents["claude-code"]
+    )
+    errors: list[str] = []
+
+    def listed_agents(label: str) -> list[str] | None:
+        match = re.search(
+            rf"(?m)^{re.escape(label)} agents:\n\n(?P<items>(?:- [^\n]+\n)+)",
+            readme_text,
+        )
+        if match is None:
+            errors.append(f"README must have a '{label} agents:' list")
+            return None
+        return [
+            line[2:].strip().strip("`")
+            for line in match["items"].splitlines()
+            if line.strip()
+        ]
+
+    for label, expected_agents in (
+        ("Universal", universal_agents),
+        ("Codex-only", codex_only_agents),
+    ):
+        documented_agents = listed_agents(label)
+        if documented_agents is None:
+            continue
+        if len(documented_agents) != len(set(documented_agents)):
+            errors.append(f"README '{label} agents' list must not contain duplicates")
+        if len(documented_agents) != len(expected_agents):
+            errors.append(
+                f"README '{label} agents' list must have {len(expected_agents)} entries"
+            )
+        if set(documented_agents) != expected_agents:
+            errors.append(
+                f"README '{label} agents' list must match canonical target eligibility: "
+                f"readme={sorted(documented_agents)} "
+                f"canonical={sorted(expected_agents)}"
+            )
+
+    expected_codex_tiers: dict[str, tuple[str, str]] = {}
+    for agent, _agent_dir in canonical_agents:
+        codex_intent = agent["model_intent"].get("openai-codex")
+        if isinstance(codex_intent, dict):
+            model = codex_intent.get("model")
+            effort = codex_intent.get("effort")
+            if isinstance(model, str) and isinstance(effort, str):
+                expected_codex_tiers[agent["id"]] = (model, effort)
+    table_marker = (
+        "| Agent | Claude model | Claude effort | Codex model | Codex effort |\n"
+        "| --- | --- | --- | --- | --- |\n"
+    )
+    if readme_text.count(table_marker) != 1:
+        errors.append("README must have exactly one authoritative agent model table")
+        return errors
+    table_rows = readme_text.split(table_marker, 1)[1].split("\n\n", 1)[0].splitlines()
+    documented_codex_tiers: dict[str, tuple[str, str]] = {}
+    for row in table_rows:
+        if not row.startswith("|") or not row.endswith("|"):
+            errors.append("README agent model table must contain only data rows")
+            continue
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        if len(cells) != 5 or not cells[0]:
+            errors.append("README agent model table has a malformed data row")
+            continue
+        role = cells[0]
+        if role not in expected_codex_tiers:
+            errors.append(f"README agent model table has unexpected role {role}")
+            continue
+        if role in documented_codex_tiers:
+            errors.append(f"README must not duplicate the Codex model row for {role}")
+            continue
+        documented_codex_tiers[role] = (cells[3].strip("`"), cells[4].strip("`"))
+    if documented_codex_tiers != expected_codex_tiers:
+        errors.append(
+            "README Codex model/effort rows must match current canonical agent metadata"
+        )
+    return errors
+
+
 def validate_docs_parity(errors: list[str]) -> None:
     """R-VALID-02: mechanical drift-policing for authoring docs, mirroring
     upstream's check-surface-sync.py / check-skill-integrity.py after they
@@ -5682,26 +5774,11 @@ def validate_docs_parity(errors: list[str]) -> None:
         errors,
     )
 
-    # 2b. Agent names: README's "Current agents" list is exact for universal
-    # roles. Codex-only derived roles intentionally have no canonical prompt.md
-    # and remain internal until their target-specific documentation phase.
-    agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
-    check(agents_match is not None, "README must have a 'Current agents:' list", errors)
-    if agents_match:
-        readme_agents = {
-            line[2:].strip()
-            for line in agents_match.group(1).splitlines()
-            if line.strip()
-        }
-        universal_agents = {
-            path.parent.name
-            for path in (REPO_ROOT / "shared" / "agents").glob("*/prompt.md")
-        }
-        check(
-            readme_agents == universal_agents,
-            f"README 'Current agents' list must exactly match universal shared agents: readme={sorted(readme_agents)} universal={sorted(universal_agents)}",
-            errors,
-        )
+    # 2b. Agent names and Codex model/effort rows use canonical target
+    # eligibility. The six universal roles and two Codex-only implementation
+    # specialists are intentionally separate; a flat filesystem listing loses
+    # that target contract.
+    errors.extend(readme_agent_contract_errors(readme_text, shared_agents()))
 
     # 2c. Hook script names: docs/runtime-checks.md's guardrail list is EXACT
     # against shared/hooks/scripts/*.sh, excluding _lib-frontmatter.sh (a

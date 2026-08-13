@@ -57,6 +57,7 @@ from validate_targets import (  # noqa: E402
     mcp_server_parity_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
+    readme_agent_contract_errors,
     root_guidance_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
@@ -725,6 +726,93 @@ def test_codex_coder_specialist_metadata_and_supplements_are_exact() -> None:
         "Do not loop, delegate further, or choose another successor.",
     ):
         assert clause in normalized_sol_supplement
+
+
+def test_readme_agent_contract_uses_target_eligibility_and_codex_tiers() -> None:
+    """README lists universal and Codex-only roles separately from metadata."""
+    canonical_agents = shared_agents()
+    target_agent_sets = tuple(
+        {agent["id"] for agent, _agent_dir in shared_agents(target)}
+        for target in ("github-copilot", "claude-code", "openai-codex")
+    )
+    universal_agents = sorted(set.intersection(*target_agent_sets))
+    codex_only_agents = sorted(
+        {agent["id"] for agent, _agent_dir in shared_agents("openai-codex")}
+        - {agent["id"] for agent, _agent_dir in shared_agents("github-copilot")}
+        - {agent["id"] for agent, _agent_dir in shared_agents("claude-code")}
+    )
+    codex_tiers = {
+        agent["id"]: agent["model_intent"]["openai-codex"]
+        for agent, _agent_dir in canonical_agents
+        if "openai-codex" in agent["targets"]
+    }
+    readme = (
+        "Universal agents:\n\n"
+        + "".join(f"- {agent}\n" for agent in universal_agents)
+        + "\nCodex-only agents:\n\n"
+        + "".join(f"- {agent}\n" for agent in codex_only_agents)
+        + "\n| Agent | Claude model | Claude effort | Codex model | Codex effort |\n"
+        + "| --- | --- | --- | --- | --- |\n"
+        + "".join(
+            f"| {agent} | — | — | `{intent['model']}` | `{intent['effort']}` |\n"
+            for agent, intent in sorted(codex_tiers.items())
+        )
+    )
+
+    assert readme_agent_contract_errors(readme, canonical_agents) == []
+    assert any(
+        "Codex-only agents" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("- sol_coder\n", "", 1), canonical_agents
+        )
+    )
+    assert any(
+        "Universal agents" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("- coder\n", "- luna_coder\n", 1), canonical_agents
+        )
+    )
+    for label, duplicate in (
+        ("Universal", "coder"),
+        ("Codex-only", "luna_coder"),
+    ):
+        duplicated = readme.replace(
+            f"- {duplicate}\n", f"- {duplicate}\n- {duplicate}\n", 1
+        )
+        assert duplicated != readme
+        assert any(
+            f"README '{label} agents' list must not contain duplicates" == error
+            for error in readme_agent_contract_errors(duplicated, canonical_agents)
+        )
+    assert any(
+        "Codex model/effort rows" in error
+        for error in readme_agent_contract_errors(
+            readme.replace("`gpt-5.6-terra`", "`gpt-5.6-sol`", 1),
+            canonical_agents,
+        )
+    )
+    verifier_model = codex_tiers["verifier"]["model"]
+    verifier_effort = codex_tiers["verifier"]["effort"]
+    verifier_row = f"| verifier | — | — | `{verifier_model}` | `{verifier_effort}` |\n"
+    for name, replacement, expected_error in (
+        (
+            "unexpected row",
+            f"{verifier_row}| unexpected | — | — | `gpt-5.6-sol` | `high` |\n",
+            "unexpected role unexpected",
+        ),
+        (
+            "duplicate row",
+            f"{verifier_row}{verifier_row}",
+            "duplicate the Codex model row",
+        ),
+        ("malformed row", f"{verifier_row}not a data row\n", "only data rows"),
+    ):
+        mutated = readme.replace(verifier_row, replacement, 1)
+        assert mutated != readme, name
+        assert any(
+            expected_error in error
+            for error in readme_agent_contract_errors(mutated, canonical_agents)
+        )
 
 
 def test_codex_orchestrator_routing_is_self_contained_and_target_isolated(

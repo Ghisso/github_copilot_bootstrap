@@ -16,6 +16,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import check_native_clients as native  # noqa: E402
 
 
+EXPECTED_CURRENT_CODEX_ROLES = {
+    "orchestrator": ("orchestrator", "gpt-5.6-sol", "xhigh"),
+    "planner": ("planner", "gpt-5.6-sol", "xhigh"),
+    "coder": ("coder", "gpt-5.6-terra", "high"),
+    "reviewer": ("reviewer", "gpt-5.6-sol", "high"),
+    "documenter": ("documenter", "gpt-5.6-luna", "medium"),
+    "verifier": ("verifier", "gpt-5.6-luna", "low"),
+    "luna_coder": ("coder", "gpt-5.6-luna", "xhigh"),
+    "sol_coder": ("coder", "gpt-5.6-sol", "xhigh"),
+}
+
+
 def observation() -> dict[str, bool]:
     return {field: True for field in native.SENTINEL_FIELDS}
 
@@ -39,11 +51,17 @@ def workload_observation(workload: str = "micro-plan") -> dict[str, Any]:
     }
 
 
-def complete_roles() -> list[dict[str, str]]:
+def role_records(
+    roles: dict[str, tuple[str, str, str]] = native.CODEX_ROLES,
+) -> list[dict[str, str]]:
     return [
         {"role": name, "type": role_type, "model": model, "reasoning_effort": effort}
-        for name, (role_type, model, effort) in native.CODEX_ROLES.items()
+        for name, (role_type, model, effort) in roles.items()
     ]
+
+
+def complete_roles() -> list[dict[str, str]]:
+    return role_records()
 
 
 def owned_workspace(root: Path) -> tuple[Path, Path, Path]:
@@ -98,7 +116,7 @@ def test_role_metadata_only_comes_from_agent_or_thread_events() -> None:
     assert native.event_role_records([event]) == [complete_roles()[0]]
 
 
-def test_role_matrix_requires_exact_six_unique_well_formed_records() -> None:
+def test_role_matrix_requires_exact_eight_unique_well_formed_records() -> None:
     roles = complete_roles()
     assert native.valid_role_matrix(roles)
     assert not native.valid_role_matrix(roles[:-1])
@@ -116,8 +134,35 @@ def test_role_matrix_requires_exact_six_unique_well_formed_records() -> None:
 
 
 def test_native_role_matrix_uses_the_calibrated_codex_planner_tier() -> None:
-    """A native role event must match the declared xhigh planner configuration."""
+    """Current probes use eight roles while dated evidence remains universal-six."""
+    assert native.CODEX_ROLES == EXPECTED_CURRENT_CODEX_ROLES
+    assert native.valid_role_matrix(role_records(EXPECTED_CURRENT_CODEX_ROLES))
+    assert set(native.CODEX_UNIVERSAL_ROLES) == {
+        "orchestrator",
+        "planner",
+        "coder",
+        "reviewer",
+        "documenter",
+        "verifier",
+    }
+    assert native.CODEX_ONLY_ROLES == {
+        "luna_coder": ("coder", "gpt-5.6-luna", "xhigh"),
+        "sol_coder": ("coder", "gpt-5.6-sol", "xhigh"),
+    }
+    assert set(native.CODEX_ROLES) == {
+        *native.CODEX_UNIVERSAL_ROLES,
+        *native.CODEX_ONLY_ROLES,
+    }
     assert native.CODEX_ROLES["planner"] == ("planner", "gpt-5.6-sol", "xhigh")
+    assert native.valid_universal_role_matrix(
+        role_records(native.CODEX_UNIVERSAL_ROLES)
+    )
+    assert not native.valid_role_matrix(role_records(native.CODEX_UNIVERSAL_ROLES))
+    for role in native.CODEX_UNIVERSAL_ROLES:
+        drifted_roles = dict(EXPECTED_CURRENT_CODEX_ROLES)
+        role_type, _model, effort = drifted_roles[role]
+        drifted_roles[role] = (role_type, "wrong-model", effort)
+        assert not native.valid_role_matrix(role_records(drifted_roles))
 
 
 @pytest.mark.parametrize("require,status", [(False, native.WARN), (True, native.FAIL)])

@@ -113,7 +113,10 @@ mutation. It keeps client output out of the result. Schema v2 records only
 instruction sentinels; trust is preflight/execution status. Codex role metadata
 can PASS only from explicit JSONL agent/thread/subagent events; undocumented or
 absent events are WARN, not proof. Compact/resume and coder escalation are
-currently unexercised WARNs. Claude has no Codex-role matrix. Read [Native
+currently unexercised WARNs. The current structural matrix has eight Codex
+roles; the dated 2026-08-09 native observation has six. A future optional
+persistent-thread probe may exercise all eight, but no native run is required
+for the current feature. Claude has no Codex-role matrix. Read [Native
 Client Acceptance](native-client-acceptance.md) before interpreting a report or
 changing a compatibility gate.
 
@@ -287,14 +290,38 @@ can create namespaces inside Docker.
 
 Codex-specific runtime notes:
 
-- `.codex/config.toml` omits the flat `[features]` block — hooks are on by default, so restating `hooks = true` is redundant — but includes `[features.multi_agent_v2]` with visible spawn metadata in the `agents` namespace so named custom-agent model and effort overrides are honored.
+- `.codex/config.toml` omits the flat `[features]` block — hooks are on by default, so restating `hooks = true` is redundant — but includes `[features.multi_agent_v2]` with visible spawn metadata in the `agents` namespace so named custom-agent model and effort profiles are honored.
 - `.codex/config.toml` leaves the interactive session model and reasoning effort unpinned; generated custom agents carry their explicit model intent.
 - `.codex/config.toml` sets the documented `agents.max_concurrent_threads_per_session = 6`, never emits the legacy `agents.max_threads`, and omits `agents.enabled` because its documented default is `true`.
 - `.codex/config.toml` retains `max_depth = 1` as a separate protected removal candidate to keep custom-agent fan-out bounded (the reviewer runs its own passes, so no second nesting level is needed).
 - `.codex/config.toml` includes one `[[skills.config]]` entry per skill whose `path` points at the skill's `SKILL.md` file (`../.claude/skills/<name>/SKILL.md`), matching Codex's documented skill registration.
 - `.codex/hooks.json` wires the documented `PreCompact` event (alongside SessionStart/PreToolUse/PostToolUse/Stop).
 - `.codex/hooks.json` uses the narrow native-edit, ordered-Bash, and wildcard-observability matcher groups; it must not send every tool through the mutation guard.
-- `.codex/agents/*.toml` files are project-scoped custom agents and must define `name`, `description`, `model`, `model_reasoning_effort`, and `developer_instructions`; model and effort must match canonical `agent.yaml` metadata. Each instruction body has one generated delimiter and the exact transformed shared prompt, with no runtime read of a Claude-native agent file. Per-agent MCP and skill overrides are omitted, so the trusted project config supplies the shared registrations. The validator checks structural parity and records actual sizes; native probes, not a static size threshold, must establish delivery without truncation.
+- `.codex/agents/*.toml` files are project-scoped custom agents and must define
+  `name`, `description`, `model`, `model_reasoning_effort`, and
+  `developer_instructions`; model and effort must match canonical `agent.yaml`
+  metadata. Codex has eight files: the six universal agents plus Codex-only
+  `luna_coder` and `sol_coder`. Claude and Copilot retain only the universal
+  six.
+- Each Codex instruction body has one generated delimiter and the exact
+  transformed role prompt, with no runtime read of a Claude-native agent file.
+  Normal Codex supplements append once to their own prompt. The two derived
+  coders use one-level composition: transformed `coder` base, one literal role
+  delimiter, then their supplement. Per-agent MCP and skill overrides are
+  omitted, so the trusted project config supplies the shared registrations.
+  The validator checks exact composition and records actual sizes; native
+  probes, not a static threshold, must establish delivery without truncation.
+- The current model/effort matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
+  coder Terra/high, reviewer Sol/high, documenter Luna/medium, verifier
+  Luna/low, `luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. The named graph
+  is exactly `luna_coder -> coder -> sol_coder`; it uses no spawn-time model or
+  effort override, no same-tier retry, and no successor after Sol.
+- Only the Codex orchestrator receives the bounded-routing supplement. It
+  validates the packet and five Luna-selection conditions, structured blocker,
+  preservation of prior work, and four-category failure attribution. Only an
+  implementation-attributable Terra failure advances automatically to Sol.
+  Environment and baseline failures stop escalation; indeterminate evidence
+  returns to orchestrator judgment.
 - `.claude/skills/*/SKILL.md` stores the shared skills used by Codex, Claude, and Copilot.
 - `.claude/review-profiles/*.md` stores the unified reviewer checklists.
 - `.codex/hooks.json` uses event groups with nested `hooks` arrays.
@@ -308,3 +335,6 @@ this bootstrap repository, the root `.codex/config.toml` is protected tracked
 authoring, so a dogfood refresh preserves it while it updates generated sibling
 adapters. The protected V2 shim is not removed based on parsing or static
 validation alone. See the [dated Codex routing compatibility record](2026-08-08-codex-routing-compatibility.md): repeated trusted-project, six-role native probes on two supported versions are required before removing the shim; `max_depth` has its own removal gate. Six-role routing was verified on 2026-08-09 with the shim present.
+Those statements describe the preserved compatibility gate and historical
+evidence. They do not claim that the two current Codex-only roles have been run
+natively.
