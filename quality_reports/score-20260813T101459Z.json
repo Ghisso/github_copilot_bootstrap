@@ -1,0 +1,26 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": "scripts",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "867 passed in 50.44s",
+  "mypy_summary": "Success: no issues found in 8 source files",
+  "deductions": [],
+  "generated_at": "2026-08-13T10:16:30Z",
+  "branch": "codex-luna-coder-routing_implementation",
+  "head_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "base_ref": "dev",
+  "merge_base_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "phase": "2026-08-13_phase-A-codex-agent-target-scoping",
+  "dirty": true,
+  "content_hash": "9af29a10ae458a1fcc9f62df47ae249cbf7fc58f",
+  "changed_files": [
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/schemas/agent.schema.json",
+    "tests/test_validate_targets.py"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-13T10:17:55Z",
+  "branch": "codex-luna-coder-routing_implementation",
+  "head_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "base_ref": "dev",
+  "merge_base_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "phase": "2026-08-13_phase-A-codex-agent-target-scoping",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "9af29a10ae458a1fcc9f62df47ae249cbf7fc58f",
+  "changed_files": [
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/schemas/agent.schema.json",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

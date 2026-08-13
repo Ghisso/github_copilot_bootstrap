@@ -411,3 +411,8 @@
   arbitrary external cache path was harmless until quarantine started renaming
   directories; the remediation mechanism defines how far ownership may extend.
   Scope a renameable/writable location to what the tool created itself.
+- [LEARN:architecture] A canonical metadata loader is authoritative only when it
+  validates every field a renderer consumes, not merely the new field that
+  motivated the loader. Preserve historical optional defaults explicitly and
+  exercise every valid target subset through real renderers; helper-only tests
+  miss broken cross-target references and late renderer type failures.
