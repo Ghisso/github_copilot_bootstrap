@@ -427,3 +427,8 @@
   assert complete enums and behavioral clauses independently, render every
   target from current source in isolation tests, and use normalized patterns
   for prohibited concept families whose wording can vary.
+- [LEARN:tests] An exact policy-list contract must consume its entire bounded
+  section. Extracting only matching bullets can silently ignore extra entries,
+  alternate Markdown markers, or stray prose; compare a normalized complete
+  section or reject every unmatched span, then mutate each position and marker
+  style adversarially.

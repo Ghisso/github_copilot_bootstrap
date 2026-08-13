@@ -3,8 +3,8 @@ name: 2026-08-13_phase-D-codex-routing-failure-attribution-and-validation
 type: small-plan
 parent_plan: codex-luna-coder-routing
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-13_codex-luna-routing-phase-d.md
 ---
 
 # Small Plan: 2026-08-13_phase-D-codex-routing-failure-attribution-and-validation
