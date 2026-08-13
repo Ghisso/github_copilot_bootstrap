@@ -11,7 +11,7 @@ phases:
   - 2026-08-13_phase-C-codex-orchestrator-coder-routing
   - 2026-08-13_phase-D-codex-routing-failure-attribution-and-validation
   - 2026-08-13_phase-E-codex-routing-documentation-and-native-bookkeeping
-current_phase: 2026-08-13_phase-C-codex-orchestrator-coder-routing
+current_phase: 2026-08-13_phase-D-codex-routing-failure-attribution-and-validation
 ---
 
 # Big Plan: codex-luna-coder-routing
