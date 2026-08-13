@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-13T11:23:33Z",
+  "branch": "codex-luna-coder-routing_implementation",
+  "head_sha": "fd66a5c0f6ede5127a1e93532e65a6dd54674b71",
+  "base_ref": "dev",
+  "merge_base_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "phase": "2026-08-13_phase-B-codex-luna-sol-coder-agents",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "ee2c4baf55aa9bd4f6706cf9c2c22ce41f8df29d",
+  "changed_files": [
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/coder/agent.yaml",
+    "shared/agents/luna_coder/agent.yaml",
+    "shared/agents/luna_coder/prompt.openai-codex.md",
+    "shared/agents/sol_coder/agent.yaml",
+    "shared/agents/sol_coder/prompt.openai-codex.md",
+    "shared/schemas/agent.schema.json",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

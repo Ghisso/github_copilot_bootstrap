@@ -416,3 +416,9 @@
   motivated the loader. Preserve historical optional defaults explicitly and
   exercise every valid target subset through real renderers; helper-only tests
   miss broken cross-target references and late renderer type failures.
+- [LEARN:architecture] When a custom Codex agent must pin a model and effort,
+  represent it as a named, statically generated agent rather than a runtime
+  model override. Keep shared implementation behavior in one base prompt,
+  compose only a bounded role supplement, and test the rendered composition
+  against an independent literal oracle so generator constants cannot mask
+  drift.
