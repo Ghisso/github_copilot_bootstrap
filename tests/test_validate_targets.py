@@ -44,6 +44,8 @@ from validate_targets import (  # noqa: E402
     CONTEXT_MODE_PINNED_VERSION,
     POLICY_SCOPE_FIXTURES,
     codex_agent_instruction_errors,
+    codex_orchestrator_escalation_errors,
+    codex_orchestrator_routing_errors,
     claude_rule_paths,
     codex_config_contract_errors,
     copilot_instruction_paths,
@@ -722,6 +724,103 @@ def test_codex_coder_specialist_metadata_and_supplements_are_exact() -> None:
         assert clause in normalized_sol_supplement
 
 
+def test_codex_orchestrator_routing_is_self_contained_and_target_isolated(
+    tmp_path: Path,
+) -> None:
+    """The named recovery route exists only in Codex's composed orchestrator prompt."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    orchestrator, orchestrator_dir = agents_by_id["orchestrator"]
+    supplement = (orchestrator_dir / "prompt.openai-codex.md").read_text(
+        encoding="utf-8"
+    )
+    rendered_codex = tomllib.loads(render_codex_agent_adapter(orchestrator))[
+        "developer_instructions"
+    ]
+
+    assert "--- Codex role supplement: orchestrator ---" in rendered_codex
+    assert rendered_codex.count("--- Codex role supplement: orchestrator ---") == 1
+    assert supplement.strip() in rendered_codex
+    assert codex_orchestrator_routing_errors(rendered_codex) == []
+    assert codex_orchestrator_escalation_errors(rendered_codex) == []
+    normalized_codex = " ".join(rendered_codex.split())
+    for clause in (
+        "Before editing where possible, `luna_coder` validates the packet.",
+        "it returns only this prompt-enforced escalation object; this is not a native typed protocol:",
+    ):
+        assert clause in normalized_codex
+    escalation_match = re.search(
+        r"```json\n(?P<object>.*?)\n```", rendered_codex, flags=re.DOTALL
+    )
+    assert escalation_match is not None
+    assert json.loads(escalation_match["object"]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["..."],
+        "needed": ["..."],
+    }
+    reason_section = rendered_codex.split("`reason` is exactly one of ", 1)[1].split(
+        "`workspace_changed`", 1
+    )[0]
+    assert set(re.findall(r"`([^`]+)`", reason_section)) == {
+        "unresolved-design-decision",
+        "unknown-root-cause",
+        "scope-not-bounded",
+        "missing-interface-contract",
+        "security-or-migration-decision",
+        "ownership-unclear",
+    }
+    invalid_reason_values = ('"other"', "[]", "{}", "7", "null")
+    for mutated in (
+        rendered_codex.replace("Before editing where possible", "Before editing", 1),
+        *(
+            rendered_codex.replace(
+                '"reason": "unknown-root-cause"', f'"reason": {value}', 1
+            )
+            for value in invalid_reason_values
+        ),
+        rendered_codex.replace(
+            "`ownership-unclear`.", "`ownership-unclear`, or `other`.", 1
+        ),
+    ):
+        assert codex_orchestrator_escalation_errors(mutated)
+    assert any(
+        "missing Codex orchestrator routing fragment" in error
+        for error in codex_orchestrator_routing_errors(
+            rendered_codex.replace(
+                "`luna_coder` for that step", "`bounded_coder` for that step", 1
+            )
+        )
+    )
+    for prohibited in (
+        "model_reasoning_effort",
+        "spawn override",
+        "spawn-time model override",
+        "spawn-time effort override",
+        "per-call model override",
+        "per-call Luna-specific override",
+        "Luna/model-specific override",
+    ):
+        assert any(
+            "obsolete Codex" in error and "override" in error
+            for error in codex_orchestrator_routing_errors(
+                f"{rendered_codex}\n{prohibited}"
+            )
+        )
+
+    target_generator.render_claude_agents(tmp_path)
+    claude = (tmp_path / ".claude" / "agents" / "orchestrator.md").read_text(
+        encoding="utf-8"
+    )
+    copilot = render_github_agent_adapter(orchestrator, orchestrator_dir)
+    for instructions in (claude, copilot):
+        assert "luna_coder" not in instructions
+        assert "sol_coder" not in instructions
+        assert "Codex Coder Routing Supplement" not in instructions
+
+
 @pytest.mark.parametrize(
     ("targets", "model_intent", "field"),
     (
@@ -1018,6 +1117,28 @@ def test_agent_loader_rejects_transformed_or_whitespace_copied_base_prompt(
         load_shared_agents(agents_root)
 
 
+def test_agent_loader_allows_only_codex_normal_agent_supplements(
+    tmp_path: Path,
+) -> None:
+    """A normal prompt can add Codex-only guidance without leaking to other targets."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-sol", "effort": "xhigh"}},
+    )
+    supplement = agent_dir / "prompt.openai-codex.md"
+    supplement.write_text("Codex-only supplement.\n", encoding="utf-8")
+    assert load_shared_agents(agents_root)[0][0]["id"] == "codex-only"
+
+    metadata = json.loads((agent_dir / "agent.yaml").read_text(encoding="utf-8"))
+    metadata["targets"] = ["claude-code"]
+    metadata["model_intent"] = {"claude-code": {"model": "sonnet"}}
+    (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError, match="requires Codex eligibility"):
+        load_shared_agents(agents_root)
+
+
 @pytest.mark.parametrize(
     ("field", "value", "expected"),
     (
@@ -1284,20 +1405,24 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
         rendered = render_codex_agent_adapter(agent)
         instructions = tomllib.loads(rendered)["developer_instructions"]
         prompt_base = agent.get("prompt_base")
-        if isinstance(prompt_base, str):
+        supplement_path = agent_dir / "prompt.openai-codex.md"
+        if isinstance(prompt_base, str) or supplement_path.exists():
             base_prompt = transform_agent_text(
-                (REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md").read_text(
-                    encoding="utf-8"
-                ),
+                (
+                    REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md"
+                    if isinstance(prompt_base, str)
+                    else agent_dir / "prompt.md"
+                ).read_text(encoding="utf-8"),
                 "openai-codex",
             ).strip()
             supplement = transform_agent_text(
-                (agent_dir / "prompt.openai-codex.md").read_text(encoding="utf-8"),
+                supplement_path.read_text(encoding="utf-8"),
                 "openai-codex",
             ).strip()
             role_delimiter = {
                 "luna_coder": "--- Codex role supplement: luna_coder ---",
                 "sol_coder": "--- Codex role supplement: sol_coder ---",
+                "orchestrator": "--- Codex role supplement: orchestrator ---",
             }[agent["id"]]
             expected_body = f"{base_prompt}\n\n{role_delimiter}\n\n{supplement}"
         else:
@@ -1314,7 +1439,7 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
         assert "Before doing the task, read `.claude/agents/" not in instructions
         assert "[mcp_servers." not in rendered
         assert codex_agent_instruction_errors(agent, instructions) == []
-        if "prompt_base" in agent:
+        if isinstance(prompt_base, str) or supplement_path.exists():
             assert instructions.count(role_delimiter) == 1
         else:
             assert "--- Codex role supplement:" not in instructions

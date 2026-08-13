@@ -590,10 +590,20 @@ def validate_prompt_composition(
         if prompt_base is None:
             if not prompt_path.is_file():
                 raise ValueError(f"{agent_dir}: missing canonical prompt.md")
-            if supplement_path.exists():
+            if supplement_path.exists() and "openai-codex" not in agent["targets"]:
                 raise ValueError(
-                    f"{agent_dir}: prompt.openai-codex.md requires prompt_base"
+                    f"{agent_dir}: prompt.openai-codex.md requires Codex eligibility"
                 )
+            if supplement_path.exists():
+                supplement = supplement_path.read_text(encoding="utf-8")
+                if not supplement.strip():
+                    raise ValueError(
+                        f"{agent_dir}: prompt.openai-codex.md must not be empty"
+                    )
+                if "--- Codex role supplement:" in supplement:
+                    raise ValueError(
+                        f"{agent_dir}: prompt.openai-codex.md must not contain a role-supplement delimiter"
+                    )
             continue
 
         base_dir = agents_by_id[prompt_base][1]
@@ -780,19 +790,19 @@ def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
     """Return the exact target-transformed, self-contained Codex prompt body."""
     agent_dir = REPO_ROOT / "shared" / "agents" / agent["id"]
     prompt_base = agent.get("prompt_base")
-    if not isinstance(prompt_base, str):
-        return transform_agent_text(
-            (agent_dir / "prompt.md").read_text(encoding="utf-8"), "openai-codex"
-        ).strip()
+    prompt_path = (
+        REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md"
+        if isinstance(prompt_base, str)
+        else agent_dir / "prompt.md"
+    )
     base_prompt = transform_agent_text(
-        (REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md").read_text(
-            encoding="utf-8"
-        ),
-        "openai-codex",
+        prompt_path.read_text(encoding="utf-8"), "openai-codex"
     ).strip()
+    supplement_path = agent_dir / "prompt.openai-codex.md"
+    if not supplement_path.exists():
+        return base_prompt
     supplement = transform_agent_text(
-        (agent_dir / "prompt.openai-codex.md").read_text(encoding="utf-8"),
-        "openai-codex",
+        supplement_path.read_text(encoding="utf-8"), "openai-codex"
     ).strip()
     delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(agent_id=agent["id"])
     return f"{base_prompt}\n\n{delimiter}\n\n{supplement}"

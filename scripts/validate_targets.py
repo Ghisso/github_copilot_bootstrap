@@ -1347,7 +1347,10 @@ def codex_agent_instruction_errors(
     if instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) != 1:
         errors.append("must contain exactly one stable prompt delimiter")
     prompt_base = agent.get("prompt_base")
-    if isinstance(prompt_base, str):
+    supplement_path = (
+        REPO_ROOT / "shared" / "agents" / str(agent["id"]) / "prompt.openai-codex.md"
+    )
+    if isinstance(prompt_base, str) or supplement_path.exists():
         supplement_delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(
             agent_id=agent["id"]
         )
@@ -1359,6 +1362,139 @@ def codex_agent_instruction_errors(
         errors.append("body must exactly match its transformed shared prompt")
     if "Before doing the task, read `.claude/agents/" in instructions:
         errors.append("must not retain the legacy Claude-native runtime read")
+    return errors
+
+
+CODEX_ORCHESTRATOR_ROUTING_REQUIRED_FRAGMENTS = (
+    "Do not run extra discovery solely to qualify a packet for Luna.",
+    "Goal and plan-step identity.",
+    "Relevant files, symbols, entry points, patterns, or failing checks.",
+    "Approved constraints and must-not-change behavior.",
+    "Rejected approaches when relevant.",
+    "Required skills.",
+    "Acceptance criteria and verification commands.",
+    "Freedom for the coder to choose the smallest maintainable local",
+    "Exclude broad conversation history and raw discovery output.",
+    "Choose `luna_coder` for that step only when all of the following are established:",
+    "1. A clear desired outcome.",
+    "2. Known relevant files, symbols, entry points, or failing checks.",
+    "3. Known constraints and must-not-change behavior.",
+    "4. Objective acceptance criteria and verification commands.",
+    "5. No unresolved architecture, interface, root-cause, migration, security, or",
+    "Otherwise choose `coder` directly. Decide independently for every",
+    '"status": "escalate"',
+    '"reason": "unknown-root-cause"',
+    '"workspace_changed": false',
+    '"evidence": ["..."]',
+    '"needed": ["..."]',
+    "unresolved-design-decision",
+    "unknown-root-cause",
+    "scope-not-bounded",
+    "missing-interface-contract",
+    "security-or-migration-decision",
+    "ownership-unclear",
+    "`workspace_changed` accurately reports whether Luna changed the workspace.",
+    "Use the named recovery path once per tier.",
+    "Luna structured blocker or",
+    "routes to `coder` with the original packet, blocker or",
+    "`coder` inspects and takes ownership of the existing diff; it does not assume a",
+    "clean workspace or blindly restart.",
+    "routes once to `sol_coder` with all prior evidence and the current diff.",
+    "A Sol failure stops the loop and reports to the user.",
+    "Never retry the same tier, jump",
+    "from Luna directly to Sol, introduce Luna/max, or let a subagent choose its",
+    "concise `initial-coder`, `fallback`, and `reason` facts.",
+    "Do not create a routing",
+    "database, telemetry file, cost tracker, or merge gate.",
+)
+CODEX_ORCHESTRATOR_ROUTING_FORBIDDEN_LITERALS = (
+    "model_reasoning_effort",
+    "gpt-5.6-terra",
+    "gpt-5.6-sol",
+)
+CODEX_ORCHESTRATOR_ROUTING_OVERRIDE_PATTERN = re.compile(
+    r"\b(?:spawn(?: time)?|per call)(?: (?:luna|model|effort)(?: specific)?)* overrides?\b"
+    r"|\b(?:luna|model|effort)(?: specific)? overrides?\b"
+)
+CODEX_LUNA_ESCALATION_REASONS = {
+    "unresolved-design-decision",
+    "unknown-root-cause",
+    "scope-not-bounded",
+    "missing-interface-contract",
+    "security-or-migration-decision",
+    "ownership-unclear",
+}
+
+
+def codex_orchestrator_routing_errors(instructions: str) -> list[str]:
+    """Return missing or obsolete Codex-only coder-routing contract errors."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex orchestrator routing fragment: {fragment}"
+        for fragment in CODEX_ORCHESTRATOR_ROUTING_REQUIRED_FRAGMENTS
+        if fragment not in normalized_instructions
+    ]
+    normalized_terms = re.sub(r"[^a-z0-9]+", " ", normalized_instructions.lower())
+    errors.extend(
+        f"must not use obsolete Codex spawn override: {literal}"
+        for literal in CODEX_ORCHESTRATOR_ROUTING_FORBIDDEN_LITERALS
+        if literal in normalized_instructions.lower()
+    )
+    if CODEX_ORCHESTRATOR_ROUTING_OVERRIDE_PATTERN.search(normalized_terms):
+        errors.append(
+            "must not use obsolete Codex spawn or per-call override terminology"
+        )
+    return [*errors, *codex_orchestrator_escalation_errors(instructions)]
+
+
+def codex_orchestrator_escalation_errors(instructions: str) -> list[str]:
+    """Return errors for the exact prompt-enforced Luna escalation contract."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex Luna escalation clause: {clause}"
+        for clause in (
+            "Before editing where possible, `luna_coder` validates the packet.",
+            "it returns only this prompt-enforced escalation object; this is not a native typed protocol:",
+        )
+        if clause not in normalized_instructions
+    ]
+    escalation_match = re.search(
+        r"```json\s*(?P<object>\{.*?\})\s*```", instructions, flags=re.DOTALL
+    )
+    if escalation_match is None:
+        return [*errors, "missing Codex Luna escalation JSON object"]
+    try:
+        escalation = json.loads(escalation_match["object"])
+    except json.JSONDecodeError:
+        return [*errors, "invalid Codex Luna escalation JSON object"]
+    expected_keys = {"status", "reason", "workspace_changed", "evidence", "needed"}
+    if not isinstance(escalation, dict) or set(escalation) != expected_keys:
+        errors.append("Codex Luna escalation JSON must contain exactly five fields")
+        return errors
+    if escalation["status"] != "escalate":
+        errors.append("Codex Luna escalation status must be 'escalate'")
+    reason = escalation["reason"]
+    if not isinstance(reason, str) or reason not in CODEX_LUNA_ESCALATION_REASONS:
+        errors.append("Codex Luna escalation reason must be an allowed value")
+    if not isinstance(escalation["workspace_changed"], bool):
+        errors.append("Codex Luna escalation workspace_changed must be boolean")
+    if not isinstance(escalation["evidence"], list) or not isinstance(
+        escalation["needed"], list
+    ):
+        errors.append("Codex Luna escalation evidence and needed must be lists")
+    reasons_match = re.search(
+        r"`reason` is exactly one of (?P<reasons>.*?)\.\s+`workspace_changed`",
+        instructions,
+        flags=re.DOTALL,
+    )
+    if (
+        reasons_match is None
+        or set(re.findall(r"`([^`]+)`", reasons_match["reasons"]))
+        != CODEX_LUNA_ESCALATION_REASONS
+    ):
+        errors.append(
+            "Codex Luna escalation reason enum must contain exactly six values"
+        )
     return errors
 
 
@@ -1446,6 +1582,12 @@ def validate_agents(errors: list[str]) -> None:
             check(
                 (agent_dir / "prompt.md").exists(),
                 f"{agent_id} missing canonical prompt.md",
+                errors,
+            )
+        if agent_id == "orchestrator":
+            check(
+                (agent_dir / "prompt.openai-codex.md").exists(),
+                "orchestrator missing Codex routing supplement",
                 errors,
             )
         check(
@@ -1689,6 +1831,11 @@ def validate_agents(errors: list[str]) -> None:
             f"generated Codex {error}: {path}"
             for error in reporting_prompt_errors(path.stem, instructions)
         )
+        if path.stem == "orchestrator":
+            errors.extend(
+                f"Codex orchestrator {error}: {path}"
+                for error in codex_orchestrator_routing_errors(instructions)
+            )
         if "tool-routing.instructions.md" in instructions:
             check(
                 "[mcp_servers." not in text,
