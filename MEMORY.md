@@ -432,3 +432,7 @@
   alternate Markdown markers, or stray prose; compare a normalized complete
   section or reject every unmatched span, then mutate each position and marker
   style adversarially.
+- [LEARN:documentation] Machine-checked documentation needs bounded, complete
+  parsers and independent oracles. Preserve list order/cardinality before set
+  comparison, reject every unexpected or malformed table row, and pin full
+  documented matrices independently of the production constants they verify.
