@@ -21,7 +21,6 @@ import generate_targets as target_generator  # noqa: E402
 
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
-    SUPPORTED_AGENT_TARGETS,
     load_shared_agents,
     parse_policy,
     render_claude_rule_adapter,
@@ -32,11 +31,13 @@ from generate_targets import (  # noqa: E402
     render_root_guidance,
     shared_agents,
     shared_policies,
-    transform_target_paths,
     transform_agent_text,
+    transform_target_paths,
 )
 from validate_targets import (  # noqa: E402
     CODEX_CODER_ESCALATION,
+    CODEX_ESCALATION_CHAIN,
+    CODEX_AGENT_MODEL_INTENTS,
     CODEX_ROLE_MODEL_INTENTS,
     CONTEXT_MODE_ALLOWED_TOOLS,
     CONTEXT_MODE_BLOCKED_TOOLS,
@@ -105,7 +106,13 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
         "documenter": ("gpt-5.6-luna", "medium"),
         "verifier": ("gpt-5.6-luna", "low"),
     }
-    assert CODEX_CODER_ESCALATION == ("gpt-5.6-sol", "xhigh")
+    assert CODEX_CODER_ESCALATION == "sol_coder"
+    assert CODEX_ESCALATION_CHAIN == {
+        "luna_coder": "coder",
+        "coder": "sol_coder",
+    }
+    assert CODEX_AGENT_MODEL_INTENTS["luna_coder"] == ("gpt-5.6-luna", "xhigh")
+    assert CODEX_AGENT_MODEL_INTENTS["sol_coder"] == ("gpt-5.6-sol", "xhigh")
 
     for key, value, expected_error in (
         ("max_threads", 6, "legacy agents.max_threads"),
@@ -565,11 +572,10 @@ def write_scoped_agent(
 
 
 def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
-    """Existing agent metadata remains eligible for every target by default."""
+    """Universal agents stay universal while Codex gains two scoped specialists."""
     agents = shared_agents()
 
-    assert len(agents) == 6
-    assert {agent["id"] for agent, _agent_dir in agents} == {
+    universal_agents = {
         "coder",
         "documenter",
         "orchestrator",
@@ -577,10 +583,143 @@ def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
         "reviewer",
         "verifier",
     }
-    for target in SUPPORTED_AGENT_TARGETS:
-        assert {agent["id"] for agent, _agent_dir in shared_agents(target)} == {
-            agent["id"] for agent, _agent_dir in agents
+    assert len(agents) == 8
+    assert {agent["id"] for agent, _agent_dir in agents} == {
+        *universal_agents,
+        "luna_coder",
+        "sol_coder",
+    }
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("github-copilot")
+    } == universal_agents
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("claude-code")
+    } == universal_agents
+    assert {agent["id"] for agent, _agent_dir in shared_agents("openai-codex")} == {
+        *universal_agents,
+        "luna_coder",
+        "sol_coder",
+    }
+
+
+def test_codex_coder_specialist_metadata_and_supplements_are_exact() -> None:
+    """Luna and Sol remain constrained Codex-only derivatives of coder."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    expected_capabilities = [
+        "edit",
+        "execute",
+        "read",
+        "search",
+        "todo",
+        "vscode",
+        "web",
+    ]
+    coder, _coder_dir = agents_by_id["coder"]
+    assert coder["capabilities"] == expected_capabilities
+    assert coder["model_intent"]["openai-codex"] == {
+        "model": "gpt-5.6-terra",
+        "effort": "high",
+        "escalate_to": "sol_coder",
+    }
+
+    luna, luna_dir = agents_by_id["luna_coder"]
+    sol, sol_dir = agents_by_id["sol_coder"]
+    expected_metadata_fields = {
+        "id",
+        "description",
+        "role_type",
+        "visibility",
+        "capabilities",
+        "delegates",
+        "targets",
+        "prompt_base",
+        "model_intent",
+    }
+    for specialist in (luna, sol):
+        assert set(specialist) == expected_metadata_fields
+        assert specialist["role_type"] == "coder"
+        assert specialist["visibility"] == "hidden"
+        assert specialist["capabilities"] == expected_capabilities
+        assert specialist["delegates"] == []
+        assert specialist["prompt_base"] == "coder"
+        assert specialist["targets"] == ("openai-codex",)
+
+    assert luna["id"] == "luna_coder"
+    assert luna["description"] == (
+        "Bounded implementation specialist for deterministic Codex orchestration. "
+        "Hidden is an internal orchestration convention and does not claim native "
+        "Codex UI invisibility."
+    )
+    assert luna["model_intent"] == {
+        "openai-codex": {
+            "model": "gpt-5.6-luna",
+            "effort": "xhigh",
+            "escalate_to": "coder",
         }
+    }
+    assert sol["id"] == "sol_coder"
+    assert sol["description"] == (
+        "Final recovery implementation specialist for deterministic Codex "
+        "orchestration. Hidden is an internal orchestration convention and does "
+        "not claim native Codex UI invisibility."
+    )
+    assert sol["model_intent"] == {
+        "openai-codex": {"model": "gpt-5.6-sol", "effort": "xhigh"}
+    }
+
+    luna_supplement = (luna_dir / "prompt.openai-codex.md").read_text(encoding="utf-8")
+    normalized_luna_supplement = " ".join(luna_supplement.split())
+    for clause in (
+        "Before editing, validate the supplied implementation packet where possible.",
+        "a clear outcome and plan-step identity;",
+        "relevant files, symbols, entry points, patterns, or failing checks;",
+        "approved constraints and must-not-change behavior;",
+        "rejected approaches when relevant; required skills;",
+        "objective acceptance criteria and verification commands;",
+        "freedom to choose the smallest maintainable local implementation body, decomposition, and algorithm.",
+        "Do not invent missing architecture, interfaces, root cause, migrations, security decisions, ownership, or unrelated refactors.",
+        "If the packet is unsafe or insufficient to implement, return only this escalation object:",
+        "`workspace_changed` must accurately report whether this agent changed the workspace.",
+        "`evidence` and `needed` must be concrete lists.",
+        "This is a prompt-enforced handoff object, not a native typed protocol.",
+    ):
+        assert clause in normalized_luna_supplement
+    escalation_match = re.search(
+        r"```json\n(?P<object>.*?)\n```", luna_supplement, flags=re.DOTALL
+    )
+    assert escalation_match is not None
+    assert json.loads(escalation_match["object"]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["concrete evidence"],
+        "needed": ["needed decision or evidence"],
+    }
+    reason_section = luna_supplement.split("`reason` must be one of ", 1)[1].split(
+        "`workspace_changed`", 1
+    )[0]
+    assert set(re.findall(r"`([^`]+)`", reason_section)) == {
+        "unresolved-design-decision",
+        "unknown-root-cause",
+        "scope-not-bounded",
+        "missing-interface-contract",
+        "security-or-migration-decision",
+        "ownership-unclear",
+    }
+
+    sol_supplement = (sol_dir / "prompt.openai-codex.md").read_text(encoding="utf-8")
+    normalized_sol_supplement = " ".join(sol_supplement.split())
+    for clause in (
+        "Inspect the existing diff and prior verifier or reviewer failure evidence before editing.",
+        "Recover with the smallest safe change that addresses that evidence;",
+        "do not restart the phase or broaden scope.",
+        "Preserve any useful prior work and adapt it only when the evidence requires it.",
+        "stop recovery and return control to the orchestrator with the failure evidence and current diff state.",
+        "Do not loop, delegate further, or choose another successor.",
+    ):
+        assert clause in normalized_sol_supplement
 
 
 @pytest.mark.parametrize(
@@ -728,6 +867,158 @@ def test_agent_loader_accepts_approved_underscore_stable_ids(tmp_path: Path) -> 
 
 
 @pytest.mark.parametrize(
+    ("prompt_base", "base_prompt_base", "include_supplement", "expected"),
+    (
+        ("missing", None, True, "prompt_base references missing agent"),
+        ("derived", None, True, "prompt_base must not self-reference"),
+        ("base", "root", True, "prompt_base must not create multi-level inheritance"),
+        ("base", None, False, "derived Codex agents require prompt.openai-codex.md"),
+    ),
+)
+def test_agent_loader_rejects_invalid_one_level_prompt_composition(
+    tmp_path: Path,
+    prompt_base: str,
+    base_prompt_base: str | None,
+    include_supplement: bool,
+    expected: str,
+) -> None:
+    """Derived Codex prompts must have one real base and one supplement."""
+    agents_root = tmp_path / "agents"
+    base = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+        agent_id="base",
+    )
+    if base_prompt_base is not None:
+        root = write_scoped_agent(
+            agents_root,
+            ["openai-codex"],
+            {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+            agent_id="root",
+        )
+        metadata = json.loads((base / "agent.yaml").read_text(encoding="utf-8"))
+        metadata["prompt_base"] = base_prompt_base
+        (base / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+        (root / "prompt.md").write_text("Root prompt.\n", encoding="utf-8")
+
+    derived = agents_root / "derived"
+    derived.mkdir()
+    derived_metadata = {
+        "id": "derived",
+        "description": "Derived fixture.",
+        "role_type": "coder",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "delegates": [],
+        "targets": ["openai-codex"],
+        "prompt_base": prompt_base,
+        "model_intent": {"openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}},
+    }
+    (derived / "agent.yaml").write_text(json.dumps(derived_metadata), encoding="utf-8")
+    if include_supplement:
+        (derived / "prompt.openai-codex.md").write_text(
+            "Derived supplement.\n", encoding="utf-8"
+        )
+
+    with pytest.raises(ValueError, match=re.escape(expected)):
+        load_shared_agents(agents_root)
+
+
+def test_agent_loader_rejects_named_escalation_cycles(tmp_path: Path) -> None:
+    """Named Codex escalation targets cannot create a recovery loop."""
+    agents_root = tmp_path / "agents"
+    for agent_id, target_id in (("first", "second"), ("second", "first")):
+        agent_dir = write_scoped_agent(
+            agents_root,
+            ["openai-codex"],
+            {
+                "openai-codex": {
+                    "model": "gpt-5.6-terra",
+                    "effort": "high",
+                    "escalate_to": target_id,
+                }
+            },
+            agent_id=agent_id,
+        )
+        (agent_dir / "prompt.md").write_text("Prompt.\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Codex escalation cycle detected"):
+        load_shared_agents(agents_root)
+
+
+def test_agent_loader_rejects_prompt_base_cycles(tmp_path: Path) -> None:
+    """Prompt composition cycles fail before any generated prompt is read."""
+    agents_root = tmp_path / "agents"
+    for agent_id, base_id in (("first", "second"), ("second", "first")):
+        agent_dir = agents_root / agent_id
+        agent_dir.mkdir(parents=True)
+        metadata = {
+            "id": agent_id,
+            "description": "Derived fixture.",
+            "role_type": "coder",
+            "visibility": "hidden",
+            "capabilities": ["read"],
+            "delegates": [],
+            "targets": ["openai-codex"],
+            "prompt_base": base_id,
+            "model_intent": {
+                "openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}
+            },
+        }
+        (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+        (agent_dir / "prompt.openai-codex.md").write_text(
+            "Derived supplement.\n", encoding="utf-8"
+        )
+
+    with pytest.raises(ValueError, match="prompt_base cycle detected"):
+        load_shared_agents(agents_root)
+
+
+@pytest.mark.parametrize(
+    "supplement",
+    (
+        "# Header\n\nUse AGENTS.md and keep implementation focused.\n",
+        "# Header\n\nUse   AGENTS.md\n\n and\tkeep implementation\nfocused.\n",
+    ),
+    ids=("transformed-copy", "whitespace-normalized-copy"),
+)
+def test_agent_loader_rejects_transformed_or_whitespace_copied_base_prompt(
+    tmp_path: Path, supplement: str
+) -> None:
+    """A supplement cannot conceal a complete base copy behind target rewrites."""
+    agents_root = tmp_path / "agents"
+    base = write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-terra", "effort": "high"}},
+        agent_id="base",
+    )
+    (base / "prompt.md").write_text(
+        "# Header\n\nUse .github/copilot-instructions.md and keep implementation focused.\n",
+        encoding="utf-8",
+    )
+    derived = agents_root / "derived"
+    derived.mkdir()
+    metadata = {
+        "id": "derived",
+        "description": "Derived fixture.",
+        "role_type": "coder",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "delegates": [],
+        "targets": ["openai-codex"],
+        "prompt_base": "base",
+        "model_intent": {"openai-codex": {"model": "gpt-5.6-luna", "effort": "xhigh"}},
+    }
+    (derived / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    (derived / "prompt.openai-codex.md").write_text(supplement, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must not copy its full base prompt"):
+        load_shared_agents(agents_root)
+
+
+@pytest.mark.parametrize(
     ("field", "value", "expected"),
     (
         ("description", None, "description must be a non-empty string"),
@@ -753,10 +1044,10 @@ def test_agent_loader_accepts_approved_underscore_stable_ids(tmp_path: Path) -> 
                 "openai-codex": {
                     "model": "gpt-5.6-luna",
                     "effort": "low",
-                    "escalate_to": {"model": "gpt-5.6-sol"},
+                    "escalate_to": {"agent": "sol_coder"},
                 },
             },
-            "model_intent.openai-codex.escalate_to.effort must be a non-empty string",
+            "model_intent.openai-codex.escalate_to must be a non-empty string",
         ),
     ),
 )
@@ -989,12 +1280,31 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
     None
 ):
     """Codex agents are self-contained while inheriting project MCP configuration."""
-    for agent, agent_dir in shared_agents():
+    for agent, agent_dir in shared_agents("openai-codex"):
         rendered = render_codex_agent_adapter(agent)
         instructions = tomllib.loads(rendered)["developer_instructions"]
-        expected_body = transform_agent_text(
-            (agent_dir / "prompt.md").read_text(encoding="utf-8"), "openai-codex"
-        ).strip()
+        prompt_base = agent.get("prompt_base")
+        if isinstance(prompt_base, str):
+            base_prompt = transform_agent_text(
+                (REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md").read_text(
+                    encoding="utf-8"
+                ),
+                "openai-codex",
+            ).strip()
+            supplement = transform_agent_text(
+                (agent_dir / "prompt.openai-codex.md").read_text(encoding="utf-8"),
+                "openai-codex",
+            ).strip()
+            role_delimiter = {
+                "luna_coder": "--- Codex role supplement: luna_coder ---",
+                "sol_coder": "--- Codex role supplement: sol_coder ---",
+            }[agent["id"]]
+            expected_body = f"{base_prompt}\n\n{role_delimiter}\n\n{supplement}"
+        else:
+            expected_body = transform_agent_text(
+                (agent_dir / "prompt.md").read_text(encoding="utf-8"),
+                "openai-codex",
+            ).strip()
 
         assert instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) == 1
         assert (
@@ -1004,6 +1314,10 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
         assert "Before doing the task, read `.claude/agents/" not in instructions
         assert "[mcp_servers." not in rendered
         assert codex_agent_instruction_errors(agent, instructions) == []
+        if "prompt_base" in agent:
+            assert instructions.count(role_delimiter) == 1
+        else:
+            assert "--- Codex role supplement:" not in instructions
 
         legacy = (
             "This is an OpenAI Codex custom-agent adapter over the shared `.claude` basis.\n\n"

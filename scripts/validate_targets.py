@@ -22,6 +22,7 @@ from typing import TypedDict, Unpack
 from check_runtime import runtime_drift_errors
 from generate_targets import (
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    CODEX_ROLE_SUPPLEMENT_DELIMITER,
     ROOT_GUIDANCE_WORKFLOW,
     SUPPORTED_AGENT_TARGETS,
     codex_agent_metadata_header,
@@ -77,7 +78,16 @@ CODEX_ROLE_MODEL_INTENTS = {
     "documenter": ("gpt-5.6-luna", "medium"),
     "verifier": ("gpt-5.6-luna", "low"),
 }
-CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
+CODEX_SPECIALIST_MODEL_INTENTS = {
+    "luna_coder": ("gpt-5.6-luna", "xhigh"),
+    "sol_coder": ("gpt-5.6-sol", "xhigh"),
+}
+CODEX_AGENT_MODEL_INTENTS = {
+    **CODEX_ROLE_MODEL_INTENTS,
+    **CODEX_SPECIALIST_MODEL_INTENTS,
+}
+CODEX_CODER_ESCALATION = "sol_coder"
+CODEX_ESCALATION_CHAIN = {"luna_coder": "coder", "coder": "sol_coder"}
 PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
     "orchestrator's evidence packet",
     "exact artifacts, supplied evidence, approved decisions, constraints",
@@ -1336,6 +1346,15 @@ def codex_agent_instruction_errors(
         errors.append("must use the generated metadata header and stable delimiter")
     if instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) != 1:
         errors.append("must contain exactly one stable prompt delimiter")
+    prompt_base = agent.get("prompt_base")
+    if isinstance(prompt_base, str):
+        supplement_delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(
+            agent_id=agent["id"]
+        )
+        if instructions.count(supplement_delimiter) != 1:
+            errors.append("must contain exactly one derived role-supplement delimiter")
+    elif "--- Codex role supplement:" in instructions:
+        errors.append("must not contain a derived role-supplement delimiter")
     if instructions.removeprefix(expected_prefix) != expected_prompt:
         errors.append("body must exactly match its transformed shared prompt")
     if "Before doing the task, read `.claude/agents/" in instructions:
@@ -1364,11 +1383,11 @@ def validate_agents(errors: list[str]) -> None:
         errors.append(str(error))
         return
     planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
-    orchestrator_prompt = read(
-        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
-    )
     errors.extend(
-        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+        planner_supervision_contract_errors(
+            planner_prompt,
+            read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"),
+        )
     )
     for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
         errors.extend(
@@ -1382,7 +1401,7 @@ def validate_agents(errors: list[str]) -> None:
     expected_codex_intents: dict[str, tuple[object, object]] = {}
     expected_claude_intents: dict[str, tuple[object, object]] = {}
     expected_github_models: dict[str, object] = {}
-    codex_escalations: dict[str, tuple[object, object]] = {}
+    codex_escalations: dict[str, object] = {}
     agents_by_id = {agent["id"]: agent for agent, _agent_dir in canonical_agents}
     agent_dirs_by_id = {agent["id"]: agent_dir for agent, agent_dir in canonical_agents}
 
@@ -1406,47 +1425,29 @@ def validate_agents(errors: list[str]) -> None:
             expected_codex_intents[agent_id] = (model, effort)
             escalate_to = codex_intent.get("escalate_to")
             if escalate_to is not None:
-                # Declarative-only: not consumed by the TOML emitter (Codex spawn-time
-                # overrides make a second generated adapter unnecessary), so its only
-                # contract is with the orchestrator prompt text that actually acts on
-                # it. Restricted to `coder` today; widen this check deliberately if
-                # another role grows an escalation lane.
                 check(
-                    agent_id == "coder",
-                    f"{agent_id} defines escalate_to but only coder is expected to",
+                    isinstance(escalate_to, str),
+                    f"{agent_id} escalate_to must name an agent ID",
                     errors,
                 )
-                check(
-                    isinstance(escalate_to, dict),
-                    f"{agent_id} escalate_to must be an object",
-                    errors,
-                )
-                if not isinstance(escalate_to, dict):
-                    continue
-                esc_model = escalate_to.get("model")
-                esc_effort = escalate_to.get("effort")
-                codex_escalations[agent_id] = (esc_model, esc_effort)
-                validate_codex_model_contract(
-                    f"{agent_id} escalate_to", esc_model, esc_effort, errors
-                )
-                check(
-                    (esc_model, esc_effort) != (model, effort),
-                    f"{agent_id} escalate_to must differ from its base Codex tier",
-                    errors,
-                )
-                check(
-                    isinstance(esc_model, str)
-                    and esc_model in orchestrator_prompt
-                    and isinstance(esc_effort, str)
-                    and esc_effort in orchestrator_prompt,
-                    "orchestrator prompt.md must name the coder escalate_to model/effort verbatim, or it will silently drift from agent.yaml",
-                    errors,
-                )
-        check(
-            (agent_dir / "prompt.md").exists(),
-            f"{agent_id} missing canonical prompt.md",
-            errors,
-        )
+                codex_escalations[agent_id] = escalate_to
+        if "prompt_base" in data:
+            check(
+                not (agent_dir / "prompt.md").exists(),
+                f"{agent_id} derived prompt must not copy canonical prompt.md",
+                errors,
+            )
+            check(
+                (agent_dir / "prompt.openai-codex.md").exists(),
+                f"{agent_id} derived prompt missing Codex supplement",
+                errors,
+            )
+        else:
+            check(
+                (agent_dir / "prompt.md").exists(),
+                f"{agent_id} missing canonical prompt.md",
+                errors,
+            )
         check(
             not (agent_dir / "targets").exists(),
             f"{agent_id} must not keep target-specific prompt forks",
@@ -1465,19 +1466,35 @@ def validate_agents(errors: list[str]) -> None:
             )
 
     check(
-        expected_codex_intents == CODEX_ROLE_MODEL_INTENTS,
-        "canonical Codex role model/effort mappings drifted from the six-role contract",
+        expected_codex_intents == CODEX_AGENT_MODEL_INTENTS,
+        "canonical Codex model/effort mappings drifted from the eight-agent contract",
         errors,
     )
     check(
-        codex_escalations == {"coder": CODEX_CODER_ESCALATION},
-        "canonical Codex escalation contract must contain only coder Sol/xhigh",
+        codex_escalations == CODEX_ESCALATION_CHAIN,
+        "canonical Codex escalation contract must be luna_coder -> coder -> sol_coder",
         errors,
     )
     expected_agent_ids = {
         target: {agent["id"] for agent, _agent_dir in shared_agents(target)}
         for target in SUPPORTED_AGENT_TARGETS
     }
+    universal_agent_ids = set(CODEX_ROLE_MODEL_INTENTS)
+    check(
+        expected_agent_ids["github-copilot"] == universal_agent_ids,
+        "GitHub Copilot must retain exactly the six universal agents",
+        errors,
+    )
+    check(
+        expected_agent_ids["claude-code"] == universal_agent_ids,
+        "Claude Code must retain exactly the six universal agents",
+        errors,
+    )
+    check(
+        expected_agent_ids["openai-codex"] == set(CODEX_AGENT_MODEL_INTENTS),
+        "Codex must contain exactly six universal agents plus luna_coder and sol_coder",
+        errors,
+    )
 
     generated_github_agents = sorted(
         (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
@@ -5392,8 +5409,9 @@ def validate_docs_parity(errors: list[str]) -> None:
         errors,
     )
 
-    # 2b. Agent names: README's "Current agents" list is EXACT (list == disk),
-    # unlike skills - every agent is small enough in number to list fully.
+    # 2b. Agent names: README's "Current agents" list is exact for universal
+    # roles. Codex-only derived roles intentionally have no canonical prompt.md
+    # and remain internal until their target-specific documentation phase.
     agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
     check(agents_match is not None, "README must have a 'Current agents:' list", errors)
     if agents_match:
@@ -5402,13 +5420,13 @@ def validate_docs_parity(errors: list[str]) -> None:
             for line in agents_match.group(1).splitlines()
             if line.strip()
         }
-        disk_agents = {
+        universal_agents = {
             path.parent.name
-            for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")
+            for path in (REPO_ROOT / "shared" / "agents").glob("*/prompt.md")
         }
         check(
-            readme_agents == disk_agents,
-            f"README 'Current agents' list must exactly match shared/agents/*/: readme={sorted(readme_agents)} disk={sorted(disk_agents)}",
+            readme_agents == universal_agents,
+            f"README 'Current agents' list must exactly match universal shared agents: readme={sorted(readme_agents)} universal={sorted(universal_agents)}",
             errors,
         )
 

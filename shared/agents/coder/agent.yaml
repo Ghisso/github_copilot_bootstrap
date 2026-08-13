@@ -19,7 +19,7 @@
     "openai-codex": {
       "model": "gpt-5.6-terra",
       "effort": "high",
-      "escalate_to": { "model": "gpt-5.6-sol", "effort": "xhigh" }
+      "escalate_to": "sol_coder"
     }
   }
 }

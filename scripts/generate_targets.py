@@ -39,6 +39,7 @@ AGENT_METADATA_FIELDS = {
     "visibility",
     "capabilities",
     "delegates",
+    "prompt_base",
     "targets",
     "model_intent",
 }
@@ -123,6 +124,7 @@ ROOT_GUIDANCE_WORKFLOW = (
     "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT"
 )
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
+CODEX_ROLE_SUPPLEMENT_DELIMITER = "--- Codex role supplement: {agent_id} ---"
 POLICY_APPLICABILITY_KEY = "applicability"
 POLICY_ALWAYS = "always"
 
@@ -471,13 +473,13 @@ def validate_target_model_intent(
         ("model", "effort", "escalate_to"),
     )
     if "escalate_to" in codex_intent:
-        validate_model_intent_object(
-            codex_intent["escalate_to"],
-            metadata_path,
-            f"{field}.escalate_to",
-            ("model", "effort"),
-            ("model", "effort"),
+        escalate_to = require_nonempty_string(
+            codex_intent["escalate_to"], metadata_path, f"{field}.escalate_to"
         )
+        if not AGENT_ID_PATTERN.fullmatch(escalate_to):
+            raise ValueError(
+                f"{metadata_path}: {field}.escalate_to must be a stable agent ID"
+            )
 
 
 def validate_agent_metadata(
@@ -518,6 +520,15 @@ def validate_agent_metadata(
         )
 
     targets = resolve_agent_targets(metadata, metadata_path)
+    prompt_base = metadata.get("prompt_base")
+    if prompt_base is not None:
+        prompt_base = require_nonempty_string(prompt_base, metadata_path, "prompt_base")
+        if not AGENT_ID_PATTERN.fullmatch(prompt_base):
+            raise ValueError(f"{metadata_path}: prompt_base must be a stable agent ID")
+        if "targets" not in metadata or targets != ("openai-codex",):
+            raise ValueError(
+                f"{metadata_path}: prompt_base is limited to explicitly Codex-only agents"
+            )
     model_intent = metadata.get("model_intent")
     if not isinstance(model_intent, dict):
         raise ValueError(f"{metadata_path}: model_intent must be an object")
@@ -534,6 +545,132 @@ def validate_agent_metadata(
     for target in targets:
         validate_target_model_intent(target, model_intent[target], metadata_path)
     return {**metadata, "delegates": delegates, "targets": targets}
+
+
+def validate_prompt_composition(
+    agents: list[tuple[dict[str, Any], Path]], agents_root: Path
+) -> None:
+    """Validate the deliberately one-level Codex prompt-composition contract."""
+    agents_by_id = {agent["id"]: (agent, agent_dir) for agent, agent_dir in agents}
+    prompt_bases = {
+        agent["id"]: agent["prompt_base"]
+        for agent, _agent_dir in agents
+        if "prompt_base" in agent
+    }
+
+    def visit(agent_id: str, visiting: list[str], visited: set[str]) -> None:
+        if agent_id in visited or agent_id not in prompt_bases:
+            return
+        if agent_id in visiting:
+            cycle = " -> ".join([*visiting, agent_id])
+            raise ValueError(f"{agents_root}: prompt_base cycle detected: {cycle}")
+        visit(prompt_bases[agent_id], [*visiting, agent_id], visited)
+        visited.add(agent_id)
+
+    visited: set[str] = set()
+    for agent_id, base_id in prompt_bases.items():
+        if agent_id == base_id:
+            raise ValueError(
+                f"{agents_root / agent_id / 'agent.yaml'}: prompt_base must not self-reference"
+            )
+        if base_id not in agents_by_id:
+            raise ValueError(
+                f"{agents_root / agent_id / 'agent.yaml'}: prompt_base references missing agent '{base_id}'"
+            )
+        visit(agent_id, [], visited)
+        if "prompt_base" in agents_by_id[base_id][0]:
+            raise ValueError(
+                f"{agents_root / agent_id / 'agent.yaml'}: prompt_base must not create multi-level inheritance"
+            )
+
+    for agent, agent_dir in agents:
+        prompt_path = agent_dir / "prompt.md"
+        supplement_path = agent_dir / "prompt.openai-codex.md"
+        prompt_base = agent.get("prompt_base")
+        if prompt_base is None:
+            if not prompt_path.is_file():
+                raise ValueError(f"{agent_dir}: missing canonical prompt.md")
+            if supplement_path.exists():
+                raise ValueError(
+                    f"{agent_dir}: prompt.openai-codex.md requires prompt_base"
+                )
+            continue
+
+        base_dir = agents_by_id[prompt_base][1]
+        base_prompt_path = base_dir / "prompt.md"
+        if not base_prompt_path.is_file():
+            raise ValueError(
+                f"{agent_dir / 'agent.yaml'}: prompt_base '{prompt_base}' is missing prompt.md"
+            )
+        if prompt_path.exists():
+            raise ValueError(
+                f"{agent_dir}: derived agents must not copy a canonical prompt.md"
+            )
+        if not supplement_path.is_file():
+            raise ValueError(
+                f"{agent_dir}: derived Codex agents require prompt.openai-codex.md"
+            )
+        supplement = supplement_path.read_text(encoding="utf-8")
+        if not supplement.strip():
+            raise ValueError(f"{agent_dir}: prompt.openai-codex.md must not be empty")
+        transformed_base = normalize_prompt_whitespace(
+            transform_agent_text(
+                base_prompt_path.read_text(encoding="utf-8"), "openai-codex"
+            )
+        )
+        transformed_supplement = normalize_prompt_whitespace(
+            transform_agent_text(supplement, "openai-codex")
+        )
+        if transformed_base in transformed_supplement:
+            raise ValueError(
+                f"{agent_dir}: prompt.openai-codex.md must not copy its full base prompt"
+            )
+        if "--- Codex role supplement:" in supplement:
+            raise ValueError(
+                f"{agent_dir}: prompt.openai-codex.md must not contain a role-supplement delimiter"
+            )
+
+
+def normalize_prompt_whitespace(text: str) -> str:
+    """Normalize whitespace only when detecting a copied complete prompt base."""
+    return " ".join(text.split())
+
+
+def validate_codex_escalation_targets(
+    agents: list[tuple[dict[str, Any], Path]], agents_root: Path
+) -> None:
+    """Validate named, acyclic Codex escalation targets."""
+    agents_by_id = {agent["id"]: agent for agent, _agent_dir in agents}
+    edges: dict[str, str] = {}
+    for agent, agent_dir in agents:
+        codex_intent = agent["model_intent"].get("openai-codex")
+        if not isinstance(codex_intent, dict) or "escalate_to" not in codex_intent:
+            continue
+        target_id = codex_intent["escalate_to"]
+        if target_id not in agents_by_id:
+            raise ValueError(
+                f"{agent_dir / 'agent.yaml'}: escalate_to references missing agent '{target_id}'"
+            )
+        if target_id == agent["id"]:
+            raise ValueError(
+                f"{agent_dir / 'agent.yaml'}: escalate_to must not self-reference"
+            )
+        if "openai-codex" not in agents_by_id[target_id]["targets"]:
+            raise ValueError(
+                f"{agent_dir / 'agent.yaml'}: escalate_to target '{target_id}' is not Codex-eligible"
+            )
+        edges[agent["id"]] = target_id
+
+    for agent_id in edges:
+        seen: set[str] = set()
+        current = agent_id
+        while current in edges:
+            if current in seen:
+                raise ValueError(
+                    f"{agents_root}: Codex escalation cycle detected at '{current}'"
+                )
+            seen.add(current)
+            current = edges[current]
 
 
 def load_shared_agents(
@@ -558,6 +695,8 @@ def load_shared_agents(
     agent_ids = [agent["id"] for agent, _agent_dir in agents]
     if len(set(agent_ids)) != len(agent_ids):
         raise ValueError(f"{agents_root}: id must be unique across shared agents")
+    validate_prompt_composition(agents, agents_root)
+    validate_codex_escalation_targets(agents, agents_root)
     return agents
 
 
@@ -638,11 +777,25 @@ def codex_agent_metadata_header(agent: dict[str, Any]) -> str:
 
 
 def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
-    """Return the target-transformed shared role prompt for one Codex agent."""
-    prompt_path = REPO_ROOT / "shared" / "agents" / agent["id"] / "prompt.md"
-    return transform_agent_text(
-        prompt_path.read_text(encoding="utf-8"), "openai-codex"
+    """Return the exact target-transformed, self-contained Codex prompt body."""
+    agent_dir = REPO_ROOT / "shared" / "agents" / agent["id"]
+    prompt_base = agent.get("prompt_base")
+    if not isinstance(prompt_base, str):
+        return transform_agent_text(
+            (agent_dir / "prompt.md").read_text(encoding="utf-8"), "openai-codex"
+        ).strip()
+    base_prompt = transform_agent_text(
+        (REPO_ROOT / "shared" / "agents" / prompt_base / "prompt.md").read_text(
+            encoding="utf-8"
+        ),
+        "openai-codex",
     ).strip()
+    supplement = transform_agent_text(
+        (agent_dir / "prompt.openai-codex.md").read_text(encoding="utf-8"),
+        "openai-codex",
+    ).strip()
+    delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(agent_id=agent["id"])
+    return f"{base_prompt}\n\n{delimiter}\n\n{supplement}"
 
 
 def shared_mcp_servers() -> dict[str, Any]:
