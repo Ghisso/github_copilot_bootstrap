@@ -1,10 +1,10 @@
 ---
 name: protect-files-operation-resolution
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: protect-files-operation-resolution_implementation
-started_at:
+started_at: 2026-08-13T23:40:48Z
 phases:
   - 2026-08-14_phase-a-protect-files-operation-resolution
 current_phase: 2026-08-14_phase-a-protect-files-operation-resolution
