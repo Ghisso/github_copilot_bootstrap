@@ -2,14 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Shared bootstrap agent",
   "type": "object",
-  "required": ["id", "description", "role_type", "visibility", "capabilities"],
+  "required": ["id", "description", "role_type", "visibility", "capabilities", "model_intent"],
   "properties": {
-    "id": {"type": "string"},
-    "description": {"type": "string"},
-    "role_type": {"type": "string"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+    "description": {"type": "string", "minLength": 1},
+    "role_type": {"type": "string", "minLength": 1},
     "visibility": {"type": "string", "enum": ["public", "hidden"]},
     "capabilities": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "type": "string",
         "enum": ["read", "search", "edit", "execute", "delegate", "todo", "web", "vscode"]
@@ -17,11 +18,52 @@
     },
     "delegates": {
       "type": "array",
-      "items": {"type": "string"}
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"}
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["github-copilot", "claude-code", "openai-codex"]
+      }
     },
     "model_intent": {
       "type": "object",
-      "additionalProperties": true
+      "properties": {
+        "github-copilot": {"type": "string", "minLength": 1},
+        "claude-code": {
+          "type": "object",
+          "required": ["model"],
+          "properties": {
+            "model": {"type": "string", "minLength": 1},
+            "effort": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "openai-codex": {
+          "type": "object",
+          "required": ["model", "effort"],
+          "properties": {
+            "model": {"type": "string", "minLength": 1},
+            "effort": {"type": "string", "minLength": 1},
+            "escalate_to": {
+              "type": "object",
+              "required": ["model", "effort"],
+              "properties": {
+                "model": {"type": "string", "minLength": 1},
+                "effort": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false
 }

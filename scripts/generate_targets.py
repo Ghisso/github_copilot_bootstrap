@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,29 @@ from runtime_ownership import render_restore_script, restore_manifest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
+SUPPORTED_AGENT_TARGETS = ("github-copilot", "claude-code", "openai-codex")
+AGENT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
+AGENT_VISIBILITIES = {"public", "hidden"}
+AGENT_CAPABILITIES = {
+    "read",
+    "search",
+    "edit",
+    "execute",
+    "delegate",
+    "todo",
+    "web",
+    "vscode",
+}
+AGENT_METADATA_FIELDS = {
+    "id",
+    "description",
+    "role_type",
+    "visibility",
+    "capabilities",
+    "delegates",
+    "targets",
+    "model_intent",
+}
 COPY_IGNORE_PARTS = {".git", "__pycache__"}
 COPY_IGNORE_SUFFIXES = {".pyc"}
 SHARED_BASIS_NAMESPACE = ".claude"
@@ -341,12 +365,210 @@ def reset_target(output_root: Path, target: str) -> Path:
     return target_root
 
 
-def shared_agents() -> list[tuple[dict[str, Any], Path]]:
-    agents_root = REPO_ROOT / "shared" / "agents"
+def resolve_agent_targets(
+    metadata: dict[str, Any], metadata_path: Path
+) -> tuple[str, ...]:
+    """Resolve one agent's declared targets, defaulting omitted metadata to all."""
+    if "targets" not in metadata:
+        return SUPPORTED_AGENT_TARGETS
+    declared_targets = metadata["targets"]
+    if not isinstance(declared_targets, list):
+        raise ValueError(f"{metadata_path}: targets must be an array")
+    if not declared_targets:
+        raise ValueError(f"{metadata_path}: targets must not be empty")
+    if any(not isinstance(target, str) for target in declared_targets):
+        raise ValueError(f"{metadata_path}: targets must contain only strings")
+    if len(set(declared_targets)) != len(declared_targets):
+        raise ValueError(f"{metadata_path}: targets must not contain duplicates")
+    unknown_targets = sorted(set(declared_targets) - set(SUPPORTED_AGENT_TARGETS))
+    if unknown_targets:
+        raise ValueError(
+            f"{metadata_path}: targets contains unsupported target IDs: {unknown_targets}"
+        )
+    return tuple(declared_targets)
+
+
+def require_metadata_string(
+    metadata: dict[str, Any], metadata_path: Path, field: str
+) -> str:
+    """Return one required non-empty metadata string or raise contextually."""
+    return require_nonempty_string(metadata.get(field), metadata_path, field)
+
+
+def validate_metadata_string_list(
+    value: object,
+    metadata_path: Path,
+    field: str,
+    allowed_values: set[str] | None = None,
+) -> list[str]:
+    """Validate a duplicate-free metadata list of non-empty strings."""
+    if not isinstance(value, list):
+        raise ValueError(f"{metadata_path}: {field} must be an array")
+    if any(not isinstance(item, str) or not item for item in value):
+        raise ValueError(f"{metadata_path}: {field} must contain non-empty strings")
+    if len(set(value)) != len(value):
+        raise ValueError(f"{metadata_path}: {field} must not contain duplicates")
+    if allowed_values is not None:
+        unknown_values = sorted(set(value) - allowed_values)
+        if unknown_values:
+            raise ValueError(
+                f"{metadata_path}: {field} contains unsupported values: {unknown_values}"
+            )
+    return value
+
+
+def require_nonempty_string(value: object, metadata_path: Path, field: str) -> str:
+    """Return a required non-empty string or raise contextually."""
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{metadata_path}: {field} must be a non-empty string")
+    return value
+
+
+def validate_model_intent_object(
+    value: object,
+    metadata_path: Path,
+    field: str,
+    required_fields: tuple[str, ...],
+    allowed_fields: tuple[str, ...],
+) -> dict[str, Any]:
+    """Validate one target's object-shaped model intent."""
+    if not isinstance(value, dict):
+        raise ValueError(f"{metadata_path}: {field} must be an object")
+    unknown_fields = sorted(set(value) - set(allowed_fields))
+    if unknown_fields:
+        raise ValueError(
+            f"{metadata_path}: {field} has unsupported fields: {unknown_fields}"
+        )
+    for required_field in allowed_fields:
+        if required_field == "escalate_to" and required_field not in required_fields:
+            continue
+        if required_field not in value and required_field not in required_fields:
+            continue
+        require_nonempty_string(
+            value.get(required_field), metadata_path, f"{field}.{required_field}"
+        )
+    return value
+
+
+def validate_target_model_intent(
+    target: str, value: object, metadata_path: Path
+) -> None:
+    """Validate the required shape for one eligible target's model intent."""
+    field = f"model_intent.{target}"
+    if target == "github-copilot":
+        require_nonempty_string(value, metadata_path, field)
+        return
+    if target == "claude-code":
+        validate_model_intent_object(
+            value, metadata_path, field, ("model",), ("model", "effort")
+        )
+        return
+    codex_intent = validate_model_intent_object(
+        value,
+        metadata_path,
+        field,
+        ("model", "effort"),
+        ("model", "effort", "escalate_to"),
+    )
+    if "escalate_to" in codex_intent:
+        validate_model_intent_object(
+            codex_intent["escalate_to"],
+            metadata_path,
+            f"{field}.escalate_to",
+            ("model", "effort"),
+            ("model", "effort"),
+        )
+
+
+def validate_agent_metadata(
+    metadata: dict[str, Any], metadata_path: Path
+) -> dict[str, Any]:
+    """Validate and normalize canonical agent metadata before rendering."""
+    unknown_fields = sorted(set(metadata) - AGENT_METADATA_FIELDS)
+    if unknown_fields:
+        raise ValueError(
+            f"{metadata_path}: metadata has unsupported fields: {unknown_fields}"
+        )
+    agent_id = require_metadata_string(metadata, metadata_path, "id")
+    if not AGENT_ID_PATTERN.fullmatch(agent_id):
+        raise ValueError(
+            f"{metadata_path}: id must be a stable lowercase identifier using letters, digits, underscores, and hyphens"
+        )
+    require_metadata_string(metadata, metadata_path, "description")
+    require_metadata_string(metadata, metadata_path, "role_type")
+    visibility = require_metadata_string(metadata, metadata_path, "visibility")
+    if visibility not in AGENT_VISIBILITIES:
+        raise ValueError(
+            f"{metadata_path}: visibility must be one of {sorted(AGENT_VISIBILITIES)}"
+        )
+    validate_metadata_string_list(
+        metadata.get("capabilities"), metadata_path, "capabilities", AGENT_CAPABILITIES
+    )
+    delegates = (
+        validate_metadata_string_list(metadata["delegates"], metadata_path, "delegates")
+        if "delegates" in metadata
+        else []
+    )
+    invalid_delegate_ids = [
+        delegate for delegate in delegates if not AGENT_ID_PATTERN.fullmatch(delegate)
+    ]
+    if invalid_delegate_ids:
+        raise ValueError(
+            f"{metadata_path}: delegates must contain stable agent IDs: {invalid_delegate_ids}"
+        )
+
+    targets = resolve_agent_targets(metadata, metadata_path)
+    model_intent = metadata.get("model_intent")
+    if not isinstance(model_intent, dict):
+        raise ValueError(f"{metadata_path}: model_intent must be an object")
+    missing_intents = [target for target in targets if target not in model_intent]
+    if missing_intents:
+        raise ValueError(
+            f"{metadata_path}: model_intent is missing eligible targets: {missing_intents}"
+        )
+    ineligible_intents = sorted(set(model_intent) - set(targets))
+    if ineligible_intents:
+        raise ValueError(
+            f"{metadata_path}: model_intent declares ineligible targets: {ineligible_intents}"
+        )
+    for target in targets:
+        validate_target_model_intent(target, model_intent[target], metadata_path)
+    return {**metadata, "delegates": delegates, "targets": targets}
+
+
+def load_shared_agents(
+    agents_root: Path | None = None,
+) -> list[tuple[dict[str, Any], Path]]:
+    """Load all shared agents through the canonical metadata contract."""
+    agents_root = agents_root or REPO_ROOT / "shared" / "agents"
     agents: list[tuple[dict[str, Any], Path]] = []
     for metadata_path in sorted(agents_root.glob("*/agent.yaml")):
-        agents.append((load_json(metadata_path), metadata_path.parent))
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"{metadata_path}: invalid JSON metadata") from error
+        if not isinstance(metadata, dict):
+            raise ValueError(f"{metadata_path}: metadata must be an object")
+        agents.append(
+            (
+                validate_agent_metadata(metadata, metadata_path),
+                metadata_path.parent,
+            )
+        )
+    agent_ids = [agent["id"] for agent, _agent_dir in agents]
+    if len(set(agent_ids)) != len(agent_ids):
+        raise ValueError(f"{agents_root}: id must be unique across shared agents")
     return agents
+
+
+def shared_agents(target: str | None = None) -> list[tuple[dict[str, Any], Path]]:
+    """Return canonical agents, optionally limited to one eligible target."""
+    agents = load_shared_agents()
+    if target is None:
+        return agents
+    if target not in SUPPORTED_AGENT_TARGETS:
+        raise ValueError(f"unsupported agent target: {target}")
+    return [(agent, path) for agent, path in agents if target in agent["targets"]]
 
 
 def transform_agent_text(
@@ -919,7 +1141,10 @@ def render_claude_policy_rules(support_root: Path) -> None:
             )
 
 
-def render_github_agent_adapter(agent: dict[str, Any]) -> str:
+def render_github_agent_adapter(
+    agent: dict[str, Any], agent_dir: Path | None = None
+) -> str:
+    """Render a GitHub agent adapter or a self-contained scoped agent body."""
     frontmatter_lines = [
         "---",
         f"name: {agent['id']}",
@@ -939,21 +1164,33 @@ def render_github_agent_adapter(agent: dict[str, Any]) -> str:
     if agent.get("visibility") == "hidden":
         frontmatter_lines.append("user-invocable: false")
     frontmatter_lines.append("---")
-    canonical_path = canonical_agent_path(agent["id"])
-    body = (
-        f"# {agent['id']} Copilot Adapter\n\n"
-        "This file is the GitHub Copilot native adapter for the shared agent body.\n\n"
-        f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
-        "Use the Copilot model, tools, delegation, and visibility metadata in this file when it "
-        "conflicts with Claude-specific frontmatter in the canonical file.\n\n"
-        "Shared skills, memory, plans, explorations, session logs, quality reports, templates, "
-        "prompts, and hook scripts live under `.claude/`.\n"
-    )
+    if "claude-code" in agent.get("targets", SUPPORTED_AGENT_TARGETS):
+        canonical_path = canonical_agent_path(agent["id"])
+        body = (
+            f"# {agent['id']} Copilot Adapter\n\n"
+            "This file is the GitHub Copilot native adapter for the shared agent body.\n\n"
+            f"Before doing the task, read `{canonical_path}` and follow that canonical role guidance. "
+            "Use the Copilot model, tools, delegation, and visibility metadata in this file when it "
+            "conflicts with Claude-specific frontmatter in the canonical file.\n\n"
+            "Shared skills, memory, plans, explorations, session logs, quality reports, templates, "
+            "prompts, and hook scripts live under `.claude/`.\n"
+        )
+    else:
+        if agent_dir is None:
+            raise ValueError(f"{agent['id']}: GitHub-only agent requires prompt source")
+        prompt = transform_agent_text(
+            (agent_dir / "prompt.md").read_text(encoding="utf-8"), "github-copilot"
+        ).strip()
+        body = (
+            f"# {agent['id']} Copilot Agent\n\n"
+            "This file is self-contained because this agent is not eligible for Claude Code.\n\n"
+            f"{prompt}\n"
+        )
     return "\n".join(frontmatter_lines) + "\n\n" + body
 
 
 def render_claude_agents(target_root: Path) -> None:
-    for agent, agent_dir in shared_agents():
+    for agent, agent_dir in shared_agents("claude-code"):
         target_name = canonical_agent_name(agent["id"])
         body = (agent_dir / "prompt.md").read_text(encoding="utf-8")
         body = transform_agent_text(body, "claude-code")
@@ -1035,10 +1272,10 @@ def render_github(target_root: Path) -> None:
     render_vscode_mcp_json(target_root / ".vscode" / "mcp.json")
     render_vscode_tasks_json(target_root / ".vscode" / "tasks.json")
 
-    for agent, _agent_dir in shared_agents():
+    for agent, agent_dir in shared_agents("github-copilot"):
         write_text(
             target_root / ".github" / "agents" / f"{agent['id']}.agent.md",
-            render_github_agent_adapter(agent),
+            render_github_agent_adapter(agent, agent_dir),
         )
 
 
@@ -1053,7 +1290,7 @@ def render_codex(target_root: Path) -> None:
     render_codex_config(target_root / ".codex" / "config.toml")
     render_codex_hooks(target_root / ".codex" / "hooks.json")
 
-    for agent, _agent_dir in shared_agents():
+    for agent, _agent_dir in shared_agents("openai-codex"):
         target_name = agent["id"]
         write_text(
             target_root / ".codex" / "agents" / f"{target_name}.toml",

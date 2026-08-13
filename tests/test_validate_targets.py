@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import subprocess
 import sys
 import tomllib
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -15,10 +17,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import generate_targets as target_generator  # noqa: E402
+
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    SUPPORTED_AGENT_TARGETS,
+    load_shared_agents,
     parse_policy,
     render_claude_rule_adapter,
+    render_github_agent_adapter,
     codex_agent_metadata_header,
     render_codex_agent_adapter,
     render_github_instruction_adapter,
@@ -40,6 +47,7 @@ from validate_targets import (  # noqa: E402
     codex_config_contract_errors,
     copilot_instruction_paths,
     github_agent_model_errors,
+    agent_membership_errors,
     mcp_server_parity_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
@@ -54,6 +62,8 @@ from validate_targets import (  # noqa: E402
     workflow_reporting_errors,
     workspace_guidance_errors,
 )
+
+import validate_targets as target_validator  # noqa: E402
 
 
 def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
@@ -525,6 +535,340 @@ def test_policy_schema_rejects_copilot_native_or_ambiguous_scope(
 
     with pytest.raises(ValueError, match="must be 'always' or a YAML list"):
         parse_policy(policy)
+
+
+def write_scoped_agent(
+    agents_root: Path,
+    targets: list[str] | None,
+    model_intent: dict[str, object],
+    agent_id: str = "codex-only",
+    include_delegates: bool = True,
+) -> Path:
+    """Create minimal canonical metadata for target-scoping tests."""
+    agent_dir = agents_root / agent_id
+    agent_dir.mkdir(parents=True)
+    metadata: dict[str, object] = {
+        "id": agent_id,
+        "description": "Synthetic target-scoping fixture.",
+        "role_type": "fixture",
+        "visibility": "hidden",
+        "capabilities": ["read"],
+        "model_intent": model_intent,
+    }
+    if include_delegates:
+        metadata["delegates"] = []
+    if targets is not None:
+        metadata["targets"] = targets
+    (agent_dir / "agent.yaml").write_text(json.dumps(metadata), encoding="utf-8")
+    (agent_dir / "prompt.md").write_text("Synthetic prompt.\n", encoding="utf-8")
+    return agent_dir
+
+
+def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
+    """Existing agent metadata remains eligible for every target by default."""
+    agents = shared_agents()
+
+    assert len(agents) == 6
+    assert {agent["id"] for agent, _agent_dir in agents} == {
+        "coder",
+        "documenter",
+        "orchestrator",
+        "planner",
+        "reviewer",
+        "verifier",
+    }
+    for target in SUPPORTED_AGENT_TARGETS:
+        assert {agent["id"] for agent, _agent_dir in shared_agents(target)} == {
+            agent["id"] for agent, _agent_dir in agents
+        }
+
+
+@pytest.mark.parametrize(
+    ("targets", "model_intent", "field"),
+    (
+        ([], {}, "targets must not be empty"),
+        (["openai-codex", "openai-codex"], {}, "targets must not contain duplicates"),
+        (["not-a-target"], {}, "targets contains unsupported target IDs"),
+        (["openai-codex"], {}, "model_intent is missing eligible targets"),
+        (
+            ["openai-codex"],
+            {"github-copilot": "target-default", "openai-codex": {}},
+            "model_intent declares ineligible targets",
+        ),
+        (["github-copilot"], {"github-copilot": 42}, "model_intent.github-copilot"),
+        (["claude-code"], {"claude-code": {}}, "model_intent.claude-code.model"),
+        (
+            ["openai-codex"],
+            {"openai-codex": {"model": "gpt-5.6-luna"}},
+            "model_intent.openai-codex.effort",
+        ),
+        (
+            ["claude-code"],
+            {"claude-code": {"model": "sonnet", "tier": "high"}},
+            "model_intent.claude-code has unsupported fields",
+        ),
+    ),
+)
+def test_agent_target_metadata_rejects_invalid_scope(
+    tmp_path: Path,
+    targets: list[str],
+    model_intent: dict[str, object],
+    field: str,
+) -> None:
+    """Invalid eligibility metadata names both its file and bad field."""
+    agents_root = tmp_path / "agents"
+    write_scoped_agent(agents_root, targets, model_intent)
+
+    with pytest.raises(ValueError, match=rf"agent\.yaml: {re.escape(field)}"):
+        load_shared_agents(agents_root)
+
+
+def test_codex_only_agent_renders_only_to_codex(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scoped agent is emitted only by its eligible target renderer."""
+    agents_root = tmp_path / "shared" / "agents"
+    write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-luna", "effort": "low"}},
+    )
+    monkeypatch.setattr(target_generator, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(target_generator, "render_root_guidance", lambda _target: "")
+    monkeypatch.setattr(target_generator, "render_codex_config", lambda _path: None)
+    monkeypatch.setattr(target_generator, "render_codex_hooks", lambda _path: None)
+    monkeypatch.setattr(target_generator, "render_copilot_instructions", lambda: "")
+    monkeypatch.setattr(target_generator, "shared_policies", lambda: [])
+    monkeypatch.setattr(
+        target_generator, "copy_file", lambda _source, _destination: None
+    )
+    monkeypatch.setattr(target_generator, "render_vscode_mcp_json", lambda _path: None)
+    monkeypatch.setattr(
+        target_generator, "render_vscode_tasks_json", lambda _path: None
+    )
+
+    target_generator.render_claude_agents(tmp_path)
+    target_generator.render_github(tmp_path)
+    target_generator.render_codex(tmp_path)
+
+    assert not (tmp_path / ".claude" / "agents" / "codex-only.md").exists()
+    assert not (tmp_path / ".github" / "agents" / "codex-only.agent.md").exists()
+    assert (tmp_path / ".codex" / "agents" / "codex-only.toml").exists()
+
+
+def test_github_only_agent_embeds_its_prompt_without_claude_reference(
+    tmp_path: Path,
+) -> None:
+    """A GitHub-only eligible agent cannot reference an absent Claude adapter."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["github-copilot"],
+        {"github-copilot": "target-default"},
+    )
+    agent = load_shared_agents(agents_root)[0][0]
+
+    rendered = render_github_agent_adapter(agent, agent_dir)
+
+    assert ".claude/agents/" not in rendered
+    assert "This file is self-contained" in rendered
+    assert "Synthetic prompt." in rendered
+
+
+def test_omitted_delegates_normalizes_to_an_empty_rendered_list(tmp_path: Path) -> None:
+    """Historical agent metadata may omit delegates without changing rendering."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["github-copilot"],
+        {"github-copilot": "target-default"},
+        include_delegates=False,
+    )
+    agent = load_shared_agents(agents_root)[0][0]
+
+    assert agent["delegates"] == []
+    assert "agents:" not in render_github_agent_adapter(agent, agent_dir)
+
+
+def test_agent_loader_preserves_malformed_json_cause(tmp_path: Path) -> None:
+    """Malformed agent metadata names its file and preserves loader safety."""
+    metadata_path = tmp_path / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text("{", encoding="utf-8")
+
+    with pytest.raises(
+        ValueError, match=r"agent\.yaml: invalid JSON metadata"
+    ) as error:
+        load_shared_agents(tmp_path / "agents")
+
+    assert isinstance(error.value.__cause__, json.JSONDecodeError)
+
+
+def test_agent_loader_rejects_non_object_metadata(tmp_path: Path) -> None:
+    """Canonical agent metadata must be a JSON object."""
+    metadata_path = tmp_path / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"agent\.yaml: metadata must be an object"):
+        load_shared_agents(tmp_path / "agents")
+
+
+def test_agent_loader_accepts_approved_underscore_stable_ids(tmp_path: Path) -> None:
+    """Stable agent IDs allow the approved underscore routing names."""
+    agents_root = tmp_path / "agents"
+    write_scoped_agent(
+        agents_root,
+        ["openai-codex"],
+        {"openai-codex": {"model": "gpt-5.6-luna", "effort": "low"}},
+        agent_id="luna_coder",
+    )
+
+    assert load_shared_agents(agents_root)[0][0]["id"] == "luna_coder"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    (
+        ("description", None, "description must be a non-empty string"),
+        ("role_type", 7, "role_type must be a non-empty string"),
+        ("visibility", "internal", "visibility must be one of"),
+        ("capabilities", ["read", "read"], "capabilities must not contain duplicates"),
+        ("capabilities", ["invent"], "capabilities contains unsupported values"),
+        (
+            "delegates",
+            ["luna_coder", "luna_coder"],
+            "delegates must not contain duplicates",
+        ),
+        ("delegates", ["not valid"], "delegates must contain stable agent IDs"),
+        (
+            "model_intent",
+            {"claude-code": {"model": "sonnet", "effort": 7}},
+            "model_intent.claude-code.effort must be a non-empty string",
+        ),
+        (
+            "model_intent",
+            {
+                "claude-code": {"model": "sonnet"},
+                "openai-codex": {
+                    "model": "gpt-5.6-luna",
+                    "effort": "low",
+                    "escalate_to": {"model": "gpt-5.6-sol"},
+                },
+            },
+            "model_intent.openai-codex.escalate_to.effort must be a non-empty string",
+        ),
+    ),
+)
+def test_agent_loader_validates_renderer_consumed_metadata(
+    tmp_path: Path, field: str, value: object, expected: str
+) -> None:
+    """All metadata a renderer reads is validated before generation starts."""
+    agents_root = tmp_path / "agents"
+    agent_dir = write_scoped_agent(
+        agents_root,
+        ["claude-code"],
+        {"claude-code": {"model": "sonnet"}},
+    )
+    metadata_path = agent_dir / "agent.yaml"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if value is None:
+        del metadata[field]
+    else:
+        metadata[field] = value
+    if "openai-codex" in metadata["model_intent"]:
+        metadata["targets"].append("openai-codex")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=rf"agent\.yaml: {re.escape(expected)}"):
+        load_shared_agents(agents_root)
+
+
+def test_agent_membership_errors_reject_target_omission_and_leakage() -> None:
+    """Target validation independently reports both eligibility failure modes."""
+    errors = agent_membership_errors("openai-codex", {"codex-only"}, {"github-only"})
+
+    assert "openai-codex missing eligible agents: ['codex-only']" in errors
+    assert "openai-codex contains ineligible agents: ['github-only']" in errors
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "contents", "expected"),
+    (
+        (
+            ".github/agents/planner.agent.md",
+            None,
+            "github-copilot missing eligible agents: ['planner']",
+        ),
+        (
+            ".github/agents/leaked.agent.md",
+            ".github/agents/coder.agent.md",
+            "github-copilot contains ineligible agents: ['leaked']",
+        ),
+    ),
+)
+def test_validate_agents_rejects_generated_target_omission_and_leakage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative_path: str,
+    contents: str | None,
+    expected: str,
+) -> None:
+    """The full agent validator detects generated target membership drift."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    path = target_root / relative_path
+    if contents is None:
+        path.unlink()
+    else:
+        path.write_text(
+            (target_root / contents).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert expected in errors
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    (
+        ("{", "invalid JSON metadata"),
+        (
+            json.dumps(
+                {
+                    "id": "github_only",
+                    "description": "Malformed model-intent fixture.",
+                    "role_type": "fixture",
+                    "visibility": "hidden",
+                    "capabilities": ["read"],
+                    "delegates": [],
+                    "targets": ["github-copilot"],
+                    "model_intent": {"github-copilot": 42},
+                }
+            ),
+            "model_intent.github-copilot must be a non-empty string",
+        ),
+    ),
+)
+def test_validate_agents_reports_canonical_loader_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    metadata: str,
+    expected: str,
+) -> None:
+    """The full validator reports malformed canonical metadata without crashing."""
+    metadata_path = tmp_path / "shared" / "agents" / "broken" / "agent.yaml"
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(metadata, encoding="utf-8")
+    monkeypatch.setattr(target_generator, "REPO_ROOT", tmp_path)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert errors == [f"{metadata_path}: {expected}"]
 
 
 def test_validate_targets() -> None:

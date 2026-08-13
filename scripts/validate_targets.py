@@ -23,9 +23,12 @@ from check_runtime import runtime_drift_errors
 from generate_targets import (
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     ROOT_GUIDANCE_WORKFLOW,
+    SUPPORTED_AGENT_TARGETS,
     codex_agent_metadata_header,
     codex_agent_prompt_body,
+    shared_agents,
     shared_policies,
+    transform_agent_text,
 )
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
@@ -1340,8 +1343,26 @@ def codex_agent_instruction_errors(
     return errors
 
 
+def agent_membership_errors(
+    target: str, expected_agent_ids: set[str], generated_agent_ids: set[str]
+) -> list[str]:
+    """Return target-scoped omissions and leaks in generated agent files."""
+    missing = sorted(expected_agent_ids - generated_agent_ids)
+    unexpected = sorted(generated_agent_ids - expected_agent_ids)
+    errors: list[str] = []
+    if missing:
+        errors.append(f"{target} missing eligible agents: {missing}")
+    if unexpected:
+        errors.append(f"{target} contains ineligible agents: {unexpected}")
+    return errors
+
+
 def validate_agents(errors: list[str]) -> None:
-    shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
+    try:
+        canonical_agents = shared_agents()
+    except ValueError as error:
+        errors.append(str(error))
+        return
     planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
     orchestrator_prompt = read(
         REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
@@ -1353,31 +1374,29 @@ def validate_agents(errors: list[str]) -> None:
         errors.extend(
             reporting_prompt_errors(prompt_path.parent.name, read(prompt_path))
         )
-    expected_count = len(shared_agents)
-    check(expected_count > 0, "no shared agents found under shared/agents/", errors)
+    check(
+        canonical_agents,
+        "no shared agents found under shared/agents/",
+        errors,
+    )
     expected_codex_intents: dict[str, tuple[object, object]] = {}
     expected_claude_intents: dict[str, tuple[object, object]] = {}
     expected_github_models: dict[str, object] = {}
     codex_escalations: dict[str, tuple[object, object]] = {}
+    agents_by_id = {agent["id"]: agent for agent, _agent_dir in canonical_agents}
+    agent_dirs_by_id = {agent["id"]: agent_dir for agent, agent_dir in canonical_agents}
 
-    for metadata_path in shared_agents:
-        data = json.loads(read(metadata_path))
+    for data, agent_dir in canonical_agents:
         agent_id = data["id"]
-        expected_github_models[agent_id] = data.get("model_intent", {}).get(
-            "github-copilot"
-        )
-        claude_intent = data.get("model_intent", {}).get("claude-code")
+        if "github-copilot" in data["targets"]:
+            expected_github_models[agent_id] = data["model_intent"]["github-copilot"]
+        claude_intent = data["model_intent"].get("claude-code")
         if isinstance(claude_intent, dict):
             expected_claude_intents[agent_id] = (
                 claude_intent.get("model"),
                 claude_intent.get("effort"),
             )
-        codex_intent = data.get("model_intent", {}).get("openai-codex")
-        check(
-            isinstance(codex_intent, dict),
-            f"{agent_id} must define an explicit openai-codex model intent",
-            errors,
-        )
+        codex_intent = data["model_intent"].get("openai-codex")
         if isinstance(codex_intent, dict):
             model = codex_intent.get("model")
             effort = codex_intent.get("effort")
@@ -1424,12 +1443,12 @@ def validate_agents(errors: list[str]) -> None:
                     errors,
                 )
         check(
-            (metadata_path.parent / "prompt.md").exists(),
+            (agent_dir / "prompt.md").exists(),
             f"{agent_id} missing canonical prompt.md",
             errors,
         )
         check(
-            not (metadata_path.parent / "targets").exists(),
+            not (agent_dir / "targets").exists(),
             f"{agent_id} must not keep target-specific prompt forks",
             errors,
         )
@@ -1455,43 +1474,63 @@ def validate_agents(errors: list[str]) -> None:
         "canonical Codex escalation contract must contain only coder Sol/xhigh",
         errors,
     )
+    expected_agent_ids = {
+        target: {agent["id"] for agent, _agent_dir in shared_agents(target)}
+        for target in SUPPORTED_AGENT_TARGETS
+    }
 
     generated_github_agents = sorted(
         (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
     )
-    check(
-        len(generated_github_agents) == expected_count,
-        "GitHub agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "github-copilot",
+            expected_agent_ids["github-copilot"],
+            {path.name.removesuffix(".agent.md") for path in generated_github_agents},
+        )
     )
-    for metadata_path in shared_agents:
-        agent_id = json.loads(read(metadata_path))["id"]
+    for agent_id in expected_agent_ids["github-copilot"]:
         generated = TARGET_ROOT / ".github" / "agents" / f"{agent_id}.agent.md"
         check(generated.exists(), f"missing generated GitHub agent: {agent_id}", errors)
         if generated.exists():
             text = read(generated)
-            check(
-                ".claude/agents/" in text,
-                f"GitHub agent adapter must point at canonical .claude agent: {generated}",
-                errors,
-            )
-            for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", text):
+            agent = agents_by_id[agent_id]
+            if "claude-code" not in agent["targets"]:
+                prompt = transform_agent_text(
+                    read(agent_dirs_by_id[agent_id] / "prompt.md"), "github-copilot"
+                ).strip()
                 check(
-                    (TARGET_ROOT / reference).exists(),
-                    f"GitHub agent adapter points at missing canonical agent: {generated}: {reference}",
+                    ".claude/agents/" not in text
+                    and "This file is self-contained" in text
+                    and prompt in text,
+                    f"GitHub-only agent must be self-contained: {generated}",
                     errors,
                 )
-            check(
-                "This file is the GitHub Copilot native adapter" in text,
-                f"GitHub agent should be a thin native adapter: {generated}",
-                errors,
-            )
+            else:
+                check(
+                    ".claude/agents/" in text,
+                    f"GitHub agent adapter must point at canonical .claude agent: {generated}",
+                    errors,
+                )
+                for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", text):
+                    check(
+                        (TARGET_ROOT / reference).exists(),
+                        f"GitHub agent adapter points at missing canonical agent: {generated}: {reference}",
+                        errors,
+                    )
+                check(
+                    "This file is the GitHub Copilot native adapter" in text,
+                    f"GitHub agent should be a thin native adapter: {generated}",
+                    errors,
+                )
 
     claude_agents = sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md"))
-    check(
-        len(claude_agents) == expected_count,
-        "canonical .claude agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "claude-code",
+            expected_agent_ids["claude-code"],
+            {path.stem for path in claude_agents},
+        )
     )
     for path in claude_agents:
         text = read(path)
@@ -1572,10 +1611,12 @@ def validate_agents(errors: list[str]) -> None:
         )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
-    check(
-        len(codex_agents) == expected_count,
-        "Codex custom agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "openai-codex",
+            expected_agent_ids["openai-codex"],
+            {path.stem for path in codex_agents},
+        )
     )
     check(
         not (TARGET_ROOT / ".codex" / "rules").exists(),
@@ -1583,7 +1624,7 @@ def validate_agents(errors: list[str]) -> None:
         errors,
     )
 
-    expected_codex_names = set(expected_codex_intents)
+    expected_codex_names = expected_agent_ids["openai-codex"]
     check(
         {path.stem for path in codex_agents} == expected_codex_names,
         "Codex custom agent filenames must match mapped shared agent names",
@@ -1620,9 +1661,9 @@ def validate_agents(errors: list[str]) -> None:
             expected_effort=expected_effort,
         )
         instructions = str(data.get("developer_instructions", ""))
-        agent = json.loads(
-            read(REPO_ROOT / "shared" / "agents" / path.stem / "agent.yaml")
-        )
+        agent = agents_by_id.get(path.stem)
+        if agent is None:
+            continue
         errors.extend(
             f"Codex agent {error}: {path}"
             for error in codex_agent_instruction_errors(agent, instructions)
