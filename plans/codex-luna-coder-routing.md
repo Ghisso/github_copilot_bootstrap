@@ -1,7 +1,7 @@
 ---
 name: codex-luna-coder-routing
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: codex-luna-coder-routing_implementation
 started_at: 2026-08-13T08:59:58Z
@@ -11,7 +11,7 @@ phases:
   - 2026-08-13_phase-C-codex-orchestrator-coder-routing
   - 2026-08-13_phase-D-codex-routing-failure-attribution-and-validation
   - 2026-08-13_phase-E-codex-routing-documentation-and-native-bookkeeping
-current_phase: 2026-08-13_phase-E-codex-routing-documentation-and-native-bookkeeping
+current_phase: 
 ---
 
 # Big Plan: codex-luna-coder-routing
