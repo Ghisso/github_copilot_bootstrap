@@ -52,17 +52,6 @@ same severity gates as every other profile.
 - **Control-plane/high-risk work:** use a full plan and run `reviewer` with `code`, `architecture`, `security`, `tests`, and `ponytail` (plus `documentation` when applicable).
 - **Standard implementation:** run `reviewer` with the inferred profiles; it performs its own primary and adversarial passes in sequence (no helper agents, so it runs identically on every runtime).
 
-## Escalation On Failure
-
-On OpenAI Codex only (spawn-time model/effort overrides are a Codex capability;
-Claude Code has no per-invocation effort override): if `verifier` fails, or
-`reviewer` returns a CRITICAL/MAJOR finding,
-on a diff `coder` just produced, re-delegate the fix to `coder` with explicit
-spawn overrides `model = gpt-5.6-sol`, `model_reasoning_effort = xhigh` instead
-of retrying at its configured `gpt-5.6-terra`/`high` tier. Escalate at most once
-per phase. If the escalated attempt also fails verification or review, stop the
-fix loop and report the failure to the user instead of retrying further.
-
 ## Delegation Rules
 
 - Before planner delegation, prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions. Keep raw logs and broad retrieval output in dated evidence; pass derived facts and source locations to the planner.

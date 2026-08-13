@@ -16,15 +16,43 @@ Expected:
 
 Expected:
 
-- GitHub Copilot has 6 `.github/agents/*.agent.md` files.
-- The generated output has 6 canonical `.claude/agents/*.md` files.
-- OpenAI Codex has 6 `.codex/agents/*.toml` files.
-- Each Codex `developer_instructions` field has exactly one generated delimiter and embeds the exact target-transformed `shared/agents/<id>/prompt.md` body; it must not instruct the agent to read `.claude/agents/<id>.md`.
+- GitHub Copilot has exactly the 6 universal `.github/agents/*.agent.md` files.
+- Claude Code has exactly the same 6 universal `.claude/agents/*.md` files.
+- OpenAI Codex has exactly 8 `.codex/agents/*.toml` files: the 6 universal
+  agents plus Codex-only `luna_coder` and `sol_coder`.
+- Neither Codex-only agent appears in `.claude/agents/` or `.github/agents/`,
+  and omitting either one from `.codex/agents/` fails validation.
+- Each Codex `developer_instructions` field has exactly one generated delimiter
+  and embeds its exact target-transformed role body; it must not instruct the
+  agent to read `.claude/agents/<id>.md`.
+- A normal agent's Codex supplement is appended once to its own prompt. A
+  derived coder prompt is exactly the transformed `coder` base, one literal
+  role-supplement delimiter, and the transformed specialist supplement. Missing
+  or duplicate supplements, copied complete bases, recursive or multi-level
+  composition, cycles, and delimiter drift fail validation.
 - `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
-- Structural checks record the current actual instruction sizes (3,145–8,202 bytes across the six roles). This is not an official Codex size limit. Native probes must verify delivery without truncation on two supported versions.
+- Structural checks record actual instruction sizes for all eight Codex roles.
+  These values are observability, not an official Codex size limit or a static
+  delivery claim. Native probes are the only delivery evidence.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
-- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and verifier Luna/low. GitHub Copilot remains `Claude Opus 4.6`.
-- `coder`'s `escalate_to` (Codex: `gpt-5.6-sol`/`xhigh`) names an allow-listed model/effort pair distinct from its base tier, and the orchestrator prompt names both values verbatim — a mismatch fails validation.
+- The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
+  reviewer Sol/high, coder Terra/high, documenter Luna/medium, verifier
+  Luna/low, `luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. Claude and
+  GitHub Copilot keep their existing six-agent model declarations.
+- The named escalation graph is exactly
+  `luna_coder -> coder -> sol_coder`, with no successor for `sol_coder`.
+  Missing or ineligible successors, cycles, self-retries, Luna-to-Sol skips,
+  Luna/max, model/effort drift, and spawn-time model or effort override wording
+  fail validation.
+- The Codex orchestrator prompt contains its supplement exactly once. It
+  requires the bounded packet and all five Luna-selection conditions, the exact
+  five-field escalation object and six-value `reason` enum, preservation of a
+  prior diff, one named recovery per tier, and a final stop after Sol.
+- Failure attribution has exactly four categories. Only `implementation`
+  advances automatically; `environment` and `baseline` stop model escalation,
+  and `indeterminate` returns to orchestrator judgment. Extra categories,
+  alternate list markers, unmatched prose, missing stop behavior, and invented
+  attribution fail validation.
 - `reviewer` runs its own passes with no helper agents: a primary pass, then a verification pass that receives the primary findings and refutes each (dropping any that do not survive re-verification, converging when a pass yields nothing new twice or after 3 rounds). An orchestrated review therefore completes and can PASS a PR gate identically on GitHub Copilot, Claude Code, and OpenAI Codex (no dependence on subagent nesting depth).
 - The generated output mirrors every repository skill under `.claude/skills/`.
 - Every agent prompt points to the [canonical audience-aware reporting policy](../shared/policies/agent-reporting.instructions.md);
@@ -78,10 +106,9 @@ Expected:
 - These are structural generation checks. Real Claude, Codex, and Copilot
   adapter-loading probes are covered by `scripts/check_native_clients.py`.
 - In particular, these checks do not prove current native Codex routing for all
-  six roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
-  defines the historical/runtime/documentation evidence boundary and the
-  two-version native-probe gate for removing the V2 shim; `max_depth` has a
-  separate gate.
+  eight declared roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
+  preserves the historical six-role observation and defines the native-evidence
+  boundary and removal gates; `max_depth` has a separate gate.
 
 ## Native Client Acceptance (Opt-In)
 
@@ -118,6 +145,9 @@ project trust, and emits only fixed schema-v2 sentinels and event-backed check
 state. `--require` also promotes unresolved `WARN` evidence to a nonzero
 result. Exact Codex routing can PASS only from explicit client JSONL
 agent/thread/subagent metadata; model prose or an absent event is not proof.
+The current declared matrix contains eight roles, while the dated 2026-08-09
+observation contains six. Future optional persistent-thread runs may exercise
+all eight without becoming required verification for this feature.
 Compact/resume and coder escalation currently remain unexercised WARNs. See
 [Native Client Acceptance](native-client-acceptance.md). Preparation refuses
 broad or nonempty unmarked paths and refreshes only marker-owned inputs; it

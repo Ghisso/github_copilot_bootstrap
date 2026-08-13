@@ -17,15 +17,19 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
-from typing import TypedDict, Unpack
+from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    CODEX_ROLE_SUPPLEMENT_DELIMITER,
     ROOT_GUIDANCE_WORKFLOW,
+    SUPPORTED_AGENT_TARGETS,
     codex_agent_metadata_header,
     codex_agent_prompt_body,
+    shared_agents,
     shared_policies,
+    transform_agent_text,
 )
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import CONSUMER_STATE_PATHS, render_restore_script
@@ -74,7 +78,24 @@ CODEX_ROLE_MODEL_INTENTS = {
     "documenter": ("gpt-5.6-luna", "medium"),
     "verifier": ("gpt-5.6-luna", "low"),
 }
-CODEX_CODER_ESCALATION = ("gpt-5.6-sol", "xhigh")
+CODEX_SPECIALIST_MODEL_INTENTS = {
+    "luna_coder": ("gpt-5.6-luna", "xhigh"),
+    "sol_coder": ("gpt-5.6-sol", "xhigh"),
+}
+CODEX_AGENT_MODEL_INTENTS = {
+    **CODEX_ROLE_MODEL_INTENTS,
+    **CODEX_SPECIALIST_MODEL_INTENTS,
+}
+CODEX_CODER_ESCALATION = "sol_coder"
+CODEX_ESCALATION_CHAIN = {"luna_coder": "coder", "coder": "sol_coder"}
+CODEX_AGENT_ALLOWED_FIELDS = {
+    "name",
+    "description",
+    "developer_instructions",
+    "model",
+    "model_reasoning_effort",
+    "sandbox_mode",
+}
 PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
     "orchestrator's evidence packet",
     "exact artifacts, supplied evidence, approved decisions, constraints",
@@ -1333,6 +1354,18 @@ def codex_agent_instruction_errors(
         errors.append("must use the generated metadata header and stable delimiter")
     if instructions.count(CODEX_AGENT_INSTRUCTIONS_DELIMITER) != 1:
         errors.append("must contain exactly one stable prompt delimiter")
+    prompt_base = agent.get("prompt_base")
+    supplement_path = (
+        REPO_ROOT / "shared" / "agents" / str(agent["id"]) / "prompt.openai-codex.md"
+    )
+    if isinstance(prompt_base, str) or supplement_path.exists():
+        supplement_delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(
+            agent_id=agent["id"]
+        )
+        if instructions.count(supplement_delimiter) != 1:
+            errors.append("must contain exactly one derived role-supplement delimiter")
+    elif "--- Codex role supplement:" in instructions:
+        errors.append("must not contain a derived role-supplement delimiter")
     if instructions.removeprefix(expected_prefix) != expected_prompt:
         errors.append("body must exactly match its transformed shared prompt")
     if "Before doing the task, read `.claude/agents/" in instructions:
@@ -1340,44 +1373,332 @@ def codex_agent_instruction_errors(
     return errors
 
 
-def validate_agents(errors: list[str]) -> None:
-    shared_agents = sorted((REPO_ROOT / "shared" / "agents").glob("*/agent.yaml"))
-    planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
-    orchestrator_prompt = read(
-        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
-    )
+CODEX_ORCHESTRATOR_ROUTING_REQUIRED_FRAGMENTS = (
+    "Do not run extra discovery solely to qualify a packet for Luna.",
+    "Goal and plan-step identity.",
+    "Relevant files, symbols, entry points, patterns, or failing checks.",
+    "Approved constraints and must-not-change behavior.",
+    "Rejected approaches when relevant.",
+    "Required skills.",
+    "Acceptance criteria and verification commands.",
+    "Freedom for the coder to choose the smallest maintainable local",
+    "Exclude broad conversation history and raw discovery output.",
+    "Choose `luna_coder` for that step only when all of the following are established:",
+    "1. A clear desired outcome.",
+    "2. Known relevant files, symbols, entry points, or failing checks.",
+    "3. Known constraints and must-not-change behavior.",
+    "4. Objective acceptance criteria and verification commands.",
+    "5. No unresolved architecture, interface, root-cause, migration, security, or",
+    "Otherwise choose `coder` directly. Decide independently for every",
+    '"status": "escalate"',
+    '"reason": "unknown-root-cause"',
+    '"workspace_changed": false',
+    '"evidence": ["..."]',
+    '"needed": ["..."]',
+    "unresolved-design-decision",
+    "unknown-root-cause",
+    "scope-not-bounded",
+    "missing-interface-contract",
+    "security-or-migration-decision",
+    "ownership-unclear",
+    "`workspace_changed` accurately reports whether Luna changed the workspace.",
+    "Use the named recovery path once per tier.",
+    "Luna structured blocker or",
+    "routes to `coder` with the original packet, blocker or",
+    "`coder` inspects and takes ownership of the existing diff; it does not assume a",
+    "clean workspace or blindly restart.",
+    "Only `implementation` routes once to `sol_coder` with all prior evidence and the",
+    "A Sol failure stops the loop and reports to the user.",
+    "Never retry the same tier, jump",
+    "from Luna directly to Sol, introduce Luna/max, or let a subagent choose its",
+    "concise `initial-coder`, `fallback`, and `reason` facts.",
+    "Do not create a routing",
+    "database, telemetry file, cost tracker, or merge gate.",
+)
+CODEX_ORCHESTRATOR_ROUTING_FORBIDDEN_LITERALS = (
+    "model_reasoning_effort",
+    "gpt-5.6-terra",
+    "gpt-5.6-sol",
+)
+CODEX_ORCHESTRATOR_ROUTING_OVERRIDE_PATTERN = re.compile(
+    r"\b(?:spawn(?: time)?|per call)(?: (?:luna|model|effort)(?: specific)?)* overrides?\b"
+    r"|\b(?:luna|model|effort)(?: specific)? overrides?\b"
+)
+CODEX_LUNA_ESCALATION_REASONS = {
+    "unresolved-design-decision",
+    "unknown-root-cause",
+    "scope-not-bounded",
+    "missing-interface-contract",
+    "security-or-migration-decision",
+    "ownership-unclear",
+}
+CODEX_FAILURE_ATTRIBUTION_REQUIRED_FRAGMENTS = (
+    "Before automatic escalation, the orchestrator classifies existing verifier",
+    "commands and results and reviewer findings as exactly one of:",
+    "A verifier failure alone is not sufficient for `implementation`.",
+    "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current",
+    "implementation diff.",
+    "Infrastructure errors, flaky or unreproduced failures,",
+    "and unrelated baseline findings must not spend a stronger model automatically.",
+    "The orchestrator may request focused evidence using existing agents or tools;",
+    "it must not invent attribution.",
+    "Only `implementation` routes once to `sol_coder` with all prior evidence and the",
+    "current diff, after an attributable Terra-produced failure.",
+)
+CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS = {
+    "implementation": (
+        "the current implementation caused the failure; advance exactly one tier "
+        "automatically."
+    ),
+    "environment": (
+        "a missing dependency, service, credential, sandbox restriction, unavailable "
+        "tool, or other execution-environment blocker; stop model escalation and "
+        "report it."
+    ),
+    "baseline": (
+        "evidence shows the failure existed on the originating branch or outside the "
+        "changed scope; stop model escalation and report it."
+    ),
+    "indeterminate": (
+        "the evidence cannot reliably attribute the failure; return to orchestrator "
+        "judgment with no automatic escalation."
+    ),
+}
+CODEX_FAILURE_ATTRIBUTION_LIST_END = (
+    "A verifier failure alone is not sufficient for `implementation`."
+)
+
+
+def codex_orchestrator_routing_errors(instructions: str) -> list[str]:
+    """Return missing or obsolete Codex-only coder-routing contract errors."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex orchestrator routing fragment: {fragment}"
+        for fragment in CODEX_ORCHESTRATOR_ROUTING_REQUIRED_FRAGMENTS
+        if fragment not in normalized_instructions
+    ]
+    normalized_terms = re.sub(r"[^a-z0-9]+", " ", normalized_instructions.lower())
     errors.extend(
-        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+        f"must not use obsolete Codex spawn override: {literal}"
+        for literal in CODEX_ORCHESTRATOR_ROUTING_FORBIDDEN_LITERALS
+        if literal in normalized_instructions.lower()
+    )
+    if CODEX_ORCHESTRATOR_ROUTING_OVERRIDE_PATTERN.search(normalized_terms):
+        errors.append(
+            "must not use obsolete Codex spawn or per-call override terminology"
+        )
+    return [
+        *errors,
+        *codex_orchestrator_escalation_errors(instructions),
+        *codex_orchestrator_attribution_errors(instructions),
+    ]
+
+
+def codex_orchestrator_escalation_errors(instructions: str) -> list[str]:
+    """Return errors for the exact prompt-enforced Luna escalation contract."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex Luna escalation clause: {clause}"
+        for clause in (
+            "Before editing where possible, `luna_coder` validates the packet.",
+            "it returns only this prompt-enforced escalation object; this is not a native typed protocol:",
+        )
+        if clause not in normalized_instructions
+    ]
+    escalation_match = re.search(
+        r"```json\s*(?P<object>\{.*?\})\s*```", instructions, flags=re.DOTALL
+    )
+    if escalation_match is None:
+        return [*errors, "missing Codex Luna escalation JSON object"]
+    try:
+        escalation = json.loads(escalation_match["object"])
+    except json.JSONDecodeError:
+        return [*errors, "invalid Codex Luna escalation JSON object"]
+    expected_keys = {"status", "reason", "workspace_changed", "evidence", "needed"}
+    if not isinstance(escalation, dict) or set(escalation) != expected_keys:
+        errors.append("Codex Luna escalation JSON must contain exactly five fields")
+        return errors
+    if escalation["status"] != "escalate":
+        errors.append("Codex Luna escalation status must be 'escalate'")
+    reason = escalation["reason"]
+    if not isinstance(reason, str) or reason not in CODEX_LUNA_ESCALATION_REASONS:
+        errors.append("Codex Luna escalation reason must be an allowed value")
+    if not isinstance(escalation["workspace_changed"], bool):
+        errors.append("Codex Luna escalation workspace_changed must be boolean")
+    if not isinstance(escalation["evidence"], list) or not isinstance(
+        escalation["needed"], list
+    ):
+        errors.append("Codex Luna escalation evidence and needed must be lists")
+    reasons_match = re.search(
+        r"`reason` is exactly one of (?P<reasons>.*?)\.\s+`workspace_changed`",
+        instructions,
+        flags=re.DOTALL,
+    )
+    if (
+        reasons_match is None
+        or set(re.findall(r"`([^`]+)`", reasons_match["reasons"]))
+        != CODEX_LUNA_ESCALATION_REASONS
+    ):
+        errors.append(
+            "Codex Luna escalation reason enum must contain exactly six values"
+        )
+    return errors
+
+
+def codex_orchestrator_attribution_errors(instructions: str) -> list[str]:
+    """Return errors for Codex-only failure-attribution and stop behavior."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex failure-attribution clause: {clause}"
+        for clause in CODEX_FAILURE_ATTRIBUTION_REQUIRED_FRAGMENTS
+        if clause not in normalized_instructions
+    ]
+    category_start = normalized_instructions.find("as exactly one of:")
+    category_end = normalized_instructions.find(
+        CODEX_FAILURE_ATTRIBUTION_LIST_END, category_start
+    )
+    if category_start == -1 or category_end == -1:
+        return [*errors, "missing Codex failure-attribution category list"]
+    category_section = normalized_instructions[
+        category_start + len("as exactly one of:") : category_end
+    ].strip()
+    normalized_category_section = " ".join(category_section.split())
+    expected_category_section = " ".join(
+        f"- `{label}`: {definition}"
+        for label, definition in CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS.items()
+    )
+    category_entries = re.findall(
+        r"- `(?P<label>[^`]+)`: (?P<definition>.*?)(?= - `|$)", category_section
+    )
+    if normalized_category_section != expected_category_section:
+        errors.append(
+            "Codex failure-attribution category list must contain only canonical bullets"
+        )
+    expected_labels = set(CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS)
+    labels = [label for label, _definition in category_entries]
+    if len(category_entries) != len(expected_labels) or set(labels) != expected_labels:
+        errors.append(
+            "Codex failure-attribution categories must be exactly implementation, environment, baseline, and indeterminate"
+        )
+    definitions_by_label = {
+        label: definition.strip() for label, definition in category_entries
+    }
+    for (
+        label,
+        expected_definition,
+    ) in CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS.items():
+        if (
+            labels.count(label) != 1
+            or definitions_by_label.get(label) != expected_definition
+        ):
+            errors.append(
+                f"Codex failure-attribution {label} category must have its exact behavior"
+            )
+    return errors
+
+
+def agent_membership_errors(
+    target: str, expected_agent_ids: set[str], generated_agent_ids: set[str]
+) -> list[str]:
+    """Return target-scoped omissions and leaks in generated agent files."""
+    missing = sorted(expected_agent_ids - generated_agent_ids)
+    unexpected = sorted(generated_agent_ids - expected_agent_ids)
+    errors: list[str] = []
+    if missing:
+        errors.append(f"{target} missing eligible agents: {missing}")
+    if unexpected:
+        errors.append(f"{target} contains ineligible agents: {unexpected}")
+    return errors
+
+
+def canonical_agent_contract_errors(
+    canonical_agents: list[tuple[dict[str, Any], Path]],
+) -> list[str]:
+    """Return drift errors for the closed six-universal/eight-Codex contract."""
+    expected_agent_ids = {
+        "github-copilot": set(CODEX_ROLE_MODEL_INTENTS),
+        "claude-code": set(CODEX_ROLE_MODEL_INTENTS),
+        "openai-codex": set(CODEX_AGENT_MODEL_INTENTS),
+    }
+    actual_agent_ids = {
+        target: {
+            agent["id"]
+            for agent, _agent_dir in canonical_agents
+            if target in agent["targets"]
+        }
+        for target in SUPPORTED_AGENT_TARGETS
+    }
+    errors: list[str] = []
+    for target, expected_ids in expected_agent_ids.items():
+        if actual_agent_ids[target] != expected_ids:
+            errors.append(
+                f"canonical {target} agents must match the closed routing contract"
+            )
+
+    codex_intents: dict[str, tuple[object, object]] = {}
+    codex_escalations: dict[str, object] = {}
+    for agent, _agent_dir in canonical_agents:
+        codex_intent = agent["model_intent"].get("openai-codex")
+        if not isinstance(codex_intent, dict):
+            continue
+        agent_id = agent["id"]
+        codex_intents[agent_id] = (
+            codex_intent.get("model"),
+            codex_intent.get("effort"),
+        )
+        if "escalate_to" in codex_intent:
+            codex_escalations[agent_id] = codex_intent["escalate_to"]
+    if codex_intents != CODEX_AGENT_MODEL_INTENTS:
+        errors.append(
+            "canonical Codex model/effort mappings drifted from the eight-agent contract"
+        )
+    if codex_escalations != CODEX_ESCALATION_CHAIN:
+        errors.append(
+            "canonical Codex escalation contract must be luna_coder -> coder -> sol_coder"
+        )
+    return errors
+
+
+def validate_agents(errors: list[str]) -> None:
+    try:
+        canonical_agents = shared_agents()
+    except ValueError as error:
+        errors.append(str(error))
+        return
+    planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
+    errors.extend(
+        planner_supervision_contract_errors(
+            planner_prompt,
+            read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"),
+        )
     )
     for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
         errors.extend(
             reporting_prompt_errors(prompt_path.parent.name, read(prompt_path))
         )
-    expected_count = len(shared_agents)
-    check(expected_count > 0, "no shared agents found under shared/agents/", errors)
+    check(
+        canonical_agents,
+        "no shared agents found under shared/agents/",
+        errors,
+    )
+    errors.extend(canonical_agent_contract_errors(canonical_agents))
     expected_codex_intents: dict[str, tuple[object, object]] = {}
     expected_claude_intents: dict[str, tuple[object, object]] = {}
     expected_github_models: dict[str, object] = {}
-    codex_escalations: dict[str, tuple[object, object]] = {}
+    agents_by_id = {agent["id"]: agent for agent, _agent_dir in canonical_agents}
+    agent_dirs_by_id = {agent["id"]: agent_dir for agent, agent_dir in canonical_agents}
 
-    for metadata_path in shared_agents:
-        data = json.loads(read(metadata_path))
+    for data, agent_dir in canonical_agents:
         agent_id = data["id"]
-        expected_github_models[agent_id] = data.get("model_intent", {}).get(
-            "github-copilot"
-        )
-        claude_intent = data.get("model_intent", {}).get("claude-code")
+        if "github-copilot" in data["targets"]:
+            expected_github_models[agent_id] = data["model_intent"]["github-copilot"]
+        claude_intent = data["model_intent"].get("claude-code")
         if isinstance(claude_intent, dict):
             expected_claude_intents[agent_id] = (
                 claude_intent.get("model"),
                 claude_intent.get("effort"),
             )
-        codex_intent = data.get("model_intent", {}).get("openai-codex")
-        check(
-            isinstance(codex_intent, dict),
-            f"{agent_id} must define an explicit openai-codex model intent",
-            errors,
-        )
+        codex_intent = data["model_intent"].get("openai-codex")
         if isinstance(codex_intent, dict):
             model = codex_intent.get("model")
             effort = codex_intent.get("effort")
@@ -1387,49 +1708,36 @@ def validate_agents(errors: list[str]) -> None:
             expected_codex_intents[agent_id] = (model, effort)
             escalate_to = codex_intent.get("escalate_to")
             if escalate_to is not None:
-                # Declarative-only: not consumed by the TOML emitter (Codex spawn-time
-                # overrides make a second generated adapter unnecessary), so its only
-                # contract is with the orchestrator prompt text that actually acts on
-                # it. Restricted to `coder` today; widen this check deliberately if
-                # another role grows an escalation lane.
                 check(
-                    agent_id == "coder",
-                    f"{agent_id} defines escalate_to but only coder is expected to",
+                    isinstance(escalate_to, str),
+                    f"{agent_id} escalate_to must name an agent ID",
                     errors,
                 )
-                check(
-                    isinstance(escalate_to, dict),
-                    f"{agent_id} escalate_to must be an object",
-                    errors,
-                )
-                if not isinstance(escalate_to, dict):
-                    continue
-                esc_model = escalate_to.get("model")
-                esc_effort = escalate_to.get("effort")
-                codex_escalations[agent_id] = (esc_model, esc_effort)
-                validate_codex_model_contract(
-                    f"{agent_id} escalate_to", esc_model, esc_effort, errors
-                )
-                check(
-                    (esc_model, esc_effort) != (model, effort),
-                    f"{agent_id} escalate_to must differ from its base Codex tier",
-                    errors,
-                )
-                check(
-                    isinstance(esc_model, str)
-                    and esc_model in orchestrator_prompt
-                    and isinstance(esc_effort, str)
-                    and esc_effort in orchestrator_prompt,
-                    "orchestrator prompt.md must name the coder escalate_to model/effort verbatim, or it will silently drift from agent.yaml",
-                    errors,
-                )
+        if "prompt_base" in data:
+            check(
+                not (agent_dir / "prompt.md").exists(),
+                f"{agent_id} derived prompt must not copy canonical prompt.md",
+                errors,
+            )
+            check(
+                (agent_dir / "prompt.openai-codex.md").exists(),
+                f"{agent_id} derived prompt missing Codex supplement",
+                errors,
+            )
+        else:
+            check(
+                (agent_dir / "prompt.md").exists(),
+                f"{agent_id} missing canonical prompt.md",
+                errors,
+            )
+        if agent_id == "orchestrator":
+            check(
+                (agent_dir / "prompt.openai-codex.md").exists(),
+                "orchestrator missing Codex routing supplement",
+                errors,
+            )
         check(
-            (metadata_path.parent / "prompt.md").exists(),
-            f"{agent_id} missing canonical prompt.md",
-            errors,
-        )
-        check(
-            not (metadata_path.parent / "targets").exists(),
+            not (agent_dir / "targets").exists(),
             f"{agent_id} must not keep target-specific prompt forks",
             errors,
         )
@@ -1445,53 +1753,63 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    check(
-        expected_codex_intents == CODEX_ROLE_MODEL_INTENTS,
-        "canonical Codex role model/effort mappings drifted from the six-role contract",
-        errors,
-    )
-    check(
-        codex_escalations == {"coder": CODEX_CODER_ESCALATION},
-        "canonical Codex escalation contract must contain only coder Sol/xhigh",
-        errors,
-    )
+    expected_agent_ids = {
+        target: {agent["id"] for agent, _agent_dir in shared_agents(target)}
+        for target in SUPPORTED_AGENT_TARGETS
+    }
 
     generated_github_agents = sorted(
         (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
     )
-    check(
-        len(generated_github_agents) == expected_count,
-        "GitHub agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "github-copilot",
+            expected_agent_ids["github-copilot"],
+            {path.name.removesuffix(".agent.md") for path in generated_github_agents},
+        )
     )
-    for metadata_path in shared_agents:
-        agent_id = json.loads(read(metadata_path))["id"]
+    for agent_id in expected_agent_ids["github-copilot"]:
         generated = TARGET_ROOT / ".github" / "agents" / f"{agent_id}.agent.md"
         check(generated.exists(), f"missing generated GitHub agent: {agent_id}", errors)
         if generated.exists():
             text = read(generated)
-            check(
-                ".claude/agents/" in text,
-                f"GitHub agent adapter must point at canonical .claude agent: {generated}",
-                errors,
-            )
-            for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", text):
+            agent = agents_by_id[agent_id]
+            if "claude-code" not in agent["targets"]:
+                prompt = transform_agent_text(
+                    read(agent_dirs_by_id[agent_id] / "prompt.md"), "github-copilot"
+                ).strip()
                 check(
-                    (TARGET_ROOT / reference).exists(),
-                    f"GitHub agent adapter points at missing canonical agent: {generated}: {reference}",
+                    ".claude/agents/" not in text
+                    and "This file is self-contained" in text
+                    and prompt in text,
+                    f"GitHub-only agent must be self-contained: {generated}",
                     errors,
                 )
-            check(
-                "This file is the GitHub Copilot native adapter" in text,
-                f"GitHub agent should be a thin native adapter: {generated}",
-                errors,
-            )
+            else:
+                check(
+                    ".claude/agents/" in text,
+                    f"GitHub agent adapter must point at canonical .claude agent: {generated}",
+                    errors,
+                )
+                for reference in re.findall(r"`(\.claude/agents/[^`]+\.md)`", text):
+                    check(
+                        (TARGET_ROOT / reference).exists(),
+                        f"GitHub agent adapter points at missing canonical agent: {generated}: {reference}",
+                        errors,
+                    )
+                check(
+                    "This file is the GitHub Copilot native adapter" in text,
+                    f"GitHub agent should be a thin native adapter: {generated}",
+                    errors,
+                )
 
     claude_agents = sorted((TARGET_ROOT / ".claude" / "agents").glob("*.md"))
-    check(
-        len(claude_agents) == expected_count,
-        "canonical .claude agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "claude-code",
+            expected_agent_ids["claude-code"],
+            {path.stem for path in claude_agents},
+        )
     )
     for path in claude_agents:
         text = read(path)
@@ -1572,10 +1890,12 @@ def validate_agents(errors: list[str]) -> None:
         )
 
     codex_agents = sorted((TARGET_ROOT / ".codex" / "agents").glob("*.toml"))
-    check(
-        len(codex_agents) == expected_count,
-        "Codex custom agent count must match shared agents",
-        errors,
+    errors.extend(
+        agent_membership_errors(
+            "openai-codex",
+            expected_agent_ids["openai-codex"],
+            {path.stem for path in codex_agents},
+        )
     )
     check(
         not (TARGET_ROOT / ".codex" / "rules").exists(),
@@ -1583,7 +1903,7 @@ def validate_agents(errors: list[str]) -> None:
         errors,
     )
 
-    expected_codex_names = set(expected_codex_intents)
+    expected_codex_names = expected_agent_ids["openai-codex"]
     check(
         {path.stem for path in codex_agents} == expected_codex_names,
         "Codex custom agent filenames must match mapped shared agent names",
@@ -1597,6 +1917,12 @@ def validate_agents(errors: list[str]) -> None:
         except tomllib.TOMLDecodeError as error:
             errors.append(f"invalid Codex custom agent TOML: {path}: {error}")
             continue
+        unsupported_fields = sorted(set(data) - CODEX_AGENT_ALLOWED_FIELDS)
+        check(
+            not unsupported_fields,
+            f"Codex agent must not define per-agent overrides: {path}: {unsupported_fields}",
+            errors,
+        )
         for field in ("name", "description", "developer_instructions"):
             check(
                 isinstance(data.get(field), str) and bool(data.get(field)),
@@ -1620,9 +1946,9 @@ def validate_agents(errors: list[str]) -> None:
             expected_effort=expected_effort,
         )
         instructions = str(data.get("developer_instructions", ""))
-        agent = json.loads(
-            read(REPO_ROOT / "shared" / "agents" / path.stem / "agent.yaml")
-        )
+        agent = agents_by_id.get(path.stem)
+        if agent is None:
+            continue
         errors.extend(
             f"Codex agent {error}: {path}"
             for error in codex_agent_instruction_errors(agent, instructions)
@@ -1631,6 +1957,11 @@ def validate_agents(errors: list[str]) -> None:
             f"generated Codex {error}: {path}"
             for error in reporting_prompt_errors(path.stem, instructions)
         )
+        if path.stem == "orchestrator":
+            errors.extend(
+                f"Codex orchestrator {error}: {path}"
+                for error in codex_orchestrator_routing_errors(instructions)
+            )
         if "tool-routing.instructions.md" in instructions:
             check(
                 "[mcp_servers." not in text,
@@ -5298,6 +5629,98 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     return ""
 
 
+def readme_agent_contract_errors(
+    readme_text: str, canonical_agents: list[tuple[dict[str, Any], Path]]
+) -> list[str]:
+    """Return README role-list and Codex-tier drift from canonical eligibility."""
+    target_agents = {
+        target: {
+            agent["id"]
+            for agent, _agent_dir in canonical_agents
+            if target in agent["targets"]
+        }
+        for target in SUPPORTED_AGENT_TARGETS
+    }
+    universal_agents = set.intersection(*target_agents.values())
+    codex_only_agents = target_agents["openai-codex"] - (
+        target_agents["github-copilot"] | target_agents["claude-code"]
+    )
+    errors: list[str] = []
+
+    def listed_agents(label: str) -> list[str] | None:
+        match = re.search(
+            rf"(?m)^{re.escape(label)} agents:\n\n(?P<items>(?:- [^\n]+\n)+)",
+            readme_text,
+        )
+        if match is None:
+            errors.append(f"README must have a '{label} agents:' list")
+            return None
+        return [
+            line[2:].strip().strip("`")
+            for line in match["items"].splitlines()
+            if line.strip()
+        ]
+
+    for label, expected_agents in (
+        ("Universal", universal_agents),
+        ("Codex-only", codex_only_agents),
+    ):
+        documented_agents = listed_agents(label)
+        if documented_agents is None:
+            continue
+        if len(documented_agents) != len(set(documented_agents)):
+            errors.append(f"README '{label} agents' list must not contain duplicates")
+        if len(documented_agents) != len(expected_agents):
+            errors.append(
+                f"README '{label} agents' list must have {len(expected_agents)} entries"
+            )
+        if set(documented_agents) != expected_agents:
+            errors.append(
+                f"README '{label} agents' list must match canonical target eligibility: "
+                f"readme={sorted(documented_agents)} "
+                f"canonical={sorted(expected_agents)}"
+            )
+
+    expected_codex_tiers: dict[str, tuple[str, str]] = {}
+    for agent, _agent_dir in canonical_agents:
+        codex_intent = agent["model_intent"].get("openai-codex")
+        if isinstance(codex_intent, dict):
+            model = codex_intent.get("model")
+            effort = codex_intent.get("effort")
+            if isinstance(model, str) and isinstance(effort, str):
+                expected_codex_tiers[agent["id"]] = (model, effort)
+    table_marker = (
+        "| Agent | Claude model | Claude effort | Codex model | Codex effort |\n"
+        "| --- | --- | --- | --- | --- |\n"
+    )
+    if readme_text.count(table_marker) != 1:
+        errors.append("README must have exactly one authoritative agent model table")
+        return errors
+    table_rows = readme_text.split(table_marker, 1)[1].split("\n\n", 1)[0].splitlines()
+    documented_codex_tiers: dict[str, tuple[str, str]] = {}
+    for row in table_rows:
+        if not row.startswith("|") or not row.endswith("|"):
+            errors.append("README agent model table must contain only data rows")
+            continue
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        if len(cells) != 5 or not cells[0]:
+            errors.append("README agent model table has a malformed data row")
+            continue
+        role = cells[0]
+        if role not in expected_codex_tiers:
+            errors.append(f"README agent model table has unexpected role {role}")
+            continue
+        if role in documented_codex_tiers:
+            errors.append(f"README must not duplicate the Codex model row for {role}")
+            continue
+        documented_codex_tiers[role] = (cells[3].strip("`"), cells[4].strip("`"))
+    if documented_codex_tiers != expected_codex_tiers:
+        errors.append(
+            "README Codex model/effort rows must match current canonical agent metadata"
+        )
+    return errors
+
+
 def validate_docs_parity(errors: list[str]) -> None:
     """R-VALID-02: mechanical drift-policing for authoring docs, mirroring
     upstream's check-surface-sync.py / check-skill-integrity.py after they
@@ -5351,25 +5774,11 @@ def validate_docs_parity(errors: list[str]) -> None:
         errors,
     )
 
-    # 2b. Agent names: README's "Current agents" list is EXACT (list == disk),
-    # unlike skills - every agent is small enough in number to list fully.
-    agents_match = re.search(r"Current agents:\n\n((?:- .+\n)+)", readme_text)
-    check(agents_match is not None, "README must have a 'Current agents:' list", errors)
-    if agents_match:
-        readme_agents = {
-            line[2:].strip()
-            for line in agents_match.group(1).splitlines()
-            if line.strip()
-        }
-        disk_agents = {
-            path.parent.name
-            for path in (REPO_ROOT / "shared" / "agents").glob("*/agent.yaml")
-        }
-        check(
-            readme_agents == disk_agents,
-            f"README 'Current agents' list must exactly match shared/agents/*/: readme={sorted(readme_agents)} disk={sorted(disk_agents)}",
-            errors,
-        )
+    # 2b. Agent names and Codex model/effort rows use canonical target
+    # eligibility. The six universal roles and two Codex-only implementation
+    # specialists are intentionally separate; a flat filesystem listing loses
+    # that target contract.
+    errors.extend(readme_agent_contract_errors(readme_text, shared_agents()))
 
     # 2c. Hook script names: docs/runtime-checks.md's guardrail list is EXACT
     # against shared/hooks/scripts/*.sh, excluding _lib-frontmatter.sh (a
