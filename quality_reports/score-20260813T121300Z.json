@@ -1,0 +1,33 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "878 passed in 50.32s",
+  "mypy_summary": "Success: no issues found in 22 source files",
+  "deductions": [],
+  "generated_at": "2026-08-13T12:00:38Z",
+  "branch": "codex-luna-coder-routing_implementation",
+  "head_sha": "1e09bf650032987f384639aea08bd1916095f1db",
+  "base_ref": "dev",
+  "merge_base_sha": "80a64951abd6c7a52d3f87820279b3b43f4ee8c2",
+  "phase": "2026-08-13_phase-C-codex-orchestrator-coder-routing",
+  "dirty": false,
+  "content_hash": "337c0d1c3602130ab43d7528fade4840d3a4b017",
+  "changed_files": [
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/coder/agent.yaml",
+    "shared/agents/luna_coder/agent.yaml",
+    "shared/agents/luna_coder/prompt.openai-codex.md",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/agents/orchestrator/prompt.openai-codex.md",
+    "shared/agents/sol_coder/agent.yaml",
+    "shared/agents/sol_coder/prompt.openai-codex.md",
+    "shared/schemas/agent.schema.json",
+    "tests/test_validate_targets.py"
+  ]
+}

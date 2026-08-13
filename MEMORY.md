@@ -422,3 +422,8 @@
   compose only a bounded role supplement, and test the rendered composition
   against an independent literal oracle so generator constants cannot mask
   drift.
+- [LEARN:tests] Prompt-policy validation must exercise semantics, not just
+  sentinel words. Parse embedded structured objects with type-safe checks,
+  assert complete enums and behavioral clauses independently, render every
+  target from current source in isolation tests, and use normalized patterns
+  for prohibited concept families whose wording can vary.
