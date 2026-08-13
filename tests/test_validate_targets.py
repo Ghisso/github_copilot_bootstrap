@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,8 @@ from validate_targets import (  # noqa: E402
     CONTEXT_MODE_PINNED_VERSION,
     POLICY_SCOPE_FIXTURES,
     codex_agent_instruction_errors,
+    canonical_agent_contract_errors,
+    codex_orchestrator_attribution_errors,
     codex_orchestrator_escalation_errors,
     codex_orchestrator_routing_errors,
     claude_rule_paths,
@@ -821,6 +824,183 @@ def test_codex_orchestrator_routing_is_self_contained_and_target_isolated(
         assert "Codex Coder Routing Supplement" not in instructions
 
 
+def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
+    """Only evidence-backed implementation failures can spend the next tier."""
+    orchestrator = next(
+        agent for agent, _agent_dir in shared_agents() if agent["id"] == "orchestrator"
+    )
+    rendered_codex = tomllib.loads(render_codex_agent_adapter(orchestrator))[
+        "developer_instructions"
+    ]
+
+    assert codex_orchestrator_attribution_errors(rendered_codex) == []
+    normalized_codex = " ".join(rendered_codex.split())
+    for clause in (
+        "`implementation`: the current implementation caused the failure; advance exactly one tier automatically.",
+        "`environment`: a missing dependency, service, credential, sandbox restriction, unavailable tool, or other execution-environment blocker; stop model escalation and report it.",
+        "`baseline`: evidence shows the failure existed on the originating branch or outside the changed scope; stop model escalation and report it.",
+        "`indeterminate`: the evidence cannot reliably attribute the failure; return to orchestrator judgment with no automatic escalation.",
+        "A verifier failure alone is not sufficient for `implementation`.",
+        "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current implementation diff.",
+        "Infrastructure errors, flaky or unreproduced failures, and unrelated baseline findings must not spend a stronger model automatically.",
+        "The orchestrator may request focused evidence using existing agents or tools; it must not invent attribution.",
+        "Only `implementation` routes once to `sol_coder` with all prior evidence and the current diff, after an attributable Terra-produced failure.",
+    ):
+        assert clause in normalized_codex
+
+    for removed_clause in (
+        "A verifier failure alone is not sufficient for `implementation`.",
+        "only when it applies to the current\nimplementation diff.",
+        "must not spend a stronger model automatically.",
+        "it must not invent attribution.",
+        "Only `implementation` routes once to\n`sol_coder` with all prior evidence and the current diff, after an attributable\nTerra-produced failure.",
+    ):
+        assert codex_orchestrator_attribution_errors(
+            rendered_codex.replace(removed_clause, "", 1)
+        )
+
+    category_mutations = (
+        (
+            "extra category",
+            "\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n- `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "categories must be exactly",
+        ),
+        (
+            "missing indeterminate category",
+            "- `indeterminate`: the evidence cannot reliably attribute the failure; return\n  to orchestrator judgment with no automatic escalation.\n",
+            "",
+            "indeterminate category",
+        ),
+        (
+            "environment stop drift",
+            "or other execution-environment blocker; stop\n  model escalation and report it.",
+            "or other execution-environment blocker; advance a tier automatically.",
+            "environment category",
+        ),
+        (
+            "baseline stop drift",
+            "outside the changed scope; stop model escalation and report it.",
+            "outside the changed scope; advance a tier automatically.",
+            "baseline category",
+        ),
+    )
+    for _name, source, replacement, expected_error in category_mutations:
+        mutated = rendered_codex.replace(source, replacement, 1)
+        assert mutated != rendered_codex, _name
+        assert any(
+            expected_error in error
+            for error in codex_orchestrator_attribution_errors(mutated)
+        )
+
+    unmatched_category_mutations = (
+        (
+            "alternate asterisk bullet",
+            "\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n* `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "alternate plus bullet",
+            "\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n+ `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "numbered category bullet",
+            "\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n1. `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+        ),
+        (
+            "stray prose before categories",
+            "as exactly one of:\n\n- `implementation`",
+            "as exactly one of:\n\nStray category prose.\n\n- `implementation`",
+        ),
+        (
+            "stray prose between categories",
+            "automatically.\n- `environment`",
+            "automatically.\nStray category prose.\n- `environment`",
+        ),
+        (
+            "stray prose after categories",
+            "\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\nStray category prose.\n\nA verifier failure alone is not sufficient for `implementation`.",
+        ),
+    )
+    for name, source, replacement in unmatched_category_mutations:
+        mutated = rendered_codex.replace(source, replacement, 1)
+        assert mutated != rendered_codex, name
+        assert any(
+            "category list must contain only canonical bullets" in error
+            for error in codex_orchestrator_attribution_errors(mutated)
+        )
+
+
+def test_canonical_coder_routing_contract_rejects_roster_tier_and_graph_drift() -> None:
+    """The universal-six/Codex-eight roster and named recovery chain are closed."""
+    canonical_agents = shared_agents()
+    assert canonical_agent_contract_errors(canonical_agents) == []
+
+    def changed_agents() -> list[tuple[dict[str, object], Path]]:
+        return [(deepcopy(agent), agent_dir) for agent, agent_dir in canonical_agents]
+
+    def agent_by_id(
+        agents: list[tuple[dict[str, object], Path]], agent_id: str
+    ) -> dict[str, object]:
+        return next(agent for agent, _agent_dir in agents if agent["id"] == agent_id)
+
+    for agent_id, model, effort in (
+        ("luna_coder", "gpt-5.6-luna", "max"),
+        ("coder", "gpt-5.6-sol", "high"),
+        ("sol_coder", "gpt-5.6-sol", "high"),
+    ):
+        drifted_agents = changed_agents()
+        intent = agent_by_id(drifted_agents, agent_id)["model_intent"]
+        assert isinstance(intent, dict)
+        codex_intent = intent["openai-codex"]
+        assert isinstance(codex_intent, dict)
+        codex_intent.update(model=model, effort=effort)
+        assert any(
+            "model/effort mappings drifted" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+
+    for source, successor in (
+        ("luna_coder", "sol_coder"),
+        ("coder", "coder"),
+        ("coder", None),
+    ):
+        drifted_agents = changed_agents()
+        intent = agent_by_id(drifted_agents, source)["model_intent"]
+        assert isinstance(intent, dict)
+        codex_intent = intent["openai-codex"]
+        assert isinstance(codex_intent, dict)
+        if successor is None:
+            codex_intent.pop("escalate_to")
+        else:
+            codex_intent["escalate_to"] = successor
+        assert any(
+            "escalation contract" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+
+    for target in ("github-copilot", "claude-code"):
+        drifted_agents = changed_agents()
+        luna = agent_by_id(drifted_agents, "luna_coder")
+        luna_targets = luna["targets"]
+        assert isinstance(luna_targets, tuple)
+        luna["targets"] = (*luna_targets, target)
+        assert any(
+            f"canonical {target} agents" in error
+            for error in canonical_agent_contract_errors(drifted_agents)
+        )
+    drifted_agents = changed_agents()
+    luna = agent_by_id(drifted_agents, "luna_coder")
+    luna["targets"] = ()
+    assert any(
+        "canonical openai-codex agents" in error
+        for error in canonical_agent_contract_errors(drifted_agents)
+    )
+
+
 @pytest.mark.parametrize(
     ("targets", "model_intent", "field"),
     (
@@ -1217,6 +1397,26 @@ def test_agent_membership_errors_reject_target_omission_and_leakage() -> None:
             ".github/agents/coder.agent.md",
             "github-copilot contains ineligible agents: ['leaked']",
         ),
+        (
+            ".github/agents/luna_coder.agent.md",
+            ".github/agents/coder.agent.md",
+            "github-copilot contains ineligible agents: ['luna_coder']",
+        ),
+        (
+            ".claude/agents/luna_coder.md",
+            ".claude/agents/coder.md",
+            "claude-code contains ineligible agents: ['luna_coder']",
+        ),
+        (
+            ".codex/agents/luna_coder.toml",
+            None,
+            "openai-codex missing eligible agents: ['luna_coder']",
+        ),
+        (
+            ".codex/agents/sol_coder.toml",
+            None,
+            "openai-codex missing eligible agents: ['sol_coder']",
+        ),
     ),
 )
 def test_validate_agents_rejects_generated_target_omission_and_leakage(
@@ -1242,6 +1442,29 @@ def test_validate_agents_rejects_generated_target_omission_and_leakage(
     target_validator.validate_agents(errors)
 
     assert expected in errors
+
+
+@pytest.mark.parametrize("field", ("skills", "mcp_servers"))
+def test_validate_agents_rejects_codex_agent_local_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    """Codex agents inherit skills and MCP configuration instead of overriding it."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".codex" / "agents" / "coder.toml"
+    agent_path.write_text(
+        f"{agent_path.read_text(encoding='utf-8')}\n{field} = []\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert any(
+        "must not define per-agent overrides" in error and field in error
+        for error in errors
+    )
 
 
 @pytest.mark.parametrize(

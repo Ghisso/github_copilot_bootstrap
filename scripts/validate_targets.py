@@ -17,7 +17,7 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
-from typing import TypedDict, Unpack
+from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
 from generate_targets import (
@@ -88,6 +88,14 @@ CODEX_AGENT_MODEL_INTENTS = {
 }
 CODEX_CODER_ESCALATION = "sol_coder"
 CODEX_ESCALATION_CHAIN = {"luna_coder": "coder", "coder": "sol_coder"}
+CODEX_AGENT_ALLOWED_FIELDS = {
+    "name",
+    "description",
+    "developer_instructions",
+    "model",
+    "model_reasoning_effort",
+    "sandbox_mode",
+}
 PLANNER_PROMPT_REQUIRED_FRAGMENTS = (
     "orchestrator's evidence packet",
     "exact artifacts, supplied evidence, approved decisions, constraints",
@@ -1399,7 +1407,7 @@ CODEX_ORCHESTRATOR_ROUTING_REQUIRED_FRAGMENTS = (
     "routes to `coder` with the original packet, blocker or",
     "`coder` inspects and takes ownership of the existing diff; it does not assume a",
     "clean workspace or blindly restart.",
-    "routes once to `sol_coder` with all prior evidence and the current diff.",
+    "Only `implementation` routes once to `sol_coder` with all prior evidence and the",
     "A Sol failure stops the loop and reports to the user.",
     "Never retry the same tier, jump",
     "from Luna directly to Sol, introduce Luna/max, or let a subagent choose its",
@@ -1424,6 +1432,41 @@ CODEX_LUNA_ESCALATION_REASONS = {
     "security-or-migration-decision",
     "ownership-unclear",
 }
+CODEX_FAILURE_ATTRIBUTION_REQUIRED_FRAGMENTS = (
+    "Before automatic escalation, the orchestrator classifies existing verifier",
+    "commands and results and reviewer findings as exactly one of:",
+    "A verifier failure alone is not sufficient for `implementation`.",
+    "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current",
+    "implementation diff.",
+    "Infrastructure errors, flaky or unreproduced failures,",
+    "and unrelated baseline findings must not spend a stronger model automatically.",
+    "The orchestrator may request focused evidence using existing agents or tools;",
+    "it must not invent attribution.",
+    "Only `implementation` routes once to `sol_coder` with all prior evidence and the",
+    "current diff, after an attributable Terra-produced failure.",
+)
+CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS = {
+    "implementation": (
+        "the current implementation caused the failure; advance exactly one tier "
+        "automatically."
+    ),
+    "environment": (
+        "a missing dependency, service, credential, sandbox restriction, unavailable "
+        "tool, or other execution-environment blocker; stop model escalation and "
+        "report it."
+    ),
+    "baseline": (
+        "evidence shows the failure existed on the originating branch or outside the "
+        "changed scope; stop model escalation and report it."
+    ),
+    "indeterminate": (
+        "the evidence cannot reliably attribute the failure; return to orchestrator "
+        "judgment with no automatic escalation."
+    ),
+}
+CODEX_FAILURE_ATTRIBUTION_LIST_END = (
+    "A verifier failure alone is not sufficient for `implementation`."
+)
 
 
 def codex_orchestrator_routing_errors(instructions: str) -> list[str]:
@@ -1444,7 +1487,11 @@ def codex_orchestrator_routing_errors(instructions: str) -> list[str]:
         errors.append(
             "must not use obsolete Codex spawn or per-call override terminology"
         )
-    return [*errors, *codex_orchestrator_escalation_errors(instructions)]
+    return [
+        *errors,
+        *codex_orchestrator_escalation_errors(instructions),
+        *codex_orchestrator_attribution_errors(instructions),
+    ]
 
 
 def codex_orchestrator_escalation_errors(instructions: str) -> list[str]:
@@ -1498,6 +1545,58 @@ def codex_orchestrator_escalation_errors(instructions: str) -> list[str]:
     return errors
 
 
+def codex_orchestrator_attribution_errors(instructions: str) -> list[str]:
+    """Return errors for Codex-only failure-attribution and stop behavior."""
+    normalized_instructions = " ".join(instructions.split())
+    errors = [
+        f"missing Codex failure-attribution clause: {clause}"
+        for clause in CODEX_FAILURE_ATTRIBUTION_REQUIRED_FRAGMENTS
+        if clause not in normalized_instructions
+    ]
+    category_start = normalized_instructions.find("as exactly one of:")
+    category_end = normalized_instructions.find(
+        CODEX_FAILURE_ATTRIBUTION_LIST_END, category_start
+    )
+    if category_start == -1 or category_end == -1:
+        return [*errors, "missing Codex failure-attribution category list"]
+    category_section = normalized_instructions[
+        category_start + len("as exactly one of:") : category_end
+    ].strip()
+    normalized_category_section = " ".join(category_section.split())
+    expected_category_section = " ".join(
+        f"- `{label}`: {definition}"
+        for label, definition in CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS.items()
+    )
+    category_entries = re.findall(
+        r"- `(?P<label>[^`]+)`: (?P<definition>.*?)(?= - `|$)", category_section
+    )
+    if normalized_category_section != expected_category_section:
+        errors.append(
+            "Codex failure-attribution category list must contain only canonical bullets"
+        )
+    expected_labels = set(CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS)
+    labels = [label for label, _definition in category_entries]
+    if len(category_entries) != len(expected_labels) or set(labels) != expected_labels:
+        errors.append(
+            "Codex failure-attribution categories must be exactly implementation, environment, baseline, and indeterminate"
+        )
+    definitions_by_label = {
+        label: definition.strip() for label, definition in category_entries
+    }
+    for (
+        label,
+        expected_definition,
+    ) in CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS.items():
+        if (
+            labels.count(label) != 1
+            or definitions_by_label.get(label) != expected_definition
+        ):
+            errors.append(
+                f"Codex failure-attribution {label} category must have its exact behavior"
+            )
+    return errors
+
+
 def agent_membership_errors(
     target: str, expected_agent_ids: set[str], generated_agent_ids: set[str]
 ) -> list[str]:
@@ -1509,6 +1608,54 @@ def agent_membership_errors(
         errors.append(f"{target} missing eligible agents: {missing}")
     if unexpected:
         errors.append(f"{target} contains ineligible agents: {unexpected}")
+    return errors
+
+
+def canonical_agent_contract_errors(
+    canonical_agents: list[tuple[dict[str, Any], Path]],
+) -> list[str]:
+    """Return drift errors for the closed six-universal/eight-Codex contract."""
+    expected_agent_ids = {
+        "github-copilot": set(CODEX_ROLE_MODEL_INTENTS),
+        "claude-code": set(CODEX_ROLE_MODEL_INTENTS),
+        "openai-codex": set(CODEX_AGENT_MODEL_INTENTS),
+    }
+    actual_agent_ids = {
+        target: {
+            agent["id"]
+            for agent, _agent_dir in canonical_agents
+            if target in agent["targets"]
+        }
+        for target in SUPPORTED_AGENT_TARGETS
+    }
+    errors: list[str] = []
+    for target, expected_ids in expected_agent_ids.items():
+        if actual_agent_ids[target] != expected_ids:
+            errors.append(
+                f"canonical {target} agents must match the closed routing contract"
+            )
+
+    codex_intents: dict[str, tuple[object, object]] = {}
+    codex_escalations: dict[str, object] = {}
+    for agent, _agent_dir in canonical_agents:
+        codex_intent = agent["model_intent"].get("openai-codex")
+        if not isinstance(codex_intent, dict):
+            continue
+        agent_id = agent["id"]
+        codex_intents[agent_id] = (
+            codex_intent.get("model"),
+            codex_intent.get("effort"),
+        )
+        if "escalate_to" in codex_intent:
+            codex_escalations[agent_id] = codex_intent["escalate_to"]
+    if codex_intents != CODEX_AGENT_MODEL_INTENTS:
+        errors.append(
+            "canonical Codex model/effort mappings drifted from the eight-agent contract"
+        )
+    if codex_escalations != CODEX_ESCALATION_CHAIN:
+        errors.append(
+            "canonical Codex escalation contract must be luna_coder -> coder -> sol_coder"
+        )
     return errors
 
 
@@ -1534,10 +1681,10 @@ def validate_agents(errors: list[str]) -> None:
         "no shared agents found under shared/agents/",
         errors,
     )
+    errors.extend(canonical_agent_contract_errors(canonical_agents))
     expected_codex_intents: dict[str, tuple[object, object]] = {}
     expected_claude_intents: dict[str, tuple[object, object]] = {}
     expected_github_models: dict[str, object] = {}
-    codex_escalations: dict[str, object] = {}
     agents_by_id = {agent["id"]: agent for agent, _agent_dir in canonical_agents}
     agent_dirs_by_id = {agent["id"]: agent_dir for agent, agent_dir in canonical_agents}
 
@@ -1566,7 +1713,6 @@ def validate_agents(errors: list[str]) -> None:
                     f"{agent_id} escalate_to must name an agent ID",
                     errors,
                 )
-                codex_escalations[agent_id] = escalate_to
         if "prompt_base" in data:
             check(
                 not (agent_dir / "prompt.md").exists(),
@@ -1607,36 +1753,10 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    check(
-        expected_codex_intents == CODEX_AGENT_MODEL_INTENTS,
-        "canonical Codex model/effort mappings drifted from the eight-agent contract",
-        errors,
-    )
-    check(
-        codex_escalations == CODEX_ESCALATION_CHAIN,
-        "canonical Codex escalation contract must be luna_coder -> coder -> sol_coder",
-        errors,
-    )
     expected_agent_ids = {
         target: {agent["id"] for agent, _agent_dir in shared_agents(target)}
         for target in SUPPORTED_AGENT_TARGETS
     }
-    universal_agent_ids = set(CODEX_ROLE_MODEL_INTENTS)
-    check(
-        expected_agent_ids["github-copilot"] == universal_agent_ids,
-        "GitHub Copilot must retain exactly the six universal agents",
-        errors,
-    )
-    check(
-        expected_agent_ids["claude-code"] == universal_agent_ids,
-        "Claude Code must retain exactly the six universal agents",
-        errors,
-    )
-    check(
-        expected_agent_ids["openai-codex"] == set(CODEX_AGENT_MODEL_INTENTS),
-        "Codex must contain exactly six universal agents plus luna_coder and sol_coder",
-        errors,
-    )
 
     generated_github_agents = sorted(
         (TARGET_ROOT / ".github" / "agents").glob("*.agent.md")
@@ -1797,6 +1917,12 @@ def validate_agents(errors: list[str]) -> None:
         except tomllib.TOMLDecodeError as error:
             errors.append(f"invalid Codex custom agent TOML: {path}: {error}")
             continue
+        unsupported_fields = sorted(set(data) - CODEX_AGENT_ALLOWED_FIELDS)
+        check(
+            not unsupported_fields,
+            f"Codex agent must not define per-agent overrides: {path}: {unsupported_fields}",
+            errors,
+        )
         for field in ("name", "description", "developer_instructions"):
             check(
                 isinstance(data.get(field), str) and bool(data.get(field)),
