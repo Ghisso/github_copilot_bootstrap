@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import glob
 import json
+import os
 import posixpath
 import re
 import shlex
@@ -59,8 +61,43 @@ GIT_READ_ONLY_SUBCOMMANDS = {
 GIT_GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree"}
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
-PROTECTED_LITERAL = re.compile(
-    r"(?:\.env(?:\.[\w.-]+)?|uv\.lock|credentials[^\s/'\"]*|[^\s/'\"]*secret[^\s/'\"]*|[^\s/'\"]+\.(?:pem|key)|(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|\.claude/settings\.json|\.codex/(?:config\.toml|hooks\.json))",
+QUOTED_GLOB = re.compile(r"(?<![=\w])(['\"])([^'\"]*[?*[][^'\"]*)\1")
+QUOTED_BRACE = re.compile(r"(['\"])([^'\"]*(?<!\$)\{[^'\"]+\}[^'\"]*)\1")
+QUOTED_VARIABLE = re.compile(r"(['\"])\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)(?:\})?\1")
+QUOTED_VARIABLE_AFFIX = re.compile(
+    r"(['\"])([^'\"]*)\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))([^'\"]*)\1"
+)
+QUOTED_VARIABLE_MARKER = re.compile(
+    r"^__PROTECT_FILES_QUOTED_VARIABLE_([A-Za-z_][A-Za-z0-9_]*)__$"
+)
+PROTECTED_PATH_LITERAL = re.compile(
+    r"(?:\.env(?:\.[\w.-]+)?|uv\.lock|credentials[-_.][\w.-]+|"
+    r"[^\s/'\"]+\.(?:pem|key)|(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
+    r"\.claude/settings\.json|\.codex/(?:config\.toml|hooks\.json))",
+    re.IGNORECASE,
+)
+OPAQUE_WRITE_PATH = re.compile(
+    r"(?:write_text|write_bytes)\(\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+BUILTIN_OPEN_PATH = re.compile(
+    r"(?<!\.)open\(\s*['\"]([^'\"]+)['\"](?:\s*,\s*(?:mode\s*=\s*)?['\"]([^'\"]+)['\"])?",
+    re.IGNORECASE,
+)
+PATHLIB_WRITE_PATH = re.compile(
+    r"Path\(\s*['\"]([^'\"]+)['\"]\s*\)\.write_(?:text|bytes)\(",
+    re.IGNORECASE,
+)
+PATHLIB_OPEN_WRITE_PATH = re.compile(
+    r"Path\(\s*['\"]([^'\"]+)['\"]\s*\)\.open\(\s*(?:mode\s*=\s*)?['\"]([^'\"]*)['\"]",
+    re.IGNORECASE,
+)
+BUILTIN_OPEN_KEYWORDS = re.compile(
+    r"(?<!\.)open\([^)]*file\s*=\s*['\"]([^'\"]+)['\"][^)]*mode\s*=\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+PATHLIB_OPEN_KEYWORDS = re.compile(
+    r"Path\(\s*['\"]([^'\"]+)['\"]\s*\)\.open\([^)]*mode\s*=\s*['\"]([^'\"]+)['\"]",
     re.IGNORECASE,
 )
 OPTION_VALUES = {
@@ -83,6 +120,7 @@ OPTION_VALUES = {
     "perl": {"-e", "-E", "-f", "-M", "-m"},
     "sed": {"-e", "-f", "--expression", "--file"},
 }
+QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
 
 
 class AmbiguousCommand(ValueError):
@@ -104,6 +142,7 @@ class UnparseableCommand(AmbiguousCommand):
 
 def normalize(path: str, repo_root: str) -> str:
     value = path.strip().strip("\"'").replace("\\", "/")
+    value = value.removeprefix(QUOTED_VALUE_PREFIX)
     if value.startswith("file://"):
         value = value[7:]
     if repo_root and value.startswith(repo_root.rstrip("/") + "/"):
@@ -126,15 +165,87 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
         base in {".env", ".env.local", "uv.lock"}
         or base.startswith((".env.", "credentials"))
         or base.endswith((".pem", ".key"))
-        or "secret" in base
     ):
         return normalized, False
     return None
 
 
-def protected_literals(value: str) -> list[str]:
-    """Return every protected-looking literal embedded in an opaque command."""
-    return [match.rstrip(",;:)") for match in PROTECTED_LITERAL.findall(value)]
+def resolve_operands(
+    paths: list[str], base_dir: str, repository_root: str = ""
+) -> list[str]:
+    """Expand filesystem operands without evaluating shell syntax."""
+    display_root = repository_root or base_dir
+    resolved: list[str] = []
+    for path in paths:
+        quoted_value = path.startswith(QUOTED_VALUE_PREFIX)
+        path = path.removeprefix(QUOTED_VALUE_PREFIX)
+        brace = re.search(r"\{([^{}]+)\}", path)
+        if brace:
+            for option in brace.group(1).split(","):
+                resolved.extend(
+                    resolve_operands(
+                        [path[: brace.start()] + option + path[brace.end() :]],
+                        base_dir,
+                        display_root,
+                    )
+                )
+            continue
+        if "@(" in path or "!(" in path or "+(" in path:
+            resolved.append(path)
+            resolved.extend(protected_path_literals(path))
+            continue
+        absolute = path if os.path.isabs(path) else os.path.join(base_dir, path)
+        matches = (
+            sorted(glob.glob(absolute))
+            if glob.has_magic(path) and not quoted_value
+            else [absolute]
+        )
+        if not matches:
+            resolved.append(path)
+            continue
+        for match in matches:
+            display = os.path.relpath(match, display_root) if display_root else match
+            resolved.append(display)
+            real = os.path.realpath(match)
+            if real != os.path.abspath(match):
+                resolved.append(
+                    os.path.relpath(real, display_root) if display_root else real
+                )
+    return resolved
+
+
+def resolve_from_directories(
+    paths: list[str], working_directories: list[str], repo_root: str
+) -> list[str]:
+    """Resolve operands against every cwd the parser considers possible."""
+    resolved: list[str] = []
+    for directory in working_directories:
+        resolved.extend(resolve_operands(paths, directory, repo_root))
+    return resolved
+
+
+def protected_path_literals(value: str) -> list[str]:
+    """Extract explicit high-confidence paths from opaque interpreter text."""
+    return [match.rstrip(",;:)") for match in PROTECTED_PATH_LITERAL.findall(value)]
+
+
+def opaque_write_paths(value: str) -> list[str]:
+    """Extract literal paths from common interpreter file-write calls."""
+    return (
+        [match.group(1) for match in OPAQUE_WRITE_PATH.finditer(value)]
+        + [match.group(1) for match in PATHLIB_WRITE_PATH.finditer(value)]
+        + [
+            match.group(1)
+            for pattern in (
+                BUILTIN_OPEN_PATH,
+                PATHLIB_OPEN_WRITE_PATH,
+                BUILTIN_OPEN_KEYWORDS,
+                PATHLIB_OPEN_KEYWORDS,
+            )
+            for match in pattern.finditer(value)
+            if any(character in (match.group(2) or "r") for character in "wax+")
+        ]
+    )
 
 
 def add_patch_paths(value: str, paths: list[str]) -> None:
@@ -152,7 +263,41 @@ def add_patch_paths(value: str, paths: list[str]) -> None:
                 break
 
 
+def protect_quoted_globs(command: str) -> str:
+    """Hide quoted glob characters so only shell-expanded patterns are resolved."""
+    count = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal count
+        value = match.group(2)
+        if any(character.isspace() or character in ";|&<>" for character in value):
+            return match.group(0)
+        marker = f"__PROTECT_FILES_QUOTED_GLOB_{count}__"
+        count += 1
+        return marker
+
+    command = QUOTED_GLOB.sub(replace, command)
+    command = QUOTED_BRACE.sub(replace, command)
+    command = QUOTED_VARIABLE.sub(
+        lambda match: f"__PROTECT_FILES_QUOTED_VARIABLE_{match.group(2)}__",
+        command,
+    )
+    return QUOTED_VARIABLE_AFFIX.sub(
+        lambda match: (
+            QUOTED_VALUE_PREFIX
+            + match.group(2)
+            + "${"
+            + (match.group(3) or match.group(4))
+            + "}"
+            + match.group(5)
+        ),
+        command,
+    )
+
+
 def split_segments(command: str) -> list[list[str]]:
+    command = command.replace("\\\n", "")
+    command = protect_quoted_globs(command)
     try:
         lexer = shlex.shlex(
             command.replace("\n", ";"), posix=True, punctuation_chars=";&|<>()"
@@ -198,6 +343,16 @@ def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
     """Replace whole-token `$NAME`/`${NAME}` references with tracked values."""
     resolved = []
     for token in tokens:
+        quoted = QUOTED_VARIABLE_MARKER.fullmatch(token)
+        if quoted and quoted.group(1) in variables:
+            resolved.append(QUOTED_VALUE_PREFIX + variables[quoted.group(1)])
+            continue
+        replaced = VARIABLE_REFERENCE.sub(
+            lambda match: variables.get(match.group(1), match.group(0)), token
+        )
+        if replaced != token:
+            resolved.append(replaced)
+            continue
         match = VARIABLE_REFERENCE.fullmatch(token)
         if match and match.group(1) in variables:
             resolved.append(variables[match.group(1)])
@@ -303,6 +458,56 @@ def git_subcommand(args: list[str]) -> str | None:
     return None
 
 
+def git_working_directory(args: list[str], shell_directory: str) -> str:
+    """Resolve leading Git `-C` options using Git's sequential semantics."""
+    directory = shell_directory
+    work_tree: str | None = None
+    index = 0
+    while index < len(args):
+        token = args[index]
+        if token == "-C":
+            if index + 1 == len(args):
+                raise AmbiguousCommand("git -C has no directory")
+            value = args[index + 1]
+            directory = (
+                value if os.path.isabs(value) else os.path.join(directory, value)
+            )
+            index += 2
+            continue
+        if token.startswith("-C") and token != "-C":
+            value = token[2:]
+            directory = (
+                value if os.path.isabs(value) else os.path.join(directory, value)
+            )
+            index += 1
+            continue
+        if token == "--work-tree":
+            if index + 1 == len(args):
+                raise AmbiguousCommand("git --work-tree has no directory")
+            value = args[index + 1]
+            work_tree = (
+                value if os.path.isabs(value) else os.path.join(directory, value)
+            )
+            index += 2
+            continue
+        if token.startswith("--work-tree="):
+            value = token.partition("=")[2]
+            if not value:
+                raise AmbiguousCommand("git --work-tree has no directory")
+            work_tree = (
+                value if os.path.isabs(value) else os.path.join(directory, value)
+            )
+            index += 1
+            continue
+        if not token.startswith("-"):
+            break
+        if token in GIT_GLOBAL_VALUE_OPTIONS:
+            index += 2
+        else:
+            index += 1
+    return os.path.normpath(work_tree or directory)
+
+
 def git_output_target(args: list[str]) -> str | None:
     """Return the value of git's `--output`/`--output=<path>` option, if any.
 
@@ -328,6 +533,8 @@ def segment_targets(
     variables: dict[str, str],
     confirmed: list[str],
     uncertain: list[str],
+    repo_root: str,
+    working_directories: list[str],
 ) -> None:
     """Classify one segment's mutation targets into `confirmed` or `uncertain`.
 
@@ -349,44 +556,87 @@ def segment_targets(
             index += 1
             if index == len(tokens) or tokens[index] in REDIRECTS:
                 raise AmbiguousCommand("redirection has no target")
-            confirmed.append(tokens[index])
+            confirmed.extend(
+                resolve_from_directories(
+                    [tokens[index]], working_directories, repo_root
+                )
+            )
         index += 1
 
     if command_info is None:
         return
     command, start = command_info
     args = tokens[start:]
-    if command in SIMPLE_MUTATORS:
-        confirmed.extend(operands(args, OPTION_VALUES.get(command, set())))
+    if command == "cd":
+        candidates = operands(args, set())
+        if len(candidates) != 1:
+            raise AmbiguousCommand("cd must have exactly one directory")
+        directory = candidates[0]
+        candidate = os.path.normpath(
+            directory
+            if os.path.isabs(directory)
+            else os.path.join(working_directories[-1], directory)
+        )
+        if candidate not in working_directories:
+            working_directories.append(candidate)
+    elif command in SIMPLE_MUTATORS:
+        confirmed.extend(
+            resolve_from_directories(
+                operands(args, OPTION_VALUES.get(command, set())),
+                working_directories,
+                repo_root,
+            )
+        )
     elif command in {"cp", "install"}:
-        directory = target_directory(args)
+        target_dir = target_directory(args)
         candidates = operands(
             args, OPTION_VALUES[command] | {"-t", "--target-directory"}
         )
-        if directory:
-            confirmed.extend(candidates)
-            confirmed.append(directory)
+        if target_dir:
+            confirmed.extend(
+                resolve_from_directories(candidates, working_directories, repo_root)
+            )
+            confirmed.extend(
+                resolve_from_directories([target_dir], working_directories, repo_root)
+            )
         elif candidates:
-            confirmed.extend(candidates)
+            confirmed.extend(
+                resolve_from_directories(candidates, working_directories, repo_root)
+            )
         else:
             raise AmbiguousCommand(f"{command} has no destination")
     elif command == "mv":
-        directory = target_directory(args)
+        target_dir = target_directory(args)
         candidates = operands(
             args, OPTION_VALUES[command] | {"-t", "--target-directory"}
         )
-        if directory:
-            confirmed.extend(candidates)
-            confirmed.append(directory)
+        if target_dir:
+            confirmed.extend(
+                resolve_from_directories(candidates, working_directories, repo_root)
+            )
+            confirmed.extend(
+                resolve_from_directories([target_dir], working_directories, repo_root)
+            )
         elif len(candidates) >= 2:
-            confirmed.extend(candidates)
+            confirmed.extend(
+                resolve_from_directories(
+                    candidates[:-1], working_directories, repo_root
+                )
+            )
+            confirmed.extend(
+                resolve_from_directories(
+                    [candidates[-1]], working_directories, repo_root
+                )
+            )
         else:
             raise AmbiguousCommand("mv has no source and destination")
     elif command in {"chmod", "chown"}:
         candidates = operands(args, OPTION_VALUES[command])
         if len(candidates) < 2:
             raise AmbiguousCommand(f"{command} has no path operand")
-        confirmed.extend(candidates[1:])
+        confirmed.extend(
+            resolve_from_directories(candidates[1:], working_directories, repo_root)
+        )
     elif command in {"sed", "perl"}:
         candidates = operands(args, OPTION_VALUES[command])
         inplace = any(
@@ -400,35 +650,64 @@ def segment_targets(
             required = 1 if command == "perl" else 2
             if len(candidates) < required:
                 raise AmbiguousCommand(f"{command} -i has no file target")
-            confirmed.extend(candidates if command == "perl" else candidates[1:])
+            confirmed.extend(
+                resolve_from_directories(
+                    candidates if command == "perl" else candidates[1:],
+                    working_directories,
+                    repo_root,
+                )
+            )
     elif command == "dd":
         confirmed.extend(
-            arg.partition("=")[2]
-            for arg in args
-            if arg.startswith("of=") and arg.partition("=")[2]
+            resolve_from_directories(
+                [
+                    arg.partition("=")[2]
+                    for arg in args
+                    if arg.startswith("of=") and arg.partition("=")[2]
+                ],
+                working_directories,
+                repo_root,
+            )
         )
     elif command == "git":
-        # git has too many mutating subcommands to enumerate safely, so only
-        # the provably read-only ones are cleared; everything else is uncertain.
-        if git_subcommand(args) not in GIT_READ_ONLY_SUBCOMMANDS:
-            uncertain.extend(token for token in args if protected(token, ""))
-            uncertain.extend(protected_literals(" ".join(args)))
-        else:
-            # Even a read-only subcommand can write directly to a file via
-            # --output; that destination is a confirmed target, not a
-            # merely-uncertain one.
-            output_target = git_output_target(args)
-            if output_target is not None:
-                confirmed.append(output_target)
+        subcommand = git_subcommand(args)
+        git_roots = [
+            git_working_directory(args, directory) for directory in working_directories
+        ]
+        output_target = git_output_target(args)
+        if output_target is not None:
+            confirmed.extend(
+                resolve_from_directories([output_target], git_roots, repo_root)
+            )
+        if subcommand == "mv":
+            subcommand_index = args.index(subcommand)
+            candidates = operands(args[subcommand_index + 1 :], OPTION_VALUES["mv"])
+            if len(candidates) < 2:
+                raise AmbiguousCommand("git mv has no source and destination")
+            confirmed.extend(resolve_from_directories(candidates, git_roots, repo_root))
+        elif subcommand not in GIT_READ_ONLY_SUBCOMMANDS and subcommand not in {
+            "commit",
+            "branch",
+            "fetch",
+            "merge",
+            "pull",
+            "push",
+            "rebase",
+            "tag",
+        }:
+            # For unmodelled mutating Git commands, inspect path-shaped
+            # arguments only. Do not scan commit messages or other prose.
+            uncertain.extend(token for token in args if protected(token, repo_root))
     elif command not in READ_ONLY:
-        # Unknown interpreters and archive tools are not proven read-only, but
-        # nor is a mutation confirmed: flag any protected literal as uncertain
-        # rather than guessing the command's syntax or failing the hook closed.
-        uncertain.extend(token for token in args if protected(token, ""))
-        uncertain.extend(protected_literals(" ".join(args)))
+        # Unknown commands are not interpreted as filesystem mutations merely
+        # because their source or prose contains a sensitive-looking word.
+        # Explicit paths remain covered by native edits and known mutators.
+        uncertain.extend(token for token in args if protected(token, repo_root))
+        uncertain.extend(protected_path_literals(" ".join(args)))
+        uncertain.extend(opaque_write_paths(" ".join(args)))
 
 
-def shell_targets(command: str) -> tuple[list[str], list[str]]:
+def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
     """Return (confirmed_targets, uncertain_targets) for a whole command line.
 
     A segment the classifier cannot fully model (AmbiguousCommand) does not
@@ -440,13 +719,22 @@ def shell_targets(command: str) -> tuple[list[str], list[str]]:
     confirmed: list[str] = []
     uncertain: list[str] = []
     variables: dict[str, str] = {}
+    working_directories = [repo_root]
     for segment in split_segments(command):
         try:
-            segment_targets(segment, variables, confirmed, uncertain)
+            segment_targets(
+                segment,
+                variables,
+                confirmed,
+                uncertain,
+                repo_root,
+                working_directories,
+            )
         except AmbiguousCommand:
             resolved = substitute(segment, variables)
-            uncertain.extend(token for token in resolved if protected(token, ""))
-            uncertain.extend(protected_literals(" ".join(resolved)))
+            uncertain.extend(token for token in resolved if protected(token, repo_root))
+            uncertain.extend(protected_path_literals(" ".join(resolved)))
+            uncertain.extend(opaque_write_paths(" ".join(resolved)))
     return confirmed, uncertain
 
 
@@ -526,7 +814,7 @@ def main() -> int:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise AmbiguousCommand("Bash payload has no command")
-        confirmed, uncertain = shell_targets(command)
+        confirmed, uncertain = shell_targets(command, repo_root)
         paths.extend(confirmed)
     else:
         native_targets(tool_input, paths)

@@ -119,13 +119,15 @@ native-edit matcher is `Edit|Write`; Claude additionally supports `MultiEdit`.
 The Bash wrapper invokes direct `python3` target classification rather than
 `uv run`, allowing protection before a project environment exists. It classifies
 mutation targets segment by segment, allows proven read-only inspection, checks
-copy/install/move sources and destinations, and fails closed for missing Python,
+resolved copy/install/move sources and destinations (including shell-expanded
+wildcards, `cd`, Git `-C`, and symlink targets), and fails closed for missing Python,
 redirects, in-place edits, and ambiguous commands. This preserves Codex's
 deny-only hook-config protection and Claude's approval path without routing Read
 or MCP calls through a mutation handler. Opaque command handling is deliberately
 literal-based rather than a claim that every unknown command mutates: it covers
-`.env*`, `uv.lock`, `credentials*`, secret names, `.pem`/`.key`, hook paths, and
-protected hook configuration files.
+high-confidence `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key`, hook paths,
+and protected hook configuration files; arbitrary prose and ordinary source
+filenames containing `secret` are not treated as credentials.
 
 The generated consumer config is mirrored under
 `.claude/bootstrap-root/.codex/` for restoration. The bootstrap repository's
