@@ -449,7 +449,6 @@ def test_protect_files_allows_read_only_or_non_targeted_protected_paths(
         "bash -c 'cat credentials-prod.json > /tmp/out'",
         'python3 -c \'open("deploy.key", "w")\'',
         "bash -c 'cat uv.lock > /tmp/out'",
-        'python3 -c \'open("db_secret_backup.txt", "w")\'',
         "bash -c 'cat service.pem > /tmp/out'",
         'python3 -c \'open(".claude/hooks/guard.sh", "w")\'',
         "bash -c 'cat .codex/hooks.json > /tmp/out'",
@@ -474,6 +473,443 @@ def test_protect_files_blocks_mutation_targets(command: str) -> None:
     )
     assert process.returncode == 0, process.stderr
     assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git mv terraform/secrets.tf terraform/aws/secrets.tf",
+        'git commit -m "fix: Needs AWS credentials for deploy"',
+        "grep -n closeout .claude/hooks/scripts/enforce-commit-gate.sh",
+        "python3 - <<'PY'\ndef secret(self, ref: str):\n    return ref\nPY",
+        'python3 -c \'open("db_secret_backup.txt", "w")\'',
+    ),
+)
+def test_protect_files_allows_non_path_secret_words(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_expands_mutating_glob_before_classification(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "normal.tf").write_text("", encoding="utf-8")
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv {source}/* {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_allows_mutating_glob_with_only_normal_sources(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "main.tf").write_text("", encoding="utf-8")
+    (source / "secrets.tf").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv {source}/* {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_tracks_cd_before_expanding_mutating_glob(tmp_path: Path) -> None:
+    source = tmp_path / "terraform"
+    destination = source / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cd {source} && mv * aws/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_does_not_expand_quoted_glob(tmp_path: Path) -> None:
+    source = tmp_path / "terraform"
+    destination = tmp_path / "aws"
+    source.mkdir()
+    destination.mkdir()
+    (source / "credentials-prod.json").write_text("", encoding="utf-8")
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"mv '{source}/*' {destination}/"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cd missing || mv * /tmp/out",
+        "cd /tmp | mv * /tmp/out",
+    ),
+)
+def test_protect_files_checks_original_cwd_when_cd_is_not_provable(
+    tmp_path: Path, command: str
+) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cd {tmp_path} && {command}"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_wildcard_move_destination() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "mv README.md .claude/h?oks/scripts/protect-files.py"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_keeps_protected_paths_inside_quoted_interpreter_text() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "bash -c 'printf x > .env; echo *'"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_expands_quoted_assignment_at_unquoted_use(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && PATTERN='*'; mv $PATTERN /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_does_not_expand_variable_at_quoted_use(tmp_path: Path) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && PATTERN='*'; mv \"$PATTERN\" /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    ('X=.env; touch "${X}.local"', "X=.env; touch ${X}.local"),
+)
+def test_protect_files_substitutes_variable_with_suffix(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_does_not_expand_quoted_braces(tmp_path: Path) -> None:
+    (tmp_path / "credentials-prod.json").write_text("", encoding="utf-8")
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": f"cd {tmp_path} && mv '{{credentials-prod.json,main.tf}}' /tmp/out"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_expands_simple_brace_operand() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "mv {.env,README.md} /tmp/out"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    ("mv .e\\\nnv /tmp/out", "printf x > .e\\\nnv"),
+)
+def test_protect_files_applies_shell_line_continuation(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_git_mv_of_protected_source() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git mv .env examples/environment"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_applies_git_c_before_resolving_mv_source() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "git -C .claude mv hooks/scripts/guard.sh archive/guard.sh"
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/guard.sh" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cd .claude && git mv hooks/scripts/protect-files.py archive/protect-files.py",
+        "git --git-dir=.claude/.git --work-tree=.claude mv hooks/scripts/protect-files.py archive/protect-files.py",
+    ),
+)
+def test_protect_files_blocks_git_mv_from_effective_worktree(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_git_archive_output() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git archive --output=.env HEAD"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_resolves_git_output_from_git_c() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "git -C .claude diff --output=hooks/new.patch"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/new.patch" in process.stdout
+
+
+def test_protect_files_blocks_mutation_through_symlinked_protected_source(
+    tmp_path: Path,
+) -> None:
+    protected_source = tmp_path / "credentials-prod.json"
+    protected_source.write_text("", encoding="utf-8")
+    alias = tmp_path / "ordinary.json"
+    alias.symlink_to(protected_source)
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"cp {alias} {tmp_path / 'copy.json'}"},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "credentials-prod.json" in process.stdout
+
+
+def test_protect_files_blocks_write_through_symlinked_directory(tmp_path: Path) -> None:
+    protected_dir = tmp_path / ".claude" / "hooks"
+    protected_dir.mkdir(parents=True)
+    alias = tmp_path / "ordinary"
+    alias.symlink_to(protected_dir, target_is_directory=True)
+
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"printf x > {alias / 'new.sh'}"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/new.sh" in process.stdout
+
+
+def test_protect_files_blocks_exact_credentials_path_in_interpreter() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'python3 -c \'open("credentials", "w")\''},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_write_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").write_text("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_open_write_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("w").write("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_blocks_pathlib_open_update_to_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("r+").write("x")\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 -c \'open("credentials", mode="w")\'',
+        'python3 -c \'Path("credentials").open(mode="w").write("x")\'',
+    ),
+)
+def test_protect_files_blocks_keyword_open_write_mode(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 -c \'open(file="credentials", mode="w")\'',
+        'python3 -c \'Path("credentials").open(encoding="utf-8", mode="w").write("x")\'',
+    ),
+)
+def test_protect_files_blocks_reordered_keyword_open_write(command: str) -> None:
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_allows_pathlib_open_read_of_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": 'python3 -c \'Path("credentials").open("r").read()\''
+            },
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_builtin_open_read_of_exact_credentials() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'python3 -c \'open("credentials", "r")\''},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_credentials_as_interpreter_prose() -> None:
+    process = _run_protect_files(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 -c 'print(\"credentials\")'"},
+        }
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
 
 
 @pytest.mark.parametrize(

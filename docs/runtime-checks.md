@@ -170,11 +170,13 @@ malformed payloads, classifier errors, incomplete redirects, indeterminate
 in-place targets, and ambiguous shell syntax must fail closed. The classifier
 must preserve the proven read-only path while checking both source and
 destination operands of copy/install/move operations, so a protected source
-cannot be exfiltrated through a write-bearing command. For opaque command or
-interpreter syntax, verify conservative literal coverage for `.env*`, `uv.lock`,
-`credentials*`, secret names, `.pem`/`.key` files, hook paths, and protected
-hook configuration files; do not require denial of unknown commands that carry
-none of those literals.
+cannot be exfiltrated through a write-bearing command. Resolve supported
+wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. For
+opaque command or interpreter syntax, verify conservative high-confidence path
+coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
+paths, and protected hook configuration files; do not treat prose or ordinary
+source filenames containing `secret` as credentials, and do not require denial
+of unknown commands that carry none of those path literals.
 
 The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
 
