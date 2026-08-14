@@ -4,6 +4,14 @@
 
 ## Domain-Specific
 
+- [LEARN:security] Shell mutation guards must preserve expansion provenance and
+  consider plausible effective cwd, Git work-tree, symlink targets, and
+  supported expansion. Raw command-word matching causes both noisy false
+  positives and protected-file bypasses.
+- [LEARN:testing] Pair newly allowed guard regressions with adjacent denied
+  mutations, then run adversarial refutation; happy-path glob tests alone do
+  not establish a fail-closed operation classifier.
+
 - [LEARN:domain] This repository is a source-of-truth multi-target agent
   bootstrap, not a Hydra/BentoML/Haystack/Gradio application. Generated output
   is `dist/multi-agent/`; durable project findings are in

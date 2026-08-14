@@ -1,0 +1,34 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-14T00:26:23Z",
+  "branch": "protect-files-operation-resolution_implementation",
+  "head_sha": "717063d33f4ce25061a8aa534ab2341ff6c66a0d",
+  "base_ref": "dev",
+  "merge_base_sha": "717063d33f4ce25061a8aa534ab2341ff6c66a0d",
+  "phase": "2026-08-14_phase-a-protect-files-operation-resolution",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "518c9a81e05e27531d0023045f645e85c2b4a98b",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "shared/hooks/scripts/protect-files.py",
+    "tests/test_hook_gates.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
