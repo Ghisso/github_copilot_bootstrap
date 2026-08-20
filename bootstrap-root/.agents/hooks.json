@@ -1,0 +1,16 @@
+{
+  "bootstrap-safety": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; exec \"$REPO_ROOT/.claude/hooks/scripts/antigravity-pretool.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
