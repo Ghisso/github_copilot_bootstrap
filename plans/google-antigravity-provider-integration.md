@@ -1,15 +1,15 @@
 ---
 name: google-antigravity-provider-integration
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: google-antigravity-provider-integration_implementation
-started_at:
+started_at: 2026-08-20T15:02:59Z
 phases:
   - 2026-08-20_phase-A-antigravity-provider-and-static-adapters
   - 2026-08-20_phase-B-antigravity-hook-runtime-and-safety
   - 2026-08-20_phase-C-antigravity-installer-and-native-acceptance
-current_phase:
+current_phase: 2026-08-20_phase-A-antigravity-provider-and-static-adapters
 ---
 
 # Big Plan: Google Antigravity provider integration

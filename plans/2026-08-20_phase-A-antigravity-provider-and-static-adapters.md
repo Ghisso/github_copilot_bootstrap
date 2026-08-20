@@ -3,8 +3,8 @@ name: 2026-08-20_phase-A-antigravity-provider-and-static-adapters
 type: small-plan
 parent_plan: google-antigravity-provider-integration
 phase_index: 0
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-21_antigravity-phase-a.md
 ---
 
 # Phase A: Antigravity provider contract and static adapters
