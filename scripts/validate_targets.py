@@ -2230,6 +2230,16 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             require_agent_settings=False,
         )
     )
+    authoring_codex_servers = authoring_config.get("mcp_servers", {})
+    if isinstance(authoring_codex_servers, dict):
+        check(
+            authoring_codex_servers.get("context-mode")
+            == shared_mcp.get("context-mode"),
+            "authoring Codex Context Mode MCP server must match the guarded shared route",
+            errors,
+        )
+    else:
+        errors.append("authoring Codex config mcp_servers must be a table")
     check(
         "[mcp_servers.semble]" in codex_config,
         "Codex config missing Semble MCP server",
