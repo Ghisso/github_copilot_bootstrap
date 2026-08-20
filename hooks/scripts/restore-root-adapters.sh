@@ -128,8 +128,8 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$OWNERSHIP_MANIFEST"
 
 ((${#paths[@]})) || fail "manifest contains no adapter paths"
-if ((${#antigravity_paths[@]})); then
-  [[ -r "$ANTIGRAVITY_ALLOWLIST" ]] || fail "missing Antigravity ownership allowlist"
+if [[ -e "$ANTIGRAVITY_ALLOWLIST" ]]; then
+  [[ -r "$ANTIGRAVITY_ALLOWLIST" ]] || fail "cannot read Antigravity ownership allowlist"
   allowed_antigravity_paths=()
   while IFS= read -r line || [[ -n "$line" ]]; do
     case "$line" in
@@ -158,6 +158,8 @@ if ((${#antigravity_paths[@]})); then
     done
     "$found" || fail "Antigravity manifest must match generated allowlist"
   done
+elif ((${#antigravity_paths[@]})); then
+  fail "missing Antigravity ownership allowlist"
 fi
 paths+=("${antigravity_paths[@]}")
 
