@@ -11,6 +11,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
 - Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode for large outputs or compaction-safe continuity. Missing optional retrieval helpers are warnings, not hard failures.
+- For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Compact internal agent handoffs may still use `caveman full`. See `.claude/instructions/agent-reporting.instructions.md` for the complete policy.
 
 ## Task Lanes
 

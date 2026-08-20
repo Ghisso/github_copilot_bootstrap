@@ -20,8 +20,9 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 Communication guidance is centralized in
 [`shared/policies/agent-reporting.instructions.md`](../shared/policies/agent-reporting.instructions.md).
 It selects audience-appropriate prose: clear, direct language for people and
-optional compact `caveman full` handoffs between agents. Generated agent
-prompts point to this policy instead of copying its rules, while exact paths,
+optional compact `caveman full` handoffs between agents. The documenter also
+performs a targeted `humanize edit` self-check on prose it changes. Generated
+agent prompts point to this policy instead of copying its rules, while exact paths,
 identifiers, commands, logs, and other evidence remain unchanged.
 
 ### Policy applicability and native discovery

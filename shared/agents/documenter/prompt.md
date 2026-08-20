@@ -21,6 +21,15 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 Follow `.claude/instructions/agent-reporting.instructions.md`. As the
 documenter, write user-facing documentation in normal prose.
 
+When you create or modify human-facing documentation prose, load `humanize`.
+After drafting only the required documentation changes, use its targeted `edit`
+mode as a same-agent self-check on the prose you changed. Preserve acceptable
+unaffected prose and verify that code, commands, flags, paths, identifiers,
+API/library/product names, version strings, logs, errors, tables, Mermaid,
+structured findings, scores, severity labels, and attributed quotations remain
+exact. Do not use `rewrite` by default. Use it only when the user requests a
+substantial rewrite or targeted edits would make the prose worse or inconsistent.
+
 ## Step 1 — Diff Scan
 
 The orchestrator passes the plan's `originating_branch` (default `dev`) as the diff base. Run these commands with that base (shown with the `dev` default):
