@@ -16,8 +16,15 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from generate_targets import render_claude_settings, render_codex_hooks  # noqa: E402
-from validate_targets import validate_claude_lifecycle_hooks  # noqa: E402
+from generate_targets import (  # noqa: E402
+    render_antigravity_hooks,
+    render_claude_settings,
+    render_codex_hooks,
+)
+from validate_targets import (  # noqa: E402
+    antigravity_hook_errors,
+    validate_claude_lifecycle_hooks,
+)
 
 CODEX_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "codex-stop.sh"
 CLAUDE_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "claude-stop.sh"
@@ -335,6 +342,34 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     assert "publish" not in session_end_handler["command"]
     assert "push" not in session_end_handler["command"]
     assert session_end_handler["timeout"] == 3
+
+
+def test_rendered_antigravity_hook_uses_only_proven_pretool_safety(
+    tmp_path: Path,
+) -> None:
+    """Generated catch-all dispatch sends unknown tools to the denying bridge."""
+    hooks_path = tmp_path / "hooks.json"
+
+    render_antigravity_hooks(hooks_path)
+
+    hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
+    assert antigravity_hook_errors(hooks) == []
+    assert set(hooks) == {"bootstrap-safety"}
+    assert set(hooks["bootstrap-safety"]) == {"PreToolUse"}
+    handler = hooks["bootstrap-safety"]["PreToolUse"][0]
+    assert handler["matcher"] == "*"
+
+    result = subprocess.run(
+        ["bash", "-c", handler["hooks"][0]["command"]],
+        cwd=REPO_ROOT,
+        input=json.dumps({"toolCall": {"name": "unverified_write", "args": {}}}),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["decision"] == "deny"
 
 
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(

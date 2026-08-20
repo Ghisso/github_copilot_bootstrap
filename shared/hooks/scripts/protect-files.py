@@ -151,22 +151,37 @@ def normalize(path: str, repo_root: str) -> str:
 
 
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
-    normalized = normalize(path, repo_root)
-    if (
-        normalized in HOOK_CONFIGS
-        or normalized.startswith((".github/hooks/", ".claude/hooks/", ".codex/hooks/"))
-        or "/.claude/hooks/" in normalized
-        or "/.github/hooks/" in normalized
-        or "/.codex/hooks/" in normalized
-    ):
-        return normalized, True
-    base = posixpath.basename(normalized).lower()
-    if (
-        base in {".env", ".env.local", "uv.lock"}
-        or base.startswith((".env.", "credentials"))
-        or base.endswith((".pem", ".key"))
-    ):
-        return normalized, False
+    raw = normalize(path, repo_root)
+    candidate = path.strip().strip("\"'").replace("\\", "/")
+    if candidate.startswith("file://"):
+        candidate = candidate[7:]
+    if not os.path.isabs(candidate):
+        candidate = os.path.join(repo_root, candidate)
+    resolved = os.path.realpath(candidate)
+    normalized_paths = [raw]
+    if repo_root:
+        normalized_paths.append(os.path.relpath(resolved, repo_root).replace("\\", "/"))
+    else:
+        normalized_paths.append(resolved.replace("\\", "/"))
+    for normalized in normalized_paths:
+        normalized = posixpath.normpath(normalized).removeprefix("./")
+        if (
+            normalized in HOOK_CONFIGS
+            or normalized.startswith(
+                (".github/hooks/", ".claude/hooks/", ".codex/hooks/")
+            )
+            or "/.claude/hooks/" in normalized
+            or "/.github/hooks/" in normalized
+            or "/.codex/hooks/" in normalized
+        ):
+            return normalized, True
+        base = posixpath.basename(normalized).lower()
+        if (
+            base in {".env", ".env.local", "uv.lock"}
+            or base.startswith((".env.", "credentials"))
+            or base.endswith((".pem", ".key"))
+        ):
+            return normalized, False
     return None
 
 
@@ -764,9 +779,13 @@ def emit(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
     if hooks:
-        decision = "deny" if target_id == "openai-codex" else "ask"
+        decision = (
+            "deny"
+            if target_id in {"openai-codex", "google-antigravity"}
+            else "ask"
+        )
         reason = (
-            "Editing hook files is blocked in Codex because PreToolUse cannot request approval: "
+            "Editing hook files is blocked because PreToolUse cannot request approval: "
             if decision == "deny"
             else "Editing hook files requires approval: "
         ) + ", ".join(hooks)

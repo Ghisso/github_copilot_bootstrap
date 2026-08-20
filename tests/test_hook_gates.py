@@ -4,15 +4,49 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_SRC = REPO_ROOT / "shared" / "hooks" / "scripts"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from generate_targets import ANTIGRAVITY_TOOL_MAP  # noqa: E402
+
+
+def _run_antigravity_pretool(payload: dict) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=REPO_ROOT,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "REPO_ROOT": str(REPO_ROOT)},
+    )
+
+
+def _run_native_protect_files(
+    payload: dict, repo_root: Path
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "python3",
+            str(SCRIPT_SRC / "protect-files.py"),
+            "google-antigravity",
+            str(repo_root),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
 
 
 def _bash_source(script: Path, expression: str) -> subprocess.CompletedProcess[str]:
@@ -1153,6 +1187,212 @@ def test_protect_files_python_3_9_compatibility() -> None:
     )
     assert malformed.returncode == 2, "Malformed payload should fail closed"
     assert '"permissionDecision":"deny"' in malformed.stdout
+
+
+def test_antigravity_pretool_allows_safe_command_with_json_only_stdout() -> None:
+    """The bridge preserves a clean protocol response for allowed commands."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "git status", "Cwd": str(REPO_ROOT)},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+    assert process.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    sorted(
+        {
+            tool
+            for capability in ("read", "search", "delegate", "web")
+            for tool in ANTIGRAVITY_TOOL_MAP[capability]
+        }
+    ),
+)
+def test_antigravity_pretool_allows_known_non_mutating_tools(tool_name: str) -> None:
+    """The wildcard bridge admits every generated non-mutating tool."""
+    process = _run_antigravity_pretool({"toolCall": {"name": tool_name, "args": {}}})
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+def test_antigravity_pretool_non_mutating_allowlist_matches_generator() -> None:
+    """The standalone bridge cannot drift from generated tool capabilities."""
+    bridge = runpy.run_path(str(SCRIPT_SRC / "antigravity-pretool.py"))
+    expected = {
+        tool
+        for capability in ("read", "search", "delegate", "web")
+        for tool in ANTIGRAVITY_TOOL_MAP[capability]
+    }
+
+    assert bridge["NON_MUTATING_TOOLS"] == expected
+
+
+def test_antigravity_pretool_is_python_3_9_compatible() -> None:
+    """The standalone bridge stays parseable by the hook runtime baseline."""
+    process = subprocess.run(
+        ["python3", "-m", "py_compile", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert process.returncode == 0, process.stderr
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    ("write_to_file", "replace_file_content", "multi_replace_file_content"),
+)
+def test_antigravity_pretool_denies_protected_file_mutations(tool_name: str) -> None:
+    """Each documented native mutation tool reaches canonical file policy."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {"name": tool_name, "args": {"TargetFile": ".env"}},
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_allows_normal_file_mutation() -> None:
+    """The bridge does not turn ordinary file writes into blanket denials."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "write_to_file",
+                "args": {"TargetFile": "notes/release.md"},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+def test_antigravity_pretool_denies_dangerous_git_command() -> None:
+    """Command normalization retains the canonical dangerous-Git guard."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": "git reset --hard", "Cwd": str(REPO_ROOT)},
+            },
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_uses_cwd_for_relative_protected_command() -> None:
+    """The documented Cwd field scopes a relative command before classification."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "touch hooks/guard.sh",
+                    "Cwd": str(REPO_ROOT / ".claude"),
+                },
+            }
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout)["decision"] == "deny"
+
+
+def test_antigravity_pretool_quotes_metacharacter_bearing_cwd() -> None:
+    """Cwd stays one operand and cannot manufacture a second shell command."""
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "git status",
+                    "Cwd": str(REPO_ROOT) + "; touch .env",
+                },
+            }
+        }
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+@pytest.mark.parametrize("kind", ("file", "directory"))
+def test_protect_files_resolves_native_target_symlink_aliases(
+    tmp_path: Path, kind: str
+) -> None:
+    """Native TargetFile checks include real paths for symlinked targets."""
+    if kind == "file":
+        protected_target = tmp_path / ".env"
+        protected_target.write_text("", encoding="utf-8")
+        alias = tmp_path / "alias"
+        alias.symlink_to(protected_target)
+        target = alias
+    else:
+        protected_directory = tmp_path / ".claude" / "hooks"
+        protected_directory.mkdir(parents=True)
+        alias = tmp_path / "alias"
+        alias.symlink_to(protected_directory, target_is_directory=True)
+        target = alias / "new-guard.sh"
+
+    process = _run_native_protect_files(
+        {"tool_name": "Write", "tool_input": {"path": str(target)}}, tmp_path
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {},
+        {"toolCall": {}},
+        {
+            "toolCall": {"name": "write_to_file", "args": {}},
+        },
+        {
+            "toolCall": {"name": "unverified_write", "args": {}},
+        },
+    ),
+)
+def test_antigravity_pretool_fails_closed_for_invalid_payloads(payload: dict) -> None:
+    """Malformed or unsupported requests never fall through to an allow."""
+    process = _run_antigravity_pretool(payload)
+
+    assert process.returncode == 0
+    assert json.loads(process.stdout)["decision"] == "deny"
+    assert "WARN antigravity-pretool:" in process.stderr
+
+
+def test_antigravity_pretool_fails_closed_for_raw_malformed_json() -> None:
+    """Raw malformed hook stdin receives a protocol deny, not a crash."""
+    process = subprocess.run(
+        ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
+        cwd=REPO_ROOT,
+        input="{malformed",
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "REPO_ROOT": str(REPO_ROOT)},
+    )
+
+    assert process.returncode == 0
+    assert json.loads(process.stdout)["decision"] == "deny"
+    assert "WARN antigravity-pretool:" in process.stderr
 
 
 if __name__ == "__main__":

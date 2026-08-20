@@ -1130,6 +1130,42 @@ def render_codex_hooks(path: Path) -> None:
     write_json(path, hooks)
 
 
+def antigravity_hook_command() -> str:
+    """Return the repo-local command for the Antigravity pre-tool bridge."""
+    root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    return (
+        f'REPO_ROOT="{root_expr}"; '
+        'exec "$REPO_ROOT/.claude/hooks/scripts/antigravity-pretool.py"'
+    )
+
+
+def render_antigravity_hooks(path: Path) -> None:
+    """Render the documented Antigravity pre-execution safety boundary.
+
+    Lifecycle hooks stay deliberately absent until native cadence evidence can
+    show that they cannot duplicate state publication or create Stop loops.
+    """
+    command = antigravity_hook_command()
+    write_json(
+        path,
+        {
+            "bootstrap-safety": {
+                "PreToolUse": [
+                    {
+                        # Antigravity documents '*' as the PreToolUse regex for
+                        # every tool. The bridge explicitly allows only known
+                        # non-mutating tools and denies unknown tool shapes.
+                        "matcher": "*",
+                        "hooks": [
+                            {"type": "command", "command": command, "timeout": 10}
+                        ],
+                    }
+                ]
+            }
+        },
+    )
+
+
 def render_root_guidance(target: str) -> str:
     if target == "multi-agent":
         title = "AI Coding Agent Project Guidance"
@@ -1576,6 +1612,7 @@ def render_antigravity(target_root: Path) -> None:
         target_root / ".agents" / "mcp_config.json",
         {"mcpServers": shared_mcp_servers()},
     )
+    render_antigravity_hooks(target_root / ".agents" / "hooks.json")
     for agent, _agent_dir in shared_agents("google-antigravity"):
         write_text(
             target_root / ".agents" / "agents" / agent["id"] / "agent.md",

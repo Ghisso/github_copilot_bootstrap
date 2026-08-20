@@ -110,9 +110,29 @@ Future optional persistent-thread probes may exercise all eight current roles;
 no native run is required for this feature. Claude and Copilot behavior remains
 unchanged.
 
+Google Antigravity:
+
+- `.agents/agents/` — seven static Markdown custom-agent adapters.
+- `.agents/skills/` — the shared skill tree.
+- `.agents/mcp_config.json` — the shared MCP servers under Antigravity's
+  `mcpServers` schema.
+- `.agents/hooks.json` — the named `bootstrap-safety` configuration.
+
+The Antigravity hook surface is intentionally limited to one `PreToolUse` event
+with a catch-all `matcher: "*"`. It calls the direct Python 3.9 standard-library
+bridge `.claude/hooks/scripts/antigravity-pretool.py`, which normalizes
+documented provider payloads into the canonical Bash and protected-file guards.
+The bridge allows only the explicit non-mutating provider-tool list, protects
+`run_command` and write tools, and denies unknown or malformed input by
+default. It emits one JSON decision on stdout and keeps diagnostics on stderr.
+Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or
+`UserPromptSubmit` equivalent because native cadence is unproven; native
+acceptance remains a Phase C gate. The adapter does not claim native loading or
+trust acceptance.
+
 Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), sets `agents.max_concurrent_threads_per_session = 6`, omits the legacy `max_threads` and redundant `agents.enabled`, configures `[features.multi_agent_v2]` to expose named-agent routing metadata (its `tool_namespace = "agents"` key is inert in Codex 0.147.0 — see the [dated record](2026-08-08-codex-routing-compatibility.md)), and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
 
-For both primary targets, generated `PreToolUse` separates mutation safety from
+For Claude and Codex, generated `PreToolUse` separates mutation safety from
 observability: native edit matchers call `protect-files.sh`, `Bash` calls one
 ordered guard wrapper, and `*` calls only context-mode dispatch. The Codex
 native-edit matcher is `Edit|Write`; Claude additionally supports `MultiEdit`.

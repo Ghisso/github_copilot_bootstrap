@@ -25,6 +25,7 @@ from generate_targets import (
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
     ROOT_GUIDANCE_WORKFLOW,
     SUPPORTED_AGENT_TARGETS,
+    antigravity_hook_command,
     codex_agent_metadata_header,
     codex_agent_prompt_body,
     shared_agents,
@@ -160,6 +161,7 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
     "two matched `xhigh` runs reproduce a material checklist failure",
 )
 REQUIRED_HOOK_SCRIPTS = (
+    "antigravity-pretool.py",
     "run-hook.sh",
     "protect-files.sh",
     "protect-files.py",
@@ -1170,6 +1172,36 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
         if matcher != "Bash" and "pretool-bash-guard.sh" in scripts:
             errors.append(f"{target} Bash safety wrapper must not run for {matcher!r}")
     return errors
+
+
+def antigravity_hook_errors(hooks: object) -> list[str]:
+    """Return structural errors for the intentionally minimal safety hook."""
+    if not isinstance(hooks, dict) or set(hooks) != {"bootstrap-safety"}:
+        return ["Antigravity hooks.json must contain only bootstrap-safety"]
+    events = hooks.get("bootstrap-safety")
+    if not isinstance(events, dict) or set(events) != {"PreToolUse"}:
+        return ["Antigravity hooks must contain only the proven PreToolUse event"]
+    groups = events.get("PreToolUse")
+    if not isinstance(groups, list) or len(groups) != 1:
+        return ["Antigravity PreToolUse must contain exactly one routing group"]
+    group = groups[0]
+    if not isinstance(group, dict):
+        return ["Antigravity PreToolUse routing group must be an object"]
+    if group.get("matcher") != "*":
+        return ["Antigravity PreToolUse must match every tool at the bridge"]
+    handlers = group.get("hooks")
+    if not isinstance(handlers, list) or len(handlers) != 1:
+        return ["Antigravity PreToolUse must contain exactly one command handler"]
+    handler = handlers[0]
+    if not isinstance(handler, dict) or set(handler) != {"type", "command", "timeout"}:
+        return ["Antigravity PreToolUse handler has unsupported fields"]
+    if handler.get("type") != "command":
+        return ["Antigravity PreToolUse handler must be a command"]
+    if handler.get("command") != antigravity_hook_command():
+        return ["Antigravity PreToolUse must invoke the normalization bridge"]
+    if handler.get("timeout") != 10:
+        return ["Antigravity PreToolUse timeout must be exactly 10"]
+    return []
 
 
 def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
@@ -2391,6 +2423,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
     antigravity_mcp = json.loads(read(TARGET_ROOT / ".agents" / "mcp_config.json"))
+    antigravity_hooks = json.loads(read(TARGET_ROOT / ".agents" / "hooks.json"))
     shared_mcp = json.loads(read(REPO_ROOT / "shared" / "mcp" / "servers.json"))[
         "servers"
     ]
@@ -2441,6 +2474,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         "Antigravity .agents/mcp_config.json must use mcpServers, not servers",
         errors,
     )
+    errors.extend(antigravity_hook_errors(antigravity_hooks))
 
     codex_config = read(TARGET_ROOT / ".codex" / "config.toml")
     codex_config_data: dict[str, object] = {}

@@ -591,7 +591,14 @@ Coder skill loading:
 
 Hooks provide guardrails and lightweight observability.
 
-All hook commands route through [run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the repo root robustly — via `BASH_SOURCE`, environment variable fallbacks (`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`. This avoids the broken-path failures that occur when `$CLAUDE_PROJECT_DIR` is empty or when `git rev-parse` runs from the wrong directory.
+Claude, Codex, and Copilot hook commands route through
+[run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the
+repo root robustly — via `BASH_SOURCE`, environment variable fallbacks
+(`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`.
+Google Antigravity is the deliberate exception: its static `.agents/hooks.json`
+adapter calls the direct Python 3.9 standard-library bridge
+`.claude/hooks/scripts/antigravity-pretool.py`, which normalizes provider input
+before invoking the canonical guards.
 
 [hooks.json](shared/hooks/hooks.json) sets `"cwd": "."` on every entry rather than `"${workspaceFolder}"`. Copilot's hook runner does not interpolate VS Code variables, so using the literal string would resolve to a non-existent path and produce `spawn /bin/sh ENOENT` errors. `run-hook.sh` resolves the repo root itself, so `"."` is sufficient.
 
@@ -607,6 +614,10 @@ Configured events:
   - Both primary targets send `Bash` through [pretool-bash-guard.sh](shared/hooks/scripts/pretool-bash-guard.sh). It runs `protect-files.sh`, [git-protection.sh](shared/hooks/scripts/git-protection.sh), [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh), [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh), and [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) in that order, stopping at the first safety decision. Lifecycle wrappers are unchanged.
   - The protected-file classifier runs directly with required `python3`, not `uv run`, so it works before a project environment exists. It derives targets per shell segment: read-only inspection of an existing protected configuration is allowed, but native edits, redirects, in-place `sed`/`perl`, missing `python3`, and ambiguous/unparseable commands fail closed. Known file operations resolve relative paths, shell-expanded wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. Unknown or interpreter-style commands retain conservative high-confidence path coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook paths, and protected hook configuration literals, while prose and ordinary source filenames containing `secret` are not credential evidence. Copy/install/move check resolved source operands as well as destinations, preventing protected-source exfiltration through write-bearing commands. Hook-config edits ask in Claude and are denied in Codex, whose `PreToolUse` cannot request approval.
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) stays in a separate wildcard matcher for best-effort observability. It makes no safety decision and does not mutate the ordered safety lane.
+- Google Antigravity PreToolUse
+  - `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `matcher: "*"` group. The bridge explicitly allows the documented non-mutating provider tools, routes `run_command` through `pretool-bash-guard.sh`, and routes write tools through `protect-files.sh`.
+  - The bridge requires valid JSON object payloads and documented fields, emits exactly one JSON decision on stdout, and writes diagnostics only to stderr. Unknown tools, malformed input, missing Python or guard failures, malformed guard output, and existing `ask` results deny by default because Antigravity has no approval response in this bridge.
+  - Canonical command and mutation guards retain symlink-safe path classification, protected-source checks, and deny-by-default handling for ambiguous or unsafe requests. Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent until native cadence is proven; native client acceptance is a Phase C task.
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
   - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; it completes the big plan after the final phase and logs allowed bypass commits

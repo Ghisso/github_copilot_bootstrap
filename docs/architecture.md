@@ -136,7 +136,12 @@ uv run python scripts/generate_targets.py --all
 
 ## Hook Dispatcher
 
-All hook commands route through `shared/hooks/scripts/run-hook.sh` rather than calling guardrail scripts directly. The dispatcher resolves `REPO_ROOT` in order:
+Claude, Codex, and Copilot hook commands route through
+`shared/hooks/scripts/run-hook.sh`. Google Antigravity is the deliberate
+exception: its static `.agents/hooks.json` adapter calls
+`antigravity-pretool.py` directly because its documented payload and response
+protocol require a Python bridge. The bridge invokes the canonical guards after
+normalizing the payload. The shared dispatcher resolves `REPO_ROOT` in order:
 
 1. `BASH_SOURCE[0]` relative navigation (primary — works when the script is called by path)
 2. Environment variable fallbacks: `GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`, `PWD`
@@ -147,7 +152,7 @@ This fixes two real failure modes found in consumer repos:
 - `$CLAUDE_PROJECT_DIR` being empty in Claude Code, producing paths like `/.claude/hooks/scripts/...`
 - `$(git rev-parse --show-toplevel)` resolving to a different directory than the repo root when invoked from certain working directories
 
-The generated hook configs for all three tools use the pattern:
+The generated Claude, Codex, and Copilot hook configs use the pattern:
 
 ```bash
 REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script> [args...]
@@ -172,6 +177,24 @@ classification.
 if a safety guard errors or produces malformed output. This avoids relying on
 the target runtime's parallel execution order while leaving lifecycle wrappers
 and wildcard observability independent.
+
+### Google Antigravity safety boundary
+
+Antigravity uses one named `bootstrap-safety` configuration with one
+`PreToolUse` group whose matcher is `*`. The bridge runs with the Python 3.9
+standard library and emits exactly one JSON decision on stdout; diagnostics go
+to stderr. It allows the explicit documented non-mutating provider tools,
+normalizes `run_command` into the canonical Bash guard, and normalizes write
+tools into the canonical protected-file guard. Unknown tools, malformed
+payloads, missing command or target fields, guard failures, and malformed guard
+responses deny by default. Existing `ask` results also deny because this
+provider has no approval response in the bridge.
+
+The canonical guards retain command and mutation protection, including
+symlink-safe path classification and protected-source checks. The Antigravity
+adapter intentionally defines no `PreInvocation`, `PostToolUse`, `Stop`, or
+`UserPromptSubmit` equivalence: native cadence is unproven, and native
+acceptance remains Phase C work.
 
 ## Task-Lane Routing
 

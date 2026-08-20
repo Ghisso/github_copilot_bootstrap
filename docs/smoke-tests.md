@@ -169,6 +169,9 @@ Expected:
 - Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Generated `run-hook.sh` is executable because Claude and Codex hook commands call it directly.
+- Generated `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `PreToolUse` matcher (`*`). It calls the direct Python 3.9 standard-library `antigravity-pretool.py` bridge; this is intentionally the only provider hook that does not call `run-hook.sh`.
+- Antigravity's bridge allows only the explicit documented non-mutating provider tools, normalizes `run_command` and write tools into the canonical guards, and denies unknown or malformed payloads, missing fields, guard failures, malformed guard output, and `ask` results by default. It emits one JSON decision on stdout and diagnostics on stderr; canonical guards retain symlink-safe path classification and protected-source checks.
+- Antigravity intentionally has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent. Native cadence and trust/loading remain unproven and are Phase C acceptance work.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.

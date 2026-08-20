@@ -83,6 +83,16 @@ Optional helpers:
 - Semble through `uvx --from "semble[mcp]" semble`
 - context7 through `npx -y @upstash/context7-mcp` (missing `npx` warns, does not fail; falls back to training-data knowledge)
 
+Target validation also checks the static Google Antigravity adapter when
+generated output is present: `.agents/hooks.json` contains only
+`bootstrap-safety` and one catch-all `PreToolUse` group, and its command points
+to the direct Python 3.9 standard-library normalization bridge. The bridge's
+runtime decision behavior is covered by the Phase B hook tests: explicit
+non-mutating tools are allowed, command and write tools use the canonical
+guards, and unknown or malformed requests deny with JSON-only protocol output.
+This check does not prove that Antigravity has loaded or trusted the adapter;
+native acceptance remains Phase C.
+
 Missing optional binaries produce `WARN`, not `FAIL`.
 
 ## Native Client Release Checks (Opt-In)
