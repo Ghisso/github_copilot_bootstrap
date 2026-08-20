@@ -1,0 +1,43 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-20T14:44:03Z",
+  "branch": "humanize-avoid-ai-writing-upstream-integration_implementation",
+  "head_sha": "6ba900c6e42454a1ff08d622662c31e24a083eb4",
+  "base_ref": "dev",
+  "merge_base_sha": "6ba900c6e42454a1ff08d622662c31e24a083eb4",
+  "phase": "2026-08-20_phase-A-integrate-and-validate-avoid-ai-writing",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "5cdbcb14938c58dc2bf5ec140a2db09ea4c6f705",
+  "changed_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "docs/architecture.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/documenter/prompt.md",
+    "shared/policies/agent-reporting.instructions.md",
+    "shared/skills/humanize/SKILL.md",
+    "shared/third_party/avoid-ai-writing/LICENSE",
+    "shared/third_party/avoid-ai-writing/SKILL.md",
+    "shared/third_party/avoid-ai-writing/UPSTREAM.md",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

@@ -444,3 +444,8 @@
   parsers and independent oracles. Preserve list order/cardinality before set
   comparison, reject every unexpected or malformed table row, and pin full
   documented matrices independently of the production constants they verify.
+- [LEARN:verification] A self-install blocked by protected-file enforcement can
+  fail after it has already removed earlier runtime paths. After any interrupted
+  self-install, inspect the nested `.claude` Git status and restore only deleted
+  tracked runtime paths before trusting tests or runtime checks; preserve logs,
+  reports, caches, and other mutable state.
