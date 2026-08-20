@@ -153,3 +153,4 @@
 2026-08-13T23:29:21.000Z,event=Stop,target=openai-codex,sessionId=019ffd70-114c-7a11-8ffb-ff43a9c78135
 2026-08-13T23:33:27.000Z,event=Stop,target=openai-codex,sessionId=019ffd70-114c-7a11-8ffb-ff43a9c78135
 2026-08-14T00:29:34.000Z,event=Stop,target=openai-codex,sessionId=019ffd70-114c-7a11-8ffb-ff43a9c78135
+2026-08-20T12:16:26.000Z,event=SessionStart,target=openai-codex,sessionId=01a01f19-7828-70c3-a1d7-ca76992095b6,source=startup
