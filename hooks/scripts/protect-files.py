@@ -764,9 +764,13 @@ def emit(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
     if hooks:
-        decision = "deny" if target_id == "openai-codex" else "ask"
+        decision = (
+            "deny"
+            if target_id in {"openai-codex", "google-antigravity"}
+            else "ask"
+        )
         reason = (
-            "Editing hook files is blocked in Codex because PreToolUse cannot request approval: "
+            "Editing hook files is blocked because PreToolUse cannot request approval: "
             if decision == "deny"
             else "Editing hook files requires approval: "
         ) + ", ".join(hooks)

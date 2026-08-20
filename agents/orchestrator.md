@@ -17,15 +17,17 @@ edits remain with the main agent and create no lifecycle artifacts.
 
 ## Task Tracking (Mandatory)
 
-You MUST maintain a todo list throughout the entire workflow:
+You MUST maintain task tracking throughout the entire workflow:
 
-1. **At start:** Create a todo list with the canonical phase order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
+1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
 2. **Loop task:** Include a parameterized task for `VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY/SCORE - repeat until score >= 90`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
-5. **On changes:** If new tasks emerge or plans change, update the todo list accordingly.
+5. **On changes:** If new tasks emerge or plans change, update task tracking accordingly.
 
-TodoWrite-first compliance is mandatory on Claude Code and VS Code Copilot. On cloud Copilot or Codex surfaces where TodoWrite is unavailable, write the same phase checklist as the first response paragraph before delegating.
+Use the runtime's native task tracker when one is available. On every surface
+where it is unavailable, write the same phase checklist as the first response
+paragraph before delegating.
 
 ## Retrieval
 
@@ -40,7 +42,7 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
 7. **DOCUMENT:** Delegate to `documenter` after the code review converges and **before** the persisted SCORE, so the documenter's tracked edits stay inside the content the score/findings reports bind to (documenting after SCORE stales both). Pass git diff range, changed files, and any public APIs, config keys, workflows, user-facing behavior, or pipeline wiring changed. Skip only for pure-internal changes.
-8. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update TodoWrite and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
+8. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
 9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
 11. **COMMIT:** Commit exactly one completed small plan after all gates pass.
