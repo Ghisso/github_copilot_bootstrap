@@ -88,24 +88,6 @@ ensure_destination_parent() {
 
 REPO_ROOT="$(canonical_path "$REPO_ROOT")" || fail "cannot resolve repository root"
 SOURCE_ROOT="$(canonical_path "$SOURCE_ROOT")" || fail "cannot resolve bootstrap root"
-[[ -r "$ANTIGRAVITY_ALLOWLIST" ]] || fail "missing Antigravity ownership allowlist"
-allowed_antigravity_paths=()
-while IFS= read -r line || [[ -n "$line" ]]; do
-  case "$line" in
-    ''|'#'*) continue ;;
-    BOOTSTRAP_ANTIGRAVITY_PATH=*)
-      relative="${line#BOOTSTRAP_ANTIGRAVITY_PATH=}"
-      [[ "$relative" =~ ^\.agents/[A-Za-z0-9._/-]+$ ]] || fail "invalid Antigravity allowlist path"
-      [[ "$relative" != */ && "$relative" != *'//' ]] || fail "invalid Antigravity allowlist path"
-      case "/$relative/" in */./*|*/../*) fail "invalid Antigravity allowlist path" ;; esac
-      for known in "${allowed_antigravity_paths[@]}"; do
-        [[ "$known" != "$relative" ]] || fail "duplicate Antigravity allowlist path"
-      done
-      allowed_antigravity_paths+=("$relative")
-      ;;
-    *) fail "invalid Antigravity ownership allowlist record" ;;
-  esac
-done < "$ANTIGRAVITY_ALLOWLIST"
 paths=()
 antigravity_paths=()
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -136,14 +118,6 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       else
         fail "manifest path is not an Antigravity adapter"
       fi
-      allowed=false
-      for known in "${allowed_antigravity_paths[@]}"; do
-        if [[ "$known" == "$relative" ]]; then
-          allowed=true
-          break
-        fi
-      done
-      "$allowed" || fail "manifest Antigravity path is not generated"
       for known in "${antigravity_paths[@]}"; do
         [[ "$known" != "$relative" ]] || fail "duplicate Antigravity manifest path"
       done
@@ -154,17 +128,37 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$OWNERSHIP_MANIFEST"
 
 ((${#paths[@]})) || fail "manifest contains no adapter paths"
-(( ${#antigravity_paths[@]} == ${#allowed_antigravity_paths[@]} )) || fail "Antigravity manifest must match generated allowlist"
-for allowed in "${allowed_antigravity_paths[@]}"; do
-  found=false
-  for known in "${antigravity_paths[@]}"; do
-    if [[ "$known" == "$allowed" ]]; then
-      found=true
-      break
-    fi
+if ((${#antigravity_paths[@]})); then
+  [[ -r "$ANTIGRAVITY_ALLOWLIST" ]] || fail "missing Antigravity ownership allowlist"
+  allowed_antigravity_paths=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      ''|'#'*) continue ;;
+      BOOTSTRAP_ANTIGRAVITY_PATH=*)
+        relative="${line#BOOTSTRAP_ANTIGRAVITY_PATH=}"
+        [[ "$relative" =~ ^\.agents/[A-Za-z0-9._/-]+$ ]] || fail "invalid Antigravity allowlist path"
+        [[ "$relative" != */ && "$relative" != *'//' ]] || fail "invalid Antigravity allowlist path"
+        case "/$relative/" in */./*|*/../*) fail "invalid Antigravity allowlist path" ;; esac
+        for known in "${allowed_antigravity_paths[@]}"; do
+          [[ "$known" != "$relative" ]] || fail "duplicate Antigravity allowlist path"
+        done
+        allowed_antigravity_paths+=("$relative")
+        ;;
+      *) fail "invalid Antigravity ownership allowlist record" ;;
+    esac
+  done < "$ANTIGRAVITY_ALLOWLIST"
+  (( ${#antigravity_paths[@]} == ${#allowed_antigravity_paths[@]} )) || fail "Antigravity manifest must match generated allowlist"
+  for allowed in "${allowed_antigravity_paths[@]}"; do
+    found=false
+    for known in "${antigravity_paths[@]}"; do
+      if [[ "$known" == "$allowed" ]]; then
+        found=true
+        break
+      fi
+    done
+    "$found" || fail "Antigravity manifest must match generated allowlist"
   done
-  "$found" || fail "Antigravity manifest must match generated allowlist"
-done
+fi
 paths+=("${antigravity_paths[@]}")
 
 for relative in "${paths[@]}"; do
