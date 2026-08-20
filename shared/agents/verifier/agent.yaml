@@ -12,6 +12,7 @@
   "model_intent": {
     "github-copilot": "target-default",
     "claude-code": { "model": "haiku" },
-    "openai-codex": { "model": "gpt-5.6-luna", "effort": "low" }
+    "openai-codex": { "model": "gpt-5.6-luna", "effort": "low" },
+    "google-antigravity": { "model": "flash" }
   }
 }

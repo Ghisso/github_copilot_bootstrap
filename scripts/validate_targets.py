@@ -88,6 +88,36 @@ CODEX_AGENT_MODEL_INTENTS = {
 }
 CODEX_CODER_ESCALATION = "sol_coder"
 CODEX_ESCALATION_CHAIN = {"luna_coder": "coder", "coder": "sol_coder"}
+ANTIGRAVITY_AGENT_MODEL_INTENTS = {
+    "orchestrator": "pro",
+    "planner": "pro",
+    "antigravity_flash_coder": "flash",
+    "coder": "pro",
+    "verifier": "flash",
+    "reviewer": "pro",
+    "documenter": "flash",
+}
+ANTIGRAVITY_ESCALATION_CHAIN = {"antigravity_flash_coder": "coder"}
+ANTIGRAVITY_CAPABILITY_TOOLS = {
+    "read": ("view_file", "list_dir", "find_by_name"),
+    "search": ("grep_search",),
+    "edit": ("write_to_file", "replace_file_content", "multi_replace_file_content"),
+    "execute": ("run_command",),
+    "delegate": ("invoke_subagent", "send_message", "manage_subagents"),
+    "web": ("search_web", "read_url_content"),
+}
+ANTIGRAVITY_ALLOWED_TOOLS = {
+    tool for tools in ANTIGRAVITY_CAPABILITY_TOOLS.values() for tool in tools
+}
+ANTIGRAVITY_AGENT_ALLOWED_FIELDS = {
+    "name",
+    "description",
+    "tools",
+    "mainAgent",
+    "subagent",
+    "model",
+    "inheritMcp",
+}
 CODEX_AGENT_ALLOWED_FIELDS = {
     "name",
     "description",
@@ -208,7 +238,6 @@ OBSOLETE_GENERATED_DIRS = (
     ".github/quality_reports",
     ".github/explorations",
     ".github/plans",
-    ".agents/skills",
     ".codex/skills",
     ".codex/scripts",
     ".codex/templates",
@@ -1706,11 +1735,12 @@ def agent_membership_errors(
 def canonical_agent_contract_errors(
     canonical_agents: list[tuple[dict[str, Any], Path]],
 ) -> list[str]:
-    """Return drift errors for the closed six-universal/eight-Codex contract."""
+    """Return drift errors for the closed provider routing contracts."""
     expected_agent_ids = {
         "github-copilot": set(CODEX_ROLE_MODEL_INTENTS),
         "claude-code": set(CODEX_ROLE_MODEL_INTENTS),
         "openai-codex": set(CODEX_AGENT_MODEL_INTENTS),
+        "google-antigravity": set(ANTIGRAVITY_AGENT_MODEL_INTENTS),
     }
     actual_agent_ids = {
         target: {
@@ -1748,6 +1778,98 @@ def canonical_agent_contract_errors(
         errors.append(
             "canonical Codex escalation contract must be luna_coder -> coder -> sol_coder"
         )
+    antigravity_intents: dict[str, object] = {}
+    antigravity_escalations: dict[str, object] = {}
+    for agent, _agent_dir in canonical_agents:
+        intent = agent["model_intent"].get("google-antigravity")
+        if not isinstance(intent, dict):
+            continue
+        antigravity_intents[agent["id"]] = intent.get("model")
+        if "escalate_to" in intent:
+            antigravity_escalations[agent["id"]] = intent["escalate_to"]
+    if antigravity_intents != ANTIGRAVITY_AGENT_MODEL_INTENTS:
+        errors.append(
+            "canonical Antigravity model mappings drifted from the seven-agent contract"
+        )
+    if antigravity_escalations != ANTIGRAVITY_ESCALATION_CHAIN:
+        errors.append(
+            "canonical Antigravity escalation contract must be antigravity_flash_coder -> coder"
+        )
+    return errors
+
+
+def antigravity_agent_adapter_errors(path: Path, agent: dict[str, Any]) -> list[str]:
+    """Return semantic failures for one generated Antigravity custom agent."""
+    text = read(path)
+    frontmatter = extract_frontmatter(text)
+    errors: list[str] = []
+    lines = frontmatter.splitlines()
+    values = {
+        key: value.strip()
+        for line in lines
+        if ":" in line and not line.startswith((" ", "\t"))
+        for key, value in [line.split(":", 1)]
+    }
+    unsupported_fields = sorted(set(values) - ANTIGRAVITY_AGENT_ALLOWED_FIELDS)
+    check(
+        not unsupported_fields,
+        f"Antigravity agent has unsupported frontmatter fields {unsupported_fields}: {path}",
+        errors,
+    )
+    expected_model = agent["model_intent"]["google-antigravity"]["model"]
+    check(
+        values.get("name") == agent["id"],
+        f"Antigravity agent name drifted: {path}",
+        errors,
+    )
+    check(
+        values.get("model") == expected_model,
+        f"Antigravity agent model drifted from canonical intent: {path}",
+        errors,
+    )
+    is_orchestrator = agent["id"] == "orchestrator"
+    check(
+        values.get("mainAgent") == ("true" if is_orchestrator else "false"),
+        f"Antigravity agent mainAgent visibility drifted: {path}",
+        errors,
+    )
+    check(
+        values.get("subagent") == ("false" if is_orchestrator else "true"),
+        f"Antigravity agent subagent visibility drifted: {path}",
+        errors,
+    )
+    check(
+        ("inheritMcp: true" in frontmatter) == (not is_orchestrator),
+        f"Antigravity specialist MCP inheritance drifted: {path}",
+        errors,
+    )
+    tools = [line.strip()[2:] for line in lines if line.startswith("  - ")]
+    expected_tools = [
+        tool
+        for capability in agent["capabilities"]
+        for tool in ANTIGRAVITY_CAPABILITY_TOOLS.get(capability, [])
+    ]
+    check(
+        tools == expected_tools,
+        f"Antigravity agent tool mapping drifted: {path}",
+        errors,
+    )
+    unknown_tools = sorted(set(tools) - ANTIGRAVITY_ALLOWED_TOOLS)
+    check(
+        not unknown_tools,
+        f"Antigravity agent has unknown native tools {unknown_tools}: {path}",
+        errors,
+    )
+    check(
+        "todo" not in tools and "vscode" not in tools,
+        f"Antigravity agent must not guess todo or vscode tools: {path}",
+        errors,
+    )
+    check(
+        "tool-routing.instructions.md" in text,
+        f"Antigravity agent must retain canonical retrieval routing: {path}",
+        errors,
+    )
     return errors
 
 
@@ -1811,14 +1933,20 @@ def validate_agents(errors: list[str]) -> None:
                     errors,
                 )
         if "prompt_base" in data:
+            derived_target = data["targets"][0]
+            supplement_name = (
+                "prompt.openai-codex.md"
+                if derived_target == "openai-codex"
+                else "prompt.google-antigravity.md"
+            )
             check(
                 not (agent_dir / "prompt.md").exists(),
                 f"{agent_id} derived prompt must not copy canonical prompt.md",
                 errors,
             )
             check(
-                (agent_dir / "prompt.openai-codex.md").exists(),
-                f"{agent_id} derived prompt missing Codex supplement",
+                (agent_dir / supplement_name).exists(),
+                f"{agent_id} derived prompt missing {derived_target} supplement",
                 errors,
             )
         else:
@@ -1831,6 +1959,11 @@ def validate_agents(errors: list[str]) -> None:
             check(
                 (agent_dir / "prompt.openai-codex.md").exists(),
                 "orchestrator missing Codex routing supplement",
+                errors,
+            )
+            check(
+                (agent_dir / "prompt.google-antigravity.md").exists(),
+                "orchestrator missing Antigravity routing supplement",
                 errors,
             )
         check(
@@ -2074,6 +2207,19 @@ def validate_agents(errors: list[str]) -> None:
                 f"Codex agent requires both Semble and Context Mode MCP from inherited config: {path}",
                 errors,
             )
+    antigravity_agents = sorted((TARGET_ROOT / ".agents" / "agents").glob("*/agent.md"))
+    errors.extend(
+        agent_membership_errors(
+            "google-antigravity",
+            expected_agent_ids["google-antigravity"],
+            {path.parent.name for path in antigravity_agents},
+        )
+    )
+    for path in antigravity_agents:
+        agent = agents_by_id.get(path.parent.name)
+        if agent is not None:
+            errors.extend(antigravity_agent_adapter_errors(path, agent))
+
     for root in (TARGET_ROOT / ".claude" / "agents", TARGET_ROOT / ".codex" / "agents"):
         for path in text_files(root):
             text = read(path)
@@ -2244,6 +2390,7 @@ def mcp_server_parity_errors(
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
+    antigravity_mcp = json.loads(read(TARGET_ROOT / ".agents" / "mcp_config.json"))
     shared_mcp = json.loads(read(REPO_ROOT / "shared" / "mcp" / "servers.json"))[
         "servers"
     ]
@@ -2281,11 +2428,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     for servers, label in (
         (github_mcp.get("servers", {}), "github"),
         (claude_mcp.get("mcpServers", {}), "claude"),
+        (antigravity_mcp.get("mcpServers", {}), "google-antigravity"),
     ):
         errors.extend(mcp_server_parity_errors(servers, shared_mcp, label))
     check(
         "servers" not in claude_mcp,
         "Claude .mcp.json must use mcpServers, not servers",
+        errors,
+    )
+    check(
+        "servers" not in antigravity_mcp,
+        "Antigravity .agents/mcp_config.json must use mcpServers, not servers",
         errors,
     )
 
@@ -5617,6 +5770,29 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         "Codex config must enable every shared .claude skill by relative SKILL.md path",
         errors,
     )
+    antigravity_skill_paths = {
+        path.relative_to(TARGET_ROOT / ".agents" / "skills")
+        for path in text_files(TARGET_ROOT / ".agents" / "skills")
+    }
+    shared_skill_paths = {
+        path.relative_to(REPO_ROOT / "shared" / "skills")
+        for path in text_files(REPO_ROOT / "shared" / "skills")
+    }
+    check(
+        antigravity_skill_paths == shared_skill_paths,
+        "Antigravity skills must copy the canonical shared skill tree",
+        errors,
+    )
+    for skill_relative_path in shared_skill_paths:
+        check(
+            filecmp.cmp(
+                REPO_ROOT / "shared" / "skills" / skill_relative_path,
+                TARGET_ROOT / ".agents" / "skills" / skill_relative_path,
+                shallow=False,
+            ),
+            f"Antigravity skill drifted from shared source: {skill_relative_path}",
+            errors,
+        )
 
     forbidden_fragments = ("/home/ghisso", "/Users/", "BEGIN OPENSSH", "PRIVATE KEY")
     for relative_path in OBSOLETE_GENERATED_DIRS:

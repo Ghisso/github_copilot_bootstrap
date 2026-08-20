@@ -20,6 +20,7 @@
       "model": "gpt-5.6-terra",
       "effort": "high",
       "escalate_to": "sol_coder"
-    }
+    },
+    "google-antigravity": { "model": "pro" }
   }
 }
