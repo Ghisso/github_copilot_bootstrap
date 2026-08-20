@@ -9,12 +9,24 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 MUTATION_TOOLS = {
     "write_to_file",
     "replace_file_content",
     "multi_replace_file_content",
+}
+NON_MUTATING_TOOLS = {
+    "view_file",
+    "list_dir",
+    "find_by_name",
+    "grep_search",
+    "search_web",
+    "read_url_content",
+    "invoke_subagent",
+    "send_message",
+    "manage_subagents",
 }
 
 
@@ -61,12 +73,10 @@ def canonical_command(command: object, cwd: object) -> dict[str, object]:
     return {"tool_name": "Bash", "tool_input": {"command": normalized_command}}
 
 
-def canonical_payload(payload: object) -> tuple[str, dict[str, object]]:
+def canonical_payload(payload: object) -> tuple[Optional[str], dict[str, object]]:
     """Validate and normalize one documented Antigravity PreToolUse payload."""
     if not isinstance(payload, dict):
         raise ValueError("hook payload must be an object")
-    if payload.get("hookEventName") != "PreToolUse":
-        raise ValueError("hookEventName must be PreToolUse")
     tool_call = payload.get("toolCall")
     if not isinstance(tool_call, dict):
         raise ValueError("PreToolUse requires toolCall")
@@ -86,6 +96,8 @@ def canonical_payload(payload: object) -> tuple[str, dict[str, object]]:
             "tool_name": "Write",
             "tool_input": {"path": target},
         }
+    if name in NON_MUTATING_TOOLS:
+        return None, {}
     raise ValueError("unsupported PreToolUse tool: %s" % name)
 
 
@@ -118,6 +130,8 @@ def main() -> int:
     except (ValueError, json.JSONDecodeError) as error:
         return deny("could not validate PreToolUse payload: %s" % error)
 
+    if script_name is None:
+        return emit("allow")
     script = repository_root() / ".claude" / "hooks" / "scripts" / script_name
     try:
         result = subprocess.run(

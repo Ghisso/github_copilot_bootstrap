@@ -4,7 +4,7 @@ type: small-plan
 parent_plan: google-antigravity-provider-integration
 phase_index: 2
 status: in-progress
-closeout_session_log:
+closeout_session_log: .claude/session_logs/2026-08-21_antigravity-phase-c.md
 ---
 
 # Phase C: Antigravity installer ownership and native acceptance
