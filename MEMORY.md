@@ -449,3 +449,7 @@
   self-install, inspect the nested `.claude` Git status and restore only deleted
   tracked runtime paths before trusting tests or runtime checks; preserve logs,
   reports, caches, and other mutable state.
+- [LEARN:security] Antigravity CLI can reuse a persisted project even when
+  launched from a disposable working directory. Force `--new-project --sandbox`
+  and verify the reported root before transmitting acceptance prompts -> see
+  `.claude/skills/antigravity-native-acceptance-isolation/SKILL.md`.
