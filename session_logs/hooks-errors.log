@@ -1484,3 +1484,5 @@ error: Please commit or stash them.
 2026-08-20T17:39:29Z WARN hook fail-closed: unparseable tool payload
 2026-08-20T17:39:29Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-08-20T17:39:29Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T17:44:52Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/.local/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-08-20T17:44:52Z WARN hook fail-closed: protect-files.sh exited with status 2
