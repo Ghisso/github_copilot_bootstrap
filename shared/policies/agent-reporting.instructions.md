@@ -14,10 +14,10 @@ Use precise, clear, direct, natural prose for communication with people. These
 rules are inspired by ASD-STE100 principles, but this project does not claim
 formal ASD-STE100 compliance.
 
-Apply these rules strongly to user answers, plans, architecture explanations,
-reviews, quality reports, summaries, session summaries, and documentation.
-Apply them lightly to commit messages. Do not apply them to source code or exact
-technical material.
+Apply these rules to every top-level message to the user: clarifying questions,
+progress or status updates, explanations, recommendations, decisions, warnings,
+summaries, and final reports. Apply them lightly to commit messages. Do not
+apply them to source code or exact technical material.
 
 - Use common words when they are as precise as uncommon words.
 - Use one term consistently for one concept; avoid unnecessary synonyms.
@@ -33,9 +33,9 @@ names, commands, paths, logs, errors, structured findings, quotations, source
 code, or other material whose wording is evidence. Preserve tables, code
 blocks, severity labels, scores, and safety-critical detail literally.
 
-Do not make a rewrite stage mandatory. The optional `humanize` skill can help
-when it is useful, but it does not replace authorial judgment or exact-content
-protection.
+Do not make a general rewrite stage mandatory. The documenter has a narrow
+mandatory `humanize` `edit` self-check for prose it creates or changes. It does
+not replace authorial judgment, and exact-content protection always wins.
 
 ## Agent-to-agent status and handoffs
 

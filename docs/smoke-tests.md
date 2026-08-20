@@ -57,8 +57,10 @@ Expected:
 - The generated output mirrors every repository skill under `.claude/skills/`.
 - Every agent prompt points to the [canonical audience-aware reporting policy](../shared/policies/agent-reporting.instructions.md);
   prompts do not duplicate its Caveman or human-facing prose rules. The policy
-  keeps exact technical material unchanged and treats any rewrite stage as
-  optional.
+  keeps exact technical material unchanged. No general rewrite stage is
+  mandatory, but the documenter performs a narrow same-agent targeted
+  `humanize edit` self-check for prose it changes. Exact technical preservation
+  wins.
 - The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.

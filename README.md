@@ -370,7 +370,9 @@ documentation use clear, direct prose; compact internal handoffs may use
 `caveman full` when it improves precision. The policy is inspired by
 ASD-STE100 principles, but this project does not claim formal compliance. It
 also protects exact technical material and does not require a separate rewrite
-stage.
+stage for ordinary interaction. The documenter performs a narrow targeted
+`humanize edit` self-check on prose it changes, with exact technical
+preservation taking priority.
 
 For example, write “The validator rejected `shared/policies/agent-reporting.instructions.md`
 because `REPORTING_POLICY_POINTER` is missing” instead of “Policy pointer

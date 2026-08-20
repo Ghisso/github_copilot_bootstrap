@@ -12,4 +12,11 @@ Semble and context-mode are optional helpers:
 - Use context-mode for large outputs, logs, long markdown, and compaction-safe session continuity.
 - Use `rg` for exact literals and direct file reads for known paths.
 
+For every user-facing message, use clear, direct language with short sentences
+and common precise words. Avoid unnecessary jargon, buzzwords, and idioms.
+Define uncommon terms when needed, retain precise technical terms, and do not
+use `caveman full` with the user. Compact internal agent handoffs may still use
+`caveman full`. See
+`.claude/instructions/agent-reporting.instructions.md` for the complete policy.
+
 When MCP tools are unavailable, Semble can still be invoked from a shell-capable environment with `uvx --from "semble[mcp]" semble` where appropriate. Missing Semble or context-mode binaries should produce warnings or fallback behavior, not hard failures.

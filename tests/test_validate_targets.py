@@ -59,6 +59,8 @@ from validate_targets import (  # noqa: E402
     pretool_routing_errors,
     readme_agent_contract_errors,
     root_guidance_errors,
+    documenter_humanize_errors,
+    humanize_contract_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
     reporting_prompt_errors,
@@ -531,6 +533,104 @@ def test_reporting_policy_and_agent_prompts_preserve_the_audience_boundary() -> 
     )
     assert reporting_prompt_errors(
         "coder", f"{coder_prompt}\nUse active voice where practical.\n"
+    )
+
+
+def test_humanize_adaptation_preserves_the_pin_and_agent_boundary() -> None:
+    """The public adaptation stays separate from its inert upstream snapshot."""
+    humanize = (REPO_ROOT / "shared" / "skills" / "humanize" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    upstream_root = REPO_ROOT / "shared" / "third_party" / "avoid-ai-writing"
+    provenance = (upstream_root / "UPSTREAM.md").read_text(encoding="utf-8")
+
+    assert (
+        humanize_contract_errors(
+            humanize, provenance, upstream_root / "SKILL.md", upstream_root / "LICENSE"
+        )
+        == []
+    )
+    reflowed_humanize = humanize.replace(
+        "do not prove AI\nauthorship", "do not prove AI authorship", 1
+    )
+    assert (
+        humanize_contract_errors(
+            reflowed_humanize,
+            provenance,
+            upstream_root / "SKILL.md",
+            upstream_root / "LICENSE",
+        )
+        == []
+    )
+    assert len(humanize) < len((upstream_root / "SKILL.md").read_text(encoding="utf-8"))
+    assert "`../../third_party/avoid-ai-writing/`" in humanize
+    assert not (REPO_ROOT / "shared" / "skills" / "avoid-ai-writing").exists()
+    for unsupported_claim in (
+        "human typical",
+        "statistically detectable",
+        "AI text is statistically smooth",
+        "catalogued from thousands",
+        "Allow small topic expansions",
+    ):
+        assert unsupported_claim not in humanize
+
+    documenter = (
+        REPO_ROOT / "shared" / "agents" / "documenter" / "prompt.md"
+    ).read_text(encoding="utf-8")
+    assert documenter_humanize_errors(documenter) == []
+    assert (
+        documenter_humanize_errors(
+            documenter.replace("targeted `edit`\nmode", "targeted `edit` mode", 1)
+        )
+        == []
+    )
+    for agent_id in ("planner", "reviewer", "coder", "orchestrator"):
+        prompt = (REPO_ROOT / "shared" / "agents" / agent_id / "prompt.md").read_text(
+            encoding="utf-8"
+        )
+        assert "humanize" not in prompt.lower()
+
+    for root_name in ("CLAUDE.md", "AGENTS.md"):
+        root_guidance = (REPO_ROOT / root_name).read_text(encoding="utf-8")
+        semantic_root_guidance = " ".join(root_guidance.split())
+        assert "For every user-facing message" in root_guidance
+        assert "use `caveman full` with the user" in root_guidance
+        assert (
+            "Compact internal agent handoffs may still use `caveman full`"
+            in semantic_root_guidance
+        )
+
+    generated_humanize = (
+        REPO_ROOT
+        / "dist"
+        / "multi-agent"
+        / ".claude"
+        / "skills"
+        / "humanize"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "`../../third_party/avoid-ai-writing/`" in generated_humanize
+    assert (
+        REPO_ROOT
+        / "dist"
+        / "multi-agent"
+        / ".claude"
+        / "third_party"
+        / "avoid-ai-writing"
+        / "SKILL.md"
+    ).is_file()
+
+    root_guidance = render_root_guidance("claude-code")
+    assert (
+        root_guidance_errors(
+            "CLAUDE.md",
+            root_guidance.replace(
+                "Compact internal agent handoffs may still use `caveman full`",
+                "Compact internal agent handoffs may still use\n`caveman full`",
+                1,
+            ),
+        )
+        == []
     )
 
 
