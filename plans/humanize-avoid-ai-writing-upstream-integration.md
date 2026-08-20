@@ -1,13 +1,13 @@
 ---
 name: humanize-avoid-ai-writing-upstream-integration
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: humanize-avoid-ai-writing-upstream-integration_implementation
-started_at:
+started_at: 2026-08-20T12:36:09Z
 phases:
   - 2026-08-20_phase-A-integrate-and-validate-avoid-ai-writing
-current_phase:
+current_phase: 2026-08-20_phase-A-integrate-and-validate-avoid-ai-writing
 ---
 
 # Big Plan: Integrate `avoid-ai-writing` and strengthen user-facing communication

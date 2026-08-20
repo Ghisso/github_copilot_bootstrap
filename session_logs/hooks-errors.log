@@ -1294,3 +1294,15 @@ error: Please commit or stash them.
 2026-08-20T12:31:44Z WARN stop-session-log-check: worktree changed but no session log was updated today
 2026-08-20T12:32:22Z WARN stop-session-log-check: worktree changed but no session log was updated today
 2026-08-20T12:33:03Z WARN stop-session-log-check: worktree changed but no session log was updated today
+2026-08-20T12:51:01Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-08-20T12:51:01Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T12:51:01Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-20T12:51:01Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T13:02:06Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-08-20T13:02:06Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T13:02:06Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-20T13:02:06Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T13:08:59Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-08-20T13:08:59Z WARN hook fail-closed: unparseable tool payload
+2026-08-20T13:08:59Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-08-20T13:09:00Z WARN hook fail-closed: unparseable tool payload

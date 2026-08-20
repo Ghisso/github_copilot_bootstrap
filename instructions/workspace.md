@@ -156,7 +156,7 @@ Quality gates:
 
 ## Project State
 
-**Project:** github_copilot_bootstrap
+**Project:** [TODO: project name and one-liner description]
 **Stack:** Python 3.12+ with uv; adapt framework guidance to the target repo.
 **Active work:** Check `.claude/plans/` and `.claude/explorations/`.
 
