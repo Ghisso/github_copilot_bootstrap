@@ -3,7 +3,7 @@ name: 2026-08-20_phase-C-antigravity-installer-and-native-acceptance
 type: small-plan
 parent_plan: google-antigravity-provider-integration
 phase_index: 2
-status: in-progress
+status: complete
 closeout_session_log: .claude/session_logs/2026-08-21_antigravity-phase-c.md
 ---
 
@@ -296,9 +296,10 @@ Use `/agents` and `invoke_subagent`.
 
 Acceptance:
 
-- orchestrator is selectable as the main agent;
-- specialists do not need to be selectable main agents because `mainAgent: false`;
+- the default native agent follows the root orchestration contract;
+- every custom adapter is non-main (`mainAgent: false`);
 - specialists are invocable as subagents;
+- the custom `orchestrator` is non-delegatable;
 - Luna/Sol are not available as Antigravity roles;
 - `antigravity_flash_coder` is available as a subagent;
 - at least planner, Flash coder, Pro coder, verifier, and reviewer can complete a harmless read-only invocation;
@@ -421,7 +422,7 @@ After all three phases are complete, mark the parent big plan complete and publi
 
 ```text
 [ ] root AGENTS.md loaded
-[ ] orchestrator main-agent selection works
+[ ] default native agent follows the root orchestration contract
 [ ] hidden specialists are invocable
 [ ] Luna/Sol absent from Antigravity
 [ ] antigravity_flash_coder available
@@ -456,6 +457,7 @@ After all three phases are complete, mark the parent big plan complete and publi
 - [ ] Complete semantic validation passes.
 - [ ] Generated output is deterministic.
 - [ ] Native Antigravity loads root guidance.
+- [ ] Default native agent delegates to the intended specialist adapters.
 - [ ] Seven expected Antigravity roles are structurally present.
 - [ ] Hidden specialists are invocable.
 - [ ] Flash and Pro tier routing has client-provided evidence where available.

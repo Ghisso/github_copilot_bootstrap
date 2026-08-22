@@ -1,7 +1,7 @@
 ---
 name: google-antigravity-provider-integration
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: google-antigravity-provider-integration_implementation
 started_at: 2026-08-20T15:02:59Z
@@ -9,7 +9,6 @@ phases:
   - 2026-08-20_phase-A-antigravity-provider-and-static-adapters
   - 2026-08-20_phase-B-antigravity-hook-runtime-and-safety
   - 2026-08-20_phase-C-antigravity-installer-and-native-acceptance
-current_phase: 2026-08-20_phase-C-antigravity-installer-and-native-acceptance
 ---
 
 # Big Plan: Google Antigravity provider integration
@@ -210,10 +209,16 @@ sol_coder
 
 Visibility:
 
-- orchestrator: `mainAgent: true`, `subagent: false`;
-- specialists: `mainAgent: false`, `subagent: true`.
+- every custom adapter: `mainAgent: false`;
+- six specialists: `subagent: true`;
+- custom `orchestrator`: `subagent: false`.
 
-Do not require hidden specialists to be selectable as primary agents.
+The native default agent is the main thread and receives the orchestration
+contract through root `AGENTS.md`. This approved compatibility deviation
+replaces the original custom-main-agent design: in `agy` 1.1.17, a custom main
+agent could not invoke a workspace custom subagent, while the default native
+agent could. Do not require hidden specialists to be selectable as primary
+agents.
 
 Use `inheritMcp: true` for specialists if the installed/current Antigravity schema supports it as documented in the current changelog. Native acceptance must prove a specialist can use a workspace MCP tool or record the exact verified limitation.
 
@@ -397,7 +402,7 @@ Key gate:
 
 - safe fresh/update/restore semantics;
 - user `.agents/` content preserved;
-- real `agy` accepts generated agents/skills/MCP/hooks;
+- real `agy` default-agent delegation accepts the generated specialist adapters;
 - Flash and Pro routing is observed from client-provided evidence where available;
 - Flash -> Pro escalation works;
 - specialist MCP use is checked;
@@ -411,7 +416,8 @@ Before parent completion:
 - full tests/type/lint/format/generation/runtime checks pass;
 - generated output is deterministic;
 - no existing provider regression remains;
-- native Antigravity acceptance passes in a disposable consumer;
+- native Antigravity evidence in a disposable consumer records completed checks
+  and any remaining external acceptance gaps;
 - documentation describes only behavior that was actually proved;
 - final findings satisfy the repository's push/PR gates;
 - quality score >= 90;

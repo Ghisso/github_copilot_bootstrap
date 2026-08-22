@@ -253,16 +253,20 @@ Use documented fields only.
 
 Visibility:
 
-- orchestrator:
-  - `mainAgent: true`;
-  - `subagent: false`;
-  - `model: pro`.
-- all specialists:
+- every custom adapter:
   - `mainAgent: false`;
+- six specialists:
   - `subagent: true`;
   - model from canonical intent.
+- custom `orchestrator`:
+  - `subagent: false`;
+  - `model: pro`.
 
-Do not require hidden specialists to appear as selectable primary agents in `/agents`.
+The native default agent is the main thread. Root `AGENTS.md` gives it the
+provider-neutral orchestration contract. This approved compatibility deviation
+replaces the original custom-main-agent design after `agy` 1.1.17 showed that a
+custom main agent could not invoke a workspace custom subagent. Do not require
+hidden specialists to appear as selectable primary agents in `/agents`.
 
 Use `inheritMcp: true` for specialists if supported by the current installed/doc schema. Current Antigravity changelog documents the field for Markdown custom agents.
 
@@ -322,6 +326,8 @@ Requirements:
 
 - preserve existing Codex content/behavior except where wording is intentionally provider-neutral;
 - preserve the user-facing simple-language contract from the preceding writing plan;
+- tell Antigravity's default native agent to follow the canonical orchestrator
+  workflow and delegate only to eligible specialists;
 - keep provider-specific runtime details under `.codex/` or `.agents/`;
 - do not create two writers for the same root file.
 
