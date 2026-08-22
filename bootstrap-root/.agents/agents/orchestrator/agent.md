@@ -13,7 +13,7 @@ tools:
   - list_dir
   - find_by_name
   - grep_search
-mainAgent: true
+mainAgent: false
 subagent: false
 model: pro
 ---
