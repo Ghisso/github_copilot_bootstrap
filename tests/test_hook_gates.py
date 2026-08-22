@@ -1224,7 +1224,7 @@ def test_antigravity_pretool_allows_known_non_mutating_tools(tool_name: str) -> 
 
 
 def test_antigravity_pretool_non_mutating_allowlist_matches_generator() -> None:
-    """The standalone bridge cannot drift from generated tool capabilities."""
+    """The bridge adds only its documented native coordination exceptions."""
     bridge = runpy.run_path(str(SCRIPT_SRC / "antigravity-pretool.py"))
     expected = {
         tool
@@ -1232,7 +1232,22 @@ def test_antigravity_pretool_non_mutating_allowlist_matches_generator() -> None:
         for tool in ANTIGRAVITY_TOOL_MAP[capability]
     }
 
-    assert bridge["NON_MUTATING_TOOLS"] == expected
+    assert not {"manage_task", "schedule"} & expected
+    assert bridge["NON_MUTATING_TOOLS"] == expected | {"manage_task", "schedule"}
+
+
+@pytest.mark.parametrize("tool_name", ("manage_task", "schedule"))
+def test_antigravity_pretool_allows_native_coordination_only_in_the_bridge(
+    tool_name: str,
+) -> None:
+    """Native coordination is safe but never becomes a custom-agent tool."""
+    process = _run_antigravity_pretool({"toolCall": {"name": tool_name, "args": {}}})
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+    assert tool_name not in {
+        tool for tools in ANTIGRAVITY_TOOL_MAP.values() for tool in tools
+    }
 
 
 def test_antigravity_pretool_is_python_3_9_compatible() -> None:

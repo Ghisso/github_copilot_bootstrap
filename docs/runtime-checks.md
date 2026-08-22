@@ -91,7 +91,7 @@ runtime decision behavior is covered by the Phase B hook tests: explicit
 non-mutating tools are allowed, command and write tools use the canonical
 guards, and unknown or malformed requests deny with JSON-only protocol output.
 This check does not prove that Antigravity has loaded or trusted the adapter;
-native acceptance remains Phase C.
+native behavior remains the external acceptance gap/blocker described below.
 
 Missing optional binaries produce `WARN`, not `FAIL`.
 
@@ -205,6 +205,52 @@ An update retains that mode unless you explicitly select the opposite
 `--[no-]commit-copilot-surface` option. During a refresh, obsolete files that
 are bootstrap-owned by the active mode are removed safely; consumer state and
 the nested repository metadata are retained.
+
+### Google Antigravity ownership
+
+`.agents/` is a shared user namespace. The installer records only exact
+generated `.agents` files in `.claude/bootstrap-ownership.env` and
+`.claude/antigravity-ownership.env`; it does not own the directory. A refresh
+updates, prunes, mirrors, and restores only those records, preserving adjacent
+private agents and skills. The current generated target and both manifests have
+69 matching file records. An incomplete dynamic record set fails closed when a
+generated allowlist exists. A legacy manifest with no Antigravity records and
+no allowlist remains restorable. Repeating the documented local-only
+self-install is deterministic.
+
+The installer never writes `~/.gemini/`. During the recorded dogfood refresh,
+temporary `PATH` entries were removed before final runtime checks; no persistent
+`PATH` change is part of the installer contract.
+
+### Google Antigravity evidence boundary
+
+Static checks prove generated structure, not a native client result. The
+authenticated `agy` CLI initially ran as 1.1.16 and later self-updated to
+1.1.17. It initially reused the development repository from
+a persisted project, so that run is invalid. Native tests must use
+`--new-project --sandbox`; an isolated run verified workspace root
+`/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
+correctly, and exact-response invocations succeeded for `planner`, canonical
+`coder`, `reviewer`, `antigravity_flash_coder`, `verifier`, and
+the default native agent with root guidance. A custom main agent could not
+invoke a workspace custom subagent. The approved adapter layout therefore
+makes the default native agent the main thread through root `AGENTS.md`, sets
+every custom adapter to `mainAgent: false`, and keeps only the six specialists
+as subagents.
+
+The Flash-coder and verifier checks passed after the free-tier quota reset;
+their successful loading is not model-tier evidence. Earlier parallel attempts
+produced no retained output and are not evidence. A fresh `agy` 1.1.17 run in
+`/tmp/antigravity-final-native.y4Nx6j`, again using `--new-project --sandbox`,
+gave the default agent one tiny prompt. It delegated to
+`antigravity_flash_coder` and then `coder`, returned exact `F/P`, and completed
+with `SUCCESS`. This proves default-agent delegation and that the bridge now
+allows native task scheduling; it is not model-tier proof or proof of the
+formal automatic Flash-to-Pro escalation contract. `agy mcp list` reported `No
+MCP servers configured`. No native `modelName` or tier proof, bounded
+Flash-only task, skill discovery or use, specialist MCP, or native PreToolUse
+hard-deny execution was completed. This remains an external acceptance
+gap/blocker, not a passed native acceptance result.
 
 The generated `state-sync.sh` supports `setup`, `pull`, `checkpoint`,
 `publish`, `push`, `status`, and `migrate-from-hf`. Verify `checkpoint` without

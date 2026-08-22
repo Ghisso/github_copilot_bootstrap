@@ -13,7 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from runtime_ownership import render_restore_script, restore_manifest
+from runtime_ownership import (
+    render_antigravity_ownership_manifest,
+    render_restore_script,
+    restore_manifest,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -875,6 +879,28 @@ def provider_agent_prompt_body(agent: dict[str, Any], target: str) -> str:
     return f"{base_prompt}\n\n{delimiter}\n\n{supplement}"
 
 
+def render_antigravity_default_agent_contract() -> str:
+    """Render the native default-agent bridge from canonical role sources."""
+    orchestrator = next(
+        agent
+        for agent, _agent_dir in shared_agents("google-antigravity")
+        if agent["id"] == "orchestrator"
+    )
+    rendered = provider_agent_prompt_body(orchestrator, "google-antigravity")
+    delimiter = ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(agent_id="orchestrator")
+    _base, separator, supplement = rendered.partition(f"\n\n{delimiter}\n\n")
+    if not separator:
+        raise ValueError("Antigravity orchestrator routing supplement is required")
+    return (
+        "## Google Antigravity Default-Agent Contract\n\n"
+        "Google Antigravity's native default agent is the main-thread orchestrator. "
+        "Before complex work, read and follow the canonical workflow in "
+        "`.claude/agents/orchestrator.md`; delegate only to the eligible custom "
+        "specialists in `.agents/agents/`.\n\n"
+        f"{delimiter}\n\n{supplement}"
+    )
+
+
 def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
     """Return the exact target-transformed, self-contained Codex prompt body."""
     return provider_agent_prompt_body(agent, "openai-codex")
@@ -1205,7 +1231,7 @@ def render_root_guidance(target: str) -> str:
     else:
         raise ValueError(f"unsupported root-guidance target: {target}")
 
-    return f"""# {title}
+    guidance = f"""# {title}
 
 This is the repository entrypoint for Python AI engineering guidance. `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
@@ -1269,6 +1295,9 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 {runtime_note}
 """
+    if target == "multi-agent":
+        return f"{guidance}\n{render_antigravity_default_agent_contract()}\n"
+    return guidance
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:
@@ -1590,7 +1619,7 @@ def render_antigravity_agent_adapter(agent: dict[str, Any]) -> str:
         f"description: {json.dumps(transform_agent_text(agent['description'], 'google-antigravity'))}",
         "tools:",
         *(f"  - {tool}" for tool in render_antigravity_tools(agent["capabilities"])),
-        f"mainAgent: {'true' if agent['id'] == 'orchestrator' else 'false'}",
+        "mainAgent: false",
         f"subagent: {'false' if agent['id'] == 'orchestrator' else 'true'}",
         f"model: {intent['model']}",
     ]
@@ -1618,6 +1647,17 @@ def render_antigravity(target_root: Path) -> None:
             target_root / ".agents" / "agents" / agent["id"] / "agent.md",
             render_antigravity_agent_adapter(agent),
         )
+    ownership_paths = tuple(
+        sorted(
+            path.relative_to(target_root).as_posix()
+            for path in (target_root / ".agents").rglob("*")
+            if path.is_file() and not path.is_symlink()
+        )
+    )
+    write_text(
+        target_root / ".claude" / "antigravity-ownership.env",
+        render_antigravity_ownership_manifest(ownership_paths),
+    )
 
 
 def render_multi_agent(target_root: Path) -> None:

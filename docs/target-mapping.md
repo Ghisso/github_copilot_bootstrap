@@ -112,11 +112,36 @@ unchanged.
 
 Google Antigravity:
 
-- `.agents/agents/` — seven static Markdown custom-agent adapters.
+- `AGENTS.md` — provider-neutral root guidance shared with Codex.
+- `.agents/agents/` — seven static Markdown custom-agent adapters:
+  `orchestrator`, `planner`, `antigravity_flash_coder`, `coder`, `verifier`,
+  `reviewer`, and `documenter`. Codex-only `luna_coder` and `sol_coder` are not
+  emitted here.
 - `.agents/skills/` — the shared skill tree.
 - `.agents/mcp_config.json` — the shared MCP servers under Antigravity's
   `mcpServers` schema.
 - `.agents/hooks.json` — the named `bootstrap-safety` configuration.
+
+Antigravity's default native agent is the main thread. Root `AGENTS.md` gives
+that agent the provider-neutral orchestration contract. Every custom adapter
+sets `mainAgent: false`; the six specialists set `subagent: true`, while the
+custom `orchestrator` remains non-delegatable with `subagent: false`. This
+layout follows native behavior: a custom main agent could not invoke workspace
+custom subagents in the tested client.
+
+The declared model intents are Pro for orchestrator, planner, canonical coder,
+and reviewer; Flash for `antigravity_flash_coder`, verifier, and documenter.
+The Flash coder has one configured escalation target, the Pro `coder`. These
+are static configuration contracts, not evidence of a backing Gemini model or
+native tier routing. Specialist MCP inheritance and the shared skill/MCP files
+are structurally generated; an unavailable optional local MCP server follows
+the standard fallback behavior.
+
+`.agents/` is a shared workspace namespace. The installer owns exact generated
+files, records them in its inert ownership manifests, and only refreshes,
+prunes, mirrors, or restores those paths. Adjacent private agents and skills
+are preserved. Repeating an install is deterministic. Native Antigravity rules
+are not generated because their exact activation metadata was not verified.
 
 The Antigravity hook surface is intentionally limited to one `PreToolUse` event
 with a catch-all `matcher: "*"`. It calls the direct Python 3.9 standard-library
@@ -126,9 +151,10 @@ The bridge allows only the explicit non-mutating provider-tool list, protects
 `run_command` and write tools, and denies unknown or malformed input by
 default. It emits one JSON decision on stdout and keeps diagnostics on stderr.
 Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or
-`UserPromptSubmit` equivalent because native cadence is unproven; native
-acceptance remains a Phase C gate. The adapter does not claim native loading or
-trust acceptance.
+`UserPromptSubmit` equivalent. The bootstrap does not invent lifecycle parity;
+durable Git-hook/state-sync behavior remains the existing cross-provider path.
+The adapter does not claim native loading or trust acceptance. The native
+acceptance gap is recorded in [Runtime Checks](runtime-checks.md#google-antigravity-evidence-boundary).
 
 Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), sets `agents.max_concurrent_threads_per_session = 6`, omits the legacy `max_threads` and redundant `agents.enabled`, configures `[features.multi_agent_v2]` to expose named-agent routing metadata (its `tool_namespace = "agents"` key is inert in Codex 0.147.0 — see the [dated record](2026-08-08-codex-routing-compatibility.md)), and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
 

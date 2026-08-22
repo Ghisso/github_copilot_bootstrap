@@ -60,7 +60,7 @@ by `scripts/check_native_clients.py`.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
 
 ## Memory Authority and Privacy
 
@@ -193,8 +193,40 @@ provider has no approval response in the bridge.
 The canonical guards retain command and mutation protection, including
 symlink-safe path classification and protected-source checks. The Antigravity
 adapter intentionally defines no `PreInvocation`, `PostToolUse`, `Stop`, or
-`UserPromptSubmit` equivalence: native cadence is unproven, and native
-acceptance remains Phase C work.
+`UserPromptSubmit` equivalence. It does not claim lifecycle parity; durable
+Git-hook/state-sync behavior remains the existing cross-provider boundary.
+
+### Google Antigravity adapters and ownership
+
+The generator creates the Antigravity workspace surface from the same canonical
+metadata and assets as the other adapters. The installer treats `.agents/` as a
+shared namespace and owns only its exact generated files.
+
+```mermaid
+flowchart LR
+    S[Shared source] --> G[Generator]
+    G --> A[.agents files]
+    A --> I[Installer]
+    I --> M[Bootstrap mirror]
+    M --> R[Safe restore]
+```
+
+`AGENTS.md` is provider-neutral guidance shared by Codex and Antigravity.
+Antigravity structurally receives seven roles: the six universal roles plus
+`antigravity_flash_coder`; Codex-only `luna_coder` and `sol_coder` do not
+render. The native default agent is the Antigravity main thread and reads its
+orchestration contract from root `AGENTS.md`. All custom adapters set
+`mainAgent: false`; the six specialists set `subagent: true`, and the custom
+`orchestrator` sets `subagent: false`. The declared Flash-to-Pro coder handoff,
+model tiers, specialist MCP inheritance, shared skills, and MCP configuration
+are static contracts. They are not native loading, routing, escalation, skill,
+or MCP-use proof.
+
+Ownership records make an update refresh, prune, mirror, and restore only the
+known generated `.agents` files. Adjacent private paths remain untouched, and
+a repeated install is deterministic. Rules are deferred because no verified
+serialized activation schema exists. The external native-acceptance blocker is
+documented in [Runtime Checks](runtime-checks.md#google-antigravity-evidence-boundary).
 
 ## Task-Lane Routing
 

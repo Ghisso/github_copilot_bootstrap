@@ -14,10 +14,20 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from install_bootstrap import (  # noqa: E402
     copy_generated_tree,
+    generated_antigravity_paths,
+    merge_gitignore,
+    persisted_antigravity_paths,
+    populate_bootstrap_root,
     substitute_project_name,
     substitute_python_version,
     validate_install_roots,
 )
+from runtime_ownership import (  # noqa: E402
+    antigravity_manifest_paths,
+    install_mode_from_manifest,
+    restore_manifest,
+)
+from check_runtime import runtime_drift_errors  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
@@ -438,3 +448,295 @@ def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> N
     assert result.returncode == 0, result.stdout + result.stderr
     gitignore = (target / ".gitignore").read_text(encoding="utf-8")
     assert ".context-mode-provenance.secret" in gitignore
+
+
+def test_antigravity_ownership_is_file_granular_and_refreshable(tmp_path: Path) -> None:
+    """Refresh only generated `.agents` files; retain adjacent consumer files."""
+    source = tmp_path / "generated"
+    generated_agent = source / ".agents/agents/coder/agent.md"
+    generated_skill = source / ".agents/skills/ponytail/SKILL.md"
+    generated_mcp = source / ".agents/mcp_config.json"
+    for path, content in (
+        (generated_agent, "generated coder v1\n"),
+        (generated_skill, "generated skill\n"),
+        (generated_mcp, '{"mcpServers": {}}\n'),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+    private_skill = target / ".agents/skills/company-private/SKILL.md"
+    private_agent = target / ".agents/agents/company-reviewer/agent.md"
+    private_skill.parent.mkdir(parents=True)
+    private_agent.parent.mkdir(parents=True)
+    private_skill.write_text("private skill\n", encoding="utf-8")
+    private_agent.write_text("private agent\n", encoding="utf-8")
+    assert _git(target, "add", ".agents").returncode == 0
+
+    owned = copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(
+        target, False, False, owned, authoritative_antigravity_paths=owned
+    )
+    merge_gitignore(target, False, antigravity_paths=owned)
+
+    assert owned == generated_antigravity_paths(source)
+    assert private_skill.read_text() == "private skill\n"
+    assert private_agent.read_text() == "private agent\n"
+    assert (
+        target / ".agents/agents/coder/agent.md"
+    ).read_text() == "generated coder v1\n"
+    assert persisted_antigravity_paths(target, owned) == owned
+    assert (
+        target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
+    ).read_text() == "generated coder v1\n"
+    ignore_block = (target / ".gitignore").read_text(encoding="utf-8")
+    assert ".agents/agents/coder/agent.md" in ignore_block
+    assert ".agents/\n" not in ignore_block
+
+    generated_agent.write_text("generated coder v2\n", encoding="utf-8")
+    generated_mcp.unlink()
+    private_paths = (
+        ".agents/agents/company-reviewer/agent.md",
+        ".agents/skills/company-private/SKILL.md",
+    )
+    refreshed = copy_generated_tree(
+        source,
+        target,
+        dry_run=False,
+        previously_owned_antigravity_paths=owned + private_paths,
+        historical_antigravity_paths=owned,
+    )
+    populate_bootstrap_root(
+        target,
+        False,
+        False,
+        refreshed,
+        owned + private_paths,
+        generated_antigravity_paths(source),
+        owned,
+    )
+
+    assert (
+        target / ".agents/agents/coder/agent.md"
+    ).read_text() == "generated coder v2\n"
+    assert not (target / ".agents/mcp_config.json").exists()
+    assert not (target / ".claude/bootstrap-root/.agents/mcp_config.json").exists()
+    assert private_skill.read_text() == "private skill\n"
+    assert private_agent.read_text() == "private agent\n"
+    assert not (
+        target / ".claude/bootstrap-root/.agents/skills/company-private/SKILL.md"
+    ).exists()
+    assert not (
+        target / ".claude/bootstrap-root/.agents/agents/company-reviewer/agent.md"
+    ).exists()
+
+
+def test_antigravity_collision_never_claims_a_user_file(tmp_path: Path) -> None:
+    """A fresh exact-path collision stays consumer-owned and unmirrored."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("bootstrap adapter\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    collision = target / ".agents/agents/coder/agent.md"
+    collision.parent.mkdir(parents=True)
+    collision.write_text("company adapter\n", encoding="utf-8")
+
+    owned = copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(
+        target,
+        False,
+        False,
+        owned,
+        authoritative_antigravity_paths=generated_antigravity_paths(source),
+    )
+
+    assert owned == ()
+    assert collision.read_text() == "company adapter\n"
+    assert (
+        persisted_antigravity_paths(target, generated_antigravity_paths(source)) == ()
+    )
+    assert not (
+        target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
+    ).exists()
+
+
+def test_antigravity_manifest_rejects_unsafe_or_duplicate_records() -> None:
+    """Ownership records never widen from exact generated `.agents` files."""
+    valid = restore_manifest(False, (".agents/agents/coder/agent.md",))
+    allowed = (".agents/agents/coder/agent.md",)
+    assert antigravity_manifest_paths(valid, allowed) == allowed
+    assert install_mode_from_manifest(valid, allowed) is False
+
+    duplicate = valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/coder/agent.md\n"
+    traversal = valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/../AGENTS.md\n"
+    private_agent = (
+        valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/company-reviewer/agent.md\n"
+    )
+    private_skill = (
+        valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/skills/company-private/SKILL.md\n"
+    )
+    assert antigravity_manifest_paths(duplicate, allowed) is None
+    assert antigravity_manifest_paths(traversal, allowed) is None
+    assert antigravity_manifest_paths(private_agent, allowed) is None
+    assert antigravity_manifest_paths(private_skill, allowed) is None
+    assert install_mode_from_manifest(duplicate, allowed) is None
+    assert install_mode_from_manifest(traversal, allowed) is None
+    assert install_mode_from_manifest(private_agent, allowed) is None
+    assert install_mode_from_manifest(private_skill, allowed) is None
+
+
+def test_runtime_check_accepts_dynamic_owned_agents_manifest(tmp_path: Path) -> None:
+    """A successful install has dynamic, semantically valid ownership state."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+
+    owned = copy_generated_tree(GENERATED, target, dry_run=False)
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        (target / name).write_bytes((REPO_ROOT / name).read_bytes())
+    assert _git(target, "add", "AGENTS.md", "CLAUDE.md").returncode == 0
+    populate_bootstrap_root(
+        target,
+        False,
+        False,
+        owned,
+        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
+    )
+
+    assert runtime_drift_errors(target, GENERATED) == []
+
+    manifest = target / ".claude/bootstrap-ownership.env"
+    manifest.write_text(
+        "\n".join(
+            line
+            for line in manifest.read_text(encoding="utf-8").splitlines()
+            if line != "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/hooks.json"
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (target / ".agents/hooks.json").unlink()
+    (target / ".claude/bootstrap-root/.agents/hooks.json").unlink()
+    missing_hook_errors = runtime_drift_errors(target, GENERATED)
+    assert any(
+        ".claude/bootstrap-ownership.env" in error for error in missing_hook_errors
+    )
+    assert any(".agents/hooks.json" in error for error in missing_hook_errors)
+
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8")
+        + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/../AGENTS.md\n",
+        encoding="utf-8",
+    )
+    unsafe_errors = runtime_drift_errors(target, GENERATED)
+    assert any(".claude/bootstrap-ownership.env" in error for error in unsafe_errors)
+
+    manifest.unlink()
+    missing_errors = runtime_drift_errors(target, GENERATED)
+    assert any(".claude/bootstrap-ownership.env" in error for error in missing_errors)
+
+
+@pytest.mark.parametrize(
+    "private_relative",
+    (
+        ".agents/agents/company-reviewer/agent.md",
+        ".agents/skills/company-private/SKILL.md",
+    ),
+)
+def test_restore_rejects_private_agents_manifest_paths(
+    tmp_path: Path, private_relative: str
+) -> None:
+    """The restorer rejects dynamic records outside generated ownership."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+    owned = copy_generated_tree(GENERATED, target, dry_run=False)
+    populate_bootstrap_root(
+        target,
+        False,
+        False,
+        owned,
+        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
+    )
+    private_path = target / private_relative
+    private_path.parent.mkdir(parents=True, exist_ok=True)
+    private_path.write_text("company-owned\n", encoding="utf-8")
+    manifest = target / ".claude/bootstrap-ownership.env"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8")
+        + f"BOOTSTRAP_ANTIGRAVITY_PATH={private_relative}\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
+        cwd=target,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Antigravity manifest" in result.stderr
+    assert private_path.read_text() == "company-owned\n"
+
+
+def test_restore_accepts_legacy_manifest_without_antigravity_records(
+    tmp_path: Path,
+) -> None:
+    """Pre-Antigravity state restores without the new optional allowlist."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+    owned = copy_generated_tree(GENERATED, target, dry_run=False)
+    populate_bootstrap_root(
+        target,
+        False,
+        True,
+        owned,
+        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
+    )
+    manifest = target / ".claude/bootstrap-ownership.env"
+    manifest.write_text(restore_manifest(True), encoding="utf-8")
+    (target / ".claude/antigravity-ownership.env").unlink()
+
+    result = subprocess.run(
+        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
+        cwd=target,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_restore_rejects_zero_records_with_generated_allowlist(tmp_path: Path) -> None:
+    """A generated allowlist requires a complete dynamic ownership manifest."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+    owned = copy_generated_tree(GENERATED, target, dry_run=False)
+    populate_bootstrap_root(
+        target,
+        False,
+        True,
+        owned,
+        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
+    )
+    (target / ".claude/bootstrap-ownership.env").write_text(
+        restore_manifest(True), encoding="utf-8"
+    )
+
+    result = subprocess.run(
+        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
+        cwd=target,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Antigravity manifest must match generated allowlist" in result.stderr

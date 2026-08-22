@@ -29,6 +29,7 @@ from generate_targets import (  # noqa: E402
     codex_agent_metadata_header,
     render_codex_agent_adapter,
     render_antigravity_agent_adapter,
+    render_antigravity_default_agent_contract,
     render_antigravity,
     render_github_instruction_adapter,
     render_root_guidance,
@@ -59,6 +60,7 @@ from validate_targets import (  # noqa: E402
     github_agent_model_errors,
     agent_membership_errors,
     antigravity_agent_adapter_errors,
+    antigravity_default_agent_contract_errors,
     mcp_server_parity_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
@@ -223,6 +225,9 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     assert root_guidance_errors("CLAUDE.md", claude) == []
     assert root_guidance_errors("AGENTS.md", codex) == []
     assert root_guidance_errors("AGENTS.md", multi_agent) == []
+    assert antigravity_default_agent_contract_errors(multi_agent) == []
+    assert render_antigravity_default_agent_contract() in multi_agent
+    assert render_antigravity_default_agent_contract() not in codex
     assert "`.claude/hooks/`" in claude
     assert "`.github/hooks/`" in claude
     assert "`.codex/`" in codex
@@ -780,6 +785,8 @@ def test_antigravity_flash_coder_metadata_and_adapter_are_exact() -> None:
 
     orchestrator, _orchestrator_dir = agents_by_id["orchestrator"]
     rendered_orchestrator = render_antigravity_agent_adapter(orchestrator)
+    assert "mainAgent: false" in rendered_orchestrator
+    assert "subagent: false" in rendered_orchestrator
     assert (
         "Use the runtime's native task tracker when one is available."
         in rendered_orchestrator
@@ -789,6 +796,8 @@ def test_antigravity_flash_coder_metadata_and_adapter_are_exact() -> None:
         in rendered_orchestrator
     )
     assert "TodoWrite" not in rendered_orchestrator
+    assert "manage_task" not in rendered_orchestrator
+    assert "schedule" not in rendered_orchestrator
 
 
 def test_antigravity_adapter_validation_rejects_unknown_schema_values(
@@ -815,6 +824,15 @@ def test_antigravity_adapter_validation_rejects_unknown_schema_values(
         for error in antigravity_agent_adapter_errors(path, flash)
     )
 
+    for native_tool in ("manage_task", "schedule"):
+        path.write_text(
+            rendered.replace("  - grep_search", f"  - {native_tool}\n  - grep_search")
+        )
+        assert any(
+            f"unknown native tools ['{native_tool}']" in error
+            for error in antigravity_agent_adapter_errors(path, flash)
+        )
+
 
 def test_antigravity_static_adapter_renders_canonical_mcp_skills_and_no_rules(
     tmp_path: Path,
@@ -827,6 +845,13 @@ def test_antigravity_static_adapter_renders_canonical_mcp_skills_and_no_rules(
         for path in (tmp_path / ".agents" / "agents").glob("*/agent.md")
     }
     assert generated_agents == set(ANTIGRAVITY_AGENT_MODEL_INTENTS)
+    for path in (tmp_path / ".agents" / "agents").glob("*/agent.md"):
+        rendered = path.read_text(encoding="utf-8")
+        assert "mainAgent: false" in rendered
+        if path.parent.name == "orchestrator":
+            assert "subagent: false" in rendered
+        else:
+            assert "subagent: true" in rendered
     assert json.loads((tmp_path / ".agents" / "mcp_config.json").read_text()) == {
         "mcpServers": target_generator.shared_mcp_servers()
     }
