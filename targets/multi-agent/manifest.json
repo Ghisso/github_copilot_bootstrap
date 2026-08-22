@@ -1,6 +1,6 @@
 {
   "target": "multi-agent",
-  "description": "Single installable target for GitHub Copilot, Claude Code, and OpenAI Codex.",
+  "description": "Single installable target for GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity.",
   "canonical_basis": ".claude",
   "devcontainer_output": ".devcontainer",
   "adapters": {
@@ -21,6 +21,13 @@
       "entrypoint": "AGENTS.md",
       "config_output": ".codex/config.toml",
       "hooks_output": ".codex/hooks.json"
+    },
+    "google-antigravity": {
+      "agent_output": ".agents/agents/*/agent.md",
+      "entrypoint": "AGENTS.md",
+      "skills_output": ".agents/skills/**",
+      "mcp_output": ".agents/mcp_config.json",
+      "hooks_output": ".agents/hooks.json"
     }
   },
   "skills_output": ".claude/skills/**/SKILL.md"

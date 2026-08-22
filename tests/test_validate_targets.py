@@ -28,6 +28,9 @@ from generate_targets import (  # noqa: E402
     render_github_agent_adapter,
     codex_agent_metadata_header,
     render_codex_agent_adapter,
+    render_antigravity_agent_adapter,
+    render_antigravity_default_agent_contract,
+    render_antigravity,
     render_github_instruction_adapter,
     render_root_guidance,
     shared_agents,
@@ -40,6 +43,8 @@ from validate_targets import (  # noqa: E402
     CODEX_ESCALATION_CHAIN,
     CODEX_AGENT_MODEL_INTENTS,
     CODEX_ROLE_MODEL_INTENTS,
+    ANTIGRAVITY_AGENT_MODEL_INTENTS,
+    ANTIGRAVITY_ESCALATION_CHAIN,
     CONTEXT_MODE_ALLOWED_TOOLS,
     CONTEXT_MODE_BLOCKED_TOOLS,
     CONTEXT_MODE_PINNED_VERSION,
@@ -54,6 +59,8 @@ from validate_targets import (  # noqa: E402
     copilot_instruction_paths,
     github_agent_model_errors,
     agent_membership_errors,
+    antigravity_agent_adapter_errors,
+    antigravity_default_agent_contract_errors,
     mcp_server_parity_errors,
     memory_security_authority_errors,
     pretool_routing_errors,
@@ -213,15 +220,31 @@ def test_root_guidance_budgets_and_structural_invariants() -> None:
     """Concise root templates retain their unique sections and lifecycle."""
     claude = render_root_guidance("claude-code")
     codex = render_root_guidance("openai-codex")
+    multi_agent = render_root_guidance("multi-agent")
 
     assert root_guidance_errors("CLAUDE.md", claude) == []
     assert root_guidance_errors("AGENTS.md", codex) == []
+    assert root_guidance_errors("AGENTS.md", multi_agent) == []
+    assert antigravity_default_agent_contract_errors(multi_agent) == []
+    assert render_antigravity_default_agent_contract() in multi_agent
+    assert render_antigravity_default_agent_contract() not in codex
     assert "`.claude/hooks/`" in claude
     assert "`.github/hooks/`" in claude
     assert "`.codex/`" in codex
     assert "`.github/hooks/`" in codex
+    for fragment in (
+        "`.codex/config.toml`",
+        "`.codex/hooks.json`",
+        "`.codex/agents/*.toml`",
+        "`.agents/agents/`",
+        "`.agents/skills/`",
+        "`.agents/mcp_config.json`",
+        "`.agents/`",
+    ):
+        assert fragment in multi_agent
     assert len(claude.splitlines()) <= 200
     assert len(codex.encode()) <= 16 * 1024
+    assert len(multi_agent.encode()) <= 16 * 1024
     missing_reporting_pointer = claude.replace(
         ".claude/instructions/agent-reporting.instructions.md", "reporting.md", 1
     )
@@ -678,7 +701,7 @@ def write_scoped_agent(
 
 
 def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
-    """Universal agents stay universal while Codex gains two scoped specialists."""
+    """Universal agents stay universal while providers add scoped specialists."""
     agents = shared_agents()
 
     universal_agents = {
@@ -689,11 +712,12 @@ def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
         "reviewer",
         "verifier",
     }
-    assert len(agents) == 8
+    assert len(agents) == 9
     assert {agent["id"] for agent, _agent_dir in agents} == {
         *universal_agents,
         "luna_coder",
         "sol_coder",
+        "antigravity_flash_coder",
     }
     assert {
         agent["id"] for agent, _agent_dir in shared_agents("github-copilot")
@@ -705,6 +729,141 @@ def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
         *universal_agents,
         "luna_coder",
         "sol_coder",
+    }
+    assert {
+        agent["id"] for agent, _agent_dir in shared_agents("google-antigravity")
+    } == {*universal_agents, "antigravity_flash_coder"}
+
+
+def test_antigravity_flash_coder_metadata_and_adapter_are_exact() -> None:
+    """Flash is a single-provider coder with one documented Pro escalation."""
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }
+    flash, flash_dir = agents_by_id["antigravity_flash_coder"]
+    coder, _coder_dir = agents_by_id["coder"]
+
+    assert flash["targets"] == ("google-antigravity",)
+    assert flash["prompt_base"] == "coder"
+    assert flash["model_intent"] == {
+        "google-antigravity": {"model": "flash", "escalate_to": "coder"}
+    }
+    assert coder["model_intent"]["google-antigravity"] == {"model": "pro"}
+    assert ANTIGRAVITY_AGENT_MODEL_INTENTS == {
+        "orchestrator": "pro",
+        "planner": "pro",
+        "antigravity_flash_coder": "flash",
+        "coder": "pro",
+        "verifier": "flash",
+        "reviewer": "pro",
+        "documenter": "flash",
+    }
+    assert ANTIGRAVITY_ESCALATION_CHAIN == {"antigravity_flash_coder": "coder"}
+
+    supplement = (flash_dir / "prompt.google-antigravity.md").read_text(
+        encoding="utf-8"
+    )
+    assert "return only this escalation object" in supplement
+    escalation_match = re.search(r"```json\n(.*?)\n```", supplement, re.DOTALL)
+    assert escalation_match is not None
+    assert json.loads(escalation_match[1]) == {
+        "status": "escalate",
+        "reason": "unknown-root-cause",
+        "workspace_changed": False,
+        "evidence": ["concrete evidence"],
+        "needed": ["needed decision or evidence"],
+    }
+
+    rendered = render_antigravity_agent_adapter(flash)
+    assert "mainAgent: false" in rendered
+    assert "subagent: true" in rendered
+    assert "model: flash" in rendered
+    assert "inheritMcp: true" in rendered
+    assert "  - run_command" in rendered
+    assert "todo" not in rendered
+    assert "vscode" not in rendered
+
+    orchestrator, _orchestrator_dir = agents_by_id["orchestrator"]
+    rendered_orchestrator = render_antigravity_agent_adapter(orchestrator)
+    assert "mainAgent: false" in rendered_orchestrator
+    assert "subagent: false" in rendered_orchestrator
+    assert (
+        "Use the runtime's native task tracker when one is available."
+        in rendered_orchestrator
+    )
+    assert (
+        "where it is unavailable, write the same phase checklist"
+        in rendered_orchestrator
+    )
+    assert "TodoWrite" not in rendered_orchestrator
+    assert "manage_task" not in rendered_orchestrator
+    assert "schedule" not in rendered_orchestrator
+
+
+def test_antigravity_adapter_validation_rejects_unknown_schema_values(
+    tmp_path: Path,
+) -> None:
+    """Static validation has independent native tool and frontmatter allowlists."""
+    flash, _flash_dir = {
+        agent["id"]: (agent, agent_dir) for agent, agent_dir in shared_agents()
+    }["antigravity_flash_coder"]
+    rendered = render_antigravity_agent_adapter(flash)
+    path = tmp_path / "agent.md"
+
+    path.write_text(rendered.replace("model: flash", "bogusField: true\nmodel: flash"))
+    assert any(
+        "unsupported frontmatter fields ['bogusField']" in error
+        for error in antigravity_agent_adapter_errors(path, flash)
+    )
+
+    path.write_text(
+        rendered.replace("  - grep_search", "  - invented_tool\n  - grep_search")
+    )
+    assert any(
+        "unknown native tools ['invented_tool']" in error
+        for error in antigravity_agent_adapter_errors(path, flash)
+    )
+
+    for native_tool in ("manage_task", "schedule"):
+        path.write_text(
+            rendered.replace("  - grep_search", f"  - {native_tool}\n  - grep_search")
+        )
+        assert any(
+            f"unknown native tools ['{native_tool}']" in error
+            for error in antigravity_agent_adapter_errors(path, flash)
+        )
+
+
+def test_antigravity_static_adapter_renders_canonical_mcp_skills_and_no_rules(
+    tmp_path: Path,
+) -> None:
+    """The provider adds static adapters without guessing native rule metadata."""
+    render_antigravity(tmp_path)
+
+    generated_agents = {
+        path.parent.name
+        for path in (tmp_path / ".agents" / "agents").glob("*/agent.md")
+    }
+    assert generated_agents == set(ANTIGRAVITY_AGENT_MODEL_INTENTS)
+    for path in (tmp_path / ".agents" / "agents").glob("*/agent.md"):
+        rendered = path.read_text(encoding="utf-8")
+        assert "mainAgent: false" in rendered
+        if path.parent.name == "orchestrator":
+            assert "subagent: false" in rendered
+        else:
+            assert "subagent: true" in rendered
+    assert json.loads((tmp_path / ".agents" / "mcp_config.json").read_text()) == {
+        "mcpServers": target_generator.shared_mcp_servers()
+    }
+    assert not (tmp_path / ".agents" / "rules").exists()
+    assert {
+        path.relative_to(tmp_path / ".agents" / "skills")
+        for path in (tmp_path / ".agents" / "skills").rglob("*")
+        if path.is_file()
+    } == {
+        path.relative_to(REPO_ROOT / "shared" / "skills")
+        for path in (REPO_ROOT / "shared" / "skills").rglob("*")
+        if path.is_file()
     }
 
 
@@ -1212,6 +1371,16 @@ def test_canonical_coder_routing_contract_rejects_roster_tier_and_graph_drift() 
             ["claude-code"],
             {"claude-code": {"model": "sonnet", "tier": "high"}},
             "model_intent.claude-code has unsupported fields",
+        ),
+        (
+            ["google-antigravity"],
+            {"google-antigravity": {"model": "flash_lite"}},
+            "model_intent.google-antigravity.model",
+        ),
+        (
+            ["google-antigravity"],
+            {"google-antigravity": {"model": "flash", "effort": "low"}},
+            "model_intent.google-antigravity has unsupported fields",
         ),
     ),
 )

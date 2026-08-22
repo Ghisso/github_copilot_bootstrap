@@ -2,7 +2,7 @@
 
 A reusable multi-target agent bootstrap I drop into my other projects.
 
-This repository is my personal starter kit for opinionated agent workflows in Python AI engineering repos. It packages the hooks, agents, skills, and instruction files I want available everywhere so I can keep quality and execution style consistent across GitHub Copilot, Claude Code, and OpenAI Codex.
+This repository is my personal starter kit for opinionated agent workflows in Python AI engineering repos. It packages the hooks, agents, skills, and instruction files I want available everywhere so I can keep quality and execution style consistent across GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity.
 
 Inspired and adapted from:
 
@@ -235,6 +235,7 @@ Generated layout:
 - `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native entrypoint/adapters/config
+- `.agents/`: Google Antigravity workspace adapters, skills, MCP configuration, and safety hook configuration
 
 Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
 content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
@@ -469,6 +470,11 @@ Codex-only agents:
 - `luna_coder`
 - `sol_coder`
 
+Google Antigravity adds one derived role, `antigravity_flash_coder`. Its
+generated workspace has seven structural adapters: the six universal roles plus
+that Flash coder. It is included in the existing `multi-agent` target, not a
+second distribution. `luna_coder` and `sol_coder` remain Codex-only.
+
 Claude Code and GitHub Copilot keep the six universal agents. Codex generates
 those six plus the two bounded implementation specialists. Claude Code and
 Codex both carry per-agent model/effort tiers for their eligible agents
@@ -484,6 +490,58 @@ Codex both carry per-agent model/effort tiers for their eligible agents
 | verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 | luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
 | sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
+
+**Google Antigravity:** the generated adapter configuration assigns Pro to the
+orchestrator, planner, canonical coder, and reviewer; it assigns Flash to the
+Flash coder, verifier, and documenter. The configured coding contract starts a
+bounded implementation with `antigravity_flash_coder` and permits one
+implementation-attributable escalation to the Pro `coder`. It is configuration,
+not evidence of the backing Gemini model or a native routing result. In
+Antigravity, the native default agent is the main thread and receives the
+orchestration contract through root `AGENTS.md`. Every custom adapter has
+`mainAgent: false`; the six specialists are subagents, while the custom
+`orchestrator` is non-delegatable. Root `AGENTS.md` remains provider-neutral
+guidance shared by Codex and Antigravity.
+
+The generated `.agents/` surface contains the shared skill tree,
+`mcp_config.json`, and `hooks.json`. Native rules are deliberately not
+generated: the on-disk activation schema was not verified. The PreToolUse
+bridge hard-denies malformed or unsafe requests before execution by translating
+documented command and write requests into the existing canonical guards. It
+does not invent lifecycle equivalents for `PreInvocation`, `PostToolUse`,
+`Stop`, or `UserPromptSubmit`; durable state-sync remains with the existing Git
+hooks and explicit commands. Optional local MCP servers follow the normal
+fallback rules, so their absence does not break structural generation.
+
+The installer owns only exact generated `.agents` files. It refreshes, prunes,
+mirrors, and restores those recorded paths while preserving adjacent private
+agents and skills. Repeat installs are deterministic. It never writes
+`~/.gemini/`.
+
+Native Antigravity acceptance is partial. The authenticated `agy` CLI initially
+ran as 1.1.16 and later self-updated to 1.1.17. It first reused the development repository from
+a persisted project, so that run is invalid. Use `--new-project --sandbox` for
+isolation; it verified the workspace root
+`/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
+correctly, and exact-response invocations succeeded for `planner`, canonical
+`coder`, `reviewer`, `antigravity_flash_coder`, `verifier`, and
+the default native agent with root guidance. A custom main agent could not
+invoke a workspace custom subagent, which is why the default native agent now
+orchestrates through root guidance instead.
+
+The Flash-coder and verifier checks passed after the free-tier quota reset;
+their successful loading is not model-tier evidence. Earlier parallel attempts
+retained no output and are not evidence. A fresh isolated `agy` 1.1.17 run in
+`/tmp/antigravity-final-native.y4Nx6j` used one tiny default-agent prompt that
+delegated to `antigravity_flash_coder` and then `coder`, returned exact `F/P`,
+and completed with `SUCCESS`. This proves default-agent delegation and the
+schedule bridge, not model tier or the formal automatic escalation contract.
+`agy mcp list` reported `No MCP servers configured`. There is no native
+`modelName` or tier proof, bounded Flash-only task, skill discovery or use,
+specialist MCP evidence, or native PreToolUse hard-deny execution. These gaps
+block complete native acceptance; they do not negate the structural checks or
+the limited isolated invocation evidence. See
+[runtime checks](docs/runtime-checks.md#google-antigravity-evidence-boundary).
 
 **Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
@@ -591,7 +649,14 @@ Coder skill loading:
 
 Hooks provide guardrails and lightweight observability.
 
-All hook commands route through [run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the repo root robustly — via `BASH_SOURCE`, environment variable fallbacks (`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`. This avoids the broken-path failures that occur when `$CLAUDE_PROJECT_DIR` is empty or when `git rev-parse` runs from the wrong directory.
+Claude, Codex, and Copilot hook commands route through
+[run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the
+repo root robustly — via `BASH_SOURCE`, environment variable fallbacks
+(`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`.
+Google Antigravity is the deliberate exception: its static `.agents/hooks.json`
+adapter calls the direct Python 3.9 standard-library bridge
+`.claude/hooks/scripts/antigravity-pretool.py`, which normalizes provider input
+before invoking the canonical guards.
 
 [hooks.json](shared/hooks/hooks.json) sets `"cwd": "."` on every entry rather than `"${workspaceFolder}"`. Copilot's hook runner does not interpolate VS Code variables, so using the literal string would resolve to a non-existent path and produce `spawn /bin/sh ENOENT` errors. `run-hook.sh` resolves the repo root itself, so `"."` is sufficient.
 
@@ -607,6 +672,10 @@ Configured events:
   - Both primary targets send `Bash` through [pretool-bash-guard.sh](shared/hooks/scripts/pretool-bash-guard.sh). It runs `protect-files.sh`, [git-protection.sh](shared/hooks/scripts/git-protection.sh), [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh), [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh), and [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) in that order, stopping at the first safety decision. Lifecycle wrappers are unchanged.
   - The protected-file classifier runs directly with required `python3`, not `uv run`, so it works before a project environment exists. It derives targets per shell segment: read-only inspection of an existing protected configuration is allowed, but native edits, redirects, in-place `sed`/`perl`, missing `python3`, and ambiguous/unparseable commands fail closed. Known file operations resolve relative paths, shell-expanded wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. Unknown or interpreter-style commands retain conservative high-confidence path coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook paths, and protected hook configuration literals, while prose and ordinary source filenames containing `secret` are not credential evidence. Copy/install/move check resolved source operands as well as destinations, preventing protected-source exfiltration through write-bearing commands. Hook-config edits ask in Claude and are denied in Codex, whose `PreToolUse` cannot request approval.
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) stays in a separate wildcard matcher for best-effort observability. It makes no safety decision and does not mutate the ordered safety lane.
+- Google Antigravity PreToolUse
+  - `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `matcher: "*"` group. The bridge explicitly allows the documented non-mutating provider tools, routes `run_command` through `pretool-bash-guard.sh`, and routes write tools through `protect-files.sh`.
+  - The bridge requires valid JSON object payloads and documented fields, emits exactly one JSON decision on stdout, and writes diagnostics only to stderr. Unknown tools, malformed input, missing Python or guard failures, malformed guard output, and existing `ask` results deny by default because Antigravity has no approval response in this bridge.
+  - Canonical command and mutation guards retain symlink-safe path classification, protected-source checks, and deny-by-default handling for ambiguous or unsafe requests. Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent; the bootstrap does not invent lifecycle parity. Native loading and cadence remain an external acceptance gap/blocker.
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
   - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; it completes the big plan after the final phase and logs allowed bypass commits

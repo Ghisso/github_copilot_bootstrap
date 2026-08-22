@@ -22,6 +22,17 @@ Expected:
   agents plus Codex-only `luna_coder` and `sol_coder`.
 - Neither Codex-only agent appears in `.claude/agents/` or `.github/agents/`,
   and omitting either one from `.codex/agents/` fails validation.
+- Google Antigravity has exactly seven structural `.agents/agents/*/agent.md`
+  adapters: the six universal roles plus `antigravity_flash_coder`. It does not
+  include Codex-only `luna_coder` or `sol_coder`.
+- Antigravity's declared configuration uses Flash for the Flash coder, verifier,
+  and documenter, and Pro for orchestrator, planner, canonical coder, and
+  reviewer. The Flash coder's only configured escalation is to the Pro coder.
+  These checks do not prove native model routing or escalation.
+- Root `AGENTS.md` is provider-neutral guidance shared by Codex and
+  Antigravity. `.agents/skills/` and `.agents/mcp_config.json` are structural
+  copies of the canonical skill tree and MCP registry. `.agents/rules/` is
+  absent until an exact native rule schema is verified.
 - Each Codex `developer_instructions` field has exactly one generated delimiter
   and embeds its exact target-transformed role body; it must not instruct the
   agent to read `.claude/agents/<id>.md`.
@@ -66,7 +77,9 @@ Expected:
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
 - Codex config sets `agents.max_concurrent_threads_per_session = 6`, omits legacy `agents.max_threads` and redundant `agents.enabled`, retains `max_depth = 1`, and retains both required `[features.multi_agent_v2]` metadata-routing values.
 - `dist/` contains `multi-agent/` and no obsolete `github-copilot/`, `claude-code/`, or `openai-codex/` generated target directories.
-- The generated output has no obsolete `.github/skills/`, `.agents/skills/`, `.codex/skills/`, or target-local state directories.
+- The generated output has no obsolete `.github/skills/` or `.codex/skills/`
+  directories. Antigravity `.agents/skills/` matches the shared skill tree, and
+  no target-local state directory is generated.
 - Claude and Codex outputs do not contain Copilot model pins.
 - Codex does not generate deprecated `.codex/rules/` output.
 - Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
@@ -80,6 +93,9 @@ Expected:
 
 - GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`).
 - Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context7]`, and `[mcp_servers.context-mode]`, all three targets sharing the same dispatcher route.
+- Antigravity `.agents/mcp_config.json` uses the same canonical server registry.
+  Its presence is structural evidence only; an optional local server that is
+  unavailable follows the normal fallback behavior.
 - The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`; every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
 - Tool-routing policy preserves:
   - direct reads for known paths
@@ -169,6 +185,50 @@ Expected:
 - Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Generated `run-hook.sh` is executable because Claude and Codex hook commands call it directly.
+- Generated `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `PreToolUse` matcher (`*`). It calls the direct Python 3.9 standard-library `antigravity-pretool.py` bridge; this is intentionally the only provider hook that does not call `run-hook.sh`.
+- Antigravity's bridge allows only the explicit documented non-mutating provider tools, normalizes `run_command` and write tools into the canonical guards, and denies unknown or malformed payloads, missing fields, guard failures, malformed guard output, and `ask` results by default. It emits one JSON decision on stdout and diagnostics on stderr; canonical guards retain symlink-safe path classification and protected-source checks.
+- Antigravity intentionally has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent. The bootstrap does not invent lifecycle parity; durable Git-hook/state-sync behavior remains the existing path. Native loading, cadence, and trust are an external acceptance gap/blocker.
+
+## Google Antigravity Ownership
+
+Expected:
+
+- `.agents/` is file-granular bootstrap ownership, not an owned directory.
+- Fresh and repeat installs refresh exact generated files and deterministically
+  prune a formerly generated file from both the root and
+  `.claude/bootstrap-root/.agents/` mirror.
+- Adjacent private agents and skills survive refresh, pruning, mirror, and
+  restore operations.
+- The generated `.agents` tree and the two ownership manifests have the same
+  69 paths. A partial dynamic manifest fails closed when its generated
+  allowlist exists; a legacy zero-record manifest with the allowlist absent
+  restores successfully.
+
+## Google Antigravity Native Evidence Boundary
+
+The authenticated `agy` CLI initially ran as 1.1.16 and later self-updated to
+1.1.17. It initially reused the development repository from a persisted
+project, so that run is invalid. Use `--new-project --sandbox`
+for isolation; the isolated run verified workspace root
+`/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
+correctly, and exact-response invocations succeeded for `planner`, canonical
+`coder`, `reviewer`, `antigravity_flash_coder`, `verifier`, and
+the default native agent with root guidance. A custom main agent could not
+invoke a workspace custom subagent, so root `AGENTS.md` now gives the default
+native agent the orchestration contract. Every custom adapter has
+`mainAgent: false`; only the six specialists have `subagent: true`.
+
+The Flash-coder and verifier checks passed after the free-tier quota reset;
+their successful loading is not model-tier evidence. Earlier parallel attempts
+retained no output and are not evidence. A fresh `agy` 1.1.17 run in
+`/tmp/antigravity-final-native.y4Nx6j` used the default agent to delegate one
+tiny prompt to `antigravity_flash_coder` and then `coder`. It returned exact
+`F/P` with `SUCCESS`, proving the schedule bridge and this delegation path.
+It does not prove model tier or the formal automatic escalation contract.
+`agy mcp list` reported `No MCP servers configured`. No native `modelName` or
+tier proof, bounded Flash-only task, skill discovery or use, specialist MCP,
+or PreToolUse hard-deny execution was completed. This remains an external
+acceptance gap/blocker.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.

@@ -13,13 +13,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from runtime_ownership import render_restore_script, restore_manifest
+from runtime_ownership import (
+    render_antigravity_ownership_manifest,
+    render_restore_script,
+    restore_manifest,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
-SUPPORTED_AGENT_TARGETS = ("github-copilot", "claude-code", "openai-codex")
+SUPPORTED_AGENT_TARGETS = (
+    "github-copilot",
+    "claude-code",
+    "openai-codex",
+    "google-antigravity",
+)
 AGENT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
 AGENT_VISIBILITIES = {"public", "hidden"}
 AGENT_CAPABILITIES = {
@@ -94,6 +103,18 @@ COPILOT_TOOL_MAP = {
     "web": ["web"],
     "vscode": ["vscode"],
 }
+ANTIGRAVITY_TOOL_MAP = {
+    "read": ["view_file", "list_dir", "find_by_name"],
+    "search": ["grep_search"],
+    "edit": ["write_to_file", "replace_file_content", "multi_replace_file_content"],
+    "execute": ["run_command"],
+    "delegate": ["invoke_subagent", "send_message", "manage_subagents"],
+    "web": ["search_web", "read_url_content"],
+}
+PROVIDER_SUPPLEMENT_FILENAMES = {
+    "openai-codex": "prompt.openai-codex.md",
+    "google-antigravity": "prompt.google-antigravity.md",
+}
 TARGET_PATH_REPLACEMENTS = {
     "claude-code": (
         (".github/copilot-instructions.md", "CLAUDE.md"),
@@ -125,6 +146,9 @@ ROOT_GUIDANCE_WORKFLOW = (
 )
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
 CODEX_ROLE_SUPPLEMENT_DELIMITER = "--- Codex role supplement: {agent_id} ---"
+ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER = (
+    "--- Google Antigravity role supplement: {agent_id} ---"
+)
 POLICY_APPLICABILITY_KEY = "applicability"
 POLICY_ALWAYS = "always"
 
@@ -465,6 +489,26 @@ def validate_target_model_intent(
             value, metadata_path, field, ("model",), ("model", "effort")
         )
         return
+    if target == "google-antigravity":
+        antigravity_intent = validate_model_intent_object(
+            value, metadata_path, field, ("model",), ("model", "escalate_to")
+        )
+        model = antigravity_intent["model"]
+        if model not in {"inherit", "flash", "pro"}:
+            raise ValueError(
+                f"{metadata_path}: {field}.model must be one of ['flash', 'inherit', 'pro']"
+            )
+        if "escalate_to" in antigravity_intent:
+            escalate_to = require_nonempty_string(
+                antigravity_intent["escalate_to"],
+                metadata_path,
+                f"{field}.escalate_to",
+            )
+            if not AGENT_ID_PATTERN.fullmatch(escalate_to):
+                raise ValueError(
+                    f"{metadata_path}: {field}.escalate_to must be a stable agent ID"
+                )
+        return
     codex_intent = validate_model_intent_object(
         value,
         metadata_path,
@@ -525,9 +569,9 @@ def validate_agent_metadata(
         prompt_base = require_nonempty_string(prompt_base, metadata_path, "prompt_base")
         if not AGENT_ID_PATTERN.fullmatch(prompt_base):
             raise ValueError(f"{metadata_path}: prompt_base must be a stable agent ID")
-        if "targets" not in metadata or targets != ("openai-codex",):
+        if "targets" not in metadata or len(targets) != 1:
             raise ValueError(
-                f"{metadata_path}: prompt_base is limited to explicitly Codex-only agents"
+                f"{metadata_path}: prompt_base is limited to explicitly single-provider agents"
             )
     model_intent = metadata.get("model_intent")
     if not isinstance(model_intent, dict):
@@ -547,10 +591,16 @@ def validate_agent_metadata(
     return {**metadata, "delegates": delegates, "targets": targets}
 
 
+def provider_supplement_path(agent_dir: Path, target: str) -> Path | None:
+    """Return the target-specific prompt supplement path when one is supported."""
+    filename = PROVIDER_SUPPLEMENT_FILENAMES.get(target)
+    return agent_dir / filename if filename else None
+
+
 def validate_prompt_composition(
     agents: list[tuple[dict[str, Any], Path]], agents_root: Path
 ) -> None:
-    """Validate the deliberately one-level Codex prompt-composition contract."""
+    """Validate deliberately one-level, single-provider prompt composition."""
     agents_by_id = {agent["id"]: (agent, agent_dir) for agent, agent_dir in agents}
     prompt_bases = {
         agent["id"]: agent["prompt_base"]
@@ -585,24 +635,25 @@ def validate_prompt_composition(
 
     for agent, agent_dir in agents:
         prompt_path = agent_dir / "prompt.md"
-        supplement_path = agent_dir / "prompt.openai-codex.md"
         prompt_base = agent.get("prompt_base")
         if prompt_base is None:
             if not prompt_path.is_file():
                 raise ValueError(f"{agent_dir}: missing canonical prompt.md")
-            if supplement_path.exists() and "openai-codex" not in agent["targets"]:
-                raise ValueError(
-                    f"{agent_dir}: prompt.openai-codex.md requires Codex eligibility"
-                )
-            if supplement_path.exists():
+            for target, filename in PROVIDER_SUPPLEMENT_FILENAMES.items():
+                supplement_path = agent_dir / filename
+                if not supplement_path.exists():
+                    continue
+                if target not in agent["targets"]:
+                    provider_label = "Codex" if target == "openai-codex" else target
+                    raise ValueError(
+                        f"{agent_dir}: {filename} requires {provider_label} eligibility"
+                    )
                 supplement = supplement_path.read_text(encoding="utf-8")
                 if not supplement.strip():
+                    raise ValueError(f"{agent_dir}: {filename} must not be empty")
+                if "role supplement:" in supplement:
                     raise ValueError(
-                        f"{agent_dir}: prompt.openai-codex.md must not be empty"
-                    )
-                if "--- Codex role supplement:" in supplement:
-                    raise ValueError(
-                        f"{agent_dir}: prompt.openai-codex.md must not contain a role-supplement delimiter"
+                        f"{agent_dir}: {filename} must not contain a role-supplement delimiter"
                     )
             continue
 
@@ -616,28 +667,31 @@ def validate_prompt_composition(
             raise ValueError(
                 f"{agent_dir}: derived agents must not copy a canonical prompt.md"
             )
-        if not supplement_path.is_file():
+        target = agent["targets"][0]
+        derived_supplement_path = provider_supplement_path(agent_dir, target)
+        if derived_supplement_path is None or not derived_supplement_path.is_file():
+            provider_label = "Codex" if target == "openai-codex" else target
             raise ValueError(
-                f"{agent_dir}: derived Codex agents require prompt.openai-codex.md"
+                f"{agent_dir}: derived {provider_label} agents require prompt.{target}.md"
             )
-        supplement = supplement_path.read_text(encoding="utf-8")
+        supplement = derived_supplement_path.read_text(encoding="utf-8")
         if not supplement.strip():
-            raise ValueError(f"{agent_dir}: prompt.openai-codex.md must not be empty")
-        transformed_base = normalize_prompt_whitespace(
-            transform_agent_text(
-                base_prompt_path.read_text(encoding="utf-8"), "openai-codex"
+            raise ValueError(
+                f"{agent_dir}: {derived_supplement_path.name} must not be empty"
             )
+        transformed_base = normalize_prompt_whitespace(
+            transform_agent_text(base_prompt_path.read_text(encoding="utf-8"), target)
         )
         transformed_supplement = normalize_prompt_whitespace(
-            transform_agent_text(supplement, "openai-codex")
+            transform_agent_text(supplement, target)
         )
         if transformed_base in transformed_supplement:
             raise ValueError(
                 f"{agent_dir}: prompt.openai-codex.md must not copy its full base prompt"
             )
-        if "--- Codex role supplement:" in supplement:
+        if "role supplement:" in supplement:
             raise ValueError(
-                f"{agent_dir}: prompt.openai-codex.md must not contain a role-supplement delimiter"
+                f"{agent_dir}: {derived_supplement_path.name} must not contain a role-supplement delimiter"
             )
 
 
@@ -646,17 +700,17 @@ def normalize_prompt_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
-def validate_codex_escalation_targets(
-    agents: list[tuple[dict[str, Any], Path]], agents_root: Path
+def validate_escalation_targets(
+    agents: list[tuple[dict[str, Any], Path]], agents_root: Path, provider: str
 ) -> None:
-    """Validate named, acyclic Codex escalation targets."""
+    """Validate named, acyclic provider-specific escalation targets."""
     agents_by_id = {agent["id"]: agent for agent, _agent_dir in agents}
     edges: dict[str, str] = {}
     for agent, agent_dir in agents:
-        codex_intent = agent["model_intent"].get("openai-codex")
-        if not isinstance(codex_intent, dict) or "escalate_to" not in codex_intent:
+        intent = agent["model_intent"].get(provider)
+        if not isinstance(intent, dict) or "escalate_to" not in intent:
             continue
-        target_id = codex_intent["escalate_to"]
+        target_id = intent["escalate_to"]
         if target_id not in agents_by_id:
             raise ValueError(
                 f"{agent_dir / 'agent.yaml'}: escalate_to references missing agent '{target_id}'"
@@ -665,9 +719,9 @@ def validate_codex_escalation_targets(
             raise ValueError(
                 f"{agent_dir / 'agent.yaml'}: escalate_to must not self-reference"
             )
-        if "openai-codex" not in agents_by_id[target_id]["targets"]:
+        if provider not in agents_by_id[target_id]["targets"]:
             raise ValueError(
-                f"{agent_dir / 'agent.yaml'}: escalate_to target '{target_id}' is not Codex-eligible"
+                f"{agent_dir / 'agent.yaml'}: escalate_to target '{target_id}' is not {provider}-eligible"
             )
         edges[agent["id"]] = target_id
 
@@ -676,8 +730,9 @@ def validate_codex_escalation_targets(
         current = agent_id
         while current in edges:
             if current in seen:
+                provider_label = "Codex" if provider == "openai-codex" else provider
                 raise ValueError(
-                    f"{agents_root}: Codex escalation cycle detected at '{current}'"
+                    f"{agents_root}: {provider_label} escalation cycle detected at '{current}'"
                 )
             seen.add(current)
             current = edges[current]
@@ -706,7 +761,8 @@ def load_shared_agents(
     if len(set(agent_ids)) != len(agent_ids):
         raise ValueError(f"{agents_root}: id must be unique across shared agents")
     validate_prompt_composition(agents, agents_root)
-    validate_codex_escalation_targets(agents, agents_root)
+    for provider in ("openai-codex", "google-antigravity"):
+        validate_escalation_targets(agents, agents_root, provider)
     return agents
 
 
@@ -763,6 +819,16 @@ def render_copilot_tools(capabilities: list[str]) -> list[str]:
     return tools
 
 
+def render_antigravity_tools(capabilities: list[str]) -> list[str]:
+    """Render only documented Antigravity tool names for abstract capabilities."""
+    tools: list[str] = []
+    for capability in capabilities:
+        for tool_name in ANTIGRAVITY_TOOL_MAP.get(capability, []):
+            if tool_name not in tools:
+                tools.append(tool_name)
+    return tools
+
+
 def toml_string(value: str) -> str:
     return json.dumps(value)
 
@@ -786,8 +852,8 @@ def codex_agent_metadata_header(agent: dict[str, Any]) -> str:
     )
 
 
-def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
-    """Return the exact target-transformed, self-contained Codex prompt body."""
+def provider_agent_prompt_body(agent: dict[str, Any], target: str) -> str:
+    """Return one target-transformed, self-contained canonical agent prompt."""
     agent_dir = REPO_ROOT / "shared" / "agents" / agent["id"]
     prompt_base = agent.get("prompt_base")
     prompt_path = (
@@ -796,16 +862,48 @@ def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
         else agent_dir / "prompt.md"
     )
     base_prompt = transform_agent_text(
-        prompt_path.read_text(encoding="utf-8"), "openai-codex"
+        prompt_path.read_text(encoding="utf-8"), target
     ).strip()
-    supplement_path = agent_dir / "prompt.openai-codex.md"
-    if not supplement_path.exists():
+    supplement_path = provider_supplement_path(agent_dir, target)
+    if supplement_path is None or not supplement_path.exists():
         return base_prompt
     supplement = transform_agent_text(
-        supplement_path.read_text(encoding="utf-8"), "openai-codex"
+        supplement_path.read_text(encoding="utf-8"), target
     ).strip()
-    delimiter = CODEX_ROLE_SUPPLEMENT_DELIMITER.format(agent_id=agent["id"])
+    delimiter_template = (
+        CODEX_ROLE_SUPPLEMENT_DELIMITER
+        if target == "openai-codex"
+        else ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER
+    )
+    delimiter = delimiter_template.format(agent_id=agent["id"])
     return f"{base_prompt}\n\n{delimiter}\n\n{supplement}"
+
+
+def render_antigravity_default_agent_contract() -> str:
+    """Render the native default-agent bridge from canonical role sources."""
+    orchestrator = next(
+        agent
+        for agent, _agent_dir in shared_agents("google-antigravity")
+        if agent["id"] == "orchestrator"
+    )
+    rendered = provider_agent_prompt_body(orchestrator, "google-antigravity")
+    delimiter = ANTIGRAVITY_ROLE_SUPPLEMENT_DELIMITER.format(agent_id="orchestrator")
+    _base, separator, supplement = rendered.partition(f"\n\n{delimiter}\n\n")
+    if not separator:
+        raise ValueError("Antigravity orchestrator routing supplement is required")
+    return (
+        "## Google Antigravity Default-Agent Contract\n\n"
+        "Google Antigravity's native default agent is the main-thread orchestrator. "
+        "Before complex work, read and follow the canonical workflow in "
+        "`.claude/agents/orchestrator.md`; delegate only to the eligible custom "
+        "specialists in `.agents/agents/`.\n\n"
+        f"{delimiter}\n\n{supplement}"
+    )
+
+
+def codex_agent_prompt_body(agent: dict[str, Any]) -> str:
+    """Return the exact target-transformed, self-contained Codex prompt body."""
+    return provider_agent_prompt_body(agent, "openai-codex")
 
 
 def shared_mcp_servers() -> dict[str, Any]:
@@ -1058,8 +1156,56 @@ def render_codex_hooks(path: Path) -> None:
     write_json(path, hooks)
 
 
+def antigravity_hook_command() -> str:
+    """Return the repo-local command for the Antigravity pre-tool bridge."""
+    root_expr = "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    return (
+        f'REPO_ROOT="{root_expr}"; '
+        'exec "$REPO_ROOT/.claude/hooks/scripts/antigravity-pretool.py"'
+    )
+
+
+def render_antigravity_hooks(path: Path) -> None:
+    """Render the documented Antigravity pre-execution safety boundary.
+
+    Lifecycle hooks stay deliberately absent until native cadence evidence can
+    show that they cannot duplicate state publication or create Stop loops.
+    """
+    command = antigravity_hook_command()
+    write_json(
+        path,
+        {
+            "bootstrap-safety": {
+                "PreToolUse": [
+                    {
+                        # Antigravity documents '*' as the PreToolUse regex for
+                        # every tool. The bridge explicitly allows only known
+                        # non-mutating tools and denies unknown tool shapes.
+                        "matcher": "*",
+                        "hooks": [
+                            {"type": "command", "command": command, "timeout": 10}
+                        ],
+                    }
+                ]
+            }
+        },
+    )
+
+
 def render_root_guidance(target: str) -> str:
-    if target == "claude-code":
+    if target == "multi-agent":
+        title = "AI Coding Agent Project Guidance"
+        control_plane_paths = (
+            "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, `.agents/`, "
+            "`.mcp.json`, and `.devcontainer/`"
+        )
+        runtime_note = (
+            "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and `.codex/agents/*.toml` "
+            "as native adapters. Google Antigravity uses `.agents/agents/`, `.agents/skills/`, "
+            "and `.agents/mcp_config.json`. Keep provider-specific runtime details in those "
+            "directories and preserve the canonical `.claude/` basis."
+        )
+    elif target == "claude-code":
         title = "Claude Code Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
@@ -1085,7 +1231,7 @@ def render_root_guidance(target: str) -> str:
     else:
         raise ValueError(f"unsupported root-guidance target: {target}")
 
-    return f"""# {title}
+    guidance = f"""# {title}
 
 This is the repository entrypoint for Python AI engineering guidance. `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
@@ -1149,6 +1295,9 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 {runtime_note}
 """
+    if target == "multi-agent":
+        return f"{guidance}\n{render_antigravity_default_agent_contract()}\n"
+    return guidance
 
 
 def split_frontmatter(text: str) -> tuple[str | None, str]:
@@ -1450,7 +1599,6 @@ def render_claude(target_root: Path) -> None:
 
 
 def render_codex(target_root: Path) -> None:
-    write_text(target_root / "AGENTS.md", render_root_guidance("openai-codex"))
     render_codex_config(target_root / ".codex" / "config.toml")
     render_codex_hooks(target_root / ".codex" / "hooks.json")
 
@@ -1462,12 +1610,64 @@ def render_codex(target_root: Path) -> None:
         )
 
 
+def render_antigravity_agent_adapter(agent: dict[str, Any]) -> str:
+    """Render one documented Antigravity Markdown custom agent."""
+    intent = agent["model_intent"]["google-antigravity"]
+    frontmatter = [
+        "---",
+        f"name: {agent['id']}",
+        f"description: {json.dumps(transform_agent_text(agent['description'], 'google-antigravity'))}",
+        "tools:",
+        *(f"  - {tool}" for tool in render_antigravity_tools(agent["capabilities"])),
+        "mainAgent: false",
+        f"subagent: {'false' if agent['id'] == 'orchestrator' else 'true'}",
+        f"model: {intent['model']}",
+    ]
+    if agent["id"] != "orchestrator":
+        frontmatter.append("inheritMcp: true")
+    frontmatter.append("---")
+    return (
+        "\n".join(frontmatter)
+        + "\n\n"
+        + provider_agent_prompt_body(agent, "google-antigravity")
+        + "\n"
+    )
+
+
+def render_antigravity(target_root: Path) -> None:
+    """Render the static Google Antigravity provider adapter surface."""
+    copy_tree(REPO_ROOT / "shared" / "skills", target_root / ".agents" / "skills")
+    write_json(
+        target_root / ".agents" / "mcp_config.json",
+        {"mcpServers": shared_mcp_servers()},
+    )
+    render_antigravity_hooks(target_root / ".agents" / "hooks.json")
+    for agent, _agent_dir in shared_agents("google-antigravity"):
+        write_text(
+            target_root / ".agents" / "agents" / agent["id"] / "agent.md",
+            render_antigravity_agent_adapter(agent),
+        )
+    ownership_paths = tuple(
+        sorted(
+            path.relative_to(target_root).as_posix()
+            for path in (target_root / ".agents").rglob("*")
+            if path.is_file() and not path.is_symlink()
+        )
+    )
+    write_text(
+        target_root / ".claude" / "antigravity-ownership.env",
+        render_antigravity_ownership_manifest(ownership_paths),
+    )
+
+
 def render_multi_agent(target_root: Path) -> None:
     render_devcontainer(target_root)
     render_shared_basis(target_root, "multi-agent")
+    write_text(target_root / "AGENTS.md", render_root_guidance("multi-agent"))
     render_github(target_root)
     render_claude(target_root)
     render_codex(target_root)
+    render_antigravity(target_root)
 
 
 def generate(targets: list[str], output_root: Path) -> None:

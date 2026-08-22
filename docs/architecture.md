@@ -60,7 +60,7 @@ by `scripts/check_native_clients.py`.
 
 The single installable output is `dist/multi-agent/`.
 
-It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, and OpenAI Codex. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
+It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, quality scoring, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
 
 ## Memory Authority and Privacy
 
@@ -136,7 +136,12 @@ uv run python scripts/generate_targets.py --all
 
 ## Hook Dispatcher
 
-All hook commands route through `shared/hooks/scripts/run-hook.sh` rather than calling guardrail scripts directly. The dispatcher resolves `REPO_ROOT` in order:
+Claude, Codex, and Copilot hook commands route through
+`shared/hooks/scripts/run-hook.sh`. Google Antigravity is the deliberate
+exception: its static `.agents/hooks.json` adapter calls
+`antigravity-pretool.py` directly because its documented payload and response
+protocol require a Python bridge. The bridge invokes the canonical guards after
+normalizing the payload. The shared dispatcher resolves `REPO_ROOT` in order:
 
 1. `BASH_SOURCE[0]` relative navigation (primary — works when the script is called by path)
 2. Environment variable fallbacks: `GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`, `PWD`
@@ -147,7 +152,7 @@ This fixes two real failure modes found in consumer repos:
 - `$CLAUDE_PROJECT_DIR` being empty in Claude Code, producing paths like `/.claude/hooks/scripts/...`
 - `$(git rev-parse --show-toplevel)` resolving to a different directory than the repo root when invoked from certain working directories
 
-The generated hook configs for all three tools use the pattern:
+The generated Claude, Codex, and Copilot hook configs use the pattern:
 
 ```bash
 REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script> [args...]
@@ -172,6 +177,56 @@ classification.
 if a safety guard errors or produces malformed output. This avoids relying on
 the target runtime's parallel execution order while leaving lifecycle wrappers
 and wildcard observability independent.
+
+### Google Antigravity safety boundary
+
+Antigravity uses one named `bootstrap-safety` configuration with one
+`PreToolUse` group whose matcher is `*`. The bridge runs with the Python 3.9
+standard library and emits exactly one JSON decision on stdout; diagnostics go
+to stderr. It allows the explicit documented non-mutating provider tools,
+normalizes `run_command` into the canonical Bash guard, and normalizes write
+tools into the canonical protected-file guard. Unknown tools, malformed
+payloads, missing command or target fields, guard failures, and malformed guard
+responses deny by default. Existing `ask` results also deny because this
+provider has no approval response in the bridge.
+
+The canonical guards retain command and mutation protection, including
+symlink-safe path classification and protected-source checks. The Antigravity
+adapter intentionally defines no `PreInvocation`, `PostToolUse`, `Stop`, or
+`UserPromptSubmit` equivalence. It does not claim lifecycle parity; durable
+Git-hook/state-sync behavior remains the existing cross-provider boundary.
+
+### Google Antigravity adapters and ownership
+
+The generator creates the Antigravity workspace surface from the same canonical
+metadata and assets as the other adapters. The installer treats `.agents/` as a
+shared namespace and owns only its exact generated files.
+
+```mermaid
+flowchart LR
+    S[Shared source] --> G[Generator]
+    G --> A[.agents files]
+    A --> I[Installer]
+    I --> M[Bootstrap mirror]
+    M --> R[Safe restore]
+```
+
+`AGENTS.md` is provider-neutral guidance shared by Codex and Antigravity.
+Antigravity structurally receives seven roles: the six universal roles plus
+`antigravity_flash_coder`; Codex-only `luna_coder` and `sol_coder` do not
+render. The native default agent is the Antigravity main thread and reads its
+orchestration contract from root `AGENTS.md`. All custom adapters set
+`mainAgent: false`; the six specialists set `subagent: true`, and the custom
+`orchestrator` sets `subagent: false`. The declared Flash-to-Pro coder handoff,
+model tiers, specialist MCP inheritance, shared skills, and MCP configuration
+are static contracts. They are not native loading, routing, escalation, skill,
+or MCP-use proof.
+
+Ownership records make an update refresh, prune, mirror, and restore only the
+known generated `.agents` files. Adjacent private paths remain untouched, and
+a repeated install is deterministic. Rules are deferred because no verified
+serialized activation schema exists. The external native-acceptance blocker is
+documented in [Runtime Checks](runtime-checks.md#google-antigravity-evidence-boundary).
 
 ## Task-Lane Routing
 

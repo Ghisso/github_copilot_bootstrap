@@ -16,6 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime_ownership import (
+    ANTIGRAVITY_ROOT,
+    antigravity_allowlist_paths,
+    antigravity_manifest_paths,
     COPILOT_SURFACE_PATHS,
     RESTORABLE_ROOT_PATHS,
     active_ignore_patterns,
@@ -130,18 +133,61 @@ def strip_quarantine(path: Path) -> None:
     subprocess.run(["xattr", "-rc", str(path)], check=False, capture_output=True)
 
 
+def generated_antigravity_paths(source: Path) -> tuple[str, ...]:
+    """Return the generated Antigravity files relative to the consumer root."""
+    root = source / ANTIGRAVITY_ROOT
+    if not root.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            path.relative_to(source).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        )
+    )
+
+
+def persisted_antigravity_paths(
+    target: Path, allowed_paths: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Return previously recorded generated `.agents` files, if valid."""
+    manifest = target / ".claude" / "bootstrap-ownership.env"
+    if not manifest.is_file():
+        return ()
+    try:
+        paths = antigravity_manifest_paths(
+            manifest.read_text(encoding="utf-8"), allowed_paths
+        )
+        return paths if paths is not None and set(paths) == set(allowed_paths) else ()
+    except OSError:
+        return ()
+
+
+def persisted_antigravity_allowlist(target: Path) -> tuple[str, ...]:
+    """Return the consumer's pre-refresh generated Antigravity allowlist."""
+    allowlist = target / ".claude" / "antigravity-ownership.env"
+    if not allowlist.is_file():
+        return ()
+    try:
+        return antigravity_allowlist_paths(allowlist.read_text(encoding="utf-8")) or ()
+    except OSError:
+        return ()
+
+
 def copy_generated_tree(
     source: Path,
     target: Path,
     dry_run: bool,
     commit_copilot_surface: bool = False,
     previously_committed_copilot_surface: bool = False,
-) -> None:
+    previously_owned_antigravity_paths: tuple[str, ...] = (),
+    historical_antigravity_paths: tuple[str, ...] = (),
+) -> tuple[str, ...]:
     if not source.is_dir():
         raise SystemExit(f"Generated source does not exist: {source}")
     info(f"copy {source} -> {target}")
     if dry_run:
-        return
+        return generated_antigravity_paths(source)
     target.mkdir(parents=True, exist_ok=True)
 
     def is_tracked(relative_path: Path) -> bool:
@@ -174,6 +220,30 @@ def copy_generated_tree(
             return False
         return is_tracked(relative_path)
 
+    current_antigravity_paths = set(generated_antigravity_paths(source))
+    previous_antigravity_paths = set(previously_owned_antigravity_paths) & set(
+        historical_antigravity_paths
+    )
+    active_antigravity_paths: set[str] = set()
+    for relative in current_antigravity_paths:
+        destination = target / relative
+        source_path = source / relative
+        collision = (destination.exists() or destination.is_symlink()) and (
+            not destination.is_file()
+            or destination.is_symlink()
+            or (
+                relative not in previous_antigravity_paths
+                and destination.read_bytes() != source_path.read_bytes()
+            )
+        )
+        if collision:
+            warn(
+                "preserve user-owned Antigravity path that collides with generated "
+                f"adapter: {relative}"
+            )
+            continue
+        active_antigravity_paths.add(relative)
+
     def owned_files() -> set[Path]:
         owned: set[Path] = set()
         claude_root = target / ".claude"
@@ -205,12 +275,19 @@ def copy_generated_tree(
                     for path in adapter_path.rglob("*")
                     if path.is_file() or path.is_symlink()
                 )
+        owned.update(Path(path) for path in previous_antigravity_paths)
         return owned
 
     for relative_path in sorted(owned_files()):
         if (source / relative_path).is_file() or should_preserve(relative_path):
             continue
         destination = target / relative_path
+        if destination.is_dir() and not destination.is_symlink():
+            warn(
+                "preserve directory that replaced obsolete generated adapter: "
+                f"{relative_path.as_posix()}"
+            )
+            continue
         info(f"remove obsolete generated file {relative_path.as_posix()}")
         destination.unlink()
 
@@ -232,6 +309,11 @@ def copy_generated_tree(
             elif should_preserve(relative_path):
                 ignored.add(name)
                 info(f"preserve tracked authoring adapter {relative_path.as_posix()}")
+            elif (
+                relative_path.as_posix() in current_antigravity_paths
+                and relative_path.as_posix() not in active_antigravity_paths
+            ):
+                ignored.add(name)
         return ignored
 
     for child in sorted(source.iterdir()):
@@ -250,15 +332,20 @@ def copy_generated_tree(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(child, destination)
         strip_quarantine(destination)
+    return tuple(sorted(active_antigravity_paths))
 
 
-def persisted_install_mode(target: Path) -> bool | None:
+def persisted_install_mode(
+    target: Path, allowed_antigravity_paths: tuple[str, ...] | None = None
+) -> bool | None:
     """Return the consumer's validated persisted Copilot-surface mode."""
     manifest = target / ".claude" / "bootstrap-ownership.env"
     if not manifest.is_file():
         return None
     try:
-        return install_mode_from_manifest(manifest.read_text(encoding="utf-8"))
+        return install_mode_from_manifest(
+            manifest.read_text(encoding="utf-8"), allowed_antigravity_paths
+        )
     except OSError:
         return None
 
@@ -298,10 +385,14 @@ def validate_install_roots(
         )
 
 
-def ignore_block(commit_copilot_surface: bool = False) -> str:
+def ignore_block(
+    commit_copilot_surface: bool = False,
+    antigravity_paths: tuple[str, ...] = (),
+) -> str:
     lines = [
         IGNORE_BLOCK_START,
         *active_ignore_patterns(commit_copilot_surface),
+        *antigravity_paths,
         IGNORE_BLOCK_END,
     ]
     return "\n".join(lines) + "\n"
@@ -419,10 +510,13 @@ def substitute_python_version(target: Path, dry_run: bool) -> None:
 
 
 def merge_gitignore(
-    target: Path, dry_run: bool, commit_copilot_surface: bool = False
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool = False,
+    antigravity_paths: tuple[str, ...] = (),
 ) -> None:
     gitignore = target / ".gitignore"
-    block = ignore_block(commit_copilot_surface)
+    block = ignore_block(commit_copilot_surface, antigravity_paths)
     current = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     if IGNORE_BLOCK_START in current and IGNORE_BLOCK_END in current:
         # Refresh an existing block in place so pattern changes (e.g. a new
@@ -516,7 +610,13 @@ def update_devcontainer_state_remote(
 
 
 def populate_bootstrap_root(
-    target: Path, dry_run: bool, commit_copilot_surface: bool
+    target: Path,
+    dry_run: bool,
+    commit_copilot_surface: bool,
+    antigravity_paths: tuple[str, ...] = (),
+    previous_antigravity_paths: tuple[str, ...] = (),
+    authoritative_antigravity_paths: tuple[str, ...] = (),
+    historical_antigravity_paths: tuple[str, ...] = (),
 ) -> None:
     """D5: mirrors the root-level adapter files into .claude/bootstrap-root/
     so they are carried by the git-backed .claude/ checkout even though they
@@ -528,6 +628,7 @@ def populate_bootstrap_root(
     info(f"populate {destination_root} from root adapters")
     if dry_run:
         return
+    destination_root.mkdir(parents=True, exist_ok=True)
 
     active_paths = set(paths)
     for relative in RESTORABLE_ROOT_PATHS:
@@ -561,9 +662,41 @@ def populate_bootstrap_root(
             shutil.copy2(source, destination)
         strip_quarantine(destination)
 
+    allowed_antigravity_paths = set(authoritative_antigravity_paths)
+    active_antigravity_paths = tuple(
+        path for path in antigravity_paths if path in allowed_antigravity_paths
+    )
+    previous_antigravity_paths = tuple(
+        path
+        for path in previous_antigravity_paths
+        if path in historical_antigravity_paths
+    )
+    for relative in previous_antigravity_paths:
+        if relative in active_antigravity_paths:
+            continue
+        destination = destination_root / relative
+        if destination.exists() or destination.is_symlink():
+            if destination.is_dir() and not destination.is_symlink():
+                warn(
+                    "preserve bootstrap-root directory that replaced obsolete Antigravity "
+                    f"adapter: {relative}"
+                )
+                continue
+            info(f"remove obsolete bootstrap-root Antigravity adapter {relative}")
+            destination.unlink()
+    for relative in active_antigravity_paths:
+        source = target / relative
+        if not source.is_file() or source.is_symlink():
+            continue
+        destination = destination_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        strip_quarantine(destination)
+
     ownership_manifest = target / ".claude" / "bootstrap-ownership.env"
     ownership_manifest.write_text(
-        restore_manifest(commit_copilot_surface), encoding="utf-8"
+        restore_manifest(commit_copilot_surface, active_antigravity_paths),
+        encoding="utf-8",
     )
 
 
@@ -763,7 +896,12 @@ def main() -> int:
     target = args.target_repo.expanduser().resolve()
     source = args.source.expanduser().resolve()
     validate_install_roots(source, target, args.allow_self)
+    antigravity_paths = generated_antigravity_paths(source)
     persisted_mode = persisted_install_mode(target)
+    historical_antigravity_paths = persisted_antigravity_allowlist(target)
+    previous_antigravity_paths = persisted_antigravity_paths(
+        target, historical_antigravity_paths
+    )
     commit_copilot_surface = (
         args.commit_copilot_surface
         if args.commit_copilot_surface is not None
@@ -791,21 +929,34 @@ def main() -> int:
         had_pre_existing_content,
         args.local_only,
     )
-    copy_generated_tree(
+    antigravity_paths = copy_generated_tree(
         source,
         target,
         args.dry_run,
         commit_copilot_surface,
         previously_committed_copilot_surface=persisted_mode is True,
+        previously_owned_antigravity_paths=previous_antigravity_paths,
+        historical_antigravity_paths=historical_antigravity_paths,
     )
     substitute_project_name(target, args.dry_run)
     substitute_python_version(target, args.dry_run)
-    populate_bootstrap_root(target, args.dry_run, commit_copilot_surface)
+    populate_bootstrap_root(
+        target,
+        args.dry_run,
+        commit_copilot_surface,
+        antigravity_paths,
+        previous_antigravity_paths,
+        generated_antigravity_paths(source),
+        historical_antigravity_paths,
+    )
     update_devcontainer_state_remote(target, state_remote, args.dry_run)
-    merge_gitignore(target, args.dry_run, commit_copilot_surface)
+    merge_gitignore(target, args.dry_run, commit_copilot_surface, antigravity_paths)
     chmod_runtime_scripts(target, args.dry_run)
     configure_git_hooks_path(target, args.dry_run)
-    warn_tracked_paths(target, active_ignore_patterns(commit_copilot_surface))
+    warn_tracked_paths(
+        target,
+        active_ignore_patterns(commit_copilot_surface) + antigravity_paths,
+    )
 
     sync_state_after_install(
         target,
