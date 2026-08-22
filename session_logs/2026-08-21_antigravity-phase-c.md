@@ -19,7 +19,7 @@ Complete file-granular `.agents/` ownership, deterministic install/update/restor
 
 ## [LEARN] Entries
 
-- [LEARN:security] Antigravity native acceptance must force `--new-project --sandbox` and verify the workspace root before transmitting prompts; see `.claude/skills/antigravity-native-acceptance-isolation/SKILL.md`.
+- [LEARN:security] Antigravity native acceptance must force `--new-project --sandbox` and verify the workspace root before transmitting prompts; this is recorded in `.claude/MEMORY.md`.
 
 ## Verification Results
 

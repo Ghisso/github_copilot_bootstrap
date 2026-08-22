@@ -451,5 +451,8 @@
   reports, caches, and other mutable state.
 - [LEARN:security] Antigravity CLI can reuse a persisted project even when
   launched from a disposable working directory. Force `--new-project --sandbox`
-  and verify the reported root before transmitting acceptance prompts -> see
-  `.claude/skills/antigravity-native-acceptance-isolation/SKILL.md`.
+  and verify the reported root before transmitting acceptance prompts.
+- [LEARN:architecture] In `agy` 1.1.17, the default native agent can invoke
+  workspace custom subagents but a custom main agent cannot. Put orchestration
+  guidance in root `AGENTS.md`, keep custom adapters non-main, and allow native
+  non-writing scheduler tools only in the PreToolUse bridge.
