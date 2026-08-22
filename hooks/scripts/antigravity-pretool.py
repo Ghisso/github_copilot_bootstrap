@@ -27,9 +27,10 @@ NON_MUTATING_TOOLS = {
     "invoke_subagent",
     "send_message",
     "manage_subagents",
-    # Native task tracking is non-mutating. It is bridge-only: custom-agent
-    # tool declarations stay limited to the documented capability map.
+    # Native task coordination is non-mutating. These are bridge-only:
+    # custom-agent tool declarations stay limited to the documented capability map.
     "manage_task",
+    "schedule",
 }
 
 
