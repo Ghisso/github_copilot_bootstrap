@@ -45,8 +45,31 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 8. **SCORE:** After DOCUMENT, persist the converged findings (`record_findings.py`) and require score >= 90 read from the canonical report the `verifier` wrote (`.claude/quality_reports/score-<ts>.json`); both artifacts bind to the final code+docs content. The coder does not write score reports. If score, verification, or review fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE.
 9. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 10. **SESSION LOG:** Update the closeout log using `.claude/templates/session-log.md`; final small-plan closeout requires `**Status:** COMPLETED`.
-11. **COMMIT:** Commit exactly one completed small plan after all gates pass.
+11. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
 12. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
+
+### Conditional pause and resume
+
+Use `paused` only for the current small plan and only after the user explicitly
+asks to stop, pause, or checkpoint and resume later. A failed check, low score,
+review finding, timeout, or agent fatigue does not authorize a pause. If the
+user names a safe boundary, reach it before pausing when it is safe to do so.
+
+Before a checkpoint commit, set `status: paused`, retain the big plan's
+`status: in-progress` and the same `current_phase`, and record `paused_at`,
+`paused_reason`, and `pause_session_log`. The referenced log must contain
+`**Status:** PAUSED` and describe completed work, verification, incomplete
+checks, remaining work, and the precise resume point. This is an explicit
+checkpoint path, not a bypass: it may commit tracked incomplete work without
+final score, findings, LEARN, DOCUMENT, or COMPLETED closeout, but it does not
+advance the phase and remains blocked from push/PR closeout. Do not create an
+empty outer-repository commit when only AI-state files changed.
+
+On a later session, read the PAUSED log, inspect `git log --oneline -10`, `git
+status`, and the current diff, report the recorded resume point, change the
+same phase back to `in-progress`, preserve its latest pause metadata, and
+continue. Do not create another small plan. Run the ordinary full lifecycle
+once the phase actually completes.
 
 ## Reviewer Routing
 
@@ -92,13 +115,13 @@ same severity gates as every other profile.
 
 ## Quality Gates
 
-- Score >= 90 plus required documentation updates is mandatory before commit or PR closeout.
+- Score >= 90 plus required documentation updates is mandatory before a normal completion commit or PR closeout; an explicitly evidenced paused checkpoint follows its separate non-final path.
 - Ensure verification commands are executed for code changes.
 - If a gate fails, delegate fixes before reporting done.
 
 ## Completion Protocol (Mandatory)
 
-Before returning the final status report, you MUST complete these steps:
+Before returning a normally completed phase, you MUST complete these steps:
 
 1. **Run learn skill:** Read `.claude/skills/learn/SKILL.md` and extract any non-obvious discoveries from the session into reusable skills or `[LEARN]` entries.
 2. **Update memories:** Save any `[LEARN]` entries to `.claude/MEMORY.md`.

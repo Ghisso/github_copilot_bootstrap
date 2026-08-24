@@ -14,6 +14,12 @@ is_implementation_branch() {
   [[ "$1" =~ ^[a-zA-Z0-9._-]+_implementation$ ]]
 }
 
+# Small-plan names are file stems, not paths. Keep lifecycle reads rooted under
+# .claude/plans instead of allowing current_phase to select an arbitrary file.
+is_plan_slug() {
+  [[ "$1" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]
+}
+
 # Single home for the uv guard / python runner shared by the optional-python paths.
 uv_available() {
   command -v uv >/dev/null 2>&1
@@ -1030,6 +1036,194 @@ assert_cancellation_evidence() {
   fi
 }
 
+# Validate the artifact-backed audit contract for a paused small plan. This is
+# deliberately separate from cancellation: a pause is non-terminal and may
+# authorize a checkpoint commit, while cancellation never can.
+pause_validation_probe() {
+  local repo_root="$1"
+  local plan_file="$2"
+  command -v python3 >/dev/null 2>&1 || return 127
+  python3 - "$repo_root" "$plan_file" <<'PY'
+import re
+import stat
+import sys
+from datetime import datetime
+from pathlib import Path
+
+TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+BLOCK_REASON = re.compile(r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?(?:[ \t]*#.*)?$")
+STATUS = re.compile(r"^\*\*Status:\*\*[ \t]+PAUSED\b", re.MULTILINE)
+
+
+def frontmatter(path):
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        return {}
+    data = {}
+    current_key = ""
+    for raw_line in parts[1].splitlines():
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("  - ") and current_key:
+            value = data.get(current_key)
+            if not isinstance(value, list):
+                value = [] if value in (None, "") else [str(value)]
+                data[current_key] = value
+            value.append(line[4:].strip())
+            continue
+        if line.startswith((" ", "\t")) and current_key == "paused_reason":
+            data[current_key] = [data.get(current_key), line.strip()]
+            continue
+        if ":" in line and not line.startswith(" "):
+            key, value = line.split(":", 1)
+            current_key = key.strip()
+            data[current_key] = value.strip().strip('"').strip("'")
+    return data
+
+
+def validate(repo_root, plan_file):
+    errors = []
+    data = frontmatter(plan_file)
+
+    paused_at = data.get("paused_at", "")
+    if paused_at in ("", []):
+        errors.append("MISSING_PAUSED_AT")
+    elif not isinstance(paused_at, str) or not TIMESTAMP.fullmatch(paused_at):
+        errors.append("INVALID_PAUSED_AT")
+    else:
+        try:
+            datetime.strptime(paused_at, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            errors.append("INVALID_PAUSED_AT")
+
+    reason = data.get("paused_reason", "")
+    if reason in ("", []):
+        errors.append("MISSING_PAUSED_REASON")
+    elif (
+        not isinstance(reason, str)
+        or not reason.strip()
+        or BLOCK_REASON.fullmatch(reason.strip())
+        or reason.lstrip().startswith(("[", "{", "- ", "#"))
+    ):
+        errors.append("INVALID_PAUSED_REASON")
+
+    log = data.get("pause_session_log", "")
+    if log in ("", []):
+        errors.append("MISSING_PAUSE_SESSION_LOG")
+        return errors
+    if not isinstance(log, str):
+        errors.append("INVALID_LOG_SCALAR")
+        return errors
+
+    log_path = Path(log)
+    if log_path.is_absolute():
+        errors.append("ABSOLUTE_LOG")
+        return errors
+    if ".." in log_path.parts:
+        errors.append("TRAVERSAL_LOG")
+        return errors
+
+    try:
+        canonical_root = repo_root.resolve(strict=True)
+        canonical_log = (canonical_root / log_path).resolve(strict=False)
+    except (OSError, RuntimeError, ValueError):
+        errors.append("LOG_RESOLUTION_FAILED")
+        return errors
+    if not canonical_log.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_LOG")
+        return errors
+    try:
+        canonical_log = canonical_log.resolve(strict=True)
+    except FileNotFoundError:
+        errors.append("MISSING_LOG_FILE")
+        return errors
+    except (OSError, RuntimeError, ValueError):
+        errors.append("LOG_RESOLUTION_FAILED")
+        return errors
+    if not canonical_log.is_relative_to(canonical_root):
+        errors.append("OUTSIDE_LOG")
+        return errors
+    try:
+        mode = canonical_log.stat().st_mode
+    except OSError:
+        errors.append("UNREADABLE_LOG")
+        return errors
+    if not stat.S_ISREG(mode):
+        errors.append("NON_REGULAR_LOG")
+        return errors
+    if not mode & (stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH):
+        errors.append("UNREADABLE_LOG")
+        return errors
+    try:
+        content = canonical_log.read_text(encoding="utf-8")
+    except UnicodeError:
+        errors.append("INVALID_UTF8_LOG")
+        return errors
+    except OSError:
+        errors.append("UNREADABLE_LOG")
+        return errors
+    if not STATUS.search(content):
+        errors.append("INVALID_LOG_MARKER")
+    return errors
+
+
+try:
+    result = validate(Path(sys.argv[1]), Path(sys.argv[2]))
+except Exception:
+    print("PROBE_EXCEPTION")
+else:
+    print("\n".join(result) if result else "OK")
+PY
+}
+
+assert_pause_evidence() {
+  local plan_file="$1"
+  local phase_label="$2"
+  local probe_output="" probe_status=0 probe_code="" malformed=0
+  probe_output="$(pause_validation_probe "$repo_root" "$plan_file" 2>/dev/null)" || probe_status=$?
+  if [[ "$probe_status" -eq 127 ]]; then
+    failures+=("$phase_label pause validation requires python3")
+    return
+  elif [[ "$probe_status" -ne 0 ]]; then
+    failures+=("$phase_label pause validation probe failed")
+    return
+  elif [[ "$probe_output" == "OK" ]]; then
+    return
+  elif [[ -z "$probe_output" ]]; then
+    failures+=("$phase_label pause validation probe returned malformed output")
+    return
+  fi
+
+  while IFS= read -r probe_code; do
+    case "$probe_code" in
+      MISSING_PAUSED_AT) failures+=("$phase_label paused plan must set paused_at") ;;
+      INVALID_PAUSED_AT) failures+=("$phase_label paused_at must be a real UTC timestamp in YYYY-MM-DDTHH:MM:SSZ format") ;;
+      MISSING_PAUSED_REASON) failures+=("$phase_label paused plan must set paused_reason") ;;
+      INVALID_PAUSED_REASON) failures+=("$phase_label paused_reason must be meaningful plain single-line scalar prose") ;;
+      MISSING_PAUSE_SESSION_LOG) failures+=("$phase_label paused plan must set pause_session_log") ;;
+      INVALID_LOG_SCALAR) failures+=("$phase_label pause_session_log must be a plain path scalar") ;;
+      ABSOLUTE_LOG) failures+=("$phase_label pause_session_log must be repository-relative") ;;
+      TRAVERSAL_LOG) failures+=("$phase_label pause_session_log must not contain .. traversal") ;;
+      LOG_RESOLUTION_FAILED) failures+=("$phase_label pause session log path could not be resolved safely") ;;
+      OUTSIDE_LOG) failures+=("$phase_label pause session log must stay inside the repository") ;;
+      MISSING_LOG_FILE) failures+=("$phase_label pause session log file is missing") ;;
+      NON_REGULAR_LOG) failures+=("$phase_label pause session log must be a regular file") ;;
+      UNREADABLE_LOG) failures+=("$phase_label pause session log must be readable") ;;
+      INVALID_UTF8_LOG) failures+=("$phase_label pause session log must be valid UTF-8 text") ;;
+      INVALID_LOG_MARKER) failures+=("$phase_label pause session log must contain exact same-line prefix: **Status:** PAUSED") ;;
+      PROBE_EXCEPTION) failures+=("$phase_label pause validation probe raised an exception") ;;
+      *) malformed=1 ;;
+    esac
+  done <<< "$probe_output"
+  if [[ "$malformed" -eq 1 ]]; then
+    failures+=("$phase_label pause validation probe returned malformed output")
+  fi
+}
+
 # Single home for the plan/score/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
@@ -1048,23 +1242,53 @@ assert_commit_invariants() {
     failures+=("missing big-plan file: .claude/plans/$slug.md")
   fi
 
-  local current_phase="" small_plan=""
+  local big_status="" current_phase="" small_plan="" phase_listed=0
   if [[ -f "$big_plan" ]]; then
+    big_status="$(fm_read_unique_status "$big_plan" || true)"
+    if [[ "$big_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$big_plan must contain exactly one status field before commit")
+    fi
     current_phase="$(fm_read "$big_plan" "current_phase" || true)"
     if [[ -z "$current_phase" ]]; then
       failures+=("big plan has no current_phase")
+    elif ! is_plan_slug "$current_phase"; then
+      failures+=("big plan current_phase must be a safe small-plan slug")
     else
       small_plan="$repo_root/.claude/plans/$current_phase.md"
+      local listed_phase
+      while IFS= read -r listed_phase; do
+        if [[ "$listed_phase" == "$current_phase" ]]; then
+          phase_listed=1
+          break
+        fi
+      done < <(fm_read_list "$big_plan" "phases")
+      if [[ "$phase_listed" -ne 1 ]]; then
+        failures+=("big plan current_phase must be listed in phases")
+      fi
     fi
   fi
 
-  local small_status closeout_log=""
+  local small_status="" closeout_log="" small_type="" small_parent=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
+    small_type="$(fm_read "$small_plan" "type" || true)"
+    small_parent="$(fm_read "$small_plan" "parent_plan" || true)"
+    if [[ "$small_type" != "small-plan" ]]; then
+      failures+=("$small_plan must have type: small-plan before commit")
+    fi
+    if [[ "$small_parent" != "$slug" ]]; then
+      failures+=("$small_plan parent_plan must match $slug before commit")
+    fi
     small_status="$(fm_read_unique_status "$small_plan" || true)"
     if [[ "$small_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
       failures+=("$small_plan must contain exactly one status field before commit")
     elif [[ "$small_status" == "cancelled" ]]; then
       failures+=("$small_plan is cancelled; a cancelled phase never certifies a commit, so advance current_phase past it")
+    elif [[ "$small_status" == "paused" ]]; then
+      if [[ "$big_status" != "in-progress" ]]; then
+        failures+=("$big_plan must have status: in-progress for a paused checkpoint commit")
+      fi
+      assert_pause_evidence "$small_plan" "$current_phase"
+      return
     elif [[ "$small_status" != "complete" ]]; then
       failures+=("$small_plan must have status: complete before commit")
     fi
