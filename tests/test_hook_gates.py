@@ -115,6 +115,46 @@ def _cancellation_failures(
     return result.stdout.splitlines()
 
 
+def _write_paused_plan(
+    root: Path,
+    *,
+    missing_field: str = "",
+    paused_at: str = "2026-08-11T07:00:00Z",
+    reason: str = "The user requested an overnight checkpoint",
+    log: str = "pause.md",
+) -> Path:
+    fields = {
+        "paused_at": paused_at,
+        "paused_reason": reason,
+        "pause_session_log": log,
+    }
+    fields.pop(missing_field, None)
+    plan = root / "phase-paused.md"
+    plan.write_text(
+        "---\n"
+        "name: phase-paused\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 2\n"
+        "status: paused\n"
+        + "".join(f"{key}: {value}\n" for key, value in fields.items())
+        + "---\n",
+        encoding="utf-8",
+    )
+    return plan
+
+
+def _pause_failures(root: Path, plan: Path, *, probe_override: str = "") -> list[str]:
+    expression = (
+        f"repo_root={shlex.quote(str(root))}; {probe_override} failures=(); "
+        f"assert_pause_evidence {shlex.quote(str(plan))} phase-paused; "
+        'if [[ "${#failures[@]}" -gt 0 ]]; then printf \'%s\\n\' "${failures[@]}"; fi'
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.splitlines()
+
+
 @pytest.mark.parametrize(
     "statuses",
     [
@@ -365,6 +405,124 @@ def test_cancellation_evidence_missing_python_blocks(tmp_path: Path) -> None:
         plan,
         probe_override=f"PATH={shlex.quote(str(empty_path))};",
     ) == ["phase-cancelled cancellation validation requires python3"]
+
+
+def test_pause_evidence_accepts_paused_session_log(tmp_path: Path) -> None:
+    plan = _write_paused_plan(tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == []
+
+
+@pytest.mark.parametrize(
+    "missing_field", ("paused_at", "paused_reason", "pause_session_log")
+)
+def test_pause_evidence_names_each_missing_field(
+    tmp_path: Path, missing_field: str
+) -> None:
+    plan = _write_paused_plan(tmp_path, missing_field=missing_field)
+    if missing_field != "pause_session_log":
+        (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == [
+        f"phase-paused paused plan must set {missing_field}"
+    ]
+
+
+def test_pause_evidence_rejects_markerless_session_log(tmp_path: Path) -> None:
+    plan = _write_paused_plan(tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** IN-PROGRESS\n", encoding="utf-8")
+
+    assert _pause_failures(tmp_path, plan) == [
+        "phase-paused pause session log must contain exact same-line prefix: "
+        "**Status:** PAUSED"
+    ]
+
+
+@pytest.mark.parametrize("reason", ('"   "', "|- # folded", "[not, prose]"))
+def test_pause_evidence_rejects_yaml_like_reason(tmp_path: Path, reason: str) -> None:
+    plan = _write_paused_plan(tmp_path, reason=reason)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+
+    assert any(
+        "single-line scalar prose" in failure
+        for failure in _pause_failures(tmp_path, plan)
+    )
+
+
+@pytest.mark.parametrize(
+    ("log", "expected"),
+    (
+        ("/tmp/outside.md", "repository-relative"),
+        ("nested/../pause.md", "must not contain .. traversal"),
+    ),
+)
+def test_pause_evidence_rejects_unsafe_paths(
+    tmp_path: Path, log: str, expected: str
+) -> None:
+    plan = _write_paused_plan(tmp_path, log=log)
+
+    assert any(expected in failure for failure in _pause_failures(tmp_path, plan))
+
+
+def test_pause_evidence_rejects_missing_nonregular_and_invalid_utf8_logs(
+    tmp_path: Path,
+) -> None:
+    missing = _write_paused_plan(tmp_path, log="missing.md")
+    assert any(
+        "log file is missing" in failure
+        for failure in _pause_failures(tmp_path, missing)
+    )
+
+    (tmp_path / "directory").mkdir()
+    directory = _write_paused_plan(tmp_path, log="directory")
+    assert any(
+        "regular file" in failure for failure in _pause_failures(tmp_path, directory)
+    )
+
+    (tmp_path / "invalid.md").write_bytes(b"\xff\xfe")
+    invalid = _write_paused_plan(tmp_path, log="invalid.md")
+    assert any(
+        "valid UTF-8" in failure for failure in _pause_failures(tmp_path, invalid)
+    )
+
+
+def test_pause_evidence_rejects_outside_symlink_and_probe_failures(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    (tmp_path / "pause.md").symlink_to(outside)
+    plan = _write_paused_plan(tmp_path)
+    assert any("stay inside" in failure for failure in _pause_failures(tmp_path, plan))
+    assert any(
+        "probe raised an exception" in failure
+        for failure in _pause_failures(
+            tmp_path,
+            plan,
+            probe_override="pause_validation_probe() { printf PROBE_EXCEPTION; };",
+        )
+    )
+
+
+def test_pause_evidence_rejects_unreadable_log_and_missing_python(
+    tmp_path: Path,
+) -> None:
+    log = tmp_path / "pause.md"
+    log.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    log.chmod(0)
+    plan = _write_paused_plan(tmp_path)
+    assert any(
+        "must be readable" in failure for failure in _pause_failures(tmp_path, plan)
+    )
+
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+    assert _pause_failures(
+        tmp_path,
+        plan,
+        probe_override=f"PATH={shlex.quote(str(empty_path))};",
+    ) == ["phase-paused pause validation requires python3"]
 
 
 def test_git_targets_nested_claude_detects_nested_claude_paths() -> None:

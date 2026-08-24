@@ -3395,6 +3395,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
 
     validate_lifecycle_hook_guardrails(errors)
     validate_cancelled_phase_gate_cases(errors)
+    validate_paused_phase_gate_cases(errors)
     validate_commit_msg_git_hook(errors)
     validate_pre_push_git_hook(errors)
 
@@ -3496,13 +3497,17 @@ def write_small_plan(
     cancelled_at: str = "2026-08-11T07:00:00Z",
     cancelled_reason: str = "The phase is no longer authorized",
     cancelled_evidence: str = "",
+    missing_pause_field: str = "",
+    paused_at: str = "2026-08-11T07:00:00Z",
+    paused_reason: str = "The user requested an overnight checkpoint",
+    pause_session_log: str = "",
     evidence_exists: bool = True,
     evidence_marker: bool = True,
     duplicate_status: str = "",
 ) -> None:
     closeout = (
         ""
-        if status == "cancelled"
+        if status in {"cancelled", "paused"}
         else f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
     )
     if not cancelled_evidence:
@@ -3518,6 +3523,17 @@ def write_small_plan(
         cancellation = "".join(
             f"{key}: {value}\n" for key, value in cancellation_values.items()
         )
+    if not pause_session_log:
+        pause_session_log = f".claude/session_logs/{phase}-paused.md"
+    pause_values = {
+        "paused_at": paused_at,
+        "paused_reason": paused_reason,
+        "pause_session_log": pause_session_log,
+    }
+    pause_values.pop(missing_pause_field, None)
+    pause = ""
+    if status == "paused":
+        pause = "".join(f"{key}: {value}\n" for key, value in pause_values.items())
     duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
     write(
         repo / ".claude" / "plans" / f"{phase}.md",
@@ -3527,7 +3543,7 @@ type: small-plan
 parent_plan: foo
 phase_index: 1
 status: {status}
-{duplicate_status_line}{closeout}{cancellation}---
+{duplicate_status_line}{closeout}{cancellation}{pause}---
 
 # {phase}
 """,
@@ -3545,6 +3561,12 @@ status: {status}
             evidence_path,
             f"# Cancellation\n\n{marker}",
         )
+    if status == "paused" and evidence_exists and "pause_session_log" in pause_values:
+        marker = "**Status:** PAUSED\n" if evidence_marker else "Status: paused\n"
+        log_path = Path(pause_values["pause_session_log"])
+        if not log_path.is_absolute():
+            log_path = repo / log_path
+        write(log_path, f"# Pause checkpoint\n\n{marker}")
 
 
 def lifecycle_script(repo: Path, name: str) -> Path:
@@ -4107,6 +4129,321 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(
             '"permissionDecision":"deny"' in stdout,
             "PR gate must deny --base main",
+            errors,
+        )
+
+
+def validate_paused_phase_gate_cases(errors: list[str]) -> None:
+    """Exercise generated checkpoint commits without relaxing completion gates."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = setup_hook_repo(Path(temp_dir))
+        git(repo, "checkout", "-b", "foo_implementation")
+        library = lifecycle_script(repo, "_lib-frontmatter.sh")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+
+        def commit_failures(probe_override: str = "") -> list[str]:
+            expression = f"""
+. {shlex.quote(str(library))}
+{probe_override}
+select_fresh_report() {{ printf 'unexpected report lookup\\n' >&2; return 1; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(repo))} foo_implementation
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
+"""
+            result = subprocess.run(
+                ["bash", "-lc", expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"paused commit invariant fixture failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        check(
+            commit_failures() == [],
+            "valid paused phase must allow a checkpoint without final reports",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="complete",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        check(
+            any("status: in-progress" in failure for failure in commit_failures()),
+            "paused checkpoint must require an in-progress big plan",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="../rogue",
+        )
+        write(
+            repo / ".claude" / "rogue.md",
+            "---\ntype: big-plan\nstatus: paused\n---\n",
+        )
+        check(
+            any("safe small-plan slug" in failure for failure in commit_failures()),
+            "paused checkpoint must reject a path-like current_phase",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-rogue",
+        )
+        write_small_plan(repo, status="paused", phase="phase-rogue")
+        check(
+            any("listed in phases" in failure for failure in commit_failures()),
+            "paused checkpoint must require current_phase membership in phases",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-rogue",),
+            current_phase="phase-rogue",
+        )
+        write(
+            repo / ".claude" / "plans" / "phase-rogue.md",
+            "---\n"
+            "name: phase-rogue\n"
+            "type: big-plan\n"
+            "parent_plan: wrong-parent\n"
+            "status: paused\n"
+            "paused_at: 2026-08-11T07:00:00Z\n"
+            "paused_reason: The user requested an overnight checkpoint\n"
+            "pause_session_log: .claude/session_logs/phase-rogue-paused.md\n"
+            "---\n",
+        )
+        write(
+            repo / ".claude" / "session_logs" / "phase-rogue-paused.md",
+            "**Status:** PAUSED\n",
+        )
+        rogue_failures = commit_failures()
+        check(
+            any("type: small-plan" in failure for failure in rogue_failures)
+            and any("parent_plan must match" in failure for failure in rogue_failures),
+            "paused checkpoint must require a matching current small-plan identity",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-commit-gate.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "checkpoint work"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            returncode == 0, f"paused checkpoint gate failed to run: {stderr}", errors
+        )
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            "paused checkpoint gate must allow valid pause evidence",
+            errors,
+        )
+
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            missing_pause_field="pause_session_log",
+        )
+        check(
+            any("pause_session_log" in failure for failure in commit_failures()),
+            "paused checkpoint must reject missing pause-session-log evidence",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            evidence_marker=False,
+        )
+        check(
+            any("**Status:** PAUSED" in failure for failure in commit_failures()),
+            "paused checkpoint must reject a pause log without the PAUSED marker",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            paused_at="2026-02-30T07:00:00Z",
+        )
+        check(
+            any("real UTC timestamp" in failure for failure in commit_failures()),
+            "paused checkpoint must reject an invalid paused_at timestamp",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            paused_reason="|- # folded",
+        )
+        check(
+            any("single-line scalar prose" in failure for failure in commit_failures()),
+            "paused checkpoint must reject a malformed paused_reason scalar",
+            errors,
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        check(
+            any(
+                "probe returned malformed output" in failure
+                for failure in commit_failures(
+                    "pause_validation_probe() { printf UNEXPECTED; }"
+                )
+            ),
+            "paused checkpoint must fail closed for unknown pause-probe output",
+            errors,
+        )
+        for pause_log, expected in (
+            ("missing-paused.md", "log file is missing"),
+            ("/tmp/outside-paused.md", "repository-relative"),
+            ("nested/../paused.md", "must not contain .. traversal"),
+        ):
+            write_small_plan(
+                repo,
+                status="paused",
+                phase="phase-paused",
+                pause_session_log=pause_log,
+                evidence_exists=False,
+            )
+            check(
+                any(expected in failure for failure in commit_failures()),
+                f"paused checkpoint must reject unsafe pause evidence: {pause_log}",
+                errors,
+            )
+        outside_log = Path(temp_dir) / "outside-paused.md"
+        write(outside_log, "**Status:** PAUSED\n")
+        outside_link = repo / ".claude" / "session_logs" / "outside-paused.md"
+        outside_link.symlink_to(outside_log)
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            pause_session_log=".claude/session_logs/outside-paused.md",
+            evidence_exists=False,
+        )
+        check(
+            any("stay inside" in failure for failure in commit_failures()),
+            "paused checkpoint must reject an outside pause-log symlink",
+            errors,
+        )
+        invalid_log = repo / ".claude" / "session_logs" / "invalid-paused.md"
+        invalid_log.write_bytes(b"\xff\xfe")
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            pause_session_log=".claude/session_logs/invalid-paused.md",
+            evidence_exists=False,
+        )
+        check(
+            any("valid UTF-8" in failure for failure in commit_failures()),
+            "paused checkpoint must reject invalid-UTF-8 pause evidence",
+            errors,
+        )
+        write_small_plan(repo, status="in-progress", phase="phase-paused")
+        check(
+            any("status: complete" in failure for failure in commit_failures()),
+            "in-progress phase must remain non-committing",
+            errors,
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+
+        write(repo / "checkpoint.txt", "incomplete checkpoint\n")
+        git(repo, "add", "checkpoint.txt")
+        git(repo, "commit", "-m", "checkpoint work")
+        returncode, _, stderr = run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "checkpoint work"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            returncode == 0,
+            f"paused checkpoint closeout fixture failed: {stderr}",
+            errors,
+        )
+        big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "status: in-progress" in big_plan_text
+            and "current_phase: phase-paused" in big_plan_text,
+            "paused checkpoint must retain the active big plan and current phase",
+            errors,
+        )
+        check(
+            "status: paused" in read(repo / ".claude" / "plans" / "phase-paused.md"),
+            "paused checkpoint must not complete the small plan",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-paused"),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        dummy_report = repo / ".claude" / "quality_reports" / "findings.json"
+        write(dummy_report, "{}\n")
+        local_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
+        push_expression = f"""
+. {shlex.quote(str(library))}
+select_fresh_report() {{ printf '%s' {shlex.quote(str(dummy_report))}; }}
+assert_report_freshness() {{ :; }}
+json_file_number_value() {{ printf '0'; }}
+assert_required_ponytail_review() {{ :; }}
+failures=()
+assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
+printf '%s\\n' "${{failures[@]}}"
+"""
+        push_result = subprocess.run(
+            ["bash", "-lc", push_expression],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            push_result.returncode == 0,
+            f"paused push invariant fixture failed: {push_result.stderr}",
+            errors,
+        )
+        check(
+            "phase-paused is paused" in push_result.stdout,
+            "paused phase must remain blocked from push/PR closeout",
             errors,
         )
 
@@ -4996,16 +5333,63 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        write_small_plan(repo, status="paused")
+        checkpoint = git(repo, "commit", "-m", "checkpoint work")
+        check(
+            checkpoint.returncode == 0,
+            "installed commit-msg hook must allow an evidenced paused checkpoint without final reports",
+            errors,
+        )
+        checkpoint_big_plan = read(repo / ".claude" / "plans" / "foo.md")
+        check(
+            "status: in-progress" in checkpoint_big_plan
+            and "current_phase: phase-one" in checkpoint_big_plan,
+            "installed checkpoint commit must not advance phase state",
+            errors,
+        )
+        write_small_plan(repo, status="in-progress")
+        write(repo / "resumed.txt", "resumed work\n")
+        git(repo, "add", "resumed.txt")
+        resumed = git(repo, "commit", "-m", "resumed work")
+        check(
+            resumed.returncode != 0,
+            "installed commit-msg hook must block a resumed in-progress phase",
+            errors,
+        )
+
         # Fully valid state -> allowed; this actually lands the commit.
+        write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
+        head_sha, content_hash = head_and_hash()
+        write_score(score_report(head_sha, content_hash))
+        write_findings(findings_report(head_sha, content_hash))
         # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode == 0,
             f"commit-msg hook must allow a fully valid commit: {result.stdout}{result.stderr}",
+            errors,
+        )
+        push_expression = f"""
+. {shlex.quote(str(lifecycle_script(repo, "_lib-frontmatter.sh")))}
+assert_report_freshness() {{ :; }}
+failures=()
+assert_push_invariants {shlex.quote(str(repo))} foo_implementation HEAD
+printf '%s\\n' "${{failures[@]}}"
+"""
+        push_result = subprocess.run(
+            ["bash", "-lc", push_expression],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            push_result.returncode == 0 and not push_result.stdout.strip(),
+            "push invariants must accept normal completion after a checkpoint commit",
             errors,
         )
 

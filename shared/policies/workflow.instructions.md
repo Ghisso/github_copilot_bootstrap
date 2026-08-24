@@ -51,6 +51,33 @@ Control-plane/high-risk work always uses a full plan.
 - Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
 
+### Pausing a phase for a checkpoint
+
+`paused` is a small-plan-only, non-terminal status. Enter it only after an
+explicit user request to stop, pause, or checkpoint and resume later; a failed
+check alone does not authorize it. If the user names a safe boundary, reach it
+before pausing when it is safe to do so.
+
+A paused phase requires `paused_at` in exact UTC `YYYY-MM-DDTHH:MM:SSZ`
+format, meaningful single-line `paused_reason`, and repository-relative
+`pause_session_log` evidence that resolves to a readable UTF-8 log containing
+`**Status:** PAUSED`. The log records the reason, completed and remaining work,
+verification already run, incomplete checks, and the exact resume point.
+
+After the evidence is recorded, a checkpoint commit may preserve tracked outer
+repository work without final score, findings, LEARN, DOCUMENT, or COMPLETED
+closeout. It is not a bypass, does not advance `current_phase`, and leaves the
+big plan `in-progress`. Do not create an empty outer-repository checkpoint
+commit when only AI-state files changed; persist the PAUSED plan and session log
+through the normal AI-state checkpoint path instead. A paused phase remains
+unfinished and blocks push/PR closeout.
+
+On resume, read the paused small plan and PAUSED log, inspect `git log --oneline
+-10`, `git status`, and the current diff, report the recorded resume point, set
+the same phase back to `in-progress`, preserve the latest pause metadata, and
+continue without creating another small plan. Complete the ordinary lifecycle
+once the phase actually finishes.
+
 ### Cancelling a plan or phase
 
 `cancelled` means an authorized decision was made that a plan or phase will
@@ -90,9 +117,15 @@ For each small plan:
 7. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE, and repeat until score is >= 90 and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory.
 8. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
 9. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
-10. **COMMIT:** Commit the completed small plan atomically.
+10. **COMMIT:** On normal completion, commit the completed small plan atomically.
 
-**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
+**Conditional checkpoint branch:** When the user explicitly requests a pause,
+write the PAUSED session log and required pause frontmatter, then checkpoint
+tracked outer-repository work. Do not run this branch merely because a gate
+failed. The checkpoint leaves the phase active; on resume, reopen that same
+small plan and run the full loop before its normal completion commit.
+
+**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before a normal completion commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. An explicitly evidenced paused checkpoint follows its separate non-final path. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
 
 ---
 
@@ -127,6 +160,7 @@ communication and agent-to-agent status or handoffs.
 - During work: design decisions, problems solved, verification results, `[LEARN]` entries
 - Before stopping: summary, scores, open questions, next steps
 - At small-plan closeout: `**Status:** COMPLETED`, `**Plan:** <small-plan path>`, `[LEARN]` entries or explicit no-lessons marker
+- At an explicit checkpoint: `**Status:** PAUSED`, `**Plan:** <small-plan path>`, pause reason, completed and remaining work, verification state, incomplete checks, and resume point
 
 **Frequency:** Every 30 responses or at session end, whichever comes first.
 
@@ -144,8 +178,9 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 
 **Starting a new session:**
 1. Read `.claude/instructions/workspace.md` plus the current plan in `.claude/plans/` or exploration in `.claude/explorations/`.
-2. Check `git log --oneline -10` and `git diff`.
-3. State understood task and next step.
+2. If the current small plan is `paused`, read its `pause_session_log`, then set that same plan to `in-progress` while preserving its pause metadata; do not create another small plan.
+3. Check `git log --oneline -10`, `git status`, and `git diff`.
+4. State the recorded resume point, understood task, and next step.
 
 ---
 
@@ -189,8 +224,8 @@ Some behaviors are automated by hooks. Others are still manual.
 - Protected file edits are denied.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
-- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence.
-- PR creation/push is gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`.
+- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
+- PR creation/push is gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`. Paused phases remain blocked.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.

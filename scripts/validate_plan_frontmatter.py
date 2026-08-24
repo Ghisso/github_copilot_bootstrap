@@ -13,15 +13,21 @@ from typing import Any, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BIG_PLAN_STATUSES = {"planning", "in-progress", "complete", "cancelled"}
-SMALL_PLAN_STATUSES = {"in-progress", "complete", "cancelled"}
+SMALL_PLAN_STATUSES = {"in-progress", "paused", "complete", "cancelled"}
 CANCELLED_FIELDS = ("cancelled_at", "cancelled_reason", "cancelled_evidence")
+PAUSED_FIELDS = ("paused_at", "paused_reason", "pause_session_log")
 CANCELLED_AT_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+PAUSED_AT_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 CANCELLED_REASON_BLOCK_PATTERN = re.compile(
+    r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?(?:[ \t]*#.*)?$"
+)
+PAUSED_REASON_BLOCK_PATTERN = re.compile(
     r"^[|>](?:[+-][1-9]?|[1-9][+-]?)?(?:[ \t]*#.*)?$"
 )
 CANCELLED_STATUS_PATTERN = re.compile(
     r"^\*\*Status:\*\*[ \t]+CANCELLED\b", re.MULTILINE
 )
+PAUSED_STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*[ \t]+PAUSED\b", re.MULTILINE)
 
 
 def parse_frontmatter(path: Path) -> dict[str, Any]:
@@ -44,7 +50,10 @@ def parse_frontmatter(path: Path) -> dict[str, Any]:
                 data[current_key] = value
             value.append(line[4:].strip())
             continue
-        if line.startswith((" ", "\t")) and current_key == "cancelled_reason":
+        if line.startswith((" ", "\t")) and current_key in {
+            "cancelled_reason",
+            "paused_reason",
+        }:
             value = data.get(current_key)
             data[current_key] = [value, line.strip()]
             continue
@@ -151,6 +160,61 @@ def validate_cancellation(path: Path, data: dict[str, Any], errors: list[str]) -
         errors.append(f"{path}: cancelled_evidence must contain **Status:** CANCELLED")
 
 
+def validate_pause(path: Path, data: dict[str, Any], errors: list[str]) -> None:
+    """Validate the audit evidence required for a paused small plan."""
+    require_fields(path, data, PAUSED_FIELDS, errors)
+
+    paused_at = str(data.get("paused_at", ""))
+    if paused_at:
+        if not PAUSED_AT_PATTERN.fullmatch(paused_at):
+            errors.append(f"{path}: paused_at must use UTC format YYYY-MM-DDTHH:MM:SSZ")
+        else:
+            try:
+                datetime.strptime(paused_at, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                errors.append(f"{path}: paused_at must be a valid UTC timestamp")
+
+    reason = data.get("paused_reason")
+    if reason not in (None, "", []):
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(
+                f"{path}: paused_reason must be meaningful plain single-line prose"
+            )
+        elif PAUSED_REASON_BLOCK_PATTERN.fullmatch(
+            reason.strip()
+        ) or reason.lstrip().startswith(("[", "{", "- ", "#")):
+            errors.append(f"{path}: paused_reason must be a plain single-line scalar")
+
+    log_value = data.get("pause_session_log", "")
+    if log_value in ("", []):
+        return
+    if not isinstance(log_value, str):
+        errors.append(f"{path}: pause_session_log must be a plain path scalar")
+        return
+    try:
+        log_path = Path(log_value)
+        if log_path.is_absolute():
+            errors.append(f"{path}: pause_session_log must be repository-relative")
+            return
+        repository_root = REPO_ROOT.resolve(strict=True)
+        log_path = (repository_root / log_path).resolve(strict=False)
+        if not log_path.is_relative_to(repository_root):
+            errors.append(f"{path}: pause_session_log must stay inside the repository")
+            return
+        log_path = log_path.resolve(strict=True)
+        if not log_path.is_file():
+            errors.append(
+                f"{path}: pause_session_log must be a regular readable text file"
+            )
+            return
+        log = log_path.read_text(encoding="utf-8")
+    except (OSError, RuntimeError, TypeError, UnicodeError, ValueError) as error:
+        errors.append(f"{path}: cannot read pause_session_log {log_path}: {error}")
+        return
+    if not PAUSED_STATUS_PATTERN.search(log):
+        errors.append(f"{path}: pause_session_log must contain **Status:** PAUSED")
+
+
 def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> None:
     require_fields(
         path,
@@ -189,6 +253,8 @@ def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> 
         require_fields(path, data, ["closeout_session_log"], errors)
     if status == "cancelled":
         validate_cancellation(path, data, errors)
+    if status == "paused":
+        validate_pause(path, data, errors)
 
 
 def validate_plan(path: Path, errors: list[str]) -> None:

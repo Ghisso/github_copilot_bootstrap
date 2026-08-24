@@ -42,7 +42,7 @@ The hook ships as source in `shared/hooks/git-hooks/commit-msg`, generates into 
 
 ### D3 — Full contract parity via a single shared function *(decided)*
 
-Rather than duplicating checks, extract the **ceremony** body of `enforce-commit-gate.sh` (big/small-plan, score JSON schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence) into one shared function `assert_commit_invariants <repo_root> <branch>` in `_lib-frontmatter.sh`. **Branch-shape is deliberately *not* in the shared function** — per D4-B the two callers diverge on it, so each owns its own branch decision and then calls the shared ceremony checks:
+Rather than duplicating checks, extract the **ceremony** body of `enforce-commit-gate.sh` (big/small-plan, score JSON schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence) into one shared function `assert_commit_invariants <repo_root> <branch>` in `_lib-frontmatter.sh`. Dispatch remains explicit: a `complete` phase uses these existing completion checks, while a current small plan with valid pause evidence uses a separate checkpoint path that does not assert final score/findings/LEARN/DOCUMENT/COMPLETED closeout. **Branch-shape is deliberately *not* in the shared function** — per D4-B the two callers diverge on it, so each owns its own branch decision and then calls the shared ceremony checks:
 
 - `enforce-commit-gate.sh` (PreToolUse): classify Bash command → if commit → wrong branch adds a failure (unchanged) → if not bypass, `assert_commit_invariants` → emit `deny` JSON.
 - `commit-msg` git hook: read subject from `$1` → **not an `_implementation` branch → `exit 0` (passthrough)** → bypass subject → `exit 0` (skip ceremony; branch already valid) → else `assert_commit_invariants` → `exit 1` with the joined reason on failure.
@@ -94,7 +94,7 @@ Each phase is one small plan, in dependency order; each leaves the tree green (`
 ### Phase 4 — `R-HOOKS-07d`: adversarial validator cases
 
 - **Change:** in [validate_targets.py](../scripts/validate_targets.py), add throwaway-repo cases that set `core.hooksPath` to the generated dir and run real `git commit`s. All commits below are on a `<plan>_implementation` branch unless stated:
-  - invalid state (no score / score < 90 / stale `content_hash` / small-plan not `complete` / current phase is `cancelled` / missing closeout `**Status:** COMPLETED` / missing LEARN) → **blocked** (`git commit` exits non-zero). A cancelled current phase gets a distinct stale-pointer message because cancellation never certifies a commit.
+  - invalid state (no score / score < 90 / stale `content_hash` / small-plan not `complete` or valid `paused` / current phase is `cancelled` / missing closeout `**Status:** COMPLETED` / missing LEARN) → **blocked** (`git commit` exits non-zero). A valid paused current small plan may create a checkpoint commit without final score/findings/LEARN/DOCUMENT/COMPLETED closeout; it does not advance the phase and still blocks push/PR closeout. A cancelled current phase gets a distinct stale-pointer message because cancellation never certifies a commit.
   - fully valid state → **allowed**.
   - **alias evasion** (`git config alias.ci commit; git ci -m ...`) with invalid state → **blocked** — the residual the layer exists to close, caught here because the commit lands on an implementation branch.
   - `git -C <path> commit` with invalid state → **blocked**.

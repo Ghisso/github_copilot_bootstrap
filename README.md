@@ -31,7 +31,7 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCO
 Core principles:
 
 - Start from `dev`, branch for each big plan, and keep plan frontmatter current.
-- Plan first for non-trivial work and split big plans into commit-sized small plans.
+- Plan first for non-trivial work and split big plans into commit-sized small plans. If a phase is deliberately paused, resume that same small plan later; do not create a second plan for the checkpoint.
 - During IMPLEMENT, the coder applies the vendored Ponytail skill once in `full` mode, then performs a lightweight changed-scope simplification and re-verification pass.
 - Treat minimality as conceptual: prefer reuse, standard-library/native features, and the smallest correct set of concepts while clarity and maintainability outrank line count.
 - Config-first design for new features.
@@ -678,7 +678,7 @@ Configured events:
   - Canonical command and mutation guards retain symlink-safe path classification, protected-source checks, and deny-by-default handling for ambiguous or unsafe requests. Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent; the bootstrap does not invent lifecycle parity. Native loading and cadence remain an external acceptance gap/blocker.
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
-  - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; it completes the big plan after the final phase and logs allowed bypass commits
+  - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; a normal `complete` commit advances the phase, while a valid `paused` checkpoint records durable incomplete work and leaves the same `current_phase` and big plan `in-progress`; it completes the big plan after the final phase and logs allowed bypass commits
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
@@ -702,7 +702,7 @@ Configured events:
 
 Two layers, two invariants, one shared contract each:
 
-- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh), covering the small-plan/closeout/score/LEARN checks. A cancelled phase never certifies a commit; if `current_phase` points to one, the commit is blocked until the pointer advances.
+- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh). A `complete` phase keeps the existing closeout, score, findings, LEARN, and documentation gates. A current small plan with valid explicit pause evidence may take the separate checkpoint path: it records durable incomplete work without final score/findings/LEARN/DOCUMENT/COMPLETED closeout, does not advance the phase, and remains unfinished for push/PR gating. `in-progress` and `cancelled` phases still cannot certify commits; cancellation semantics are unchanged.
 - **Push invariant** — `enforce-pr-gate.sh` (`PreToolUse`) and `pre-push` (git hook) both call `assert_push_invariants` in the same file. Every phase must be complete or carry the full cancellation evidence contract, and at least one phase must be complete. Commit counts include completed phases only, and the final findings report binds to the last completed phase. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `gh pr create --base dev` has no push-hook analog and stays `PreToolUse`-only.
 
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
@@ -734,9 +734,9 @@ Expected verification commands after implementation:
 Quality gates:
 
 - >= 95: excellence target
-- >= 90: required for commit and PR closeout
+- >= 90: required for a normal completion commit and PR closeout; a paused checkpoint does not make a final quality claim and does not waive the unfinished-phase push/PR gate
 - < 90: blocked until implementation, verification, review, and score are rerun
-- findings report `counts.critical == 0`: required for commit
+- findings report `counts.critical == 0`: required for a normal completion commit
 - findings report `counts.major == 0`: additionally required for PR/push closeout
 - Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
 

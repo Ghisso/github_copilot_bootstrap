@@ -76,6 +76,9 @@ if [[ -f "$CURRENT_PLAN" ]]; then
     additional_context "PostToolUse" "commit closeout not recorded because the current phase plan must contain exactly one status field"
     exit 0
   fi
+  if [[ "$CURRENT_STATUS" == "paused" ]]; then
+    exit 0
+  fi
 fi
 
 # macOS's default /bin/bash is 3.2 and has no `mapfile`/`readarray`; accumulate
