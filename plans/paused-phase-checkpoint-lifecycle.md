@@ -1,13 +1,13 @@
 ---
 name: paused-phase-checkpoint-lifecycle
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: paused-phase-checkpoint-lifecycle_implementation
 started_at: 2026-08-24T12:50:21Z
 phases:
   - 2026-08-24_phase-A-paused-phase-checkpoint-lifecycle
-current_phase: 2026-08-24_phase-A-paused-phase-checkpoint-lifecycle
+current_phase: 
 ---
 
 # Big Plan: Paused phase checkpoint lifecycle
