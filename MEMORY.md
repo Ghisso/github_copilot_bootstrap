@@ -456,3 +456,11 @@
   workspace custom subagents but a custom main agent cannot. Put orchestration
   guidance in root `AGENTS.md`, keep custom adapters non-main, and allow native
   non-writing scheduler tools only in the PreToolUse bridge.
+- [LEARN:security] A relaxed lifecycle gate must validate the subject identity
+  before dispatching to the relaxed branch. Prove the active plan state, safe
+  contained phase slug, phase membership, plan type, and parent relationship;
+  evidence for the relaxed state cannot establish those common invariants.
+- [LEARN:tests] A checkpoint lifecycle regression must exercise the installed Git
+  hook and keep the checkpoint commit in history through resume, later normal
+  completion, and push validation. Resetting the checkpoint away tests two
+  isolated commits, not the promised lifecycle.

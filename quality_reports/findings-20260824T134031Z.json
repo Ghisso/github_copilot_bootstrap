@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-24T13:41:12Z",
+  "branch": "paused-phase-checkpoint-lifecycle_implementation",
+  "head_sha": "693373c4bddfb0559af1183364b1844e15605f9d",
+  "base_ref": "dev",
+  "merge_base_sha": "693373c4bddfb0559af1183364b1844e15605f9d",
+  "phase": "2026-08-24_phase-A-paused-phase-checkpoint-lifecycle",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "9f80348901e021156affdcf4759231a6977d0e72",
+  "changed_files": [
+    "README.md",
+    "docs/plan-deterministic-commit-gate.md",
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/plans/README.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/templates/plan-small.md",
+    "shared/templates/session-log.md",
+    "tests/test_hook_gates.py",
+    "tests/test_validate_plan_frontmatter.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
