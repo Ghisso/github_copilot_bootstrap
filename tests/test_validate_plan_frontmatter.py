@@ -44,6 +44,16 @@ def cancellation_fields(
     )
 
 
+def pause_fields(
+    log: str = "pause.md",
+    *,
+    paused_at: str = "2026-08-11T06:30:00Z",
+    reason: str = "The user requested an overnight checkpoint",
+) -> str:
+    """Return valid pause fields for a test plan."""
+    return f"paused_at: {paused_at}\npaused_reason: {reason}\npause_session_log: {log}"
+
+
 def small_plan(status: str, extra: str = "") -> str:
     """Return small-plan frontmatter for a test case."""
     return f"""
@@ -87,6 +97,111 @@ def test_accepts_cancelled_small_plan_with_evidence(
     plan = write_plan(
         tmp_path / "small.md", small_plan("cancelled", cancellation_fields())
     )
+
+    assert validation_errors(plan) == []
+
+
+def test_accepts_paused_small_plan_with_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize("missing_field", validator.PAUSED_FIELDS)
+def test_rejects_each_missing_pause_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, missing_field: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    fields = {
+        "paused_at": "2026-08-11T06:30:00Z",
+        "paused_reason": "The user requested an overnight checkpoint",
+        "pause_session_log": "pause.md",
+    }
+    del fields[missing_field]
+    plan = write_plan(
+        tmp_path / "small.md",
+        small_plan(
+            "paused", "\n".join(f"{key}: {value}" for key, value in fields.items())
+        ),
+    )
+
+    assert any(
+        f"missing required field: {missing_field}" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("paused_at", ["2026-08-11T06:30:00", "2026-02-30T06:30:00Z"])
+def test_rejects_invalid_paused_at(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, paused_at: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "small.md", small_plan("paused", pause_fields(paused_at=paused_at))
+    )
+
+    assert any("paused_at" in error for error in validation_errors(plan))
+
+
+def test_rejects_pause_session_log_without_paused_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "pause.md").write_text("**Status:** IN-PROGRESS\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+
+    assert any(
+        "pause_session_log must contain **Status:** PAUSED" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("log", ("missing.md", "/tmp/pause.md", "nested/../pause.md"))
+def test_rejects_missing_or_unsafe_pause_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, log: str
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields(log)))
+
+    assert any("pause_session_log" in error for error in validation_errors(plan))
+
+
+def test_rejects_unreadable_pause_session_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    log = tmp_path / "pause.md"
+    log.write_text("**Status:** PAUSED\n", encoding="utf-8")
+    plan = write_plan(tmp_path / "small.md", small_plan("paused", pause_fields()))
+    data = validator.parse_frontmatter(plan)
+
+    def deny_read(self: Path, *args: object, **kwargs: object) -> str:
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr(Path, "read_text", deny_read)
+    errors: list[str] = []
+    validator.validate_pause(plan, data, errors)
+
+    assert any("cannot read pause_session_log" in error for error in errors)
+
+
+def test_paused_status_is_invalid_for_big_plan(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path / "big.md", big_plan("paused"))
+
+    assert any(
+        "invalid status for big-plan: paused" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_resumed_small_plan_allows_historical_pause_metadata(tmp_path: Path) -> None:
+    plan = write_plan(tmp_path / "small.md", small_plan("in-progress", pause_fields()))
 
     assert validation_errors(plan) == []
 
@@ -554,4 +669,39 @@ def test_shipped_probe_shares_the_cancellation_fields() -> None:
         assert field in library, (
             f"required cancellation field {field} is not enforced by the "
             "shipped push-time probe"
+        )
+
+
+@pytest.mark.parametrize(
+    ("validator_pattern", "probe_name"),
+    [
+        ("PAUSED_AT_PATTERN", "TIMESTAMP"),
+        ("PAUSED_REASON_BLOCK_PATTERN", "BLOCK_REASON"),
+        ("PAUSED_STATUS_PATTERN", "STATUS"),
+    ],
+)
+def test_shipped_probe_shares_the_pause_rules(
+    validator_pattern: str, probe_name: str
+) -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    probe = library.split("pause_validation_probe()", 1)[1].split(
+        "assert_pause_evidence()", 1
+    )[0]
+    expected = getattr(validator, validator_pattern).pattern
+    assert f'{probe_name} = re.compile(r"{expected}"' in probe, (
+        f"{probe_name} in the shipped pause probe no longer matches "
+        f"{validator_pattern}; the pause contract has drifted"
+    )
+
+
+def test_shipped_probe_shares_the_pause_fields() -> None:
+    library = (REPO_ROOT / "shared/hooks/scripts/_lib-frontmatter.sh").read_text(
+        encoding="utf-8"
+    )
+    for field in validator.PAUSED_FIELDS:
+        assert field in library, (
+            f"required pause field {field} is not enforced by the shipped "
+            "pause-time probe"
         )
