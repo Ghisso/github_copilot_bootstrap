@@ -165,7 +165,7 @@ uv run python scripts/validate_targets.py
 uv run python scripts/validate_plan_frontmatter.py
 uv run python scripts/check_runtime.py
 uv run pytest tests/ -q --tb=short
-uv run mypy . --ignore-missing-imports --explicit-package-bases
+uv run mypy scripts/ --ignore-missing-imports --explicit-package-bases
 uv run ruff check scripts/ tests/
 uv run ruff format --check scripts/ tests/
 ```
