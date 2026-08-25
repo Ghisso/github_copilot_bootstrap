@@ -44,9 +44,21 @@ git add src/changed_file.py tests/test_changed.py
 - Review: `git diff --cached`
 
 ## Phase 4: Commit
-Commit exactly one completed small plan, after all gates pass — small-plan
-`status: complete`, a closeout log containing `**Status:** COMPLETED`, LEARN
-evidence, and a fresh score ≥ 90 report matching the branch/phase/HEAD:
+Choose one explicit commit path.
+
+For a normal completion commit, commit exactly one completed small plan after
+all gates pass: `status: complete`, a closeout log containing
+`**Status:** COMPLETED`, LEARN evidence, and a fresh score ≥ 90 report matching
+the branch, phase, and HEAD.
+
+For a paused checkpoint, commit only after the user explicitly asks to stop and
+resume later. The same small plan must be `status: paused` with `paused_at`,
+`paused_reason`, and `pause_session_log`; that log must contain
+`**Status:** PAUSED`. A checkpoint needs real outer-repository work, does not
+advance the phase machine, and does not require final score, findings, LEARN,
+DOCUMENT, or a COMPLETED closeout. Never create an empty outer commit for only
+AI-state files.
+
 ```bash
 git commit -m "type: description
 
@@ -68,7 +80,9 @@ EOF
 )"
 ```
 PRs must target `dev`. All phases must be complete with at least one commit per
-small plan before the PR/push gate allows this.
+completed phase before the PR/push gate allows this. A phase may instead be
+fully evidenced as cancelled, but there must be at least one completed phase.
+Paused phases remain unfinished and block push/PR closeout.
 
 ## Phase 6: Merge (human)
 A human reviews and merges the PR into `dev`; the agent does not merge the PR

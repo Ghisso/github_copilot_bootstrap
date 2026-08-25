@@ -42,7 +42,8 @@ uv run ruff check src/ tests/ --statistics 2>/dev/null | tail -3
 
 ```
 Session Status:
-  Active Plan: [filename] ([DRAFT/APPROVED/COMPLETED]) or none
+  Active Big Plan: [filename] ([planning/in-progress/complete/cancelled]) or none
+  Active Small Plan: [filename] ([in-progress/paused/complete/cancelled]) or none
   Session Log: [filename] (updated [N] min ago) or none
   MEMORY.md:   [N] lines, [M] [LEARN] entries
   Git:         [branch] ([N] uncommitted changes)

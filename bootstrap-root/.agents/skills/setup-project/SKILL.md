@@ -21,8 +21,9 @@ touch tests/__init__.py tests/conftest.py
 
 ## Step 2: Copy Scaffold Files
 - Regenerate this bootstrap with `uv run python scripts/generate_targets.py --all`
-- Copy `dist/multi-agent/` into the new project root
-- Copy `pyproject.toml`, `.gitignore`, `.env.example`
+- Install the generated target with `uv run python scripts/install_bootstrap.py <project-root>`
+- Let the installer create and preserve the nested `.claude/` AI-state repo
+- Copy only project-owned files such as `pyproject.toml` and `.env.example`
 
 ## Step 3: Configure Project
 ```bash
@@ -63,6 +64,6 @@ uv run ruff check src/ tests/
 
 ## Step 7: Initial Commit
 ```bash
-git add .claude/ .github/ .codex/ AGENTS.md CLAUDE.md pyproject.toml .gitignore .env.example
+git add pyproject.toml .gitignore .env.example src tests docs examples scripts
 git commit -m "feat: initialize project with AI scaffold"
 ```
