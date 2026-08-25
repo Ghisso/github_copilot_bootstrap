@@ -32,7 +32,8 @@ Each phase is a single small-plan file carrying both the "what/why" and the
 - **Frontmatter** (validated): `name`, `type: small-plan`, `parent_plan`,
   `phase_index`, `status`, `closeout_session_log`, plus conditional pause
   (`paused_at`, `paused_reason`, `pause_session_log`) or cancellation evidence
-  when that status is used.
+  (`cancelled_at`, `cancelled_reason`, `cancelled_evidence`) when that status
+  is used.
 - **Body**: a short plain-language Scope, the ordered Steps with enough
   precision for a coding agent, Verification commands, and the Closeout
   Checklist.

@@ -57,7 +57,8 @@ resume later. The same small plan must be `status: paused` with `paused_at`,
 `**Status:** PAUSED`. A checkpoint needs real outer-repository work, does not
 advance the phase machine, and does not require final score, findings, LEARN,
 DOCUMENT, or a COMPLETED closeout. Never create an empty outer commit for only
-AI-state files.
+AI-state files. It keeps the big plan `in-progress` with the same
+`current_phase`.
 
 ```bash
 git commit -m "type: description
@@ -79,10 +80,10 @@ gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
 EOF
 )"
 ```
-PRs must target `dev`. All phases must be complete with at least one commit per
-completed phase before the PR/push gate allows this. A phase may instead be
-fully evidenced as cancelled, but there must be at least one completed phase.
-Paused phases remain unfinished and block push/PR closeout.
+PRs must target `dev`. Every phase must be terminal: `complete` or fully
+evidenced as `cancelled`. There must be at least one completed phase and one
+commit per completed phase. Paused phases remain unfinished and block push/PR
+closeout.
 
 ## Phase 6: Merge (human)
 A human reviews and merges the PR into `dev`; the agent does not merge the PR

@@ -15,30 +15,30 @@ argument-hint: "[project-name]"
 mkdir -p src/{configs,models,pipelines,utils,api}
 mkdir -p tests/{unit,integration,fixtures}
 mkdir -p {docs,examples,scripts,data,output}
-touch src/__init__.py src/configs/__init__.py
+touch src/__init__.py src/configs/__init__.py .env.example
 touch tests/__init__.py tests/conftest.py
 ```
 
-## Step 2: Copy Scaffold Files
-- Regenerate this bootstrap with `uv run python scripts/generate_targets.py --all`
-- Install the generated target with `uv run python scripts/install_bootstrap.py <project-root>`
-- Let the installer create and preserve the nested `.claude/` AI-state repo
-- Copy only project-owned files such as `pyproject.toml` and `.env.example`
-
-## Step 3: Configure Project
-```bash
-# Update pyproject.toml with project name
-# Update .claude/instructions/workspace.md Project State section
-# Add required env vars to .env.example
-cp .env.example .env
-```
-
-## Step 4: Initialize
+## Step 2: Initialize Git and Python
 ```bash
 git init
 uv init
 uv add --dev pytest pytest-cov mypy ruff pytest-asyncio
 uv add --dev "ruff>=0.3" "mypy>=1.0"
+```
+
+## Step 3: Install the Bootstrap
+- Regenerate this bootstrap with `uv run python scripts/generate_targets.py --all`
+- Install the generated target with `uv run python scripts/install_bootstrap.py <project-root>`
+- Let the installer create and preserve the nested `.claude/` AI-state repo
+- Copy only project-owned files such as `pyproject.toml` and `.env.example`
+
+## Step 4: Configure Project
+```bash
+# Update pyproject.toml with project name
+# Update .claude/instructions/workspace.md Project State section
+# Add required env vars to .env.example
+cp .env.example .env
 ```
 
 ## Step 5: pyproject.toml ruff config
@@ -64,6 +64,6 @@ uv run ruff check src/ tests/
 
 ## Step 7: Initial Commit
 ```bash
-git add pyproject.toml .gitignore .env.example src tests docs examples scripts
+git add pyproject.toml .gitignore .env.example src/__init__.py src/configs/__init__.py tests/__init__.py tests/conftest.py
 git commit -m "feat: initialize project with AI scaffold"
 ```
