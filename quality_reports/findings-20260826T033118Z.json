@@ -1,0 +1,48 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-26T03:31:25Z",
+  "branch": "antigravity-directory-ownership-and-paused-commit-skill_implementation",
+  "head_sha": "b23825467d83b84d7851e3bba88d315a45f796b1",
+  "base_ref": "dev",
+  "merge_base_sha": "b23825467d83b84d7851e3bba88d315a45f796b1",
+  "phase": "2026-08-24_phase-A-antigravity-directory-ownership-and-paused-commit-skill",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "c594bad9a5bd66c9de0ae8be9b069785380deadf",
+  "changed_files": [
+    ".gitignore",
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/restore-root-adapters.sh",
+    "shared/skills/commit/SKILL.md",
+    "shared/skills/context-status/SKILL.md",
+    "shared/skills/plan-decomposition/SKILL.md",
+    "shared/skills/setup-project/SKILL.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

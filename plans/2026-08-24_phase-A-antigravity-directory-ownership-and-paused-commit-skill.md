@@ -3,8 +3,9 @@ name: 2026-08-24_phase-A-antigravity-directory-ownership-and-paused-commit-skill
 type: small-plan
 parent_plan: antigravity-directory-ownership-and-paused-commit-skill
 phase_index: 0
-status: in-progress
-closeout_session_log:
+status: complete
+completed_at: 2026-08-26T03:34:37Z
+closeout_session_log: .claude/session_logs/2026-08-25_antigravity-directory-ownership-and-paused-commit-skill.md
 ---
 
 # Phase A: Antigravity directory ownership and paused commit skill
@@ -62,7 +63,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
 
 ## Implementation
 
-- [ ] **1. Reconfirm ownership and stale-skill evidence**
+- [x] **1. Reconfirm ownership and stale-skill evidence**
   - Trace legacy evidence in `.claude/bootstrap-ownership.env`,
     `.claude/antigravity-ownership.env`, and
     `.claude/bootstrap-root/.agents/`.
@@ -71,7 +72,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
   - Record file-and-line evidence for the four known stale skills. Add another
     skill only if the exact audit proves a false current statement.
 
-- [ ] **2. Adopt directory-level `.agents` ownership**
+- [x] **2. Adopt directory-level `.agents` ownership**
   - In `scripts/runtime_ownership.py`, add `.agents` to
     `ROOT_ADAPTER_PATHS` and add exactly `.agents/` to
     `active_ignore_patterns()`.
@@ -84,7 +85,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
     renderers, allowlist records, and predicates once the narrow migration read
     required by Step 3 is isolated.
 
-- [ ] **3. Guard the directory takeover before any write**
+- [x] **3. Guard the directory takeover before any write**
   - Add one narrow preflight in `scripts/install_bootstrap.py`, adapting its
     name to live code, that compares an existing `.agents` tree with trusted
     evidence before migration, copy, ignore edits, mirroring, nested-state
@@ -101,7 +102,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
     migration, emit only directory-level ownership and remove obsolete
     generated allowlist/per-file records.
 
-- [ ] **4. Simplify install, generation, restore, and runtime paths**
+- [x] **4. Simplify install, generation, restore, and runtime paths**
   - Remove Antigravity-specific return values, collision skipping, per-file
     ignore entries, pruning, bootstrap-root copying, and manifest plumbing from
     `scripts/install_bootstrap.py`; use the existing root-adapter path after
@@ -119,7 +120,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
     regenerated legacy records.
   - Never edit `dist/` directly.
 
-- [ ] **5. Correct and guard stale skills**
+- [x] **5. Correct and guard stale skills**
   - `shared/skills/commit/SKILL.md`: document separate normal-completion and
     explicit paused-checkpoint commit paths. Preserve all completion gates;
     require pause evidence and real outer work; forbid phase advancement and
@@ -143,7 +144,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
     and generated copies using required concepts plus narrow forbidden stale
     claims, not whole-paragraph snapshots.
 
-- [ ] **6. Replace file-level tests with migration regressions**
+- [x] **6. Replace file-level tests with migration regressions**
   - Update `tests/test_install_bootstrap.py` for fresh/repeat directory
     ownership, one ignore entry, root manifest/mirror parity, idempotence, and
     removal of legacy outputs.
@@ -159,7 +160,7 @@ boundaries. Agents share the worktree and must not revert concurrent edits.
     refusal, mirror/restore, compact ignore output, and corrected skills.
   - Reuse existing fixtures; do not add another ownership test framework.
 
-- [ ] **7. Document, verify, and close once**
+- [x] **7. Document, verify, and close once**
   - Update `README.md`, `docs/architecture.md`,
     `docs/target-mapping.md`, `docs/runtime-checks.md`, and
     `docs/smoke-tests.md` where they describe file-granular `.agents`,
@@ -252,12 +253,12 @@ uv run python .claude/scripts/quality_score.py scripts/ \
 
 ## Closeout checklist
 
-- [ ] Focused and full verification pass
-- [ ] One consolidated six-profile review passes
-- [ ] Documenter completes targeted `humanize edit`
-- [ ] Final findings are persisted; score >= 90
-- [ ] LEARN and `**Status:** COMPLETED` closeout are recorded
-- [ ] Small plan is `complete`
+- [x] Focused and full verification pass
+- [x] One consolidated six-profile review passes
+- [x] Documenter completes targeted `humanize edit`
+- [x] Final findings are persisted; score >= 90
+- [x] LEARN and `**Status:** COMPLETED` closeout are recorded
+- [x] Small plan is `complete`
 - [ ] Exactly one normal completion commit is created
 
 ## Pause checkpoint
