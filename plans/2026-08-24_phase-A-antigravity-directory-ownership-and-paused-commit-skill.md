@@ -259,7 +259,7 @@ uv run python .claude/scripts/quality_score.py scripts/ \
 - [x] Final findings are persisted; score >= 90
 - [x] LEARN and `**Status:** COMPLETED` closeout are recorded
 - [x] Small plan is `complete`
-- [ ] Exactly one normal completion commit is created
+- [x] Exactly one normal completion commit is created
 
 ## Pause checkpoint
 
