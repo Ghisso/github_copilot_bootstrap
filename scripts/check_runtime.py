@@ -12,7 +12,6 @@ from pathlib import Path
 from runtime_ownership import (
     RESTORABLE_ROOT_PATHS,
     TRACKED_AUTHORING_PATHS,
-    antigravity_manifest_paths,
     bootstrap_root_paths,
     install_mode_from_manifest,
     is_consumer_state_path,
@@ -143,15 +142,7 @@ def runtime_drift_errors(
             )
 
     manifest = repo_root / ".claude" / "bootstrap-ownership.env"
-    authoritative_antigravity_paths = tuple(
-        sorted(
-            path.relative_to(target_root).as_posix()
-            for path in (target_root / ".agents").rglob("*")
-            if path.is_file() and not path.is_symlink()
-        )
-    )
     install_mode: bool | None = None
-    antigravity_paths: tuple[str, ...] = ()
     valid_ownership_manifest = False
     if manifest.is_file():
         try:
@@ -164,21 +155,8 @@ def runtime_drift_errors(
                 )
             )
         else:
-            install_mode = install_mode_from_manifest(
-                manifest_text, authoritative_antigravity_paths
-            )
-            parsed_antigravity_paths = antigravity_manifest_paths(
-                manifest_text, authoritative_antigravity_paths
-            )
-            antigravity_paths = authoritative_antigravity_paths
-            valid_ownership_manifest = (
-                install_mode is not None
-                and parsed_antigravity_paths is not None
-                and set(parsed_antigravity_paths)
-                == set(authoritative_antigravity_paths)
-            )
-            if not valid_ownership_manifest:
-                antigravity_paths = ()
+            install_mode = install_mode_from_manifest(manifest_text)
+            valid_ownership_manifest = install_mode is not None
             if not valid_ownership_manifest:
                 errors.append(
                     drift_diagnostic(
@@ -201,16 +179,13 @@ def runtime_drift_errors(
                 and valid_ownership_manifest
             ):
                 continue
+            if claude_relative == Path("antigravity-ownership.env"):
+                continue
             if not is_consumer_state_path(claude_relative) and (
                 not claude_relative.parts
                 or claude_relative.parts[0] != "bootstrap-root"
             ):
                 expected[target_relative] = authoritative_path
-        if target_relative.as_posix() in authoritative_antigravity_paths:
-            expected[target_relative] = authoritative_path
-            expected[Path(".claude/bootstrap-root") / target_relative] = (
-                authoritative_path
-            )
         if not is_root_adapter_path(target_relative):
             continue
         if target_relative.as_posix() in TRACKED_AUTHORING_PATHS and is_exact_tracked(
@@ -284,10 +259,6 @@ def runtime_drift_errors(
             if is_active and is_exact_tracked(repo_root, root_relative):
                 continue
             installed.add(Path(".claude/bootstrap-root") / root_relative)
-    for antigravity_relative in antigravity_paths:
-        installed.add(Path(antigravity_relative))
-        installed.add(Path(".claude/bootstrap-root") / antigravity_relative)
-
     for obsolete_relative in sorted(installed - expected.keys()):
         errors.append(
             drift_diagnostic(

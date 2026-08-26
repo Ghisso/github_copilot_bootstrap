@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Restores the root-level adapter files (CLAUDE.md, AGENTS.md, .mcp.json,
-# .codex/**, .vscode/*.json, file-granular `.agents/` adapters, and the Copilot
-# surface when not committed) that
+# .codex/**, `.agents/**`, .vscode/*.json, and the Copilot surface when not
+# committed) that
 # live outside .claude/ in the outer repo. state-sync.sh only checks out
 # .claude/ itself, so these are carried inside .claude/bootstrap-root/ (D5 in
 # plans/plan-git-state-sync.md) and copied back out to their real locations
@@ -29,7 +29,6 @@ esac
 
 SOURCE_ROOT="$REPO_ROOT/.claude/bootstrap-root"
 OWNERSHIP_MANIFEST="$REPO_ROOT/.claude/bootstrap-ownership.env"
-ANTIGRAVITY_ALLOWLIST="$REPO_ROOT/.claude/antigravity-ownership.env"
 
 if [[ ! -d "$SOURCE_ROOT" || ! -r "$OWNERSHIP_MANIFEST" ]]; then
   exit 0
@@ -89,7 +88,6 @@ ensure_destination_parent() {
 REPO_ROOT="$(canonical_path "$REPO_ROOT")" || fail "cannot resolve repository root"
 SOURCE_ROOT="$(canonical_path "$SOURCE_ROOT")" || fail "cannot resolve bootstrap root"
 paths=()
-antigravity_paths=()
 while IFS= read -r line || [[ -n "$line" ]]; do
   case "$line" in
     ''|'#'*) continue ;;
@@ -104,64 +102,11 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       is_allowed_adapter_path "$relative" || fail "manifest path is not an adapter"
       paths+=("$relative")
       ;;
-    BOOTSTRAP_ANTIGRAVITY_PATH=*)
-      relative="${line#BOOTSTRAP_ANTIGRAVITY_PATH=}"
-      [[ "$relative" =~ ^\.agents/[A-Za-z0-9._/-]+$ ]] || fail "invalid Antigravity manifest path"
-      [[ "$relative" != */ && "$relative" != *'//' ]] || fail "invalid Antigravity manifest path"
-      case "/$relative/" in */./*|*/../*) fail "invalid Antigravity manifest path" ;; esac
-      if [[ "$relative" == ".agents/mcp_config.json" || "$relative" == ".agents/hooks.json" ]]; then
-        :
-      elif [[ "$relative" =~ ^\.agents/agents/[A-Za-z0-9._-]+/agent\.md$ ]]; then
-        :
-      elif [[ "$relative" =~ ^\.agents/skills/[A-Za-z0-9._/-]+$ ]]; then
-        :
-      else
-        fail "manifest path is not an Antigravity adapter"
-      fi
-      for known in "${antigravity_paths[@]}"; do
-        [[ "$known" != "$relative" ]] || fail "duplicate Antigravity manifest path"
-      done
-      antigravity_paths+=("$relative")
-      ;;
     *) fail "invalid manifest record" ;;
   esac
 done < "$OWNERSHIP_MANIFEST"
 
 ((${#paths[@]})) || fail "manifest contains no adapter paths"
-if [[ -e "$ANTIGRAVITY_ALLOWLIST" ]]; then
-  [[ -r "$ANTIGRAVITY_ALLOWLIST" ]] || fail "cannot read Antigravity ownership allowlist"
-  allowed_antigravity_paths=()
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    case "$line" in
-      ''|'#'*) continue ;;
-      BOOTSTRAP_ANTIGRAVITY_PATH=*)
-        relative="${line#BOOTSTRAP_ANTIGRAVITY_PATH=}"
-        [[ "$relative" =~ ^\.agents/[A-Za-z0-9._/-]+$ ]] || fail "invalid Antigravity allowlist path"
-        [[ "$relative" != */ && "$relative" != *'//' ]] || fail "invalid Antigravity allowlist path"
-        case "/$relative/" in */./*|*/../*) fail "invalid Antigravity allowlist path" ;; esac
-        for known in "${allowed_antigravity_paths[@]}"; do
-          [[ "$known" != "$relative" ]] || fail "duplicate Antigravity allowlist path"
-        done
-        allowed_antigravity_paths+=("$relative")
-        ;;
-      *) fail "invalid Antigravity ownership allowlist record" ;;
-    esac
-  done < "$ANTIGRAVITY_ALLOWLIST"
-  (( ${#antigravity_paths[@]} == ${#allowed_antigravity_paths[@]} )) || fail "Antigravity manifest must match generated allowlist"
-  for allowed in "${allowed_antigravity_paths[@]}"; do
-    found=false
-    for known in "${antigravity_paths[@]}"; do
-      if [[ "$known" == "$allowed" ]]; then
-        found=true
-        break
-      fi
-    done
-    "$found" || fail "Antigravity manifest must match generated allowlist"
-  done
-elif ((${#antigravity_paths[@]})); then
-  fail "missing Antigravity ownership allowlist"
-fi
-paths+=("${antigravity_paths[@]}")
 
 for relative in "${paths[@]}"; do
   source="$SOURCE_ROOT/$relative"

@@ -22,15 +22,10 @@ ROOT_ADAPTER_PATHS = (
     "AGENTS.md",
     ".mcp.json",
     ".codex",
+    ".agents",
     ".vscode/mcp.json",
     ".vscode/tasks.json",
 )
-# Antigravity owns individual files below its shared workspace directory, not
-# the directory itself.  Consumers can keep private agents and skills beside
-# generated adapters, so this surface is recorded file-by-file in the inert
-# ownership manifest instead of being added to ``ROOT_ADAPTER_PATHS``.
-ANTIGRAVITY_ROOT = ".agents"
-ANTIGRAVITY_MANIFEST_KEY = "BOOTSTRAP_ANTIGRAVITY_PATH"
 COPILOT_SURFACE_PATHS = (
     ".github/agents",
     ".github/hooks",
@@ -67,6 +62,7 @@ def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
     patterns = (
         ".claude/",
         ".codex/",
+        ".agents/",
         ".github/agents/",
         ".github/hooks/",
         ".github/instructions/",
@@ -101,87 +97,6 @@ def bootstrap_root_paths(commit_copilot_surface: bool) -> tuple[str, ...]:
     return ROOT_ADAPTER_PATHS + COPILOT_SURFACE_PATHS
 
 
-def is_antigravity_owned_path(path: str | PurePath) -> bool:
-    """Return whether one file belongs to a generated Antigravity surface."""
-    pure_path = PurePosixPath(path)
-    if pure_path.parts[:1] != (ANTIGRAVITY_ROOT,):
-        return False
-    if pure_path.as_posix() in {
-        f"{ANTIGRAVITY_ROOT}/mcp_config.json",
-        f"{ANTIGRAVITY_ROOT}/hooks.json",
-    }:
-        return True
-    return (
-        len(pure_path.parts) == 4
-        and pure_path.parts[1] == "agents"
-        and pure_path.parts[3] == "agent.md"
-    ) or (len(pure_path.parts) >= 3 and pure_path.parts[1] == "skills")
-
-
-def antigravity_manifest_paths(
-    text: str, allowed_paths: tuple[str, ...] | None = None
-) -> tuple[str, ...] | None:
-    """Return validated file-granular Antigravity ownership records.
-
-    Older manifests did not record Antigravity files and intentionally map to
-    an empty tuple.  A malformed record returns ``None`` so callers fail
-    closed rather than treating arbitrary consumer files as generated.
-    """
-    paths: list[str] = []
-    allowed = set(allowed_paths) if allowed_paths is not None else None
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if (
-            not line
-            or line.startswith("#")
-            or not line.startswith(f"{ANTIGRAVITY_MANIFEST_KEY}=")
-        ):
-            continue
-        path = line.removeprefix(f"{ANTIGRAVITY_MANIFEST_KEY}=")
-        pure_path = PurePosixPath(path)
-        if (
-            not is_antigravity_owned_path(path)
-            or pure_path.is_absolute()
-            or "." in pure_path.parts
-            or ".." in pure_path.parts
-            or path.endswith("/")
-            or "//" in path
-            or path in paths
-            or (allowed is not None and path not in allowed)
-        ):
-            return None
-        paths.append(path)
-    return tuple(paths)
-
-
-def antigravity_allowlist_paths(text: str) -> tuple[str, ...] | None:
-    """Read a generated Antigravity allowlist without accepting extra records."""
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if (
-            not line
-            or line.startswith("#")
-            or line.startswith(f"{ANTIGRAVITY_MANIFEST_KEY}=")
-        ):
-            continue
-        return None
-    return antigravity_manifest_paths(text)
-
-
-def render_antigravity_ownership_manifest(paths: tuple[str, ...]) -> str:
-    """Render the generated allowlist used to validate dynamic ownership."""
-    parsed_paths = antigravity_manifest_paths(
-        "\n".join(f"{ANTIGRAVITY_MANIFEST_KEY}={path}" for path in paths), paths
-    )
-    if parsed_paths is None or tuple(sorted(parsed_paths)) != paths:
-        raise ValueError("Antigravity ownership paths must be sorted unique adapters")
-    return (
-        "# Generated Antigravity ownership allowlist.\n"
-        + "\n".join(f"{ANTIGRAVITY_MANIFEST_KEY}={path}" for path in paths)
-        + "\n"
-    )
-
-
 def is_consumer_state_path(relative_path: str | PurePath) -> bool:
     """Return whether a path relative to ``.claude`` belongs to the consumer."""
     path = PurePosixPath(relative_path)
@@ -202,40 +117,21 @@ def is_root_adapter_path(relative_path: str | PurePath) -> bool:
 
 def restore_manifest(
     commit_copilot_surface: bool = False,
-    antigravity_paths: tuple[str, ...] = (),
 ) -> str:
     """Render inert root-adapter records for the restoration shell script."""
     paths = "\n".join(
         f"BOOTSTRAP_ROOT_PATH={path}"
         for path in bootstrap_root_paths(commit_copilot_surface)
     )
-    antigravity_records = antigravity_manifest_paths(
-        "\n".join(f"{ANTIGRAVITY_MANIFEST_KEY}={path}" for path in antigravity_paths),
-        antigravity_paths,
-    )
-    if (
-        antigravity_records is None
-        or tuple(sorted(antigravity_records)) != antigravity_paths
-    ):
-        raise ValueError(
-            "Antigravity manifest paths must be sorted unique .agents files"
-        )
-    antigravity = "\n".join(
-        f"{ANTIGRAVITY_MANIFEST_KEY}={path}" for path in antigravity_paths
-    )
     mode = int(commit_copilot_surface)
     return (
         "# Generated from scripts/runtime_ownership.py.\n"
-        f"{INSTALL_MODE_KEY}={mode}\n{paths}\n{antigravity}\n"
+        f"{INSTALL_MODE_KEY}={mode}\n{paths}\n"
     )
 
 
-def install_mode_from_manifest(
-    text: str, allowed_antigravity_paths: tuple[str, ...] | None = None
-) -> bool | None:
-    """Read the inert install mode, including manifests from older releases."""
-    if antigravity_manifest_paths(text, allowed_antigravity_paths) is None:
-        return None
+def install_mode_from_manifest(text: str) -> bool | None:
+    """Read the inert Copilot-surface install mode from a root manifest."""
     mode: bool | None = None
     paths: list[str] = []
     for raw_line in text.splitlines():
@@ -251,8 +147,6 @@ def install_mode_from_manifest(
             mode = value == "1"
             continue
         if not line.startswith("BOOTSTRAP_ROOT_PATH="):
-            if line.startswith(f"{ANTIGRAVITY_MANIFEST_KEY}="):
-                continue
             return None
         path = line.removeprefix("BOOTSTRAP_ROOT_PATH=")
         if path not in RESTORABLE_ROOT_PATHS or path in paths:

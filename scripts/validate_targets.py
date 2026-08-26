@@ -36,7 +36,6 @@ from generate_targets import (
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
-    render_antigravity_ownership_manifest,
     render_restore_script,
 )
 
@@ -5996,6 +5995,84 @@ def validate_generated_scripts(errors: list[str]) -> None:
         )
 
 
+def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
+    """Return narrow lifecycle and installer drift errors for four shared skills."""
+    required: dict[str, tuple[str, ...]] = {
+        "commit": (
+            "status: complete",
+            "status: paused",
+            "paused_at",
+            "paused_reason",
+            "pause_session_log",
+            "**status:** paused",
+            "does not advance the phase machine",
+            "empty outer commit",
+            "big plan `in-progress`",
+            "same `current_phase`",
+            "paused phases remain unfinished",
+            "every phase must be terminal",
+        ),
+        "plan-decomposition": (
+            "paused_at",
+            "pause_session_log",
+            "cancellation evidence",
+            "cancelled_at",
+            "cancelled_reason",
+            "cancelled_evidence",
+            "normal completion commit",
+        ),
+        "context-status": (
+            "planning/in-progress/complete/cancelled",
+            "in-progress/paused/complete/cancelled",
+            "frontmatter",
+            "type: big-plan",
+            "type: small-plan",
+        ),
+        "setup-project": (
+            "scripts/generate_targets.py --all",
+            "scripts/install_bootstrap.py <project-root>",
+            "nested `.claude/` ai-state repo",
+            "git init",
+            "git add pyproject.toml .gitignore .env.example",
+        ),
+    }
+    forbidden: dict[str, tuple[str, ...]] = {
+        "commit": ("commit exactly one completed small plan, after all gates pass",),
+        "plan-decomposition": (
+            "closeout checklist — leave the template's checklist; it gates the commit.",
+        ),
+        "context-status": ("[draft/approved/completed]", "ls -lt .claude/plans"),
+        "setup-project": (
+            "copy `dist/multi-agent/` into the new project root",
+            "git add .claude/ .github/ .codex/ agents.md claude.md",
+        ),
+    }
+    errors: list[str] = []
+    for name, fragments in required.items():
+        path = skill_root / name / "SKILL.md"
+        text = " ".join(read(path).lower().split()) if path.is_file() else ""
+        for fragment in fragments:
+            if fragment not in text:
+                errors.append(
+                    f"{label} {name} skill is missing required current contract: {fragment}"
+                )
+        for fragment in forbidden[name]:
+            if fragment in text:
+                errors.append(
+                    f"{label} {name} skill retains stale contract: {fragment}"
+                )
+    setup = skill_root / "setup-project" / "SKILL.md"
+    setup_text = " ".join(read(setup).lower().split()) if setup.is_file() else ""
+    if (
+        "git init" in setup_text
+        and "scripts/install_bootstrap.py <project-root>" in setup_text
+        and setup_text.index("git init")
+        > setup_text.index("scripts/install_bootstrap.py <project-root>")
+    ):
+        errors.append(f"{label} setup-project skill must initialize Git before install")
+    return errors
+
+
 def validate_skills_and_paths(errors: list[str]) -> None:
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
     skill_root = TARGET_ROOT / ".claude" / "skills"
@@ -6162,6 +6239,11 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             "commit skill must open PRs against dev",
             errors,
         )
+    for label, root in (
+        ("canonical", REPO_ROOT / "shared" / "skills"),
+        ("generated", skill_root),
+    ):
+        errors.extend(stale_skill_contract_errors(root, label))
 
     shared_prompts = sorted((REPO_ROOT / "shared" / "prompts").glob("*.prompt.md"))
     generated_prompts = sorted(
@@ -6778,19 +6860,9 @@ def validate_antigravity_manifest_and_skills(errors: list[str]) -> None:
         errors.extend(
             antigravity_default_agent_contract_errors(read(TARGET_ROOT / "AGENTS.md"))
         )
-    ownership_paths = tuple(
-        sorted(
-            path.relative_to(TARGET_ROOT).as_posix()
-            for path in (TARGET_ROOT / ".agents").rglob("*")
-            if path.is_file() and not path.is_symlink()
-        )
-    )
-    ownership_allowlist = TARGET_ROOT / ".claude" / "antigravity-ownership.env"
     check(
-        ownership_allowlist.is_file()
-        and read(ownership_allowlist)
-        == render_antigravity_ownership_manifest(ownership_paths),
-        "Antigravity ownership allowlist must exactly match generated .agents files",
+        not (TARGET_ROOT / ".claude" / "antigravity-ownership.env").exists(),
+        "Antigravity must use root-adapter ownership, not a file allowlist",
         errors,
     )
     canonical_skills = REPO_ROOT / "shared" / "skills"

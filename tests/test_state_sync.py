@@ -1290,6 +1290,23 @@ def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(
     assert (root / ".codex" / "agents" / "coder.toml").read_text() == "new agent\n"
 
 
+def test_restore_root_adapters_restores_agents_directory(tmp_path: Path) -> None:
+    """The ordinary root manifest restores the complete `.agents` adapter."""
+    root = tmp_path / "consumer"
+    source = root / ".claude" / "bootstrap-root"
+    _write_restore_manifest(root, ".agents")
+    agent = source / ".agents" / "agents" / "coder" / "agent.md"
+    agent.parent.mkdir(parents=True)
+    agent.write_text("generated agent\n")
+
+    result = _restore(root)
+
+    assert result.returncode == 0, result.stderr
+    assert (root / ".agents" / "agents" / "coder" / "agent.md").read_text() == (
+        "generated agent\n"
+    )
+
+
 def test_restore_root_adapters_preserves_tracked_root_guidance(
     tmp_path: Path,
 ) -> None:
