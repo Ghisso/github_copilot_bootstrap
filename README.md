@@ -513,10 +513,21 @@ does not invent lifecycle equivalents for `PreInvocation`, `PostToolUse`,
 hooks and explicit commands. Optional local MCP servers follow the normal
 fallback rules, so their absence does not break structural generation.
 
-The installer owns only exact generated `.agents` files. It refreshes, prunes,
-mirrors, and restores those recorded paths while preserving adjacent private
-agents and skills. Repeat installs are deterministic. It never writes
-`~/.gemini/`.
+The installer owns `.agents/` as one bootstrap-managed root adapter, like
+`.codex/`. The consumer `.gitignore` contains one `.agents/` entry, and the
+directory is mirrored at `.claude/bootstrap-root/.agents/` and restored through
+the ordinary `BOOTSTRAP_ROOT_PATH=.agents` manifest record. This is a deliberate
+consumer contract: move any private Antigravity files out of `.agents/` or add
+them to the shared bootstrap source before updating.
+
+Before the first write, installation proves that an existing `.agents/` tree is
+current generated output, matches the prior bootstrap mirror, or has strictly
+validated legacy ownership evidence. Unknown, modified, unsafe, or otherwise
+unproved content stops the install with paths and instructions to back it up or
+move it, remove it only if intended, and rerun. The installer never silently
+adopts or deletes that content. Repeat installs are deterministic, and no empty
+outer-repository commit is created when only AI-state files changed. It never
+writes `~/.gemini/`.
 
 Native Antigravity acceptance is partial. The authenticated `agy` CLI initially
 ran as 1.1.16 and later self-updated to 1.1.17. It first reused the development repository from

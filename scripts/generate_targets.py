@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from runtime_ownership import (
-    render_antigravity_ownership_manifest,
     render_restore_script,
     restore_manifest,
 )
@@ -1647,17 +1646,6 @@ def render_antigravity(target_root: Path) -> None:
             target_root / ".agents" / "agents" / agent["id"] / "agent.md",
             render_antigravity_agent_adapter(agent),
         )
-    ownership_paths = tuple(
-        sorted(
-            path.relative_to(target_root).as_posix()
-            for path in (target_root / ".agents").rglob("*")
-            if path.is_file() and not path.is_symlink()
-        )
-    )
-    write_text(
-        target_root / ".claude" / "antigravity-ownership.env",
-        render_antigravity_ownership_manifest(ownership_paths),
-    )
 
 
 def render_multi_agent(target_root: Path) -> None:

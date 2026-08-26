@@ -30,7 +30,10 @@ Each phase is a single small-plan file carrying both the "what/why" and the
 "exactly how":
 
 - **Frontmatter** (validated): `name`, `type: small-plan`, `parent_plan`,
-  `phase_index`, `status`, `closeout_session_log`.
+  `phase_index`, `status`, `closeout_session_log`, plus conditional pause
+  (`paused_at`, `paused_reason`, `pause_session_log`) or cancellation evidence
+  (`cancelled_at`, `cancelled_reason`, `cancelled_evidence`) when that status
+  is used.
 - **Body**: a short plain-language Scope, the ordered Steps with enough
   precision for a coding agent, Verification commands, and the Closeout
   Checklist.
@@ -98,7 +101,9 @@ and must appear in the big plan's `phases` list. Fill:
   command. Let the coding agent adapt bodies to the actual codebase.
 - **Verification** — the exact commands (pytest, mypy, ruff, and the
   `quality_score.py` invocation with `--phase`/`--base-ref dev`/`--out`).
-- **Closeout Checklist** — leave the template's checklist; it gates the commit.
+- **Closeout Checklist** — leave the template's checklist; it gates the normal
+  completion commit. An explicitly requested paused checkpoint uses its own
+  evidence path and does not complete or advance the phase.
 
 ### Step 5: Cross-Phase Consistency
 

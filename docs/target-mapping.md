@@ -137,11 +137,20 @@ native tier routing. Specialist MCP inheritance and the shared skill/MCP files
 are structurally generated; an unavailable optional local MCP server follows
 the standard fallback behavior.
 
-`.agents/` is a shared workspace namespace. The installer owns exact generated
-files, records them in its inert ownership manifests, and only refreshes,
-prunes, mirrors, or restores those paths. Adjacent private agents and skills
-are preserved. Repeating an install is deterministic. Native Antigravity rules
-are not generated because their exact activation metadata was not verified.
+`.agents/` is a bootstrap-owned root adapter, like `.codex/`. Consumers receive
+one `.agents/` ignore entry, and the whole directory is mirrored under
+`.claude/bootstrap-root/.agents/` and restored through
+`BOOTSTRAP_ROOT_PATH=.agents`. Private Antigravity files must be moved out of
+`.agents/` or incorporated into the shared source.
+
+Before writing, the installer proves an existing tree from current generated
+bytes, the prior mirror, or strictly validated legacy evidence. Unknown,
+modified, unsafe, non-regular, or unproved content blocks the operation before
+any mutation and reports paths with backup/move/remove-and-rerun guidance. The
+installer never silently adopts or deletes consumer content. After migration,
+there is no per-file allowlist or Antigravity ownership manifest. Native
+Antigravity rules are not generated because their exact activation metadata was
+not verified.
 
 The Antigravity hook surface is intentionally limited to one `PreToolUse` event
 with a catch-all `matcher: "*"`. It calls the direct Python 3.9 standard-library

@@ -14,17 +14,15 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from install_bootstrap import (  # noqa: E402
     copy_generated_tree,
-    generated_antigravity_paths,
     merge_gitignore,
-    persisted_antigravity_paths,
+    persisted_install_mode,
     populate_bootstrap_root,
     substitute_project_name,
     substitute_python_version,
+    validate_agents_takeover,
     validate_install_roots,
 )
 from runtime_ownership import (  # noqa: E402
-    antigravity_manifest_paths,
-    install_mode_from_manifest,
     restore_manifest,
 )
 from check_runtime import runtime_drift_errors  # noqa: E402
@@ -450,172 +448,408 @@ def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> N
     assert ".context-mode-provenance.secret" in gitignore
 
 
-def test_antigravity_ownership_is_file_granular_and_refreshable(tmp_path: Path) -> None:
-    """Refresh only generated `.agents` files; retain adjacent consumer files."""
+def test_agents_directory_is_a_refreshable_root_adapter(tmp_path: Path) -> None:
+    """A generated `.agents` directory is mirrored and ignored as one adapter."""
     source = tmp_path / "generated"
     generated_agent = source / ".agents/agents/coder/agent.md"
-    generated_skill = source / ".agents/skills/ponytail/SKILL.md"
-    generated_mcp = source / ".agents/mcp_config.json"
-    for path, content in (
-        (generated_agent, "generated coder v1\n"),
-        (generated_skill, "generated skill\n"),
-        (generated_mcp, '{"mcpServers": {}}\n'),
-    ):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+    generated_agent.parent.mkdir(parents=True)
+    generated_agent.write_text("generated coder v1\n", encoding="utf-8")
     target = tmp_path / "consumer"
     target.mkdir()
     assert _git(target, "init", "-q").returncode == 0
-    private_skill = target / ".agents/skills/company-private/SKILL.md"
-    private_agent = target / ".agents/agents/company-reviewer/agent.md"
-    private_skill.parent.mkdir(parents=True)
-    private_agent.parent.mkdir(parents=True)
-    private_skill.write_text("private skill\n", encoding="utf-8")
-    private_agent.write_text("private agent\n", encoding="utf-8")
-    assert _git(target, "add", ".agents").returncode == 0
+    validate_agents_takeover(source, target)
+    copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(target, False, False)
+    merge_gitignore(target, False)
 
-    owned = copy_generated_tree(source, target, dry_run=False)
-    populate_bootstrap_root(
-        target, False, False, owned, authoritative_antigravity_paths=owned
-    )
-    merge_gitignore(target, False, antigravity_paths=owned)
-
-    assert owned == generated_antigravity_paths(source)
-    assert private_skill.read_text() == "private skill\n"
-    assert private_agent.read_text() == "private agent\n"
-    assert (
-        target / ".agents/agents/coder/agent.md"
-    ).read_text() == "generated coder v1\n"
-    assert persisted_antigravity_paths(target, owned) == owned
     assert (
         target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
     ).read_text() == "generated coder v1\n"
     ignore_block = (target / ".gitignore").read_text(encoding="utf-8")
-    assert ".agents/agents/coder/agent.md" in ignore_block
-    assert ".agents/\n" not in ignore_block
+    assert ignore_block.count(".agents/") == 1
+    manifest = (target / ".claude/bootstrap-ownership.env").read_text()
+    assert "BOOTSTRAP_ROOT_PATH=.agents\n" in manifest
+    assert "BOOTSTRAP_ANTIGRAVITY_PATH" not in manifest
+    assert not (target / ".claude/antigravity-ownership.env").exists()
 
     generated_agent.write_text("generated coder v2\n", encoding="utf-8")
-    generated_mcp.unlink()
-    private_paths = (
-        ".agents/agents/company-reviewer/agent.md",
-        ".agents/skills/company-private/SKILL.md",
-    )
-    refreshed = copy_generated_tree(
-        source,
-        target,
-        dry_run=False,
-        previously_owned_antigravity_paths=owned + private_paths,
-        historical_antigravity_paths=owned,
-    )
-    populate_bootstrap_root(
-        target,
-        False,
-        False,
-        refreshed,
-        owned + private_paths,
-        generated_antigravity_paths(source),
-        owned,
-    )
-
+    validate_agents_takeover(source, target)
+    copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(target, False, False)
     assert (
         target / ".agents/agents/coder/agent.md"
     ).read_text() == "generated coder v2\n"
-    assert not (target / ".agents/mcp_config.json").exists()
-    assert not (target / ".claude/bootstrap-root/.agents/mcp_config.json").exists()
-    assert private_skill.read_text() == "private skill\n"
-    assert private_agent.read_text() == "private agent\n"
-    assert not (
-        target / ".claude/bootstrap-root/.agents/skills/company-private/SKILL.md"
-    ).exists()
-    assert not (
-        target / ".claude/bootstrap-root/.agents/agents/company-reviewer/agent.md"
-    ).exists()
+    assert (
+        target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
+    ).read_text() == "generated coder v2\n"
 
 
-def test_antigravity_collision_never_claims_a_user_file(tmp_path: Path) -> None:
-    """A fresh exact-path collision stays consumer-owned and unmirrored."""
+@pytest.mark.parametrize("dry_run", (False, True), ids=("write", "dry-run"))
+def test_agents_takeover_refuses_unproved_content_before_writes(
+    tmp_path: Path, dry_run: bool
+) -> None:
+    """Private or modified `.agents` content blocks both installer modes unchanged."""
     source = tmp_path / "generated"
     generated = source / ".agents/agents/coder/agent.md"
     generated.parent.mkdir(parents=True)
     generated.write_text("bootstrap adapter\n", encoding="utf-8")
     target = tmp_path / "consumer"
-    collision = target / ".agents/agents/coder/agent.md"
-    collision.parent.mkdir(parents=True)
-    collision.write_text("company adapter\n", encoding="utf-8")
+    private = target / ".agents/skills/company-private/SKILL.md"
+    private.parent.mkdir(parents=True)
+    private.write_text("company-owned\n", encoding="utf-8")
+    before = _tree_snapshot(tmp_path)
+    command = [
+        sys.executable,
+        str(INSTALLER),
+        str(target),
+        "--source",
+        str(source),
+        "--local-only",
+    ]
+    if dry_run:
+        command.append("--dry-run")
 
-    owned = copy_generated_tree(source, target, dry_run=False)
-    populate_bootstrap_root(
-        target,
-        False,
-        False,
-        owned,
-        authoritative_antigravity_paths=generated_antigravity_paths(source),
+    result = subprocess.run(
+        command, cwd=REPO_ROOT, text=True, capture_output=True, check=False
     )
 
-    assert owned == ()
-    assert collision.read_text() == "company adapter\n"
+    assert result.returncode != 0
+    assert ".agents/skills/company-private/SKILL.md" in result.stderr
+    assert "move or back up" in result.stderr
+    assert _tree_snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("outer", ("absent", "current"))
+def test_agents_takeover_refuses_private_mirror_before_writes(
+    tmp_path: Path, outer: str
+) -> None:
+    """A mirror is classified before any copy, even when the outer tree is safe."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("generated\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    if outer == "current":
+        outer_agent = target / ".agents/agents/coder/agent.md"
+        outer_agent.parent.mkdir(parents=True)
+        outer_agent.write_text("generated\n", encoding="utf-8")
+    private_mirror = target / ".claude/bootstrap-root/.agents/private.txt"
+    private_mirror.parent.mkdir(parents=True)
+    private_mirror.write_text("private\n", encoding="utf-8")
+    before = _tree_snapshot(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(source),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert ".claude/bootstrap-root/.agents/private.txt" in result.stderr
+    assert _tree_snapshot(tmp_path) == before
+
+
+def test_agents_takeover_reports_sorted_mirror_and_legacy_conflicts(
+    tmp_path: Path,
+) -> None:
+    """Unsafe evidence and multiple mirror paths produce stable actionable output."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("generated\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    for name in ("z-private.txt", "a-private.txt"):
+        path = target / ".claude/bootstrap-root/.agents" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("private\n", encoding="utf-8")
+    allowlist = target / ".claude/antigravity-ownership.env"
+    allowlist.parent.mkdir(parents=True, exist_ok=True)
+    allowlist.write_text("invalid\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=r"Refusing \.agents takeover") as error:
+        validate_agents_takeover(source, target)
+
+    message = str(error.value)
     assert (
-        persisted_antigravity_paths(target, generated_antigravity_paths(source)) == ()
+        message.index(".claude/antigravity-ownership.env")
+        < message.index(".claude/bootstrap-root/.agents/a-private.txt")
+        < message.index(".claude/bootstrap-root/.agents/z-private.txt")
     )
-    assert not (
-        target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
-    ).exists()
 
 
-def test_antigravity_manifest_rejects_unsafe_or_duplicate_records() -> None:
-    """Ownership records never widen from exact generated `.agents` files."""
-    valid = restore_manifest(False, (".agents/agents/coder/agent.md",))
-    allowed = (".agents/agents/coder/agent.md",)
-    assert antigravity_manifest_paths(valid, allowed) == allowed
-    assert install_mode_from_manifest(valid, allowed) is False
+def test_agents_takeover_rejects_symlink_and_malformed_root_evidence(
+    tmp_path: Path,
+) -> None:
+    """Legacy evidence requires regular files and a complete valid root manifest."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("generated\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    agent = target / ".agents/agents/coder/agent.md"
+    agent.parent.mkdir(parents=True)
+    agent.write_text("generated\n", encoding="utf-8")
+    allowlist = target / ".claude/antigravity-ownership.env"
+    allowlist.parent.mkdir(parents=True)
+    allowlist.symlink_to(tmp_path / "outside")
 
-    duplicate = valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/coder/agent.md\n"
-    traversal = valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/../AGENTS.md\n"
-    private_agent = (
-        valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/company-reviewer/agent.md\n"
+    with pytest.raises(SystemExit, match=r"antigravity-ownership.env"):
+        validate_agents_takeover(source, target)
+
+    allowlist.unlink()
+    records = "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/coder/agent.md\n"
+    allowlist.write_text(records, encoding="utf-8")
+    (target / ".claude/bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n"
+        "BOOTSTRAP_ROOT_PATH=../../outside\n" + records,
+        encoding="utf-8",
     )
-    private_skill = (
-        valid + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/skills/company-private/SKILL.md\n"
+
+    with pytest.raises(SystemExit, match=r"bootstrap-ownership.env"):
+        validate_agents_takeover(source, target)
+
+
+def test_agents_takeover_refuses_identical_unowned_outer_and_mirror(
+    tmp_path: Path,
+) -> None:
+    """Matching old trees alone never authorize a directory takeover."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("current\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    for root in (
+        target / ".agents",
+        target / ".claude/bootstrap-root/.agents",
+    ):
+        agent = root / "agents/coder/agent.md"
+        agent.parent.mkdir(parents=True, exist_ok=True)
+        agent.write_text("unowned old copy\n", encoding="utf-8")
+    before = _tree_snapshot(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(source),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
     )
-    assert antigravity_manifest_paths(duplicate, allowed) is None
-    assert antigravity_manifest_paths(traversal, allowed) is None
-    assert antigravity_manifest_paths(private_agent, allowed) is None
-    assert antigravity_manifest_paths(private_skill, allowed) is None
-    assert install_mode_from_manifest(duplicate, allowed) is None
-    assert install_mode_from_manifest(traversal, allowed) is None
-    assert install_mode_from_manifest(private_agent, allowed) is None
-    assert install_mode_from_manifest(private_skill, allowed) is None
+
+    assert result.returncode != 0
+    assert ".agents/agents/coder/agent.md" in result.stderr
+    assert _tree_snapshot(tmp_path) == before
 
 
-def test_runtime_check_accepts_dynamic_owned_agents_manifest(tmp_path: Path) -> None:
-    """A successful install has dynamic, semantically valid ownership state."""
+def test_agents_takeover_refuses_unproved_current_mirror_when_outer_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A byte-identical mirror alone is not ownership evidence."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("current\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    mirror = target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
+    mirror.parent.mkdir(parents=True)
+    mirror.write_text("current\n", encoding="utf-8")
+    before = _tree_snapshot(tmp_path)
+
+    with pytest.raises(SystemExit, match=r"\.claude/bootstrap-root/\.agents"):
+        validate_agents_takeover(source, target)
+
+    assert _tree_snapshot(tmp_path) == before
+
+
+def test_agents_takeover_accepts_managed_mirror_when_outer_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A valid current root manifest proves an older mirror is safe to refresh."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("current\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    mirror = target / ".claude/bootstrap-root/.agents/agents/coder/agent.md"
+    mirror.parent.mkdir(parents=True)
+    mirror.write_text("older managed copy\n", encoding="utf-8")
+    (target / ".claude/bootstrap-ownership.env").write_text(
+        restore_manifest(False), encoding="utf-8"
+    )
+
+    validate_agents_takeover(source, target)
+    copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(target, False, False)
+
+    assert (target / ".agents/agents/coder/agent.md").read_text() == "current\n"
+    assert mirror.read_text() == "current\n"
+
+
+@pytest.mark.parametrize(
+    ("evidence", "relative"),
+    (
+        ("invalid-utf8", ".claude/antigravity-ownership.env"),
+        ("directory", ".claude/antigravity-ownership.env"),
+        ("invalid-utf8", ".claude/bootstrap-ownership.env"),
+        ("directory", ".claude/bootstrap-ownership.env"),
+    ),
+)
+def test_agents_takeover_rejects_nonregular_or_invalid_legacy_evidence(
+    tmp_path: Path, evidence: str, relative: str
+) -> None:
+    """Unreadable ownership evidence is an actionable blocker, never a traceback."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("generated\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    agent = target / ".agents/agents/coder/agent.md"
+    agent.parent.mkdir(parents=True)
+    agent.write_text("generated\n", encoding="utf-8")
+    evidence_path = target / relative
+    evidence_path.parent.mkdir(parents=True)
+    if evidence == "invalid-utf8":
+        evidence_path.write_bytes(b"\xff\xfe")
+    else:
+        evidence_path.mkdir()
+
+    with pytest.raises(SystemExit, match=relative.removeprefix(".claude/")):
+        validate_agents_takeover(source, target)
+
+
+def test_agents_takeover_rejects_unsafe_links_and_malformed_legacy_evidence(
+    tmp_path: Path,
+) -> None:
+    """Neither a link nor a forged old manifest can authorize directory takeover."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("bootstrap adapter\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    agents = target / ".agents"
+    agents.mkdir(parents=True)
+    (agents / "agents").symlink_to(tmp_path / "outside", target_is_directory=True)
+
+    with pytest.raises(SystemExit, match=r"\.agents/agents"):
+        validate_agents_takeover(source, target)
+
+    (agents / "agents").unlink()
+    collision = agents / "agents/coder/agent.md"
+    collision.parent.mkdir(parents=True)
+    collision.write_text("bootstrap adapter\n", encoding="utf-8")
+    evidence = target / ".claude/antigravity-ownership.env"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text("not a legacy record\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=r"Refusing \.agents takeover"):
+        validate_agents_takeover(source, target)
+
+
+def test_agents_takeover_refuses_modified_or_later_consumer_content(
+    tmp_path: Path,
+) -> None:
+    """A later `.agents` edit remains a blocker even after a valid takeover."""
+    source = tmp_path / "generated"
+    generated = source / ".agents/agents/coder/agent.md"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("bootstrap adapter\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    validate_agents_takeover(source, target)
+    copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(target, False, False)
+
+    generated_target = target / ".agents/agents/coder/agent.md"
+    generated_target.write_text("consumer edit\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match=r"\.agents/agents/coder/agent\.md"):
+        validate_agents_takeover(source, target)
+
+    generated_target.write_text("bootstrap adapter\n", encoding="utf-8")
+    private = target / ".agents/skills/company-private/SKILL.md"
+    private.parent.mkdir(parents=True)
+    private.write_text("consumer file\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match=r"\.agents/skills/company-private/SKILL.md"):
+        validate_agents_takeover(source, target)
+
+
+def test_agents_legacy_migration_prunes_only_mirrored_generated_paths(
+    tmp_path: Path,
+) -> None:
+    """Legacy evidence migrates generated-only content and retains Copilot mode."""
+    source = tmp_path / "generated"
+    current = source / ".agents/agents/coder/agent.md"
+    current.parent.mkdir(parents=True)
+    current.write_text("current\n", encoding="utf-8")
+    target = tmp_path / "consumer"
+    current_target = target / ".agents/agents/coder/agent.md"
+    obsolete_target = target / ".agents/agents/obsolete/agent.md"
+    current_target.parent.mkdir(parents=True)
+    current_target.write_text("current\n", encoding="utf-8")
+    obsolete_target.parent.mkdir(parents=True)
+    obsolete_target.write_text("obsolete\n", encoding="utf-8")
+    records = (
+        "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/coder/agent.md\n"
+        "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/agents/obsolete/agent.md\n"
+    )
+    allowlist = target / ".claude/antigravity-ownership.env"
+    allowlist.parent.mkdir(parents=True)
+    allowlist.write_text(records)
+    legacy_roots = "\n".join(
+        line
+        for line in restore_manifest(True).splitlines()
+        if line != "BOOTSTRAP_ROOT_PATH=.agents"
+    )
+    (target / ".claude/bootstrap-ownership.env").write_text(
+        f"{legacy_roots}\n{records}", encoding="utf-8"
+    )
+
+    validate_agents_takeover(source, target)
+    assert persisted_install_mode(target) is True
+    copy_generated_tree(source, target, dry_run=False)
+    populate_bootstrap_root(target, False, True)
+    merge_gitignore(target, False, True)
+
+    assert not obsolete_target.exists()
+    assert not (target / ".claude/bootstrap-root/.agents/agents/obsolete").exists()
+    assert not (target / ".claude/antigravity-ownership.env").exists()
+    assert (
+        "BOOTSTRAP_ROOT_PATH=.agents"
+        in (target / ".claude/bootstrap-ownership.env").read_text()
+    )
+
+
+def test_runtime_check_accepts_root_owned_agents_manifest(tmp_path: Path) -> None:
+    """A successful install validates `.agents` through the root manifest."""
     target = tmp_path / "consumer"
     target.mkdir()
     assert _git(target, "init", "-q").returncode == 0
 
-    owned = copy_generated_tree(GENERATED, target, dry_run=False)
+    validate_agents_takeover(GENERATED, target)
+    copy_generated_tree(GENERATED, target, dry_run=False)
     for name in ("AGENTS.md", "CLAUDE.md"):
         (target / name).write_bytes((REPO_ROOT / name).read_bytes())
     assert _git(target, "add", "AGENTS.md", "CLAUDE.md").returncode == 0
-    populate_bootstrap_root(
-        target,
-        False,
-        False,
-        owned,
-        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
-    )
+    populate_bootstrap_root(target, False, False)
 
     assert runtime_drift_errors(target, GENERATED) == []
 
     manifest = target / ".claude/bootstrap-ownership.env"
     manifest.write_text(
-        "\n".join(
-            line
-            for line in manifest.read_text(encoding="utf-8").splitlines()
-            if line != "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/hooks.json"
-        )
-        + "\n",
-        encoding="utf-8",
+        manifest.read_text().replace("BOOTSTRAP_ROOT_PATH=.agents\n", "")
     )
     (target / ".agents/hooks.json").unlink()
     (target / ".claude/bootstrap-root/.agents/hooks.json").unlink()
@@ -624,119 +858,3 @@ def test_runtime_check_accepts_dynamic_owned_agents_manifest(tmp_path: Path) -> 
         ".claude/bootstrap-ownership.env" in error for error in missing_hook_errors
     )
     assert any(".agents/hooks.json" in error for error in missing_hook_errors)
-
-    manifest.write_text(
-        manifest.read_text(encoding="utf-8")
-        + "BOOTSTRAP_ANTIGRAVITY_PATH=.agents/../AGENTS.md\n",
-        encoding="utf-8",
-    )
-    unsafe_errors = runtime_drift_errors(target, GENERATED)
-    assert any(".claude/bootstrap-ownership.env" in error for error in unsafe_errors)
-
-    manifest.unlink()
-    missing_errors = runtime_drift_errors(target, GENERATED)
-    assert any(".claude/bootstrap-ownership.env" in error for error in missing_errors)
-
-
-@pytest.mark.parametrize(
-    "private_relative",
-    (
-        ".agents/agents/company-reviewer/agent.md",
-        ".agents/skills/company-private/SKILL.md",
-    ),
-)
-def test_restore_rejects_private_agents_manifest_paths(
-    tmp_path: Path, private_relative: str
-) -> None:
-    """The restorer rejects dynamic records outside generated ownership."""
-    target = tmp_path / "consumer"
-    target.mkdir()
-    assert _git(target, "init", "-q").returncode == 0
-    owned = copy_generated_tree(GENERATED, target, dry_run=False)
-    populate_bootstrap_root(
-        target,
-        False,
-        False,
-        owned,
-        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
-    )
-    private_path = target / private_relative
-    private_path.parent.mkdir(parents=True, exist_ok=True)
-    private_path.write_text("company-owned\n", encoding="utf-8")
-    manifest = target / ".claude/bootstrap-ownership.env"
-    manifest.write_text(
-        manifest.read_text(encoding="utf-8")
-        + f"BOOTSTRAP_ANTIGRAVITY_PATH={private_relative}\n",
-        encoding="utf-8",
-    )
-
-    result = subprocess.run(
-        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
-        cwd=target,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode != 0
-    assert "Antigravity manifest" in result.stderr
-    assert private_path.read_text() == "company-owned\n"
-
-
-def test_restore_accepts_legacy_manifest_without_antigravity_records(
-    tmp_path: Path,
-) -> None:
-    """Pre-Antigravity state restores without the new optional allowlist."""
-    target = tmp_path / "consumer"
-    target.mkdir()
-    assert _git(target, "init", "-q").returncode == 0
-    owned = copy_generated_tree(GENERATED, target, dry_run=False)
-    populate_bootstrap_root(
-        target,
-        False,
-        True,
-        owned,
-        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
-    )
-    manifest = target / ".claude/bootstrap-ownership.env"
-    manifest.write_text(restore_manifest(True), encoding="utf-8")
-    (target / ".claude/antigravity-ownership.env").unlink()
-
-    result = subprocess.run(
-        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
-        cwd=target,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-
-
-def test_restore_rejects_zero_records_with_generated_allowlist(tmp_path: Path) -> None:
-    """A generated allowlist requires a complete dynamic ownership manifest."""
-    target = tmp_path / "consumer"
-    target.mkdir()
-    assert _git(target, "init", "-q").returncode == 0
-    owned = copy_generated_tree(GENERATED, target, dry_run=False)
-    populate_bootstrap_root(
-        target,
-        False,
-        True,
-        owned,
-        authoritative_antigravity_paths=generated_antigravity_paths(GENERATED),
-    )
-    (target / ".claude/bootstrap-ownership.env").write_text(
-        restore_manifest(True), encoding="utf-8"
-    )
-
-    result = subprocess.run(
-        ["bash", str(target / ".claude/hooks/scripts/restore-root-adapters.sh")],
-        cwd=target,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode != 0
-    assert "Antigravity manifest must match generated allowlist" in result.stderr

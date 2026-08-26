@@ -77,6 +77,7 @@ from validate_targets import (  # noqa: E402
     TaskLaneInputs,
     workflow_reporting_errors,
     workspace_guidance_errors,
+    stale_skill_contract_errors,
 )
 
 import validate_targets as target_validator  # noqa: E402
@@ -97,6 +98,128 @@ def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
     errors = pretool_routing_errors(hooks, "openai-codex")
     assert any("wildcard" in error for error in errors)
     assert any("must contain only" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("skill", "old", "replacement"),
+    (
+        (
+            "commit",
+            "pause_session_log",
+            "pause session log",
+        ),
+        (
+            "commit",
+            "current_phase",
+            "next_phase",
+        ),
+        (
+            "plan-decomposition",
+            "paused_at",
+            "paused timestamp",
+        ),
+        (
+            "plan-decomposition",
+            "cancelled_evidence",
+            "cancellation proof",
+        ),
+        (
+            "context-status",
+            "in-progress/paused/complete/cancelled",
+            "DRAFT/APPROVED/COMPLETED",
+        ),
+        (
+            "context-status",
+            "frontmatter",
+            "directory listing",
+        ),
+        (
+            "setup-project",
+            "scripts/install_bootstrap.py <project-root>",
+            "Copy `dist/multi-agent/` into the new project root",
+        ),
+        (
+            "setup-project",
+            "git init",
+            "initialize later",
+        ),
+    ),
+)
+def test_stale_skill_contract_validation_rejects_each_obsolete_claim(
+    tmp_path: Path, skill: str, old: str, replacement: str
+) -> None:
+    """The lifecycle and installer guidance cannot silently regress in output."""
+    skill_root = tmp_path / "skills"
+    for source in (
+        REPO_ROOT / "shared" / "skills" / "commit" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "plan-decomposition" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "context-status" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "setup-project" / "SKILL.md",
+    ):
+        destination = skill_root / source.parent.name / "SKILL.md"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target = skill_root / skill / "SKILL.md"
+    target.write_text(
+        target.read_text(encoding="utf-8").replace(old, replacement),
+        encoding="utf-8",
+    )
+
+    errors = stale_skill_contract_errors(skill_root, "fixture")
+
+    assert any(skill in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("skill", "stale_claim", "guarded_fragment"),
+    (
+        (
+            "commit",
+            "Commit exactly one completed small plan, after all gates pass",
+            "commit exactly one completed small plan, after all gates pass",
+        ),
+        (
+            "plan-decomposition",
+            "Closeout Checklist — leave the template's checklist; it gates the commit.",
+            "closeout checklist — leave the template's checklist; it gates the commit.",
+        ),
+        ("context-status", "[DRAFT/APPROVED/COMPLETED]", "[draft/approved/completed]"),
+        ("context-status", "ls -lt .claude/plans/*.md", "ls -lt .claude/plans"),
+        (
+            "setup-project",
+            "Copy `dist/multi-agent/` into the new project root",
+            "copy `dist/multi-agent/` into the new project root",
+        ),
+        (
+            "setup-project",
+            "git add .claude/ .github/ .codex/ AGENTS.md CLAUDE.md",
+            "git add .claude/ .github/ .codex/ agents.md claude.md",
+        ),
+    ),
+)
+def test_stale_skill_contract_validation_rejects_each_forbidden_claim(
+    tmp_path: Path, skill: str, stale_claim: str, guarded_fragment: str
+) -> None:
+    """Every explicitly retired lifecycle or installer phrase remains guarded."""
+    skill_root = tmp_path / "skills"
+    for source in (
+        REPO_ROOT / "shared" / "skills" / "commit" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "plan-decomposition" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "context-status" / "SKILL.md",
+        REPO_ROOT / "shared" / "skills" / "setup-project" / "SKILL.md",
+    ):
+        destination = skill_root / source.parent.name / "SKILL.md"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target = skill_root / skill / "SKILL.md"
+    target.write_text(
+        target.read_text(encoding="utf-8") + f"\n{stale_claim}\n",
+        encoding="utf-8",
+    )
+
+    errors = stale_skill_contract_errors(skill_root, "fixture")
+
+    assert f"fixture {skill} skill retains stale contract: {guarded_fragment}" in errors
 
 
 def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
