@@ -62,8 +62,10 @@ Before a checkpoint commit, set `status: paused`, retain the big plan's
 checks, remaining work, and the precise resume point. This is an explicit
 checkpoint path, not a bypass: it may commit tracked incomplete work without
 final score, findings, LEARN, DOCUMENT, or COMPLETED closeout, but it does not
-advance the phase and remains blocked from push/PR closeout. Do not create an
-empty outer-repository commit when only AI-state files changed.
+advance the phase. After that checkpoint commit, it may be pushed as a durable
+remote backup when paused-publication invariants pass. It still blocks PR
+creation and final closeout. Do not create an empty outer-repository commit
+when only AI-state files changed.
 
 On a later session, read the PAUSED log, inspect `git log --oneline -10`, `git
 status`, and the current diff, report the recorded resume point, change the

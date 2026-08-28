@@ -70,7 +70,9 @@ closeout. It is not a bypass, does not advance `current_phase`, and leaves the
 big plan `in-progress`. Do not create an empty outer-repository checkpoint
 commit when only AI-state files changed; persist the PAUSED plan and session log
 through the normal AI-state checkpoint path instead. A paused phase remains
-unfinished and blocks push/PR closeout.
+unfinished. After its checkpoint commit, it may be pushed as a durable remote
+checkpoint only when paused-publication invariants pass. It still blocks PR
+creation and final closeout.
 
 On resume, read the paused small plan and PAUSED log, inspect `git log --oneline
 -10`, `git status`, and the current diff, report the recorded resume point, set
@@ -91,8 +93,8 @@ containing the same-line prefix `**Status:** CANCELLED`.
 
 A cancelled phase requires no commit, findings report, score, or closeout
 session log. A cancelled big plan is terminal and cannot start an implementation
-branch. A branch containing cancelled phases becomes pushable only when at
-least one phase is complete, every cancelled phase has the full evidence
+branch. A branch containing cancelled phases reaches final push/PR closeout only
+when at least one phase is complete, every cancelled phase has the full evidence
 contract, and commit-count checks count completed phases only. The push gate
 binds findings to the last completed phase. Commit closeout skips cancelled
 phases when advancing `current_phase`, while a commit whose current phase is
@@ -225,7 +227,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
 - Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
-- PR creation/push is gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`. Paused phases remain blocked.
+- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.
