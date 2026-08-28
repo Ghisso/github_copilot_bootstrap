@@ -6,6 +6,9 @@ tools:
   - execute
   - read
   - search
+  - semble/*
+  - context-mode/*
+  - context7/*
 user-invocable: false
 ---
 

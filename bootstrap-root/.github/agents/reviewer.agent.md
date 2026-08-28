@@ -4,6 +4,9 @@ description: "Unified review agent for code, architecture, security, tests, APIs
 tools:
   - read
   - search
+  - semble/*
+  - context-mode/*
+  - context7/*
 ---
 
 # reviewer Copilot Adapter

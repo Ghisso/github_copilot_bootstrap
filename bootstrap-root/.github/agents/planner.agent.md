@@ -1,16 +1,19 @@
 ---
 name: planner
 description: "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles."
-model: Claude Opus 4.6
 tools:
   - agent
   - execute
   - read
   - search
+  - semble/*
+  - context-mode/*
+  - context7/*
   - todo
   - todos
   - vscode
   - web
+agents: []
 ---
 
 # planner Copilot Adapter

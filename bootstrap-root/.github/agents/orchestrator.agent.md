@@ -1,13 +1,15 @@
 ---
 name: orchestrator
 description: "Main-thread workflow orchestrator for complex implementation tasks. Delegates planning, coding, review, and verification to specialists, and owns the lifecycle ceremony (branch, commit, PR, memory, and session-log writes) itself. Not itself a delegatable subagent."
-model: Claude Opus 4.6
 tools:
   - agent
   - edit
   - execute
   - read
   - search
+  - semble/*
+  - context-mode/*
+  - context7/*
   - todo
   - todos
 agents:
@@ -16,6 +18,7 @@ agents:
   - reviewer
   - verifier
   - documenter
+disable-model-invocation: true
 ---
 
 # orchestrator Copilot Adapter

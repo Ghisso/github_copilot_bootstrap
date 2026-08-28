@@ -9,7 +9,7 @@ started_at: 2026-08-28T15:46:17Z
 phases:
   - 2026-08-28_phase-A-paused-remote-checkpoints
   - 2026-08-28_phase-B-copilot-vscode-parity
-current_phase: 2026-08-28_phase-A-paused-remote-checkpoints
+current_phase: 2026-08-28_phase-B-copilot-vscode-parity
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>

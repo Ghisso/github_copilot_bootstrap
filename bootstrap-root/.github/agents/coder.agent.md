@@ -1,12 +1,14 @@
 ---
 name: coder
 description: "Implementation specialist for Python AI engineering tasks. Applies standards, executes focused edits, simplifies changed code, and verifies with tests, types, and linting."
-model: GPT-5.4
 tools:
   - edit
   - execute
   - read
   - search
+  - semble/*
+  - context-mode/*
+  - context7/*
   - todo
   - todos
   - vscode
