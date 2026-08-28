@@ -43,21 +43,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
 TARGET_ROOT = DIST_ROOT / "multi-agent"
-COPILOT_MODEL_PINS = (
-    "GPT-5.4",
-    "Claude Opus 4.6",
-    "Claude Sonnet 4.6",
-    "(copilot)",
-)
-# Hand-maintained allow-list of Copilot picker model names. These were valid
-# against the official GitHub Copilot supported-models reference as last checked
-# 2026-07-03. This list rots silently as the picker changes — re-verify against
-# the reference and update the date when you touch it.
-GITHUB_ALLOWED_AGENT_MODELS = {
-    "GPT-5.4",
-    "Claude Opus 4.6",
-    "Claude Sonnet 4.6",
-}
 # Claude subagent frontmatter allow-lists. Model aliases and effort levels are
 # validated against the official Claude Code references as last checked
 # 2026-07-09 (subagents.md supported frontmatter fields; model-config.md effort
@@ -2048,6 +2033,12 @@ def validate_agents(errors: list[str]) -> None:
         if generated.exists():
             text = read(generated)
             agent = agents_by_id[agent_id]
+            errors.extend(
+                github_agent_model_errors(
+                    text, expected_github_models[agent_id], generated
+                )
+            )
+            errors.extend(github_agent_metadata_errors(text, agent, generated))
             if "claude-code" not in agent["targets"]:
                 prompt = transform_agent_text(
                     read(agent_dirs_by_id[agent_id] / "prompt.md"), "github-copilot"
@@ -2336,7 +2327,7 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    validate_github_agent_models(errors, expected_github_models)
+    validate_github_agent_metadata_cases(errors)
 
 
 def github_agent_model_errors(
@@ -2355,27 +2346,6 @@ def github_agent_model_errors(
         for line in frontmatter_lines
         if line.startswith("model:")
     ]
-    for index, line in enumerate(frontmatter_lines):
-        if not line.startswith("model:"):
-            continue
-        value = line.split(":", 1)[1].strip()
-        if not value:
-            errors.append(
-                f"GitHub agent model must be a single string, not a YAML list: {path}"
-            )
-            continue
-        if value not in GITHUB_ALLOWED_AGENT_MODELS:
-            errors.append(
-                f"GitHub agent model is not a current supported Copilot model string: {path}: {value}"
-            )
-        if "(copilot)" in value:
-            errors.append(
-                f"GitHub agent model must not include provider suffix: {path}"
-            )
-        if index + 1 < len(frontmatter_lines) and frontmatter_lines[
-            index + 1
-        ].lstrip().startswith("- "):
-            errors.append(f"GitHub agent model must not be a YAML sequence: {path}")
     expected = expected_model if isinstance(expected_model, str) else "target-default"
     if expected == "target-default":
         if model_lines:
@@ -2387,35 +2357,136 @@ def github_agent_model_errors(
     return errors
 
 
-def validate_github_agent_models(
-    errors: list[str], expected_models: dict[str, object]
-) -> None:
-    agent_root = TARGET_ROOT / ".github" / "agents"
-    for path in sorted(agent_root.glob("*.agent.md")):
-        text = read(path)
-        errors.extend(
-            github_agent_model_errors(
-                text, expected_models.get(path.name.removesuffix(".agent.md")), path
+COPILOT_RETRIEVAL_WILDCARDS = {"semble/*", "context-mode/*", "context7/*"}
+
+
+def github_frontmatter_list(frontmatter: str, key: str) -> list[str] | None:
+    """Return one generated list field, or None when the field is absent."""
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
+        if line == f"{key}: []":
+            return []
+        if line != f"{key}:":
+            continue
+        values: list[str] = []
+        for follow in lines[index + 1 :]:
+            if follow.startswith("  - "):
+                values.append(follow[4:])
+            else:
+                break
+        return values
+    return None
+
+
+def github_agent_metadata_errors(
+    text: str, agent: dict[str, Any], path: Path
+) -> list[str]:
+    """Return Copilot custom-agent metadata drift errors."""
+    frontmatter = extract_frontmatter(text)
+    if not frontmatter:
+        return [f"GitHub agent missing frontmatter: {path}"]
+    errors: list[str] = []
+    tools = github_frontmatter_list(frontmatter, "tools") or []
+    rendered_delegates = github_frontmatter_list(frontmatter, "agents")
+    capabilities = set(agent.get("capabilities", []))
+    wildcard_tools = {tool for tool in tools if tool.endswith("/*")}
+    if "search" in capabilities:
+        if "search" not in tools or wildcard_tools != COPILOT_RETRIEVAL_WILDCARDS:
+            errors.append(
+                f"GitHub search tools drifted from canonical MCP mapping: {path}"
             )
+    elif wildcard_tools:
+        errors.append(f"GitHub non-search agent received retrieval MCP tools: {path}")
+
+    expected_delegates = list(agent.get("delegates", []))
+    if "delegate" in capabilities:
+        if rendered_delegates != expected_delegates:
+            errors.append(
+                f"GitHub agent delegation list drifted from canonical metadata: {path}"
+            )
+    elif rendered_delegates is not None:
+        errors.append(f"GitHub non-delegating agent must not define agents: {path}")
+    if rendered_delegates is not None and "agent" not in tools:
+        errors.append(f"GitHub agent list requires the agent tool: {path}")
+
+    hidden = agent.get("visibility") == "hidden"
+    user_invocable = "user-invocable: false" in frontmatter.splitlines()
+    if hidden != user_invocable:
+        errors.append(
+            f"GitHub agent visibility drifted from canonical metadata: {path}"
         )
-
-
-def validate_model_leaks(errors: list[str]) -> None:
-    non_github_roots = (
-        TARGET_ROOT / "CLAUDE.md",
-        TARGET_ROOT / "AGENTS.md",
-        TARGET_ROOT / ".claude",
-        TARGET_ROOT / ".codex",
+    model_invocation_disabled = (
+        "disable-model-invocation: true" in frontmatter.splitlines()
     )
-    for root in non_github_roots:
-        paths = [root] if root.is_file() else text_files(root)
-        for path in paths:
-            text = read(path)
-            for pin in COPILOT_MODEL_PINS:
-                if pin in text:
-                    errors.append(
-                        f"Copilot model pin leaked into non-GitHub output: {path} contains {pin}"
-                    )
+    if (agent["id"] == "orchestrator") != model_invocation_disabled:
+        errors.append(
+            f"GitHub agent invocation restriction drifted from canonical metadata: {path}"
+        )
+    return errors
+
+
+def validate_github_agent_metadata_cases(errors: list[str]) -> None:
+    """Exercise the focused negative cases for Copilot metadata validation."""
+    no_search_agent = {
+        "id": "fixture",
+        "visibility": "public",
+        "capabilities": ["read"],
+        "delegates": [],
+    }
+    planner_agent = {
+        "id": "planner",
+        "visibility": "public",
+        "capabilities": ["delegate"],
+        "delegates": [],
+    }
+    orchestrator_agent = {
+        "id": "orchestrator",
+        "visibility": "public",
+        "capabilities": ["delegate"],
+        "delegates": ["planner"],
+    }
+    cases = (
+        (
+            "---\ntools:\n  - read\n  - semble/*\n---\n",
+            no_search_agent,
+            "non-search agent received retrieval MCP tools",
+        ),
+        (
+            "---\ntools:\n  - agent\n---\n",
+            planner_agent,
+            "delegation list drifted",
+        ),
+        (
+            "---\ntools:\n  - agent\nagents:\n  - planner\n---\n",
+            orchestrator_agent,
+            "invocation restriction drifted",
+        ),
+        (
+            "---\ntools:\n  - read\nagents: []\n---\n",
+            no_search_agent,
+            "non-delegating agent must not define agents",
+        ),
+        (
+            "---\ntools:\n  - read\nagents: []\n---\n",
+            planner_agent,
+            "agent list requires the agent tool",
+        ),
+    )
+    for text, agent, expected in cases:
+        fixture_errors = github_agent_metadata_errors(text, agent, Path("fixture"))
+        check(
+            any(expected in error for error in fixture_errors),
+            f"GitHub metadata validator must reject fixture drift: {expected}",
+            errors,
+        )
+    model_errors = github_agent_model_errors(
+        "---\nmodel: intentional-future-model\n---\n", "target-default", Path("fixture")
+    )
+    check(
+        any("must inherit" in error for error in model_errors),
+        "GitHub model validator must reject a current inherited agent with model metadata",
+        errors,
+    )
 
 
 # Every generated target must carry the identical Semble, Context7, and
@@ -4407,18 +4478,12 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             errors,
         )
 
-        write_big_plan(
-            repo,
-            status="in-progress",
-            phases=("phase-complete", "phase-paused"),
-            current_phase="phase-paused",
-        )
-        write_small_plan(repo, status="complete", phase="phase-complete")
-        write_small_plan(repo, status="paused", phase="phase-paused")
         dummy_report = repo / ".claude" / "quality_reports" / "findings.json"
         write(dummy_report, "{}\n")
-        local_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
-        push_expression = f"""
+
+        def push_failures(local_sha: str | None = None) -> list[str]:
+            local_sha = local_sha or git(repo, "rev-parse", "HEAD").stdout.strip()
+            push_expression = f"""
 . {shlex.quote(str(library))}
 select_fresh_report() {{ printf '%s' {shlex.quote(str(dummy_report))}; }}
 assert_report_freshness() {{ :; }}
@@ -4426,23 +4491,187 @@ json_file_number_value() {{ printf '0'; }}
 assert_required_ponytail_review() {{ :; }}
 failures=()
 assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
-printf '%s\\n' "${{failures[@]}}"
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
 """
-        push_result = subprocess.run(
-            ["bash", "-lc", push_expression],
-            cwd=repo,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+            push_result = subprocess.run(
+                ["bash", "-lc", push_expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                push_result.returncode == 0,
+                f"paused push invariant fixture failed: {push_result.stderr}",
+                errors,
+            )
+            return push_result.stdout.splitlines()
+
+        # First phase: the checkpoint commit is enough for a remote backup,
+        # but using dev itself proves the separate +1 checkpoint requirement.
         check(
-            push_result.returncode == 0,
-            f"paused push invariant fixture failed: {push_result.stderr}",
+            push_failures() == [],
+            "first paused phase must allow one checkpoint commit to be pushed",
             errors,
         )
         check(
-            "phase-paused is paused" in push_result.stdout,
-            "paused phase must remain blocked from push/PR closeout",
+            any("at least 1 commit" in failure for failure in push_failures("dev")),
+            "paused first phase must require a checkpoint commit beyond dev",
+            errors,
+        )
+
+        # A paused current phase accepts terminal predecessors only. Future
+        # pre-created phases intentionally do not affect checkpoint backup.
+        write(repo / "completed-work.txt", "completed work\n")
+        git(repo, "add", "completed-work.txt")
+        git(repo, "commit", "-m", "completed work")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-paused", "phase-future"),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        write_small_plan(repo, status="in-progress", phase="phase-future")
+        check(
+            push_failures() == [],
+            "mid-plan paused phase must allow completed predecessors and future in-progress phases",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-cancelled", "phase-paused"),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        check(
+            push_failures() == [],
+            "evidenced cancelled phases before a paused checkpoint must not block publication",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_marker=False,
+        )
+        check(
+            any("CANCELLED" in failure for failure in push_failures()),
+            "paused publication must validate cancellation evidence for prior phases",
+            errors,
+        )
+
+        for prior_status in ("in-progress", "paused", "invalid"):
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-prior", "phase-paused"),
+                current_phase="phase-paused",
+            )
+            write_small_plan(repo, status=prior_status, phase="phase-prior")
+            write_small_plan(repo, status="paused", phase="phase-paused")
+            check(
+                any("before current_phase" in failure for failure in push_failures()),
+                f"paused publication must reject prior {prior_status} phases",
+                errors,
+            )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            evidence_marker=False,
+        )
+        check(
+            any("**Status:** PAUSED" in failure for failure in push_failures()),
+            "paused publication must reuse pause-evidence validation",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-other",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        check(
+            any("listed in phases" in failure for failure in push_failures()),
+            "paused publication must require current_phase membership in phases",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write(
+            repo / ".claude" / "plans" / "phase-paused.md",
+            "---\n"
+            "name: phase-paused\n"
+            "type: big-plan\n"
+            "parent_plan: wrong-parent\n"
+            "status: paused\n"
+            "paused_at: 2026-08-11T07:00:00Z\n"
+            "paused_reason: The user requested an overnight checkpoint\n"
+            "pause_session_log: .claude/session_logs/phase-paused-paused.md\n"
+            "---\n",
+        )
+        identity_failures = push_failures()
+        check(
+            any("type: small-plan" in failure for failure in identity_failures)
+            and any(
+                "parent_plan must match" in failure for failure in identity_failures
+            ),
+            "paused publication must require the current small-plan identity",
+            errors,
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        write_small_plan(repo, status="in-progress", phase="phase-paused")
+        check(
+            any(
+                "phase-paused is in-progress" in failure for failure in push_failures()
+            ),
+            "ordinary in-progress phases must remain blocked from push",
+            errors,
+        )
+
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git push origin foo_implementation"},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"paused push gate failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            "PreToolUse git push must allow a valid paused checkpoint",
+            errors,
+        )
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"paused PR gate failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "PR creation must keep a paused checkpoint on the strict closeout path",
             errors,
         )
 
@@ -5623,6 +5852,31 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        # A real native pre-push hook receives the local ref SHA from Git, so
+        # a first-phase paused checkpoint can publish without making the
+        # branch ready for the later strict closeout checks.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-one",),
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="paused")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "paused checkpoint", "--no-verify")
+        paused_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            paused_push.returncode == 0,
+            f"pre-push hook must allow a valid paused checkpoint ref: {paused_push.stdout}{paused_push.stderr}",
+            errors,
+        )
+
         # Complete the small plan/closeout/LEARN so the commit-count check
         # (>= one commit per phase) is also satisfied.
         write_small_plan(repo, status="complete")
@@ -6009,7 +6263,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "empty outer commit",
             "big plan `in-progress`",
             "same `current_phase`",
-            "paused phases remain unfinished",
+            "durable remote backup",
             "every phase must be terminal",
         ),
         "plan-decomposition": (
@@ -9395,7 +9649,6 @@ def main() -> int:
         validate_task_lane_contract(errors)
         validate_codex_model_contract_cases(errors)
         validate_agents(errors)
-        validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_antigravity_manifest_and_skills(errors)
         validate_context_mode_tool_surface(errors)

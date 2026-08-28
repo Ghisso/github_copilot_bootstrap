@@ -14,7 +14,7 @@
   ],
   "delegates": [],
   "model_intent": {
-    "github-copilot": "GPT-5.4",
+    "github-copilot": "target-default",
     "claude-code": { "model": "sonnet", "effort": "xhigh" },
     "openai-codex": {
       "model": "gpt-5.6-terra",

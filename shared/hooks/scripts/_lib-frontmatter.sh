@@ -1391,9 +1391,9 @@ assert_commit_invariants() {
   fi
 }
 
-# Single home for the push/PR ceremony shared by every push gate entry point
-# (PreToolUse `enforce-pr-gate.sh` and the `pre-push` git hook). Branch-shape
-# is deliberately NOT checked here, mirroring assert_commit_invariants above:
+# Strict final closeout ceremony shared by PR creation and terminal pushes.
+# Branch-shape is deliberately NOT checked here, mirroring
+# assert_commit_invariants above:
 # callers diverge on it (docs/plan-post-review-hardening.md Phase 3), so
 # `branch` is assumed already valid (an <plan>_implementation branch).
 #
@@ -1407,7 +1407,7 @@ assert_commit_invariants() {
 # (`failures=()`) before calling; see assert_commit_invariants for the same
 # dynamic-scoping convention. The gh/PR-shape check (`--base dev`) has no
 # pre-push analog and stays in the PreToolUse caller.
-assert_push_invariants() {
+assert_closeout_invariants() {
   local repo_root="$1"
   local branch="$2"
   local local_sha="$3"
@@ -1504,5 +1504,134 @@ assert_push_invariants() {
     fi
 
     assert_required_ponytail_review "$findings_file" "$repo_root" "$local_sha" "push" "$findings_regen_hint"
+  fi
+}
+
+# Validate the narrow remote-backup path for a current paused phase. This does
+# not inspect final closeout reports: the checkpoint remains unfinished and PR
+# creation always calls assert_closeout_invariants directly.
+assert_paused_publication_invariants() {
+  local repo_root="$1"
+  local branch="$2"
+  local local_sha="$3"
+  local slug="${branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  if [[ ! -f "$big_plan" ]]; then
+    failures+=("missing big-plan file: .claude/plans/$slug.md")
+    return
+  fi
+
+  local big_status current_phase
+  big_status="$(fm_read_unique_status "$big_plan" || true)"
+  if [[ "$big_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    failures+=("$big_plan must contain exactly one status field before paused checkpoint push")
+  elif [[ "$big_status" != "in-progress" ]]; then
+    failures+=("$big_plan must have status: in-progress for a paused checkpoint push")
+  fi
+
+  current_phase="$(fm_read "$big_plan" "current_phase" || true)"
+  if [[ -z "$current_phase" ]]; then
+    failures+=("big plan has no current_phase")
+    return
+  elif ! is_plan_slug "$current_phase"; then
+    failures+=("big plan current_phase must be a safe small-plan slug")
+    return
+  fi
+
+  # Keep this Bash 3.2-compatible: collect the existing frontmatter list with
+  # `while read` rather than mapfile/readarray.
+  local -a phases=()
+  local phase
+  while IFS= read -r phase; do
+    [[ -n "$phase" ]] && phases+=("$phase")
+  done < <(fm_read_list "$big_plan" "phases")
+  if [[ "${#phases[@]}" -eq 0 ]]; then
+    failures+=("$big_plan has no phases list")
+    return
+  fi
+
+  local current_listed=0 prior_completed_count=0 before_current=1
+  local small_plan status
+  for phase in "${phases[@]}"; do
+    if [[ "$phase" == "$current_phase" ]]; then
+      current_listed=1
+      before_current=0
+      continue
+    fi
+    [[ "$before_current" -eq 1 ]] || continue
+
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    if [[ ! -f "$small_plan" ]]; then
+      failures+=("missing small-plan file: .claude/plans/$phase.md")
+      continue
+    fi
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$status" == "complete" ]]; then
+      prior_completed_count=$((prior_completed_count + 1))
+    elif [[ "$status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$small_plan" "$phase"
+    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before paused checkpoint push")
+    else
+      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
+    fi
+  done
+
+  if [[ "$current_listed" -ne 1 ]]; then
+    failures+=("big plan current_phase must be listed in phases")
+    return
+  fi
+
+  small_plan="$repo_root/.claude/plans/$current_phase.md"
+  if [[ ! -f "$small_plan" ]]; then
+    failures+=("missing small-plan file: .claude/plans/$current_phase.md")
+    return
+  fi
+  if [[ "$(fm_read "$small_plan" "type" || true)" != "small-plan" ]]; then
+    failures+=("$small_plan must have type: small-plan before paused checkpoint push")
+  fi
+  if [[ "$(fm_read "$small_plan" "parent_plan" || true)" != "$slug" ]]; then
+    failures+=("$small_plan parent_plan must match $slug before paused checkpoint push")
+  fi
+  status="$(fm_read_unique_status "$small_plan" || true)"
+  if [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    failures+=("$small_plan must contain exactly one status field before paused checkpoint push")
+  elif [[ "$status" != "paused" ]]; then
+    failures+=("$small_plan must have status: paused before paused checkpoint push")
+  else
+    assert_pause_evidence "$small_plan" "$current_phase"
+  fi
+
+  local commit_count minimum_commits=$((prior_completed_count + 1))
+  commit_count="$(git -C "$repo_root" rev-list --count "dev..$local_sha" 2>/dev/null || echo 0)"
+  if [[ ! "$commit_count" =~ ^[0-9]+$ || "$commit_count" -lt "$minimum_commits" ]]; then
+    failures+=("paused checkpoint push must have at least $minimum_commits commit(s) beyond dev")
+  fi
+}
+
+# Public push entry point. A paused current phase may publish a durable remote
+# checkpoint; all other states retain the strict final closeout ceremony.
+assert_push_invariants() {
+  local repo_root="$1"
+  local branch="$2"
+  local local_sha="$3"
+  local slug="${branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  local current_phase="" small_plan="" current_status=""
+
+  if [[ -f "$big_plan" ]]; then
+    current_phase="$(fm_read "$big_plan" "current_phase" || true)"
+    if [[ -n "$current_phase" ]] && is_plan_slug "$current_phase"; then
+      small_plan="$repo_root/.claude/plans/$current_phase.md"
+      if [[ -f "$small_plan" ]]; then
+        current_status="$(fm_read_unique_status "$small_plan" || true)"
+      fi
+    fi
+  fi
+
+  if [[ "$current_status" == "paused" ]]; then
+    assert_paused_publication_invariants "$repo_root" "$branch" "$local_sha"
+  else
+    assert_closeout_invariants "$repo_root" "$branch" "$local_sha"
   fi
 }

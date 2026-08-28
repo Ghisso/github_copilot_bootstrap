@@ -14,7 +14,7 @@
   ],
   "delegates": [],
   "model_intent": {
-    "github-copilot": "Claude Opus 4.6",
+    "github-copilot": "target-default",
     "claude-code": { "model": "opus", "effort": "xhigh" },
     "openai-codex": { "model": "gpt-5.6-sol", "effort": "xhigh" },
     "google-antigravity": { "model": "pro" }

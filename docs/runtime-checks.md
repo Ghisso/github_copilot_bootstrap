@@ -98,10 +98,11 @@ Missing optional binaries produce `WARN`, not `FAIL`.
 ## Native Client Release Checks (Opt-In)
 
 `check_runtime.py` remains an offline structural/runtime check. It does not
-authenticate or start Codex or Claude, and a structural PASS is not evidence of
-native instruction delivery, hook trust, compact/resume behavior, or Codex role
-routing. The native probe's default temporary mode deliberately does not launch
-either client, so it is only a structure/missing-client smoke and reports an
+authenticate or start Codex, Claude, or VS Code Copilot, and a structural PASS
+is not evidence of native instruction delivery, hook trust, compact/resume
+behavior, Codex role routing, or Copilot custom-agent loading. The native
+probe's default temporary mode deliberately does not launch either existing
+probe client, so it is only a structure/missing-client smoke and reports an
 installed client as unresolved `WARN`/`untrusted`. For actual native execution,
 prepare, inspect, and manually trust a dedicated stable workspace, then rerun
 against that same workspace:
@@ -129,6 +130,15 @@ persistent-thread probe may exercise all eight, but no native run is required
 for the current feature. Claude has no Codex-role matrix. Read [Native
 Client Acceptance](native-client-acceptance.md) before interpreting a report or
 changing a compatibility gate.
+
+### VS Code Copilot evidence boundary
+
+Generation and `validate_targets.py` prove the rendered Copilot custom-agent
+frontmatter only. They do not prove that an authenticated VS Code Copilot
+session loads the agents, exposes their MCP tools, honors delegation metadata,
+or leaves session-selected Auto unpinned. Record those observations only after
+a small authenticated VS Code smoke; otherwise record the smoke as `not run`.
+This bootstrap does not add Copilot CLI, cloud-agent, or native-harness support.
 
 The persistent path must be dedicated: preparation refuses broad paths and
 nonempty directories without its ownership marker. A later preparation refreshes

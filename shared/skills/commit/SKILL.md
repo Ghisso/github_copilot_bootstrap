@@ -67,7 +67,7 @@ Details of what changed and why."
 ```
 Types: `feat` | `fix` | `refactor` | `test` | `docs` | `config`
 
-## Phase 5: Push & PR (if requested, after the last small plan)
+## Phase 5: Push or PR (if requested)
 ```bash
 git push -u origin <plan_name>_implementation
 gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
@@ -80,10 +80,12 @@ gh pr create --base dev --title "type: description" --body "$(cat <<'EOF'
 EOF
 )"
 ```
-PRs must target `dev`. Every phase must be terminal: `complete` or fully
-evidenced as `cancelled`. There must be at least one completed phase and one
-commit per completed phase. Paused phases remain unfinished and block push/PR
-closeout.
+PRs must target `dev`. A valid paused checkpoint commit may be pushed as a
+durable remote backup after paused-publication invariants pass. It remains
+unfinished, keeps the big plan `in-progress` with the same `current_phase`, and
+does not make the branch PR-ready. For PR creation and final push closeout,
+every phase must be terminal: `complete` or fully evidenced as `cancelled`, with
+at least one completed phase and one commit per completed phase.
 
 ## Phase 6: Merge (human)
 A human reviews and merges the PR into `dev`; the agent does not merge the PR
