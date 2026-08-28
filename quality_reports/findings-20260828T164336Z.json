@@ -1,0 +1,43 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-28T16:43:46Z",
+  "branch": "paused-push-copilot-vscode-parity_implementation",
+  "head_sha": "25de4b6a47dbeb60da38a33b333b9e958d8dc27e",
+  "base_ref": "dev",
+  "merge_base_sha": "175460c9b3810cb86e8cf597ed3929e2c85f5561",
+  "phase": "2026-08-28_phase-B-copilot-vscode-parity",
+  "target": "scripts",
+  "dirty": false,
+  "content_hash": "a88530d6736a4e5798d2514f0dda3d5b618fe3e6",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/coder/agent.yaml",
+    "shared/agents/orchestrator/agent.yaml",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/agents/planner/agent.yaml",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/hooks/scripts/enforce-pr-gate.sh",
+    "shared/policies/workflow.instructions.md",
+    "shared/skills/commit/SKILL.md",
+    "shared/templates/plan-small.md",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
