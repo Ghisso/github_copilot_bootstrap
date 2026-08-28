@@ -83,8 +83,8 @@ EOF
 PRs must target `dev`. A valid paused checkpoint commit may be pushed as a
 durable remote backup after paused-publication invariants pass. It remains
 unfinished, keeps the big plan `in-progress` with the same `current_phase`, and
-does not make the branch PR-ready. PR creation and final push closeout require
-every phase to be terminal: `complete` or fully evidenced as `cancelled`, with
+does not make the branch PR-ready. For PR creation and final push closeout,
+every phase must be terminal: `complete` or fully evidenced as `cancelled`, with
 at least one completed phase and one commit per completed phase.
 
 ## Phase 6: Merge (human)
