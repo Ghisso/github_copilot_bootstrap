@@ -41,7 +41,11 @@ if is_gh_pr_create_command "$COMMAND"; then
 fi
 
 failures=()
-assert_push_invariants "$REPO_ROOT" "$CURRENT_BRANCH" "HEAD"
+if is_gh_pr_create_command "$COMMAND"; then
+  assert_closeout_invariants "$REPO_ROOT" "$CURRENT_BRANCH" "HEAD"
+else
+  assert_push_invariants "$REPO_ROOT" "$CURRENT_BRANCH" "HEAD"
+fi
 
 if [[ "${#failures[@]}" -gt 0 ]]; then
   reason="$(printf '%s; ' "${failures[@]}")"

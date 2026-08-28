@@ -4407,18 +4407,12 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             errors,
         )
 
-        write_big_plan(
-            repo,
-            status="in-progress",
-            phases=("phase-complete", "phase-paused"),
-            current_phase="phase-paused",
-        )
-        write_small_plan(repo, status="complete", phase="phase-complete")
-        write_small_plan(repo, status="paused", phase="phase-paused")
         dummy_report = repo / ".claude" / "quality_reports" / "findings.json"
         write(dummy_report, "{}\n")
-        local_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
-        push_expression = f"""
+
+        def push_failures(local_sha: str | None = None) -> list[str]:
+            local_sha = local_sha or git(repo, "rev-parse", "HEAD").stdout.strip()
+            push_expression = f"""
 . {shlex.quote(str(library))}
 select_fresh_report() {{ printf '%s' {shlex.quote(str(dummy_report))}; }}
 assert_report_freshness() {{ :; }}
@@ -4426,23 +4420,187 @@ json_file_number_value() {{ printf '0'; }}
 assert_required_ponytail_review() {{ :; }}
 failures=()
 assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
-printf '%s\\n' "${{failures[@]}}"
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
 """
-        push_result = subprocess.run(
-            ["bash", "-lc", push_expression],
-            cwd=repo,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+            push_result = subprocess.run(
+                ["bash", "-lc", push_expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                push_result.returncode == 0,
+                f"paused push invariant fixture failed: {push_result.stderr}",
+                errors,
+            )
+            return push_result.stdout.splitlines()
+
+        # First phase: the checkpoint commit is enough for a remote backup,
+        # but using dev itself proves the separate +1 checkpoint requirement.
         check(
-            push_result.returncode == 0,
-            f"paused push invariant fixture failed: {push_result.stderr}",
+            push_failures() == [],
+            "first paused phase must allow one checkpoint commit to be pushed",
             errors,
         )
         check(
-            "phase-paused is paused" in push_result.stdout,
-            "paused phase must remain blocked from push/PR closeout",
+            any("at least 1 commit" in failure for failure in push_failures("dev")),
+            "paused first phase must require a checkpoint commit beyond dev",
+            errors,
+        )
+
+        # A paused current phase accepts terminal predecessors only. Future
+        # pre-created phases intentionally do not affect checkpoint backup.
+        write(repo / "completed-work.txt", "completed work\n")
+        git(repo, "add", "completed-work.txt")
+        git(repo, "commit", "-m", "completed work")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-paused", "phase-future"),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        write_small_plan(repo, status="in-progress", phase="phase-future")
+        check(
+            push_failures() == [],
+            "mid-plan paused phase must allow completed predecessors and future in-progress phases",
+            errors,
+        )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-cancelled", "phase-paused"),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        check(
+            push_failures() == [],
+            "evidenced cancelled phases before a paused checkpoint must not block publication",
+            errors,
+        )
+        write_small_plan(
+            repo,
+            status="cancelled",
+            phase="phase-cancelled",
+            evidence_marker=False,
+        )
+        check(
+            any("CANCELLED" in failure for failure in push_failures()),
+            "paused publication must validate cancellation evidence for prior phases",
+            errors,
+        )
+
+        for prior_status in ("in-progress", "paused", "invalid"):
+            write_big_plan(
+                repo,
+                status="in-progress",
+                phases=("phase-prior", "phase-paused"),
+                current_phase="phase-paused",
+            )
+            write_small_plan(repo, status=prior_status, phase="phase-prior")
+            write_small_plan(repo, status="paused", phase="phase-paused")
+            check(
+                any("before current_phase" in failure for failure in push_failures()),
+                f"paused publication must reject prior {prior_status} phases",
+                errors,
+            )
+
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(
+            repo,
+            status="paused",
+            phase="phase-paused",
+            evidence_marker=False,
+        )
+        check(
+            any("**Status:** PAUSED" in failure for failure in push_failures()),
+            "paused publication must reuse pause-evidence validation",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-other",),
+            current_phase="phase-paused",
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        check(
+            any("listed in phases" in failure for failure in push_failures()),
+            "paused publication must require current_phase membership in phases",
+            errors,
+        )
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-paused",),
+            current_phase="phase-paused",
+        )
+        write(
+            repo / ".claude" / "plans" / "phase-paused.md",
+            "---\n"
+            "name: phase-paused\n"
+            "type: big-plan\n"
+            "parent_plan: wrong-parent\n"
+            "status: paused\n"
+            "paused_at: 2026-08-11T07:00:00Z\n"
+            "paused_reason: The user requested an overnight checkpoint\n"
+            "pause_session_log: .claude/session_logs/phase-paused-paused.md\n"
+            "---\n",
+        )
+        identity_failures = push_failures()
+        check(
+            any("type: small-plan" in failure for failure in identity_failures)
+            and any(
+                "parent_plan must match" in failure for failure in identity_failures
+            ),
+            "paused publication must require the current small-plan identity",
+            errors,
+        )
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        write_small_plan(repo, status="in-progress", phase="phase-paused")
+        check(
+            any(
+                "phase-paused is in-progress" in failure for failure in push_failures()
+            ),
+            "ordinary in-progress phases must remain blocked from push",
+            errors,
+        )
+
+        write_small_plan(repo, status="paused", phase="phase-paused")
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git push origin foo_implementation"},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"paused push gate failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' not in stdout,
+            "PreToolUse git push must allow a valid paused checkpoint",
+            errors,
+        )
+        returncode, stdout, stderr = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(returncode == 0, f"paused PR gate failed to run: {stderr}", errors)
+        check(
+            '"permissionDecision":"deny"' in stdout,
+            "PR creation must keep a paused checkpoint on the strict closeout path",
             errors,
         )
 
@@ -5623,6 +5781,31 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        # A real native pre-push hook receives the local ref SHA from Git, so
+        # a first-phase paused checkpoint can publish without making the
+        # branch ready for the later strict closeout checks.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-one",),
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="paused")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", "paused checkpoint", "--no-verify")
+        paused_push = subprocess.run(
+            ["git", "push", "origin", "foo_implementation"],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            paused_push.returncode == 0,
+            f"pre-push hook must allow a valid paused checkpoint ref: {paused_push.stdout}{paused_push.stderr}",
+            errors,
+        )
+
         # Complete the small plan/closeout/LEARN so the commit-count check
         # (>= one commit per phase) is also satisfied.
         write_small_plan(repo, status="complete")
@@ -6009,7 +6192,7 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
             "empty outer commit",
             "big plan `in-progress`",
             "same `current_phase`",
-            "paused phases remain unfinished",
+            "durable remote backup",
             "every phase must be terminal",
         ),
         "plan-decomposition": (

@@ -50,6 +50,9 @@ Use only after the user explicitly asks to stop or checkpoint and resume later.
 Set `status: paused`, record the three pause fields, and create a session log
 with `**Status:** PAUSED`. A checkpoint commit preserves incomplete work; it
 does not require final score, findings, LEARN, DOCUMENT, or a completed closeout.
+After the checkpoint commit, it may be pushed as a durable remote backup when
+paused-publication invariants pass. It remains unfinished and blocks PR creation
+and final closeout.
 Keep the big plan `in-progress` with the same `current_phase`. On resume, read
 the pause log and Git state, restore this plan to `in-progress`, and continue
 this same phase without creating another small plan.

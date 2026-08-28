@@ -207,7 +207,7 @@ Expected:
   `.agents/` or intentionally removes them.
 - A valid paused checkpoint commit requires real outer work and pause evidence;
   it does not create an empty outer-repository commit, advance the phase, or
-  waive the unfinished-phase push/PR gate. Normal completion commits retain the
+  waive the unfinished-phase PR/final-closeout gate. Normal completion commits retain the
   score, findings, LEARN, DOCUMENT, and closeout requirements.
 
 ## Google Antigravity Native Evidence Boundary
