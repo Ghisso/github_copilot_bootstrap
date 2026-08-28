@@ -82,19 +82,12 @@ CLAUDE_TOOL_MAP = {
 # tool and has no equivalent in Claude/Codex, so it is (correctly) omitted from
 # their tool lists rather than silently mishandled.
 #
-# KNOWN GAP: unlike CLAUDE_TOOL_MAP above, this map has no MCP entry for
-# "search" — Copilot custom-agent `tools:` also filters MCP-sourced tools
-# (same explicit-allowlist semantics as Claude), so generated Copilot agents
-# have the identical bug (their prompt says "use Semble"
-# but neither is in their tools: list). Left unfixed deliberately: Copilot's
-# exact tool-name convention for MCP-sourced tools (bare server name? a
-# "server.tool" form? the raw tool name, which could collide with the
-# existing "search" alias) is not confirmed from documentation alone, and a
-# wrong guess here would look fixed while silently doing nothing. Verify the
-# real declared tool name in a live VS Code Copilot session before adding it.
+# VS Code Copilot custom agents allow every tool from a configured MCP server
+# with the documented `<server-name>/*` wildcard. Context Mode still exposes
+# only its filtered server surface; this allowlist does not bypass that filter.
 COPILOT_TOOL_MAP = {
     "read": ["read"],
-    "search": ["search"],
+    "search": ["search", "semble/*", "context-mode/*", "context7/*"],
     "edit": ["edit"],
     "execute": ["execute"],
     "delegate": ["agent"],
@@ -1473,8 +1466,12 @@ def render_github_agent_adapter(
     if delegates:
         frontmatter_lines.append("agents:")
         frontmatter_lines.extend(f"  - {delegate}" for delegate in delegates)
+    elif "delegate" in agent.get("capabilities", []):
+        frontmatter_lines.append("agents: []")
     if agent.get("visibility") == "hidden":
         frontmatter_lines.append("user-invocable: false")
+    if agent["id"] == "orchestrator":
+        frontmatter_lines.append("disable-model-invocation: true")
     frontmatter_lines.append("---")
     if "claude-code" in agent.get("targets", SUPPORTED_AGENT_TARGETS):
         canonical_path = canonical_agent_path(agent["id"])

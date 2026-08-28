@@ -322,8 +322,10 @@ def test_github_agent_model_contract_uses_frontmatter_not_body_substrings() -> N
     )
 
 
-def test_planner_model_intent_preserves_native_models_and_copilot_choice() -> None:
-    """Only planner effort changes; native models and Copilot intent stay fixed."""
+def test_planner_model_intent_preserves_native_models_and_copilot_session_inheritance() -> (
+    None
+):
+    """Planner preserves native models and inherits the Copilot session model."""
     planner = json.loads(
         (REPO_ROOT / "shared" / "agents" / "planner" / "agent.yaml").read_text(
             encoding="utf-8"
@@ -331,7 +333,7 @@ def test_planner_model_intent_preserves_native_models_and_copilot_choice() -> No
     )
     intent = planner["model_intent"]
 
-    assert intent["github-copilot"] == "Claude Opus 4.6"
+    assert intent["github-copilot"] == "target-default"
     assert intent["claude-code"] == {"model": "opus", "effort": "xhigh"}
     assert intent["openai-codex"] == {
         "model": "gpt-5.6-sol",

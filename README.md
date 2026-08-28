@@ -262,18 +262,18 @@ exists. `.claude/hooks/scripts/state-sync.sh` (the copy normal hooks call) can't
 be used for this first bootstrap: it doesn't exist until `.claude/` does, which
 is exactly why `.devcontainer/` carries its own copy of the same script.
 
-### GitHub Copilot: local-IDE vs cloud
+### GitHub Copilot surface ownership
 
 By default the installer gitignores the GitHub Copilot surface
 (`.github/agents/`, `.github/hooks/`, `.github/instructions/`,
-`.github/copilot-instructions.md`), so **only local-IDE Copilot is configured** —
-cloud Copilot agents read that surface only from the committed default branch and
-will not see gitignored files. To enable cloud Copilot, install with
-`--commit-copilot-surface`, which keeps those paths out of the ignore block so you
-can commit them (like `.devcontainer/`); the AI state in `.claude/` still stays
-ignored and git-backed. The selected mode is persisted in the ownership manifest:
-later installs and `update_consumers.py` retain it unless you explicitly pass
-`--commit-copilot-surface` or `--no-commit-copilot-surface`.
+`.github/copilot-instructions.md`). Use `--commit-copilot-surface` when you need
+those generated files tracked in the consumer repository; the AI state in
+`.claude/` still stays ignored and git-backed. The selected mode is persisted in
+the ownership manifest: later installs and `update_consumers.py` retain it
+unless you explicitly pass `--commit-copilot-surface` or
+`--no-commit-copilot-surface`. The supported Copilot claim here is limited to
+custom agents in local VS Code; this bootstrap does not claim Copilot CLI or
+cloud-agent support.
 
 If you do not use one of the tools, you may delete its native adapter/config
 files locally after installing. A later installer refresh restores every path
@@ -404,10 +404,11 @@ use the corresponding `.claude/skills/` workflow instead, so the root guidance
 budget is not widened speculatively. See [Codex AGENTS.md
 guidance](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
-GitHub Copilot is compatibility coverage: its `.github/instructions/` adapters
-derive `applyTo` from the same target-neutral patterns. Claude/Copilot scope
-parity is structurally validated; real-client loading probes live in `scripts/check_native_clients.py`
-work.
+GitHub Copilot has first-class **VS Code custom-agent** support. Its
+`.github/instructions/` adapters derive `applyTo` from the same target-neutral
+patterns, and its custom agents are structurally validated with the shared
+metadata. This claim excludes Copilot CLI and Copilot cloud coding agents.
+Authenticated VS Code loading remains separate native evidence.
 
 ## Most Important Skills
 
@@ -477,8 +478,10 @@ second distribution. `luna_coder` and `sol_coder` remain Codex-only.
 
 Claude Code and GitHub Copilot keep the six universal agents. Codex generates
 those six plus the two bounded implementation specialists. Claude Code and
-Codex both carry per-agent model/effort tiers for their eligible agents
-(Copilot uses its own model pins):
+Codex both carry per-agent model/effort tiers for their eligible agents.
+Copilot agents inherit the VS Code session-selected model because their
+generated metadata omits `model:`. If the user selects Auto, Auto remains that
+session choice; the bootstrap does not define per-role complexity routing.
 
 | Agent | Claude model | Claude effort | Codex model | Codex effort |
 | --- | --- | --- | --- | --- |
@@ -490,6 +493,13 @@ Codex both carry per-agent model/effort tiers for their eligible agents
 | verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 | luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
 | sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
+
+In VS Code Copilot, the visible orchestrator lists only the five universal
+specialists and is not generally model-invocable as a subagent. The planner has
+an explicit empty subagent list. Hidden agents remain out of the picker but are
+available when an allowed coordinator names them. Search-capable agents receive
+`search` plus the configured `semble/*`, `context-mode/*`, and `context7/*` MCP
+surfaces; Context Mode still enforces its filtered server boundary.
 
 **Google Antigravity:** the generated adapter configuration assigns Pro to the
 orchestrator, planner, canonical coder, and reviewer; it assigns Flash to the
@@ -607,8 +617,8 @@ informed at least every five minutes when no stricter cadence applies. Thirty
 minutes is a provisional health-review floor, not an automatic interruption
 timer. Retain `max` only for two matched `xhigh` checklist failures resolved by
 a matched `max` control; consider `high` only after a paired benchmark. GitHub
-Copilot remains `Claude Opus 4.6`; effort labels are not cross-vendor compute
-claims. See the [dated planner calibration record](docs/2026-08-09-planner-reliability-calibration.md).
+Copilot inherits the VS Code session model; Auto is a user-selected session
+choice, not a per-role effort policy. See the [dated planner calibration record](docs/2026-08-09-planner-reliability-calibration.md).
 
 ### Task lanes
 

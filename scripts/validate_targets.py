@@ -43,21 +43,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
 TARGET_ROOT = DIST_ROOT / "multi-agent"
-COPILOT_MODEL_PINS = (
-    "GPT-5.4",
-    "Claude Opus 4.6",
-    "Claude Sonnet 4.6",
-    "(copilot)",
-)
-# Hand-maintained allow-list of Copilot picker model names. These were valid
-# against the official GitHub Copilot supported-models reference as last checked
-# 2026-07-03. This list rots silently as the picker changes — re-verify against
-# the reference and update the date when you touch it.
-GITHUB_ALLOWED_AGENT_MODELS = {
-    "GPT-5.4",
-    "Claude Opus 4.6",
-    "Claude Sonnet 4.6",
-}
 # Claude subagent frontmatter allow-lists. Model aliases and effort levels are
 # validated against the official Claude Code references as last checked
 # 2026-07-09 (subagents.md supported frontmatter fields; model-config.md effort
@@ -2048,6 +2033,12 @@ def validate_agents(errors: list[str]) -> None:
         if generated.exists():
             text = read(generated)
             agent = agents_by_id[agent_id]
+            errors.extend(
+                github_agent_model_errors(
+                    text, expected_github_models[agent_id], generated
+                )
+            )
+            errors.extend(github_agent_metadata_errors(text, agent, generated))
             if "claude-code" not in agent["targets"]:
                 prompt = transform_agent_text(
                     read(agent_dirs_by_id[agent_id] / "prompt.md"), "github-copilot"
@@ -2336,7 +2327,7 @@ def validate_agents(errors: list[str]) -> None:
                 errors,
             )
 
-    validate_github_agent_models(errors, expected_github_models)
+    validate_github_agent_metadata_cases(errors)
 
 
 def github_agent_model_errors(
@@ -2355,27 +2346,6 @@ def github_agent_model_errors(
         for line in frontmatter_lines
         if line.startswith("model:")
     ]
-    for index, line in enumerate(frontmatter_lines):
-        if not line.startswith("model:"):
-            continue
-        value = line.split(":", 1)[1].strip()
-        if not value:
-            errors.append(
-                f"GitHub agent model must be a single string, not a YAML list: {path}"
-            )
-            continue
-        if value not in GITHUB_ALLOWED_AGENT_MODELS:
-            errors.append(
-                f"GitHub agent model is not a current supported Copilot model string: {path}: {value}"
-            )
-        if "(copilot)" in value:
-            errors.append(
-                f"GitHub agent model must not include provider suffix: {path}"
-            )
-        if index + 1 < len(frontmatter_lines) and frontmatter_lines[
-            index + 1
-        ].lstrip().startswith("- "):
-            errors.append(f"GitHub agent model must not be a YAML sequence: {path}")
     expected = expected_model if isinstance(expected_model, str) else "target-default"
     if expected == "target-default":
         if model_lines:
@@ -2387,35 +2357,136 @@ def github_agent_model_errors(
     return errors
 
 
-def validate_github_agent_models(
-    errors: list[str], expected_models: dict[str, object]
-) -> None:
-    agent_root = TARGET_ROOT / ".github" / "agents"
-    for path in sorted(agent_root.glob("*.agent.md")):
-        text = read(path)
-        errors.extend(
-            github_agent_model_errors(
-                text, expected_models.get(path.name.removesuffix(".agent.md")), path
+COPILOT_RETRIEVAL_WILDCARDS = {"semble/*", "context-mode/*", "context7/*"}
+
+
+def github_frontmatter_list(frontmatter: str, key: str) -> list[str] | None:
+    """Return one generated list field, or None when the field is absent."""
+    lines = frontmatter.splitlines()
+    for index, line in enumerate(lines):
+        if line == f"{key}: []":
+            return []
+        if line != f"{key}:":
+            continue
+        values: list[str] = []
+        for follow in lines[index + 1 :]:
+            if follow.startswith("  - "):
+                values.append(follow[4:])
+            else:
+                break
+        return values
+    return None
+
+
+def github_agent_metadata_errors(
+    text: str, agent: dict[str, Any], path: Path
+) -> list[str]:
+    """Return Copilot custom-agent metadata drift errors."""
+    frontmatter = extract_frontmatter(text)
+    if not frontmatter:
+        return [f"GitHub agent missing frontmatter: {path}"]
+    errors: list[str] = []
+    tools = github_frontmatter_list(frontmatter, "tools") or []
+    rendered_delegates = github_frontmatter_list(frontmatter, "agents")
+    capabilities = set(agent.get("capabilities", []))
+    wildcard_tools = {tool for tool in tools if tool.endswith("/*")}
+    if "search" in capabilities:
+        if "search" not in tools or wildcard_tools != COPILOT_RETRIEVAL_WILDCARDS:
+            errors.append(
+                f"GitHub search tools drifted from canonical MCP mapping: {path}"
             )
+    elif wildcard_tools:
+        errors.append(f"GitHub non-search agent received retrieval MCP tools: {path}")
+
+    expected_delegates = list(agent.get("delegates", []))
+    if "delegate" in capabilities:
+        if rendered_delegates != expected_delegates:
+            errors.append(
+                f"GitHub agent delegation list drifted from canonical metadata: {path}"
+            )
+    elif rendered_delegates is not None:
+        errors.append(f"GitHub non-delegating agent must not define agents: {path}")
+    if rendered_delegates is not None and "agent" not in tools:
+        errors.append(f"GitHub agent list requires the agent tool: {path}")
+
+    hidden = agent.get("visibility") == "hidden"
+    user_invocable = "user-invocable: false" in frontmatter.splitlines()
+    if hidden != user_invocable:
+        errors.append(
+            f"GitHub agent visibility drifted from canonical metadata: {path}"
         )
-
-
-def validate_model_leaks(errors: list[str]) -> None:
-    non_github_roots = (
-        TARGET_ROOT / "CLAUDE.md",
-        TARGET_ROOT / "AGENTS.md",
-        TARGET_ROOT / ".claude",
-        TARGET_ROOT / ".codex",
+    model_invocation_disabled = (
+        "disable-model-invocation: true" in frontmatter.splitlines()
     )
-    for root in non_github_roots:
-        paths = [root] if root.is_file() else text_files(root)
-        for path in paths:
-            text = read(path)
-            for pin in COPILOT_MODEL_PINS:
-                if pin in text:
-                    errors.append(
-                        f"Copilot model pin leaked into non-GitHub output: {path} contains {pin}"
-                    )
+    if (agent["id"] == "orchestrator") != model_invocation_disabled:
+        errors.append(
+            f"GitHub agent invocation restriction drifted from canonical metadata: {path}"
+        )
+    return errors
+
+
+def validate_github_agent_metadata_cases(errors: list[str]) -> None:
+    """Exercise the focused negative cases for Copilot metadata validation."""
+    no_search_agent = {
+        "id": "fixture",
+        "visibility": "public",
+        "capabilities": ["read"],
+        "delegates": [],
+    }
+    planner_agent = {
+        "id": "planner",
+        "visibility": "public",
+        "capabilities": ["delegate"],
+        "delegates": [],
+    }
+    orchestrator_agent = {
+        "id": "orchestrator",
+        "visibility": "public",
+        "capabilities": ["delegate"],
+        "delegates": ["planner"],
+    }
+    cases = (
+        (
+            "---\ntools:\n  - read\n  - semble/*\n---\n",
+            no_search_agent,
+            "non-search agent received retrieval MCP tools",
+        ),
+        (
+            "---\ntools:\n  - agent\n---\n",
+            planner_agent,
+            "delegation list drifted",
+        ),
+        (
+            "---\ntools:\n  - agent\nagents:\n  - planner\n---\n",
+            orchestrator_agent,
+            "invocation restriction drifted",
+        ),
+        (
+            "---\ntools:\n  - read\nagents: []\n---\n",
+            no_search_agent,
+            "non-delegating agent must not define agents",
+        ),
+        (
+            "---\ntools:\n  - read\nagents: []\n---\n",
+            planner_agent,
+            "agent list requires the agent tool",
+        ),
+    )
+    for text, agent, expected in cases:
+        fixture_errors = github_agent_metadata_errors(text, agent, Path("fixture"))
+        check(
+            any(expected in error for error in fixture_errors),
+            f"GitHub metadata validator must reject fixture drift: {expected}",
+            errors,
+        )
+    model_errors = github_agent_model_errors(
+        "---\nmodel: intentional-future-model\n---\n", "target-default", Path("fixture")
+    )
+    check(
+        any("must inherit" in error for error in model_errors),
+        "GitHub model validator must reject a current inherited agent with model metadata",
+        errors,
+    )
 
 
 # Every generated target must carry the identical Semble, Context7, and
@@ -9578,7 +9649,6 @@ def main() -> int:
         validate_task_lane_contract(errors)
         validate_codex_model_contract_cases(errors)
         validate_agents(errors)
-        validate_model_leaks(errors)
         validate_mcp_and_hooks(errors)
         validate_antigravity_manifest_and_skills(errors)
         validate_context_mode_tool_surface(errors)
