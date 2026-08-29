@@ -148,6 +148,12 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
     "Explicit user cancellation and an actual terminal error remain immediate exceptions",
     "Do not add a generic `max` retry or lower the default to `high`",
     "two matched `xhigh` runs reproduce a material checklist failure",
+    "approved existing plan remains implementation-ready, skip the planner and proceed to IMPLEMENT",
+    "revise affected future phases only",
+    "Git and the filesystem are authoritative over cached index content",
+    "do not index again for every subagent",
+    "Reuse or continue an existing role when the follow-up is in the same role and phase and its context remains valid",
+    "Do not reuse a coder as reviewer or verifier merely to save usage",
 )
 REQUIRED_HOOK_SCRIPTS = (
     "antigravity-pretool.py",
@@ -292,9 +298,12 @@ REPORTING_POLICY_REQUIRED_FRAGMENTS = (
     "Do not lossily rewrite",
     "Do not make a general rewrite stage mandatory",
     "mandatory `humanize` `edit` self-check",
+    "Before sending a human-facing response, perform a send-time self-check",
+    "not as a separate rewrite lifecycle",
     "## Agent-to-agent status and handoffs",
     "`caveman full` may be the default",
     "not the default for user communication",
+    "do not relay them verbatim when they are unsuitable for the user",
 )
 ROOT_GUIDANCE_USER_FACING_FRAGMENTS = (
     "For every user-facing message, use clear, direct language",
@@ -303,7 +312,27 @@ ROOT_GUIDANCE_USER_FACING_FRAGMENTS = (
     "Define uncommon terms when needed, retain precise technical terms",
     "do not use `caveman full` with the user",
     "Compact internal agent handoffs may still use `caveman full`",
+    "Reporting rules are output requirements",
+    "Self-check user-facing prose before sending",
 )
+EXECUTION_DEFAULTS_POLICY_FRAGMENTS = {
+    "workflow.instructions.md": (
+        "An approved existing implementation-ready plan normally skips new plan creation.",
+        "revise affected future phases only, without reopening completed or unaffected scope.",
+        "Before each new phase, perform the material-impact check above",
+    ),
+    "workspace.instructions.md": (
+        "approved implementation-ready plan follows the conditional planner route",
+        "orchestrator -> [planner when needed] -> coder",
+    ),
+    "tool-routing.instructions.md": (
+        "contained real directory",
+        "one bounded directory index after direct pre-flight reads",
+        "no directory-policy override arguments",
+        "never repository truth",
+        "Git and filesystem state are authoritative over cached content",
+    ),
+}
 HUMANIZE_SKILL_REQUIRED_FRAGMENTS = (
     "Writing-pattern signals are editorial heuristics",
     "do not prove AI authorship",
@@ -701,6 +730,16 @@ def task_lane_contract_errors(text: str) -> list[str]:
     return errors
 
 
+def execution_defaults_policy_errors(name: str, text: str) -> list[str]:
+    """Return missing conditional-planning and guarded-indexing policy clauses."""
+    semantic_text = normalized_text(text)
+    return [
+        f"{name} is missing execution-defaults policy: {fragment}"
+        for fragment in EXECUTION_DEFAULTS_POLICY_FRAGMENTS.get(name, ())
+        if normalized_text(fragment) not in semantic_text
+    ]
+
+
 def planner_supervision_contract_errors(
     planner_prompt: str, orchestrator_prompt: str
 ) -> list[str]:
@@ -914,6 +953,16 @@ def validate_policy_adapters(errors: list[str]) -> None:
             and canonical_path.exists()
         ):
             errors.extend(reporting_policy_errors(read(canonical_path)))
+        if policy.source.name in EXECUTION_DEFAULTS_POLICY_FRAGMENTS:
+            errors.extend(
+                execution_defaults_policy_errors(policy.source.name, source_text)
+            )
+            if canonical_path.exists():
+                errors.extend(
+                    execution_defaults_policy_errors(
+                        policy.source.name, read(canonical_path)
+                    )
+                )
         check(
             github_path.exists(),
             f"missing Copilot policy adapter: {github_path}",
@@ -3131,6 +3180,27 @@ def validate_context_mode_tool_surface(errors: list[str]) -> None:
     check(
         f'"{CONTEXT_MODE_PINNED_VERSION}"' in filter_text,
         f"Context Mode MCP filter must pin version {CONTEXT_MODE_PINNED_VERSION}",
+        errors,
+    )
+    check(
+        'new Set(["content", "path", "source"])' in filter_text,
+        "Context Mode MCP filter must keep the closed ctx_index argument allowlist",
+        errors,
+    )
+    check(
+        "Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name))"
+        in filter_text,
+        "Context Mode MCP filter must expose only guarded ctx_index schema properties",
+        errors,
+    )
+    check(
+        "if (!stat.isFile() && !stat.isDirectory())" in filter_text,
+        "Context Mode MCP filter must allow only contained regular files or real directories",
+        errors,
+    )
+    check(
+        "directory input is temporarily disabled" not in filter_text,
+        "Context Mode MCP filter must not claim guarded directory indexing is disabled",
         errors,
     )
     surfaces = [

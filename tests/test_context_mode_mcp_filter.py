@@ -32,7 +32,9 @@ def fake_upstream(tmp_path: Path) -> tuple[Path, Path]:
         "def handle(m):\n"
         " mid=m.get('id'); method=m.get('method')\n"
         " if method=='initialize': r={'serverInfo':{'name':'context-mode','version':os.environ.get('FAKE_VERSION','1.0.169')}}\n"
-        " elif method=='tools/list': r={'tools':[{'name':n} for n in ['ctx_index','ctx_search','ctx_stats','ctx_doctor','ctx_execute','ctx_fetch_and_index','future_tool']]}\n"
+        " elif method=='tools/list':\n"
+        "  schema={'type':'object','properties':{key:{'type':'string'} for key in ['content','path','source','include','exclude','maxDepth','maxFiles','extensions','respectGitignore','followSymlinks']}}\n"
+        "  r={'tools':[{'name':n, **({'inputSchema':schema} if n=='ctx_index' else {})} for n in ['ctx_index','ctx_search','ctx_stats','ctx_doctor','ctx_execute','ctx_fetch_and_index','future_tool']]}\n"
         " elif method=='tools/call':\n"
         "  open(os.environ['FAKE_TRACE'],'a').write(m['params']['name']+'\\n'); r={'content':[{'type':'text','text':'ok'}]}\n"
         " else: r={'echo':method}\n"
@@ -102,6 +104,8 @@ def test_initialize_and_tools_list_expose_exact_allowlist(
     response = _request(process, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     names = [tool["name"] for tool in response["result"]["tools"]]  # type: ignore[index]
     assert names == ["ctx_index", "ctx_search", "ctx_stats", "ctx_doctor"]
+    index_tool = response["result"]["tools"][0]  # type: ignore[index]
+    assert set(index_tool["inputSchema"]["properties"]) == {"content", "path", "source"}  # type: ignore[index]
     process.terminate()
 
 
@@ -159,7 +163,7 @@ def test_fragmented_and_multiple_messages_are_forwarded(
     process.terminate()
 
 
-def test_allowed_calls_and_guarded_index_content_and_file_pass_through(
+def test_allowed_calls_and_guarded_index_content_file_and_directories_pass_through(
     tmp_path: Path, fake_upstream: tuple[Path, Path]
 ) -> None:
     fake, trace = fake_upstream
@@ -167,15 +171,21 @@ def test_allowed_calls_and_guarded_index_content_and_file_pass_through(
     project.mkdir()
     ordinary = project / "ordinary.md"
     ordinary.write_text("safe")
+    nested = project / "nested"
+    nested.mkdir()
     process = _start(project, fake, trace)
     _initialize(process)
     assert "result" in _call(
         process, 2, "ctx_index", {"content": "safe", "source": "fixture"}
     )
     assert "result" in _call(process, 3, "ctx_index", {"path": "ordinary.md"})
-    for request_id, name in enumerate(("ctx_search", "ctx_stats", "ctx_doctor"), 4):
+    assert "result" in _call(process, 4, "ctx_index", {"path": "."})
+    assert "result" in _call(process, 5, "ctx_index", {"path": "nested"})
+    for request_id, name in enumerate(("ctx_search", "ctx_stats", "ctx_doctor"), 6):
         assert "result" in _call(process, request_id, name, {})
     assert trace.read_text().splitlines() == [
+        "ctx_index",
+        "ctx_index",
         "ctx_index",
         "ctx_index",
         "ctx_search",
@@ -308,28 +318,19 @@ def test_racing_call_and_list_with_shared_id_never_leaks_blocked_tools(
     process.terminate()
 
 
-@pytest.mark.parametrize(
-    ("path_value", "message"),
-    [
-        ("../outside.md", "traversal"),
-        ("directory", "temporarily disabled"),
-        ("missing.md", "must exist"),
-    ],
-)
-def test_index_rejects_traversal_directory_and_missing_path(
+@pytest.mark.parametrize("argument", ["respectGitignore", "maxDepth", "maxFiles"])
+def test_index_rejects_directory_policy_override_arguments(
     tmp_path: Path,
     fake_upstream: tuple[Path, Path],
-    path_value: str,
-    message: str,
+    argument: str,
 ) -> None:
     fake, trace = fake_upstream
     project = tmp_path / "repo"
     project.mkdir()
-    (project / "directory").mkdir()
     process = _start(project, fake, trace)
     _initialize(process)
-    response = _call(process, 2, "ctx_index", {"path": path_value})
-    assert message in response["error"]["message"]  # type: ignore[index]
+    response = _call(process, 2, "ctx_index", {"path": ".", argument: True})
+    assert argument in response["error"]["message"]  # type: ignore[index]
     assert not trace.exists()
     process.terminate()
 
@@ -348,21 +349,33 @@ def test_index_rejects_oversized_source_label(
     process.terminate()
 
 
-def test_index_rejects_absolute_outside_and_symlink_paths(
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO fixtures require mkfifo")
+def test_index_rejects_outside_traversal_symlink_and_unsupported_paths(
     tmp_path: Path, fake_upstream: tuple[Path, Path]
 ) -> None:
     fake, trace = fake_upstream
     project = tmp_path / "repo"
     project.mkdir()
-    outside = tmp_path / "outside.md"
-    outside.write_text("outside")
-    (project / "link.md").symlink_to(outside)
+    contained_target = project / "contained"
+    contained_target.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (project / "inside-link").symlink_to(contained_target, target_is_directory=True)
+    (project / "outside-link").symlink_to(outside, target_is_directory=True)
+    unsupported = project / "unsupported"
+    os.mkfifo(unsupported)
     process = _start(project, fake, trace)
     _initialize(process)
     outside_response = _call(process, 2, "ctx_index", {"path": str(outside)})
-    link_response = _call(process, 3, "ctx_index", {"path": "link.md"})
+    traversal_response = _call(process, 3, "ctx_index", {"path": "../outside"})
+    inside_link_response = _call(process, 4, "ctx_index", {"path": "inside-link"})
+    outside_link_response = _call(process, 5, "ctx_index", {"path": "outside-link"})
+    unsupported_response = _call(process, 6, "ctx_index", {"path": "unsupported"})
     assert "inside the repository" in outside_response["error"]["message"]  # type: ignore[index]
-    assert "symbolic link" in link_response["error"]["message"]  # type: ignore[index]
+    assert "traversal" in traversal_response["error"]["message"]  # type: ignore[index]
+    assert "symbolic link" in inside_link_response["error"]["message"]  # type: ignore[index]
+    assert "symbolic link" in outside_link_response["error"]["message"]  # type: ignore[index]
+    assert "regular file or directory" in unsupported_response["error"]["message"]  # type: ignore[index]
     assert not trace.exists()
     process.terminate()
 

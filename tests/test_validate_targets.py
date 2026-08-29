@@ -67,6 +67,7 @@ from validate_targets import (  # noqa: E402
     readme_agent_contract_errors,
     root_guidance_errors,
     documenter_humanize_errors,
+    execution_defaults_policy_errors,
     humanize_contract_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
@@ -576,6 +577,20 @@ def test_task_lane_contract_rejects_missing_requirement_and_stale_drift() -> Non
         1,
     )
     assert workflow_reporting_errors(legacy_reporting)
+
+
+def test_execution_defaults_policy_contract_rejects_missing_clauses() -> None:
+    """Conditional planning and bounded indexing remain explicit policy."""
+    mutations = {
+        "workflow.instructions.md": "implementation-ready plan normally skips new plan",
+        "workspace.instructions.md": "approved implementation-ready plan follows",
+        "tool-routing.instructions.md": "contained real directory",
+    }
+    for name in target_validator.EXECUTION_DEFAULTS_POLICY_FRAGMENTS:
+        policy = (REPO_ROOT / "shared" / "policies" / name).read_text(encoding="utf-8")
+        assert execution_defaults_policy_errors(name, policy) == []
+        missing = policy.replace(mutations[name], "missing policy clause", 1)
+        assert execution_defaults_policy_errors(name, missing)
 
 
 def test_policy_adapters_share_one_validated_target_neutral_scope() -> None:

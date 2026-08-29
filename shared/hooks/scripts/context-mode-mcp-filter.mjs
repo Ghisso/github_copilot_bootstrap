@@ -78,10 +78,9 @@ function validateIndex(args) {
   }
   if (stat.isSymbolicLink()) return "ctx_index path must not be a symbolic link";
   if (!isContained(canonical)) return "ctx_index path must remain inside the repository";
-  if (stat.isDirectory()) {
-    return "ctx_index directory input is temporarily disabled; provide content or one regular file";
+  if (!stat.isFile() && !stat.isDirectory()) {
+    return "ctx_index path must be a regular file or directory";
   }
-  if (!stat.isFile()) return "ctx_index path must be a regular file";
   return null;
 }
 
@@ -175,7 +174,20 @@ function handleUpstream(message, raw) {
     } else {
       listIds.set(key, pendingListResponses - 1);
     }
-    message.result.tools = message.result.tools.filter((tool) => ALLOWED_TOOLS.has(tool?.name));
+    message.result.tools = message.result.tools
+      .filter((tool) => ALLOWED_TOOLS.has(tool?.name))
+      .map((tool) => {
+        if (tool?.name !== "ctx_index" || !tool.inputSchema?.properties) return tool;
+        return {
+          ...tool,
+          inputSchema: {
+            ...tool.inputSchema,
+            properties: Object.fromEntries(
+              Object.entries(tool.inputSchema.properties).filter(([name]) => INDEX_ARGS.has(name)),
+            ),
+          },
+        };
+      });
     send(process.stdout, message);
     return;
   }

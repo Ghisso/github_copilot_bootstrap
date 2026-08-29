@@ -455,7 +455,7 @@ The agent layer gives me orchestration plus profile-driven reviews. Full shared 
 
 The specialist flow for standard and high-risk implementation work is:
 
-- orchestrator -> planner -> coder -> verifier -> reviewer -> documenter
+- orchestrator -> conditional planner -> coder -> verifier -> reviewer -> documenter
 
 Universal agents:
 
@@ -655,6 +655,8 @@ hook gates remain in force for their normal lifecycle checks.
 Orchestrator routing details:
 
 - The orchestrator does a shallow exploration pass, then chooses `--mode micro-plan` or `--mode full-plan` under the task-lane policy before delegating to the planner.
+- To execute an approved existing plan, say `Implement big plan <plan-name>.` Approved plans that remain implementation-ready normally skip the planner. Evidence from a completed phase can trigger one planner pass to revise affected future phases only; unchanged future work proceeds directly.
+- Known authoritative files are read directly. When broader discovery helps, guarded Context Mode may optionally establish one bounded project index with pinned defaults. Indexing is nonblocking, never repository truth, and existing agent context and evidence are reused; independent verifier and reviewer judgment remains independent. Retrieval, language, verification, review, and lifecycle rules remain mandatory.
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
@@ -770,7 +772,7 @@ Documentation gate:
 VS Code can load the checked-in MCP servers from [.vscode/mcp.json](.vscode/mcp.json):
 
 - `semble` uses `uvx --from "semble[mcp]" semble`.
-- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. `ctx_index` currently accepts content and a single guarded regular file only; directory indexing is rejected with an actionable message as a temporary limitation.
+- `context-mode` routes through [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) `server` mode, which forwards a public-stdio filter (`shared/hooks/scripts/context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. All three generated targets (GitHub Copilot, Claude Code, OpenAI Codex) route through the same dispatcher. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) locally, before the request reaches upstream. Guarded `ctx_index` accepts content, a contained regular file, or a contained real directory. Directory-policy knobs stay fixed at the pinned upstream defaults, so callers do not pass `include`, `exclude`, `maxDepth`, `maxFiles`, `extensions`, `respectGitignore`, or `followSymlinks`.
 
 **Inside the devcontainer**, Node.js 22 and `context-mode` are pre-installed — no extra setup needed.
 
