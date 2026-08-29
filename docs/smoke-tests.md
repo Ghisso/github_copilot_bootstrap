@@ -276,7 +276,7 @@ acceptance gap/blocker.
   gate.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
 - A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
-- Two findings reports for the same branch/phase select the newest by `generated_at`, not filename — a lexically-later but older clean report loses to a lexically-earlier but newer report containing a `CRITICAL` finding.
+- Completed gates use only the exact findings path and SHA-256 hash recorded by the final closeout receipt; an extra newer or lexically-later report cannot replace it.
 - A findings report with `counts.critical == 0` but `counts.major > 0` allows the commit (the commit gate only checks `critical`) but blocks the push, naming a `MAJOR` finding.
 - A findings report generated pre-commit (its `head_sha` is the certified commit's parent) still satisfies the push gate, since `pre-push` accepts any ancestor of the pushed commit, not only an exact match.
 - All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.

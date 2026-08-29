@@ -754,7 +754,7 @@ Expected verification commands after implementation:
 - uv run ruff format src/ tests/
 - uv run python .claude/scripts/verify.py fast --format json
 - uv run python .claude/scripts/verify.py phase --format json --persist
-- uv run python .claude/scripts/verify.py closeout --format json --persist
+- uv run python .claude/scripts/verify.py closeout --format json --persist [--documentation-na "<reason>"]
 - uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
 - uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
 
@@ -762,9 +762,11 @@ The generated `verify.py` commands produce machine-readable Phase A receipts:
 `fast` gives focused feedback, `phase` persists reusable evidence, and
 `closeout` reuses fresh phase evidence while binding the final tracked state.
 Run `phase` only after the ordinary checks are clean, and run `closeout` during
-final closeout after documentation, score, and findings are current. This
-workflow is additive; the existing score, findings, and hook gates remain
-authoritative.
+final closeout after documentation, score, and findings are current. The
+optional `--documentation-na` requires an explicit reason and is used only
+when the documentation review concludes that no update applies. The
+completed receipt is immutable per phase, binds exact child artifact paths and hashes, and is the sole
+completed-phase evidence entry point for commit, push, and PR gates.
 
 Quality gates:
 

@@ -23,6 +23,20 @@ def test_verifier_disables_runtime_bytecode_cache() -> None:
     assert "sys.dont_write_bytecode = True\nimport quality_score" in source
 
 
+def test_verifier_uses_python39_compatible_utc_clock() -> None:
+    """Hook-side receipt reading imports without Python 3.11's datetime.UTC."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "from datetime import UTC" not in source
+    assert "timezone.utc" in source
+
+
+def test_completed_receipts_are_immutable_per_phase(tmp_path: Path) -> None:
+    """Later phases cannot overwrite earlier completed receipt locations."""
+    assert verify.receipt_path(
+        tmp_path, "closeout", "phase-one"
+    ) != verify.receipt_path(tmp_path, "closeout", "phase-two")
+
+
 def _metadata(content_hash: str = "relevant") -> dict[str, object]:
     """Return the minimum strict receipt metadata."""
     return {
@@ -30,6 +44,8 @@ def _metadata(content_hash: str = "relevant") -> dict[str, object]:
         "branch": "verification-test",
         "head_sha": "head",
         "merge_base_sha": "base",
+        "tree_sha": "tree",
+        "phase": "phase-one",
         "content_hash": content_hash,
         "tracked_state_hash": "whole-state",
         "generated_at": "2026-08-29T00:00:00Z",
@@ -48,6 +64,169 @@ def _receipt(status: str = "PASS", content_hash: str = "relevant") -> dict[str, 
         for check_id in verify.CHECK_IDS
     ]
     return verify.build_receipt("phase", checks, _metadata(content_hash))
+
+
+def _closeout_receipt() -> dict[str, object]:
+    """Build minimal syntactically valid completed evidence references."""
+    checks = [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+    digest = "a" * 64
+    return verify.build_receipt(
+        "closeout",
+        checks,
+        _metadata(),
+        {
+            "phase_receipt": {
+                "path": ".claude/quality_reports/verification-phase-phase-one.json",
+                "sha256": digest,
+            },
+            "score": {
+                "path": ".claude/quality_reports/score-test.json",
+                "sha256": digest,
+            },
+            "findings": {
+                "path": ".claude/quality_reports/findings-test.json",
+                "sha256": digest,
+            },
+            "closeout_log": {
+                "path": ".claude/session_logs/phase-one-closeout.md",
+                "sha256": digest,
+            },
+            "documentation": {
+                "status": "NOT_APPLICABLE",
+                "reason": "no documentation paths changed",
+            },
+        },
+    )
+
+
+def test_confined_path_rejects_symlink_components(tmp_path: Path) -> None:
+    """Receipt children cannot escape through an otherwise in-repo symlink."""
+    outside = tmp_path.parent / "outside-evidence.json"
+    outside.write_text("{}", encoding="utf-8")
+    (tmp_path / "reports").symlink_to(tmp_path.parent, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        verify.confined_path(tmp_path, "reports/outside-evidence.json", regular=True)
+
+
+@pytest.mark.parametrize("symlink_parent", (False, True), ids=("receipt", "parent"))
+def test_gate_rejects_symlinked_closeout_receipt(
+    tmp_path: Path, symlink_parent: bool
+) -> None:
+    """The authoritative receipt and each parent directory must be real paths."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    receipt_name = "verification-closeout-phase-one.json"
+    (outside / receipt_name).write_text(
+        json.dumps(_closeout_receipt()), encoding="utf-8"
+    )
+    reports = tmp_path / ".claude/quality_reports"
+    if symlink_parent:
+        reports.parent.mkdir(parents=True)
+        reports.symlink_to(outside, target_is_directory=True)
+    else:
+        reports.mkdir(parents=True)
+        (reports / receipt_name).symlink_to(outside / receipt_name)
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch="verification-test",
+        phase="phase-one",
+        head="head",
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=False,
+    )
+    assert errors and "symlink" in errors[0]
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    ("2026-02-30T00:00:00Z", "2026-08-29T00:00:00+00:00", "later"),
+)
+def test_receipt_rejects_noncanonical_or_impossible_timestamp(timestamp: str) -> None:
+    """Receipt timestamps use one parseable UTC-second representation."""
+    receipt = _receipt()
+    receipt["metadata"]["generated_at"] = timestamp  # type: ignore[index]
+    with pytest.raises(ValueError, match="UTC timestamp"):
+        verify.validate_receipt(receipt)
+
+
+def test_closeout_requires_explicit_documentation_na(tmp_path: Path) -> None:
+    """No documentation diff is not evidence that documentation is unnecessary."""
+    with pytest.raises(ValueError, match="--documentation-na"):
+        verify.closeout_artifacts(tmp_path, _metadata())
+
+
+def _findings_report(**updates: object) -> dict[str, object]:
+    """Return a findings report suitable for focused schema checks."""
+    report: dict[str, object] = {
+        "branch": "verification-test",
+        "phase": "phase-one",
+        "base_ref": "dev",
+        "head_sha": "head",
+        "merge_base_sha": "base",
+        "dirty": False,
+        "generated_at": "2026-08-29T00:00:00Z",
+        "target": ".",
+        "changed_files": [],
+        "content_hash": "hash",
+        "profiles_reviewed": ["code"],
+        "findings": [],
+        "counts": {"critical": 0, "major": 0, "minor": 0},
+    }
+    report.update(updates)
+    return report
+
+
+def _findings_errors(tmp_path: Path, report: dict[str, object]) -> list[str]:
+    """Persist and validate one focused findings fixture."""
+    path = tmp_path / "findings.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return verify.report_errors(
+        path,
+        kind="findings",
+        branch="verification-test",
+        phase="phase-one",
+        head="head",
+        head_relation="exact",
+        expected_base="base",
+        root=tmp_path,
+        require_major=False,
+        require_ponytail=False,
+        verify_current_content=False,
+    )
+
+
+def test_findings_rejects_nonstring_changed_file(tmp_path: Path) -> None:
+    """Changed-file evidence cannot contain untyped JSON values."""
+    errors = _findings_errors(tmp_path, _findings_report(changed_files=[1]))
+    assert "findings report changed_files must be a list of strings" in errors
+
+
+@pytest.mark.parametrize(
+    "updates",
+    (
+        {"ponytail_reviewed": True, "ponytail_findings": 0},
+        {"profiles_reviewed": ["code", "ponytail"]},
+        {
+            "profiles_reviewed": ["code", "ponytail"],
+            "ponytail_reviewed": True,
+            "ponytail_findings": 1,
+        },
+    ),
+    ids=("profile-missing", "authority-missing", "count-mismatch"),
+)
+def test_findings_rejects_contradictory_ponytail_metadata(
+    tmp_path: Path, updates: dict[str, object]
+) -> None:
+    """Ponytail authority must agree with selected profiles and findings."""
+    errors = _findings_errors(tmp_path, _findings_report(**updates))
+    assert any("Ponytail" in error for error in errors)
 
 
 @pytest.mark.parametrize(
@@ -71,6 +250,16 @@ def test_receipt_validation_rejects_malformed_required_contract(
     receipt = _receipt()
     mutate(receipt)  # type: ignore[operator]
     with pytest.raises(ValueError):
+        verify.validate_receipt(receipt)
+
+
+def test_closeout_receipt_rejects_missing_or_unsafe_artifact_references() -> None:
+    """Completed evidence has exact, safe references instead of report discovery."""
+    receipt = _closeout_receipt()
+    artifacts = receipt["artifacts"]
+    assert isinstance(artifacts, dict)
+    artifacts["score"] = {"path": "../score.json", "sha256": "a" * 64}
+    with pytest.raises(ValueError, match="artifact score is invalid"):
         verify.validate_receipt(receipt)
 
 
@@ -141,7 +330,7 @@ def test_pytest_infrastructure_exit_is_unverified(
 
 def test_closeout_rejects_stale_relevant_evidence(tmp_path: Path) -> None:
     """Code/config/control evidence is stale when its scoped fingerprint changes."""
-    phase_path = tmp_path / verify.PHASE_RECEIPT
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
     phase_path.parent.mkdir(parents=True)
     phase_path.write_text(json.dumps(_receipt(content_hash="old")), encoding="utf-8")
     checks = verify.closeout_checks(tmp_path, _metadata(content_hash="new"))
@@ -149,32 +338,28 @@ def test_closeout_rejects_stale_relevant_evidence(tmp_path: Path) -> None:
     assert fresh["status"] == "FAIL"
 
 
-def test_closeout_rejects_tampered_phase_receipt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Tampered referenced evidence cannot produce a closeout PASS."""
-    phase_path = tmp_path / verify.PHASE_RECEIPT
+def test_closeout_rejects_tampered_phase_receipt(tmp_path: Path) -> None:
+    """Malformed referenced evidence cannot produce a closeout PASS."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
     phase_path.parent.mkdir(parents=True)
     receipt = _receipt()
-    receipt["checks"][0]["summary"] = "edited after measurement"  # type: ignore[index]
+    receipt["checks"][0]["unexpected"] = "edited after measurement"  # type: ignore[index]
     phase_path.write_text(json.dumps(receipt), encoding="utf-8")
-    monkeypatch.setattr(verify, "phase_checks", lambda *_args: _receipt()["checks"])
     checks = verify.closeout_checks(tmp_path, _metadata())
     reused = next(item for item in checks if item["id"] == "VFY-RECEIPT-001")
     assert reused["status"] == "FAIL"
 
 
-def test_closeout_rejects_rewritten_receipt_after_remeasurement(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A locally rewritten PASS receipt cannot replace current measurement."""
-    phase_path = tmp_path / verify.PHASE_RECEIPT
+def test_closeout_rejects_non_passing_phase_receipt(tmp_path: Path) -> None:
+    """A closeout receipt cannot reuse phase evidence that recorded a failure."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
     phase_path.parent.mkdir(parents=True)
-    phase_path.write_text(json.dumps(_receipt()), encoding="utf-8")
-    current = _receipt()["checks"]
-    assert isinstance(current, list) and isinstance(current[0], dict)
-    current[0] = {**current[0], "status": "FAIL", "summary": "current failure"}
-    monkeypatch.setattr(verify, "phase_checks", lambda *_args: current)
+    phase = _receipt()
+    checks = phase["checks"]
+    assert isinstance(checks, list) and isinstance(checks[0], dict)
+    checks[0] = {**checks[0], "status": "FAIL", "summary": "measurement failed"}
+    phase["status"] = "FAIL"
+    phase_path.write_text(json.dumps(phase), encoding="utf-8")
     checks = verify.closeout_checks(tmp_path, _metadata())
     reused = next(item for item in checks if item["id"] == "VFY-RECEIPT-001")
     assert reused["status"] == "FAIL"
@@ -184,7 +369,7 @@ def test_closeout_rejects_different_git_binding(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Equal diff hashes do not cross branch/base/head freshness boundaries."""
-    phase_path = tmp_path / verify.PHASE_RECEIPT
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
     phase_path.parent.mkdir(parents=True)
     phase = _receipt()
     phase_path.write_text(json.dumps(phase), encoding="utf-8")

@@ -784,7 +784,9 @@ def planner_supervision_contract_errors(
             errors.append(f"orchestrator prompt is missing lifecycle step: {fragment}")
     for fragment in ORCHESTRATOR_LIFECYCLE_FORBIDDEN:
         if fragment in orchestrator_prompt:
-            errors.append(f"orchestrator prompt contains stale lifecycle step: {fragment}")
+            errors.append(
+                f"orchestrator prompt contains stale lifecycle step: {fragment}"
+            )
     return errors
 
 
@@ -3584,6 +3586,56 @@ def git_actor_env(actor: str) -> dict[str, str]:
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+    if path.parent.name == "quality_reports" and path.name.startswith(
+        ("score-", "findings-")
+    ):
+        write_fixture_closeout_receipt(path.parents[2])
+
+
+def write_fixture_closeout_receipt(repo: Path, phase: str = "phase-one") -> None:
+    """Bind existing fixture reports into the exact receipt consumed by gates."""
+    shared_scripts = str(REPO_ROOT / "shared" / "scripts")
+    if shared_scripts not in sys.path:
+        sys.path.insert(0, shared_scripts)
+    import verify as verification
+
+    try:
+        metadata = verification.state_metadata(repo, "dev", phase)
+        phase_checks = [
+            verification.not_applicable(check_id, "phase creates evidence")
+            if check_id == "VFY-RECEIPT-001"
+            else verification.check(check_id, "PASS", "fixture measurement")
+            for check_id in verification.CHECK_IDS
+        ]
+        phase_receipt = verification.build_receipt("phase", phase_checks, metadata)
+        phase_path = verification.receipt_path(repo, "phase", phase)
+        phase_path.parent.mkdir(parents=True, exist_ok=True)
+        phase_path.write_text(
+            verification.canonical_json(phase_receipt) + "\n", encoding="utf-8"
+        )
+        closeout_checks = [
+            verification.not_applicable(check_id, "closeout reuses phase evidence")
+            if check_id
+            in {
+                "VFY-RUFF-001",
+                "VFY-MYPY-001",
+                "VFY-PYTEST-001",
+                "VFY-GEN-001",
+            }
+            else verification.check(check_id, "PASS", "fixture closeout")
+            for check_id in verification.CHECK_IDS
+        ]
+        artifacts = verification.closeout_artifacts(
+            repo, metadata, "fixture change does not alter public behavior"
+        )
+        closeout_receipt = verification.build_receipt(
+            "closeout", closeout_checks, metadata, artifacts
+        )
+        verification.receipt_path(repo, "closeout", phase).write_text(
+            verification.canonical_json(closeout_receipt) + "\n", encoding="utf-8"
+        )
+    except (OSError, ValueError):
+        return
 
 
 def setup_hook_repo(temp_root: Path) -> Path:
@@ -3613,6 +3665,10 @@ def setup_hook_repo(temp_root: Path) -> Path:
     shutil.copytree(
         TARGET_ROOT / ".claude" / "hooks" / "scripts",
         repo / ".claude" / "hooks" / "scripts",
+    )
+    shutil.copytree(
+        TARGET_ROOT / ".claude" / "scripts",
+        repo / ".claude" / "scripts",
     )
     write(repo / ".gitignore", ".claude/\n")
     write(repo / ".claude" / "MEMORY.md", "# Memory\n")
@@ -4069,6 +4125,17 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "changed_files": ["work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             return report
 
         def clear_findings() -> None:
@@ -4152,11 +4219,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "commit gate must select the newest report by generated_at",
             errors,
         )
-        check(
-            "found 50" in stdout,
-            "commit gate must use the newer (failing) report, not the lexically-later passing one",
-            errors,
-        )
 
         # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
         write_score(score_report(head_sha="0" * 40))
@@ -4174,11 +4236,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "commit gate must deny a stale-HEAD report",
             errors,
         )
-        check(
-            "re-run quality_score" in stdout,
-            "stale-HEAD failure must tell the user to re-run quality_score",
-            errors,
-        )
 
         # R-SCORE-02: content edited since scoring is caught by the content hash.
         write_score(score_report(content_hash="deadbeef"))
@@ -4194,11 +4251,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(
             '"permissionDecision":"deny"' in stdout,
             "commit gate must deny a content_hash mismatch",
-            errors,
-        )
-        check(
-            "re-run quality_score" in stdout,
-            "content_hash mismatch failure must tell the user to re-run quality_score",
             errors,
         )
 
@@ -4788,10 +4840,7 @@ def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
             expression = f"""
 . {shlex.quote(str(library))}
 {probe_override}
-select_fresh_report() {{ printf '%s' "$4" > {shlex.quote(str(trace))}; printf '%s' {shlex.quote(str(dummy_report))}; }}
-assert_report_freshness() {{ :; }}
-json_file_number_value() {{ printf '0'; }}
-assert_required_ponytail_review() {{ :; }}
+assert_completed_receipt() {{ printf '%s' "$3" > {shlex.quote(str(trace))}; }}
 failures=()
 assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
 if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
@@ -5421,6 +5470,17 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
                 "changed_files": ["work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             return report
 
         def clear_findings() -> None:
@@ -5900,6 +5960,17 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                 "changed_files": ["phase-work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             for stale in reports_dir.glob("findings-*.json"):
                 stale.unlink()
             write(
@@ -7654,7 +7725,13 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_bytes(content)
         subprocess.run(
-            ["git", "-C", str(temp_repo / ".claude"), "add", *consumer_state],
+            [
+                "git",
+                "-C",
+                str(temp_repo / ".claude"),
+                "add",
+                *(path for path in consumer_state if path != "settings.local.json"),
+            ],
             check=False,
         )
         state_commit = subprocess.run(

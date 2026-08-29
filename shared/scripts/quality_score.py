@@ -18,7 +18,7 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -99,7 +99,7 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     inside = _git(["rev-parse", "--is-inside-work-tree"], cwd)
     if inside != "true":
         return {
-            "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "branch": "",
             "head_sha": "",
             "base_ref": base_ref,
@@ -134,7 +134,7 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     except ValueError:
         target_str = str(target)
     return {
-        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "branch": branch,
         "head_sha": head_sha,
         "base_ref": base_ref,
