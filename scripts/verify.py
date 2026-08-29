@@ -24,6 +24,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 import quality_score
 
 
