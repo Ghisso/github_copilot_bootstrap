@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Fail-closed deterministic verification receipts.
+"""Fail-closed deterministic verification evidence and gate receipts.
 
-The deterministic command owns verification evidence while quality-score,
-findings, and legacy hook gates remain authoritative. ``fast`` is focused feedback, ``phase``
-persists reusable evidence, and ``closeout`` proves that phase evidence remains
-fresh before emitting a final state-bound receipt.
+The deterministic command owns verification evidence and emits the authoritative
+per-phase closeout receipt consumed by lifecycle gates. ``fast`` is focused
+feedback, ``phase`` persists reusable evidence, and ``closeout`` proves that
+phase evidence remains fresh before binding the final state and child artifacts.
 
 Usage:
     uv run python .claude/scripts/verify.py fast --format json
@@ -223,6 +223,8 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ValueError(f"receipt metadata is missing {field}")
     if not isinstance(metadata.get("path_discovery_ok"), bool):
         raise ValueError("receipt metadata is missing path_discovery_ok")
+    if not is_utc_timestamp(metadata["generated_at"]):
+        raise ValueError("receipt metadata generated_at must be a UTC timestamp")
     if receipt["mode"] in {"phase", "closeout"}:
         for field in (
             "generated_at",
@@ -294,6 +296,19 @@ def validate_documentation_evidence(evidence: object) -> None:
             raise ValueError("closeout documentation update paths are invalid")
     else:
         raise ValueError("closeout documentation status is unknown")
+
+
+def is_utc_timestamp(value: object) -> bool:
+    """Return whether a value is a real canonical UTC second timestamp."""
+    if not isinstance(value, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value
+    ):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return False
+    return True
 
 
 def is_safe_relative_path(value: str) -> bool:
@@ -503,7 +518,11 @@ def gate_receipt_errors(
     if not branch or not phase or not head:
         return ["closeout receipt gate needs branch, phase, and head"]
     try:
-        receipt = load_receipt(receipt_path(root, "closeout", phase))
+        closeout_path = receipt_path(root, "closeout", phase)
+        safe_closeout_path = confined_path(
+            root, closeout_path.relative_to(root).as_posix(), regular=True
+        )
+        receipt = load_receipt(safe_closeout_path)
     except ValueError as error:
         return [str(error)]
     if receipt["mode"] != "closeout" or receipt["status"] != "PASS":
@@ -707,8 +726,8 @@ def report_errors(
         errors.append(f"{label} merge_base_sha is stale")
     if report.get("dirty") is not False:
         errors.append(f"{label} must record dirty: false")
-    if not isinstance(report.get("generated_at"), str):
-        errors.append(f"{label} is missing generated_at")
+    if not is_utc_timestamp(report.get("generated_at")):
+        errors.append(f"{label} generated_at must be a UTC timestamp")
     target = report.get("target")
     if not isinstance(target, str):
         errors.append(f"{label} is missing target")
@@ -719,8 +738,11 @@ def report_errors(
             errors.append(
                 f"{label} target is missing, unsafe, or outside the repository"
             )
-    if not isinstance(report.get("changed_files"), list):
-        errors.append(f"{label} is missing changed_files")
+    changed_files = report.get("changed_files")
+    if not isinstance(changed_files, list) or not all(
+        isinstance(item, str) for item in changed_files
+    ):
+        errors.append(f"{label} changed_files must be a list of strings")
     if verify_current_content:
         current_hash = content_hash_for(
             root, expected_base, head if head_relation == "ancestor" else ""
@@ -764,7 +786,10 @@ def report_errors(
                 or not isinstance(title, str)
                 or not title.strip()
             ):
-                errors.append("findings report finding is invalid")
+                errors.append(
+                    "findings report finding is invalid"
+                    + (f": {title}" if isinstance(title, str) and title else "")
+                )
                 continue
             observed[str(severity).lower()] += 1
         counts = report.get("counts")
@@ -777,10 +802,44 @@ def report_errors(
             if counts != observed:
                 errors.append("findings report counts do not match findings")
             if counts["critical"] != 0:
-                errors.append("findings report has CRITICAL findings")
+                titles = ", ".join(
+                    str(item.get("title"))
+                    for item in findings
+                    if isinstance(item, dict) and item.get("severity") == "CRITICAL"
+                )
+                errors.append(
+                    "findings report has CRITICAL findings"
+                    + (f": {titles}" if titles else "")
+                )
             if require_major and counts["major"] != 0:
-                errors.append("findings report has MAJOR findings")
-        if require_ponytail and report.get("ponytail_reviewed") is not True:
+                titles = ", ".join(
+                    str(item.get("title"))
+                    for item in findings
+                    if isinstance(item, dict) and item.get("severity") == "MAJOR"
+                )
+                errors.append(
+                    "findings report has MAJOR findings"
+                    + (f": {titles}" if titles else "")
+                )
+        ponytail_reviewed = report.get("ponytail_reviewed")
+        ponytail_findings = report.get("ponytail_findings")
+        ponytail_selected = "ponytail" in profiles
+        observed_ponytail = sum(
+            1
+            for finding in findings
+            if isinstance(finding, dict) and finding.get("profile") == "ponytail"
+        )
+        if ponytail_selected:
+            if ponytail_reviewed is not True:
+                errors.append("Ponytail review metadata contradicts reviewed profiles")
+            if (
+                type(ponytail_findings) is not int
+                or ponytail_findings != observed_ponytail
+            ):
+                errors.append("Ponytail finding count does not match findings")
+        elif ponytail_reviewed is not None or ponytail_findings is not None:
+            errors.append("unselected Ponytail review must omit Ponytail metadata")
+        if require_ponytail and not ponytail_selected:
             errors.append("this high-risk diff requires a fresh Ponytail review")
     return errors
 
@@ -935,9 +994,9 @@ def latest_report(root: Path, pattern: str, branch: str, phase: str) -> Path:
         if (
             report.get("branch") == branch
             and report.get("phase") == phase
-            and isinstance(generated_at, str)
+            and is_utc_timestamp(generated_at)
         ):
-            candidates.append((generated_at, safe_candidate))
+            candidates.append((str(generated_at), safe_candidate))
     if not candidates:
         raise ValueError(f"no matching {pattern} report for phase {phase}")
     return max(candidates, key=lambda item: item[0])[1]
@@ -958,7 +1017,9 @@ def closeout_log_path(root: Path, phase: str) -> Path:
     return confined_path(root, match.group(1), regular=True)
 
 
-def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, object]:
+def closeout_artifacts(
+    root: Path, metadata: dict[str, object], documentation_na: str = ""
+) -> dict[str, object]:
     """Capture the precise evidence set a completed-phase gate consumes."""
     branch = metadata.get("branch")
     phase = metadata.get("phase")
@@ -974,6 +1035,10 @@ def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, obj
         for path in metadata_paths(metadata, "changed_paths")
         if classify_path(path) == "documentation-only"
     ]
+    if not documentation_paths and not documentation_na.strip():
+        raise ValueError(
+            "closeout needs --documentation-na REASON when documentation was not updated"
+        )
     return {
         "phase_receipt": relative_artifact(root, receipt_path(root, "phase", phase)),
         "score": relative_artifact(
@@ -988,7 +1053,7 @@ def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, obj
             if documentation_paths
             else {
                 "status": "NOT_APPLICABLE",
-                "reason": "no documentation paths changed",
+                "reason": documentation_na.strip(),
             }
         ),
     }
@@ -1214,11 +1279,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-major", action="store_true")
     parser.add_argument("--require-ponytail", action="store_true")
     parser.add_argument("--enforce-final-state", action="store_true")
+    parser.add_argument(
+        "--documentation-na",
+        default="",
+        metavar="REASON",
+        help="explain why a closeout does not require documentation changes",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
-    """Run one verifier mode and optionally persist its non-authoritative receipt."""
+    """Run one verifier mode and optionally persist its authoritative receipt."""
     args = parse_args()
     root = Path.cwd()
     if args.mode == "gate":
@@ -1241,7 +1312,11 @@ def main() -> int:
         checks = phase_checks(root, metadata)
     else:
         checks = closeout_checks(root, metadata)
-    artifacts = closeout_artifacts(root, metadata) if args.mode == "closeout" else None
+    artifacts = (
+        closeout_artifacts(root, metadata, args.documentation_na)
+        if args.mode == "closeout"
+        else None
+    )
     receipt = build_receipt(args.mode, checks, metadata, artifacts)
     if args.persist:
         if args.mode == "fast":

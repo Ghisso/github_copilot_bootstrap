@@ -177,9 +177,8 @@ ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
 `counts.major == 0` (push/PR). The metadata matrix is exact: selecting the
 `ponytail` profile always emits `ponytail_reviewed: true` and a numeric
-`ponytail_findings` count; a new report for an unselected profile omits both
-fields. Optional diffs may still read compatible legacy reports containing
-`false`/`0`, but a routed high-risk review requires true evidence. The
+`ponytail_findings` count; a report for an unselected profile omits both
+fields. A routed high-risk review requires true evidence. The
 authoritative routing table selects Ponytail for deterministic
 control-plane/high-risk, multi-file, dependency, script, generator, or
 reviewer-selected complexity. Ordinary low-complexity and exactly one
