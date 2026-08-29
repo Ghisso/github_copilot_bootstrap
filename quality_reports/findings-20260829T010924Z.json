@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-29T01:09:33Z",
+  "branch": "orchestrator-plan-execution-defaults_implementation",
+  "head_sha": "9a39f55b217acd2eacc62baa7994b55ab553028b",
+  "base_ref": "dev",
+  "merge_base_sha": "9a39f55b217acd2eacc62baa7994b55ab553028b",
+  "phase": "2026-08-29_phase-A-orchestrator-plan-execution-defaults",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "d6b7981eacf76fbf0c02ffd93295c3aaa1ebc730",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/hooks/scripts/context-mode-mcp-filter.mjs",
+    "shared/policies/agent-reporting.instructions.md",
+    "shared/policies/tool-routing.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/policies/workspace.instructions.md",
+    "shared/skills/onboard/SKILL.md",
+    "tests/test_context_mode_mcp_filter.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

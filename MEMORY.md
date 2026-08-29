@@ -411,6 +411,10 @@
   look complete while hook mode still executed whatever was on `PATH`. Enumerate
   every path that launches a pinned dependency, not just the one with the
   obvious handshake.
+- [LEARN:security] A tool-call argument allow-list does not close the public
+  capability boundary if `tools/list` still advertises forbidden arguments.
+  Filter both invocation arguments and the advertised input schema from the
+  same allow-list, then test both surfaces.
 - [LEARN:security] A self-check that restates configuration proves nothing. It
   reported the required version as a PASS without ever observing the installed
   binary. Report the observed value alongside an explicit contract result, so the

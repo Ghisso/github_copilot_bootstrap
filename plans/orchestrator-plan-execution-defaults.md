@@ -1,13 +1,13 @@
 ---
 name: orchestrator-plan-execution-defaults
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: orchestrator-plan-execution-defaults_implementation
-started_at:
+started_at: 2026-08-29T00:21:40Z
 phases:
   - 2026-08-29_phase-A-orchestrator-plan-execution-defaults
-current_phase:
+current_phase: 2026-08-29_phase-A-orchestrator-plan-execution-defaults
 ---
 # Big Plan: orchestrator-plan-execution-defaults
 
