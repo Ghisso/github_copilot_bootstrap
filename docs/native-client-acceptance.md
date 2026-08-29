@@ -75,12 +75,11 @@ It also predates the two Codex-only coder roles. The current declared matrix is:
 | coder | `gpt-5.6-terra` | high | universal |
 | reviewer | `gpt-5.6-sol` | high | universal |
 | documenter | `gpt-5.6-luna` | medium | universal |
-| verifier | `gpt-5.6-luna` | low | universal |
 | luna_coder | `gpt-5.6-luna` | xhigh | Codex only |
 | sol_coder | `gpt-5.6-sol` | xhigh | Codex only |
 
 This declaration is not new native evidence. Future optional probes may test
-all eight roles through a persistent-thread interface, but Phase E requires no
+all seven roles through a persistent-thread interface, but Phase E requires no
 client run and makes no quality or cost claim.
 
 **This does not make the shim removable.** Routing was verified with
@@ -283,7 +282,7 @@ sentinels are the only structured final output accepted. The candidate has a
 separate execution result; a successful launch does not alone prove equivalent
 routing.
 
-For Codex, exact type/model/reasoning-effort evidence for the current eight-role
+For Codex, exact type/model/reasoning-effort evidence for the current seven-role
 declaration is accepted only from explicit JSONL agent/thread/subagent
 events—not final-answer prose. The dated 2026-08-09 evidence remains a separate
 six-role observation. If the installed client does not document or emit such
@@ -336,7 +335,7 @@ Do not remove either MultiAgent V2 routing-shim key based on documentation,
 structural validation, a single successful run, or an untrusted result. On two
 supported native Codex versions, run the trusted Codex `--require --json` probe
 repeatedly with no root CLI model or reasoning-effort override. Each release
-claim needs separately exercised, event-backed evidence for all six exact roles,
+claim needs separately exercised, event-backed evidence for all seven exact roles,
 the coder escalation contract, and exact candidate routing without the shim.
 Current v2 does not exercise compact/resume or coder escalation, so its WARNs
 cannot satisfy those conditions. Review and record the resulting evidence before

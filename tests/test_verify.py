@@ -17,6 +17,12 @@ import quality_score  # noqa: E402
 import verify  # noqa: E402
 
 
+def test_verifier_disables_runtime_bytecode_cache() -> None:
+    """Running the managed verifier must not create unmanaged runtime files."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "sys.dont_write_bytecode = True\nimport quality_score" in source
+
+
 def _metadata(content_hash: str = "relevant") -> dict[str, object]:
     """Return the minimum strict receipt metadata."""
     return {

@@ -31,7 +31,7 @@ assume a clean workspace or blindly restart.
 
 ## Failure Attribution
 
-Before automatic escalation, classify existing verifier commands and results
+Before automatic escalation, classify existing deterministic verification commands and results
 and reviewer findings as exactly one of:
 
 - `implementation`: the current implementation caused the failure; advance

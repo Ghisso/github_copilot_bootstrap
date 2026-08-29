@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fail-closed deterministic verification receipts.
 
-This Phase-A command is additive: existing verifier, quality-score, findings,
-and hook gates remain authoritative.  ``fast`` is focused feedback, ``phase``
+The deterministic command owns verification evidence while quality-score,
+findings, and legacy hook gates remain authoritative. ``fast`` is focused feedback, ``phase``
 persists reusable evidence, and ``closeout`` proves that phase evidence remains
 fresh before emitting a final state-bound receipt.
 
@@ -24,7 +24,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import quality_score
+sys.dont_write_bytecode = True
+import quality_score  # noqa: E402  # must follow the bytecode-cache guard
 
 
 SCHEMA_VERSION = 1

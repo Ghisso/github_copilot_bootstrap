@@ -243,7 +243,6 @@ def test_codex_routing_contract_rejects_aliases_and_root_pins() -> None:
         "coder": ("gpt-5.6-terra", "high"),
         "reviewer": ("gpt-5.6-sol", "high"),
         "documenter": ("gpt-5.6-luna", "medium"),
-        "verifier": ("gpt-5.6-luna", "low"),
     }
     assert CODEX_CODER_ESCALATION == "sol_coder"
     assert CODEX_ESCALATION_CHAIN == {
@@ -416,10 +415,10 @@ def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() ->
     """Structural validation rejects regressions hidden by broad substring checks."""
     guidance = render_root_guidance("claude-code")
     mutated = guidance.replace("## Map\n", "## Map\n\n## Map\n", 1).replace(
-        "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
-        "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
-        "PRE-FLIGHT -> PLAN -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
-        "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
+        "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "CLOSEOUT -> COMMIT",
+        "PRE-FLIGHT -> PLAN WHEN NEEDED -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "CLOSEOUT -> COMMIT",
         1,
     )
 
@@ -433,6 +432,38 @@ def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() ->
         "`.github/hooks/`" in error
         for error in root_guidance_errors("CLAUDE.md", missing_inventory)
     )
+
+
+def test_orchestrator_checklist_rejects_stale_plan_and_comma_lifecycles() -> None:
+    """The detailed checklist must agree with the conditional root lifecycle."""
+    planner = (REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    orchestrator = (
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert planner_supervision_contract_errors(planner, orchestrator) == []
+    for source, replacement in (
+        (
+            "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+            "PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+        ),
+        (
+            "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90",
+            "VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY/SCORE - repeat until score >= 90",
+        ),
+        ("**PLAN WHEN NEEDED:**", "**PLAN:**"),
+        ("7. **CLOSEOUT:**", "7. **DOCUMENT:**"),
+        (
+            "## Core Workflow\n",
+            "## Core Workflow\n\n"
+            "PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT\n",
+        ),
+    ):
+        mutated = orchestrator.replace(source, replacement, 1)
+        assert mutated != orchestrator
+        assert planner_supervision_contract_errors(planner, mutated)
 
     codex_missing_inventory = render_root_guidance("openai-codex").replace(
         "`.github/hooks/`, ", "", 1
@@ -850,9 +881,8 @@ def test_omitted_agent_targets_resolve_to_all_supported_targets() -> None:
         "orchestrator",
         "planner",
         "reviewer",
-        "verifier",
     }
-    assert len(agents) == 9
+    assert len(agents) == 8
     assert {agent["id"] for agent, _agent_dir in agents} == {
         *universal_agents,
         "luna_coder",
@@ -894,7 +924,6 @@ def test_antigravity_flash_coder_metadata_and_adapter_are_exact() -> None:
         "planner": "pro",
         "antigravity_flash_coder": "flash",
         "coder": "pro",
-        "verifier": "flash",
         "reviewer": "pro",
         "documenter": "flash",
     }
@@ -1117,7 +1146,7 @@ def test_codex_coder_specialist_metadata_and_supplements_are_exact() -> None:
     sol_supplement = (sol_dir / "prompt.openai-codex.md").read_text(encoding="utf-8")
     normalized_sol_supplement = " ".join(sol_supplement.split())
     for clause in (
-        "Inspect the existing diff and prior verifier or reviewer failure evidence before editing.",
+        "Inspect the existing diff and prior deterministic verification or reviewer failure evidence before editing.",
         "Recover with the smallest safe change that addresses that evidence;",
         "do not restart the phase or broaden scope.",
         "Preserve any useful prior work and adapt it only when the evidence requires it.",
@@ -1190,23 +1219,26 @@ def test_readme_agent_contract_uses_target_eligibility_and_codex_tiers() -> None
             canonical_agents,
         )
     )
-    verifier_model = codex_tiers["verifier"]["model"]
-    verifier_effort = codex_tiers["verifier"]["effort"]
-    verifier_row = f"| verifier | — | — | `{verifier_model}` | `{verifier_effort}` |\n"
+    documenter_model = codex_tiers["documenter"]["model"]
+    documenter_effort = codex_tiers["documenter"]["effort"]
+    documenter_row = (
+        f"| documenter | — | — | `{documenter_model}` | "
+        f"`{documenter_effort}` |\n"
+    )
     for name, replacement, expected_error in (
         (
             "unexpected row",
-            f"{verifier_row}| unexpected | — | — | `gpt-5.6-sol` | `high` |\n",
+            f"{documenter_row}| unexpected | — | — | `gpt-5.6-sol` | `high` |\n",
             "unexpected role unexpected",
         ),
         (
             "duplicate row",
-            f"{verifier_row}{verifier_row}",
+            f"{documenter_row}{documenter_row}",
             "duplicate the Codex model row",
         ),
-        ("malformed row", f"{verifier_row}not a data row\n", "only data rows"),
+        ("malformed row", f"{documenter_row}not a data row\n", "only data rows"),
     ):
-        mutated = readme.replace(verifier_row, replacement, 1)
+        mutated = readme.replace(documenter_row, replacement, 1)
         assert mutated != readme, name
         assert any(
             expected_error in error
@@ -1327,7 +1359,7 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
         "`environment`: a missing dependency, service, credential, sandbox restriction, unavailable tool, or other execution-environment blocker; stop model escalation and report it.",
         "`baseline`: evidence shows the failure existed on the originating branch or outside the changed scope; stop model escalation and report it.",
         "`indeterminate`: the evidence cannot reliably attribute the failure; return to orchestrator judgment with no automatic escalation.",
-        "A verifier failure alone is not sufficient for `implementation`.",
+        "A deterministic verification failure alone is not sufficient for `implementation`.",
         "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current implementation diff.",
         "Infrastructure errors, flaky or unreproduced failures, and unrelated baseline findings must not spend a stronger model automatically.",
         "The orchestrator may request focused evidence using existing agents or tools; it must not invent attribution.",
@@ -1336,7 +1368,7 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
         assert clause in normalized_codex
 
     for removed_clause in (
-        "A verifier failure alone is not sufficient for `implementation`.",
+        "A deterministic verification failure alone is not sufficient for `implementation`.",
         "only when it applies to the current\nimplementation diff.",
         "must not spend a stronger model automatically.",
         "it must not invent attribution.",
@@ -1349,8 +1381,8 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
     category_mutations = (
         (
             "extra category",
-            "\n\nA verifier failure alone is not sufficient for `implementation`.",
-            "\n- `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n- `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
             "categories must be exactly",
         ),
         (
@@ -1383,18 +1415,18 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
     unmatched_category_mutations = (
         (
             "alternate asterisk bullet",
-            "\n\nA verifier failure alone is not sufficient for `implementation`.",
-            "\n* `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n* `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
         ),
         (
             "alternate plus bullet",
-            "\n\nA verifier failure alone is not sufficient for `implementation`.",
-            "\n+ `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n+ `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
         ),
         (
             "numbered category bullet",
-            "\n\nA verifier failure alone is not sufficient for `implementation`.",
-            "\n1. `fifth`: spend a stronger model automatically.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\n1. `fifth`: spend a stronger model automatically.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
         ),
         (
             "stray prose before categories",
@@ -1408,8 +1440,8 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
         ),
         (
             "stray prose after categories",
-            "\n\nA verifier failure alone is not sufficient for `implementation`.",
-            "\nStray category prose.\n\nA verifier failure alone is not sufficient for `implementation`.",
+            "\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
+            "\nStray category prose.\n\nA deterministic verification failure alone is not sufficient for `implementation`.",
         ),
     )
     for name, source, replacement in unmatched_category_mutations:
@@ -1422,7 +1454,7 @@ def test_codex_orchestrator_attribution_contract_fails_closed() -> None:
 
 
 def test_canonical_coder_routing_contract_rejects_roster_tier_and_graph_drift() -> None:
-    """The universal-six/Codex-eight roster and named recovery chain are closed."""
+    """The universal-five/Codex-seven roster and named recovery chain are closed."""
     canonical_agents = shared_agents()
     assert canonical_agent_contract_errors(canonical_agents) == []
 

@@ -124,9 +124,9 @@ mutation. It keeps client output out of the result. Schema v2 records only
 instruction sentinels; trust is preflight/execution status. Codex role metadata
 can PASS only from explicit JSONL agent/thread/subagent events; undocumented or
 absent events are WARN, not proof. Compact/resume and coder escalation are
-currently unexercised WARNs. The current structural matrix has eight Codex
+currently unexercised WARNs. The current structural matrix has seven Codex
 roles; the dated 2026-08-09 native observation has six. A future optional
-persistent-thread probe may exercise all eight, but no native run is required
+persistent-thread probe may exercise all seven, but no native run is required
 for the current feature. Claude has no Codex-role matrix. Read [Native
 Client Acceptance](native-client-acceptance.md) before interpreting a report or
 changing a compatibility gate.
@@ -241,6 +241,8 @@ temporary `PATH` entries were removed before final runtime checks; no persistent
 ### Google Antigravity evidence boundary
 
 Static checks prove generated structure, not a native client result. The
+following Antigravity role observations are historical and predate verifier
+retirement; they are not the current generated role matrix. The
 authenticated `agy` CLI initially ran as 1.1.16 and later self-updated to
 1.1.17. It initially reused the development repository from
 a persisted project, so that run is invalid. Native tests must use
@@ -374,9 +376,9 @@ Codex-specific runtime notes:
 - `.codex/agents/*.toml` files are project-scoped custom agents and must define
   `name`, `description`, `model`, `model_reasoning_effort`, and
   `developer_instructions`; model and effort must match canonical `agent.yaml`
-  metadata. Codex has eight files: the six universal agents plus Codex-only
+  metadata. Codex has seven files: the five universal agents plus Codex-only
   `luna_coder` and `sol_coder`. Claude and Copilot retain only the universal
-  six.
+  five.
 - Each Codex instruction body has one generated delimiter and the exact
   transformed role prompt, with no runtime read of a Claude-native agent file.
   Normal Codex supplements append once to their own prompt. The two derived
@@ -386,8 +388,8 @@ Codex-specific runtime notes:
   The validator checks exact composition and records actual sizes; native
   probes, not a static threshold, must establish delivery without truncation.
 - The current model/effort matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
-  coder Terra/high, reviewer Sol/high, documenter Luna/medium, verifier
-  Luna/low, `luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. The named graph
+  coder Terra/high, reviewer Sol/high, documenter Luna/medium, `luna_coder`
+  Luna/xhigh, and `sol_coder` Sol/xhigh. The named graph
   is exactly `luna_coder -> coder -> sol_coder`; it uses no spawn-time model or
   effort override, no same-tier retry, and no successor after Sol.
 - Only the Codex orchestrator receives the bounded-routing supplement. It

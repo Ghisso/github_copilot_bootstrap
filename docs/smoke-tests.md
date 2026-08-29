@@ -16,17 +16,17 @@ Expected:
 
 Expected:
 
-- GitHub Copilot has exactly the 6 universal `.github/agents/*.agent.md` files.
-- Claude Code has exactly the same 6 universal `.claude/agents/*.md` files.
-- OpenAI Codex has exactly 8 `.codex/agents/*.toml` files: the 6 universal
+- GitHub Copilot has exactly the 5 universal `.github/agents/*.agent.md` files.
+- Claude Code has exactly the same 5 universal `.claude/agents/*.md` files.
+- OpenAI Codex has exactly 7 `.codex/agents/*.toml` files: the 5 universal
   agents plus Codex-only `luna_coder` and `sol_coder`.
 - Neither Codex-only agent appears in `.claude/agents/` or `.github/agents/`,
   and omitting either one from `.codex/agents/` fails validation.
-- Google Antigravity has exactly seven structural `.agents/agents/*/agent.md`
-  adapters: the six universal roles plus `antigravity_flash_coder`. It does not
+- Google Antigravity has exactly six structural `.agents/agents/*/agent.md`
+  adapters: the five universal roles plus `antigravity_flash_coder`. It does not
   include Codex-only `luna_coder` or `sol_coder`.
-- Antigravity's declared configuration uses Flash for the Flash coder, verifier,
-  and documenter, and Pro for orchestrator, planner, canonical coder, and
+- Antigravity's declared configuration uses Flash for the Flash coder and
+  documenter, and Pro for orchestrator, planner, canonical coder, and
   reviewer. The Flash coder's only configured escalation is to the Pro coder.
   These checks do not prove native model routing or escalation.
 - Root `AGENTS.md` is provider-neutral guidance shared by Codex and
@@ -42,14 +42,14 @@ Expected:
   or duplicate supplements, copied complete bases, recursive or multi-level
   composition, cycles, and delimiter drift fail validation.
 - `agent.yaml` remains the source of model/effort metadata. Codex agent TOMLs omit per-agent MCP and skill overrides and therefore use the trusted project's `.codex/config.toml` registrations.
-- Structural checks record actual instruction sizes for all eight Codex roles.
+- Structural checks record actual instruction sizes for all seven Codex roles.
   These values are observability, not an official Codex size limit or a static
   delivery claim. Native probes are the only delivery evidence.
 - Codex leaves the interactive session model and effort unpinned; every custom agent emits the exact model and effort from its canonical `model_intent.openai-codex` object.
 - The generated Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
-  reviewer Sol/high, coder Terra/high, documenter Luna/medium, verifier
-  Luna/low, `luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. Claude and
-  GitHub Copilot keep their existing six-agent model declarations.
+  reviewer Sol/high, coder Terra/high, documenter Luna/medium, `luna_coder`
+  Luna/xhigh, and `sol_coder` Sol/xhigh. Claude and GitHub Copilot keep their
+  existing five-agent model declarations.
 - The named escalation graph is exactly
   `luna_coder -> coder -> sol_coder`, with no successor for `sol_coder`.
   Missing or ineligible successors, cycles, self-retries, Luna-to-Sol skips,
@@ -124,7 +124,7 @@ Expected:
 - These are structural generation checks. Real Claude, Codex, and Copilot
   adapter-loading probes are covered by `scripts/check_native_clients.py`.
 - In particular, these checks do not prove current native Codex routing for all
-  eight declared roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
+  seven declared Codex roles. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md)
   preserves the historical six-role observation and defines the native-evidence
   boundary and removal gates; `max_depth` has a separate gate.
 
@@ -163,9 +163,9 @@ project trust, and emits only fixed schema-v2 sentinels and event-backed check
 state. `--require` also promotes unresolved `WARN` evidence to a nonzero
 result. Exact Codex routing can PASS only from explicit client JSONL
 agent/thread/subagent metadata; model prose or an absent event is not proof.
-The current declared matrix contains eight roles, while the dated 2026-08-09
+The current declared Codex matrix contains seven roles, while the dated 2026-08-09
 observation contains six. Future optional persistent-thread runs may exercise
-all eight without becoming required verification for this feature.
+all seven without becoming required verification for this feature.
 Compact/resume and coder escalation currently remain unexercised WARNs. See
 [Native Client Acceptance](native-client-acceptance.md). Preparation refuses
 broad or nonempty unmarked paths and refreshes only marker-owned inputs; it
@@ -212,7 +212,9 @@ Expected:
 
 ## Google Antigravity Native Evidence Boundary
 
-The authenticated `agy` CLI initially ran as 1.1.16 and later self-updated to
+The following Antigravity role observations are historical and predate verifier
+retirement; they are not the current generated role matrix. The authenticated
+`agy` CLI initially ran as 1.1.16 and later self-updated to
 1.1.17. It initially reused the development repository from a persisted
 project, so that run is invalid. Use `--new-project --sandbox`
 for isolation; the isolated run verified workspace root

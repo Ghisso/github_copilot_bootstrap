@@ -122,12 +122,18 @@ FROZEN_PLANNER_WORKLOADS: dict[str, FrozenPlannerWorkload] = {
     },
 }
 
-CODEX_UNIVERSAL_ROLES = {
+CODEX_CURRENT_UNIVERSAL_ROLES = {
     "orchestrator": ("orchestrator", "gpt-5.6-sol", "xhigh"),
     "planner": ("planner", "gpt-5.6-sol", "xhigh"),
     "coder": ("coder", "gpt-5.6-terra", "high"),
     "reviewer": ("reviewer", "gpt-5.6-sol", "high"),
     "documenter": ("documenter", "gpt-5.6-luna", "medium"),
+}
+# Dated 2026-08-09 native evidence captured this former universal six-role
+# matrix. Keep it separate from current declarations so validation can inspect
+# the record without reinterpreting it as current routing.
+CODEX_HISTORICAL_UNIVERSAL_ROLES = {
+    **CODEX_CURRENT_UNIVERSAL_ROLES,
     "verifier": ("verifier", "gpt-5.6-luna", "low"),
 }
 CODEX_ONLY_ROLES = {
@@ -135,9 +141,9 @@ CODEX_ONLY_ROLES = {
     "sol_coder": ("coder", "gpt-5.6-sol", "xhigh"),
 }
 # This is the declared current matrix for optional future persistent-thread
-# probes. Historical native observations remain six universal roles and keep
-# their original evidence class; do not reinterpret them as an eight-role run.
-CODEX_ROLES = {**CODEX_UNIVERSAL_ROLES, **CODEX_ONLY_ROLES}
+# probes. Historical native observations use CODEX_HISTORICAL_UNIVERSAL_ROLES
+# and keep their original evidence class; do not reinterpret them as current.
+CODEX_ROLES = {**CODEX_CURRENT_UNIVERSAL_ROLES, **CODEX_ONLY_ROLES}
 SENTINEL_FIELDS = (
     "root_instruction",
     "scoped_instruction",
@@ -654,13 +660,13 @@ def collaboration_attempted_without_spawn(events: list[dict[str, Any]] | None) -
 
 
 def valid_role_matrix(records: list[dict[str, str]]) -> bool:
-    """Validate the declared current eight-role Codex matrix exactly."""
+    """Validate the declared current seven-role Codex matrix exactly."""
     return valid_role_records(records, CODEX_ROLES)
 
 
 def valid_universal_role_matrix(records: list[dict[str, str]]) -> bool:
     """Validate dated six-role native evidence without upgrading its scope."""
-    return valid_role_records(records, CODEX_UNIVERSAL_ROLES)
+    return valid_role_records(records, CODEX_HISTORICAL_UNIVERSAL_ROLES)
 
 
 def valid_role_records(

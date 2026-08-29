@@ -215,11 +215,11 @@ flowchart LR
 ```
 
 `AGENTS.md` is provider-neutral guidance shared by Codex and Antigravity.
-Antigravity structurally receives seven roles: the six universal roles plus
+Antigravity structurally receives six roles: the five universal roles plus
 `antigravity_flash_coder`; Codex-only `luna_coder` and `sol_coder` do not
 render. The native default agent is the Antigravity main thread and reads its
 orchestration contract from root `AGENTS.md`. All custom adapters set
-`mainAgent: false`; the six specialists set `subagent: true`, and the custom
+`mainAgent: false`; the five specialists set `subagent: true`, and the custom
 `orchestrator` sets `subagent: false`. The declared Flash-to-Pro coder handoff,
 model tiers, specialist MCP inheritance, shared skills, and MCP configuration
 are static contracts. They are not native loading, routing, escalation, skill,
@@ -281,7 +281,7 @@ branch-shape check and require acknowledgement before PR or push closeout.
 The canonical workflow is:
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
 ```
 
 Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:
@@ -397,7 +397,7 @@ Each agent contains:
   use it with `prompt_base` instead of copying the base `prompt.md`.
 
 The shared loader validates all metadata before any target renders. Omitted
-`targets` means all supported targets, which keeps the six universal agents
+`targets` means all supported targets, which keeps the five universal agents
 eligible for GitHub Copilot, Claude Code, and Codex. `luna_coder` and
 `sol_coder` explicitly declare only `openai-codex`, so they never generate a
 Claude or Copilot adapter. The loader also rejects empty, duplicated, unknown,
@@ -406,7 +406,7 @@ portable semantics. GitHub Copilot agent `model` fields must be one supported
 Copilot model string. Claude and Codex adapters must not include Copilot model
 pins.
 
-The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`xhigh`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`); the mechanical `verifier` runs on `haiku` with no `effort:` line, because Haiku does not support the effort field. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
+The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`xhigh`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`). Verification runs through canonical lifecycle scripts rather than a dedicated agent. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
 
 Agent names are identical wherever an agent is eligible; the generator performs
 no per-target renaming. Codex agents are project-scoped
@@ -424,16 +424,16 @@ delimiters, and supplements that copy the complete base prompt.
 model intent; the Codex prompt is derived output, not a second editable role
 definition. The root Codex session is intentionally unpinned in
 `.codex/config.toml`, leaving the user free to choose the interactive model and
-effort. The six universal Codex agents are orchestrator Sol/xhigh, planner
-Sol/xhigh, reviewer Sol/high, coder Terra/high, documenter Luna/medium, and
-verifier Luna/low. The two Codex-only agents are `luna_coder` Luna/xhigh and
+effort. The five universal Codex agents are orchestrator Sol/xhigh, planner
+Sol/xhigh, reviewer Sol/high, coder Terra/high, and documenter Luna/medium.
+The two Codex-only agents are `luna_coder` Luna/xhigh and
 `sol_coder` Sol/xhigh. Agent files omit per-agent MCP and skill overrides and
 inherit the trusted project's registrations. Structural size measurements are
 observability only; no official per-agent instruction-size cap is asserted.
 The dated 2026-08-09 native evidence covers the historical six-role matrix, not
 the two newly declared specialists. Future optional persistent-thread probes
-may exercise the current eight roles, but this feature does not require a
-native run. Claude and Copilot retain their existing six-agent output.
+may exercise the current seven Codex roles, but this feature does not require a
+native run. Claude and Copilot retain their existing five-agent output.
 
 The orchestrator's own `prompt.openai-codex.md` is also target-scoped. It adds
 the experimental bounded implementation policy only to the generated Codex
@@ -470,12 +470,12 @@ restarting blindly. The declared escalation graph is exactly
 retries or skips a tier.
 
 Before automatic Terra-to-Sol recovery, the orchestrator classifies the
-existing verifier commands/results and reviewer findings as exactly one of
+existing verification commands/results and reviewer findings as exactly one of
 `implementation`, `environment`, `baseline`, or `indeterminate`. Only an
 implementation-attributable failure advances automatically. Environment and
 baseline failures stop model escalation and are reported. Indeterminate
 evidence returns to orchestrator judgment with no automatic escalation. A
-verifier failure alone is not implementation attribution, and the orchestrator
+verification failure alone is not implementation attribution, and the orchestrator
 must not invent evidence. `visibility: hidden` on the two specialists is an
 internal orchestration convention, not a native Codex invisibility guarantee.
 Optional `initial-coder`, `fallback`, and `reason` facts may use an existing
@@ -489,4 +489,4 @@ Codex skills are wired through `[[skills.config]]` entries in `.codex/config.tom
 - [ADR-001: Multi-target bootstrap over native per-platform packaging](../plans/adr-001-multi-target-lcd.md) — why this repo generates thin adapters for Copilot/Claude/Codex from one shared basis instead of shipping Claude-native plugin packaging, what that costs, and the trigger for revisiting it.
 - [ADR-002: Git-backed AI state sync over object-storage mirroring](../plans/adr-002-git-backed-state-sync.md) — why `.claude/` is a nested git repository synced via `state-sync.sh` instead of Hugging Face bucket mirroring, and the `--state-remote` privacy trade-off.
 
-The unified `reviewer` runs both review passes itself (a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive), so it is a single-nesting-level operation that executes identically on every runtime — there are no separate review-helper agents. The orchestrator is the main-thread persona: it holds `edit`+`execute` and owns the branch/commit/PR and memory/session-log ceremony itself rather than delegating it. UI work goes through the `coder` (which loads the `gradio-streamlit` skill); there is no separate designer agent. The `verifier` is the single owner of the persisted score report.
+The unified `reviewer` runs both review passes itself (a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive), so it is a single-nesting-level operation that executes identically on every runtime — there are no separate review-helper agents. The orchestrator is the main-thread persona: it holds `edit`+`execute` and owns the branch/commit/PR and memory/session-log ceremony itself rather than delegating it. UI work goes through the `coder` (which loads the `gradio-streamlit` skill); there is no separate designer agent. Verification and score persistence run through canonical lifecycle scripts, not a verifier agent.

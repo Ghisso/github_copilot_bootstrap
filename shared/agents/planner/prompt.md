@@ -85,7 +85,7 @@ decisions remain, use a focused PRD-style interview before drafting.
 ## Plan Requirements
 
 - Output clear phases and ordered steps.
-- For each step, include owner (`coder` or reviewer), target files, and verification commands.
+- For each step, include owner (`coder` or reviewer), target files, acceptance criteria, and verification groups or check IDs. Do not duplicate long command lists owned by the deterministic verification entrypoint.
 - For each step, include `Required Skills` listing exact SKILL.md files implementers must read.
 - For each review step, include `Review Profiles` listing exact profiles from `.claude/review-profiles/` (see the authoritative routing table in `.claude/instructions/workspace.instructions.md`).
 - Call out assumptions, risks, and dependency ordering.

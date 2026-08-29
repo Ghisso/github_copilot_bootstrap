@@ -132,7 +132,7 @@ def runtime_drift_errors(
     for authoring_relative in TRACKED_AUTHORING_PATHS:
         path = repo_root / authoring_relative
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        required_fragments: tuple[str, ...] = ("review -> document -> score",)
+        required_fragments: tuple[str, ...] = ("review -> closeout",)
         if authoring_relative == "AGENTS.md":
             required_fragments += ("source of truth lives in `shared/`",)
         if any(fragment not in text.lower() for fragment in required_fragments):

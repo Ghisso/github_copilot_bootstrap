@@ -26,7 +26,7 @@ Main goals:
 
 I use a strict execution loop:
 
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
 
 Core principles:
 
@@ -293,8 +293,10 @@ Optional pruning after copy:
 flowchart LR
   U[Developer Request] --> A[Orchestrator / Planner]
   A --> C[Coder]
-  C --> V[Verifier + Quality Gates]
-  V --> D[Documenter]
+  C --> V[Deterministic Verification]
+  V --> R[Reviewer]
+  R --> C
+  R --> D[Documenter / Closeout]
   D --> L[Learn + Session Log]
 
   I[Instructions] --> A
@@ -306,9 +308,6 @@ flowchart LR
   H[Hooks] --> T[Tool Execution Guardrails]
   T --> C
 
-  R[Reviewer] --> V
-  C --> R
-
   L --> O[Commit or PR Decision]
 ```
 
@@ -318,7 +317,7 @@ Interpretation:
 - Skills provide reusable playbooks for specific tasks.
 - Agents execute and review the work.
 - Hooks enforce safety and log lifecycle events.
-- Verifier and quality gates decide whether code is ready.
+- Deterministic verification, independent review, and closeout gates decide whether code is ready.
 
 ## What Is Included
 
@@ -455,7 +454,10 @@ The agent layer gives me orchestration plus profile-driven reviews. Full shared 
 
 The specialist flow for standard and high-risk implementation work is:
 
-- orchestrator -> conditional planner -> coder -> verifier -> reviewer -> documenter
+- orchestrator -> conditional planner -> coder -> reviewer -> closeout
+
+PLAN is conditional. VERIFY and CLOSEOUT are lifecycle stages run by the
+orchestrator and canonical scripts, not delegated agent roles.
 
 Universal agents:
 
@@ -463,7 +465,6 @@ Universal agents:
 - `planner`
 - `coder`
 - `reviewer`
-- `verifier`
 - `documenter`
 
 Codex-only agents:
@@ -472,12 +473,13 @@ Codex-only agents:
 - `sol_coder`
 
 Google Antigravity adds one derived role, `antigravity_flash_coder`. Its
-generated workspace has seven structural adapters: the six universal roles plus
-that Flash coder. It is included in the existing `multi-agent` target, not a
+generated workspace has six roles: the main-thread orchestrator, the four
+universal specialists (`planner`, `coder`, `reviewer`, and `documenter`), and
+the Flash coder. It is included in the existing `multi-agent` target, not a
 second distribution. `luna_coder` and `sol_coder` remain Codex-only.
 
-Claude Code and GitHub Copilot keep the six universal agents. Codex generates
-those six plus the two bounded implementation specialists. Claude Code and
+Claude Code and GitHub Copilot keep the five universal agents. Codex generates
+those five plus the two bounded implementation specialists. Claude Code and
 Codex both carry per-agent model/effort tiers for their eligible agents.
 Copilot agents inherit the VS Code session-selected model because their
 generated metadata omits `model:`. If the user selects Auto, Auto remains that
@@ -490,11 +492,10 @@ session choice; the bootstrap does not define per-role complexity routing.
 | reviewer | `sonnet` | `xhigh` | `gpt-5.6-sol` | `high` |
 | coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
 | documenter | `sonnet` | `medium` | `gpt-5.6-luna` | `medium` |
-| verifier | `haiku` | — | `gpt-5.6-luna` | `low` |
 | luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
 | sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
 
-In VS Code Copilot, the visible orchestrator lists only the five universal
+In VS Code Copilot, the visible orchestrator lists only the four universal
 specialists and is not generally model-invocable as a subagent. The planner has
 an explicit empty subagent list. Hidden agents remain out of the picker but are
 available when an allowed coordinator names them. Search-capable agents receive
@@ -503,13 +504,13 @@ surfaces; Context Mode still enforces its filtered server boundary.
 
 **Google Antigravity:** the generated adapter configuration assigns Pro to the
 orchestrator, planner, canonical coder, and reviewer; it assigns Flash to the
-Flash coder, verifier, and documenter. The configured coding contract starts a
+Flash coder and documenter. The configured coding contract starts a
 bounded implementation with `antigravity_flash_coder` and permits one
 implementation-attributable escalation to the Pro `coder`. It is configuration,
 not evidence of the backing Gemini model or a native routing result. In
 Antigravity, the native default agent is the main thread and receives the
 orchestration contract through root `AGENTS.md`. Every custom adapter has
-`mainAgent: false`; the six specialists are subagents, while the custom
+`mainAgent: false`; the five specialists are subagents, while the custom
 `orchestrator` is non-delegatable. Root `AGENTS.md` remains provider-neutral
 guidance shared by Codex and Antigravity.
 
@@ -545,13 +546,13 @@ a persisted project, so that run is invalid. Use `--new-project --sandbox` for
 isolation; it verified the workspace root
 `/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
 correctly, and exact-response invocations succeeded for `planner`, canonical
-`coder`, `reviewer`, `antigravity_flash_coder`, `verifier`, and
+`coder`, `reviewer`, `antigravity_flash_coder`, and
 the default native agent with root guidance. A custom main agent could not
 invoke a workspace custom subagent, which is why the default native agent now
 orchestrates through root guidance instead.
 
-The Flash-coder and verifier checks passed after the free-tier quota reset;
-their successful loading is not model-tier evidence. Earlier parallel attempts
+The Flash-coder checks passed after the free-tier quota reset; successful
+loading is not model-tier evidence. Earlier parallel attempts
 retained no output and are not evidence. A fresh isolated `agy` 1.1.17 run in
 `/tmp/antigravity-final-native.y4Nx6j` used one tiny default-agent prompt that
 delegated to `antigravity_flash_coder` and then `coder`, returned exact `F/P`,
@@ -564,9 +565,9 @@ block complete native acceptance; they do not negate the structural checks or
 the limited isolated invocation evidence. See
 [runtime checks](docs/runtime-checks.md#google-antigravity-evidence-boundary).
 
-**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. The `verifier` runs on `haiku` with no effort, because Haiku does not support the effort field. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
+**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
 
-**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed role prompt. `agent.yaml` remains the single source for metadata, target eligibility, and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**; that dated observation does not include the two current Codex-only specialists. Keep the shim and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gates are met. The shim-removed candidate has never been exercised. The current declarations use Sol for coordination, planning, review, and final implementation recovery; Terra for the normal coder; and Luna for documentation, mechanical verification, and bounded implementation.
+**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed role prompt. `agent.yaml` remains the single source for metadata, target eligibility, and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**; that dated observation does not include the two current Codex-only specialists. Keep the shim and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gates are met. The shim-removed candidate has never been exercised. The current declarations use Sol for coordination, planning, review, and final implementation recovery; Terra for the normal coder; and Luna for documentation and bounded implementation.
 
 **Experimental bounded implementation route (Codex only):** for each approved
 implementation step, the orchestrator builds a compact packet with the goal and
@@ -591,7 +592,7 @@ flowchart LR
 of six bounded `reason` values, `workspace_changed`, `evidence`, and `needed`.
 The orchestrator passes that object and the current diff to `coder`, which
 preserves and takes ownership of useful prior work. Before advancing from the
-Terra coder to `sol_coder`, the orchestrator classifies existing verifier and
+Terra coder to `sol_coder`, the orchestrator classifies existing deterministic verification and
 reviewer evidence as `implementation`, `environment`, `baseline`, or
 `indeterminate`. Only `implementation` advances one tier automatically;
 environment and baseline failures stop model escalation, and indeterminate
@@ -656,7 +657,7 @@ Orchestrator routing details:
 
 - The orchestrator does a shallow exploration pass, then chooses `--mode micro-plan` or `--mode full-plan` under the task-lane policy before delegating to the planner.
 - To execute an approved existing plan, say `Implement big plan <plan-name>.` Approved plans that remain implementation-ready normally skip the planner. Evidence from a completed phase can trigger one planner pass to revise affected future phases only; unchanged future work proceeds directly.
-- Known authoritative files are read directly. When broader discovery helps, guarded Context Mode may optionally establish one bounded project index with pinned defaults. Indexing is nonblocking, never repository truth, and existing agent context and evidence are reused; independent verifier and reviewer judgment remains independent. Retrieval, language, verification, review, and lifecycle rules remain mandatory.
+- Known authoritative files are read directly. When broader discovery helps, guarded Context Mode may optionally establish one bounded project index with pinned defaults. Indexing is nonblocking, never repository truth, and existing agent context and evidence are reused; independent reviewer judgment remains independent. Retrieval, language, verification, review, and lifecycle rules remain mandatory.
 - The planner does NOT self-classify; routing ownership stays with the orchestrator.
 - Planner micro-plan mode: load skills → draft → done (no interview required).
 - Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
@@ -762,8 +763,8 @@ The generated `verify.py` commands produce machine-readable Phase A receipts:
 `closeout` reuses fresh phase evidence while binding the final tracked state.
 Run `phase` only after the ordinary checks are clean, and run `closeout` during
 final closeout after documentation, score, and findings are current. This
-workflow is additive; the existing verifier, score, findings, and hook gates
-remain authoritative.
+workflow is additive; the existing score, findings, and hook gates remain
+authoritative.
 
 Quality gates:
 
@@ -852,7 +853,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

@@ -18,18 +18,18 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 - Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
 - Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
 - Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
-- Standard implementation and control-plane/high-risk work use `orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score`; all commit/PR work is standard or higher.
+- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> reviewer -> closeout`; PLAN is conditional, while VERIFY and CLOSEOUT are lifecycle stages run by the orchestrator and canonical scripts. All commit/PR work is standard or higher.
 - Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
 - Audited typo commit bypasses are recovery exceptions, never lane classification.
 
 ## Required Lifecycle
 
-`PRE-FLIGHT -> BRANCH -> PLAN -> PONYTAIL -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT`
+`PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT`
 
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
-- Verify, then run profile-driven review until clean. Update required documentation before persisting findings and score.
-- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail findings are zero, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete.
+- Run VERIFY with the canonical checks, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings and score, records learning and the completed session log, then runs the closeout checks.
+- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
 
 ## Exact Commands
@@ -54,7 +54,7 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 - Policies: `.claude/instructions/workspace.instructions.md`, `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
 - Skills: `.claude/skills/<name>/SKILL.md`; apply Ponytail to all coding and use task-matched skills when relevant.
-- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, verification, review, documentation, and scoring.
+- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, review, and documentation. Verification and scoring run through canonical scripts.
 - Hooks: target-native configuration dispatches to `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
 
 ## Target Runtime
