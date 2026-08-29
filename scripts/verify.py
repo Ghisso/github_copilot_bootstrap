@@ -17,10 +17,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import stat
 import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+import quality_score
 
 
 SCHEMA_VERSION = 1
@@ -51,6 +55,20 @@ CONTROL_PLANE_PREFIXES = (
 )
 CONTROL_PLANE_FILES = {"AGENTS.md", "CLAUDE.md", ".mcp.json"}
 CONFIG_SUFFIXES = {".cfg", ".ini", ".json", ".toml", ".yaml", ".yml"}
+DEPENDENCY_FILES = {
+    "Cargo.lock",
+    "Cargo.toml",
+    "Pipfile",
+    "Pipfile.lock",
+    "go.mod",
+    "go.sum",
+    "package-lock.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "uv.lock",
+    "yarn.lock",
+}
 
 
 def run_process(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -165,6 +183,8 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             isinstance(path, str) for path in metadata[field]
         ):
             raise ValueError(f"receipt metadata is missing {field}")
+    if not isinstance(metadata.get("path_discovery_ok"), bool):
+        raise ValueError("receipt metadata is missing path_discovery_ok")
     validate_mode_applicability(receipt["mode"], typed_checks, metadata)
     return receipt
 
@@ -214,14 +234,20 @@ def git_paths(root: Path, base_ref: str) -> list[str]:
     merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
     paths: set[str] = set()
     for args in (
-        ["diff", "--name-only", f"{base_ref}...HEAD"],
-        ["diff", "--name-only"],
-        ["diff", "--cached", "--name-only"],
-        ["ls-files", "--others", "--exclude-standard"],
+        ["diff", "--name-only", "-z", f"{base_ref}...HEAD"],
+        ["diff", "--name-only", "-z"],
+        ["diff", "--cached", "--name-only", "-z"],
+        ["ls-files", "--others", "--exclude-standard", "-z"],
     ):
         if not merge_base and base_ref in args[-1]:
             continue
-        paths.update(path for path in git_output(args, root).splitlines() if path)
+        try:
+            result = run_process(["git", *args], root)
+        except (OSError, subprocess.SubprocessError) as error:
+            raise ValueError(f"Git path discovery failed: {error}") from error
+        if result.returncode != 0:
+            raise ValueError(f"Git path discovery exited {result.returncode}")
+        paths.update(path for path in result.stdout.split("\0") if path)
     return sorted(paths)
 
 
@@ -233,6 +259,13 @@ def classify_path(path: str) -> str:
         return "generator"
     if path.startswith("shared/"):
         return "control-plane"
+    name = Path(path).name
+    if (
+        name in DEPENDENCY_FILES
+        or name.startswith("requirements")
+        or name.startswith("Dockerfile")
+    ):
+        return "config"
     suffix = Path(path).suffix.lower()
     if suffix in CONFIG_SUFFIXES:
         return "config"
@@ -240,17 +273,14 @@ def classify_path(path: str) -> str:
         return "test"
     if suffix == ".py":
         return "code"
-    return "documentation-only"
+    if path.startswith("docs/") or suffix in {".md", ".rst"}:
+        return "documentation-only"
+    return "code"
 
 
 def scoped_paths(paths: list[str]) -> list[str]:
     """Select evidence-relevant paths; ordinary documentation stays reusable."""
     return [path for path in paths if classify_path(path) != "documentation-only"]
-
-
-def hash_text(text: str) -> str:
-    """Return a stable SHA-256 digest for receipt evidence."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def hash_paths(root: Path, paths: list[str]) -> str:
@@ -259,7 +289,20 @@ def hash_paths(root: Path, paths: list[str]) -> str:
     for path in paths:
         digest.update(path.encode("utf-8") + b"\0")
         candidate = root / path
-        digest.update(candidate.read_bytes() if candidate.is_file() else b"<deleted>")
+        try:
+            info = candidate.lstat()
+        except FileNotFoundError:
+            digest.update(b"<deleted>")
+        else:
+            digest.update(
+                f"{stat.S_IFMT(info.st_mode):o}:{stat.S_IMODE(info.st_mode):o}".encode()
+            )
+            if stat.S_ISLNK(info.st_mode):
+                digest.update(b":link:" + os.readlink(candidate).encode("utf-8"))
+            elif stat.S_ISREG(info.st_mode):
+                digest.update(b":file:" + candidate.read_bytes())
+            else:
+                digest.update(b":other")
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -267,7 +310,13 @@ def hash_paths(root: Path, paths: list[str]) -> str:
 def state_metadata(root: Path, base_ref: str) -> dict[str, object]:
     """Capture Git metadata and whole/scoped content bindings."""
     merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
-    paths = git_paths(root, base_ref)
+    try:
+        paths = git_paths(root, base_ref)
+    except ValueError:
+        paths = []
+        path_discovery_ok = False
+    else:
+        path_discovery_ok = True
     relevant = scoped_paths(paths)
     return {
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -279,110 +328,60 @@ def state_metadata(root: Path, base_ref: str) -> dict[str, object]:
         "tracked_state_hash": hash_paths(root, paths),
         "changed_paths": paths,
         "relevant_paths": relevant,
+        "path_discovery_ok": path_discovery_ok,
     }
 
 
 def measure_ruff(root: Path, targets: list[str]) -> dict[str, object]:
-    """Measure Ruff with strict JSON and documented exit-code semantics."""
-    try:
-        result = run_process(
-            ["uv", "run", "ruff", "check", *targets, "--output-format=json"], root
-        )
-    except subprocess.TimeoutExpired:
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff timed out")
-    except (OSError, subprocess.SubprocessError) as error:
-        return check("VFY-RUFF-001", "UNVERIFIED", f"Ruff did not run: {error}")
-    if result.returncode not in {0, 1}:
-        return check(
-            "VFY-RUFF-001", "UNVERIFIED", f"Ruff abnormal exit: {result.returncode}"
-        )
-    if not result.stdout.strip():
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff produced no JSON output")
-    try:
-        findings = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff produced malformed JSON")
-    if not isinstance(findings, list) or not all(
-        isinstance(item, dict) for item in findings
-    ):
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff JSON was not a finding list")
-    if result.returncode == 0 and findings:
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff exit and JSON disagree")
-    if result.returncode == 1 and not findings:
-        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff exit and JSON disagree")
+    """Adapt the scorer's strict Ruff measurement into a receipt check."""
+    measurement = quality_score.measure_ruff(targets, cwd=str(root))
     return check(
         "VFY-RUFF-001",
-        "PASS" if result.returncode == 0 else "FAIL",
-        f"Ruff found {len(findings)} violation(s)",
+        measurement.status,
+        measurement.detail,
     )
 
 
 def measure_mypy(root: Path, targets: list[str]) -> dict[str, object]:
-    """Measure mypy while treating operational exits as unverified."""
-    try:
-        result = run_process(
-            [
-                "uv",
-                "run",
-                "mypy",
-                *targets,
-                "--ignore-missing-imports",
-                "--explicit-package-bases",
-            ],
-            root,
-        )
-    except subprocess.TimeoutExpired:
-        return check("VFY-MYPY-001", "UNVERIFIED", "mypy timed out")
-    except (OSError, subprocess.SubprocessError) as error:
-        return check("VFY-MYPY-001", "UNVERIFIED", f"mypy did not run: {error}")
-    output = result.stdout + result.stderr
-    errors = sum(1 for line in output.splitlines() if ": error:" in line)
-    if result.returncode == 0 and errors == 0:
-        return check("VFY-MYPY-001", "PASS", "mypy completed")
-    if result.returncode == 1 and errors:
-        return check("VFY-MYPY-001", "FAIL", f"mypy found {errors} error(s)")
-    return check(
-        "VFY-MYPY-001",
-        "UNVERIFIED",
-        f"mypy abnormal exit: {result.returncode} ({output.strip() or 'no output'})",
-    )
+    """Adapt the scorer's strict mypy measurement into a receipt check."""
+    measurement = quality_score.measure_mypy(targets, cwd=str(root))
+    return check("VFY-MYPY-001", measurement.status, measurement.detail)
 
 
 def measure_pytest(root: Path) -> dict[str, object]:
-    """Measure pytest, separating test failures from infrastructure failures."""
-    try:
-        result = run_process(
-            ["uv", "run", "pytest", "tests/", "-q", "--tb=short"], root
-        )
-    except subprocess.TimeoutExpired:
-        return check("VFY-PYTEST-001", "UNVERIFIED", "pytest timed out")
-    except (OSError, subprocess.SubprocessError) as error:
-        return check("VFY-PYTEST-001", "UNVERIFIED", f"pytest did not run: {error}")
-    if result.returncode == 0:
-        return check("VFY-PYTEST-001", "PASS", "pytest completed")
-    if result.returncode == 1:
-        return check("VFY-PYTEST-001", "FAIL", "pytest reported test failures")
-    return check(
-        "VFY-PYTEST-001",
-        "UNVERIFIED",
-        f"pytest infrastructure exit: {result.returncode}",
-    )
+    """Adapt the scorer's strict pytest measurement into a receipt check."""
+    measurement = quality_score.measure_pytest(cwd=str(root))
+    return check("VFY-PYTEST-001", measurement.status, measurement.detail)
 
 
 def generation_check(root: Path) -> dict[str, object]:
-    """Require a development checkout's generated verifier to match its source."""
-    source = root / "shared/scripts/verify.py"
-    generated = root / ".claude/scripts/verify.py"
-    if source.is_file():
-        if not generated.is_file():
-            return check("VFY-GEN-001", "UNVERIFIED", "generated verifier is missing")
-        status = "PASS" if source.read_bytes() == generated.read_bytes() else "FAIL"
+    """Require the generated verifier and its measurement module to match source."""
+    pairs = [
+        (root / f"shared/scripts/{name}", root / f".claude/scripts/{name}")
+        for name in ("verify.py", "quality_score.py")
+    ]
+    if pairs[0][0].is_file():
+        if any(
+            not source.is_file() or not generated.is_file()
+            for source, generated in pairs
+        ):
+            return check(
+                "VFY-GEN-001", "UNVERIFIED", "generated verifier runtime is missing"
+            )
+        status = (
+            "PASS"
+            if all(
+                source.read_bytes() == generated.read_bytes()
+                for source, generated in pairs
+            )
+            else "FAIL"
+        )
         return check(
             "VFY-GEN-001",
             status,
-            "generated verifier matches source"
+            "generated verifier runtime matches source"
             if status == "PASS"
-            else "generated verifier drifted from source",
+            else "generated verifier runtime drifted from source",
         )
     return check(
         "VFY-GEN-001",
@@ -434,7 +433,11 @@ def metadata_paths(metadata: dict[str, object], field: str) -> list[str]:
 
 def metadata_is_bound(metadata: dict[str, object]) -> bool:
     """Return whether Git supplied the commit/base pair freshness requires."""
-    return bool(metadata.get("head_sha") and metadata.get("merge_base_sha"))
+    return bool(
+        metadata.get("head_sha")
+        and metadata.get("merge_base_sha")
+        and metadata.get("path_discovery_ok") is True
+    )
 
 
 def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
