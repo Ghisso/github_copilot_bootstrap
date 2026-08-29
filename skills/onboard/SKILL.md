@@ -39,8 +39,9 @@ Per `.claude/instructions/tool-routing.instructions.md`: use direct reads for
 known files, `rg` for exact claims, and Semble for semantic "where is X
 actually implemented" discovery. The Context Mode MCP server exposes exactly
 four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`);
-`ctx_index` currently indexes content and single guarded regular files only,
-not directories.
+`ctx_index` accepts content, a contained regular file, or a contained real
+directory. Directory indexing uses the pinned upstream defaults and does not
+accept directory-policy overrides.
 
 ```
 mcp__semble__search(repo=<project root>, query="<key behavior claimed in the docs>")

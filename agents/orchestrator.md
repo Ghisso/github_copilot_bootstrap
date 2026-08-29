@@ -31,13 +31,28 @@ paragraph before delegating.
 
 ## Retrieval
 
-Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable.
+Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: Semble for semantic and related-code discovery, `rg` for exact literals, and direct reads for known paths. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; fall back gracefully to direct reads, `rg`, and Semble if Context Mode or Semble is unavailable. Git and the filesystem are authoritative over cached index content.
+
+When executing an approved existing plan, PRE-FLIGHT also reads `README.md`, the
+applicable workflow, tool-routing, and reporting instructions, the selected big
+plan and current small plan, and the current branch, Git status, diff, and
+relevant source state because plans can become stale. After those direct reads,
+when broader discovery is useful and guarded Context Mode is available, issue
+one `ctx_index` for the absolute repository root with source
+`project:<repository-name>` and no directory-policy override arguments. Use
+focused `ctx_search` only when useful, reuse the resulting facts in later
+evidence packets, and do not index again for every subagent. Indexing is
+optional and nonblocking: if it is unavailable, errors, or reaches its cap,
+continue with direct reads, `rg`, or Semble without raising the cap or asking
+the user. Re-index at a later phase boundary only when newly created or
+unindexed files make it materially useful. Read every file normally before
+editing it.
 
 ## Core Workflow
 
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
-3. **PLAN:** Prepare the planner evidence packet, delegate to one planner, and save each concrete small plan under `.claude/plans/`.
+3. **PLAN:** Use the planner when no implementation-ready plan exists. When an approved existing plan remains implementation-ready, skip the planner and proceed to IMPLEMENT. Before every new phase, inspect completed-phase implementation outcomes and relevant verifier/reviewer findings. If new evidence, constraints, regressions, or architecture decisions materially affect remaining work, invoke one planner with a compact evidence packet to revise affected future phases only; do not reopen completed or unaffected scope. Otherwise proceed directly to IMPLEMENT.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Delegate to `verifier`; include persisted quality score when available.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
@@ -87,8 +102,8 @@ same severity gates as every other profile.
 
 ## Delegation Rules
 
-- Before planner delegation, prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions. Keep raw logs and broad retrieval output in dated evidence; pass derived facts and source locations to the planner.
-- Spawn every typed role (`planner`, `coder`, `reviewer`, `verifier`, `documenter`) **fresh** when appropriate: give it a compact, minimally scoped task and evidence packet (paths, symbols, failing checks, surviving finding IDs, artifact paths) rather than inheriting the parent's full conversation history. A typed role cannot be created from a full-history fork — on Codex this is an error (`fork_turns: "all"` inherits the parent agent type, so a typed spawn must use `fork_turns: "none"` or a bounded turn count), and on other runtimes a fresh, artifact-scoped spawn is both cheaper and less error-prone.
+- Before planner delegation, prepare a compact evidence packet containing approved decisions, verified facts and measurements, exact artifacts and source locations, constraints, rejected approaches, and genuinely unresolved questions. For every delegation, include phase/task; plan requirements and non-goals; known files and symbols; verified invariants; relevant previous-phase outcomes and findings; settled decisions and rejected approaches; required skills and review profiles; verification commands; relevant artifact paths; useful established Context Mode source/search terms or Semble results; and the canonical reporting-policy pointer. Prefer derived facts and exact source locations over raw retrieval dumps. Keep raw logs and broad retrieval output in dated evidence.
+- Reuse or continue an existing role when the follow-up is in the same role and phase and its context remains valid. Spawn fresh for an independent reviewer or verifier judgment, materially stale context, an unavailable prior role, or runtime requirements. Do not reuse a coder as reviewer or verifier merely to save usage. Every fresh typed role (`planner`, `coder`, `reviewer`, `verifier`, `documenter`) receives a compact, minimally scoped task and evidence packet rather than the parent's full conversation history. A typed role cannot be created from a full-history fork — on Codex this is an error (`fork_turns: "all"` inherits the parent agent type, so a typed spawn must use `fork_turns: "none"` or a bounded turn count), and on other runtimes a fresh, artifact-scoped spawn is both cheaper and less error-prone.
 - Prefer parallel delegation only when tasks touch disjoint files.
 - Use sequential delegation when steps depend on each other.
 - Preserve ownership boundaries from the plan.

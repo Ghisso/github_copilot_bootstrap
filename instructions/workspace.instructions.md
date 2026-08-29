@@ -26,7 +26,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 
 ## Core Principles
 
-- Plan first for non-trivial work.
+- Plan first when plan creation is needed for non-trivial work; an approved implementation-ready plan follows the conditional planner route in `workflow.instructions.md`.
 - Search before writing new code.
 - During IMPLEMENT, the coder applies the `ponytail` skill in `full` mode once
   per coding task, then performs a lightweight simplification and re-verifies
@@ -67,7 +67,7 @@ standard, and control-plane/high-risk work follows the lifecycle. Use the
 orchestrated path for standard and control-plane/high-risk work:
 
 ```text
-orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score
+orchestrator -> [planner when needed] -> coder -> verifier -> reviewer -> documenter -> score
 ```
 
 Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.

@@ -32,6 +32,13 @@ Standard implementation uses a micro-plan when its scope is obvious and one
 phase; use a full plan for ambiguous, multi-phase, or new-module work.
 Control-plane/high-risk work always uses a full plan.
 
+An approved existing implementation-ready plan normally skips new plan
+creation. Before each new phase, inspect completed-phase outcomes and relevant
+verifier/reviewer findings. Invoke one planner only when new evidence,
+constraints, regressions, or architecture decisions materially affect remaining
+work; revise affected future phases only, without reopening completed or
+unaffected scope.
+
 1. Check `.claude/MEMORY.md` for relevant `[LEARN]` entries.
 2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.claude/quality_reports/specs/`.
 3. Draft plan -> save to `.claude/plans/` for concrete implementation plans or `.claude/explorations/` for exploratory/PoC plans.
@@ -110,7 +117,7 @@ PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCO
 
 For each small plan:
 
-1. **PLAN:** Delegate to `planner`; save concrete small-plan file under `.claude/plans/`.
+1. **PLAN:** If no implementation-ready plan exists, delegate to `planner` and save the concrete small plan under `.claude/plans/`. Otherwise use the approved existing plan directly. Before each new phase, perform the material-impact check above; use one planner only for affected future work.
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
 3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
