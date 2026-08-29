@@ -17,6 +17,7 @@ import argparse
 import json
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -25,23 +26,38 @@ from pathlib import Path
 # Scoring weights (from quality-and-testing.instructions.md rubric)
 # ---------------------------------------------------------------------------
 
-MYPY_PENALTY = 20      # binary: any errors = -20
-TEST_PENALTY = 15      # binary: any failures = -15
+MYPY_PENALTY = 20  # binary: any errors = -20
+TEST_PENALTY = 15  # binary: any failures = -15
 SEVERITY_PENALTY: dict[str, int] = {
-    "E": 1,    # ruff errors (style/minor)
-    "W": 1,    # ruff warnings
-    "I": 1,    # import ordering
-    "D": 2,    # docstring violations
-    "UP": 2,   # pyupgrade
-    "G": 3,    # logging format (f-strings)
-    "B": 5,    # bugbear (bugs)
-    "S": 5,    # security (bandit)
+    "E": 1,  # ruff errors (style/minor)
+    "W": 1,  # ruff warnings
+    "I": 1,  # import ordering
+    "D": 2,  # docstring violations
+    "UP": 2,  # pyupgrade
+    "G": 3,  # logging format (f-strings)
+    "B": 5,  # bugbear (bugs)
+    "S": 5,  # security (bandit)
 }
-DEFAULT_PENALTY = 2    # for rule codes not in map above
+DEFAULT_PENALTY = 2  # for rule codes not in map above
+
+
+@dataclass(frozen=True)
+class Measurement:
+    """One tool measurement and whether its output was trustworthy."""
+
+    status: str
+    detail: str
+    count: int = 0
+    violations: list[dict] | None = None
+
+
+MEASUREMENT_PASS = "PASS"
+MEASUREMENT_FAIL = "FAIL"
+MEASUREMENT_UNVERIFIED = "UNVERIFIED"
 
 
 def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
-    result = subprocess.run(args, capture_output=True, text=True, cwd=cwd)
+    result = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=180)
     return result.returncode, result.stdout, result.stderr
 
 
@@ -131,40 +147,122 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     }
 
 
-def run_ruff(target: str) -> tuple[list[dict], int]:
-    rc, stdout, _ = _run(["uv", "run", "ruff", "check", target, "--output-format=json"])
+def _targets(target: str | list[str]) -> list[str]:
+    """Normalize one or more measurement targets."""
+    return [target] if isinstance(target, str) else target
+
+
+def measure_ruff(target: str | list[str], cwd: str = ".") -> Measurement:
+    """Measure Ruff without treating failed measurement as a clean result."""
+    try:
+        rc, stdout, stderr = _run(
+            ["uv", "run", "ruff", "check", *_targets(target), "--output-format=json"],
+            cwd=cwd,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return Measurement(MEASUREMENT_UNVERIFIED, f"Ruff did not run: {error}")
+    if rc not in {0, 1}:
+        return Measurement(
+            MEASUREMENT_UNVERIFIED,
+            f"Ruff exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
     if not stdout.strip():
-        return [], 0
+        return Measurement(MEASUREMENT_UNVERIFIED, "Ruff produced no JSON output")
     try:
         violations = json.loads(stdout)
-    except json.JSONDecodeError:
-        return [], 0
-    return violations, len(violations)
+    except json.JSONDecodeError as error:
+        return Measurement(
+            MEASUREMENT_UNVERIFIED, f"Ruff produced invalid JSON: {error}"
+        )
+    if not isinstance(violations, list) or not all(
+        isinstance(item, dict) for item in violations
+    ):
+        return Measurement(MEASUREMENT_UNVERIFIED, "Ruff JSON was not a violation list")
+    if rc == 0 and violations:
+        return Measurement(
+            MEASUREMENT_UNVERIFIED,
+            "Ruff reported violations with a successful exit status",
+        )
+    if rc == 1 and not violations:
+        return Measurement(
+            MEASUREMENT_UNVERIFIED,
+            "Ruff failed without reporting any violations",
+        )
+    return Measurement(
+        MEASUREMENT_PASS if rc == 0 else MEASUREMENT_FAIL,
+        "Ruff completed",
+        len(violations),
+        violations,
+    )
+
+
+def run_ruff(target: str) -> tuple[list[dict], int]:
+    """Return legacy Ruff fields while fencing failed measurement upstream."""
+    measurement = measure_ruff(target)
+    return measurement.violations or [], measurement.count
+
+
+def measure_mypy(target: str | list[str], cwd: str = ".") -> Measurement:
+    """Measure mypy while distinguishing type failures from tool failures."""
+    try:
+        rc, stdout, stderr = _run(
+            [
+                "uv",
+                "run",
+                "mypy",
+                *_targets(target),
+                "--ignore-missing-imports",
+                "--explicit-package-bases",
+            ],
+            cwd=cwd,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return Measurement(MEASUREMENT_UNVERIFIED, f"mypy did not run: {error}")
+    output = stdout + stderr
+    errors = sum(1 for line in output.splitlines() if ": error:" in line)
+    if rc == 0:
+        if errors:
+            return Measurement(
+                MEASUREMENT_UNVERIFIED,
+                "mypy reported errors with a successful exit status",
+            )
+        return Measurement(MEASUREMENT_PASS, "mypy completed", errors)
+    if rc == 1 and errors:
+        return Measurement(MEASUREMENT_FAIL, "mypy reported type errors", errors)
+    return Measurement(
+        MEASUREMENT_UNVERIFIED,
+        f"mypy exited abnormally ({rc}): {output.strip() or 'no output'}",
+    )
 
 
 def run_mypy(target: str) -> tuple[int, str]:
-    rc, stdout, stderr = _run([
-        "uv", "run", "mypy", target,
-        "--ignore-missing-imports",
-        "--explicit-package-bases",
-    ])
-    output = stdout + stderr
-    errors = sum(1 for line in output.splitlines() if ": error:" in line)
-    summary = next(
-        (line for line in reversed(output.splitlines()) if line.strip()),
-        "No output",
+    """Return legacy mypy fields while fencing failed measurement upstream."""
+    measurement = measure_mypy(target)
+    return measurement.count, measurement.detail
+
+
+def measure_pytest(cwd: str = ".") -> Measurement:
+    """Measure pytest, separating test failures from infrastructure failures."""
+    try:
+        rc, stdout, stderr = _run(
+            ["uv", "run", "pytest", "tests/", "-q", "--tb=no"], cwd=cwd
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return Measurement(MEASUREMENT_UNVERIFIED, f"pytest did not run: {error}")
+    if rc == 0:
+        return Measurement(MEASUREMENT_PASS, "pytest completed")
+    if rc == 1:
+        return Measurement(MEASUREMENT_FAIL, "pytest reported test failures")
+    return Measurement(
+        MEASUREMENT_UNVERIFIED,
+        f"pytest infrastructure exit ({rc}): {(stderr or stdout).strip() or 'no output'}",
     )
-    return errors, summary
 
 
 def run_pytest() -> tuple[bool, str]:
-    rc, stdout, _ = _run(["uv", "run", "pytest", "tests/", "-q", "--tb=no"])
-    passed = rc == 0
-    summary = next(
-        (line for line in reversed(stdout.splitlines()) if line.strip()),
-        "No tests run",
-    )
-    return passed, summary
+    """Return legacy pytest fields while fencing failed measurement upstream."""
+    measurement = measure_pytest()
+    return measurement.status == MEASUREMENT_PASS, measurement.detail
 
 
 def classify_ruff_violation(code: str) -> int:
@@ -221,13 +319,19 @@ def main() -> None:
     parser.add_argument("--skip-tests", action="store_true", help="Skip pytest.")
     parser.add_argument("--out", type=Path, help="Write the JSON result to this path.")
     parser.add_argument("--phase", default="", help="Current small-plan phase slug.")
-    parser.add_argument("--base-ref", default="dev", help="Base ref used for branch metadata.")
+    parser.add_argument(
+        "--base-ref", default="dev", help="Base ref used for branch metadata."
+    )
     args = parser.parse_args()
 
     target_path = Path(args.target).resolve()
     target = str(target_path)
-    ruff_violations, ruff_count = run_ruff(target)
-    mypy_errors, mypy_summary = run_mypy(target)
+    ruff = measure_ruff(target)
+    mypy = measure_mypy(target)
+    ruff_violations = ruff.violations or []
+    ruff_count = ruff.count
+    mypy_errors = mypy.count
+    mypy_summary = mypy.detail
 
     if args.skip_tests:
         # Skipping tests is not the same as passing them. Record it explicitly
@@ -235,10 +339,32 @@ def main() -> None:
         # reflect that the test surface was not verified.
         tests_passed, pytest_summary, tests_skipped = False, "skipped", True
     else:
-        tests_passed, pytest_summary = run_pytest()
+        pytest = measure_pytest()
+        tests_passed, pytest_summary = (
+            pytest.status == MEASUREMENT_PASS,
+            pytest.detail,
+        )
         tests_skipped = False
 
     score, deductions = compute_score(ruff_violations, mypy_errors, tests_passed)
+    measurement_status = {
+        "ruff": ruff.status,
+        "mypy": mypy.status,
+        "pytest": "UNVERIFIED" if args.skip_tests else pytest.status,
+    }
+    measurement_failures = [
+        f"{name}: {status}"
+        for name, status in measurement_status.items()
+        if status == MEASUREMENT_UNVERIFIED
+    ]
+    if measurement_failures:
+        # A score is meaningful only when all required tools were measured. Keep
+        # legacy count fields, but never publish a clean-looking gate result
+        # after a missing executable, parser error, or abnormal tool exit.
+        score = 0
+        deductions.extend(
+            f"measurement: {failure}  [-100]" for failure in measurement_failures
+        )
     gate = gate_label(score)
 
     result = {
@@ -251,6 +377,8 @@ def main() -> None:
         "tests_skipped": tests_skipped,
         "pytest_summary": pytest_summary,
         "mypy_summary": mypy_summary,
+        "measurement_status": measurement_status,
+        "measurement_failures": measurement_failures,
         "deductions": deductions,
         **git_metadata(target_path, args.phase, args.base_ref),
     }
@@ -263,10 +391,10 @@ def main() -> None:
         print(json.dumps(result, indent=2))
         sys.exit(0)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Quality Score: {score}/100  [{gate}]")
     print(f"  Target: {target}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"\n  ruff:   {ruff_count} violations")
     print(f"  mypy:   {mypy_errors} errors  ({mypy_summary})")
     print(f"  pytest: {'PASS' if tests_passed else 'FAIL'}  ({pytest_summary})")

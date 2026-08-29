@@ -43,6 +43,7 @@ REQUIRED_FILES = (
     "dist/multi-agent/.claude/skills/ponytail-review/SKILL.md",
     "dist/multi-agent/.claude/third_party/ponytail/LICENSE",
     "dist/multi-agent/.claude/third_party/ponytail/UPSTREAM.md",
+    "dist/multi-agent/.claude/scripts/verify.py",
 )
 REQUIRED_DIRS = (
     "dist/multi-agent/.codex/agents",
@@ -360,7 +361,7 @@ def main() -> int:
                 print(
                     "WARN optional binary missing: uv; guardrails use Bash 3.2 orchestration and "
                     "Python 3 standard-library JSON parsing for report reads without uv; "
-                    "quality_score.py is the only feature that needs uv"
+                    "quality_score.py and verify.py need uv"
                 )
             elif command == "context-mode":
                 print(

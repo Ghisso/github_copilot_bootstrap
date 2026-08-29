@@ -7089,6 +7089,7 @@ def validate_support_files(errors: list[str]) -> None:
         "MEMORY.md",
         "scripts/quality_score.py",
         "scripts/record_findings.py",
+        "scripts/verify.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",

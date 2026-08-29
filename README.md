@@ -331,7 +331,7 @@ Interpretation:
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
-- Templates, prompts, memory, plans, session logs, quality reports, and quality scoring rendered into the shared `.claude/` basis
+- Templates, prompts, memory, plans, session logs, quality reports, quality scoring, and deterministic verification receipts rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
 
@@ -751,8 +751,19 @@ Expected verification commands after implementation:
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
 - uv run ruff format src/ tests/
+- uv run python .claude/scripts/verify.py fast --format json
+- uv run python .claude/scripts/verify.py phase --format json --persist
+- uv run python .claude/scripts/verify.py closeout --format json --persist
 - uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
 - uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+
+The generated `verify.py` commands produce machine-readable Phase A receipts:
+`fast` gives focused feedback, `phase` persists reusable evidence, and
+`closeout` reuses fresh phase evidence while binding the final tracked state.
+Run `phase` only after the ordinary checks are clean, and run `closeout` during
+final closeout after documentation, score, and findings are current. This
+workflow is additive; the existing verifier, score, findings, and hook gates
+remain authoritative.
 
 Quality gates:
 
