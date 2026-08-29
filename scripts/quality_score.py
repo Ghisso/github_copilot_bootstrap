@@ -177,6 +177,11 @@ def measure_ruff(target: str) -> Measurement:
             MEASUREMENT_UNVERIFIED,
             "Ruff reported violations with a successful exit status",
         )
+    if rc == 1 and not violations:
+        return Measurement(
+            MEASUREMENT_UNVERIFIED,
+            "Ruff failed without reporting any violations",
+        )
     return Measurement(
         MEASUREMENT_PASS if rc == 0 else MEASUREMENT_FAIL,
         "Ruff completed",

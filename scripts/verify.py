@@ -107,7 +107,6 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         "status",
         "checks",
         "metadata",
-        "integrity_hash",
     }
     missing = sorted(required - receipt.keys())
     if missing:
@@ -166,11 +165,39 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             isinstance(path, str) for path in metadata[field]
         ):
             raise ValueError(f"receipt metadata is missing {field}")
-    if not isinstance(receipt["integrity_hash"], str):
-        raise ValueError("receipt integrity_hash must be a string")
-    if receipt["integrity_hash"] != receipt_integrity_hash(receipt):
-        raise ValueError("receipt integrity hash does not match its contents")
+    validate_mode_applicability(receipt["mode"], typed_checks, metadata)
     return receipt
+
+
+def validate_mode_applicability(
+    mode: object, checks: list[dict[str, object]], metadata: dict[str, object]
+) -> None:
+    """Reject caller-selected N/A states using fixed mode applicability."""
+    inapplicable = {
+        "fast": {
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-FRESH-001",
+            "VFY-FRESH-002",
+            "VFY-GEN-001",
+            "VFY-RECEIPT-001",
+        },
+        "phase": {"VFY-RECEIPT-001"},
+        "closeout": {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        },
+    }[str(mode)]
+    if mode == "fast" and not any(
+        Path(path).suffix == ".py"
+        for path in metadata_paths(metadata, "relevant_paths")
+    ):
+        inapplicable.add("VFY-RUFF-001")
+    for item in checks:
+        if item["applicable"] is not (item["id"] not in inapplicable):
+            raise ValueError(f"{item['id']} has invalid applicability for {mode} mode")
 
 
 def git_output(args: list[str], root: Path) -> str:
@@ -203,6 +230,8 @@ def classify_path(path: str) -> str:
         return "control-plane"
     if path.startswith(("scripts/", "shared/scripts/")):
         return "generator"
+    if path.startswith("shared/"):
+        return "control-plane"
     suffix = Path(path).suffix.lower()
     if suffix in CONFIG_SUFFIXES:
         return "config"
@@ -274,6 +303,8 @@ def measure_ruff(root: Path, targets: list[str]) -> dict[str, object]:
     ):
         return check("VFY-RUFF-001", "UNVERIFIED", "Ruff JSON was not a finding list")
     if result.returncode == 0 and findings:
+        return check("VFY-RUFF-001", "UNVERIFIED", "Ruff exit and JSON disagree")
+    if result.returncode == 1 and not findings:
         return check("VFY-RUFF-001", "UNVERIFIED", "Ruff exit and JSON disagree")
     return check(
         "VFY-RUFF-001",
@@ -361,12 +392,6 @@ def canonical_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
-def receipt_integrity_hash(receipt: dict[str, object]) -> str:
-    """Hash a receipt's content without recursively hashing its digest field."""
-    payload = {key: value for key, value in receipt.items() if key != "integrity_hash"}
-    return hash_text(canonical_json(payload))
-
-
 def build_receipt(
     mode: str, checks: list[dict[str, object]], metadata: dict[str, object]
 ) -> dict[str, object]:
@@ -378,7 +403,6 @@ def build_receipt(
         "checks": checks,
         "metadata": metadata,
     }
-    receipt["integrity_hash"] = receipt_integrity_hash(receipt)
     validate_receipt(receipt)
     return receipt
 
@@ -499,8 +523,13 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         phase_metadata: dict[str, object] = {}
     else:
         phase_metadata = phase["metadata"]  # type: ignore[assignment]
+        current_phase_checks = phase_checks(root, metadata)
         status = (
-            "PASS" if phase["mode"] == "phase" and phase["status"] == "PASS" else "FAIL"
+            "PASS"
+            if phase["mode"] == "phase"
+            and phase["status"] == "PASS"
+            and phase["checks"] == current_phase_checks
+            else "FAIL"
         )
         receipt_check = check(
             "VFY-RECEIPT-001",
@@ -511,7 +540,13 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         )
     if not metadata_is_bound(metadata) or not metadata_is_bound(phase_metadata):
         fresh_status = "UNVERIFIED"
-    elif phase_metadata.get("content_hash") == metadata["content_hash"]:
+    elif (
+        all(
+            phase_metadata.get(field) == metadata.get(field)
+            for field in ("base_ref", "branch", "head_sha", "merge_base_sha")
+        )
+        and phase_metadata.get("content_hash") == metadata["content_hash"]
+    ):
         fresh_status = "PASS"
     else:
         fresh_status = "FAIL"
