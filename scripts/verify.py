@@ -404,19 +404,37 @@ def metadata_paths(metadata: dict[str, object], field: str) -> list[str]:
     return value
 
 
+def metadata_is_bound(metadata: dict[str, object]) -> bool:
+    """Return whether Git supplied the commit/base pair freshness requires."""
+    return bool(metadata.get("head_sha") and metadata.get("merge_base_sha"))
+
+
 def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
     """Run the complete Phase-A measurement group."""
     categories = sorted(
         {classify_path(path) for path in metadata_paths(metadata, "changed_paths")}
     )
+    freshness_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
     checks = [
         check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
         check("VFY-STATUS-002", "PASS", "phase check applicability is deterministic"),
         measure_ruff(root, ["shared", "scripts", "tests"]),
         measure_mypy(root, ["shared", "scripts", "tests"]),
         measure_pytest(root),
-        check("VFY-FRESH-001", "PASS", "phase evidence captured relevant state"),
-        check("VFY-FRESH-002", "PASS", "phase evidence captured whole tracked state"),
+        check(
+            "VFY-FRESH-001",
+            freshness_status,
+            "phase evidence captured relevant state"
+            if freshness_status == "PASS"
+            else "Git base state was unavailable",
+        ),
+        check(
+            "VFY-FRESH-002",
+            freshness_status,
+            "phase evidence captured whole tracked state"
+            if freshness_status == "PASS"
+            else "Git base state was unavailable",
+        ),
         check(
             "VFY-CONTROL-001",
             "PASS",
@@ -491,11 +509,12 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
             if status == "PASS"
             else "phase receipt was not successful",
         )
-    fresh_status = (
-        "PASS"
-        if phase_metadata.get("content_hash") == metadata["content_hash"]
-        else "FAIL"
-    )
+    if not metadata_is_bound(metadata) or not metadata_is_bound(phase_metadata):
+        fresh_status = "UNVERIFIED"
+    elif phase_metadata.get("content_hash") == metadata["content_hash"]:
+        fresh_status = "PASS"
+    else:
+        fresh_status = "FAIL"
     return [
         check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
         check(
@@ -509,9 +528,19 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
             fresh_status,
             "phase evidence matches relevant state"
             if fresh_status == "PASS"
-            else "relevant code evidence is stale",
+            else (
+                "relevant code evidence is stale"
+                if fresh_status == "FAIL"
+                else "Git base state was unavailable"
+            ),
         ),
-        check("VFY-FRESH-002", "PASS", "closeout receipt binds whole tracked state"),
+        check(
+            "VFY-FRESH-002",
+            "PASS" if metadata_is_bound(metadata) else "UNVERIFIED",
+            "closeout receipt binds whole tracked state"
+            if metadata_is_bound(metadata)
+            else "Git base state was unavailable",
+        ),
         check("VFY-CONTROL-001", "PASS", "control-plane paths are evidence-relevant"),
         not_applicable("VFY-GEN-001", "closeout reuses phase generation evidence"),
         check("VFY-DETERMINISM-001", "PASS", "receipt serialization is canonical"),
