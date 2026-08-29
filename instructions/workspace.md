@@ -45,7 +45,7 @@ Always consult the relevant files under `.claude/instructions/`:
 
 | File | Covers |
 |---|---|
-| `workflow.instructions.md` | Pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit loop |
+| `workflow.instructions.md` | Pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit loop |
 | `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
@@ -57,7 +57,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
 ```
 
 Classify work with the single authoritative **Task Lanes** table in
@@ -67,7 +67,7 @@ standard, and control-plane/high-risk work follows the lifecycle. Use the
 orchestrated path for standard and control-plane/high-risk work:
 
 ```text
-orchestrator -> [planner when needed] -> coder -> verifier -> reviewer -> documenter -> score
+orchestrator -> [planner when needed] -> coder -> verify phase -> reviewer -> closeout
 ```
 
 Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.
@@ -95,7 +95,7 @@ and maintainability outrank reducing physical line count.
 | `planner` | Creates implementation plans with required skills and review profiles |
 | `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
 | `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
-| `verifier` | Runs final tests, typing, linting, imports, deprecation checks, and scoring |
+| `orchestrator` | Runs deterministic `verify phase`, coordinates independent review, and owns CLOSEOUT ordering |
 | `documenter` | Updates documentation after code review converges, before the persisted score/findings gate and commit/PR closeout |
 
 ## Review Profiles

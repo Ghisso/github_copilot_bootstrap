@@ -3,7 +3,7 @@ description: "Always-on: Workflow protocol, branch lifecycle, session logging, c
 applicability: always
 ---
 
-# Workflow: Pre-Flight -> Branch -> Plan -> Implement -> Verify -> Review -> Document -> Score -> Learn -> Session Log -> Commit
+# Workflow: Pre-Flight -> Branch -> Plan When Needed -> Implement -> Verify -> Review -> Closeout -> Commit
 
 ---
 
@@ -34,7 +34,7 @@ Control-plane/high-risk work always uses a full plan.
 
 An approved existing implementation-ready plan normally skips new plan
 creation. Before each new phase, inspect completed-phase outcomes and relevant
-verifier/reviewer findings. Invoke one planner only when new evidence,
+deterministic verification/reviewer findings. Invoke one planner only when new evidence,
 constraints, regressions, or architecture decisions materially affect remaining
 work; revise affected future phases only, without reopening completed or
 unaffected scope.
@@ -112,21 +112,18 @@ cancelled remains blocked.
 ## Canonical Orchestrator Loop
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
 ```
 
 For each small plan:
 
 1. **PLAN:** If no implementation-ready plan exists, delegate to `planner` and save the concrete small plan under `.claude/plans/`. Otherwise use the approved existing plan directly. Before each new phase, perform the material-impact check above; use one planner only for affected future work.
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
-3. **VERIFY:** Delegate to `verifier`; run tests, typing, linting, imports, and score when available.
+3. **VERIFY:** The orchestrator runs `uv run python .claude/scripts/verify.py phase --format json --persist`. Route a deterministic failure to the coder with its receipt and changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
-5. **DOCUMENT:** Delegate to `documenter` with diff range, changed files, and public/config/workflow/user-facing changes. Skip only when the change is purely internal. DOCUMENT runs before the persisted SCORE/FINDINGS so the documenter's tracked edits are inside the content those reports are bound to — otherwise a post-score doc change stales both.
-6. **SCORE & PERSIST:** After documentation is final, persist the converged findings with one `--profile <name>` for each profile that ran, then run `quality_score.py` with `--phase <current_phase> --base-ref dev --out .claude/quality_reports/score-<timestamp>.json`. Both artifacts bind to the final code+docs `content_hash`. Doc-only changes from DOCUMENT are not re-reviewed — the code review already converged; persisting here simply keeps the reports fresh against the committed content. Re-run REVIEW only if a later fix changes code.
-7. **FIX LOOP:** If verification, review, or score fails, update TodoWrite, re-add IMPLEMENT/VERIFY/REVIEW/DOCUMENT/SCORE, and repeat until score is >= 90 and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory.
-8. **LEARN:** Run the `learn` skill and save reusable discoveries to `.claude/MEMORY.md`, or record `[LEARN] none - no new lessons this session`.
-9. **SESSION LOG:** Update the closeout session log using `.claude/templates/session-log.md`; final status must be `COMPLETED`.
-10. **COMMIT:** On normal completion, commit the completed small plan atomically.
+5. **CLOSEOUT:** In this fixed order: (a) delegate documentation applicability/update; (b) persist converged review findings with one `--profile <name>` per profile; (c) write the final quality score with `quality_score.py --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json`; (d) run `learn` or record `[LEARN] none - no new lessons this session`; (e) update the `COMPLETED` session log; then (f) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation precedes binding reports so score and findings remain fresh. The reviewer is not the score writer and the coder cannot create final verification receipts.
+6. **FIX LOOP:** If verification, review, closeout, or score fails, update TodoWrite, return to IMPLEMENT, and repeat until score is >= 90 and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory.
+7. **COMMIT:** On normal completion, commit the completed small plan atomically.
 
 **Conditional checkpoint branch:** When the user explicitly requests a pause,
 write the PAUSED session log and required pause frontmatter, then checkpoint

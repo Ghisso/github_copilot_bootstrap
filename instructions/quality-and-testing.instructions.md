@@ -19,7 +19,9 @@ uv run ruff check src/ tests/              # Lint (0 violations required)
 
 The generated `.claude/scripts/verify.py` also offers machine-readable
 `fast`, `phase`, and `closeout` receipts. It is additive during Phase A:
-existing verifier, score, findings, and hook gates remain authoritative.
+existing score, findings, and hook gates remain authoritative. The orchestrator
+runs the deterministic `verify phase` and `verify closeout` entrypoints; their
+receipts are additive while legacy gates remain authoritative in Phase B.
 Use `phase --format json --persist` only after the ordinary checks are clean;
 `closeout` reuses fresh phase evidence and binds the final tracked state.
 

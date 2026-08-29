@@ -71,11 +71,8 @@ audience-appropriate communication.
 
 - Prefer minimal diffs and preserve existing style.
 - Avoid unrelated refactors unless required.
-- Run verification commands after edits:
-  - `uv run pytest tests/ -q --tb=short`
-  - `uv run mypy src/ --ignore-missing-imports --explicit-package-bases`
-  - `uv run ruff check src/ tests/`
-- You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out`. The `verifier` is the single owner of the persisted score report — do not write score reports from the coder.
+- Use `uv run python .claude/scripts/verify.py fast --format json` and project-native focused checks while implementing. Fix failures until the changed scope is green; the orchestrator later runs authoritative `verify phase`.
+- You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out` or create verification receipts. The orchestrator owns final closeout evidence.
 - If checks fail, fix and re-run before returning.
 
 ## Changed-Scope Simplification

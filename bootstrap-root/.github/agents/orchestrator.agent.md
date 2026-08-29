@@ -16,7 +16,6 @@ agents:
   - planner
   - coder
   - reviewer
-  - verifier
   - documenter
 disable-model-invocation: true
 ---
