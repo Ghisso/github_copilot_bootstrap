@@ -101,7 +101,14 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     """Validate the versioned receipt contract and return its typed mapping."""
     if not isinstance(receipt, dict):
         raise ValueError("receipt must be an object")
-    required = {"schema_version", "mode", "status", "checks", "metadata"}
+    required = {
+        "schema_version",
+        "mode",
+        "status",
+        "checks",
+        "metadata",
+        "integrity_hash",
+    }
     missing = sorted(required - receipt.keys())
     if missing:
         raise ValueError(f"receipt missing required fields: {', '.join(missing)}")
@@ -159,6 +166,10 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             isinstance(path, str) for path in metadata[field]
         ):
             raise ValueError(f"receipt metadata is missing {field}")
+    if not isinstance(receipt["integrity_hash"], str):
+        raise ValueError("receipt integrity_hash must be a string")
+    if receipt["integrity_hash"] != receipt_integrity_hash(receipt):
+        raise ValueError("receipt integrity hash does not match its contents")
     return receipt
 
 
@@ -350,6 +361,12 @@ def canonical_json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+def receipt_integrity_hash(receipt: dict[str, object]) -> str:
+    """Hash a receipt's content without recursively hashing its digest field."""
+    payload = {key: value for key, value in receipt.items() if key != "integrity_hash"}
+    return hash_text(canonical_json(payload))
+
+
 def build_receipt(
     mode: str, checks: list[dict[str, object]], metadata: dict[str, object]
 ) -> dict[str, object]:
@@ -361,6 +378,7 @@ def build_receipt(
         "checks": checks,
         "metadata": metadata,
     }
+    receipt["integrity_hash"] = receipt_integrity_hash(receipt)
     validate_receipt(receipt)
     return receipt
 
