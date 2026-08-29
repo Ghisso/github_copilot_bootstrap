@@ -1236,15 +1236,15 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
-- For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
-- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. Missing optional helpers are warnings, not hard failures.
+- Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
+- Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. A guarded bounded project index is optional for broader discovery, never repository truth, and missing optional helpers are warnings, not hard failures.
 
 ## Task Lanes
 
 - Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
 - Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
 - Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
-- Standard implementation and control-plane/high-risk work use `orchestrator -> planner -> coder -> verifier -> reviewer -> documenter -> score`; all commit/PR work is standard or higher.
+- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> verifier -> reviewer -> documenter -> score`; an approved implementation-ready plan normally skips planner. All commit/PR work is standard or higher.
 - Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
 - Audited typo commit bypasses are recovery exceptions, never lane classification.
 
