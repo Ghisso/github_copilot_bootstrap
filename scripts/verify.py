@@ -22,7 +22,7 @@ import re
 import stat
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -46,9 +46,15 @@ CHECK_IDS = (
     "VFY-RECEIPT-001",
 )
 COMMAND_TIMEOUT_SECONDS = 180
-PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase.json")
-CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout.json")
-ARTIFACT_KEYS = ("phase_receipt", "score", "findings", "closeout_log")
+PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
+CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
+ARTIFACT_KEYS = (
+    "phase_receipt",
+    "score",
+    "findings",
+    "closeout_log",
+    "documentation",
+)
 AUTHORITATIVE_RECEIPT_FIELDS = {
     "schema_version",
     "mode",
@@ -58,6 +64,7 @@ AUTHORITATIVE_RECEIPT_FIELDS = {
     "artifacts",
 }
 RECEIPT_EXTENSIONS_FIELD = "extensions"
+PHASE_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 CONTROL_PLANE_PREFIXES = (
     ".claude/",
     ".codex/",
@@ -180,6 +187,22 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     metadata = receipt["metadata"]
     if not isinstance(metadata, dict):
         raise ValueError("receipt metadata must be an object")
+    metadata_fields = {
+        "generated_at",
+        "base_ref",
+        "branch",
+        "head_sha",
+        "merge_base_sha",
+        "tree_sha",
+        "phase",
+        "content_hash",
+        "tracked_state_hash",
+        "changed_paths",
+        "relevant_paths",
+        "path_discovery_ok",
+    }
+    if set(metadata) != metadata_fields:
+        raise ValueError("receipt metadata has unknown or missing authoritative fields")
     for field in (
         "generated_at",
         "base_ref",
@@ -200,6 +223,21 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ValueError(f"receipt metadata is missing {field}")
     if not isinstance(metadata.get("path_discovery_ok"), bool):
         raise ValueError("receipt metadata is missing path_discovery_ok")
+    if receipt["mode"] in {"phase", "closeout"}:
+        for field in (
+            "generated_at",
+            "branch",
+            "head_sha",
+            "merge_base_sha",
+            "tree_sha",
+            "phase",
+            "content_hash",
+            "tracked_state_hash",
+        ):
+            if not metadata[field]:
+                raise ValueError(f"receipt metadata {field} must be non-empty")
+        if metadata["base_ref"] != "dev" or not PHASE_SLUG.fullmatch(metadata["phase"]):
+            raise ValueError("receipt metadata base_ref or phase is invalid")
     artifacts = receipt.get("artifacts")
     if receipt["mode"] == "closeout":
         validate_artifact_references(artifacts)
@@ -215,6 +253,9 @@ def validate_artifact_references(artifacts: object) -> None:
         raise ValueError("closeout receipt must contain every artifact reference")
     for key in ARTIFACT_KEYS:
         artifact = artifacts[key]
+        if key == "documentation":
+            validate_documentation_evidence(artifact)
+            continue
         if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"}:
             raise ValueError(f"closeout artifact {key} is malformed")
         path, digest = artifact["path"], artifact["sha256"]
@@ -227,10 +268,64 @@ def validate_artifact_references(artifacts: object) -> None:
             raise ValueError(f"closeout artifact {key} is invalid")
 
 
+def validate_documentation_evidence(evidence: object) -> None:
+    """Validate the compact canonical documentation disposition."""
+    if not isinstance(evidence, dict) or set(evidence) not in (
+        {"status", "reason"},
+        {"status", "paths"},
+    ):
+        raise ValueError("closeout documentation evidence is malformed")
+    status = evidence.get("status")
+    if status == "NOT_APPLICABLE":
+        if (
+            not isinstance(evidence.get("reason"), str)
+            or not evidence["reason"].strip()
+        ):
+            raise ValueError("closeout documentation N/A needs a reason")
+    elif status == "UPDATED":
+        paths = evidence.get("paths")
+        if (
+            not isinstance(paths, list)
+            or not paths
+            or not all(
+                isinstance(path, str) and is_safe_relative_path(path) for path in paths
+            )
+        ):
+            raise ValueError("closeout documentation update paths are invalid")
+    else:
+        raise ValueError("closeout documentation status is unknown")
+
+
 def is_safe_relative_path(value: str) -> bool:
     """Return whether a receipt reference stays inside the repository root."""
     path = Path(value)
     return bool(value and not path.is_absolute() and ".." not in path.parts)
+
+
+def confined_path(root: Path, value: str, *, regular: bool = False) -> Path:
+    """Resolve an existing repo path while rejecting symlink traversal."""
+    root = root.resolve(strict=True)
+    raw = Path(value)
+    candidate = raw if raw.is_absolute() else root / raw
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError as error:
+        raise ValueError("path is outside repository") from error
+    if ".." in relative.parts:
+        raise ValueError("path traversal is not allowed")
+    current = root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError("symlink path components are not allowed")
+    try:
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(root)
+    except (OSError, ValueError) as error:
+        raise ValueError("path is missing or outside repository") from error
+    if regular and (not resolved.is_file() or resolved.is_symlink()):
+        raise ValueError("path is not a regular file")
+    return resolved
 
 
 def validate_mode_applicability(
@@ -377,7 +472,7 @@ def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, obje
     relevant = scoped_paths(paths)
     branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
     return {
-        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "base_ref": base_ref,
         "branch": branch,
         "phase": phase or current_phase(root, branch),
@@ -408,7 +503,7 @@ def gate_receipt_errors(
     if not branch or not phase or not head:
         return ["closeout receipt gate needs branch, phase, and head"]
     try:
-        receipt = load_receipt(root / CLOSEOUT_RECEIPT)
+        receipt = load_receipt(receipt_path(root, "closeout", phase))
     except ValueError as error:
         return [str(error)]
     if receipt["mode"] != "closeout" or receipt["status"] != "PASS":
@@ -444,13 +539,21 @@ def gate_receipt_errors(
     if not isinstance(artifacts, dict):
         return errors + ["closeout receipt artifacts are malformed"]
     expected_paths = {
-        "phase_receipt": PHASE_RECEIPT.as_posix(),
+        "phase_receipt": receipt_path(root, "phase", phase)
+        .relative_to(root)
+        .as_posix(),
         "score": ".claude/quality_reports/",
         "findings": ".claude/quality_reports/",
     }
     loaded: dict[str, object] = {}
     for key in ARTIFACT_KEYS:
         artifact = artifacts.get(key)
+        if key == "documentation":
+            try:
+                validate_documentation_evidence(artifact)
+            except ValueError as error:
+                errors.append(str(error))
+            continue
         if not isinstance(artifact, dict):
             errors.append(f"closeout receipt artifact {key} is missing")
             continue
@@ -466,8 +569,8 @@ def gate_receipt_errors(
         ):
             errors.append(f"closeout receipt {key} path is outside quality reports")
             continue
-        path = root / path_value
         try:
+            path = confined_path(root, path_value, regular=True)
             actual_digest = file_digest(path)
         except ValueError:
             errors.append(f"closeout receipt artifact {key} is missing or unsafe")
@@ -476,6 +579,21 @@ def gate_receipt_errors(
             errors.append(f"closeout receipt artifact {key} was tampered with")
             continue
         loaded[key] = path
+
+    documentation = artifacts.get("documentation")
+    if isinstance(documentation, dict):
+        changed_docs = [
+            path
+            for path in metadata.get("changed_paths", [])
+            if isinstance(path, str) and classify_path(path) == "documentation-only"
+        ]
+        if changed_docs and documentation.get("status") != "UPDATED":
+            errors.append("closeout receipt must record updated documentation")
+        if (
+            documentation.get("status") == "UPDATED"
+            and documentation.get("paths") != changed_docs
+        ):
+            errors.append("closeout receipt documentation paths are stale")
 
     phase_path = loaded.get("phase_receipt")
     if isinstance(phase_path, Path):
@@ -486,6 +604,19 @@ def gate_receipt_errors(
         else:
             if phase_receipt["mode"] != "phase" or phase_receipt["status"] != "PASS":
                 errors.append("phase receipt must be passing phase evidence")
+            phase_metadata = phase_receipt.get("metadata")
+            if not isinstance(phase_metadata, dict) or any(
+                phase_metadata.get(field) != metadata.get(field)
+                for field in (
+                    "phase",
+                    "branch",
+                    "base_ref",
+                    "head_sha",
+                    "merge_base_sha",
+                    "content_hash",
+                )
+            ):
+                errors.append("phase receipt does not correlate with closeout evidence")
     score_path = loaded.get("score")
     if isinstance(score_path, Path):
         errors.extend(
@@ -578,8 +709,16 @@ def report_errors(
         errors.append(f"{label} must record dirty: false")
     if not isinstance(report.get("generated_at"), str):
         errors.append(f"{label} is missing generated_at")
-    if not isinstance(report.get("target"), str):
+    target = report.get("target")
+    if not isinstance(target, str):
         errors.append(f"{label} is missing target")
+    else:
+        try:
+            confined_path(root, target)
+        except ValueError:
+            errors.append(
+                f"{label} target is missing, unsafe, or outside the repository"
+            )
     if not isinstance(report.get("changed_files"), list):
         errors.append(f"{label} is missing changed_files")
     if verify_current_content:
@@ -598,6 +737,36 @@ def report_errors(
         ):
             errors.append("quality report test evidence is invalid")
     else:
+        findings = report.get("findings")
+        profiles = report.get("profiles_reviewed")
+        if (
+            not isinstance(findings, list)
+            or not isinstance(profiles, list)
+            or not profiles
+            or not all(isinstance(profile, str) and profile for profile in profiles)
+            or len(set(profiles)) != len(profiles)
+        ):
+            errors.append("findings report schema or reviewed profiles are invalid")
+            findings = []
+            profiles = []
+        observed = {"critical": 0, "major": 0, "minor": 0}
+        for finding in findings:
+            if not isinstance(finding, dict):
+                errors.append("findings report contains a malformed finding")
+                continue
+            severity = finding.get("severity")
+            profile = finding.get("profile")
+            title = finding.get("title")
+            if (
+                severity not in {"CRITICAL", "MAJOR", "MINOR"}
+                or not isinstance(profile, str)
+                or profile not in profiles
+                or not isinstance(title, str)
+                or not title.strip()
+            ):
+                errors.append("findings report finding is invalid")
+                continue
+            observed[str(severity).lower()] += 1
         counts = report.get("counts")
         if not isinstance(counts, dict) or any(
             type(counts.get(name)) is not int or counts[name] < 0
@@ -605,6 +774,8 @@ def report_errors(
         ):
             errors.append("findings report severity counts are invalid")
         else:
+            if counts != observed:
+                errors.append("findings report counts do not match findings")
             if counts["critical"] != 0:
                 errors.append("findings report has CRITICAL findings")
             if require_major and counts["major"] != 0:
@@ -740,10 +911,11 @@ def file_digest(path: Path) -> str:
 def relative_artifact(root: Path, path: Path) -> dict[str, str]:
     """Bind one existing artifact by safe repository-relative path and bytes."""
     try:
-        relative = path.resolve(strict=True).relative_to(root.resolve(strict=True))
-    except (OSError, ValueError) as error:
+        relative = path.relative_to(root)
+        resolved = confined_path(root, relative.as_posix(), regular=True)
+    except ValueError as error:
         raise ValueError(f"artifact is outside repository: {path}") from error
-    return {"path": relative.as_posix(), "sha256": file_digest(path)}
+    return {"path": relative.as_posix(), "sha256": file_digest(resolved)}
 
 
 def latest_report(root: Path, pattern: str, branch: str, phase: str) -> Path:
@@ -751,8 +923,11 @@ def latest_report(root: Path, pattern: str, branch: str, phase: str) -> Path:
     candidates: list[tuple[str, Path]] = []
     for candidate in (root / ".claude/quality_reports").glob(pattern):
         try:
-            report = json.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            safe_candidate = confined_path(
+                root, candidate.relative_to(root).as_posix(), regular=True
+            )
+            report = json.loads(safe_candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
             continue
         if not isinstance(report, dict):
             continue
@@ -762,7 +937,7 @@ def latest_report(root: Path, pattern: str, branch: str, phase: str) -> Path:
             and report.get("phase") == phase
             and isinstance(generated_at, str)
         ):
-            candidates.append((generated_at, candidate))
+            candidates.append((generated_at, safe_candidate))
     if not candidates:
         raise ValueError(f"no matching {pattern} report for phase {phase}")
     return max(candidates, key=lambda item: item[0])[1]
@@ -780,7 +955,7 @@ def closeout_log_path(root: Path, phase: str) -> Path:
     )
     if not match or not is_safe_relative_path(match.group(1)):
         raise ValueError("phase plan has no safe closeout_session_log")
-    return root / match.group(1)
+    return confined_path(root, match.group(1), regular=True)
 
 
 def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, object]:
@@ -794,8 +969,13 @@ def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, obj
         or not phase
     ):
         raise ValueError("closeout receipt needs branch and phase metadata")
+    documentation_paths = [
+        path
+        for path in metadata_paths(metadata, "changed_paths")
+        if classify_path(path) == "documentation-only"
+    ]
     return {
-        "phase_receipt": relative_artifact(root, root / PHASE_RECEIPT),
+        "phase_receipt": relative_artifact(root, receipt_path(root, "phase", phase)),
         "score": relative_artifact(
             root, latest_report(root, "score-*.json", branch, phase)
         ),
@@ -803,6 +983,14 @@ def closeout_artifacts(root: Path, metadata: dict[str, object]) -> dict[str, obj
             root, latest_report(root, "findings-*.json", branch, phase)
         ),
         "closeout_log": relative_artifact(root, closeout_log_path(root, phase)),
+        "documentation": (
+            {"status": "UPDATED", "paths": documentation_paths}
+            if documentation_paths
+            else {
+                "status": "NOT_APPLICABLE",
+                "reason": "no documentation paths changed",
+            }
+        ),
     }
 
 
@@ -938,7 +1126,8 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
 
 def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
     """Reuse validated phase evidence and bind a final full-state receipt."""
-    phase_path = root / PHASE_RECEIPT
+    phase = metadata.get("phase")
+    phase_path = receipt_path(root, "phase", phase) if isinstance(phase, str) else root
     try:
         phase = load_receipt(phase_path)
     except ValueError as error:
@@ -1001,9 +1190,12 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
     ]
 
 
-def receipt_path(root: Path, mode: str) -> Path:
-    """Return the only deterministic persistence location for a receipt mode."""
-    return root / (PHASE_RECEIPT if mode == "phase" else CLOSEOUT_RECEIPT)
+def receipt_path(root: Path, mode: str, phase: str) -> Path:
+    """Return one immutable receipt path for the named implementation phase."""
+    if mode not in {"phase", "closeout"} or not PHASE_SLUG.fullmatch(phase):
+        raise ValueError("receipt persistence needs a safe phase slug")
+    pattern = PHASE_RECEIPT if mode == "phase" else CLOSEOUT_RECEIPT
+    return root / Path(str(pattern).format(phase=phase))
 
 
 def parse_args() -> argparse.Namespace:
@@ -1055,7 +1247,11 @@ def main() -> int:
         if args.mode == "fast":
             print("fast mode never persists evidence", file=sys.stderr)
             return 2
-        path = receipt_path(root, args.mode)
+        phase = metadata.get("phase")
+        if not isinstance(phase, str):
+            print("receipt persistence needs phase metadata", file=sys.stderr)
+            return 2
+        path = receipt_path(root, args.mode, phase)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     if args.format == "json":
