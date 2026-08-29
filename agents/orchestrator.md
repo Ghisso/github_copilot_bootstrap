@@ -19,8 +19,8 @@ edits remain with the main agent and create no lifecycle artifacts.
 
 You MUST maintain task tracking throughout the entire workflow:
 
-1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT, and PR-on-request when relevant.
-2. **Loop task:** Include a parameterized task for `VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY/SCORE - repeat until score >= 90`.
+1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT, and PR-on-request when relevant.
+2. **Loop task:** Include a parameterized task for `IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
 5. **On changes:** If new tasks emerge or plans change, update task tracking accordingly.
@@ -52,13 +52,13 @@ editing it.
 
 1. **PRE-FLIGHT:** Confirm current branch is `dev`, working tree is clean, and the big plan exists under `.claude/plans/`.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
-3. **PLAN:** Use the planner when no implementation-ready plan exists. When an approved existing plan remains implementation-ready, skip the planner and proceed to IMPLEMENT. Before every new phase, inspect completed-phase implementation outcomes and relevant deterministic verification/reviewer findings. If new evidence, constraints, regressions, or architecture decisions materially affect remaining work, invoke one planner with a compact evidence packet to revise affected future phases only; do not reopen completed or unaffected scope. Otherwise proceed directly to IMPLEMENT.
+3. **PLAN WHEN NEEDED:** Use the planner only when no implementation-ready plan exists. When an approved existing plan remains implementation-ready, skip the planner and proceed to IMPLEMENT. Before every new phase, inspect completed-phase implementation outcomes and relevant deterministic verification/reviewer findings. If new evidence, constraints, regressions, or architecture decisions materially affect remaining work, invoke one planner with a compact evidence packet to revise affected future phases only; do not reopen completed or unaffected scope. Otherwise proceed directly to IMPLEMENT.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Run `uv run python .claude/scripts/verify.py phase --format json --persist` yourself. Give deterministic failures and their receipt to the coder; do not delegate repetitive test execution to another model.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
-8. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); persist converged findings with `record_findings.py`; write the final `quality_score.py --json --out` report and require score >= 90; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings and score so both bind to final code+docs. The reviewer is not the score writer and the coder cannot create final receipts. If score, verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
-9. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
-12. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
+7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); persist converged findings with `record_findings.py`; write the final `quality_score.py --json --out` report and require score >= 90; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings and score so both bind to final code+docs. The reviewer is not the score writer and the coder cannot create final receipts. If score, verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
+9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ### Conditional pause and resume
 

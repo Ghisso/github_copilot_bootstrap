@@ -7,23 +7,22 @@ applicability: always
 
 ---
 
-## Verification Commands (run after every task)
+## Verification Commands
 
 ```bash
-uv run pytest tests/ -q --tb=short          # All tests
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases  # Type check
-uv run ruff check src/ tests/              # Lint (0 violations required)
+uv run python .claude/scripts/verify.py fast --format json  # Focused feedback during IMPLEMENT
 ```
 
-### Deterministic verification evidence (Phase A)
+### Deterministic verification evidence
 
 The generated `.claude/scripts/verify.py` also offers machine-readable
-`fast`, `phase`, and `closeout` receipts. It is additive during Phase A:
-existing score, findings, and hook gates remain authoritative. The orchestrator
-runs the deterministic `verify phase` and `verify closeout` entrypoints; their
-receipts are additive while legacy gates remain authoritative in Phase B.
-Use `phase --format json --persist` only after the ordinary checks are clean;
-`closeout` reuses fresh phase evidence and binds the final tracked state.
+`fast`, `phase`, and `closeout` receipts. During IMPLEMENT, use `fast` and
+project-native focused checks; do not repeat the complete fixed suite after
+every small edit. The orchestrator runs the authoritative complete suite with
+`verify phase --format json --persist` before REVIEW, then runs `verify
+closeout` after CLOSEOUT. Existing score, findings, and hook gates remain
+authoritative until their later migration. `closeout` reuses fresh phase
+evidence and binds the final tracked state.
 
 **Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
 **Never claim completion without running all three unless the repository lacks that surface and you say so.**

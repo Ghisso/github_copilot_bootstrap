@@ -91,11 +91,10 @@ and maintainability outrank reducing physical line count.
 
 | Agent | Purpose |
 |---|---|
-| `orchestrator` | Coordinates complex workflows and delegates work |
+| `orchestrator` | Coordinates complex workflows, runs deterministic `verify phase`, and owns CLOSEOUT ordering |
 | `planner` | Creates implementation plans with required skills and review profiles |
 | `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
 | `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
-| `orchestrator` | Runs deterministic `verify phase`, coordinates independent review, and owns CLOSEOUT ordering |
 | `documenter` | Updates documentation after code review converges, before the persisted score/findings gate and commit/PR closeout |
 
 ## Review Profiles
