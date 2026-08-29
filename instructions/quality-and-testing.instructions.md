@@ -15,6 +15,14 @@ uv run mypy src/ --ignore-missing-imports --explicit-package-bases  # Type check
 uv run ruff check src/ tests/              # Lint (0 violations required)
 ```
 
+### Deterministic verification evidence (Phase A)
+
+The generated `.claude/scripts/verify.py` also offers machine-readable
+`fast`, `phase`, and `closeout` receipts. It is additive during Phase A:
+existing verifier, score, findings, and hook gates remain authoritative.
+Use `phase --format json --persist` only after the ordinary checks are clean;
+`closeout` reuses fresh phase evidence and binds the final tracked state.
+
 **Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
 **Never claim completion without running all three unless the repository lacks that surface and you say so.**
 
