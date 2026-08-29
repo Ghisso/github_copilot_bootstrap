@@ -482,3 +482,10 @@
 - [LEARN:verification] When a generated verifier imports another generated
   measurement module, generation parity must bind the files as one runtime
   unit; checking only the entrypoint can certify stale measurement semantics.
+- [LEARN:architecture] Role retirement must separate current declarations from
+  dated native evidence. Update living provider counts, prompts, validators,
+  and docs atomically while preserving historical matrices under explicit
+  historical names.
+- [LEARN:runtime] Managed runtime scripts that import sibling modules should
+  disable bytecode writes before the local import; otherwise a successful run
+  can create unmanaged `__pycache__` drift inside the installed surface.
