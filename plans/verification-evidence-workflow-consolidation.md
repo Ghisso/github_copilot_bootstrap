@@ -10,7 +10,7 @@ phases:
   - 2026-08-29_phase-A-deterministic-verification-foundation
   - 2026-08-29_phase-B-workflow-and-agent-migration
   - 2026-08-29_phase-C-gate-evidence-migration-and-cleanup
-current_phase: 2026-08-29_phase-B-workflow-and-agent-migration
+current_phase: 2026-08-29_phase-C-gate-evidence-migration-and-cleanup
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>

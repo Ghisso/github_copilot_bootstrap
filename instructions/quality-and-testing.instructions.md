@@ -20,9 +20,11 @@ The generated `.claude/scripts/verify.py` also offers machine-readable
 project-native focused checks; do not repeat the complete fixed suite after
 every small edit. The orchestrator runs the authoritative complete suite with
 `verify phase --format json --persist` before REVIEW, then runs `verify
-closeout` after CLOSEOUT. Existing score, findings, and hook gates remain
-authoritative until their later migration. `closeout` reuses fresh phase
-evidence and binds the final tracked state.
+closeout` after CLOSEOUT. A completed closeout receipt records exact hashes and
+paths for its phase receipt, score, findings, and completed session log.
+Completed commit, push, and PR gates read that one strict receipt rather than
+rediscovering a newest report. `closeout` reuses fresh phase evidence and binds
+the final tracked state.
 
 **Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
 **Never claim completion without running all three unless the repository lacks that surface and you say so.**
