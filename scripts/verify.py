@@ -217,6 +217,7 @@ def git_paths(root: Path, base_ref: str) -> list[str]:
         ["diff", "--name-only", f"{base_ref}...HEAD"],
         ["diff", "--name-only"],
         ["diff", "--cached", "--name-only"],
+        ["ls-files", "--others", "--exclude-standard"],
     ):
         if not merge_base and base_ref in args[-1]:
             continue
@@ -252,27 +253,30 @@ def hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def hash_paths(root: Path, paths: list[str]) -> str:
+    """Hash current path names and bytes, including deletions and untracked files."""
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.encode("utf-8") + b"\0")
+        candidate = root / path
+        digest.update(candidate.read_bytes() if candidate.is_file() else b"<deleted>")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def state_metadata(root: Path, base_ref: str) -> dict[str, object]:
     """Capture Git metadata and whole/scoped content bindings."""
     merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
     paths = git_paths(root, base_ref)
-    whole_diff = (
-        git_output(["diff", "--binary", merge_base], root) if merge_base else ""
-    )
     relevant = scoped_paths(paths)
-    scoped_diff = (
-        git_output(["diff", "--binary", merge_base, "--", *relevant], root)
-        if merge_base and relevant
-        else ""
-    )
     return {
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "base_ref": base_ref,
         "branch": git_output(["rev-parse", "--abbrev-ref", "HEAD"], root),
         "head_sha": git_output(["rev-parse", "HEAD"], root),
         "merge_base_sha": merge_base,
-        "content_hash": hash_text(scoped_diff),
-        "tracked_state_hash": hash_text(whole_diff),
+        "content_hash": hash_paths(root, relevant),
+        "tracked_state_hash": hash_paths(root, paths),
         "changed_paths": paths,
         "relevant_paths": relevant,
     }
