@@ -142,7 +142,7 @@ repository-integrity/security defect.
 
 ## Phases
 
-- [ ] `2026-08-29_phase-A-deterministic-verification-foundation` — deterministic verification/evidence foundation
+- [x] `2026-08-29_phase-A-deterministic-verification-foundation` — deterministic verification/evidence foundation
 - [ ] `2026-08-29_phase-B-workflow-and-agent-migration` — workflow, agent, and provider migration
 - [ ] `2026-08-29_phase-C-gate-evidence-migration-and-cleanup` — receipt-based gate authority and cleanup
 

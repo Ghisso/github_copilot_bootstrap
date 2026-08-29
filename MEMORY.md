@@ -475,3 +475,10 @@
   replaced, and prove refusal leaves the full consumer snapshot unchanged. See
   `.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md` for the reusable
   takeover checklist.
+- [LEARN:verification] Freshness inventories must fail closed at discovery and
+  hashing boundaries: use NUL-delimited Git paths, include untracked files,
+  file type/mode/symlink identity, classify documentation narrowly, and treat
+  any partial Git path discovery as UNVERIFIED.
+- [LEARN:verification] When a generated verifier imports another generated
+  measurement module, generation parity must bind the files as one runtime
+  unit; checking only the entrypoint can certify stale measurement semantics.

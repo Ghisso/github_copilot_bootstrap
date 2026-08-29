@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-29T06:31:38Z",
+  "branch": "verification-evidence-workflow-consolidation_implementation",
+  "head_sha": "2fe48d62ca372a920b37cdd0b6b4797ca0ccccf0",
+  "base_ref": "dev",
+  "merge_base_sha": "2fe48d62ca372a920b37cdd0b6b4797ca0ccccf0",
+  "phase": "2026-08-29_phase-A-deterministic-verification-foundation",
+  "target": "shared",
+  "dirty": false,
+  "content_hash": "ab8da57055cfb616f5d56a7688296fe543c5a99d",
+  "changed_files": [
+    "README.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/scripts/quality_score.py",
+    "shared/scripts/verify.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
