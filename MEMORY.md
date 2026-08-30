@@ -500,3 +500,10 @@
 - [LEARN:verification] Record nested HEAD for audit, but compare the governing
   runtime, tracked/index state, and active-plan digests for freshness. This lets
   evidence-only nested commits advance HEAD without making receipts stale.
+- [LEARN:workflow] A final-phase receipt necessarily predates the automatic big
+  plan transition to `complete`. Push provenance must validate that exact
+  index-anchored transition, including the supported clean nested checkpoint,
+  while rejecting every other plan or runtime mutation.
+- [LEARN:security] `sys.dont_write_bytecode` prevents cache writes but not cache
+  reads. Imported `__pycache__` and `.pyc` files remain governing runtime state
+  unless imports explicitly bypass them, so provenance must continue to bind them.
