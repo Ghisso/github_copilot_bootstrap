@@ -30,20 +30,16 @@ sys.dont_write_bytecode = True
 import quality_score  # noqa: E402  # must follow the bytecode-cache guard
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
 MODES = frozenset({"fast", "phase", "closeout"})
 CHECK_IDS = (
-    "VFY-STATUS-001",
-    "VFY-STATUS-002",
     "VFY-RUFF-001",
     "VFY-MYPY-001",
     "VFY-PYTEST-001",
     "VFY-FRESH-001",
     "VFY-FRESH-002",
-    "VFY-CONTROL-001",
     "VFY-GEN-001",
-    "VFY-DETERMINISM-001",
     "VFY-RECEIPT-001",
 )
 COMMAND_TIMEOUT_SECONDS = 180
@@ -97,6 +93,27 @@ AUTHORING_RUNTIME_MARKERS = (
 )
 MYPY_CONFIG_FILES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
 MYPY_SCOPE_OPTIONS = ("files", "packages", "modules")
+CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION = 1
+CONTROL_PLANE_PROVENANCE_FIELDS = {
+    "schema_version",
+    "nested_head",
+    "runtime_fingerprint",
+    "tracked_state_fingerprint",
+    "big_plan_digest",
+    "small_plan_digest",
+}
+NESTED_MUTABLE_STATE_ROOTS = frozenset(
+    {
+        "MEMORY.md",
+        "plans",
+        "explorations",
+        "session_logs",
+        "quality_reports",
+        ".cache",
+        "settings.local.json",
+    }
+)
+NESTED_MUTABLE_STATE_PATHS = frozenset({"instructions/project-context.instructions.md"})
 
 
 def run_process(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -209,6 +226,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         "changed_paths",
         "relevant_paths",
         "path_discovery_ok",
+        "control_plane_provenance",
     }
     if set(metadata) != metadata_fields:
         raise ValueError("receipt metadata has unknown or missing authoritative fields")
@@ -232,6 +250,8 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ValueError(f"receipt metadata is missing {field}")
     if not isinstance(metadata.get("path_discovery_ok"), bool):
         raise ValueError("receipt metadata is missing path_discovery_ok")
+    if not has_control_plane_provenance(metadata):
+        raise ValueError("receipt metadata control-plane provenance is invalid")
     if not is_utc_timestamp(metadata["generated_at"]):
         raise ValueError("receipt metadata generated_at must be a UTC timestamp")
     if receipt["mode"] in {"phase", "closeout"}:
@@ -470,6 +490,198 @@ def hash_paths(root: Path, paths: list[str]) -> str:
     return digest.hexdigest()
 
 
+def nested_runtime_paths(root: Path) -> list[str] | None:
+    """Return static nested runtime paths, excluding mutable consumer evidence."""
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return None
+    paths: list[str] = []
+    try:
+        for path in nested.rglob("*"):
+            relative = path.relative_to(nested)
+            if not is_relevant_nested_path(relative.as_posix()):
+                continue
+            if path.is_file() or path.is_symlink():
+                paths.append(relative.as_posix())
+    except OSError:
+        return None
+    return sorted(paths)
+
+
+def is_relevant_nested_path(
+    path: str, active_plan_paths: frozenset[str] = frozenset()
+) -> bool:
+    """Return whether one nested path governs runtime behavior rather than evidence."""
+    relative = Path(path)
+    return bool(
+        relative.parts
+        and ".git" not in relative.parts
+        and (
+            relative.as_posix() in active_plan_paths
+            or (
+                relative.parts[0] not in NESTED_MUTABLE_STATE_ROOTS
+                and relative.as_posix() not in NESTED_MUTABLE_STATE_PATHS
+            )
+        )
+    )
+
+
+def nested_git_head(root: Path) -> str:
+    """Return the nested AI-state HEAD only when it is available."""
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return ""
+    return git_output(["-C", str(nested), "rev-parse", "--verify", "HEAD"], root)
+
+
+def nested_tracked_state_fingerprint(
+    root: Path, active_plan_paths: frozenset[str]
+) -> str:
+    """Hash relevant nested Git index and dirty state without mutable evidence."""
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return ""
+    try:
+        index = run_process(["git", "ls-files", "--stage", "-z"], nested)
+        status = run_process(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            nested,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if index.returncode != 0 or status.returncode != 0:
+        return ""
+    digest = hashlib.sha256()
+    for record in index.stdout.split("\0"):
+        _, separator, path = record.partition("\t")
+        if separator and is_relevant_nested_path(path, active_plan_paths):
+            digest.update(b"index\0" + record.encode("utf-8") + b"\0")
+    records = status.stdout.split("\0")
+    position = 0
+    while position < len(records):
+        record = records[position]
+        position += 1
+        if not record:
+            continue
+        state, separator, path = record[:2], record[2:3], record[3:]
+        paths = [path] if separator == " " else []
+        if "R" in state or "C" in state:
+            if position >= len(records):
+                return ""
+            paths.append(records[position])
+            position += 1
+        if any(
+            is_relevant_nested_path(candidate, active_plan_paths) for candidate in paths
+        ):
+            digest.update(b"status\0" + record.encode("utf-8") + b"\0")
+            for candidate in paths[1:]:
+                digest.update(candidate.encode("utf-8") + b"\0")
+    return digest.hexdigest()
+
+
+def digest_file(path: Path) -> str:
+    """Return a SHA-256 file digest, or an empty value when it is unreadable."""
+    try:
+        if not path.is_file() or path.is_symlink():
+            return ""
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+def active_big_plan_path(root: Path, branch: str) -> Path | None:
+    """Return the active implementation plan path when the branch names one."""
+    if not branch.endswith("_implementation"):
+        return None
+    slug = branch.removesuffix("_implementation")
+    if not PHASE_SLUG.fullmatch(slug):
+        return None
+    return root / ".claude/plans" / f"{slug}.md"
+
+
+def control_plane_provenance(root: Path, branch: str, phase: str) -> dict[str, object]:
+    """Bind the nested runtime and active plans without hashing mutable evidence."""
+    runtime_paths = nested_runtime_paths(root)
+    runtime_fingerprint = (
+        hash_paths(root / ".claude", runtime_paths) if runtime_paths is not None else ""
+    )
+    nested_head = nested_git_head(root)
+    big_plan = active_big_plan_path(root, branch)
+    small_plan = (
+        root / ".claude/plans" / f"{phase}.md"
+        if big_plan is not None and PHASE_SLUG.fullmatch(phase)
+        else None
+    )
+    active_plan_paths = frozenset(
+        path.relative_to(root / ".claude").as_posix()
+        for path in (big_plan, small_plan)
+        if path is not None
+    )
+    tracked_state_fingerprint = nested_tracked_state_fingerprint(
+        root, active_plan_paths
+    )
+    return {
+        "schema_version": CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+        "nested_head": nested_head,
+        "runtime_fingerprint": runtime_fingerprint,
+        "tracked_state_fingerprint": tracked_state_fingerprint,
+        "big_plan_digest": digest_file(big_plan) if big_plan is not None else "",
+        "small_plan_digest": digest_file(small_plan) if small_plan is not None else "",
+    }
+
+
+def has_control_plane_provenance(metadata: dict[str, object]) -> bool:
+    """Return whether required nested state was recorded for this branch."""
+    provenance = metadata.get("control_plane_provenance")
+    if (
+        not isinstance(provenance, dict)
+        or set(provenance) != CONTROL_PLANE_PROVENANCE_FIELDS
+    ):
+        return False
+    if provenance.get("schema_version") != CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION:
+        return False
+    nested_head = provenance.get("nested_head")
+    if not isinstance(nested_head, str) or not re.fullmatch(
+        r"[0-9a-f]{40,64}", nested_head
+    ):
+        return False
+    for field in ("runtime_fingerprint", "tracked_state_fingerprint"):
+        if not isinstance(provenance.get(field), str) or not re.fullmatch(
+            r"[0-9a-f]{64}", str(provenance[field])
+        ):
+            return False
+    branch = metadata.get("branch")
+    if isinstance(branch, str) and branch.endswith("_implementation"):
+        return all(
+            isinstance(provenance.get(field), str)
+            and re.fullmatch(r"[0-9a-f]{64}", str(provenance[field]))
+            for field in ("big_plan_digest", "small_plan_digest")
+        )
+    return all(
+        isinstance(provenance.get(field), str)
+        for field in ("big_plan_digest", "small_plan_digest")
+    )
+
+
+def control_plane_provenance_matches(
+    recorded: dict[str, object], current: dict[str, object]
+) -> bool:
+    """Compare governing bytes while allowing evidence-only nested HEAD advances."""
+    if not has_control_plane_provenance(recorded) or not has_control_plane_provenance(
+        current
+    ):
+        return False
+    recorded_provenance = recorded["control_plane_provenance"]
+    current_provenance = current["control_plane_provenance"]
+    assert isinstance(recorded_provenance, dict) and isinstance(
+        current_provenance, dict
+    )
+    return all(
+        recorded_provenance.get(field) == current_provenance.get(field)
+        for field in CONTROL_PLANE_PROVENANCE_FIELDS - {"nested_head"}
+    )
+
+
 def current_phase(root: Path, branch: str) -> str:
     """Read the active phase for an implementation branch without YAML parsing."""
     if not branch.endswith("_implementation"):
@@ -508,6 +720,9 @@ def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, obje
         "changed_paths": paths,
         "relevant_paths": relevant,
         "path_discovery_ok": path_discovery_ok,
+        "control_plane_provenance": control_plane_provenance(
+            root, branch, phase or current_phase(root, branch)
+        ),
     }
 
 
@@ -562,6 +777,19 @@ def gate_receipt_errors(
         )
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append("closeout receipt final tracked state is stale")
+        current_provenance = control_plane_provenance(root, branch, phase)
+        if not has_control_plane_provenance(
+            {**metadata, "control_plane_provenance": current_provenance}
+        ):
+            errors.append(
+                "closeout receipt governing control-plane provenance is unavailable"
+            )
+        elif not control_plane_provenance_matches(
+            metadata, {**metadata, "control_plane_provenance": current_provenance}
+        ):
+            errors.append(
+                "closeout receipt governing control-plane provenance is stale"
+            )
 
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, dict):
@@ -633,16 +861,20 @@ def gate_receipt_errors(
             if phase_receipt["mode"] != "phase" or phase_receipt["status"] != "PASS":
                 errors.append("phase receipt must be passing phase evidence")
             phase_metadata = phase_receipt.get("metadata")
-            if not isinstance(phase_metadata, dict) or any(
-                phase_metadata.get(field) != metadata.get(field)
-                for field in (
-                    "phase",
-                    "branch",
-                    "base_ref",
-                    "head_sha",
-                    "merge_base_sha",
-                    "content_hash",
+            if (
+                not isinstance(phase_metadata, dict)
+                or any(
+                    phase_metadata.get(field) != metadata.get(field)
+                    for field in (
+                        "phase",
+                        "branch",
+                        "base_ref",
+                        "head_sha",
+                        "merge_base_sha",
+                        "content_hash",
+                    )
                 )
+                or not control_plane_provenance_matches(phase_metadata, metadata)
             ):
                 errors.append("phase receipt does not correlate with closeout evidence")
     score_path = loaded.get("score")
@@ -1177,7 +1409,17 @@ def metadata_paths(metadata: dict[str, object], field: str) -> list[str]:
 
 
 def metadata_is_bound(metadata: dict[str, object]) -> bool:
-    """Return whether Git supplied the commit/base pair freshness requires."""
+    """Return whether Git and governing nested provenance are trustworthy."""
+    return bool(
+        metadata.get("head_sha")
+        and metadata.get("merge_base_sha")
+        and metadata.get("path_discovery_ok") is True
+        and has_control_plane_provenance(metadata)
+    )
+
+
+def metadata_has_outer_binding(metadata: dict[str, object]) -> bool:
+    """Return whether Git supplied the outer commit/base pair freshness needs."""
     return bool(
         metadata.get("head_sha")
         and metadata.get("merge_base_sha")
@@ -1187,10 +1429,10 @@ def metadata_is_bound(metadata: dict[str, object]) -> bool:
 
 def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
     """Run the complete Phase-A measurement group."""
-    categories = sorted(
-        {classify_path(path) for path in metadata_paths(metadata, "changed_paths")}
+    outer_freshness_status = (
+        "PASS" if metadata_has_outer_binding(metadata) else "UNVERIFIED"
     )
-    freshness_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
+    provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
     if is_bootstrap_authoring_repository(root):
         ruff = measure_ruff(root, ["shared", "scripts", "tests"])
         mypy = measure_mypy(root, ["shared", "scripts", "tests"])
@@ -1209,32 +1451,24 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
         )
         pytest = measure_pytest(root, [])
     checks = [
-        check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
-        check("VFY-STATUS-002", "PASS", "phase check applicability is deterministic"),
         ruff,
         mypy,
         pytest,
         check(
             "VFY-FRESH-001",
-            freshness_status,
+            outer_freshness_status,
             "phase evidence captured relevant state"
-            if freshness_status == "PASS"
+            if outer_freshness_status == "PASS"
             else "Git base state was unavailable",
         ),
         check(
             "VFY-FRESH-002",
-            freshness_status,
-            "phase evidence captured whole tracked state"
-            if freshness_status == "PASS"
-            else "Git base state was unavailable",
-        ),
-        check(
-            "VFY-CONTROL-001",
-            "PASS",
-            f"classified paths: {', '.join(categories) or 'none'}",
+            provenance_status,
+            "phase evidence captured governing control-plane provenance"
+            if provenance_status == "PASS"
+            else "governing control-plane provenance was unavailable",
         ),
         generation_check(root),
-        check("VFY-DETERMINISM-001", "PASS", "receipt serialization is canonical"),
         not_applicable(
             "VFY-RECEIPT-001", "phase creates evidence; it does not reuse it"
         ),
@@ -1254,12 +1488,7 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
         if python_paths
         else not_applicable("VFY-RUFF-001", "no changed Python paths")
     )
-    categories = sorted(
-        {classify_path(path) for path in metadata_paths(metadata, "changed_paths")}
-    )
     return [
-        check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
-        check("VFY-STATUS-002", "PASS", "fast mode has fixed applicability"),
         ruff,
         not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),
         not_applicable("VFY-PYTEST-001", "fast mode does not run the full test suite"),
@@ -1269,15 +1498,9 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
         not_applicable(
             "VFY-FRESH-002", "fast mode never establishes closeout authority"
         ),
-        check(
-            "VFY-CONTROL-001",
-            "PASS",
-            f"classified paths: {', '.join(categories) or 'none'}",
-        ),
         not_applicable(
             "VFY-GEN-001", "fast mode does not validate generated ownership"
         ),
-        check("VFY-DETERMINISM-001", "PASS", "receipt serialization is canonical"),
         not_applicable("VFY-RECEIPT-001", "fast mode does not consume evidence"),
     ]
 
@@ -1303,7 +1526,9 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
             if status == "PASS"
             else "phase receipt was not successful",
         )
-    if not metadata_is_bound(metadata) or not metadata_is_bound(phase_metadata):
+    if not metadata_has_outer_binding(metadata) or not metadata_has_outer_binding(
+        phase_metadata
+    ):
         fresh_status = "UNVERIFIED"
     elif (
         all(
@@ -1315,11 +1540,13 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         fresh_status = "PASS"
     else:
         fresh_status = "FAIL"
+    if not metadata_is_bound(metadata) or not metadata_is_bound(phase_metadata):
+        provenance_status = "UNVERIFIED"
+    elif control_plane_provenance_matches(phase_metadata, metadata):
+        provenance_status = "PASS"
+    else:
+        provenance_status = "FAIL"
     return [
-        check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
-        check(
-            "VFY-STATUS-002", "PASS", "closeout check applicability is deterministic"
-        ),
         not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
         not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
         not_applicable("VFY-PYTEST-001", "closeout reuses phase pytest evidence"),
@@ -1336,14 +1563,16 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         ),
         check(
             "VFY-FRESH-002",
-            "PASS" if metadata_is_bound(metadata) else "UNVERIFIED",
-            "closeout receipt binds whole tracked state"
-            if metadata_is_bound(metadata)
-            else "Git base state was unavailable",
+            provenance_status,
+            "phase evidence matches governing control-plane provenance"
+            if provenance_status == "PASS"
+            else (
+                "governing control-plane provenance is stale"
+                if provenance_status == "FAIL"
+                else "governing control-plane provenance was unavailable"
+            ),
         ),
-        check("VFY-CONTROL-001", "PASS", "control-plane paths are evidence-relevant"),
         not_applicable("VFY-GEN-001", "closeout reuses phase generation evidence"),
-        check("VFY-DETERMINISM-001", "PASS", "receipt serialization is canonical"),
         receipt_check,
     ]
 
@@ -1428,7 +1657,7 @@ def main() -> int:
         print(f"{args.mode}: {receipt['status']}")
         for item in checks:
             print(f"{item['id']}: {item['status']} - {item['summary']}")
-    return 0 if receipt["status"] == "PASS" else 1
+    return 0 if receipt["status"] in {"PASS", "NOT_APPLICABLE"} else 1
 
 
 if __name__ == "__main__":
