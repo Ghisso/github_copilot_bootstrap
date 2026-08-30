@@ -1,14 +1,14 @@
 ---
 name: consumer-verification-provenance-hardening
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-verification-provenance-hardening_implementation
-started_at:
+started_at: 2026-08-30T03:10:05Z
 phases:
   - 2026-08-30_phase-A-consumer-native-verification
   - 2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof
-current_phase:
+current_phase: 2026-08-30_phase-A-consumer-native-verification
 ---
 # Big Plan: consumer-verification-provenance-hardening
 

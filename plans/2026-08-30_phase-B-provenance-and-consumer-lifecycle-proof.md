@@ -3,7 +3,7 @@ name: 2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof
 type: small-plan
 parent_plan: consumer-verification-provenance-hardening
 phase_index: 1
-status: in-progress
+status: pending
 closeout_session_log:
 ---
 # Small Plan: 2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof

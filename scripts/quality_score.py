@@ -147,18 +147,32 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     }
 
 
-def _targets(target: str | list[str]) -> list[str]:
+def _targets(target: str | list[str] | None) -> list[str]:
     """Normalize one or more measurement targets."""
+    if target is None:
+        return []
     return [target] if isinstance(target, str) else target
 
 
-def measure_ruff(target: str | list[str], cwd: str = ".") -> Measurement:
+def measure_ruff(
+    target: str | list[str],
+    cwd: str = ".",
+    *,
+    extend_exclude: list[str] | None = None,
+) -> Measurement:
     """Measure Ruff without treating failed measurement as a clean result."""
     try:
-        rc, stdout, stderr = _run(
-            ["uv", "run", "ruff", "check", *_targets(target), "--output-format=json"],
-            cwd=cwd,
-        )
+        args = [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            *_targets(target),
+            "--output-format=json",
+        ]
+        for pattern in extend_exclude or []:
+            args.extend(("--extend-exclude", pattern))
+        rc, stdout, stderr = _run(args, cwd=cwd)
     except (OSError, subprocess.SubprocessError) as error:
         return Measurement(MEASUREMENT_UNVERIFIED, f"Ruff did not run: {error}")
     if rc not in {0, 1}:
@@ -202,7 +216,7 @@ def run_ruff(target: str) -> tuple[list[dict], int]:
     return measurement.violations or [], measurement.count
 
 
-def measure_mypy(target: str | list[str], cwd: str = ".") -> Measurement:
+def measure_mypy(target: str | list[str] | None, cwd: str = ".") -> Measurement:
     """Measure mypy while distinguishing type failures from tool failures."""
     try:
         rc, stdout, stderr = _run(
@@ -241,11 +255,19 @@ def run_mypy(target: str) -> tuple[int, str]:
     return measurement.count, measurement.detail
 
 
-def measure_pytest(cwd: str = ".") -> Measurement:
+def measure_pytest(cwd: str = ".", targets: list[str] | None = None) -> Measurement:
     """Measure pytest, separating test failures from infrastructure failures."""
     try:
         rc, stdout, stderr = _run(
-            ["uv", "run", "pytest", "tests/", "-q", "--tb=no"], cwd=cwd
+            [
+                "uv",
+                "run",
+                "pytest",
+                *(targets if targets is not None else ["tests/"]),
+                "-q",
+                "--tb=no",
+            ],
+            cwd=cwd,
         )
     except (OSError, subprocess.SubprocessError) as error:
         return Measurement(MEASUREMENT_UNVERIFIED, f"pytest did not run: {error}")

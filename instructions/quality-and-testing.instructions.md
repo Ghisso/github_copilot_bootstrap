@@ -26,6 +26,17 @@ Completed commit, push, and PR gates read that one strict receipt rather than
 rediscovering a newest report. `closeout` reuses fresh phase evidence and binds
 the final tracked state.
 
+### Consumer-native verification scope
+
+Bootstrap authoring repositories keep explicit `shared`, `scripts`, and
+`tests` checks. Installed consumers use project-native configuration: Ruff
+checks the project while excluding the bootstrap-owned `.claude` runtime,
+pytest uses native discovery, and Mypy uses its selected native config's
+`files`, `packages`, or `modules` setting before the conventional `src/`
+fallback. If a required scope or selected config cannot be safely resolved,
+verification returns `UNVERIFIED`; real lint, type, and test findings remain
+`FAIL`.
+
 **Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
 **Never claim completion without running all three unless the repository lacks that surface and you say so.**
 
