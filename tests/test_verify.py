@@ -604,3 +604,183 @@ def test_quality_score_does_not_report_failed_measurement_clean(
     monkeypatch.setattr(quality_score, "_run", lambda *_args, **_kwargs: result)
     measurement = runner("shared")  # type: ignore[operator]
     assert measurement.status == status
+
+
+def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Consumer linting adds the runtime exclusion without bypassing Ruff config."""
+    captured: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        captured.extend(args)
+        assert cwd == "consumer"
+        return 0, "[]", ""
+
+    monkeypatch.setattr(quality_score, "_run", fake_run)
+    measurement = quality_score.measure_ruff(
+        ["."], cwd="consumer", extend_exclude=[".claude"]
+    )
+
+    assert measurement.status == "PASS"
+    assert captured == [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        ".",
+        "--output-format=json",
+        "--extend-exclude",
+        ".claude",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("filename", "contents"),
+    (
+        ("mypy.ini", "[mypy]\nfiles = src\n"),
+        (".mypy.ini", "[mypy]\npackages = example_consumer\n"),
+        ("pyproject.toml", '[tool.mypy]\nfiles = ["lib", "tests"]\n'),
+        ("setup.cfg", "[mypy]\nmodules = example_consumer.cli\n"),
+    ),
+    ids=("mypy-ini", "dot-mypy-ini", "pyproject", "setup-cfg"),
+)
+def test_consumer_mypy_scope_prefers_valid_native_configuration(
+    tmp_path: Path, filename: str, contents: str
+) -> None:
+    """Valid native Mypy syntax delegates scope to Mypy's own config parser."""
+    (tmp_path / filename).write_text(contents, encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_respects_mypy_config_precedence(tmp_path: Path) -> None:
+    """A higher-precedence config without scope suppresses lower config targets."""
+    (tmp_path / "mypy.ini").write_text("[mypy]\nwarn_unused_configs = True\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_skips_non_mypy_config_files(tmp_path: Path) -> None:
+    """Mypy discovery continues after a valid config that has no Mypy section."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "example-consumer"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "setup.cfg").write_text("[mypy]\nfiles = src\n", encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_rejects_invalid_selected_config(tmp_path: Path) -> None:
+    """Malformed selected config cannot fall through to a lower-precedence file."""
+    (tmp_path / "mypy.ini").write_text("[mypy\nfiles = src\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_does_not_parse_toml_text_as_config(tmp_path: Path) -> None:
+    """Valid TOML strings cannot masquerade as Mypy configuration sections."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.example]\nnote = "[tool.mypy] files = [\\"src\\"]"\n',
+        encoding="utf-8",
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_falls_back_only_to_src(tmp_path: Path) -> None:
+    """Without native Mypy targets, only the conventional source root is trusted."""
+    assert verify.consumer_mypy_targets(tmp_path) is None
+    (tmp_path / "src").mkdir()
+    assert verify.consumer_mypy_targets(tmp_path) == ["src"]
+
+
+def test_consumer_phase_checks_exclude_bootstrap_runtime_and_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Consumers use native project targets and never guess a Mypy scope."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "installed"),
+    )
+    metadata = _metadata()
+    checks = verify.phase_checks(tmp_path, metadata)
+
+    assert ruff_calls == [(["."], [".claude"])]
+    assert mypy_calls == []
+    assert pytest_calls == [[]]
+    assert next(
+        item for item in checks if item["id"] == "VFY-MYPY-001"
+    ) == verify.check(
+        "VFY-MYPY-001",
+        "UNVERIFIED",
+        "Mypy has no configured scope or conventional src root",
+    )
+
+
+def test_bootstrap_phase_checks_keep_explicit_authoring_targets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The authoring checkout retains its existing fixed verification groups."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "generated"),
+    )
+
+    verify.phase_checks(REPO_ROOT, _metadata())
+
+    assert ruff_calls == [(["shared", "scripts", "tests"], None)]
+    assert mypy_calls == [["shared", "scripts", "tests"]]
+    assert pytest_calls == [["tests/"]]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from runtime_ownership import (  # noqa: E402
     restore_manifest,
 )
 from check_runtime import runtime_drift_errors  # noqa: E402
+import generate_targets as target_generator  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
@@ -55,6 +57,158 @@ def _tree_snapshot(root: Path) -> dict[Path, bytes | None]:
         path.relative_to(root): path.read_bytes() if path.is_file() else None
         for path in root.rglob("*")
     }
+
+
+def _run_consumer_verifier(
+    consumer: Path, mode: str, *extra_args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run the installed verifier through its supported generated entrypoint."""
+    return subprocess.run(
+        [
+            sys.executable,
+            ".claude/scripts/verify.py",
+            mode,
+            "--format",
+            "json",
+            *extra_args,
+        ],
+        cwd=consumer,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def test_installed_verifier_uses_consumer_native_scopes(tmp_path: Path) -> None:
+    """A generated bootstrap verifies consumer code without authoring paths."""
+    generated_root = tmp_path / "generated"
+    target_generator.generate(["multi-agent"], generated_root)
+    consumer = tmp_path / "consumer"
+    source = consumer / "src" / "example_consumer" / "__init__.py"
+    test_file = consumer / "tests" / "test_example.py"
+    source.parent.mkdir(parents=True)
+    test_file.parent.mkdir()
+    (consumer / "pyproject.toml").write_text(
+        """[project]
+name = "example-consumer"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = ["mypy", "pytest", "ruff"]
+
+[tool.mypy]
+files = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+""",
+        encoding="utf-8",
+    )
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    test_file.write_text(
+        'from example_consumer import greet\n\n\ndef test_greet() -> None:\n    assert greet() == "hello"\n',
+        encoding="utf-8",
+    )
+    assert _git(consumer, "init", "-q", "-b", "dev").returncode == 0
+    assert _git(consumer, "add", ".").returncode == 0
+    initial_commit = subprocess.run(
+        ["git", "-C", str(consumer), "commit", "-q", "-m", "initial consumer"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert initial_commit.returncode == 0, initial_commit.stderr
+
+    install = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(generated_root / "multi-agent"),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
+
+    (consumer / ".claude" / "consumer_noise.py").write_text(
+        "import never_used\n", encoding="utf-8"
+    )
+
+    fast = _run_consumer_verifier(consumer, "fast")
+    phase = _run_consumer_verifier(
+        consumer, "phase", "--persist", "--phase", "consumer-native-fixture"
+    )
+    assert fast.returncode == 0, fast.stdout + fast.stderr
+    assert phase.returncode == 0, phase.stdout + phase.stderr
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\nimport os\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    ruff_failure = _run_consumer_verifier(consumer, "fast")
+    ruff_receipt = json.loads(ruff_failure.stdout)
+    assert ruff_failure.returncode == 1
+    assert (
+        next(
+            check for check in ruff_receipt["checks"] if check["id"] == "VFY-RUFF-001"
+        )["status"]
+        == "FAIL"
+    )
+    assert "shared" not in ruff_failure.stdout
+    assert "scripts" not in ruff_failure.stdout
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n\n\ndef broken() -> str:\n    return 1\n',
+        encoding="utf-8",
+    )
+    mypy_failure = _run_consumer_verifier(
+        consumer, "phase", "--phase", "consumer-native-fixture"
+    )
+    mypy_receipt = json.loads(mypy_failure.stdout)
+    assert mypy_failure.returncode == 1
+    assert (
+        next(
+            check for check in mypy_receipt["checks"] if check["id"] == "VFY-MYPY-001"
+        )["status"]
+        == "FAIL"
+    )
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    test_file.write_text(
+        'from example_consumer import greet\n\n\ndef test_greet() -> None:\n    assert greet() == "goodbye"\n',
+        encoding="utf-8",
+    )
+    pytest_failure = _run_consumer_verifier(
+        consumer, "phase", "--phase", "consumer-native-fixture"
+    )
+    pytest_receipt = json.loads(pytest_failure.stdout)
+    assert pytest_failure.returncode == 1
+    assert (
+        next(
+            check
+            for check in pytest_receipt["checks"]
+            if check["id"] == "VFY-PYTEST-001"
+        )["status"]
+        == "FAIL"
+    )
 
 
 @pytest.mark.parametrize("gitfile", (False, True), ids=("directory", "gitfile"))

@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import configparser
 import hashlib
 import json
 import os
@@ -88,6 +89,14 @@ DEPENDENCY_FILES = {
     "uv.lock",
     "yarn.lock",
 }
+AUTHORING_RUNTIME_MARKERS = (
+    "shared/scripts/verify.py",
+    "shared/policies/workspace.instructions.md",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+)
+MYPY_CONFIG_FILES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
+MYPY_SCOPE_OPTIONS = ("files", "packages", "modules")
 
 
 def run_process(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -897,9 +906,13 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
     return ["LEARN evidence is missing"]
 
 
-def measure_ruff(root: Path, targets: list[str]) -> dict[str, object]:
+def measure_ruff(
+    root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+) -> dict[str, object]:
     """Adapt the scorer's strict Ruff measurement into a receipt check."""
-    measurement = quality_score.measure_ruff(targets, cwd=str(root))
+    measurement = quality_score.measure_ruff(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
     return check(
         "VFY-RUFF-001",
         measurement.status,
@@ -907,16 +920,79 @@ def measure_ruff(root: Path, targets: list[str]) -> dict[str, object]:
     )
 
 
-def measure_mypy(root: Path, targets: list[str]) -> dict[str, object]:
+def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
     """Adapt the scorer's strict mypy measurement into a receipt check."""
     measurement = quality_score.measure_mypy(targets, cwd=str(root))
     return check("VFY-MYPY-001", measurement.status, measurement.detail)
 
 
-def measure_pytest(root: Path) -> dict[str, object]:
+def measure_pytest(root: Path, targets: list[str] | None = None) -> dict[str, object]:
     """Adapt the scorer's strict pytest measurement into a receipt check."""
-    measurement = quality_score.measure_pytest(cwd=str(root))
+    measurement = quality_score.measure_pytest(cwd=str(root), targets=targets)
     return check("VFY-PYTEST-001", measurement.status, measurement.detail)
+
+
+def is_bootstrap_authoring_repository(root: Path) -> bool:
+    """Return whether the repository contains the bootstrap source ownership markers."""
+    return all((root / marker).is_file() for marker in AUTHORING_RUNTIME_MARKERS)
+
+
+def is_configured_mypy_scope(value: object) -> bool:
+    """Return whether one parsed Mypy target setting has usable values."""
+    if isinstance(value, str):
+        return bool(value.strip())
+    return bool(
+        isinstance(value, list)
+        and value
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
+def mypy_configured_scope(root: Path) -> bool | None:
+    """Read the selected native Mypy config or report an unsafe parse as unknown."""
+    for relative in MYPY_CONFIG_FILES:
+        config = root / relative
+        if not config.exists():
+            continue
+        if config.name == "pyproject.toml":
+            try:
+                import tomllib
+            except ModuleNotFoundError:  # Python 3.9-3.10 cannot inspect TOML safely.
+                return None
+            try:
+                parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+                return None
+            tool = parsed.get("tool")
+            section = tool.get("mypy") if isinstance(tool, dict) else None
+            if not isinstance(section, dict):
+                continue
+            return any(
+                is_configured_mypy_scope(section.get(option))
+                for option in MYPY_SCOPE_OPTIONS
+            )
+        parser = configparser.ConfigParser(interpolation=None)
+        try:
+            parser.read(config, encoding="utf-8")
+        except (OSError, UnicodeDecodeError, configparser.Error):
+            return None
+        if not parser.has_section("mypy"):
+            continue
+        return any(
+            is_configured_mypy_scope(parser.get("mypy", option, fallback=""))
+            for option in MYPY_SCOPE_OPTIONS
+        )
+    return False
+
+
+def consumer_mypy_targets(root: Path) -> list[str] | None:
+    """Resolve only native configured scope or the conventional ``src`` root."""
+    configured_scope = mypy_configured_scope(root)
+    if configured_scope is True:
+        return []
+    if configured_scope is None:
+        return None
+    return ["src"] if (root / "src").is_dir() else None
 
 
 def generation_check(root: Path) -> dict[str, object]:
@@ -1115,12 +1191,29 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
         {classify_path(path) for path in metadata_paths(metadata, "changed_paths")}
     )
     freshness_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
+    if is_bootstrap_authoring_repository(root):
+        ruff = measure_ruff(root, ["shared", "scripts", "tests"])
+        mypy = measure_mypy(root, ["shared", "scripts", "tests"])
+        pytest = measure_pytest(root, ["tests/"])
+    else:
+        ruff = measure_ruff(root, ["."], extend_exclude=[".claude"])
+        mypy_targets = consumer_mypy_targets(root)
+        mypy = (
+            measure_mypy(root, mypy_targets)
+            if mypy_targets is not None
+            else check(
+                "VFY-MYPY-001",
+                "UNVERIFIED",
+                "Mypy has no configured scope or conventional src root",
+            )
+        )
+        pytest = measure_pytest(root, [])
     checks = [
         check("VFY-STATUS-001", "PASS", "receipt schema is versioned and strict"),
         check("VFY-STATUS-002", "PASS", "phase check applicability is deterministic"),
-        measure_ruff(root, ["shared", "scripts", "tests"]),
-        measure_mypy(root, ["shared", "scripts", "tests"]),
-        measure_pytest(root),
+        ruff,
+        mypy,
+        pytest,
         check(
             "VFY-FRESH-001",
             freshness_status,
