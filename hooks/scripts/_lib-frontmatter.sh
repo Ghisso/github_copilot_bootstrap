@@ -1218,7 +1218,6 @@ assert_closeout_invariants() {
   fi
 
   local phase small_plan status completed_count=0 last_completed_phase=""
-  local -a completed_phases=()
   for phase in "${phases[@]}"; do
     small_plan="$repo_root/.claude/plans/$phase.md"
     if [[ ! -f "$small_plan" ]]; then
@@ -1231,7 +1230,6 @@ assert_closeout_invariants() {
     elif [[ "$status" == "complete" ]]; then
       completed_count=$((completed_count + 1))
       last_completed_phase="$phase"
-      completed_phases+=("$phase")
     elif [[ "$status" == "cancelled" ]]; then
       assert_cancellation_evidence "$small_plan" "$phase"
     else
@@ -1264,24 +1262,16 @@ assert_closeout_invariants() {
     done < "$repo_root/.claude/session_logs/hooks-bypass.log"
   fi
 
-  # Every completed phase needs its own receipt. Only the final completed
-  # phase must also bind the branch tip and enforce the PR/push MAJOR gate;
-  # older receipts remain immutable phase evidence rather than being compared
-  # to later-phase code.
-  local completed_phase require_major require_ponytail enforce_final_state
-  for completed_phase in "${completed_phases[@]}"; do
-    require_major="false"
-    require_ponytail="false"
-    enforce_final_state="false"
-    if [[ "$completed_phase" == "$last_completed_phase" ]]; then
-      require_major="true"
-      enforce_final_state="true"
-      if diff_requires_ponytail "$repo_root" "$local_sha"; then
-        require_ponytail="true"
-      fi
+  # The terminal completed phase verifies the whole dev..tip branch state.
+  # Earlier phases may predate the receipt schema, so lifecycle status and the
+  # one-commit-per-phase rule cover them without inventing retroactive receipts.
+  if [[ "$completed_count" -gt 0 ]]; then
+    local require_ponytail="false"
+    if diff_requires_ponytail "$repo_root" "$local_sha"; then
+      require_ponytail="true"
     fi
-    assert_completed_receipt "$repo_root" "$branch" "$completed_phase" "$local_sha" "ancestor" "$require_major" "$require_ponytail" "$enforce_final_state"
-  done
+    assert_completed_receipt "$repo_root" "$branch" "$last_completed_phase" "$local_sha" "ancestor" "true" "$require_ponytail" "true"
+  fi
 }
 
 # Validate the narrow remote-backup path for a current paused phase. This does

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-29
 **Plan:** .claude/plans/2026-08-29_phase-C-gate-evidence-migration-and-cleanup.md
-**Status:** COMPLETED
+**Status:** IN-PROGRESS
 
 ## Goal
 
@@ -16,6 +16,7 @@ while preserving the separate paused checkpoint and backup-push path.
 - Routed completed commit, push, and PR gates through one provider-neutral receipt validator while retaining the separate paused checkpoint path.
 - Added fail-closed timestamp, path confinement, documentation disposition, Ponytail authority, freshness, tamper, and native-adapter regressions.
 - Regenerated and self-installed the consumer runtime, then confirmed source/generated parity.
+- Reopened Phase C after the first real push exposed a pre-schema receipt migration gap; updated final push/PR to use the terminal whole-branch receipt and added a legacy-phase regression.
 
 ## [LEARN] Entries
 
@@ -34,8 +35,8 @@ independent reviewer: code, architecture, security, tests, documentation, ponyta
 # PASS, zero surviving findings
 ```
 
-## Score: 100 / EXCELLENCE
+## Score: Pending refreshed closeout
 
 ## Open Questions / Next Steps
 
-- Bind the closeout receipt and commit Phase C.
+- Refresh verification, review, score, and closeout evidence for the push-gate fix.
