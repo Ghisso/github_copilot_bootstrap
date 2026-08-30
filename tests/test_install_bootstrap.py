@@ -264,6 +264,16 @@ testpaths = ["tests"]
         == 0
     )
     big_plan, small_plan = _write_lifecycle_plans(consumer)
+    nested_plans = _git(consumer / ".claude", "add", "plans", "session_logs")
+    assert nested_plans.returncode == 0, nested_plans.stderr
+    nested_plan_commit = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "plans"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert nested_plan_commit.returncode == 0, nested_plan_commit.stderr
 
     source.write_text('VALUE: str = "ready"\n', encoding="utf-8")
     test_file.write_text(
@@ -271,6 +281,7 @@ testpaths = ["tests"]
         encoding="utf-8",
     )
     assert _git(consumer, "add", "src", "tests").returncode == 0
+    assert _git(consumer, "add", ".gitignore").returncode == 0
     fast = _run_consumer_verifier(consumer, "fast")
     assert fast.returncode == 0, fast.stdout + fast.stderr
     assert _git(consumer, "add", "uv.lock").returncode == 0
@@ -392,6 +403,56 @@ testpaths = ["tests"]
 
     committed = _native_commit(consumer)
     assert committed.returncode == 0, committed.stdout + committed.stderr
+
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    remote = tmp_path / "remote.git"
+    assert (
+        _git(tmp_path, "init", "--bare", "-q", "-b", "dev", str(remote)).returncode == 0
+    )
+    assert _git(consumer, "remote", "add", "origin", str(remote)).returncode == 0
+    assert _git(consumer, "push", "origin", "dev").returncode == 0
+
+    big_plan.write_text(big_plan.read_text(encoding="utf-8") + "# changed\n")
+    rejected_push = _git(
+        consumer, "push", "origin", "consumer-lifecycle_implementation"
+    )
+    assert rejected_push.returncode != 0
+    assert "control-plane provenance is stale" in rejected_push.stderr
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace("# changed\n", ""),
+        encoding="utf-8",
+    )
+
+    checkpoint = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(consumer / ".claude"),
+            "add",
+            "plans/consumer-lifecycle.md",
+        ],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert checkpoint.returncode == 0, checkpoint.stderr
+    checkpoint = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "checkpoint"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert checkpoint.returncode == 0, checkpoint.stderr
+
+    pushed = _git(consumer, "push", "origin", "consumer-lifecycle_implementation")
+    assert pushed.returncode == 0, pushed.stdout + pushed.stderr
 
 
 def test_installed_verifier_uses_consumer_native_scopes(tmp_path: Path) -> None:

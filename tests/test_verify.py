@@ -513,6 +513,127 @@ def test_control_plane_provenance_binds_runtime_and_active_plans(
     )
 
 
+def test_terminal_plan_transition_provenance(
+    tmp_path: Path,
+) -> None:
+    """Only the hook's unstaged final-plan transition may follow closeout."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        """---
+name: consumer-proof
+type: big-plan
+status: in-progress
+current_phase: phase-one
+phases:
+  - phase-one
+review_profiles:
+  - code
+  - security
+---
+""",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text("status: complete\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "closeout state",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    metadata = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": before,
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    terminal = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    assert verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {**metadata, "control_plane_provenance": terminal},
+    )
+
+    big_plan.write_text(big_plan.read_text(encoding="utf-8") + "# changed\n")
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace(
+            "  - phase-one", "  - phase-one\n  - phase-two"
+        ),
+        encoding="utf-8",
+    )
+    (plans / "phase-two.md").write_text("status: complete\n", encoding="utf-8")
+    subprocess.run(["git", "add", "plans"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "later phase"], cwd=nested, check=True)
+    nonterminal = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    nonterminal_metadata = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": nonterminal,
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        nonterminal_metadata,
+        {
+            **nonterminal_metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+
 def test_receipt_rejects_missing_control_plane_provenance() -> None:
     """Schema validation cannot silently accept receipts without nested evidence."""
     receipt = _receipt()
