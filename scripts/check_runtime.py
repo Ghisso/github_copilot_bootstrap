@@ -43,6 +43,7 @@ REQUIRED_FILES = (
     "dist/multi-agent/.claude/skills/ponytail-review/SKILL.md",
     "dist/multi-agent/.claude/third_party/ponytail/LICENSE",
     "dist/multi-agent/.claude/third_party/ponytail/UPSTREAM.md",
+    "dist/multi-agent/.claude/scripts/verify.py",
 )
 REQUIRED_DIRS = (
     "dist/multi-agent/.codex/agents",
@@ -131,7 +132,7 @@ def runtime_drift_errors(
     for authoring_relative in TRACKED_AUTHORING_PATHS:
         path = repo_root / authoring_relative
         text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        required_fragments: tuple[str, ...] = ("review -> document -> score",)
+        required_fragments: tuple[str, ...] = ("review -> closeout",)
         if authoring_relative == "AGENTS.md":
             required_fragments += ("source of truth lives in `shared/`",)
         if any(fragment not in text.lower() for fragment in required_fragments):
@@ -360,7 +361,7 @@ def main() -> int:
                 print(
                     "WARN optional binary missing: uv; guardrails use Bash 3.2 orchestration and "
                     "Python 3 standard-library JSON parsing for report reads without uv; "
-                    "quality_score.py is the only feature that needs uv"
+                    "quality_score.py and verify.py need uv"
                 )
             elif command == "context-mode":
                 print(

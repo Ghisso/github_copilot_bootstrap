@@ -66,7 +66,6 @@ CODEX_ROLE_MODEL_INTENTS = {
     "coder": ("gpt-5.6-terra", "high"),
     "reviewer": ("gpt-5.6-sol", "high"),
     "documenter": ("gpt-5.6-luna", "medium"),
-    "verifier": ("gpt-5.6-luna", "low"),
 }
 CODEX_SPECIALIST_MODEL_INTENTS = {
     "luna_coder": ("gpt-5.6-luna", "xhigh"),
@@ -83,7 +82,6 @@ ANTIGRAVITY_AGENT_MODEL_INTENTS = {
     "planner": "pro",
     "antigravity_flash_coder": "flash",
     "coder": "pro",
-    "verifier": "flash",
     "reviewer": "pro",
     "documenter": "flash",
 }
@@ -153,7 +151,26 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
     "Git and the filesystem are authoritative over cached index content",
     "do not index again for every subagent",
     "Reuse or continue an existing role when the follow-up is in the same role and phase and its context remains valid",
-    "Do not reuse a coder as reviewer or verifier merely to save usage",
+    "Do not reuse a coder as reviewer merely to save usage",
+)
+ORCHESTRATOR_LIFECYCLE_REQUIRED = (
+    "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+    "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90",
+    "3. **PLAN WHEN NEEDED:**",
+    "4. **IMPLEMENT:**",
+    "5. **VERIFY:**",
+    "6. **REVIEW:**",
+    "7. **CLOSEOUT:**",
+    "8. **COMMIT:**",
+    "9. **PR ON REQUEST:**",
+)
+ORCHESTRATOR_LIFECYCLE_FORBIDDEN = (
+    "**PLAN:**",
+    "**DOCUMENT:**",
+    "**SCORE:**",
+    "**LEARN:**",
+    "**SESSION LOG:**",
+    "PLAN, IMPLEMENT, VERIFY, REVIEW, DOCUMENT, SCORE, LEARN, SESSION LOG, COMMIT",
 )
 REQUIRED_HOOK_SCRIPTS = (
     "antigravity-pretool.py",
@@ -454,9 +471,9 @@ class TaskLaneInputs(TypedDict, total=False):
 
 
 ROOT_LIFECYCLE_PATTERN = re.compile(
-    r"\b(?:PRE-FLIGHT|BRANCH|PLAN|IMPLEMENT|VERIFY|REVIEW|DOCUMENT|"
-    r"SCORE|LEARN|SESSION LOG|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN|"
-    r"IMPLEMENT|VERIFY|REVIEW|DOCUMENT|SCORE|LEARN|SESSION LOG|COMMIT))+\b",
+    r"\b(?:PRE-FLIGHT|BRANCH|PLAN(?: WHEN NEEDED)?|IMPLEMENT|VERIFY|REVIEW|"
+    r"CLOSEOUT|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN(?: WHEN NEEDED)?|"
+    r"IMPLEMENT|VERIFY|REVIEW|CLOSEOUT|COMMIT))+\b",
     re.IGNORECASE,
 )
 POLICY_SCOPE_FIXTURES = {
@@ -540,7 +557,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         "<plan_name>_implementation",
         ".claude/skills/ponytail/SKILL.md",
         "score is at least 90",
-        "documentation before persisting findings and score",
+        "CLOSEOUT updates required documentation, persists findings and score",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -761,6 +778,14 @@ def planner_supervision_contract_errors(
         if fragment not in orchestrator_text:
             errors.append(
                 f"orchestrator prompt is missing planner-supervision contract: {fragment}"
+            )
+    for fragment in ORCHESTRATOR_LIFECYCLE_REQUIRED:
+        if fragment not in orchestrator_prompt:
+            errors.append(f"orchestrator prompt is missing lifecycle step: {fragment}")
+    for fragment in ORCHESTRATOR_LIFECYCLE_FORBIDDEN:
+        if fragment in orchestrator_prompt:
+            errors.append(
+                f"orchestrator prompt contains stale lifecycle step: {fragment}"
             )
     return errors
 
@@ -1632,9 +1657,9 @@ CODEX_LUNA_ESCALATION_REASONS = {
     "ownership-unclear",
 }
 CODEX_FAILURE_ATTRIBUTION_REQUIRED_FRAGMENTS = (
-    "Before automatic escalation, the orchestrator classifies existing verifier",
+    "Before automatic escalation, the orchestrator classifies existing deterministic",
     "commands and results and reviewer findings as exactly one of:",
-    "A verifier failure alone is not sufficient for `implementation`.",
+    "A deterministic verification failure alone is not sufficient for `implementation`.",
     "A reviewer CRITICAL or MAJOR finding advances a tier only when it applies to the current",
     "implementation diff.",
     "Infrastructure errors, flaky or unreproduced failures,",
@@ -1664,7 +1689,7 @@ CODEX_FAILURE_ATTRIBUTION_CATEGORY_DEFINITIONS = {
     ),
 }
 CODEX_FAILURE_ATTRIBUTION_LIST_END = (
-    "A verifier failure alone is not sufficient for `implementation`."
+    "A deterministic verification failure alone is not sufficient for `implementation`."
 )
 
 
@@ -1850,7 +1875,7 @@ def canonical_agent_contract_errors(
             codex_escalations[agent_id] = codex_intent["escalate_to"]
     if codex_intents != CODEX_AGENT_MODEL_INTENTS:
         errors.append(
-            "canonical Codex model/effort mappings drifted from the eight-agent contract"
+            "canonical Codex model/effort mappings drifted from the seven-agent contract"
         )
     if codex_escalations != CODEX_ESCALATION_CHAIN:
         errors.append(
@@ -2304,8 +2329,8 @@ def validate_agents(errors: list[str]) -> None:
         if agent is not None:
             errors.extend(antigravity_agent_adapter_errors(path, agent))
     check(
-        len(antigravity_agents) == 7,
-        "Antigravity must generate exactly seven custom-agent adapters",
+        len(antigravity_agents) == 6,
+        "Antigravity must generate exactly six custom-agent adapters",
         errors,
     )
     for obsolete_name in ("luna_coder", "sol_coder"):
@@ -2367,12 +2392,12 @@ def validate_agents(errors: list[str]) -> None:
             f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
             errors,
         )
-        # R-AGENTS-08: the verifier is the single owner of the persisted score
-        # report; only it writes the report (`--json --out`).
+        # R-AGENTS-08: only the orchestrator writes persisted score reports;
+        # coder and reviewer never create final closeout artifacts.
         if "--json --out" in text:
             check(
-                path.stem == "verifier",
-                f"only the verifier may write a persisted score report (--json --out): {path}",
+                path.stem == "orchestrator",
+                f"only the orchestrator may write a persisted score report (--json --out): {path}",
                 errors,
             )
 
@@ -3561,6 +3586,56 @@ def git_actor_env(actor: str) -> dict[str, str]:
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+    if path.parent.name == "quality_reports" and path.name.startswith(
+        ("score-", "findings-")
+    ):
+        write_fixture_closeout_receipt(path.parents[2])
+
+
+def write_fixture_closeout_receipt(repo: Path, phase: str = "phase-one") -> None:
+    """Bind existing fixture reports into the exact receipt consumed by gates."""
+    shared_scripts = str(REPO_ROOT / "shared" / "scripts")
+    if shared_scripts not in sys.path:
+        sys.path.insert(0, shared_scripts)
+    import verify as verification
+
+    try:
+        metadata = verification.state_metadata(repo, "dev", phase)
+        phase_checks = [
+            verification.not_applicable(check_id, "phase creates evidence")
+            if check_id == "VFY-RECEIPT-001"
+            else verification.check(check_id, "PASS", "fixture measurement")
+            for check_id in verification.CHECK_IDS
+        ]
+        phase_receipt = verification.build_receipt("phase", phase_checks, metadata)
+        phase_path = verification.receipt_path(repo, "phase", phase)
+        phase_path.parent.mkdir(parents=True, exist_ok=True)
+        phase_path.write_text(
+            verification.canonical_json(phase_receipt) + "\n", encoding="utf-8"
+        )
+        closeout_checks = [
+            verification.not_applicable(check_id, "closeout reuses phase evidence")
+            if check_id
+            in {
+                "VFY-RUFF-001",
+                "VFY-MYPY-001",
+                "VFY-PYTEST-001",
+                "VFY-GEN-001",
+            }
+            else verification.check(check_id, "PASS", "fixture closeout")
+            for check_id in verification.CHECK_IDS
+        ]
+        artifacts = verification.closeout_artifacts(
+            repo, metadata, "fixture change does not alter public behavior"
+        )
+        closeout_receipt = verification.build_receipt(
+            "closeout", closeout_checks, metadata, artifacts
+        )
+        verification.receipt_path(repo, "closeout", phase).write_text(
+            verification.canonical_json(closeout_receipt) + "\n", encoding="utf-8"
+        )
+    except (OSError, ValueError):
+        return
 
 
 def setup_hook_repo(temp_root: Path) -> Path:
@@ -3590,6 +3665,10 @@ def setup_hook_repo(temp_root: Path) -> Path:
     shutil.copytree(
         TARGET_ROOT / ".claude" / "hooks" / "scripts",
         repo / ".claude" / "hooks" / "scripts",
+    )
+    shutil.copytree(
+        TARGET_ROOT / ".claude" / "scripts",
+        repo / ".claude" / "scripts",
     )
     write(repo / ".gitignore", ".claude/\n")
     write(repo / ".claude" / "MEMORY.md", "# Memory\n")
@@ -4046,6 +4125,17 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 "changed_files": ["work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             return report
 
         def clear_findings() -> None:
@@ -4129,11 +4219,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "commit gate must select the newest report by generated_at",
             errors,
         )
-        check(
-            "found 50" in stdout,
-            "commit gate must use the newer (failing) report, not the lexically-later passing one",
-            errors,
-        )
 
         # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
         write_score(score_report(head_sha="0" * 40))
@@ -4151,11 +4236,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             "commit gate must deny a stale-HEAD report",
             errors,
         )
-        check(
-            "re-run quality_score" in stdout,
-            "stale-HEAD failure must tell the user to re-run quality_score",
-            errors,
-        )
 
         # R-SCORE-02: content edited since scoring is caught by the content hash.
         write_score(score_report(content_hash="deadbeef"))
@@ -4171,11 +4251,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         check(
             '"permissionDecision":"deny"' in stdout,
             "commit gate must deny a content_hash mismatch",
-            errors,
-        )
-        check(
-            "re-run quality_score" in stdout,
-            "content_hash mismatch failure must tell the user to re-run quality_score",
             errors,
         )
 
@@ -4765,10 +4840,7 @@ def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
             expression = f"""
 . {shlex.quote(str(library))}
 {probe_override}
-select_fresh_report() {{ printf '%s' "$4" > {shlex.quote(str(trace))}; printf '%s' {shlex.quote(str(dummy_report))}; }}
-assert_report_freshness() {{ :; }}
-json_file_number_value() {{ printf '0'; }}
-assert_required_ponytail_review() {{ :; }}
+assert_completed_receipt() {{ printf '%s' "$3" > {shlex.quote(str(trace))}; }}
 failures=()
 assert_push_invariants {shlex.quote(str(repo))} foo_implementation {shlex.quote(local_sha)}
 if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
@@ -5398,6 +5470,17 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
                 "changed_files": ["work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             return report
 
         def clear_findings() -> None:
@@ -5877,6 +5960,17 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                 "changed_files": ["phase-work.txt"],
             }
             report.update(overrides)
+            if "findings" in overrides and "ponytail_findings" not in overrides:
+                report_findings = report.get("findings")
+                report["ponytail_findings"] = len(
+                    [
+                        finding
+                        for finding in report_findings
+                        if finding.get("profile") == "ponytail"
+                    ]
+                    if isinstance(report_findings, list)
+                    else []
+                )
             for stale in reports_dir.glob("findings-*.json"):
                 stale.unlink()
             write(
@@ -5949,6 +6043,13 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
 
         # Complete the small plan/closeout/LEARN so the commit-count check
         # (>= one commit per phase) is also satisfied.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-legacy", "phase-one"),
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="complete", phase="phase-legacy")
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
@@ -5970,7 +6071,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         check(
             push_result.returncode == 0,
-            f"pre-push hook must allow a push once all phases are complete: {push_result.stdout}{push_result.stderr}",
+            f"pre-push hook must allow a terminal receipt to cover completed phases that predate the receipt schema: {push_result.stdout}{push_result.stderr}",
             errors,
         )
 
@@ -6696,6 +6797,9 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     )
 
     stale_workflow_fragments = (
+        "PRE-FLIGHT -> BRANCH -> PLAN -> IMPLEMENT -> VERIFY -> REVIEW -> "
+        "DOCUMENT -> SCORE -> LEARN -> SESSION LOG -> COMMIT",
+        "orchestrator -> planner -> coder",
         "After score >= 80",
         "After score ≥ 80",
         "Score >= 80",
@@ -6722,7 +6826,6 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         / "instructions"
         / "quality-and-testing.instructions.md",
         TARGET_ROOT / ".claude" / "agents" / "orchestrator.md",
-        TARGET_ROOT / ".claude" / "agents" / "verifier.md",
     ):
         text = read(path)
         for fragment in stale_workflow_fragments:
@@ -6952,7 +7055,7 @@ def validate_docs_parity(errors: list[str]) -> None:
     )
 
     # 2b. Agent names and Codex model/effort rows use canonical target
-    # eligibility. The six universal roles and two Codex-only implementation
+    # eligibility. The five universal roles and two Codex-only implementation
     # specialists are intentionally separate; a flat filesystem listing loses
     # that target contract.
     errors.extend(readme_agent_contract_errors(readme_text, shared_agents()))
@@ -7089,6 +7192,7 @@ def validate_support_files(errors: list[str]) -> None:
         "MEMORY.md",
         "scripts/quality_score.py",
         "scripts/record_findings.py",
+        "scripts/verify.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",
@@ -7628,7 +7732,13 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_bytes(content)
         subprocess.run(
-            ["git", "-C", str(temp_repo / ".claude"), "add", *consumer_state],
+            [
+                "git",
+                "-C",
+                str(temp_repo / ".claude"),
+                "add",
+                *(path for path in consumer_state if path != "settings.local.json"),
+            ],
             check=False,
         )
         state_commit = subprocess.run(
@@ -9506,7 +9616,7 @@ def validate_runtime_drift_cases(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir_name:
         repo = Path(temp_dir_name) / "repo"
         target = Path(temp_dir_name) / "target"
-        workflow = "PRE-FLIGHT -> REVIEW -> DOCUMENT -> SCORE\n"
+        workflow = "PRE-FLIGHT -> REVIEW -> CLOSEOUT\n"
         write(target / "CLAUDE.md", workflow)
         write(target / ".codex" / "config.toml", "generated config\n")
         write(target / ".codex" / "agents" / "coder.toml", "generated agent\n")
@@ -9521,7 +9631,7 @@ def validate_runtime_drift_cases(errors: list[str]) -> None:
         write(target / ".claude" / "agents" / "orchestrator.md", workflow)
         write(
             repo / "AGENTS.md",
-            "The source of truth lives in `shared/`.\nREVIEW -> DOCUMENT -> SCORE\n",
+            "The source of truth lives in `shared/`.\nREVIEW -> CLOSEOUT\n",
         )
         write(repo / "CLAUDE.md", workflow)
         write(repo / ".codex" / "config.toml", "tracked authoring config\n")

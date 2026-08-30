@@ -56,8 +56,8 @@ clean workspace or blindly restart.
 
 ## Failure Attribution
 
-Before automatic escalation, the orchestrator classifies existing verifier
-commands and results and reviewer findings as exactly one of:
+Before automatic escalation, the orchestrator classifies existing deterministic
+verification commands and results and reviewer findings as exactly one of:
 
 - `implementation`: the current implementation caused the failure; advance
   exactly one tier automatically.
@@ -69,7 +69,7 @@ commands and results and reviewer findings as exactly one of:
 - `indeterminate`: the evidence cannot reliably attribute the failure; return
   to orchestrator judgment with no automatic escalation.
 
-A verifier failure alone is not sufficient for `implementation`. A reviewer
+A deterministic verification failure alone is not sufficient for `implementation`. A reviewer
 CRITICAL or MAJOR finding advances a tier only when it applies to the current
 implementation diff. Infrastructure errors, flaky or unreproduced failures,
 and unrelated baseline findings must not spend a stronger model automatically.

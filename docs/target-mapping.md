@@ -59,7 +59,7 @@ Claude Code:
 - `.claude/settings.json`
 - `.claude/rules/*.instructions.md` for conditional policy adapters
 
-`CLAUDE.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Claude receives exactly the six universal agents: `orchestrator`, `planner`, `coder`, `reviewer`, `verifier`, and `documenter`. Eligible agent names are not renamed between targets. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
+`CLAUDE.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Claude receives exactly five universal agents: `orchestrator`, `planner`, `coder`, `reviewer`, and `documenter`. Eligible agent names are not renamed between targets. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
 OpenAI Codex:
 
@@ -71,10 +71,10 @@ OpenAI Codex:
 `AGENTS.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Codex discovers project guidance from the repository root down to the current working directory, with closer `AGENTS.md` files taking precedence and a default 32 KiB combined-project-document cap. This bootstrap emits nested `AGENTS.md` only when a policy owns a stable concrete directory. The Phase C policy scopes are mixed/glob/file-specific, so their non-widening Codex mapping is the corresponding shared skill rather than speculative nested guidance.
 
 The shared agent loader resolves target eligibility before rendering. Omitted
-`targets` keeps the six universal agents eligible everywhere; explicit
+`targets` keeps the five universal agents eligible everywhere; explicit
 `targets: ["openai-codex"]` limits `luna_coder` and `sol_coder` to Codex.
-GitHub Copilot therefore also retains exactly the universal six, while Codex
-generates eight project-scoped `.codex/agents/*.toml` files.
+GitHub Copilot therefore also retains exactly the universal five, while Codex
+generates seven project-scoped `.codex/agents/*.toml` files.
 
 Codex custom agents contain `name`, `description`, `model`,
 `model_reasoning_effort`, and `developer_instructions`. The generator places a
@@ -91,12 +91,12 @@ source of truth, so the prompt body is not a second metadata source. The TOMLs
 intentionally omit `mcp_servers` and skill overrides: Codex applies the trusted
 project's `.codex/config.toml`, including the shared MCP and skill
 registrations. Structural validation checks exact body parity and records the
-actual `developer_instructions` size for all eight roles. The current official
+actual `developer_instructions` size for all seven roles. The current official
 custom-agent schema does not publish a separate size cap; these measurements
 are observability, not a product limit or delivery evidence.
 
 The current declared Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
-reviewer Sol/high, coder Terra/high, documenter Luna/medium, verifier Luna/low,
+reviewer Sol/high, coder Terra/high, and documenter Luna/medium,
 `luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. The experimental named
 implementation path is exactly `luna_coder -> coder -> sol_coder`, with no
 successor after Sol and no spawn-time model or effort override. The Codex-only
@@ -106,16 +106,16 @@ specialists is an internal orchestration convention, not a native Codex UI
 guarantee.
 
 The dated 2026-08-09 native record observed the historical six roles only.
-Future optional persistent-thread probes may exercise all eight current roles;
+Future optional persistent-thread probes may exercise all seven current Codex roles;
 no native run is required for this feature. Claude and Copilot behavior remains
 unchanged.
 
 Google Antigravity:
 
 - `AGENTS.md` — provider-neutral root guidance shared with Codex.
-- `.agents/agents/` — seven static Markdown custom-agent adapters:
-  `orchestrator`, `planner`, `antigravity_flash_coder`, `coder`, `verifier`,
-  `reviewer`, and `documenter`. Codex-only `luna_coder` and `sol_coder` are not
+- `.agents/agents/` — six static Markdown custom-agent adapters:
+  `orchestrator`, `planner`, `antigravity_flash_coder`, `coder`, `reviewer`,
+  and `documenter`. Codex-only `luna_coder` and `sol_coder` are not
   emitted here.
 - `.agents/skills/` — the shared skill tree.
 - `.agents/mcp_config.json` — the shared MCP servers under Antigravity's
@@ -124,13 +124,13 @@ Google Antigravity:
 
 Antigravity's default native agent is the main thread. Root `AGENTS.md` gives
 that agent the provider-neutral orchestration contract. Every custom adapter
-sets `mainAgent: false`; the six specialists set `subagent: true`, while the
+sets `mainAgent: false`; the five specialists set `subagent: true`, while the
 custom `orchestrator` remains non-delegatable with `subagent: false`. This
 layout follows native behavior: a custom main agent could not invoke workspace
 custom subagents in the tested client.
 
 The declared model intents are Pro for orchestrator, planner, canonical coder,
-and reviewer; Flash for `antigravity_flash_coder`, verifier, and documenter.
+and reviewer; Flash for `antigravity_flash_coder` and documenter.
 The Flash coder has one configured escalation target, the Pro `coder`. These
 are static configuration contracts, not evidence of a backing Gemini model or
 native tier routing. Specialist MCP inheritance and the shared skill/MCP files
@@ -192,7 +192,7 @@ metadata-exposure configuration and `max_depth = 1` are distinct compatibility
 decisions: retain both until their respective gates in the [dated Codex routing
 compatibility record](2026-08-08-codex-routing-compatibility.md) pass. Current
 generation validation is structural; it is not evidence that a contemporary
-native client has routed all eight current roles. The dated record preserves
+native client has routed all seven current Codex roles. The dated record preserves
 its six-role observations separately.
 
 GitHub Copilot (secondary compatibility adapter):
@@ -208,4 +208,4 @@ and point to `.claude/agents/`; each policy adapter points to the canonical
 `.claude/instructions/` copy and derives `applyTo` from the target-neutral
 `applicability` patterns. This parity is generator-validated alongside Claude
 `paths`; it is not by itself a claim of real-client loading. Copilot generates
-only the six universal agents and receives no Codex routing supplement.
+only the five universal agents and receives no Codex routing supplement.

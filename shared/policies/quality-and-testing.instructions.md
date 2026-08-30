@@ -7,13 +7,24 @@ applicability: always
 
 ---
 
-## Verification Commands (run after every task)
+## Verification Commands
 
 ```bash
-uv run pytest tests/ -q --tb=short          # All tests
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases  # Type check
-uv run ruff check src/ tests/              # Lint (0 violations required)
+uv run python .claude/scripts/verify.py fast --format json  # Focused feedback during IMPLEMENT
 ```
+
+### Deterministic verification evidence
+
+The generated `.claude/scripts/verify.py` also offers machine-readable
+`fast`, `phase`, and `closeout` receipts. During IMPLEMENT, use `fast` and
+project-native focused checks; do not repeat the complete fixed suite after
+every small edit. The orchestrator runs the authoritative complete suite with
+`verify phase --format json --persist` before REVIEW, then runs `verify
+closeout` after CLOSEOUT. A completed closeout receipt records exact hashes and
+paths for its phase receipt, score, findings, and completed session log.
+Completed commit, push, and PR gates read that one strict receipt rather than
+rediscovering a newest report. `closeout` reuses fresh phase evidence and binds
+the final tracked state.
 
 **Testing order:** unit tests -> existing tests (regression) -> E2E (if applicable).
 **Never claim completion without running all three unless the repository lacks that surface and you say so.**
@@ -166,9 +177,8 @@ ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
 `counts.critical == 0` (commit) or `counts.critical == 0` and
 `counts.major == 0` (push/PR). The metadata matrix is exact: selecting the
 `ponytail` profile always emits `ponytail_reviewed: true` and a numeric
-`ponytail_findings` count; a new report for an unselected profile omits both
-fields. Optional diffs may still read compatible legacy reports containing
-`false`/`0`, but a routed high-risk review requires true evidence. The
+`ponytail_findings` count; a report for an unselected profile omits both
+fields. A routed high-risk review requires true evidence. The
 authoritative routing table selects Ponytail for deterministic
 control-plane/high-risk, multi-file, dependency, script, generator, or
 reviewer-selected complexity. Ordinary low-complexity and exactly one

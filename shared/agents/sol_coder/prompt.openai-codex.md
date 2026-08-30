@@ -1,6 +1,6 @@
 # Final Recovery Coder Supplement
 
-Inspect the existing diff and prior verifier or reviewer failure evidence before
+Inspect the existing diff and prior deterministic verification or reviewer failure evidence before
 editing. Recover with the smallest safe change that addresses that evidence;
 do not restart the phase or broaden scope. Preserve any useful prior work and
 adapt it only when the evidence requires it.
