@@ -682,6 +682,291 @@ def control_plane_provenance_matches(
     )
 
 
+def indexed_nested_file(root: Path, relative: str) -> bytes | None:
+    """Read one tracked nested-state file from the Git index."""
+    nested = root / ".claude"
+    if (
+        not nested.is_dir()
+        or nested.is_symlink()
+        or not is_safe_relative_path(relative)
+    ):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "show", f":{relative}"],
+            cwd=nested,
+            capture_output=True,
+            check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def nested_revision_file(root: Path, revision: str, relative: str) -> bytes | None:
+    """Read one nested-state file from a recorded immutable Git revision."""
+    nested = root / ".claude"
+    if (
+        not nested.is_dir()
+        or nested.is_symlink()
+        or not re.fullmatch(r"[0-9a-f]{40,64}", revision)
+        or not is_safe_relative_path(relative)
+    ):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"],
+            cwd=nested,
+            capture_output=True,
+            check=False,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def relevant_nested_status_changes(
+    root: Path, active_plan_paths: frozenset[str]
+) -> list[tuple[str, list[str]]] | None:
+    """Return only dirty nested state that contributes to provenance."""
+    nested = root / ".claude"
+    try:
+        status = run_process(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            nested,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if status.returncode != 0:
+        return None
+    changes: list[tuple[str, list[str]]] = []
+    records = status.stdout.split("\0")
+    position = 0
+    while position < len(records):
+        record = records[position]
+        position += 1
+        if not record:
+            continue
+        state, separator, path = record[:2], record[2:3], record[3:]
+        paths = [path] if separator == " " else []
+        if "R" in state or "C" in state:
+            if position >= len(records):
+                return None
+            paths.append(records[position])
+            position += 1
+        relevant = [
+            candidate
+            for candidate in paths
+            if is_relevant_nested_path(candidate, active_plan_paths)
+        ]
+        if relevant:
+            changes.append((state, relevant))
+    return changes
+
+
+def terminal_big_plan_bytes(indexed: bytes, phase: str) -> bytes | None:
+    """Return the sole final-plan mutation the post-commit hook may make."""
+    try:
+        text = indexed.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    body = frontmatter.group("body")
+
+    def replace_scalar(key: str, expected: str, replacement: str) -> str | None:
+        pattern = re.compile(
+            rf"^{key}:[ \t]*(?P<value>[^\r\n#]*?)[ \t]*$", re.MULTILINE
+        )
+        matches = list(pattern.finditer(body))
+        if len(matches) != 1 or matches[0].group("value").strip() != expected:
+            return None
+        match = matches[0]
+        return body[: match.start()] + f"{key}: {replacement}" + body[match.end() :]
+
+    completed = replace_scalar("status", "in-progress", "complete")
+    if completed is None:
+        return None
+    original_body = body
+    body = completed
+    current_pattern = re.compile(
+        r"^current_phase:[ \t]*(?P<value>[^\r\n#]*?)[ \t]*$", re.MULTILINE
+    )
+    matches = list(current_pattern.finditer(body))
+    if len(matches) != 1 or matches[0].group("value").strip() != phase:
+        return None
+    match = matches[0]
+    body = body[: match.start()] + "current_phase: " + body[match.end() :]
+    if phase not in frontmatter_phases(original_body):
+        return None
+    return ("---\n" + body + "\n---" + text[frontmatter.end() :]).encode("utf-8")
+
+
+def frontmatter_phases(frontmatter: str) -> list[str]:
+    """Read only the ``phases:`` list, matching the hook's list reader."""
+    phases: list[str] = []
+    capture = False
+    for line in frontmatter.splitlines():
+        if re.fullmatch(r"phases:[ \t]*", line):
+            capture = True
+            continue
+        if not capture:
+            continue
+        item = re.fullmatch(r"[ \t]*-[ \t]*([^\s#]+)[ \t]*", line)
+        if item is not None:
+            candidate = item.group(1)
+            if PHASE_SLUG.fullmatch(candidate):
+                phases.append(candidate)
+            continue
+        if re.fullmatch(r"[A-Za-z0-9_.-]+[ \t]*:.*", line):
+            break
+    return phases
+
+
+def terminal_later_phases(source: bytes, phase: str) -> list[str] | None:
+    """Return only cancelled phases a terminal hook may skip after ``phase``."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    phases = frontmatter_phases(frontmatter.group("body"))
+    return phases[phases.index(phase) + 1 :] if phase in phases else None
+
+
+def is_cancelled_small_plan(source: bytes) -> bool:
+    """Return whether a small plan has exactly one terminal cancelled status."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return False
+    statuses = re.findall(
+        r"^status:[ \t]*([^\r\n#]*?)[ \t]*$",
+        frontmatter.group("body"),
+        re.MULTILINE,
+    )
+    return len(statuses) == 1 and statuses[0].strip() == "cancelled"
+
+
+def has_only_terminal_big_plan_change(
+    root: Path, branch: str, phase: str, metadata: dict[str, object]
+) -> bool:
+    """Accept the exact unstaged final-plan mutation made by closeout hooks."""
+    recorded = metadata.get("control_plane_provenance")
+    if not isinstance(recorded, dict) or not branch.endswith("_implementation"):
+        return False
+    slug = branch.removesuffix("_implementation")
+    relative = f"plans/{slug}.md"
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    if indexed is None or digest_file(plan) == "":
+        return False
+    if hashlib.sha256(indexed).hexdigest() != recorded.get("big_plan_digest"):
+        return False
+    expected = terminal_big_plan_bytes(indexed, phase)
+    if expected is None or plan.read_bytes() != expected:
+        return False
+    later_phases = terminal_later_phases(indexed, phase)
+    if later_phases is None:
+        return False
+    for later_phase in later_phases:
+        later = indexed_nested_file(root, f"plans/{later_phase}.md")
+        if later is None or not is_cancelled_small_plan(later):
+            return False
+
+    changes = relevant_nested_status_changes(
+        root, frozenset({relative, f"plans/{phase}.md"})
+    )
+    return changes == [(" M", [relative])]
+
+
+def has_only_checkpointed_terminal_big_plan_change(
+    root: Path, branch: str, phase: str, metadata: dict[str, object]
+) -> bool:
+    """Accept a clean nested checkpoint containing only the terminal plan update."""
+    recorded = metadata.get("control_plane_provenance")
+    if not isinstance(recorded, dict) or not branch.endswith("_implementation"):
+        return False
+    slug = branch.removesuffix("_implementation")
+    relative = f"plans/{slug}.md"
+    recorded_head = recorded.get("nested_head")
+    if not isinstance(recorded_head, str):
+        return False
+    source = nested_revision_file(root, recorded_head, relative)
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    if source is None or indexed is None or digest_file(plan) == "":
+        return False
+    if hashlib.sha256(source).hexdigest() != recorded.get("big_plan_digest"):
+        return False
+    expected = terminal_big_plan_bytes(source, phase)
+    if expected is None or indexed != expected or plan.read_bytes() != expected:
+        return False
+    later_phases = terminal_later_phases(source, phase)
+    if later_phases is None:
+        return False
+    for later_phase in later_phases:
+        later = nested_revision_file(root, recorded_head, f"plans/{later_phase}.md")
+        if later is None or not is_cancelled_small_plan(later):
+            return False
+    active_plan_paths = frozenset({relative, f"plans/{phase}.md"})
+    if relevant_nested_status_changes(root, active_plan_paths) != []:
+        return False
+    current_head = nested_git_head(root)
+    if not current_head:
+        return False
+    try:
+        diff = run_process(
+            ["git", "diff", "--name-only", "-z", recorded_head, current_head],
+            root / ".claude",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if diff.returncode != 0:
+        return False
+    changed = [path for path in diff.stdout.split("\0") if path]
+    return all(
+        not is_relevant_nested_path(path, active_plan_paths) or path == relative
+        for path in changed
+    )
+
+
+def terminal_control_plane_provenance_matches(
+    root: Path,
+    branch: str,
+    phase: str,
+    recorded_metadata: dict[str, object],
+    current_metadata: dict[str, object],
+) -> bool:
+    """Allow only the terminal big-plan change made after a successful commit."""
+    if not has_control_plane_provenance(
+        recorded_metadata
+    ) or not has_control_plane_provenance(current_metadata):
+        return False
+    recorded = recorded_metadata["control_plane_provenance"]
+    current = current_metadata["control_plane_provenance"]
+    assert isinstance(recorded, dict) and isinstance(current, dict)
+    unchanged = CONTROL_PLANE_PROVENANCE_FIELDS - {
+        "nested_head",
+        "tracked_state_fingerprint",
+        "big_plan_digest",
+    }
+    return all(recorded.get(field) == current.get(field) for field in unchanged) and (
+        has_only_terminal_big_plan_change(root, branch, phase, recorded_metadata)
+        or has_only_checkpointed_terminal_big_plan_change(
+            root, branch, phase, recorded_metadata
+        )
+    )
+
+
 def current_phase(root: Path, branch: str) -> str:
     """Read the active phase for an implementation branch without YAML parsing."""
     if not branch.endswith("_implementation"):
@@ -786,6 +1071,12 @@ def gate_receipt_errors(
             )
         elif not control_plane_provenance_matches(
             metadata, {**metadata, "control_plane_provenance": current_provenance}
+        ) and not terminal_control_plane_provenance_matches(
+            root,
+            branch,
+            phase,
+            metadata,
+            {**metadata, "control_plane_provenance": current_provenance},
         ):
             errors.append(
                 "closeout receipt governing control-plane provenance is stale"
