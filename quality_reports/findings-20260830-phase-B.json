@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-08-30T07:54:35Z",
+  "branch": "consumer-verification-provenance-hardening_implementation",
+  "head_sha": "8b8be33ebe132374489bc48af0aa6420cf89e23f",
+  "base_ref": "dev",
+  "merge_base_sha": "ca51bbc212d9bc79929db5c2a1bab2ba09855b23",
+  "phase": "2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "bec20efebfe4b7aef3100dc9f3a01adf0437520f",
+  "changed_files": [
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "scripts/validate_targets.py",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/scripts/quality_score.py",
+    "shared/scripts/verify.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
