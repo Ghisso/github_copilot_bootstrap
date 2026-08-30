@@ -1,13 +1,13 @@
 ---
 name: active-consumer-upgrade-safety-hardening
 type: big-plan
-status: planning
-originating_branch: consumer-verification-provenance-hardening_implementation
+status: in-progress
+originating_branch: dev
 implementation_branch: active-consumer-upgrade-safety-hardening_implementation
-started_at:
+started_at: 2026-08-30T14:44:50Z
 phases:
   - 2026-08-30_phase-A-active-consumer-upgrade-safety-hardening
-current_phase:
+current_phase: 2026-08-30_phase-A-active-consumer-upgrade-safety-hardening
 ---
 # Big Plan: active-consumer-upgrade-safety-hardening
 

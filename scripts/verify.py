@@ -508,6 +508,89 @@ def nested_runtime_paths(root: Path) -> list[str] | None:
     return sorted(paths)
 
 
+def bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
+    """Return the finite installer-owned root adapters from its manifest."""
+    manifest = root / ".claude" / "bootstrap-ownership.env"
+    try:
+        info = manifest.lstat()
+        if not stat.S_ISREG(info.st_mode) or manifest.is_symlink():
+            return None
+        lines = manifest.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError):
+        return None
+
+    mode: str | None = None
+    paths: list[str] = []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("BOOTSTRAP_COMMIT_COPILOT_SURFACE="):
+            if mode is not None:
+                return None
+            mode = line.removeprefix("BOOTSTRAP_COMMIT_COPILOT_SURFACE=")
+            if mode not in {"0", "1"}:
+                return None
+            continue
+        if not line.startswith("BOOTSTRAP_ROOT_PATH="):
+            return None
+        path = line.removeprefix("BOOTSTRAP_ROOT_PATH=")
+        if not is_safe_relative_path(path) or path in paths:
+            return None
+        paths.append(path)
+    return tuple(paths) if mode is not None and paths else None
+
+
+def regular_tree_fingerprint(path: Path) -> bytes | None:
+    """Fingerprint a regular root adapter tree while rejecting links and special files."""
+    try:
+        info = path.lstat()
+        if path.is_symlink():
+            return None
+        digest = hashlib.sha256()
+        if stat.S_ISREG(info.st_mode):
+            return b"file\0" + hashlib.sha256(path.read_bytes()).digest()
+        if not stat.S_ISDIR(info.st_mode):
+            return None
+        digest.update(b"directory\0")
+        for descendant in sorted(path.rglob("*")):
+            relative = descendant.relative_to(path).as_posix().encode("utf-8")
+            child_info = descendant.lstat()
+            if descendant.is_symlink():
+                return None
+            if stat.S_ISDIR(child_info.st_mode):
+                digest.update(b"directory\0" + relative + b"\0")
+            elif stat.S_ISREG(child_info.st_mode):
+                digest.update(
+                    b"file\0"
+                    + relative
+                    + b"\0"
+                    + hashlib.sha256(descendant.read_bytes()).digest()
+                )
+            else:
+                return None
+        return b"directory\0" + digest.digest()
+    except OSError:
+        return None
+
+
+def bootstrap_root_fingerprint(root: Path) -> str:
+    """Bind each installer-owned live adapter to its canonical nested mirror."""
+    paths = bootstrap_root_paths(root)
+    if paths is None:
+        return ""
+    digest = hashlib.sha256()
+    for relative in paths:
+        live = regular_tree_fingerprint(root / relative)
+        mirror = regular_tree_fingerprint(
+            root / ".claude" / "bootstrap-root" / relative
+        )
+        if live is None or mirror is None or live != mirror:
+            return ""
+        digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
+    return digest.hexdigest()
+
+
 def is_relevant_nested_path(
     path: str, active_plan_paths: frozenset[str] = frozenset()
 ) -> bool:
@@ -602,8 +685,19 @@ def active_big_plan_path(root: Path, branch: str) -> Path | None:
 def control_plane_provenance(root: Path, branch: str, phase: str) -> dict[str, object]:
     """Bind the nested runtime and active plans without hashing mutable evidence."""
     runtime_paths = nested_runtime_paths(root)
-    runtime_fingerprint = (
+    nested_fingerprint = (
         hash_paths(root / ".claude", runtime_paths) if runtime_paths is not None else ""
+    )
+    root_fingerprint = bootstrap_root_fingerprint(root)
+    runtime_fingerprint = (
+        hashlib.sha256(
+            b"nested\0"
+            + nested_fingerprint.encode("ascii")
+            + b"\0root\0"
+            + root_fingerprint.encode("ascii")
+        ).hexdigest()
+        if nested_fingerprint and root_fingerprint
+        else ""
     )
     nested_head = nested_git_head(root)
     big_plan = active_big_plan_path(root, branch)
@@ -856,6 +950,37 @@ def is_cancelled_small_plan(source: bytes) -> bool:
     return len(statuses) == 1 and statuses[0].strip() == "cancelled"
 
 
+def is_complete_small_plan(source: bytes) -> bool:
+    """Return whether a small plan has exactly one completed status."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return False
+    statuses = re.findall(
+        r"^status:[ \t]*([^\r\n#]*?)[ \t]*$",
+        frontmatter.group("body"),
+        re.MULTILINE,
+    )
+    return len(statuses) == 1 and statuses[0].strip() == "complete"
+
+
+def terminal_current_small_plan_matches(
+    root: Path, phase: str, recorded: dict[str, object], source: bytes
+) -> bool:
+    """Require the current completed small plan to be unchanged after receipt authority."""
+    relative = f"plans/{phase}.md"
+    if hashlib.sha256(source).hexdigest() != recorded.get(
+        "small_plan_digest"
+    ) or not is_complete_small_plan(source):
+        return False
+    indexed = indexed_nested_file(root, relative)
+    plan = root / ".claude" / relative
+    return indexed == source and bool(digest_file(plan)) and plan.read_bytes() == source
+
+
 def has_only_terminal_big_plan_change(
     root: Path, branch: str, phase: str, metadata: dict[str, object]
 ) -> bool:
@@ -873,6 +998,11 @@ def has_only_terminal_big_plan_change(
         return False
     expected = terminal_big_plan_bytes(indexed, phase)
     if expected is None or plan.read_bytes() != expected:
+        return False
+    source_small = indexed_nested_file(root, f"plans/{phase}.md")
+    if source_small is None or not terminal_current_small_plan_matches(
+        root, phase, recorded, source_small
+    ):
         return False
     later_phases = terminal_later_phases(indexed, phase)
     if later_phases is None:
@@ -909,6 +1039,11 @@ def has_only_checkpointed_terminal_big_plan_change(
         return False
     expected = terminal_big_plan_bytes(source, phase)
     if expected is None or indexed != expected or plan.read_bytes() != expected:
+        return False
+    source_small = nested_revision_file(root, recorded_head, f"plans/{phase}.md")
+    if source_small is None or not terminal_current_small_plan_matches(
+        root, phase, recorded, source_small
+    ):
         return False
     later_phases = terminal_later_phases(source, phase)
     if later_phases is None:

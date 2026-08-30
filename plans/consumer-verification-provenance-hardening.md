@@ -134,19 +134,23 @@ generate/install
 
 No LLM calls.
 
-## Why Two Phases
+## Why Three Phases
 
 1. Consumer-native verification is a current correctness issue and should be
    fixed independently.
 2. Provenance, full lifecycle proof, and check-ID falsifiability all concern the
    trustworthiness of the now-correct verifier/receipt path.
+3. Terminal push provenance recovery validates the post-commit transition as a
+   separate safety boundary.
 
-A third phase would add ceremony without a distinct rollback boundary.
+The three phases keep distinct rollback boundaries without changing their
+completed implementation evidence.
 
 ## Phases
 
 - [ ] `2026-08-30_phase-A-consumer-native-verification` — consumer-native verification
 - [ ] `2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof` — nested provenance, generated-consumer lifecycle proof, check-ID audit
+- [ ] `2026-08-30_phase-C-terminal-push-provenance` — terminal push provenance recovery
 
 ## Repository-Wide Acceptance
 
