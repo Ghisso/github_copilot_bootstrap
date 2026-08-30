@@ -36,3 +36,5 @@ it. Verify, review, document, and close out each phase independently.
 [LEARN:verification] Match Mypy native config discovery precisely: skip shared
 config files that lack a Mypy section, continue in documented precedence, and
 fail closed only after selecting a malformed Mypy configuration.
+
+[LEARN] Saved the Mypy native discovery lesson to `.claude/MEMORY.md`.
