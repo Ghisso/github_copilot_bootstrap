@@ -491,4 +491,5 @@
   can create unmanaged `__pycache__` drift inside the installed surface.
 - [LEARN:verification] Match Mypy native config discovery precisely: skip shared
   config files that lack a Mypy section, continue in documented precedence,
-  and fail closed only after selecting a malformed Mypy configuration.
+  and fail closed only after selecting a malformed Mypy configuration. A
+  generic project config file is not automatically a Mypy config file.
