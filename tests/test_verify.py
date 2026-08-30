@@ -52,6 +52,14 @@ def _metadata(content_hash: str = "relevant") -> dict[str, object]:
         "changed_paths": [],
         "relevant_paths": [],
         "path_discovery_ok": True,
+        "control_plane_provenance": {
+            "schema_version": verify.CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+            "nested_head": "a" * 40,
+            "runtime_fingerprint": "b" * 64,
+            "tracked_state_fingerprint": "c" * 64,
+            "big_plan_digest": "",
+            "small_plan_digest": "",
+        },
     }
 
 
@@ -379,6 +387,141 @@ def test_closeout_rejects_different_git_binding(
     checks = verify.closeout_checks(tmp_path, current)
     fresh = next(item for item in checks if item["id"] == "VFY-FRESH-001")
     assert fresh["status"] == "FAIL"
+
+
+def test_closeout_rejects_stale_control_plane_provenance(tmp_path: Path) -> None:
+    """Changing a governing runtime or plan fingerprint stales phase evidence."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(_receipt()), encoding="utf-8")
+    current = _metadata()
+    provenance = current["control_plane_provenance"]
+    assert isinstance(provenance, dict)
+    current["control_plane_provenance"] = {
+        **provenance,
+        "runtime_fingerprint": "d" * 64,
+    }
+
+    checks = verify.closeout_checks(tmp_path, current)
+
+    fresh = next(item for item in checks if item["id"] == "VFY-FRESH-002")
+    assert fresh["status"] == "FAIL"
+
+
+def test_control_plane_provenance_binds_runtime_and_active_plans(
+    tmp_path: Path,
+) -> None:
+    """Nested runtime and active plan changes invalidate only governing evidence."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    small_plan = plans / "phase-one.md"
+    big_plan.write_text(
+        "status: in-progress\ncurrent_phase: phase-one\n", encoding="utf-8"
+    )
+    small_plan.write_text("status: in-progress\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "runtime",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_control_plane_provenance(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before}
+    )
+
+    (nested / "quality_reports").mkdir()
+    (nested / "quality_reports" / "score.json").write_text(
+        "mutable\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "quality_reports/score.json"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "evidence"],
+        cwd=nested,
+        check=True,
+    )
+    after_evidence = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert after_evidence["nested_head"] != before["nested_head"]
+    assert verify.control_plane_provenance_matches(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before},
+        {
+            "branch": "consumer-proof_implementation",
+            "control_plane_provenance": after_evidence,
+        },
+    )
+
+    runtime_file = nested / "scripts" / "verify.py"
+    runtime_file.write_text("runtime = staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+    runtime_file.write_text("runtime = 1\n", encoding="utf-8")
+    index_only = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert index_only["runtime_fingerprint"] == before["runtime_fingerprint"]
+    assert (
+        index_only["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+
+    original_small_plan = small_plan.read_text(encoding="utf-8")
+    small_plan.write_text("status: staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    small_plan.write_text(original_small_plan, encoding="utf-8")
+    staged_plan = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert staged_plan["small_plan_digest"] == before["small_plan_digest"]
+    assert (
+        staged_plan["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+
+    small_plan.write_text("status: complete\n", encoding="utf-8")
+    plan_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert plan_changed["small_plan_digest"] != before["small_plan_digest"]
+    assert plan_changed["runtime_fingerprint"] == before["runtime_fingerprint"]
+
+    runtime_file.write_text("runtime = 2\n", encoding="utf-8")
+    runtime_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert runtime_changed["runtime_fingerprint"] != before["runtime_fingerprint"]
+    assert (
+        runtime_changed["tracked_state_fingerprint"]
+        != before["tracked_state_fingerprint"]
+    )
+
+
+def test_receipt_rejects_missing_control_plane_provenance() -> None:
+    """Schema validation cannot silently accept receipts without nested evidence."""
+    receipt = _receipt()
+    metadata = receipt["metadata"]
+    assert isinstance(metadata, dict)
+    metadata.pop("control_plane_provenance")
+
+    with pytest.raises(ValueError, match="authoritative fields"):
+        verify.validate_receipt(receipt)
 
 
 def test_docs_only_scope_preserves_code_evidence_but_control_markdown_does_not() -> (

@@ -293,6 +293,41 @@ Lifecycle hook scripts keep that workflow stateful without mutating during valid
 - `enforce-pr-gate.sh` blocks PRs or pushes unless every phase is complete or fully evidenced as cancelled, at least one phase is complete, the base is `dev`, and bypass commits have been acknowledged. Commit counts include completed phases only, and findings bind to the last completed phase. It exempts nested `.claude/` pushes (`state-sync.sh push`) the same way and with the same per-invocation scoping as the commit gate above.
 - `session-start-state.sh` and `stop-session-log-check.sh` provide reminders for stale phase, score, and session-log state.
 
+### Deterministic verification and provenance
+
+`shared/scripts/verify.py` is the authoritative verifier rendered into each
+consumer's `.claude/scripts/verify.py`. `fast` runs cheap changed-Python
+feedback only. `phase` runs the complete measurement group and can persist a
+reusable phase receipt. `closeout` reuses that receipt and persists the final
+closeout receipt; lifecycle gates consume that receipt rather than selecting a
+newest report themselves.
+
+Verification chooses its scope from the repository being verified. The
+bootstrap authoring repository uses its explicit `shared`, `scripts`, and
+`tests` groups. A generated consumer runs Ruff over the consumer root while
+excluding `.claude`, uses native Mypy configuration (`files`, `packages`, or
+`modules`) or a proven `src` root, and uses native pytest discovery. If a
+required Mypy scope cannot be established, the result is `UNVERIFIED` rather
+than an invented target. This keeps bootstrap runtime files out of consumer
+application checks.
+
+Every phase and closeout receipt binds the measured outer repository state:
+base ref, branch, phase, `head_sha`, merge-base SHA, path discovery, relevant
+paths, and content/tracked-state hashes. It also records
+`control_plane_provenance`, which includes the nested `.claude` Git HEAD,
+relevant nested index/dirty-state fingerprint, active big- and small-plan
+digests, and a schema version. Runtime fingerprints cover governing nested
+files but exclude mutable evidence roots (`plans`, `session_logs`,
+`quality_reports`, and other consumer state), so writing a receipt or report
+does not make its own evidence stale.
+
+Closeout compares all governing provenance fields except `nested_head`. A
+nested HEAD advance is therefore acceptable when it changes only excluded
+evidence state; changes to tracked runtime files, relevant nested state, or
+active plans make the evidence stale. The receipt schema and deterministic
+measurements validate structural invariants directly. They do not emit
+synthetic PASS records for facts that cannot independently fail.
+
 Bypass commit prefixes `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` are allowed for short-lived recovery work, but they skip only the plan-ceremony checks (small-plan/closeout/score/LEARN) — branch-shape validation still runs, so a bypass commit off a non-`*_implementation` branch is still denied. Bypasses are logged and must be acknowledged before PR or push.
 
 `protect-files.sh` invokes its bundled classifier directly with `python3`; it
