@@ -493,3 +493,10 @@
   config files that lack a Mypy section, continue in documented precedence,
   and fail closed only after selecting a malformed Mypy configuration. A
   generic project config file is not automatically a Mypy config file.
+- [LEARN:security] Nested provenance must bind relevant Git index entries and
+  dirty status independently of worktree bytes. Include active plan paths even
+  when other mutable plan/evidence roots are excluded, or a staged change plus
+  restored worktree can bypass freshness.
+- [LEARN:verification] Record nested HEAD for audit, but compare the governing
+  runtime, tracked/index state, and active-plan digests for freshness. This lets
+  evidence-only nested commits advance HEAD without making receipts stale.

@@ -3,8 +3,8 @@ name: 2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof
 type: small-plan
 parent_plan: consumer-verification-provenance-hardening
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-30_provenance-consumer-lifecycle-proof.md
 ---
 # Small Plan: 2026-08-30_phase-B-provenance-and-consumer-lifecycle-proof
 
@@ -33,7 +33,7 @@ Use Ponytail `full`.
 
 ## Steps
 
-- [ ] **1. Define minimal nested control-plane provenance.**
+- [x] **1. Define minimal nested control-plane provenance.**
   - Owner: `coder`
   - Reuse existing nested Git/state-sync/runtime-ownership helpers.
   - Required semantic coverage:
@@ -48,7 +48,7 @@ Use Ponytail `full`.
   - Exclude mutable evidence outputs that would self-invalidate receipts.
   - Do not create another state repository/database.
 
-- [ ] **2. Capture/validate provenance in phase and closeout evidence.**
+- [x] **2. Capture/validate provenance in phase and closeout evidence.**
   - Owner: `coder`
   - `verify phase --persist` records governing provenance.
   - `verify closeout --persist` validates current outer + nested state before
@@ -58,7 +58,7 @@ Use Ponytail `full`.
   - Do not hash caches, venvs, every package, or unrelated user-owned `.claude`
     state.
 
-- [ ] **3. Make gates consume provenance without becoming expensive.**
+- [x] **3. Make gates consume provenance without becoming expensive.**
   - Owner: `coder`
   - Reuse current canonical receipt validator/gate path.
   - Relevant nested runtime/plan change after verification must stale the receipt.
@@ -66,7 +66,7 @@ Use Ponytail `full`.
   - Preserve paused checkpoint publication as separate authority.
   - Hooks remain cheap.
 
-- [ ] **4. Extend generated-consumer fixture through full lifecycle.**
+- [x] **4. Extend generated-consumer fixture through full lifecycle.**
   - Owner: `coder`
   - Establish deterministic minimal approved plan state, review/findings fixture,
     documentation applicability/update evidence, score, LEARN/no-learn, and
@@ -79,7 +79,7 @@ Use Ponytail `full`.
     ```
   - No LLM calls.
 
-- [ ] **5. Add provenance/lifecycle negative mutations.**
+- [x] **5. Add provenance/lifecycle negative mutations.**
   - Owner: `coder`
   - Outer source change after phase -> stale.
   - Active small-plan content change -> stale.
@@ -93,7 +93,7 @@ Use Ponytail `full`.
   - Unchanged valid consumer reaches commit allow.
   - Execute via installed consumer/native gate path, not only source helpers.
 
-- [ ] **6. Audit runtime check IDs for falsifiability.**
+- [x] **6. Audit runtime check IDs for falsifiability.**
   - Owner: `coder`
   - For every emitted check ask: can a realistic fixture make this check itself
     turn red?
@@ -105,7 +105,7 @@ Use Ponytail `full`.
   - Do not add artificial runtime work just to preserve an ID.
   - Document intentional check-ID removals/migrations where needed.
 
-- [ ] **7. Keep docs/generated ownership aligned.**
+- [x] **7. Keep docs/generated ownership aligned.**
   - Owner: `documenter`
   - Document consumer-native scope, outer+nested provenance, staleness rules,
     self-referential-output exclusion, and measurement-vs-invariant distinction.
@@ -113,7 +113,7 @@ Use Ponytail `full`.
   - Apply `humanize` edit self-check.
   - Regenerate providers; never hand-edit `dist/`.
 
-- [ ] **8. Final control-plane/security review + Ponytail.**
+- [x] **8. Final control-plane/security review + Ponytail.**
   - Owner: `reviewer`
   - Profiles: `code`, `architecture`, `security`, `tests`, `documentation`,
     `ponytail`.
@@ -162,29 +162,29 @@ through installed verifier/gate paths.
 
 ## Acceptance Criteria
 
-- [ ] Evidence binds relevant outer and nested control-plane state.
-- [ ] Active plan changes stale evidence when they govern current work.
-- [ ] Verification/runtime changes stale evidence.
-- [ ] Relevant nested dirty state cannot hide behind unchanged HEAD.
-- [ ] Mutable evidence outputs do not self-invalidate receipts.
-- [ ] Missing required provenance fails closed.
-- [ ] Hooks remain cheap.
-- [ ] Paused publication remains unchanged/distinct.
-- [ ] Generated consumer completes lifecycle to commit allow.
-- [ ] Required source/plan/runtime/control-plane/tamper mutations deny.
-- [ ] Every emitted runtime PASS is genuinely measured/falsifiable.
-- [ ] Structural invariants are enforced outside runtime PASS output.
-- [ ] Full provider/install/runtime/state-sync/determinism coverage passes.
-- [ ] No workflow/model-routing regression exists.
+- [x] Evidence binds relevant outer and nested control-plane state.
+- [x] Active plan changes stale evidence when they govern current work.
+- [x] Verification/runtime changes stale evidence.
+- [x] Relevant nested dirty state cannot hide behind unchanged HEAD.
+- [x] Mutable evidence outputs do not self-invalidate receipts.
+- [x] Missing required provenance fails closed.
+- [x] Hooks remain cheap.
+- [x] Paused publication remains unchanged/distinct.
+- [x] Generated consumer completes lifecycle to commit allow.
+- [x] Required source/plan/runtime/control-plane/tamper mutations deny.
+- [x] Every emitted runtime PASS is genuinely measured/falsifiable.
+- [x] Structural invariants are enforced outside runtime PASS output.
+- [x] Full provider/install/runtime/state-sync/determinism coverage passes.
+- [x] No workflow/model-routing regression exists.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted
-- [ ] Documentation updated or explicitly skipped
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log is COMPLETED
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted
+- [x] Documentation updated or explicitly skipped
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log is COMPLETED
 
 ## Pause Checkpoint
 
