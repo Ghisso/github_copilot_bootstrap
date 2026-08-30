@@ -489,3 +489,6 @@
 - [LEARN:runtime] Managed runtime scripts that import sibling modules should
   disable bytecode writes before the local import; otherwise a successful run
   can create unmanaged `__pycache__` drift inside the installed surface.
+- [LEARN:verification] Match Mypy native config discovery precisely: skip shared
+  config files that lack a Mypy section, continue in documented precedence,
+  and fail closed only after selecting a malformed Mypy configuration.

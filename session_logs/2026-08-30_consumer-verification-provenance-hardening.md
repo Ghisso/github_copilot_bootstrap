@@ -1,6 +1,6 @@
 # Consumer Verification Provenance Hardening
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** .claude/plans/2026-08-30_phase-A-consumer-native-verification.md
 
 ## Goal
@@ -20,3 +20,19 @@ it. Verify, review, document, and close out each phase independently.
 - Base branch: `dev`
 - Implementation branch: `consumer-verification-provenance-hardening_implementation`
 - Working tree was clean before branch creation.
+
+## Phase A Result
+
+- Consumer repositories use native Ruff and pytest discovery.
+- Mypy uses native configured scope or a conventional `src` root and otherwise
+  fails closed as `UNVERIFIED`.
+- Generated-consumer positive and negative verification fixtures execute the
+  installed verifier.
+- Full test suite: 1095 passed.
+- Phase verification: PASS.
+- Review: no surviving findings.
+- Quality score: 100.
+
+[LEARN:verification] Match Mypy native config discovery precisely: skip shared
+config files that lack a Mypy section, continue in documented precedence, and
+fail closed only after selecting a malformed Mypy configuration.

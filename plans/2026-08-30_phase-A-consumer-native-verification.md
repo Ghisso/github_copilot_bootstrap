@@ -3,8 +3,8 @@ name: 2026-08-30_phase-A-consumer-native-verification
 type: small-plan
 parent_plan: consumer-verification-provenance-hardening
 phase_index: 0
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-30_consumer-verification-provenance-hardening.md
 ---
 # Small Plan: 2026-08-30_phase-A-consumer-native-verification
 
@@ -31,7 +31,7 @@ Context Mode, or provider behavior. Use Ponytail `full`.
 
 ## Steps
 
-- [ ] **1. Separate bootstrap-self targets from consumer targets.**
+- [x] **1. Separate bootstrap-self targets from consumer targets.**
   - Owner: `coder`
   - Keep explicit authoring targets where valid for this repo.
   - Remove assumptions that arbitrary consumers have `shared/` or `scripts/`.
@@ -39,7 +39,7 @@ Context Mode, or provider behavior. Use Ponytail `full`.
     do not use a fragile repository-name check.
   - Missing paths must never imply PASS.
 
-- [ ] **2. Add the smallest project-native consumer scope resolver.**
+- [x] **2. Add the smallest project-native consumer scope resolver.**
   - Owner: `coder`
   - Reuse current task-lane/applicability and changed-scope logic.
   - Do not add bootstrap verification config.
@@ -53,7 +53,7 @@ Context Mode, or provider behavior. Use Ponytail `full`.
   - Do not build a generic framework/language detector or custom recursive walker
     unless live tool behavior proves it necessary.
 
-- [ ] **3. Preserve strict failure semantics.**
+- [x] **3. Preserve strict failure semantics.**
   - Owner: `coder`
   - Missing tool, invalid configured target, timeout, parser failure, abnormal
     execution, and required unmeasured scope remain `UNVERIFIED`.
@@ -61,7 +61,7 @@ Context Mode, or provider behavior. Use Ponytail `full`.
   - `NOT_APPLICABLE` remains deterministic.
   - Keep existing verification-consolidation falsifier tests green.
 
-- [ ] **4. Add a representative generated-consumer verification fixture.**
+- [x] **4. Add a representative generated-consumer verification fixture.**
   - Owner: `coder`
   - Extend existing generator/installer integration tests.
   - Fixture contains `pyproject.toml`, `src/example_consumer/`, and `tests/`.
@@ -73,7 +73,7 @@ Context Mode, or provider behavior. Use Ponytail `full`.
   - Execute installed generated artifacts; do not import source-side verifier
     helpers as a substitute.
 
-- [ ] **5. Add negative consumer mutations.**
+- [x] **5. Add negative consumer mutations.**
   - Owner: `coder`
   - Ruff violation -> FAIL.
   - Mypy violation -> FAIL when applicable.
@@ -83,14 +83,14 @@ Context Mode, or provider behavior. Use Ponytail `full`.
   - No false references to missing bootstrap `shared/`/`scripts/`.
   - Keep fixture variants minimal; do not create a packaging-layout matrix.
 
-- [ ] **6. Update policy/docs only where needed.**
+- [x] **6. Update policy/docs only where needed.**
   - Owner: `documenter`
   - Explain bootstrap-self versus consumer verification.
   - Explain fail-closed behavior when required scope is not safely known.
   - Do not present heuristics as universal guarantees.
   - Apply mandatory `humanize` edit check.
 
-- [ ] **7. Consolidated review + Ponytail.**
+- [x] **7. Consolidated review + Ponytail.**
   - Owner: `reviewer`
   - Profiles: `code`, `architecture`, `security`, `tests`, `documentation`,
     `ponytail`.
@@ -140,25 +140,25 @@ Use the actual supported invocation if equivalent.
 
 ## Acceptance Criteria
 
-- [ ] Bootstrap self-verification remains green.
-- [ ] Ordinary consumer verifier does not assume `shared/` or `scripts/`.
-- [ ] Consumer Ruff/pytest/mypy scope follows project-native configuration/layout.
-- [ ] `.claude` runtime is excluded from consumer application checks.
-- [ ] Required unknown/unsafe scope yields UNVERIFIED.
-- [ ] Clean generated consumer passes fast/phase verification.
-- [ ] Consumer lint/type/test negative fixtures fail correctly.
-- [ ] Integration test uses real generator/install path.
-- [ ] Existing fail-closed semantics remain unchanged.
-- [ ] No lifecycle/provider/gate regression exists.
+- [x] Bootstrap self-verification remains green.
+- [x] Ordinary consumer verifier does not assume `shared/` or `scripts/`.
+- [x] Consumer Ruff/pytest/mypy scope follows project-native configuration/layout.
+- [x] `.claude` runtime is excluded from consumer application checks.
+- [x] Required unknown/unsafe scope yields UNVERIFIED.
+- [x] Clean generated consumer passes fast/phase verification.
+- [x] Consumer lint/type/test negative fixtures fail correctly.
+- [x] Integration test uses real generator/install path.
+- [x] Existing fail-closed semantics remain unchanged.
+- [x] No lifecycle/provider/gate regression exists.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted
-- [ ] Documentation updated or explicitly skipped
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log is COMPLETED
+- [x] Verification passed
+- [x] Review findings resolved
+- [x] Score >= 90 persisted
+- [x] Documentation updated or explicitly skipped
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log is COMPLETED
 
 ## Pause Checkpoint
 
