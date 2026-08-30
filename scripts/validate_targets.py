@@ -6043,6 +6043,13 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
 
         # Complete the small plan/closeout/LEARN so the commit-count check
         # (>= one commit per phase) is also satisfied.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-legacy", "phase-one"),
+            current_phase="phase-one",
+        )
+        write_small_plan(repo, status="complete", phase="phase-legacy")
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
@@ -6064,7 +6071,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         check(
             push_result.returncode == 0,
-            f"pre-push hook must allow a push once all phases are complete: {push_result.stdout}{push_result.stderr}",
+            f"pre-push hook must allow a terminal receipt to cover completed phases that predate the receipt schema: {push_result.stdout}{push_result.stderr}",
             errors,
         )
 
