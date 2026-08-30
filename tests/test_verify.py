@@ -52,6 +52,14 @@ def _metadata(content_hash: str = "relevant") -> dict[str, object]:
         "changed_paths": [],
         "relevant_paths": [],
         "path_discovery_ok": True,
+        "control_plane_provenance": {
+            "schema_version": verify.CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+            "nested_head": "a" * 40,
+            "runtime_fingerprint": "b" * 64,
+            "tracked_state_fingerprint": "c" * 64,
+            "big_plan_digest": "",
+            "small_plan_digest": "",
+        },
     }
 
 
@@ -381,6 +389,262 @@ def test_closeout_rejects_different_git_binding(
     assert fresh["status"] == "FAIL"
 
 
+def test_closeout_rejects_stale_control_plane_provenance(tmp_path: Path) -> None:
+    """Changing a governing runtime or plan fingerprint stales phase evidence."""
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(_receipt()), encoding="utf-8")
+    current = _metadata()
+    provenance = current["control_plane_provenance"]
+    assert isinstance(provenance, dict)
+    current["control_plane_provenance"] = {
+        **provenance,
+        "runtime_fingerprint": "d" * 64,
+    }
+
+    checks = verify.closeout_checks(tmp_path, current)
+
+    fresh = next(item for item in checks if item["id"] == "VFY-FRESH-002")
+    assert fresh["status"] == "FAIL"
+
+
+def test_control_plane_provenance_binds_runtime_and_active_plans(
+    tmp_path: Path,
+) -> None:
+    """Nested runtime and active plan changes invalidate only governing evidence."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    small_plan = plans / "phase-one.md"
+    big_plan.write_text(
+        "status: in-progress\ncurrent_phase: phase-one\n", encoding="utf-8"
+    )
+    small_plan.write_text("status: in-progress\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "runtime",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_control_plane_provenance(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before}
+    )
+
+    (nested / "quality_reports").mkdir()
+    (nested / "quality_reports" / "score.json").write_text(
+        "mutable\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "add", "quality_reports/score.json"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "evidence"],
+        cwd=nested,
+        check=True,
+    )
+    after_evidence = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert after_evidence["nested_head"] != before["nested_head"]
+    assert verify.control_plane_provenance_matches(
+        {"branch": "consumer-proof_implementation", "control_plane_provenance": before},
+        {
+            "branch": "consumer-proof_implementation",
+            "control_plane_provenance": after_evidence,
+        },
+    )
+
+    runtime_file = nested / "scripts" / "verify.py"
+    runtime_file.write_text("runtime = staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+    runtime_file.write_text("runtime = 1\n", encoding="utf-8")
+    index_only = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert index_only["runtime_fingerprint"] == before["runtime_fingerprint"]
+    assert (
+        index_only["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "scripts/verify.py"], cwd=nested, check=True)
+
+    original_small_plan = small_plan.read_text(encoding="utf-8")
+    small_plan.write_text("status: staged\n", encoding="utf-8")
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    small_plan.write_text(original_small_plan, encoding="utf-8")
+    staged_plan = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert staged_plan["small_plan_digest"] == before["small_plan_digest"]
+    assert (
+        staged_plan["tracked_state_fingerprint"] != before["tracked_state_fingerprint"]
+    )
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+
+    small_plan.write_text("status: complete\n", encoding="utf-8")
+    plan_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert plan_changed["small_plan_digest"] != before["small_plan_digest"]
+    assert plan_changed["runtime_fingerprint"] == before["runtime_fingerprint"]
+
+    runtime_file.write_text("runtime = 2\n", encoding="utf-8")
+    runtime_changed = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert runtime_changed["runtime_fingerprint"] != before["runtime_fingerprint"]
+    assert (
+        runtime_changed["tracked_state_fingerprint"]
+        != before["tracked_state_fingerprint"]
+    )
+
+
+def test_terminal_plan_transition_provenance(
+    tmp_path: Path,
+) -> None:
+    """Only the hook's unstaged final-plan transition may follow closeout."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    (nested / "scripts").mkdir(parents=True)
+    plans.mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        """---
+name: consumer-proof
+type: big-plan
+status: in-progress
+current_phase: phase-one
+phases:
+  - phase-one
+review_profiles:
+  - code
+  - security
+---
+""",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text("status: complete\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "closeout state",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    metadata = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": before,
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    terminal = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    assert verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    assert verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {**metadata, "control_plane_provenance": terminal},
+    )
+
+    big_plan.write_text(big_plan.read_text(encoding="utf-8") + "# changed\n")
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        metadata,
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace(
+            "  - phase-one", "  - phase-one\n  - phase-two"
+        ),
+        encoding="utf-8",
+    )
+    (plans / "phase-two.md").write_text("status: complete\n", encoding="utf-8")
+    subprocess.run(["git", "add", "plans"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "later phase"], cwd=nested, check=True)
+    nonterminal = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    nonterminal_metadata = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": nonterminal,
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert not verify.terminal_control_plane_provenance_matches(
+        tmp_path,
+        "consumer-proof_implementation",
+        "phase-one",
+        nonterminal_metadata,
+        {
+            **nonterminal_metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        },
+    )
+
+
+def test_receipt_rejects_missing_control_plane_provenance() -> None:
+    """Schema validation cannot silently accept receipts without nested evidence."""
+    receipt = _receipt()
+    metadata = receipt["metadata"]
+    assert isinstance(metadata, dict)
+    metadata.pop("control_plane_provenance")
+
+    with pytest.raises(ValueError, match="authoritative fields"):
+        verify.validate_receipt(receipt)
+
+
 def test_docs_only_scope_preserves_code_evidence_but_control_markdown_does_not() -> (
     None
 ):
@@ -604,3 +868,183 @@ def test_quality_score_does_not_report_failed_measurement_clean(
     monkeypatch.setattr(quality_score, "_run", lambda *_args, **_kwargs: result)
     measurement = runner("shared")  # type: ignore[operator]
     assert measurement.status == status
+
+
+def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Consumer linting adds the runtime exclusion without bypassing Ruff config."""
+    captured: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        captured.extend(args)
+        assert cwd == "consumer"
+        return 0, "[]", ""
+
+    monkeypatch.setattr(quality_score, "_run", fake_run)
+    measurement = quality_score.measure_ruff(
+        ["."], cwd="consumer", extend_exclude=[".claude"]
+    )
+
+    assert measurement.status == "PASS"
+    assert captured == [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        ".",
+        "--output-format=json",
+        "--extend-exclude",
+        ".claude",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("filename", "contents"),
+    (
+        ("mypy.ini", "[mypy]\nfiles = src\n"),
+        (".mypy.ini", "[mypy]\npackages = example_consumer\n"),
+        ("pyproject.toml", '[tool.mypy]\nfiles = ["lib", "tests"]\n'),
+        ("setup.cfg", "[mypy]\nmodules = example_consumer.cli\n"),
+    ),
+    ids=("mypy-ini", "dot-mypy-ini", "pyproject", "setup-cfg"),
+)
+def test_consumer_mypy_scope_prefers_valid_native_configuration(
+    tmp_path: Path, filename: str, contents: str
+) -> None:
+    """Valid native Mypy syntax delegates scope to Mypy's own config parser."""
+    (tmp_path / filename).write_text(contents, encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_respects_mypy_config_precedence(tmp_path: Path) -> None:
+    """A higher-precedence config without scope suppresses lower config targets."""
+    (tmp_path / "mypy.ini").write_text("[mypy]\nwarn_unused_configs = True\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_skips_non_mypy_config_files(tmp_path: Path) -> None:
+    """Mypy discovery continues after a valid config that has no Mypy section."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "example-consumer"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "setup.cfg").write_text("[mypy]\nfiles = src\n", encoding="utf-8")
+
+    assert verify.consumer_mypy_targets(tmp_path) == []
+
+
+def test_consumer_mypy_scope_rejects_invalid_selected_config(tmp_path: Path) -> None:
+    """Malformed selected config cannot fall through to a lower-precedence file."""
+    (tmp_path / "mypy.ini").write_text("[mypy\nfiles = src\n")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.mypy]\nfiles = ["lib"]\n', encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_does_not_parse_toml_text_as_config(tmp_path: Path) -> None:
+    """Valid TOML strings cannot masquerade as Mypy configuration sections."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.example]\nnote = "[tool.mypy] files = [\\"src\\"]"\n',
+        encoding="utf-8",
+    )
+
+    assert verify.consumer_mypy_targets(tmp_path) is None
+
+
+def test_consumer_mypy_scope_falls_back_only_to_src(tmp_path: Path) -> None:
+    """Without native Mypy targets, only the conventional source root is trusted."""
+    assert verify.consumer_mypy_targets(tmp_path) is None
+    (tmp_path / "src").mkdir()
+    assert verify.consumer_mypy_targets(tmp_path) == ["src"]
+
+
+def test_consumer_phase_checks_exclude_bootstrap_runtime_and_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Consumers use native project targets and never guess a Mypy scope."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "installed"),
+    )
+    metadata = _metadata()
+    checks = verify.phase_checks(tmp_path, metadata)
+
+    assert ruff_calls == [(["."], [".claude"])]
+    assert mypy_calls == []
+    assert pytest_calls == [[]]
+    assert next(
+        item for item in checks if item["id"] == "VFY-MYPY-001"
+    ) == verify.check(
+        "VFY-MYPY-001",
+        "UNVERIFIED",
+        "Mypy has no configured scope or conventional src root",
+    )
+
+
+def test_bootstrap_phase_checks_keep_explicit_authoring_targets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The authoring checkout retains its existing fixed verification groups."""
+    ruff_calls: list[tuple[list[str], list[str] | None]] = []
+    mypy_calls: list[list[str] | None] = []
+    pytest_calls: list[list[str] | None] = []
+
+    def fake_ruff(
+        _root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+    ) -> dict[str, object]:
+        ruff_calls.append((targets, extend_exclude))
+        return verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+
+    def fake_mypy(_root: Path, targets: list[str] | None) -> dict[str, object]:
+        mypy_calls.append(targets)
+        return verify.check("VFY-MYPY-001", "PASS", "mypy completed")
+
+    def fake_pytest(_root: Path, targets: list[str] | None = None) -> dict[str, object]:
+        pytest_calls.append(targets)
+        return verify.check("VFY-PYTEST-001", "PASS", "pytest completed")
+
+    monkeypatch.setattr(verify, "measure_ruff", fake_ruff)
+    monkeypatch.setattr(verify, "measure_mypy", fake_mypy)
+    monkeypatch.setattr(verify, "measure_pytest", fake_pytest)
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda _root: verify.check("VFY-GEN-001", "PASS", "generated"),
+    )
+
+    verify.phase_checks(REPO_ROOT, _metadata())
+
+    assert ruff_calls == [(["shared", "scripts", "tests"], None)]
+    assert mypy_calls == [["shared", "scripts", "tests"]]
+    assert pytest_calls == [["tests/"]]

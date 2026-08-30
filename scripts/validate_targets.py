@@ -3600,6 +3600,20 @@ def write_fixture_closeout_receipt(repo: Path, phase: str = "phase-one") -> None
     import verify as verification
 
     try:
+        # A real post-commit state sync snapshots plans before the next
+        # closeout receipt is consumed.  Keep the fixture at that same stable
+        # nested Git boundary: otherwise a later outer commit merely changing
+        # untracked plans into tracked nested state makes the new provenance
+        # fingerprint stale without any governing-byte change.
+        nested = repo / ".claude"
+        if git(nested, "add", "-A").returncode != 0:
+            return
+        if git(nested, "diff", "--cached", "--quiet").returncode != 0:
+            if (
+                git(nested, "commit", "-m", "fixture: synchronize state").returncode
+                != 0
+            ):
+                return
         metadata = verification.state_metadata(repo, "dev", phase)
         phase_checks = [
             verification.not_applicable(check_id, "phase creates evidence")
@@ -3673,6 +3687,12 @@ def setup_hook_repo(temp_root: Path) -> Path:
     write(repo / ".gitignore", ".claude/\n")
     write(repo / ".claude" / "MEMORY.md", "# Memory\n")
     write(repo / "README.md", "# Scratch\n")
+    nested = repo / ".claude"
+    git(nested, "init", "-q")
+    git(nested, "config", "user.email", "agent@example.com")
+    git(nested, "config", "user.name", "Agent")
+    git(nested, "add", ".")
+    git(nested, "commit", "-m", "initial nested state")
     git(repo, "add", ".")
     git(repo, "commit", "-m", "initial")
     return repo
@@ -6104,7 +6124,8 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         check(
             minor_push.returncode == 0,
-            "pre-push hook must allow an advisory Ponytail MINOR finding",
+            "pre-push hook must allow an advisory Ponytail MINOR finding: "
+            f"{minor_push.stdout}{minor_push.stderr}",
             errors,
         )
 

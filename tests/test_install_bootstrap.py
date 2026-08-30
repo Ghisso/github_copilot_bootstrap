@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -26,6 +27,7 @@ from runtime_ownership import (  # noqa: E402
     restore_manifest,
 )
 from check_runtime import runtime_drift_errors  # noqa: E402
+import generate_targets as target_generator  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
@@ -55,6 +57,534 @@ def _tree_snapshot(root: Path) -> dict[Path, bytes | None]:
         path.relative_to(root): path.read_bytes() if path.is_file() else None
         for path in root.rglob("*")
     }
+
+
+def _run_consumer_verifier(
+    consumer: Path, mode: str, *extra_args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run the installed verifier through its supported generated entrypoint."""
+    return subprocess.run(
+        [
+            sys.executable,
+            ".claude/scripts/verify.py",
+            mode,
+            "--format",
+            "json",
+            *extra_args,
+        ],
+        cwd=consumer,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _content_hash(root: Path, merge_base: str) -> str:
+    """Return the report freshness digest for the current staged consumer state."""
+    diff = _git(root, "diff", "--no-color", "--no-ext-diff", merge_base)
+    assert diff.returncode == 0, diff.stderr
+    hashed = subprocess.run(
+        ["git", "hash-object", "--stdin"],
+        cwd=root,
+        input=diff.stdout,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert hashed.returncode == 0, hashed.stderr
+    return hashed.stdout.strip()
+
+
+def _native_commit(consumer: Path) -> subprocess.CompletedProcess[str]:
+    """Invoke the installed Git hook through a normal outer-repository commit."""
+    return subprocess.run(
+        ["git", "-C", str(consumer), "commit", "-m", "complete lifecycle"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _write_lifecycle_reports(consumer: Path, metadata: dict[str, object]) -> None:
+    """Write deterministic closeout inputs matching one installed phase receipt."""
+    branch = metadata["branch"]
+    phase = metadata["phase"]
+    head = metadata["head_sha"]
+    merge_base = metadata["merge_base_sha"]
+    assert isinstance(branch, str) and branch
+    assert isinstance(phase, str) and phase
+    assert isinstance(head, str) and head
+    assert isinstance(merge_base, str) and merge_base
+    report_fields = {
+        "branch": branch,
+        "phase": phase,
+        "base_ref": "dev",
+        "head_sha": head,
+        "merge_base_sha": merge_base,
+        "dirty": False,
+        "generated_at": "2026-08-30T00:00:00Z",
+        "target": ".",
+        "changed_files": ["src/example_consumer/__init__.py"],
+        "content_hash": _content_hash(consumer, merge_base),
+    }
+    reports = consumer / ".claude" / "quality_reports"
+    reports.mkdir(exist_ok=True)
+    (reports / "score-lifecycle.json").write_text(
+        json.dumps(
+            {
+                **report_fields,
+                "score": 100,
+                "tests_passed": True,
+                "tests_skipped": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (reports / "findings-lifecycle.json").write_text(
+        json.dumps(
+            {
+                **report_fields,
+                "profiles_reviewed": ["code", "ponytail"],
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_lifecycle_plans(consumer: Path) -> tuple[Path, Path]:
+    """Create the smallest completed plan state accepted by the native gate."""
+    plans = consumer / ".claude" / "plans"
+    plans.mkdir(exist_ok=True)
+    big_plan = plans / "consumer-lifecycle.md"
+    small_plan = plans / "phase-one.md"
+    big_plan.write_text(
+        """---
+name: consumer-lifecycle
+type: big-plan
+status: in-progress
+current_phase: phase-one
+phases:
+  - phase-one
+---
+""",
+        encoding="utf-8",
+    )
+    small_plan.write_text(
+        """---
+name: phase-one
+type: small-plan
+parent_plan: consumer-lifecycle
+status: complete
+closeout_session_log: .claude/session_logs/lifecycle.md
+---
+""",
+        encoding="utf-8",
+    )
+    log = consumer / ".claude" / "session_logs" / "lifecycle.md"
+    log.parent.mkdir(exist_ok=True)
+    log.write_text(
+        "**Status:** COMPLETED\n\n[LEARN] none - no new lessons this session\n",
+        encoding="utf-8",
+    )
+    return big_plan, small_plan
+
+
+def test_installed_consumer_lifecycle_binds_nested_provenance_and_gate(
+    tmp_path: Path,
+) -> None:
+    """The installed verifier and native commit gate reject stale provenance."""
+    generated_root = tmp_path / "generated"
+    target_generator.generate(["multi-agent"], generated_root)
+    consumer = tmp_path / "consumer"
+    source = consumer / "src" / "example_consumer" / "__init__.py"
+    test_file = consumer / "tests" / "test_example.py"
+    source.parent.mkdir(parents=True)
+    test_file.parent.mkdir()
+    (consumer / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    (consumer / "pyproject.toml").write_text(
+        """[project]
+name = "example-consumer"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = ["mypy", "pytest", "ruff"]
+
+[tool.mypy]
+files = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+""",
+        encoding="utf-8",
+    )
+    source.write_text('VALUE: str = "base"\n', encoding="utf-8")
+    test_file.write_text(
+        'from example_consumer import VALUE\n\n\ndef test_value() -> None:\n    assert VALUE == "base"\n',
+        encoding="utf-8",
+    )
+    assert _git(consumer, "init", "-q", "-b", "dev").returncode == 0
+    assert _git(consumer, "add", ".").returncode == 0
+    assert (
+        subprocess.run(
+            ["git", "-C", str(consumer), "commit", "-q", "-m", "initial consumer"],
+            env=_actor_env(),
+            text=True,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+    install = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(generated_root / "multi-agent"),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
+    assert (
+        _git(
+            consumer, "checkout", "-qb", "consumer-lifecycle_implementation"
+        ).returncode
+        == 0
+    )
+    big_plan, small_plan = _write_lifecycle_plans(consumer)
+    nested_plans = _git(consumer / ".claude", "add", "plans", "session_logs")
+    assert nested_plans.returncode == 0, nested_plans.stderr
+    nested_plan_commit = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "plans"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert nested_plan_commit.returncode == 0, nested_plan_commit.stderr
+
+    source.write_text('VALUE: str = "ready"\n', encoding="utf-8")
+    test_file.write_text(
+        'from example_consumer import VALUE\n\n\ndef test_value() -> None:\n    assert VALUE == "ready"\n',
+        encoding="utf-8",
+    )
+    assert _git(consumer, "add", "src", "tests").returncode == 0
+    assert _git(consumer, "add", ".gitignore").returncode == 0
+    fast = _run_consumer_verifier(consumer, "fast")
+    assert fast.returncode == 0, fast.stdout + fast.stderr
+    assert _git(consumer, "add", "uv.lock").returncode == 0
+    phase = _run_consumer_verifier(consumer, "phase", "--persist")
+    assert phase.returncode == 0, phase.stdout + phase.stderr
+    phase_receipt = json.loads(phase.stdout)
+    metadata = phase_receipt["metadata"]
+    assert isinstance(metadata, dict)
+    _write_lifecycle_reports(consumer, metadata)
+    nested_evidence = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(consumer / ".claude"),
+            "add",
+            "quality_reports",
+        ],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert nested_evidence.returncode == 0, nested_evidence.stderr
+    nested_evidence = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(consumer / ".claude"),
+            "commit",
+            "-qm",
+            "evidence",
+        ],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert nested_evidence.returncode == 0, nested_evidence.stderr
+
+    original_source = source.read_text(encoding="utf-8")
+    source.write_text('VALUE: str = "stale"\n', encoding="utf-8")
+    assert (
+        _run_consumer_verifier(
+            consumer, "closeout", "--documentation-na", "fixture"
+        ).returncode
+        == 1
+    )
+    source.write_text(original_source, encoding="utf-8")
+
+    original_small_plan = small_plan.read_text(encoding="utf-8")
+    small_plan.write_text(original_small_plan + "\n# changed\n", encoding="utf-8")
+    assert (
+        _run_consumer_verifier(
+            consumer, "closeout", "--documentation-na", "fixture"
+        ).returncode
+        == 1
+    )
+    small_plan.write_text(original_small_plan, encoding="utf-8")
+
+    original_big_plan = big_plan.read_text(encoding="utf-8")
+    big_plan.write_text(original_big_plan + "\n# changed\n", encoding="utf-8")
+    assert (
+        _run_consumer_verifier(
+            consumer, "closeout", "--documentation-na", "fixture"
+        ).returncode
+        == 1
+    )
+    big_plan.write_text(original_big_plan, encoding="utf-8")
+
+    runtime_file = consumer / ".claude" / "agents" / "coder.md"
+    original_runtime = runtime_file.read_text(encoding="utf-8")
+    runtime_file.write_text(original_runtime + "\nchanged\n", encoding="utf-8")
+    assert (
+        _run_consumer_verifier(
+            consumer, "closeout", "--documentation-na", "fixture"
+        ).returncode
+        == 1
+    )
+    runtime_file.write_text(original_runtime, encoding="utf-8")
+
+    closeout = _run_consumer_verifier(
+        consumer, "closeout", "--persist", "--documentation-na", "fixture"
+    )
+    assert closeout.returncode == 0, closeout.stdout + closeout.stderr
+
+    source.write_text('VALUE: str = "post-closeout"\n', encoding="utf-8")
+    assert _git(consumer, "add", "src/example_consumer/__init__.py").returncode == 0
+    stale_outer = _native_commit(consumer)
+    assert stale_outer.returncode != 0
+    source.write_text(original_source, encoding="utf-8")
+    assert _git(consumer, "add", "src/example_consumer/__init__.py").returncode == 0
+
+    runtime_file.write_text(original_runtime + "\nchanged\n", encoding="utf-8")
+    stale_nested = _native_commit(consumer)
+    assert stale_nested.returncode != 0
+    runtime_file.write_text(original_runtime, encoding="utf-8")
+
+    runtime_file.write_text(original_runtime + "\nstaged\n", encoding="utf-8")
+    assert _git(consumer / ".claude", "add", "agents/coder.md").returncode == 0
+    runtime_file.write_text(original_runtime, encoding="utf-8")
+    index_only_nested = _native_commit(consumer)
+    assert index_only_nested.returncode != 0
+    assert _git(consumer / ".claude", "add", "agents/coder.md").returncode == 0
+
+    for artifact in (
+        consumer / ".claude" / "quality_reports" / "verification-phase-phase-one.json",
+        consumer / ".claude" / "quality_reports" / "score-lifecycle.json",
+        consumer / ".claude" / "quality_reports" / "findings-lifecycle.json",
+        consumer / ".claude" / "session_logs" / "lifecycle.md",
+        consumer
+        / ".claude"
+        / "quality_reports"
+        / "verification-closeout-phase-one.json",
+    ):
+        original_artifact = artifact.read_text(encoding="utf-8")
+        artifact.write_text(original_artifact + "\ntampered\n", encoding="utf-8")
+        assert _native_commit(consumer).returncode != 0
+        artifact.write_text(original_artifact, encoding="utf-8")
+
+    committed = _native_commit(consumer)
+    assert committed.returncode == 0, committed.stdout + committed.stderr
+
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    remote = tmp_path / "remote.git"
+    assert (
+        _git(tmp_path, "init", "--bare", "-q", "-b", "dev", str(remote)).returncode == 0
+    )
+    assert _git(consumer, "remote", "add", "origin", str(remote)).returncode == 0
+    assert _git(consumer, "push", "origin", "dev").returncode == 0
+
+    big_plan.write_text(big_plan.read_text(encoding="utf-8") + "# changed\n")
+    rejected_push = _git(
+        consumer, "push", "origin", "consumer-lifecycle_implementation"
+    )
+    assert rejected_push.returncode != 0
+    assert "control-plane provenance is stale" in rejected_push.stderr
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace("# changed\n", ""),
+        encoding="utf-8",
+    )
+
+    checkpoint = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(consumer / ".claude"),
+            "add",
+            "plans/consumer-lifecycle.md",
+        ],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert checkpoint.returncode == 0, checkpoint.stderr
+    checkpoint = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "checkpoint"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert checkpoint.returncode == 0, checkpoint.stderr
+
+    pushed = _git(consumer, "push", "origin", "consumer-lifecycle_implementation")
+    assert pushed.returncode == 0, pushed.stdout + pushed.stderr
+
+
+def test_installed_verifier_uses_consumer_native_scopes(tmp_path: Path) -> None:
+    """A generated bootstrap verifies consumer code without authoring paths."""
+    generated_root = tmp_path / "generated"
+    target_generator.generate(["multi-agent"], generated_root)
+    consumer = tmp_path / "consumer"
+    source = consumer / "src" / "example_consumer" / "__init__.py"
+    test_file = consumer / "tests" / "test_example.py"
+    source.parent.mkdir(parents=True)
+    test_file.parent.mkdir()
+    (consumer / "pyproject.toml").write_text(
+        """[project]
+name = "example-consumer"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = ["mypy", "pytest", "ruff"]
+
+[tool.mypy]
+files = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+""",
+        encoding="utf-8",
+    )
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    test_file.write_text(
+        'from example_consumer import greet\n\n\ndef test_greet() -> None:\n    assert greet() == "hello"\n',
+        encoding="utf-8",
+    )
+    assert _git(consumer, "init", "-q", "-b", "dev").returncode == 0
+    assert _git(consumer, "add", ".").returncode == 0
+    initial_commit = subprocess.run(
+        ["git", "-C", str(consumer), "commit", "-q", "-m", "initial consumer"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert initial_commit.returncode == 0, initial_commit.stderr
+
+    install = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(generated_root / "multi-agent"),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
+
+    (consumer / ".claude" / "consumer_noise.py").write_text(
+        "import never_used\n", encoding="utf-8"
+    )
+
+    fast = _run_consumer_verifier(consumer, "fast")
+    phase = _run_consumer_verifier(
+        consumer, "phase", "--persist", "--phase", "consumer-native-fixture"
+    )
+    assert fast.returncode == 0, fast.stdout + fast.stderr
+    assert phase.returncode == 0, phase.stdout + phase.stderr
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\nimport os\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    ruff_failure = _run_consumer_verifier(consumer, "fast")
+    ruff_receipt = json.loads(ruff_failure.stdout)
+    assert ruff_failure.returncode == 1
+    assert (
+        next(
+            check for check in ruff_receipt["checks"] if check["id"] == "VFY-RUFF-001"
+        )["status"]
+        == "FAIL"
+    )
+    assert "shared" not in ruff_failure.stdout
+    assert "scripts" not in ruff_failure.stdout
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n\n\ndef broken() -> str:\n    return 1\n',
+        encoding="utf-8",
+    )
+    mypy_failure = _run_consumer_verifier(
+        consumer, "phase", "--phase", "consumer-native-fixture"
+    )
+    mypy_receipt = json.loads(mypy_failure.stdout)
+    assert mypy_failure.returncode == 1
+    assert (
+        next(
+            check for check in mypy_receipt["checks"] if check["id"] == "VFY-MYPY-001"
+        )["status"]
+        == "FAIL"
+    )
+
+    source.write_text(
+        '"""Example consumer package."""\n\n\ndef greet() -> str:\n    return "hello"\n',
+        encoding="utf-8",
+    )
+    test_file.write_text(
+        'from example_consumer import greet\n\n\ndef test_greet() -> None:\n    assert greet() == "goodbye"\n',
+        encoding="utf-8",
+    )
+    pytest_failure = _run_consumer_verifier(
+        consumer, "phase", "--phase", "consumer-native-fixture"
+    )
+    pytest_receipt = json.loads(pytest_failure.stdout)
+    assert pytest_failure.returncode == 1
+    assert (
+        next(
+            check
+            for check in pytest_receipt["checks"]
+            if check["id"] == "VFY-PYTEST-001"
+        )["status"]
+        == "FAIL"
+    )
 
 
 @pytest.mark.parametrize("gitfile", (False, True), ids=("directory", "gitfile"))

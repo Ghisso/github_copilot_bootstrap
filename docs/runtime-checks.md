@@ -301,7 +301,26 @@ without claiming that it changed hooks. If sync is not progressing after you
 approve updated hooks, run `state-sync.sh status` and inspect
 `.claude/session_logs/hooks-errors.log`.
 
-Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records exact score and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; score evidence must record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree. Gate orchestration is Bash 3.2 plus Python 3 standard-library JSON parsing; it has no `uv` dependency and remains enforceable when `uv` is absent. Only the optional `quality_score.py` command needs the project environment.
+Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records exact score and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; score evidence must record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
+
+Phase and closeout receipts also bind the governing nested control plane. Their
+`control_plane_provenance` records the nested `.claude` HEAD, relevant nested
+tracked/dirty state, active big- and small-plan digests, and a runtime
+fingerprint, with a schema version. The runtime fingerprint excludes mutable
+consumer evidence such as plans, session logs, quality reports, and local
+cache state, so receipt generation does not invalidate itself. Closeout treats
+the nested HEAD as informational when all other provenance fields match: an
+evidence-only nested commit may advance that HEAD without staling the receipt.
+Changes to governing runtime files, relevant nested state, or either active
+plan make the receipt stale. Structural receipt invariants are enforced by the
+schema and verifier; they are not represented as synthetic PASS check IDs.
+
+The verifier derives consumer scopes from native project configuration and
+layout. It excludes `.claude` from consumer Ruff coverage, honors configured
+Mypy `files`, `packages`, or `modules`, and falls back only to a conventional
+`src` root. If required Mypy scope cannot be proven, it reports `UNVERIFIED`.
+The bootstrap authoring repository retains its explicit `shared`, `scripts`,
+and `tests` scope. Gate orchestration is Bash 3.2 plus Python 3 standard-library JSON parsing; it has no `uv` dependency and remains enforceable when `uv` is absent. Only the optional `quality_score.py` command needs the project environment.
 
 When routing selects the `ponytail` profile, `record_findings.py --profile
 ponytail` always emits `ponytail_reviewed: true` and a numeric
