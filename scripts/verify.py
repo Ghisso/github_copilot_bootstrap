@@ -29,6 +29,20 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 import quality_score  # noqa: E402  # must follow the bytecode-cache guard
 
+try:
+    from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
+        bootstrap_root_paths as owned_bootstrap_root_paths,
+        install_mode_from_manifest,
+    )
+except ModuleNotFoundError:
+    authoring_scripts = Path(__file__).resolve().parents[2] / "scripts"
+    if authoring_scripts.is_dir():
+        sys.path.insert(0, str(authoring_scripts))
+    from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
+        bootstrap_root_paths as owned_bootstrap_root_paths,
+        install_mode_from_manifest,
+    )
+
 
 SCHEMA_VERSION = 3
 CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
@@ -508,7 +522,7 @@ def nested_runtime_paths(root: Path) -> list[str] | None:
     return sorted(paths)
 
 
-def bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
+def manifest_bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
     """Return the finite installer-owned root adapters from its manifest."""
     manifest = root / ".claude" / "bootstrap-ownership.env"
     try:
@@ -519,26 +533,24 @@ def bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
     except (OSError, UnicodeError):
         return None
 
-    mode: str | None = None
-    paths: list[str] = []
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("BOOTSTRAP_COMMIT_COPILOT_SURFACE="):
-            if mode is not None:
+    mode = install_mode_from_manifest("\n".join(lines) + "\n")
+    return owned_bootstrap_root_paths(mode) if mode is not None else None
+
+
+def confined_adapter_path(root: Path, relative: str) -> Path | None:
+    """Return one adapter path only when every component is a non-symlink."""
+    if not is_safe_relative_path(relative):
+        return None
+    candidate = root
+    try:
+        for component in Path(relative).parts:
+            candidate /= component
+            if candidate.is_symlink():
                 return None
-            mode = line.removeprefix("BOOTSTRAP_COMMIT_COPILOT_SURFACE=")
-            if mode not in {"0", "1"}:
-                return None
-            continue
-        if not line.startswith("BOOTSTRAP_ROOT_PATH="):
-            return None
-        path = line.removeprefix("BOOTSTRAP_ROOT_PATH=")
-        if not is_safe_relative_path(path) or path in paths:
-            return None
-        paths.append(path)
-    return tuple(paths) if mode is not None and paths else None
+            candidate.lstat()
+    except OSError:
+        return None
+    return candidate
 
 
 def regular_tree_fingerprint(path: Path) -> bytes | None:
@@ -576,15 +588,17 @@ def regular_tree_fingerprint(path: Path) -> bytes | None:
 
 def bootstrap_root_fingerprint(root: Path) -> str:
     """Bind each installer-owned live adapter to its canonical nested mirror."""
-    paths = bootstrap_root_paths(root)
+    paths = manifest_bootstrap_root_paths(root)
     if paths is None:
         return ""
     digest = hashlib.sha256()
     for relative in paths:
-        live = regular_tree_fingerprint(root / relative)
-        mirror = regular_tree_fingerprint(
-            root / ".claude" / "bootstrap-root" / relative
-        )
+        live_path = confined_adapter_path(root, relative)
+        mirror_path = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+        if live_path is None or mirror_path is None:
+            return ""
+        live = regular_tree_fingerprint(live_path)
+        mirror = regular_tree_fingerprint(mirror_path)
         if live is None or mirror is None or live != mirror:
             return ""
         digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
@@ -682,8 +696,33 @@ def active_big_plan_path(root: Path, branch: str) -> Path | None:
     return root / ".claude/plans" / f"{slug}.md"
 
 
+def active_plan_paths(root: Path, branch: str, phase: str) -> frozenset[str]:
+    """Return every declared active-plan path, including future phase plans."""
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None:
+        return frozenset()
+    paths = {big_plan.relative_to(root / ".claude").as_posix()}
+    if PHASE_SLUG.fullmatch(phase):
+        paths.add(f"plans/{phase}.md")
+    try:
+        match = re.match(
+            r"\A---\n(?P<body>.*?)\n---",
+            big_plan.read_text(encoding="utf-8"),
+            re.DOTALL,
+        )
+    except OSError:
+        return frozenset(paths)
+    if match is None:
+        return frozenset(paths)
+    phases = frontmatter_phases(match.group("body"))
+    if phases is not None:
+        paths.update(f"plans/{item}.md" for item in phases)
+    return frozenset(paths)
+
+
 def control_plane_provenance(root: Path, branch: str, phase: str) -> dict[str, object]:
     """Bind the nested runtime and active plans without hashing mutable evidence."""
+    active_paths = active_plan_paths(root, branch, phase)
     runtime_paths = nested_runtime_paths(root)
     nested_fingerprint = (
         hash_paths(root / ".claude", runtime_paths) if runtime_paths is not None else ""
@@ -706,14 +745,7 @@ def control_plane_provenance(root: Path, branch: str, phase: str) -> dict[str, o
         if big_plan is not None and PHASE_SLUG.fullmatch(phase)
         else None
     )
-    active_plan_paths = frozenset(
-        path.relative_to(root / ".claude").as_posix()
-        for path in (big_plan, small_plan)
-        if path is not None
-    )
-    tracked_state_fingerprint = nested_tracked_state_fingerprint(
-        root, active_plan_paths
-    )
+    tracked_state_fingerprint = nested_tracked_state_fingerprint(root, active_paths)
     return {
         "schema_version": CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
         "nested_head": nested_head,
@@ -894,17 +926,22 @@ def terminal_big_plan_bytes(indexed: bytes, phase: str) -> bytes | None:
         return None
     match = matches[0]
     body = body[: match.start()] + "current_phase: " + body[match.end() :]
-    if phase not in frontmatter_phases(original_body):
+    phases = frontmatter_phases(original_body)
+    if phases is None or phase not in phases:
         return None
     return ("---\n" + body + "\n---" + text[frontmatter.end() :]).encode("utf-8")
 
 
-def frontmatter_phases(frontmatter: str) -> list[str]:
-    """Read only the ``phases:`` list, matching the hook's list reader."""
+def frontmatter_phases(frontmatter: str) -> list[str] | None:
+    """Read one complete, unambiguous ``phases:`` list from frontmatter."""
     phases: list[str] = []
     capture = False
+    found = False
     for line in frontmatter.splitlines():
         if re.fullmatch(r"phases:[ \t]*", line):
+            if found:
+                return None
+            found = True
             capture = True
             continue
         if not capture:
@@ -912,12 +949,31 @@ def frontmatter_phases(frontmatter: str) -> list[str]:
         item = re.fullmatch(r"[ \t]*-[ \t]*([^\s#]+)[ \t]*", line)
         if item is not None:
             candidate = item.group(1)
-            if PHASE_SLUG.fullmatch(candidate):
-                phases.append(candidate)
+            if not PHASE_SLUG.fullmatch(candidate) or candidate in phases:
+                return None
+            phases.append(candidate)
+            continue
+        if re.fullmatch(r"[ \t]*(?:#.*)?", line):
             continue
         if re.fullmatch(r"[A-Za-z0-9_.-]+[ \t]*:.*", line):
             break
-    return phases
+        return None
+    return phases if found and phases else None
+
+
+def terminal_plan_paths(source: bytes, relative: str) -> frozenset[str] | None:
+    """Return the complete active plan set only for valid terminal frontmatter."""
+    try:
+        text = source.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    if frontmatter is None:
+        return None
+    phases = frontmatter_phases(frontmatter.group("body"))
+    if phases is None:
+        return None
+    return frozenset({relative, *(f"plans/{item}.md" for item in phases)})
 
 
 def terminal_later_phases(source: bytes, phase: str) -> list[str] | None:
@@ -930,51 +986,72 @@ def terminal_later_phases(source: bytes, phase: str) -> list[str] | None:
     if frontmatter is None:
         return None
     phases = frontmatter_phases(frontmatter.group("body"))
-    return phases[phases.index(phase) + 1 :] if phase in phases else None
+    return (
+        phases[phases.index(phase) + 1 :]
+        if phases is not None and phase in phases
+        else None
+    )
 
 
-def is_cancelled_small_plan(source: bytes) -> bool:
-    """Return whether a small plan has exactly one terminal cancelled status."""
+def small_plan_frontmatter(source: bytes) -> dict[str, str] | None:
+    """Parse a small plan's scalar frontmatter without permissive YAML coercion."""
     try:
         text = source.decode("utf-8")
     except UnicodeDecodeError:
-        return False
+        return None
     frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
     if frontmatter is None:
-        return False
-    statuses = re.findall(
-        r"^status:[ \t]*([^\r\n#]*?)[ \t]*$",
-        frontmatter.group("body"),
-        re.MULTILINE,
-    )
-    return len(statuses) == 1 and statuses[0].strip() == "cancelled"
+        return None
+    values: dict[str, str] = {}
+    for line in frontmatter.group("body").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = re.fullmatch(r"([A-Za-z_]+):[ \t]*([^\r\n#]*?)[ \t]*", line)
+        if match is None:
+            return None
+        key, value = match.groups()
+        if key in values:
+            return None
+        values[key] = value.strip()
+    return values
 
 
-def is_complete_small_plan(source: bytes) -> bool:
-    """Return whether a small plan has exactly one completed status."""
-    try:
-        text = source.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
-    if frontmatter is None:
-        return False
-    statuses = re.findall(
-        r"^status:[ \t]*([^\r\n#]*?)[ \t]*$",
-        frontmatter.group("body"),
-        re.MULTILINE,
+def is_cancelled_small_plan(source: bytes, phase: str, parent_plan: str) -> bool:
+    """Return whether an identified later small plan is terminally cancelled."""
+    values = small_plan_frontmatter(source)
+    return bool(
+        values
+        and values.get("name") == phase
+        and values.get("type") == "small-plan"
+        and values.get("parent_plan") == parent_plan
+        and values.get("status") == "cancelled"
+        and re.fullmatch(r"[0-9]+", values.get("phase_index", ""))
     )
-    return len(statuses) == 1 and statuses[0].strip() == "complete"
+
+
+def is_complete_small_plan(source: bytes, phase: str, parent_plan: str) -> bool:
+    """Return whether the authoritative current small plan is complete and valid."""
+    values = small_plan_frontmatter(source)
+    return (
+        values is not None
+        and values.get("name") == phase
+        and values.get("type") == "small-plan"
+        and values.get("parent_plan") == parent_plan
+        and values.get("status") == "complete"
+        and bool(re.fullmatch(r"[0-9]+", values.get("phase_index", "")))
+        and bool(values.get("closeout_session_log"))
+        and is_safe_relative_path(values["closeout_session_log"])
+    )
 
 
 def terminal_current_small_plan_matches(
-    root: Path, phase: str, recorded: dict[str, object], source: bytes
+    root: Path, phase: str, parent_plan: str, recorded: dict[str, object], source: bytes
 ) -> bool:
     """Require the current completed small plan to be unchanged after receipt authority."""
     relative = f"plans/{phase}.md"
     if hashlib.sha256(source).hexdigest() != recorded.get(
         "small_plan_digest"
-    ) or not is_complete_small_plan(source):
+    ) or not is_complete_small_plan(source, phase, parent_plan):
         return False
     indexed = indexed_nested_file(root, relative)
     plan = root / ".claude" / relative
@@ -1001,7 +1078,7 @@ def has_only_terminal_big_plan_change(
         return False
     source_small = indexed_nested_file(root, f"plans/{phase}.md")
     if source_small is None or not terminal_current_small_plan_matches(
-        root, phase, recorded, source_small
+        root, phase, slug, recorded, source_small
     ):
         return False
     later_phases = terminal_later_phases(indexed, phase)
@@ -1009,12 +1086,13 @@ def has_only_terminal_big_plan_change(
         return False
     for later_phase in later_phases:
         later = indexed_nested_file(root, f"plans/{later_phase}.md")
-        if later is None or not is_cancelled_small_plan(later):
+        if later is None or not is_cancelled_small_plan(later, later_phase, slug):
             return False
 
-    changes = relevant_nested_status_changes(
-        root, frozenset({relative, f"plans/{phase}.md"})
-    )
+    plan_paths = terminal_plan_paths(indexed, relative)
+    if plan_paths is None:
+        return False
+    changes = relevant_nested_status_changes(root, plan_paths)
     return changes == [(" M", [relative])]
 
 
@@ -1042,7 +1120,7 @@ def has_only_checkpointed_terminal_big_plan_change(
         return False
     source_small = nested_revision_file(root, recorded_head, f"plans/{phase}.md")
     if source_small is None or not terminal_current_small_plan_matches(
-        root, phase, recorded, source_small
+        root, phase, slug, recorded, source_small
     ):
         return False
     later_phases = terminal_later_phases(source, phase)
@@ -1050,9 +1128,11 @@ def has_only_checkpointed_terminal_big_plan_change(
         return False
     for later_phase in later_phases:
         later = nested_revision_file(root, recorded_head, f"plans/{later_phase}.md")
-        if later is None or not is_cancelled_small_plan(later):
+        if later is None or not is_cancelled_small_plan(later, later_phase, slug):
             return False
-    active_plan_paths = frozenset({relative, f"plans/{phase}.md"})
+    active_plan_paths = terminal_plan_paths(source, relative)
+    if active_plan_paths is None:
+        return False
     if relevant_nested_status_changes(root, active_plan_paths) != []:
         return False
     current_head = nested_git_head(root)
