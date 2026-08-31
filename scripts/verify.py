@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import configparser
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -33,12 +34,20 @@ _VERIFIER_PATH = Path(__file__).resolve()
 _AUTHORING_VERIFIER_PATH = (
     _VERIFIER_PATH.parents[2] / "shared" / "scripts" / "verify.py"
 )
-if _VERIFIER_PATH == _AUTHORING_VERIFIER_PATH:
-    sys.path.insert(0, str(_VERIFIER_PATH.parents[2] / "scripts"))
-from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
-    bootstrap_root_paths as owned_bootstrap_root_paths,
-    install_mode_from_manifest,
+_OWNERSHIP_PATH = (
+    _VERIFIER_PATH.parents[2] / "scripts" / "runtime_ownership.py"
+    if _VERIFIER_PATH == _AUTHORING_VERIFIER_PATH
+    else _VERIFIER_PATH.with_name("runtime_ownership.py")
 )
+_ownership_spec = importlib.util.spec_from_file_location(
+    "runtime_ownership", _OWNERSHIP_PATH
+)
+if _ownership_spec is None or _ownership_spec.loader is None:
+    raise ImportError(f"missing runtime ownership authority: {_OWNERSHIP_PATH}")
+_ownership = importlib.util.module_from_spec(_ownership_spec)
+_ownership_spec.loader.exec_module(_ownership)
+owned_bootstrap_root_paths = _ownership.bootstrap_root_paths
+install_mode_from_manifest = _ownership.install_mode_from_manifest
 
 
 SCHEMA_VERSION = 3
@@ -526,11 +535,11 @@ def manifest_bootstrap_root_paths(root: Path) -> tuple[str, ...] | None:
         info = manifest.lstat()
         if not stat.S_ISREG(info.st_mode) or manifest.is_symlink():
             return None
-        lines = manifest.read_text(encoding="utf-8").splitlines()
+        text = manifest.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None
 
-    mode = install_mode_from_manifest("\n".join(lines) + "\n")
+    mode = install_mode_from_manifest(text)
     return owned_bootstrap_root_paths(mode) if mode is not None else None
 
 
