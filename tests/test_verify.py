@@ -1035,6 +1035,97 @@ def test_terminal_paths_require_valid_cancelled_evidence(
     )
 
 
+def test_checkpointed_terminal_accepts_receipt_bound_dirty_closeout_state(
+    tmp_path: Path,
+) -> None:
+    """A receipt may precede one checkpoint that persists its completed plan."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n---\n",
+        encoding="utf-8",
+    )
+    small_plan = plans / "phase-one.md"
+    small_plan.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: in-progress\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "config", "user.name", "Verifier"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "verifier@example.com"],
+        cwd=nested,
+        check=True,
+    )
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        cwd=nested,
+        check=True,
+    )
+    small_plan.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    evidence = nested / "quality_reports" / "verification-phase-phase-one.json"
+    evidence.parent.mkdir()
+    evidence.write_text("receipt\n", encoding="utf-8")
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    subprocess.run(
+        ["git", "add", "plans/phase-one.md", "quality_reports"], cwd=nested, check=True
+    )
+    subprocess.run(
+        ["git", "commit", "-qm", "closeout evidence checkpoint"],
+        cwd=nested,
+        check=True,
+    )
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "closeout checkpoint"], cwd=nested, check=True
+    )
+
+    assert verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    small_plan.write_text(small_plan.read_text(encoding="utf-8") + "# mutated\n")
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "post-receipt mutation"], cwd=nested, check=True
+    )
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+
+
 def test_receipt_rejects_missing_control_plane_provenance() -> None:
     """Schema validation cannot silently accept receipts without nested evidence."""
     receipt = _receipt()
