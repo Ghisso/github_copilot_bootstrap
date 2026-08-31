@@ -3,8 +3,8 @@ name: 2026-08-31_phase-B-checkpointed-terminal-push-recovery
 type: small-plan
 parent_plan: active-consumer-upgrade-safety-hardening
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-31_checkpointed-terminal-push-recovery.md
 ---
 # Small Plan: 2026-08-31_phase-B-checkpointed-terminal-push-recovery
 
@@ -31,8 +31,8 @@ before the exact terminal big-plan transition.
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings persisted
-- [ ] Score >= 90 persisted
-- [ ] LEARN/session evidence recorded
-- [ ] Closeout verification passed
+- [x] Verification passed
+- [x] Review findings persisted
+- [x] Score >= 90 persisted
+- [x] LEARN/session evidence recorded
+- [x] Closeout verification passed

@@ -147,7 +147,7 @@ commit ceremony without an independent rollback boundary.
 
 ## Phase
 
-- [ ] `2026-08-30_phase-A-active-consumer-upgrade-safety-hardening`
+- [x] `2026-08-30_phase-A-active-consumer-upgrade-safety-hardening`
 - [ ] `2026-08-31_phase-B-checkpointed-terminal-push-recovery`
 
 ## Repository-Wide Acceptance

@@ -520,3 +520,7 @@
   phase and closeout receipts also bind completed plan and session evidence.
   Stage first, then generate reports, update canonical LEARN evidence, and
   refresh phase and closeout receipts before the completion commit.
+- [LEARN:verification] Clean-checkpoint terminal provenance must compare the
+  checkpointed completed small-plan bytes to the receipt digest. The receipt's
+  nested HEAD may legitimately predate those dirty closeout bytes, so reading
+  the plan only from that HEAD rejects the supported lifecycle.

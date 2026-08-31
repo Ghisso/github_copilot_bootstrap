@@ -1,0 +1,41 @@
+{
+  "score": 100,
+  "gate": "EXCELLENCE",
+  "target": ".",
+  "ruff_violations": 0,
+  "mypy_errors": 0,
+  "tests_passed": true,
+  "tests_skipped": false,
+  "pytest_summary": "pytest completed",
+  "mypy_summary": "mypy completed",
+  "measurement_status": {
+    "ruff": "PASS",
+    "mypy": "PASS",
+    "pytest": "PASS"
+  },
+  "measurement_failures": [],
+  "deductions": [],
+  "generated_at": "2026-08-31T06:00:23Z",
+  "branch": "active-consumer-upgrade-safety-hardening_implementation",
+  "head_sha": "9773a689cc4c9162eb2389d4e157abfc0f2c058b",
+  "base_ref": "dev",
+  "merge_base_sha": "379e1342571f15dbe2f7b55b36fc0ec4490ec87a",
+  "phase": "2026-08-31_phase-B-checkpointed-terminal-push-recovery",
+  "dirty": false,
+  "content_hash": "e5fcca1cc043aca9c4b55d7ad2a1fdd391b31470",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_plan_frontmatter.py",
+    "scripts/validate_targets.py",
+    "shared/scripts/verify.py",
+    "tests/fixtures/schema-v2-closeout-receipt.json",
+    "tests/fixtures/schema-v2-receipt.json",
+    "tests/fixtures/schema-v2-source.json",
+    "tests/fixtures/schema-v2-verify.py.txt",
+    "tests/test_install_bootstrap.py",
+    "tests/test_validate_plan_frontmatter.py",
+    "tests/test_verify.py"
+  ]
+}
