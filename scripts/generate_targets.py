@@ -286,6 +286,13 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         support_root / "scripts" / "verify.py",
         "claude-code",
     )
+    # Ownership is a target-neutral authority shared by the installer and
+    # generated verifier.  Transforming provider paths here would corrupt its
+    # canonical root-adapter inventory (for example `.github/hooks`).
+    copy_file(
+        REPO_ROOT / "scripts" / "runtime_ownership.py",
+        support_root / "scripts" / "runtime_ownership.py",
+    )
 
     for name in ("plans", "quality_reports", "session_logs"):
         source = REPO_ROOT / "shared" / name / "README.md"

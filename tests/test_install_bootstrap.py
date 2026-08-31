@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -24,6 +25,7 @@ from install_bootstrap import (  # noqa: E402
     validate_install_roots,
 )
 from runtime_ownership import (  # noqa: E402
+    bootstrap_root_paths,
     restore_manifest,
 )
 from check_runtime import runtime_drift_errors  # noqa: E402
@@ -31,6 +33,21 @@ import generate_targets as target_generator  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
+LEGACY_SCHEMA_V2_RECEIPT = REPO_ROOT / "tests" / "fixtures" / "schema-v2-receipt.json"
+LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT = (
+    REPO_ROOT / "tests" / "fixtures" / "schema-v2-closeout-receipt.json"
+)
+LEGACY_SCHEMA_V2_RUNTIME = REPO_ROOT / "tests" / "fixtures" / "schema-v2-verify.py.txt"
+LEGACY_SCHEMA_V2_RECEIPT_SHA256 = (
+    "15c78e5320e23b1bb59c6751d165a87d2e74d146b431fd7320639bafd87e5c76"
+)
+LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT_SHA256 = (
+    "5cf5c3477016200a817e0fa0de4db13aef06a84c64b791d3a90f51f90cb72f15"
+)
+LEGACY_SCHEMA_V2_SOURCE_COMMIT = "e2753a9f2fd24dd2fc952e20929a9c7bbb1eeb37"
+LEGACY_SCHEMA_V2_RUNTIME_SHA256 = (
+    "9abc7edbd1d31ab89c232ad451583867b5943ad42af7eee45d58ff60fbe35fad"
+)
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -106,6 +123,28 @@ def _native_commit(consumer: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _trace_remote_git_commands(trace_path: Path) -> set[str]:
+    """Return forbidden remote Git commands observed by a full process tree."""
+    commands: set[str] = set()
+    for line in trace_path.read_text(encoding="utf-8").splitlines():
+        event = json.loads(line)
+        if event.get("event") == "start" and isinstance(event.get("argv"), list):
+            commands.update(
+                command
+                for command in event["argv"]
+                if command in {"fetch", "ls-remote", "pull", "merge", "push"}
+            )
+    return commands
+
+
+def _historical_schema_v2_runtime() -> bytes:
+    """Read the pinned pre-v3 verifier fixture without Git-history access."""
+    runtime = LEGACY_SCHEMA_V2_RUNTIME.read_bytes()
+    assert hashlib.sha256(runtime).hexdigest() == LEGACY_SCHEMA_V2_RUNTIME_SHA256
+    assert b"SCHEMA_VERSION = 2" in runtime
+    return runtime
+
+
 def _write_lifecycle_reports(consumer: Path, metadata: dict[str, object]) -> None:
     """Write deterministic closeout inputs matching one installed phase receipt."""
     branch = metadata["branch"]
@@ -179,6 +218,7 @@ phases:
 name: phase-one
 type: small-plan
 parent_plan: consumer-lifecycle
+phase_index: 1
 status: complete
 closeout_session_log: .claude/session_logs/lifecycle.md
 ---
@@ -192,6 +232,50 @@ closeout_session_log: .claude/session_logs/lifecycle.md
         encoding="utf-8",
     )
     return big_plan, small_plan
+
+
+def test_generated_verifier_requires_sibling_ownership_authority(
+    tmp_path: Path,
+) -> None:
+    """A consumer runtime cannot borrow an arbitrary nearby authoring module."""
+    generated_root = tmp_path / "generated"
+    target_generator.generate(["multi-agent"], generated_root)
+    consumer = generated_root / "multi-agent"
+    (consumer / ".claude" / "scripts" / "runtime_ownership.py").unlink()
+    (consumer / "scripts").mkdir()
+    (consumer / "scripts" / "runtime_ownership.py").write_text(
+        "raise RuntimeError('must not load')\n", encoding="utf-8"
+    )
+
+    result = _run_consumer_verifier(consumer, "fast")
+
+    assert result.returncode != 0
+    assert "runtime_ownership" in result.stderr
+
+
+def test_generated_verifier_ignores_conflicting_pythonpath_authority(
+    tmp_path: Path,
+) -> None:
+    """Only the generated verifier's sibling authority may govern a consumer."""
+    generated_root = tmp_path / "generated"
+    target_generator.generate(["multi-agent"], generated_root)
+    consumer = generated_root / "multi-agent"
+    conflicting = tmp_path / "conflicting"
+    conflicting.mkdir()
+    (conflicting / "runtime_ownership.py").write_text(
+        "raise RuntimeError('must not load')\n", encoding="utf-8"
+    )
+
+    result = subprocess.run(
+        [sys.executable, ".claude/scripts/verify.py", "fast", "--format", "json"],
+        cwd=consumer,
+        env={**os.environ, "PYTHONPATH": str(conflicting)},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert "must not load" not in result.stderr
 
 
 def test_installed_consumer_lifecycle_binds_nested_provenance_and_gate(
@@ -257,6 +341,9 @@ testpaths = ["tests"]
         check=False,
     )
     assert install.returncode == 0, install.stdout + install.stderr
+    for relative in bootstrap_root_paths(False):
+        assert (consumer / relative).exists(), relative
+        assert (consumer / ".claude" / "bootstrap-root" / relative).exists(), relative
     assert (
         _git(
             consumer, "checkout", "-qb", "consumer-lifecycle_implementation"
@@ -274,6 +361,123 @@ testpaths = ["tests"]
         check=False,
     )
     assert nested_plan_commit.returncode == 0, nested_plan_commit.stderr
+
+    legacy_runtime = consumer / ".claude" / "scripts" / "verify.py"
+    legacy_receipt = (
+        consumer / ".claude" / "quality_reports" / "verification-phase-phase-one.json"
+    )
+    legacy_closeout_receipt = (
+        consumer
+        / ".claude"
+        / "quality_reports"
+        / "verification-closeout-phase-one.json"
+    )
+    legacy_receipt_bytes = LEGACY_SCHEMA_V2_RECEIPT.read_bytes()
+    legacy_closeout_receipt_bytes = LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT.read_bytes()
+    assert (
+        hashlib.sha256(legacy_receipt_bytes).hexdigest()
+        == LEGACY_SCHEMA_V2_RECEIPT_SHA256
+    )
+    assert (
+        hashlib.sha256(legacy_closeout_receipt_bytes).hexdigest()
+        == LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT_SHA256
+    )
+    legacy_runtime.write_bytes(_historical_schema_v2_runtime())
+    legacy_receipt.parent.mkdir(exist_ok=True)
+    legacy_receipt.write_bytes(legacy_receipt_bytes)
+    legacy_closeout_receipt.write_bytes(legacy_closeout_receipt_bytes)
+    assert (
+        _git(
+            consumer / ".claude", "add", "scripts/verify.py", "quality_reports"
+        ).returncode
+        == 0
+    )
+    legacy_commit = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "legacy v2 state"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert legacy_commit.returncode == 0, legacy_commit.stderr
+    legacy_complete_small_plan = small_plan.read_text(encoding="utf-8")
+    small_plan.write_text(
+        legacy_complete_small_plan.replace("status: complete", "status: in-progress")
+        + "# dirty legacy state\n",
+        encoding="utf-8",
+    )
+    legacy_small_plan_bytes = small_plan.read_bytes()
+    application_before_refresh = {
+        path: path.read_bytes() for path in (source, test_file)
+    }
+    refresh_trace = tmp_path / "legacy-refresh-trace.json"
+    refresh = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(generated_root / "multi-agent"),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env={**_actor_env(), "GIT_TRACE2_EVENT": str(refresh_trace)},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert refresh.returncode == 0, refresh.stdout + refresh.stderr
+    assert {
+        path: path.read_bytes() for path in application_before_refresh
+    } == application_before_refresh
+    assert legacy_receipt.read_bytes() == legacy_receipt_bytes
+    assert legacy_closeout_receipt.read_bytes() == legacy_closeout_receipt_bytes
+    assert small_plan.read_bytes() == legacy_small_plan_bytes
+    assert "SCHEMA_VERSION = 3" in legacy_runtime.read_text(encoding="utf-8")
+    assert _trace_remote_git_commands(refresh_trace) == set()
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
+    small_plan.write_text(legacy_complete_small_plan, encoding="utf-8")
+    assert _git(consumer / ".claude", "add", "plans/phase-one.md").returncode == 0
+    resumed_plan = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "resume phase"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert resumed_plan.returncode == 0, resumed_plan.stderr
+    original_source = source.read_text(encoding="utf-8")
+    source.write_text('VALUE: str = "legacy-gate"\n', encoding="utf-8")
+    assert _git(consumer, "add", "src/example_consumer/__init__.py").returncode == 0
+    legacy_gate = _native_commit(consumer)
+    assert legacy_gate.returncode != 0
+    assert "unsupported schema_version" in legacy_gate.stderr
+    source.write_text(original_source, encoding="utf-8")
+    assert _git(consumer, "add", "src/example_consumer/__init__.py").returncode == 0
+    legacy_archive = consumer / ".claude" / "quality_reports" / "legacy-v2"
+    legacy_archive.mkdir()
+    archived_phase = legacy_archive / legacy_receipt.name
+    archived_closeout = legacy_archive / legacy_closeout_receipt.name
+    legacy_receipt.rename(archived_phase)
+    legacy_closeout_receipt.rename(archived_closeout)
+    assert archived_phase.read_bytes() == legacy_receipt_bytes
+    assert archived_closeout.read_bytes() == legacy_closeout_receipt_bytes
+    assert _git(consumer / ".claude", "add", "quality_reports").returncode == 0
+    archive_commit = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(consumer / ".claude"),
+            "commit",
+            "-qm",
+            "archive v2 evidence",
+        ],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert archive_commit.returncode == 0, archive_commit.stderr
 
     source.write_text('VALUE: str = "ready"\n', encoding="utf-8")
     test_file.write_text(
@@ -428,6 +632,11 @@ testpaths = ["tests"]
         encoding="utf-8",
     )
 
+    immediate_push = _git(
+        consumer, "push", "origin", "consumer-lifecycle_implementation"
+    )
+    assert immediate_push.returncode == 0, immediate_push.stdout + immediate_push.stderr
+
     checkpoint = subprocess.run(
         [
             "git",
@@ -451,7 +660,23 @@ testpaths = ["tests"]
     )
     assert checkpoint.returncode == 0, checkpoint.stderr
 
-    pushed = _git(consumer, "push", "origin", "consumer-lifecycle_implementation")
+    checkpoint_remote = tmp_path / "checkpoint.git"
+    assert (
+        _git(
+            tmp_path, "init", "--bare", "-q", "-b", "dev", str(checkpoint_remote)
+        ).returncode
+        == 0
+    )
+    assert (
+        _git(consumer, "remote", "add", "checkpoint", str(checkpoint_remote)).returncode
+        == 0
+    )
+    pushed = _git(
+        consumer,
+        "push",
+        "checkpoint",
+        "consumer-lifecycle_implementation:checkpointed-terminal",
+    )
     assert pushed.returncode == 0, pushed.stdout + pushed.stderr
 
 

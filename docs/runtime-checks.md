@@ -315,6 +315,27 @@ Changes to governing runtime files, relevant nested state, or either active
 plan make the receipt stale. Structural receipt invariants are enforced by the
 schema and verifier; they are not represented as synthetic PASS check IDs.
 
+### Mid-plan consumer upgrade
+
+For a consumer with active work, use the installer or updater with
+`--local-only`. The refresh preserves active plans, user-owned state, and
+schema-v2 receipts. Those receipts remain available for history, but the
+current schema-v3 verifier rejects them as authorization for current gates.
+Before verification, confirm that nested `.claude` has a valid `HEAD` and a
+clean worktree.
+
+Regenerate fast and phase evidence with the current verifier, then regenerate
+the score, findings, documentation, `[LEARN]`, and completed session closeout
+evidence. Persist phase and closeout evidence with `verify phase --persist` and
+`verify closeout --persist`. Run the native commit gate and native pre-push gate
+only after this sequence passes; commit and push are supported only after those
+gates allow them.
+
+An evidence-only checkpoint does not stale current evidence. A change to the
+governing plan or runtime does stale it, so rerun the verification and closeout
+sequence after such a change. Evidence-only checkpoints that are excluded from
+the provenance fingerprint do not require a rerun.
+
 The verifier derives consumer scopes from native project configuration and
 layout. It excludes `.claude` from consumer Ruff coverage, honors configured
 Mypy `files`, `packages`, or `modules`, and falls back only to a conventional

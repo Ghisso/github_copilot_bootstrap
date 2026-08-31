@@ -223,6 +223,29 @@ its nested status and a quoted command to publish later.
 uv run python scripts/update_consumers.py --local-only /path/to/repo
 ```
 
+### Upgrading a consumer with active work
+
+Use the supported mid-plan refresh when a consumer already has active plans,
+receipts, or other user state. Run the refresh with `--local-only` first. The
+installer preserves the active and user-owned state, including schema-v2
+receipts, but schema-v2 receipts cannot authorize current schema-v3 gates.
+
+After the refresh, verify the consumer's nested `.claude` repository has a
+valid `HEAD` and a clean worktree. Then regenerate evidence with the current
+runtime, in order:
+
+1. Run fast verification and `verify phase --persist`.
+2. Regenerate the score, findings, documentation, and `[LEARN]` evidence, and
+   write the completed session closeout evidence.
+3. Run `verify closeout --persist`.
+4. Run the native commit and pre-push gates. Commit and push only after those
+   gates pass.
+
+Evidence-only checkpoints do not make current evidence stale. Changes to the
+governing plan or runtime do make it stale and require the affected evidence
+to be regenerated before continuing. If a governing plan or runtime change
+occurs during the upgrade, rerun the verification and closeout sequence.
+
 When self-installing this repository, ignored generated overlays under the root
 `.github/` tree are valid only when they are byte-identical to generated output.
 Validation rejects a tracked, unignored, or stale overlay; keep editable source

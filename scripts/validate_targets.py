@@ -36,6 +36,7 @@ from generate_targets import (
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
+    bootstrap_root_paths,
     render_restore_script,
 )
 
@@ -3684,6 +3685,21 @@ def setup_hook_repo(temp_root: Path) -> Path:
         TARGET_ROOT / ".claude" / "scripts",
         repo / ".claude" / "scripts",
     )
+    shutil.copy2(
+        TARGET_ROOT / ".claude" / "bootstrap-ownership.env",
+        repo / ".claude" / "bootstrap-ownership.env",
+    )
+    for relative in bootstrap_root_paths(False):
+        source = TARGET_ROOT / relative
+        for destination in (
+            repo / relative,
+            repo / ".claude" / "bootstrap-root" / relative,
+        ):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_dir():
+                shutil.copytree(source, destination)
+            else:
+                shutil.copy2(source, destination)
     write(repo / ".gitignore", ".claude/\n")
     write(repo / ".claude" / "MEMORY.md", "# Memory\n")
     write(repo / "README.md", "# Scratch\n")
@@ -5627,6 +5643,10 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             git(repo, "reset", "--soft", "HEAD~1")
 
         write(repo / ".codex" / "config.toml", "[features]\n")
+        write(
+            repo / ".claude" / "bootstrap-root" / ".codex" / "config.toml",
+            "[features]\n",
+        )
         git(repo, "add", ".codex/config.toml")
         head_sha, content_hash = head_and_hash()
         write_score(score_report(head_sha, content_hash))
@@ -6130,6 +6150,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
 
         write(repo / ".codex" / "config.toml", "[features]\n")
+        write(
+            repo / ".claude" / "bootstrap-root" / ".codex" / "config.toml",
+            "[features]\n",
+        )
         git(repo, "add", ".codex/config.toml")
         write_score_report()
         # Build the ordinary report then remove optional metadata to exercise
@@ -6788,6 +6812,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     ):
         paths = [root] if root.is_file() else text_files(root)
         for path in paths:
+            # This target-neutral ownership authority deliberately enumerates
+            # every installer-managed root adapter, including the optional
+            # Copilot surface.  It is copied verbatim so verifier, installer,
+            # and restorer cannot drift on the manifest contract.
+            if path == TARGET_ROOT / ".claude" / "scripts" / "runtime_ownership.py":
+                continue
             if (
                 "hooks" in path.parts and "scripts" in path.parts
             ) or path.name == "bootstrap-ownership.env":

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -12,9 +15,28 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "shared" / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import quality_score  # noqa: E402
 import verify  # noqa: E402
+from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
+    bootstrap_root_paths,
+    restore_manifest,
+)
+
+
+HISTORICAL_SCHEMA_V2_SOURCE_COMMIT = "e2753a9f2fd24dd2fc952e20929a9c7bbb1eeb37"
+HISTORICAL_SCHEMA_V2_RUNTIME_SHA256 = (
+    "9abc7edbd1d31ab89c232ad451583867b5943ad42af7eee45d58ff60fbe35fad"
+)
+HISTORICAL_SCHEMA_V2_RECEIPTS = {
+    "schema-v2-receipt.json": "15c78e5320e23b1bb59c6751d165a87d2e74d146b431fd7320639bafd87e5c76",
+    "schema-v2-closeout-receipt.json": "5cf5c3477016200a817e0fa0de4db13aef06a84c64b791d3a90f51f90cb72f15",
+}
+HISTORICAL_SCHEMA_V2_RUNTIME = (
+    REPO_ROOT / "tests" / "fixtures" / "schema-v2-verify.py.txt"
+)
+HISTORICAL_SCHEMA_V2_SOURCE = REPO_ROOT / "tests" / "fixtures" / "schema-v2-source.json"
 
 
 def test_verifier_disables_runtime_bytecode_cache() -> None:
@@ -72,6 +94,46 @@ def _receipt(status: str = "PASS", content_hash: str = "relevant") -> dict[str, 
         for check_id in verify.CHECK_IDS
     ]
     return verify.build_receipt("phase", checks, _metadata(content_hash))
+
+
+def test_historical_schema_v2_receipts_are_rejected_before_v3_validation() -> None:
+    """Pinned local v2 receipts are valid there, never current authority."""
+    source = HISTORICAL_SCHEMA_V2_RUNTIME.read_bytes()
+    source_metadata = json.loads(HISTORICAL_SCHEMA_V2_SOURCE.read_text())
+    assert source_metadata == {
+        "source_commit": HISTORICAL_SCHEMA_V2_SOURCE_COMMIT,
+        "runtime_sha256": HISTORICAL_SCHEMA_V2_RUNTIME_SHA256,
+    }
+    assert hashlib.sha256(source).hexdigest() == HISTORICAL_SCHEMA_V2_RUNTIME_SHA256
+    historical = types.ModuleType("historical_verify")
+    historical.__file__ = str(REPO_ROOT / "shared" / "scripts" / "verify.py")
+    exec(compile(source, historical.__file__, "exec"), historical.__dict__)
+    assert historical.SCHEMA_VERSION == 2
+    for fixture, digest in HISTORICAL_SCHEMA_V2_RECEIPTS.items():
+        raw = (REPO_ROOT / "tests" / "fixtures" / fixture).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == digest
+        receipt = json.loads(raw)
+        assert historical.validate_receipt(receipt) == receipt
+        with pytest.raises(
+            ValueError, match=r"^receipt has an unsupported schema_version$"
+        ):
+            verify.validate_receipt(receipt)
+
+
+def _write_root_adapter_pairs(root: Path, mode: bool = True) -> None:
+    """Write one complete mode-specific ownership inventory and its mirrors."""
+    for relative in bootstrap_root_paths(mode):
+        for base in (root, root / ".claude" / "bootstrap-root"):
+            path = base / relative
+            if Path(relative).suffix:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("adapter\n", encoding="utf-8")
+            else:
+                (path / "fixture.txt").parent.mkdir(parents=True, exist_ok=True)
+                (path / "fixture.txt").write_text("adapter\n", encoding="utf-8")
+    manifest = root / ".claude" / "bootstrap-ownership.env"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(restore_manifest(mode), encoding="utf-8")
 
 
 def _closeout_receipt() -> dict[str, object]:
@@ -416,6 +478,7 @@ def test_control_plane_provenance_binds_runtime_and_active_plans(
     plans = nested / "plans"
     (nested / "scripts").mkdir(parents=True)
     plans.mkdir()
+    _write_root_adapter_pairs(tmp_path)
     (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
     big_plan = plans / "consumer-proof.md"
     small_plan = plans / "phase-one.md"
@@ -513,6 +576,169 @@ def test_control_plane_provenance_binds_runtime_and_active_plans(
     )
 
 
+def test_control_plane_provenance_binds_owned_live_root_adapters(
+    tmp_path: Path,
+) -> None:
+    """Every manifest-owned live root adapter must equal its nested mirror."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    (plans / "consumer-proof.md").write_text("big plan\n", encoding="utf-8")
+    (plans / "phase-one.md").write_text("small plan\n", encoding="utf-8")
+    adapters = {
+        "CLAUDE.md": "claude\n",
+        "AGENTS.md": "agents\n",
+        ".mcp.json": "{}\n",
+        ".codex/hooks.json": "{}\n",
+        ".agents/agents/coder.md": "coder\n",
+        ".vscode/mcp.json": "{}\n",
+        ".github/hooks/hooks.json": "{}\n",
+    }
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    for relative, content in adapters.items():
+        for base in (tmp_path, nested / "bootstrap-root"):
+            path = base / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "runtime",
+        ],
+        cwd=nested,
+        check=True,
+    )
+
+    before = verify.control_plane_provenance(
+        tmp_path, "consumer-proof_implementation", "phase-one"
+    )
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": before,
+    }
+    assert verify.has_control_plane_provenance(metadata)
+
+    for relative, content in adapters.items():
+        live = tmp_path / relative
+        live.write_text(content + "drift\n", encoding="utf-8")
+        after = verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        )
+        assert not verify.control_plane_provenance_matches(
+            metadata, {**metadata, "control_plane_provenance": after}
+        )
+        live.write_text(content, encoding="utf-8")
+
+    (tmp_path / ".mcp.json").unlink()
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+    (tmp_path / ".mcp.json").mkdir()
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+    (tmp_path / ".mcp.json").rmdir()
+    (tmp_path / ".mcp.json").symlink_to(nested / "bootstrap-root" / ".mcp.json")
+    assert not verify.has_control_plane_provenance(
+        {
+            **metadata,
+            "control_plane_provenance": verify.control_plane_provenance(
+                tmp_path, "consumer-proof_implementation", "phase-one"
+            ),
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("mode", "manifest"),
+    (
+        (True, "BOOTSTRAP_COMMIT_COPILOT_SURFACE=1\nBOOTSTRAP_ROOT_PATH=.mcp.json\n"),
+        (
+            False,
+            "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n"
+            "BOOTSTRAP_ROOT_PATH=.mcp.json\nBOOTSTRAP_ROOT_PATH=foreign\n",
+        ),
+    ),
+)
+def test_root_adapter_manifest_requires_complete_mode_inventory(
+    tmp_path: Path, mode: bool, manifest: str
+) -> None:
+    """Incomplete or foreign root ownership records cannot establish provenance."""
+    _write_root_adapter_pairs(tmp_path, mode)
+    (tmp_path / ".claude" / "bootstrap-ownership.env").write_text(
+        manifest, encoding="utf-8"
+    )
+
+    assert verify.manifest_bootstrap_root_paths(tmp_path) is None
+
+
+@pytest.mark.parametrize("mirror", (False, True))
+def test_root_adapter_rejects_ancestor_symlink_escape(
+    tmp_path: Path, mirror: bool
+) -> None:
+    """A link in either adapter ancestry cannot redirect hashing outside the repo."""
+    _write_root_adapter_pairs(tmp_path)
+    ancestor = (
+        tmp_path / ".claude" / "bootstrap-root" / ".codex"
+        if mirror
+        else tmp_path / ".codex"
+    )
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    shutil.rmtree(ancestor)
+    ancestor.symlink_to(outside, target_is_directory=True)
+
+    assert verify.bootstrap_root_fingerprint(tmp_path) == ""
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    (
+        "name: wrong-phase",
+        "parent_plan: another-plan",
+        "phase_index: not-a-number",
+        "status: in-progress",
+        "closeout_session_log:",
+        "closeout_session_log: ../escape.md",
+        "type:\n  - small-plan",
+    ),
+)
+def test_terminal_small_plan_requires_complete_well_formed_identity(
+    replacement: str,
+) -> None:
+    """Terminal exceptions accept only the receipt's complete current plan."""
+    source = (
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n"
+    )
+    key = replacement.partition(":")[0]
+    original = next(line for line in source.splitlines() if line.startswith(f"{key}:"))
+    assert not verify.is_complete_small_plan(
+        source.replace(original, replacement).encode(), "phase-one", "consumer-proof"
+    )
+
+
 def test_terminal_plan_transition_provenance(
     tmp_path: Path,
 ) -> None:
@@ -521,6 +747,7 @@ def test_terminal_plan_transition_provenance(
     plans = nested / "plans"
     (nested / "scripts").mkdir(parents=True)
     plans.mkdir()
+    _write_root_adapter_pairs(tmp_path)
     (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
     big_plan = plans / "consumer-proof.md"
     big_plan.write_text(
@@ -538,7 +765,12 @@ review_profiles:
 """,
         encoding="utf-8",
     )
-    (plans / "phase-one.md").write_text("status: complete\n", encoding="utf-8")
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
     subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
     subprocess.run(["git", "add", "."], cwd=nested, check=True)
     subprocess.run(
@@ -559,7 +791,7 @@ review_profiles:
     before = verify.control_plane_provenance(
         tmp_path, "consumer-proof_implementation", "phase-one"
     )
-    metadata = {
+    metadata: dict[str, object] = {
         "branch": "consumer-proof_implementation",
         "control_plane_provenance": before,
     }
@@ -598,21 +830,19 @@ review_profiles:
     )
 
     subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
-    big_plan.write_text(
-        big_plan.read_text(encoding="utf-8").replace(
-            "  - phase-one", "  - phase-one\n  - phase-two"
-        ),
+    phase_one = plans / "phase-one.md"
+    phase_one.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: in-progress\n---\n",
         encoding="utf-8",
     )
-    (plans / "phase-two.md").write_text("status: complete\n", encoding="utf-8")
-    subprocess.run(["git", "add", "plans"], cwd=nested, check=True)
-    subprocess.run(["git", "commit", "-qm", "later phase"], cwd=nested, check=True)
-    nonterminal = verify.control_plane_provenance(
-        tmp_path, "consumer-proof_implementation", "phase-one"
-    )
-    nonterminal_metadata = {
+    subprocess.run(["git", "add", "plans/phase-one.md"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "unfinished phase"], cwd=nested, check=True)
+    unfinished_metadata: dict[str, object] = {
         "branch": "consumer-proof_implementation",
-        "control_plane_provenance": nonterminal,
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
     }
     big_plan.write_text(
         big_plan.read_text(encoding="utf-8")
@@ -624,13 +854,184 @@ review_profiles:
         tmp_path,
         "consumer-proof_implementation",
         "phase-one",
-        nonterminal_metadata,
+        unfinished_metadata,
         {
-            **nonterminal_metadata,
+            **unfinished_metadata,
             "control_plane_provenance": verify.control_plane_provenance(
                 tmp_path, "consumer-proof_implementation", "phase-one"
             ),
         },
+    )
+
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8").replace(
+            "  - phase-one", "  - phase-one\n  - phase-two"
+        ),
+        encoding="utf-8",
+    )
+    phase_one.write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    phase_two = plans / "phase-two.md"
+    cancelled_evidence = nested / "session_logs" / "phase-two-cancelled.md"
+    cancelled_evidence.parent.mkdir(exist_ok=True)
+    cancelled_evidence.write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    phase_two.write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\n"
+        "cancelled_at: 2026-08-31T00:00:00Z\n"
+        "cancelled_reason: Later work is no longer needed\n"
+        "cancelled_evidence: .claude/session_logs/phase-two-cancelled.md\n---\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "terminal precondition"], cwd=nested, check=True
+    )
+    later_metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# dirty\n")
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    subprocess.run(["git", "reset", "--", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# staged\n")
+    subprocess.run(["git", "add", "plans/phase-two.md"], cwd=nested, check=True)
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    subprocess.run(["git", "reset", "--", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(["git", "checkout", "--", "plans"], cwd=nested, check=True)
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "terminal transition"], cwd=nested, check=True
+    )
+    assert verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+    phase_two.write_text(phase_two.read_text(encoding="utf-8") + "# checkpoint dirty\n")
+    subprocess.run(["git", "add", "plans/phase-two.md"], cwd=nested, check=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "later phase mutation"], cwd=nested, check=True
+    )
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", later_metadata
+    )
+
+
+@pytest.mark.parametrize(
+    ("replacement", "evidence"),
+    (
+        ("cancelled_at:", "**Status:** CANCELLED\n"),
+        ("cancelled_at: invalid", "**Status:** CANCELLED\n"),
+        ("cancelled_reason: [not prose]", "**Status:** CANCELLED\n"),
+        ("cancelled_evidence: ../escape.md", "**Status:** CANCELLED\n"),
+        ("cancelled_evidence: .claude/session_logs/cancelled.md", "not cancelled\n"),
+    ),
+)
+def test_terminal_paths_require_valid_cancelled_evidence(
+    tmp_path: Path, replacement: str, evidence: str
+) -> None:
+    """Both terminal paths require the full audited cancellation contract."""
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+    (plans / "consumer-proof.md").write_text(
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n  - phase-two\n---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n",
+        encoding="utf-8",
+    )
+    base_cancelled = (
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\ncancelled_at: 2026-08-31T00:00:00Z\n"
+        "cancelled_reason: Later work is unnecessary\n"
+        "cancelled_evidence: .claude/session_logs/cancelled.md\n---\n"
+    )
+    key = replacement.partition(":")[0]
+    original = next(
+        line for line in base_cancelled.splitlines() if line.startswith(f"{key}:")
+    )
+    (plans / "phase-two.md").write_text(
+        base_cancelled.replace(original, replacement), encoding="utf-8"
+    )
+    cancelled_log = nested / "session_logs" / "cancelled.md"
+    cancelled_log.parent.mkdir()
+    cancelled_log.write_text(evidence, encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=nested, check=True)
+    subprocess.run(["git", "add", "."], cwd=nested, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Verifier",
+            "-c",
+            "user.email=verifier@example.com",
+            "commit",
+            "-qm",
+            "base",
+        ],
+        cwd=nested,
+        check=True,
+    )
+    metadata: dict[str, object] = {
+        "branch": "consumer-proof_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "consumer-proof_implementation", "phase-one"
+        ),
+    }
+    big_plan = plans / "consumer-proof.md"
+    big_plan.write_text(
+        big_plan.read_text(encoding="utf-8")
+        .replace("status: in-progress", "status: complete")
+        .replace("current_phase: phase-one", "current_phase: "),
+        encoding="utf-8",
+    )
+    assert not verify.has_only_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
+    )
+    subprocess.run(["git", "add", "plans/consumer-proof.md"], cwd=nested, check=True)
+    subprocess.run(["git", "commit", "-qm", "terminal"], cwd=nested, check=True)
+    assert not verify.has_only_checkpointed_terminal_big_plan_change(
+        tmp_path, "consumer-proof_implementation", "phase-one", metadata
     )
 
 
