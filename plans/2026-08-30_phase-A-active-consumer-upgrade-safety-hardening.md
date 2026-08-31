@@ -3,8 +3,8 @@ name: 2026-08-30_phase-A-active-consumer-upgrade-safety-hardening
 type: small-plan
 parent_plan: active-consumer-upgrade-safety-hardening
 phase_index: 0
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-08-30_active-consumer-upgrade-safety-hardening.md
 ---
 # Small Plan: 2026-08-30_phase-A-active-consumer-upgrade-safety-hardening
 

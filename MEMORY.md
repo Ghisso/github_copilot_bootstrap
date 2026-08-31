@@ -507,3 +507,16 @@
 - [LEARN:security] `sys.dont_write_bytecode` prevents cache writes but not cache
   reads. Imported `__pycache__` and `.pyc` files remain governing runtime state
   unless imports explicitly bypass them, so provenance must continue to bind them.
+- [LEARN:security] A generated verifier must load its ownership authority from
+  the exact role-specific file path and validate every ancestor component of
+  owned live and mirror paths. Normal module search and final-component-only
+  symlink checks can let consumer-controlled code or ancestor links redefine
+  the provenance boundary.
+- [LEARN:testing] Historical upgrade regressions must vendor hash-pinned runtime
+  and canonical receipt bytes rather than depend on local Git ancestry. One
+  dirty active consumer should traverse refresh, evidence regeneration, commit,
+  terminal transition, and both immediate and checkpointed pre-push states.
+- [LEARN:workflow] Final quality and findings reports bind the staged index, while
+  phase and closeout receipts also bind completed plan and session evidence.
+  Stage first, then generate reports, update canonical LEARN evidence, and
+  refresh phase and closeout receipts before the completion commit.
