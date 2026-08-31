@@ -28,6 +28,13 @@ CANCELLED_STATUS_PATTERN = re.compile(
     r"^\*\*Status:\*\*[ \t]+CANCELLED\b", re.MULTILINE
 )
 PAUSED_STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*[ \t]+PAUSED\b", re.MULTILINE)
+BODY_PHASE_ITEM_PATTERN = re.compile(
+    r"^- (?:\[[ xX]\] )?`(?P<phase>[^`]+)`(?:[ \t]+(?:—|--|:|-).*)?$"
+)
+BODY_PHASE_HEADING_PATTERN = re.compile(
+    r"^## (?:Phase|Phases|Phase Order)[ \t]*\n(?P<body>.*?)(?=^## |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def parse_frontmatter(path: Path) -> dict[str, Any]:
@@ -240,6 +247,33 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
         validate_cancellation(path, data, errors)
     if not isinstance(data.get("phases"), list) or not data.get("phases"):
         errors.append(f"{path}: phases must be a non-empty list")
+        return
+    body = path.read_text(encoding="utf-8").split("---\n", 2)
+    if len(body) != 3:
+        return
+    for phase_section in BODY_PHASE_HEADING_PATTERN.finditer(body[2]):
+        section = phase_section.group("body")
+        body_phases: list[str] = []
+        malformed = False
+        for line in section.splitlines():
+            match = BODY_PHASE_ITEM_PATTERN.fullmatch(line)
+            if match is not None:
+                body_phases.append(match.group("phase"))
+            elif line.startswith("- [") and "`" in line:
+                malformed = True
+        if not body_phases and not malformed:
+            continue
+        if (
+            malformed
+            or len(body_phases) != len(set(body_phases))
+            or any(
+                not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", phase)
+                for phase in body_phases
+            )
+        ):
+            errors.append(f"{path}: body phase inventory is malformed")
+        elif body_phases != data["phases"]:
+            errors.append(f"{path}: body phase inventory must match frontmatter phases")
 
 
 def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> None:

@@ -545,6 +545,86 @@ def test_accepts_cancelled_big_plan_without_started_at_or_current_phase(
     assert validation_errors(plan) == []
 
 
+def test_rejects_big_plan_body_phase_inventory_drift(tmp_path: Path) -> None:
+    """The readable phase list cannot silently diverge from frontmatter."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + "\n## Phases\n\n- [ ] `second`\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory must match frontmatter phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("heading", ("Phase", "Phases", "Phase Order"))
+def test_rejects_supported_body_phase_heading_drift(
+    tmp_path: Path, heading: str
+) -> None:
+    """Every supported duplicated phase heading has the same inventory contract."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## {heading}\n\n- [ ] `second`\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory must match" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize("item", ("- `second`", "- [ ] `second` — descriptive suffix"))
+def test_rejects_unambiguous_phase_inventory_bullets_that_drift(
+    tmp_path: Path, item: str
+) -> None:
+    """Slug-bearing lists under a phase heading cannot evade frontmatter parity."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## Phases\n\n{item}\n",
+        encoding="utf-8",
+    )
+
+    assert any("body phase inventory" in error for error in validation_errors(plan))
+
+
+def test_ignores_narrative_phase_subheadings_and_plain_bullets(tmp_path: Path) -> None:
+    """Narrative checklist text is not an inventory without a code-form slug."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\ncurrent_phase: first\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + "\n## Phase Order\n\n### Phase two\n\n- ordinary prose\n- [ ] narrative checklist\n",
+        encoding="utf-8",
+    )
+
+    assert validation_errors(plan) == []
+
+
 @pytest.mark.parametrize("status", ["canceled", "abandoned"])
 def test_rejects_near_miss_statuses(tmp_path: Path, status: str) -> None:
     plan = write_plan(tmp_path / "small.md", small_plan(status))
