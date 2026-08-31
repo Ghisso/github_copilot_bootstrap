@@ -1128,7 +1128,7 @@ def has_only_terminal_big_plan_change(
 def has_only_checkpointed_terminal_big_plan_change(
     root: Path, branch: str, phase: str, metadata: dict[str, object]
 ) -> bool:
-    """Accept a clean nested checkpoint containing only the terminal plan update."""
+    """Accept a receipt-bound completed small-plan checkpoint and exact terminal big-plan transition."""
     recorded = metadata.get("control_plane_provenance")
     if not isinstance(recorded, dict) or not branch.endswith("_implementation"):
         return False
@@ -1147,7 +1147,7 @@ def has_only_checkpointed_terminal_big_plan_change(
     expected = terminal_big_plan_bytes(source, phase)
     if expected is None or indexed != expected or plan.read_bytes() != expected:
         return False
-    source_small = nested_revision_file(root, recorded_head, f"plans/{phase}.md")
+    source_small = indexed_nested_file(root, f"plans/{phase}.md")
     if source_small is None or not terminal_current_small_plan_matches(
         root, phase, slug, recorded, source_small
     ):
@@ -1177,8 +1177,10 @@ def has_only_checkpointed_terminal_big_plan_change(
     if diff.returncode != 0:
         return False
     changed = [path for path in diff.stdout.split("\0") if path]
+    allowed_checkpoint_paths = {relative, f"plans/{phase}.md"}
     return all(
-        not is_relevant_nested_path(path, active_plan_paths) or path == relative
+        not is_relevant_nested_path(path, active_plan_paths)
+        or path in allowed_checkpoint_paths
         for path in changed
     )
 
