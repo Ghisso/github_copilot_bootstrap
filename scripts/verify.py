@@ -29,19 +29,16 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 import quality_score  # noqa: E402  # must follow the bytecode-cache guard
 
-try:
-    from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
-        bootstrap_root_paths as owned_bootstrap_root_paths,
-        install_mode_from_manifest,
-    )
-except ModuleNotFoundError:
-    authoring_scripts = Path(__file__).resolve().parents[2] / "scripts"
-    if authoring_scripts.is_dir():
-        sys.path.insert(0, str(authoring_scripts))
-    from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
-        bootstrap_root_paths as owned_bootstrap_root_paths,
-        install_mode_from_manifest,
-    )
+_VERIFIER_PATH = Path(__file__).resolve()
+_AUTHORING_VERIFIER_PATH = (
+    _VERIFIER_PATH.parents[2] / "shared" / "scripts" / "verify.py"
+)
+if _VERIFIER_PATH == _AUTHORING_VERIFIER_PATH:
+    sys.path.insert(0, str(_VERIFIER_PATH.parents[2] / "scripts"))
+from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
+    bootstrap_root_paths as owned_bootstrap_root_paths,
+    install_mode_from_manifest,
+)
 
 
 SCHEMA_VERSION = 3
@@ -1016,17 +1013,40 @@ def small_plan_frontmatter(source: bytes) -> dict[str, str] | None:
     return values
 
 
-def is_cancelled_small_plan(source: bytes, phase: str, parent_plan: str) -> bool:
+def is_cancelled_small_plan(
+    root: Path, source: bytes, phase: str, parent_plan: str
+) -> bool:
     """Return whether an identified later small plan is terminally cancelled."""
     values = small_plan_frontmatter(source)
-    return bool(
+    if not (
         values
         and values.get("name") == phase
         and values.get("type") == "small-plan"
         and values.get("parent_plan") == parent_plan
         and values.get("status") == "cancelled"
         and re.fullmatch(r"[0-9]+", values.get("phase_index", ""))
-    )
+        and is_utc_timestamp(values.get("cancelled_at"))
+    ):
+        return False
+    reason = values.get("cancelled_reason", "").strip()
+    evidence = values.get("cancelled_evidence", "")
+    if (
+        not reason
+        or reason in {"''", '""'}
+        or reason.startswith(("[", "{", "- ", "#"))
+        or not is_safe_relative_path(evidence)
+    ):
+        return False
+    try:
+        return bool(
+            re.search(
+                r"^\*\*Status:\*\*[ \t]+CANCELLED\b",
+                confined_path(root, evidence, regular=True).read_text(encoding="utf-8"),
+                re.MULTILINE,
+            )
+        )
+    except (OSError, UnicodeError, ValueError):
+        return False
 
 
 def is_complete_small_plan(source: bytes, phase: str, parent_plan: str) -> bool:
@@ -1086,7 +1106,7 @@ def has_only_terminal_big_plan_change(
         return False
     for later_phase in later_phases:
         later = indexed_nested_file(root, f"plans/{later_phase}.md")
-        if later is None or not is_cancelled_small_plan(later, later_phase, slug):
+        if later is None or not is_cancelled_small_plan(root, later, later_phase, slug):
             return False
 
     plan_paths = terminal_plan_paths(indexed, relative)
@@ -1128,7 +1148,7 @@ def has_only_checkpointed_terminal_big_plan_change(
         return False
     for later_phase in later_phases:
         later = nested_revision_file(root, recorded_head, f"plans/{later_phase}.md")
-        if later is None or not is_cancelled_small_plan(later, later_phase, slug):
+        if later is None or not is_cancelled_small_plan(root, later, later_phase, slug):
             return False
     active_plan_paths = terminal_plan_paths(source, relative)
     if active_plan_paths is None:
