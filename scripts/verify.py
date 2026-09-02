@@ -28,7 +28,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-import quality_score  # noqa: E402  # must follow the bytecode-cache guard
 
 _VERIFIER_PATH = Path(__file__).resolve()
 _AUTHORING_VERIFIER_PATH = (
@@ -50,7 +49,7 @@ owned_bootstrap_root_paths = _ownership.bootstrap_root_paths
 install_mode_from_manifest = _ownership.install_mode_from_manifest
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
 MODES = frozenset({"fast", "phase", "closeout"})
 CHECK_IDS = (
@@ -67,7 +66,6 @@ PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
 CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
 ARTIFACT_KEYS = (
     "phase_receipt",
-    "score",
     "findings",
     "closeout_log",
     "documentation",
@@ -1335,8 +1333,7 @@ def gate_receipt_errors(
         "phase_receipt": receipt_path(root, "phase", phase)
         .relative_to(root)
         .as_posix(),
-        "score": ".claude/quality_reports/",
-        "findings": ".claude/quality_reports/",
+        "findings": f".claude/quality_reports/findings-{phase}.json",
     }
     loaded: dict[str, object] = {}
     for key in ARTIFACT_KEYS:
@@ -1354,13 +1351,8 @@ def gate_receipt_errors(
         if not isinstance(path_value, str) or not is_safe_relative_path(path_value):
             errors.append(f"closeout receipt artifact {key} has an unsafe path")
             continue
-        if key == "phase_receipt" and path_value != expected_paths[key]:
-            errors.append("closeout receipt phase receipt path is invalid")
-            continue
-        if key in {"score", "findings"} and not path_value.startswith(
-            expected_paths[key]
-        ):
-            errors.append(f"closeout receipt {key} path is outside quality reports")
+        if key in {"phase_receipt", "findings"} and path_value != expected_paths[key]:
+            errors.append(f"closeout receipt {key} path is invalid")
             continue
         try:
             path = confined_path(root, path_value, regular=True)
@@ -1414,29 +1406,11 @@ def gate_receipt_errors(
                 or not control_plane_provenance_matches(phase_metadata, metadata)
             ):
                 errors.append("phase receipt does not correlate with closeout evidence")
-    score_path = loaded.get("score")
-    if isinstance(score_path, Path):
-        errors.extend(
-            report_errors(
-                score_path,
-                kind="score",
-                branch=branch,
-                phase=phase,
-                head=head,
-                head_relation=head_relation,
-                expected_base=expected_base,
-                root=root,
-                require_major=False,
-                require_ponytail=False,
-                verify_current_content=enforce_final_state,
-            )
-        )
     findings_path = loaded.get("findings")
     if isinstance(findings_path, Path):
         errors.extend(
             report_errors(
                 findings_path,
-                kind="findings",
                 branch=branch,
                 phase=phase,
                 head=head,
@@ -1470,7 +1444,6 @@ def git_is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
 def report_errors(
     path: Path,
     *,
-    kind: str,
     branch: str,
     phase: str,
     head: str,
@@ -1481,8 +1454,8 @@ def report_errors(
     require_ponytail: bool,
     verify_current_content: bool,
 ) -> list[str]:
-    """Validate one exact child report without provider-specific policy."""
-    label = f"{kind} report"
+    """Validate the findings report without provider-specific policy."""
+    label = "findings report"
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -1527,98 +1500,84 @@ def report_errors(
         )
         if not current_hash or report.get("content_hash") != current_hash:
             errors.append(f"{label} content_hash is stale")
-    if kind == "score":
-        score = report.get("score")
-        if type(score) is not int or score < 90:
-            errors.append("quality score must be >= 90")
+    findings = report.get("findings")
+    profiles = report.get("profiles_reviewed")
+    if (
+        not isinstance(findings, list)
+        or not isinstance(profiles, list)
+        or not profiles
+        or not all(isinstance(profile, str) and profile for profile in profiles)
+        or len(set(profiles)) != len(profiles)
+    ):
+        errors.append("findings report schema or reviewed profiles are invalid")
+        findings = []
+        profiles = []
+    observed = {"critical": 0, "major": 0, "minor": 0}
+    for finding in findings:
+        if not isinstance(finding, dict):
+            errors.append("findings report contains a malformed finding")
+            continue
+        severity = finding.get("severity")
+        profile = finding.get("profile")
+        title = finding.get("title")
         if (
-            report.get("tests_passed") is not True
-            or report.get("tests_skipped") is True
+            severity not in {"CRITICAL", "MAJOR", "MINOR"}
+            or not isinstance(profile, str)
+            or profile not in profiles
+            or not isinstance(title, str)
+            or not title.strip()
         ):
-            errors.append("quality report test evidence is invalid")
+            errors.append(
+                "findings report finding is invalid"
+                + (f": {title}" if isinstance(title, str) and title else "")
+            )
+            continue
+        observed[str(severity).lower()] += 1
+    counts = report.get("counts")
+    if not isinstance(counts, dict) or any(
+        type(counts.get(name)) is not int or counts[name] < 0
+        for name in ("critical", "major", "minor")
+    ):
+        errors.append("findings report severity counts are invalid")
     else:
-        findings = report.get("findings")
-        profiles = report.get("profiles_reviewed")
-        if (
-            not isinstance(findings, list)
-            or not isinstance(profiles, list)
-            or not profiles
-            or not all(isinstance(profile, str) and profile for profile in profiles)
-            or len(set(profiles)) != len(profiles)
-        ):
-            errors.append("findings report schema or reviewed profiles are invalid")
-            findings = []
-            profiles = []
-        observed = {"critical": 0, "major": 0, "minor": 0}
-        for finding in findings:
-            if not isinstance(finding, dict):
-                errors.append("findings report contains a malformed finding")
-                continue
-            severity = finding.get("severity")
-            profile = finding.get("profile")
-            title = finding.get("title")
-            if (
-                severity not in {"CRITICAL", "MAJOR", "MINOR"}
-                or not isinstance(profile, str)
-                or profile not in profiles
-                or not isinstance(title, str)
-                or not title.strip()
-            ):
-                errors.append(
-                    "findings report finding is invalid"
-                    + (f": {title}" if isinstance(title, str) and title else "")
-                )
-                continue
-            observed[str(severity).lower()] += 1
-        counts = report.get("counts")
-        if not isinstance(counts, dict) or any(
-            type(counts.get(name)) is not int or counts[name] < 0
-            for name in ("critical", "major", "minor")
-        ):
-            errors.append("findings report severity counts are invalid")
-        else:
-            if counts != observed:
-                errors.append("findings report counts do not match findings")
-            if counts["critical"] != 0:
-                titles = ", ".join(
-                    str(item.get("title"))
-                    for item in findings
-                    if isinstance(item, dict) and item.get("severity") == "CRITICAL"
-                )
-                errors.append(
-                    "findings report has CRITICAL findings"
-                    + (f": {titles}" if titles else "")
-                )
-            if require_major and counts["major"] != 0:
-                titles = ", ".join(
-                    str(item.get("title"))
-                    for item in findings
-                    if isinstance(item, dict) and item.get("severity") == "MAJOR"
-                )
-                errors.append(
-                    "findings report has MAJOR findings"
-                    + (f": {titles}" if titles else "")
-                )
-        ponytail_reviewed = report.get("ponytail_reviewed")
-        ponytail_findings = report.get("ponytail_findings")
-        ponytail_selected = "ponytail" in profiles
-        observed_ponytail = sum(
-            1
-            for finding in findings
-            if isinstance(finding, dict) and finding.get("profile") == "ponytail"
-        )
-        if ponytail_selected:
-            if ponytail_reviewed is not True:
-                errors.append("Ponytail review metadata contradicts reviewed profiles")
-            if (
-                type(ponytail_findings) is not int
-                or ponytail_findings != observed_ponytail
-            ):
-                errors.append("Ponytail finding count does not match findings")
-        elif ponytail_reviewed is not None or ponytail_findings is not None:
-            errors.append("unselected Ponytail review must omit Ponytail metadata")
-        if require_ponytail and not ponytail_selected:
-            errors.append("this high-risk diff requires a fresh Ponytail review")
+        if counts != observed:
+            errors.append("findings report counts do not match findings")
+        if counts["critical"] != 0:
+            titles = ", ".join(
+                str(item.get("title"))
+                for item in findings
+                if isinstance(item, dict) and item.get("severity") == "CRITICAL"
+            )
+            errors.append(
+                "findings report has CRITICAL findings"
+                + (f": {titles}" if titles else "")
+            )
+        if require_major and counts["major"] != 0:
+            titles = ", ".join(
+                str(item.get("title"))
+                for item in findings
+                if isinstance(item, dict) and item.get("severity") == "MAJOR"
+            )
+            errors.append(
+                "findings report has MAJOR findings" + (f": {titles}" if titles else "")
+            )
+    ponytail_reviewed = report.get("ponytail_reviewed")
+    ponytail_findings = report.get("ponytail_findings")
+    ponytail_selected = "ponytail" in profiles
+    observed_ponytail = sum(
+        1
+        for finding in findings
+        if isinstance(finding, dict) and finding.get("profile") == "ponytail"
+    )
+    if ponytail_selected:
+        if ponytail_reviewed is not True:
+            errors.append("Ponytail review metadata contradicts reviewed profiles")
+        if type(ponytail_findings) is not int or ponytail_findings != observed_ponytail:
+            errors.append("Ponytail finding count does not match findings")
+    elif ponytail_reviewed is not None or ponytail_findings is not None:
+        errors.append("unselected Ponytail review must omit Ponytail metadata")
+    if require_ponytail and not ponytail_selected:
+        errors.append("this high-risk diff requires a fresh Ponytail review")
     return errors
 
 
@@ -1675,30 +1634,131 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
     return ["LEARN evidence is missing"]
 
 
+def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+    """Run one external verification tool, returning its raw result."""
+    result = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def _ruff_measurement(
+    targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure Ruff without treating failed measurement as a clean result."""
+    try:
+        args = ["uv", "run", "ruff", "check", *targets, "--output-format=json"]
+        for pattern in extend_exclude or []:
+            args.extend(("--extend-exclude", pattern))
+        rc, stdout, stderr = _run(args, cwd=cwd)
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"Ruff did not run: {error}"
+    if rc not in {0, 1}:
+        return (
+            "UNVERIFIED",
+            f"Ruff exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
+    if not stdout.strip():
+        return "UNVERIFIED", "Ruff produced no JSON output"
+    try:
+        violations = json.loads(stdout)
+    except json.JSONDecodeError as error:
+        return "UNVERIFIED", f"Ruff produced invalid JSON: {error}"
+    if not isinstance(violations, list) or not all(
+        isinstance(item, dict) for item in violations
+    ):
+        return "UNVERIFIED", "Ruff JSON was not a violation list"
+    if rc == 0 and violations:
+        return "UNVERIFIED", "Ruff reported violations with a successful exit status"
+    if rc == 1 and not violations:
+        return "UNVERIFIED", "Ruff failed without reporting any violations"
+    if rc == 0:
+        return "PASS", "Ruff completed with 0 violations"
+    return "FAIL", f"Ruff reported {len(violations)} violation(s)"
+
+
+def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, str]:
+    """Measure mypy while distinguishing type failures from tool failures."""
+    try:
+        rc, stdout, stderr = _run(
+            [
+                "uv",
+                "run",
+                "mypy",
+                *(targets or []),
+                "--ignore-missing-imports",
+                "--explicit-package-bases",
+            ],
+            cwd=cwd,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"mypy did not run: {error}"
+    output = stdout + stderr
+    error_count = sum(1 for line in output.splitlines() if ": error:" in line)
+    if rc == 0:
+        if error_count:
+            return "UNVERIFIED", "mypy reported errors with a successful exit status"
+        return "PASS", "mypy completed with 0 errors"
+    if rc == 1 and error_count:
+        return "FAIL", f"mypy reported {error_count} type error(s)"
+    return (
+        "UNVERIFIED",
+        f"mypy exited abnormally ({rc}): {output.strip() or 'no output'}",
+    )
+
+
+def _pytest_measurement(
+    cwd: str = ".", targets: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure pytest, separating test failures from infrastructure failures."""
+    try:
+        rc, stdout, stderr = _run(
+            [
+                "uv",
+                "run",
+                "pytest",
+                *(targets if targets is not None else ["tests/"]),
+                "-q",
+                "--tb=no",
+            ],
+            cwd=cwd,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"pytest did not run: {error}"
+    if rc == 0:
+        return "PASS", "pytest completed"
+    if rc == 1:
+        return "FAIL", "pytest reported test failures"
+    return (
+        "UNVERIFIED",
+        f"pytest infrastructure exit ({rc}): {(stderr or stdout).strip() or 'no output'}",
+    )
+
+
 def measure_ruff(
     root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
 ) -> dict[str, object]:
-    """Adapt the scorer's strict Ruff measurement into a receipt check."""
-    measurement = quality_score.measure_ruff(
+    """Adapt the strict Ruff measurement into a receipt check."""
+    status, detail = _ruff_measurement(
         targets, cwd=str(root), extend_exclude=extend_exclude
     )
-    return check(
-        "VFY-RUFF-001",
-        measurement.status,
-        measurement.detail,
-    )
+    return check("VFY-RUFF-001", status, detail)
 
 
 def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
-    """Adapt the scorer's strict mypy measurement into a receipt check."""
-    measurement = quality_score.measure_mypy(targets, cwd=str(root))
-    return check("VFY-MYPY-001", measurement.status, measurement.detail)
+    """Adapt the strict mypy measurement into a receipt check."""
+    status, detail = _mypy_measurement(targets, cwd=str(root))
+    return check("VFY-MYPY-001", status, detail)
 
 
 def measure_pytest(root: Path, targets: list[str] | None = None) -> dict[str, object]:
-    """Adapt the scorer's strict pytest measurement into a receipt check."""
-    measurement = quality_score.measure_pytest(cwd=str(root), targets=targets)
-    return check("VFY-PYTEST-001", measurement.status, measurement.detail)
+    """Adapt the strict pytest measurement into a receipt check."""
+    status, detail = _pytest_measurement(cwd=str(root), targets=targets)
+    return check("VFY-PYTEST-001", status, detail)
 
 
 def is_bootstrap_authoring_repository(root: Path) -> bool:
@@ -1765,27 +1825,15 @@ def consumer_mypy_targets(root: Path) -> list[str] | None:
 
 
 def generation_check(root: Path) -> dict[str, object]:
-    """Require the generated verifier and its measurement module to match source."""
-    pairs = [
-        (root / f"shared/scripts/{name}", root / f".claude/scripts/{name}")
-        for name in ("verify.py", "quality_score.py")
-    ]
-    if pairs[0][0].is_file():
-        if any(
-            not source.is_file() or not generated.is_file()
-            for source, generated in pairs
-        ):
+    """Require the generated verifier to match its canonical source."""
+    source = root / "shared/scripts/verify.py"
+    generated = root / ".claude/scripts/verify.py"
+    if source.is_file():
+        if not generated.is_file():
             return check(
                 "VFY-GEN-001", "UNVERIFIED", "generated verifier runtime is missing"
             )
-        status = (
-            "PASS"
-            if all(
-                source.read_bytes() == generated.read_bytes()
-                for source, generated in pairs
-            )
-            else "FAIL"
-        )
+        status = "PASS" if source.read_bytes() == generated.read_bytes() else "FAIL"
         return check(
             "VFY-GEN-001",
             status,
@@ -1820,31 +1868,6 @@ def relative_artifact(root: Path, path: Path) -> dict[str, str]:
     except ValueError as error:
         raise ValueError(f"artifact is outside repository: {path}") from error
     return {"path": relative.as_posix(), "sha256": file_digest(resolved)}
-
-
-def latest_report(root: Path, pattern: str, branch: str, phase: str) -> Path:
-    """Choose a report once at receipt creation; gates never rediscover it."""
-    candidates: list[tuple[str, Path]] = []
-    for candidate in (root / ".claude/quality_reports").glob(pattern):
-        try:
-            safe_candidate = confined_path(
-                root, candidate.relative_to(root).as_posix(), regular=True
-            )
-            report = json.loads(safe_candidate.read_text(encoding="utf-8"))
-        except (OSError, ValueError, json.JSONDecodeError):
-            continue
-        if not isinstance(report, dict):
-            continue
-        generated_at = report.get("generated_at")
-        if (
-            report.get("branch") == branch
-            and report.get("phase") == phase
-            and is_utc_timestamp(generated_at)
-        ):
-            candidates.append((str(generated_at), safe_candidate))
-    if not candidates:
-        raise ValueError(f"no matching {pattern} report for phase {phase}")
-    return max(candidates, key=lambda item: item[0])[1]
 
 
 def closeout_log_path(root: Path, phase: str) -> Path:
@@ -1886,11 +1909,8 @@ def closeout_artifacts(
         )
     return {
         "phase_receipt": relative_artifact(root, receipt_path(root, "phase", phase)),
-        "score": relative_artifact(
-            root, latest_report(root, "score-*.json", branch, phase)
-        ),
         "findings": relative_artifact(
-            root, latest_report(root, "findings-*.json", branch, phase)
+            root, root / ".claude/quality_reports" / f"findings-{phase}.json"
         ),
         "closeout_log": relative_artifact(root, closeout_log_path(root, phase)),
         "documentation": (

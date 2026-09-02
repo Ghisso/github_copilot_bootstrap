@@ -32,14 +32,13 @@ closeout_session_log:
 uv run pytest tests/ -q --tb=short
 uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 uv run ruff check src/ tests/
-uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
+uv run python .claude/scripts/verify.py phase --format json --persist
 ```
 
 ## Closeout Checklist
 
-- [ ] Verification passed
-- [ ] Review findings resolved
-- [ ] Score >= 90 persisted with branch/phase metadata
+- [ ] Verification passed (`verify phase` PASS)
+- [ ] Review findings resolved and persisted with branch/phase metadata
 - [ ] Documentation updated or explicitly skipped as pure-internal
 - [ ] LEARN entries saved or no-lessons marker recorded
 - [ ] Closeout session log has `**Status:** COMPLETED`
@@ -49,7 +48,7 @@ uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --ba
 Use only after the user explicitly asks to stop or checkpoint and resume later.
 Set `status: paused`, record the three pause fields, and create a session log
 with `**Status:** PAUSED`. A checkpoint commit preserves incomplete work; it
-does not require final score, findings, LEARN, DOCUMENT, or a completed closeout.
+does not require final findings, LEARN, DOCUMENT, or a completed closeout.
 After the checkpoint commit, it may be pushed as a durable remote backup when
 paused-publication invariants pass. It remains unfinished and blocks PR creation
 and final closeout.

@@ -19,7 +19,7 @@ fi
 
 COMMAND="$(hook_command "$INPUT")"
 # state-sync.sh commits to the nested ai-state repo (git -C .claude commit ...)
-# constantly and has no plan/score/closeout ceremony of its own to satisfy —
+# constantly and has no plan/findings/closeout ceremony of its own to satisfy —
 # without this, the outer gate misjudges those commits against this repo's
 # ceremony and blocks routine state syncing. git_targets_nested_claude checks
 # the specific commit invocation, not "does the command string mention
@@ -46,7 +46,7 @@ if ! is_implementation_branch "$CURRENT_BRANCH"; then
 fi
 
 # Bypass subjects (fixup!/squash!/chore(typo):/docs(typo):) skip only the
-# plan-ceremony checks below (small-plan/closeout/score/LEARN); branch-shape
+# plan-ceremony checks below (small-plan/closeout/findings/LEARN); branch-shape
 # validation above still applies, and the bypass is still ledgered by
 # record-commit-closeout.sh. This keeps the recovery use-case without turning
 # the strictest gate into a blank check.

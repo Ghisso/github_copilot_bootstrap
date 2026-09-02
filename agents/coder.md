@@ -60,7 +60,7 @@ audience-appropriate communication.
 - Prefer minimal diffs and preserve existing style.
 - Avoid unrelated refactors unless required.
 - Use `uv run python .claude/scripts/verify.py fast --format json` and project-native focused checks while implementing. Fix failures until the changed scope is green; the orchestrator later runs authoritative `verify phase`.
-- You may run `.claude/scripts/quality_score.py` for a local read (`uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json`), but do **not** pass `--out` or create verification receipts. The orchestrator owns final closeout evidence.
+- Do not create verification receipts or persist findings; the orchestrator owns final closeout evidence.
 - If checks fail, fix and re-run before returning.
 
 ## Changed-Scope Simplification

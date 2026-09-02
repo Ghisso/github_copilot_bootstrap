@@ -1081,7 +1081,7 @@ assert_completed_receipt() {
   fi
 }
 
-# Single home for the plan/score/findings/closeout/LEARN ceremony shared by
+# Single home for the plan/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
 # D4 in docs/plan-deterministic-commit-gate.md) - so `branch` is assumed

@@ -1,13 +1,15 @@
 ---
 name: verification-gate-semantic-hardening
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: verification-gate-semantic-hardening_implementation
 phases:
- - verification-authority
- - lifecycle-evidence
- - consistency-hardening
+  - 2026-09-02_phase-1-verification-authority
+  - 2026-09-02_phase-2-lifecycle-evidence
+  - 2026-09-02_phase-3-consistency-hardening
+started_at: 2026-09-02T01:16:25Z
+current_phase: 2026-09-02_phase-1-verification-authority
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -181,9 +183,9 @@ Relocate code by symbol or behavior. Do not trust old line numbers.
 
 ## Phase
 
-- `verification-authority` — remove the score authority, simplify closeout artifacts, add schema/migration support, and make `verify.py` the only deterministic measurement authority.
-- `lifecycle-evidence` — harden findings, plan-frontmatter, cancellation, and all-phase historical receipt-chain enforcement.
-- `consistency-hardening` — align session logs, errata/stale-claim guidance, bypass restrictions, generated surfaces, docs, and regression coverage.
+- `2026-09-02_phase-1-verification-authority` — remove the score authority, simplify closeout artifacts, add schema/migration support, and make `verify.py` the only deterministic measurement authority.
+- `2026-09-02_phase-2-lifecycle-evidence` — harden findings, plan-frontmatter, cancellation, and all-phase historical receipt-chain enforcement.
+- `2026-09-02_phase-3-consistency-hardening` — align session logs, errata/stale-claim guidance, bypass restrictions, generated surfaces, docs, and regression coverage.
 
 ## 6. Phase boundaries
 
