@@ -1905,14 +1905,61 @@ def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+def _toml_basic_string(value: str) -> str | None:
+    """Return a quoted TOML basic-string literal for value, or None when
+    value cannot round-trip through valid UTF-8 text (for example an
+    unpaired surrogate), which TOML requires and which no amount of
+    character escaping can repair."""
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return None
+    named = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+    escaped = "".join(
+        named.get(ch, ch if 0x20 <= ord(ch) != 0x7F else f"\\u{ord(ch):04x}")
+        for ch in value
+    )
+    return f'"{escaped}"'
+
+
+def _ruff_exclude_config_args(
+    extend_exclude: list[str] | None,
+) -> tuple[list[str], str | None]:
+    """Return shared `--config extend-exclude=[...]` args for both Ruff
+    subcommands, or an error summary if a pattern is unsafe.
+
+    `ruff format` rejects the `--extend-exclude` flag that `ruff check`
+    accepts, so both use the generic `--config` override instead — one
+    construction path for both, so the two cannot diverge again.
+    """
+    if not extend_exclude:
+        return [], None
+    literals: list[str] = []
+    for pattern in extend_exclude:
+        literal = _toml_basic_string(pattern)
+        if literal is None:
+            return [], "Ruff exclude pattern cannot be safely represented in TOML"
+        literals.append(literal)
+    return ["--config", "extend-exclude=[" + ",".join(literals) + "]"], None
+
+
 def _ruff_measurement(
     targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
 ) -> tuple[str, str]:
     """Measure Ruff without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
     try:
-        args = ["uv", "run", "ruff", "check", *targets, "--output-format=json"]
-        for pattern in extend_exclude or []:
-            args.extend(("--extend-exclude", pattern))
+        args = [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            *targets,
+            "--output-format=json",
+            *config_args,
+        ]
         rc, stdout, stderr = _run(args, cwd=cwd)
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff did not run: {error}"
@@ -1944,10 +1991,11 @@ def _ruff_format_measurement(
     targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
 ) -> tuple[str, str]:
     """Measure Ruff formatting compliance without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
     try:
-        args = ["uv", "run", "ruff", "format", "--check", *targets]
-        for pattern in extend_exclude or []:
-            args.extend(("--extend-exclude", pattern))
+        args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
         rc, stdout, stderr = _run(args, cwd=cwd)
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff format did not run: {error}"
