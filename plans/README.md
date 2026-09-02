@@ -34,6 +34,12 @@ Required big-plan fields:
 - `phases`
 - `current_phase` while in progress
 
+Big-plan status vocabulary is `planning`, `in-progress`, `complete`, or
+`cancelled`. `complete` means the authorized work shipped; `cancelled` means
+the plan itself was called off and remaining phases will never be authorized.
+The top-level `status` field must occur exactly once; duplicate status keys are
+invalid even when their values match.
+
 Required small-plan fields:
 
 - `name`
@@ -42,3 +48,39 @@ Required small-plan fields:
 - `phase_index`
 - `status`
 - `closeout_session_log` once complete
+
+Small-plan status vocabulary is `in-progress`, `paused`, `complete`, or
+`cancelled`. The same exactly-once `status` rule applies to small plans.
+
+`paused` is non-terminal and may be used only after the user explicitly asks
+to stop or checkpoint and resume later. A paused phase requires:
+
+- `paused_at`: a real UTC calendar date and time in exact
+  `YYYY-MM-DDTHH:MM:SSZ` format
+- `paused_reason`: meaningful plain single-line scalar prose without leading
+  quotes, YAML block headers, collections, list markers, or comment-only values
+- `pause_session_log`: a repository-relative path that stays inside the
+  repository and resolves to an existing regular, readable UTF-8 session log
+  containing the same-line prefix `**Status:** PAUSED`
+
+A paused phase has no `closeout_session_log` requirement and may make a
+checkpoint commit without final findings, LEARN, DOCUMENT, or completed
+closeout evidence. It keeps the big plan `in-progress` and leaves
+`current_phase` unchanged. On resume, read the PAUSED log and current Git state,
+set the same small plan back to `in-progress`, and continue it without creating
+a replacement small plan. Paused phases remain unfinished and block push/PR
+closeout.
+
+Cancelled big plans and small plans require all three of these fields:
+
+- `cancelled_at`: a real UTC calendar date and time in exact
+  `YYYY-MM-DDTHH:MM:SSZ` format
+- `cancelled_reason`: meaningful plain single-line scalar prose without leading
+  quotes, YAML block headers, collections, list markers, or comment-only values
+- `cancelled_evidence`: a repository-relative path that stays inside the
+  repository and resolves to an existing regular, readable UTF-8 text artifact
+  containing the same-line prefix `**Status:** CANCELLED`
+
+A cancelled phase requires no commit, findings report, or closeout
+session log. Its cancellation evidence is required instead and provides the
+auditable record for work that will never run.

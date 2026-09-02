@@ -31,8 +31,7 @@ Types: `code-review`, `security-review`, `verification`, `merge`
 | Major | N |
 | Minor | N |
 
-**Score:** [N]/100
-**Gate:** [Commit / PR-ready / Excellence / BLOCKED]
+**Verification:** [PASS / FAIL]
 
 ## Findings
 
