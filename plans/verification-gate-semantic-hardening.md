@@ -1,15 +1,16 @@
 ---
 name: verification-gate-semantic-hardening
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: verification-gate-semantic-hardening_implementation
 phases:
   - 2026-09-02_phase-1-verification-authority
   - 2026-09-02_phase-2-lifecycle-evidence
   - 2026-09-02_phase-3-consistency-hardening
+  - 2026-09-02_phase-4-minor-findings-closure
 started_at: 2026-09-02T01:16:25Z
-current_phase: 
+current_phase: 2026-09-02_phase-4-minor-findings-closure
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -199,6 +200,18 @@ Relocate code by symbol or behavior. Do not trust old line numbers.
 - `2026-09-02_phase-1-verification-authority` — remove the score authority, simplify closeout artifacts, add schema/migration support, and make `verify.py` the only deterministic measurement authority.
 - `2026-09-02_phase-2-lifecycle-evidence` — harden findings, plan-frontmatter, cancellation, and all-phase historical receipt-chain enforcement.
 - `2026-09-02_phase-3-consistency-hardening` — align session logs, errata/stale-claim guidance, bypass restrictions, generated surfaces, docs, and regression coverage.
+- `2026-09-02_phase-4-minor-findings-closure` — fix the three MINOR findings that phases 2 and 3 closed with an accepted disposition.
+
+### Why this plan grew to four phases
+
+Phases 1–3 delivered the plan's §7 global acceptance criteria in full, and the
+plan reached `complete` on that basis. Three MINOR findings were carried out of
+phases 2 and 3 as `disposition: accepted` with recorded reasons, which the
+findings contract introduced by §3.3 permits. The user subsequently asked for
+those findings to be fixed rather than accepted, so the dispositions are
+withdrawn and Phase 4 resolves each on its merits. Phase 4 adds no new scope:
+it closes recorded residuals of earlier phases, and its non-goals forbid
+widening anything those phases established.
 
 ## 6. Phase boundaries
 

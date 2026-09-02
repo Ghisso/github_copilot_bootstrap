@@ -1382,25 +1382,43 @@ def historical_chain_errors(
         # Receipts are generated before their completion commit (stage, then
         # report, then commit), so head_sha is the *parent* of the commit the
         # receipt certifies, not that commit itself. The certified commit is
-        # head_sha's immediate descendant on the ancestry path toward
-        # chain_head; its tree - not head_sha's own tree - must match
-        # tree_sha. An empty path (or an unresolvable tree) fails closed.
+        # head_sha's immediate child on the ancestry path toward chain_head;
+        # its tree - not head_sha's own tree - must match tree_sha. The
+        # implementation branch is assumed linear, so a well-formed range
+        # has exactly one commit whose parent set contains earlier_head.
+        # Selecting by list position alone cannot tell that assumption apart
+        # from a merge that gave earlier_head two divergent, reconverging
+        # children, so the candidate is proven by parentage, not position;
+        # zero or more than one candidate fails closed rather than guessing.
         ancestry_path = git_output(
             [
                 "rev-list",
                 "--ancestry-path",
                 "--reverse",
+                "--parents",
                 f"{earlier_head}..{chain_head}",
             ],
             root,
         )
-        certified_commit = ancestry_path.splitlines()[0] if ancestry_path else ""
-        if not certified_commit:
+        candidates = [
+            parts[0]
+            for parts in (line.split() for line in ancestry_path.splitlines())
+            if parts and earlier_head in parts[1:]
+        ]
+        if not candidates:
             errors.append(
                 f"historical phase {earlier} receipt head_sha has no ancestry path "
                 "to the next completed phase"
             )
             break
+        if len(candidates) > 1:
+            errors.append(
+                f"historical phase {earlier} receipt head_sha has more than one "
+                "candidate certified completion commit on the ancestry path to the "
+                "next completed phase"
+            )
+            break
+        certified_commit = candidates[0]
         expected_tree = git_output(["rev-parse", f"{certified_commit}^{{tree}}"], root)
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append(
@@ -1785,7 +1803,7 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
 
 
 _FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
-_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*$")
+_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*\r?$")
 
 
 def _strip_fenced_code_blocks(text: str) -> str:
@@ -1794,13 +1812,19 @@ def _strip_fenced_code_blocks(text: str) -> str:
     is never mistaken for real evidence.
 
     Handles both GFM fence characters (```` ``` ```` or ``~~~``), an
-    indented fence delimiter, and an unterminated fence - which strips to
-    the end of the text rather than leaving its contents exposed to the
-    scanner, since unclosed fenced content is not evidence either way. A
-    closing fence must reuse the same character and be at least as long as
-    the opening one, matching GFM; a single regex cannot express "no
-    matching close -> swallow to end" without this line-by-line state
-    machine, which is exactly the gap an unterminated fence exploited.
+    indented fence delimiter, a CRLF-terminated fence line, and an
+    unterminated fence - which strips to the end of the text rather than
+    leaving its contents exposed to the scanner, since unclosed fenced
+    content is not evidence either way. A closing fence must reuse the same
+    character and be at least as long as the opening one, matching GFM; a
+    single regex cannot express "no matching close -> swallow to end"
+    without this line-by-line state machine, which is exactly the gap an
+    unterminated fence exploited. Splitting on ``"\\n"`` leaves a trailing
+    ``\\r`` on each line of CRLF input, so the closing-delimiter check
+    tolerates an optional trailing ``\\r`` the same way it already tolerates
+    trailing spaces or tabs; this caller's actual input arrives pre-
+    normalized to LF via ``Path.read_text()``'s universal newlines, but the
+    shipped verifier's callers are not guaranteed to normalize first.
     """
     kept: list[str] = []
     in_fence = False
