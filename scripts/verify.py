@@ -1323,7 +1323,9 @@ def historical_chain_errors(
         if is_cancelled_small_plan(root, source, earlier, slug):
             continue
         if not is_complete_small_plan(source, earlier, slug):
-            errors.append(f"historical phase {earlier} is neither complete nor cancelled")
+            errors.append(
+                f"historical phase {earlier} is neither complete nor cancelled"
+            )
             break
         try:
             receipt = load_receipt(receipt_path(root, "closeout", earlier))
@@ -1338,7 +1340,9 @@ def historical_chain_errors(
             or metadata.get("branch") != branch
             or metadata.get("phase") != earlier
         ):
-            errors.append(f"historical phase {earlier} receipt is not a valid completion")
+            errors.append(
+                f"historical phase {earlier} receipt is not a valid completion"
+            )
             break
         earlier_head = metadata.get("head_sha")
         if not isinstance(earlier_head, str) or not earlier_head:
