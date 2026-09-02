@@ -154,11 +154,31 @@ When a phase changes a previously documented fact, number, behavior, API, decisi
 - active/relevant plans;
 - `docs/`;
 - `README.md`;
-- other user-facing workflow documentation.
+- other user-facing workflow documentation;
+- `.claude/MEMORY.md`.
 
 Update or explicitly supersede those claims.
 
-This is review guidance, not a deterministic hook.
+**Corrected in Phase 7:** `.claude/MEMORY.md` is live advice loaded into every
+session, not a dated record. A superseded entry must be corrected or removed
+in place; appending a correction elsewhere in the file while the wrong entry
+still stands is not sufficient — a reader can act on the wrong entry before
+ever reaching the correction, which is exactly the failure Phase 7's own audit
+measured (the phase 2 certified-commit entry stayed live for three phases).
+Archived plans, dated design narratives, and closed session logs remain dated
+records: they describe what was true at the time and are left unchanged
+except a sibling `<log-name>.errata.md` where an entry would actively
+mislead a reader into reintroducing a defect and no closeout receipt binds
+that log.
+
+This is review guidance, not a deterministic hook. Phase 7 additionally makes
+a documentation, memory, and LEARN audit a **required final-phase step** of
+every big plan (see §10), also documented process rather than a gate: the
+required evidence is a recorded surface list in the final phase's closeout
+log, deliberately left unenforced by any check because this plan's own
+non-goals forbid changing gate behavior, strictness, or scope, and because the
+only enforceable shape (a new required closeout-log section) is a receipt/
+evidence-contract change this plan also declines to make.
 
 ### 3.8 Schema migration must be safe mid-plan
 
@@ -355,3 +375,13 @@ Each small plan must close with:
 - full relevant test suite green.
 
 The final phase must also run the repo-wide validation path and confirm no stale score-era instructions or generated files remain.
+
+The final phase of **every** big plan — not only this one — must also run a
+documentation, memory, and LEARN audit: sweep every live-advice surface for
+claims this plan or earlier work invalidated, correct or supersede each one,
+leave dated records unchanged, and record the audited surfaces and each
+one's outcome in the closeout session log. This requirement is stated in
+`shared/policies/workflow.instructions.md`, `shared/agents/orchestrator/prompt.md`,
+`shared/templates/plan-big.md`, and `shared/skills/plan-decomposition/SKILL.md`
+so every future big plan inherits it. It is documented process, not a gate;
+see §3.7 for why.

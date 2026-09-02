@@ -56,7 +56,21 @@ editing it.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Run `uv run python .claude/scripts/verify.py phase --format json --persist` yourself. Give deterministic failures and their receipt to the coder; do not delegate repetitive test execution to another model.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
-7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); give every surviving MINOR finding an explicit `disposition` and non-empty `reason`, then persist converged findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings so findings bind to final code+docs. The reviewer does not persist findings itself, and the coder cannot create final receipts. An open CRITICAL or MAJOR finding blocks the phase-completion commit; resolve it before COMMIT rather than deferring it to push/PR. If verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); when the current phase is the big plan's last entry in `phases:`, also run the standing final-phase documentation, memory, and LEARN audit below; give every surviving MINOR finding an explicit `disposition` and non-empty `reason`, then persist converged findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings so findings bind to final code+docs. The reviewer does not persist findings itself, and the coder cannot create final receipts. An open CRITICAL or MAJOR finding blocks the phase-completion commit; resolve it before COMMIT rather than deferring it to push/PR. If verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+
+### Standing final-phase audit
+
+When the current phase is the big plan's last phase, sweep every live-advice
+surface (`CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` except dated
+documents, `shared/policies/`, `shared/skills/`, `shared/templates/`,
+`shared/agents/`, `shared/review-profiles/`, state READMEs, and
+`.claude/MEMORY.md`) for claims this plan or earlier work invalidated;
+correct or supersede each stale claim, leave dated records (archived plans,
+dated design narratives, closed session logs) alone, and write a sibling
+`<log-name>.errata.md` only where a closed log's entry would actively mislead
+a reader and no closeout receipt binds that log. Record the audited surfaces
+and each one's outcome in the closeout session log — this is documented
+process, not a gate; there is no deterministic check for its presence.
 8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
 9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 

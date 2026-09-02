@@ -27,8 +27,8 @@
   every phase boundary remains green.
 - [LEARN:quality] The authoring repository uses `scripts/validate_targets.py`
   as its adversarial suite. Keep `tests/test_validate_targets.py` as the
-  pytest integration entrypoint so the canonical quality scorer exercises that
-  real suite instead of reporting a false no-tests failure.
+  pytest integration entrypoint so `verify.py`'s pytest measurement exercises
+  that real suite instead of reporting a false no-tests failure.
 - [LEARN:runtime] Codex 0.144.x MultiAgent V2 hides custom-agent spawn routing
   metadata by default. Set
   `[features.multi_agent_v2].hide_spawn_agent_metadata = false` and
@@ -48,9 +48,9 @@
   `AI_STATE_REPO_ROOT` falls back to the consumer root.
 - [LEARN:quality] The commit gate's `content_hash` is `git hash-object` of
   `git diff <base>`, which excludes untracked files. Stage every file destined
-  for the commit BEFORE running `quality_score.py`/`record_findings.py`, or the
-  report's hash and `changed_files` will not match what the gate recomputes at
-  commit time (and `dirty` will be `true`, which the gate rejects).
+  for the commit BEFORE running `record_findings.py`, or the report's hash and
+  `changed_files` will not match what the gate recomputes at commit time (and
+  `dirty` will be `true`, which the gate rejects).
 - [LEARN:domain] `state-sync.sh` `cmd_pull` must return non-zero on a rebase
   conflict and `cmd_push` must guard its push on that result; otherwise a push
   is attempted after an aborted rebase and rejected non-fast-forward. The
@@ -108,7 +108,7 @@
   determinism failure even when two fresh generations are byte-identical.
 - [LEARN:workflow] Phase closeout gates read the small-plan frontmatter status
   as well as checklist prose; set `status: complete` only after verification,
-  review, score, documentation, and learning evidence are recorded.
+  review, findings, documentation, and learning evidence are recorded.
 - [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
   checklist, session log, and big-plan checklist from the actual commit SHAs;
   do not infer completion from a clean outer worktree alone.
@@ -335,7 +335,7 @@
   accumulated validation errors rather than escaping as exceptions.
 - [LEARN:documentation] Lifecycle templates and policies must state the exact
   constraints enforced by their validator; run DOCUMENT after review to
-  reconcile the final hardened contract before score and closeout.
+  reconcile the final hardened contract before findings and closeout.
 - [LEARN:security] Action-time gates must revalidate mutable lifecycle evidence
   immediately before granting commit, push, closeout, or branch actions; an
   earlier validator pass is not authorization for frontmatter or artifacts
@@ -362,8 +362,8 @@
   `cancelled`, clearing a stopped plan required fabricated closeouts or an
   inaccurate `complete`; the Graphify record used the inaccurate status.
 - [LEARN:security] Relaxing a gate is safe only when paired with a new
-  requirement. Cancellation exempts commit, score, findings, and closeout only
-  when an artifact-backed reason records the decision.
+  requirement. Cancellation exempts commit, findings, and closeout only when
+  an artifact-backed reason records the decision.
 - [LEARN:planning] A NO-GO gate is a valid final result. Low measured value is
   a reason to stop, not a reason to add integration machinery or schedule
   another trial.
