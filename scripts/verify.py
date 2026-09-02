@@ -2436,16 +2436,27 @@ def receipt_path(root: Path, mode: str, phase: str) -> Path:
     return root / Path(str(pattern).format(phase=phase))
 
 
-def unresolved_phase_reason(root: Path, branch: str, phase: str) -> str | None:
-    """Diagnose an implementation branch with no phase bound to real plan files.
+def unresolved_phase_reason(
+    root: Path, branch: str, phase: str, *, requires_phase: bool
+) -> str | None:
+    """Diagnose an active phase that cannot be bound to real plan files.
 
-    Speaks only to whether the active phase resolves to readable plan files
-    on disk; it never inspects nested runtime provenance, so any other
+    Attempts to actually read each plan file rather than trusting a
+    file-type check, and reads the big plan itself to tell a legitimately
+    blank ``current_phase`` apart from a big plan that cannot be read or
+    parsed. Never inspects nested runtime provenance, so any other
     provenance failure still surfaces through the normal receipt validation
-    path unchanged. Returns None when a phase is resolved (or no phase is
-    required, because ``branch`` is not an implementation branch).
+    path unchanged. Returns None when a phase is resolved, or when
+    ``branch`` is not an implementation branch and ``requires_phase`` is
+    False (``fast`` never needs one).
     """
     if not branch.endswith("_implementation"):
+        if requires_phase:
+            return (
+                f"no active phase: branch '{branch}' does not follow the "
+                "<slug>_implementation convention; switch to the plan's "
+                "implementation branch before running verify"
+            )
         return None
     big_plan = active_big_plan_path(root, branch)
     if big_plan is None or not big_plan.is_file():
@@ -2454,17 +2465,39 @@ def unresolved_phase_reason(root: Path, branch: str, phase: str) -> str | None:
             "branch; open a plan before running verify"
         )
     if not phase:
+        try:
+            big_plan_text = big_plan.read_text(encoding="utf-8")
+        except OSError:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} exists "
+                "but could not be read; fix file permissions before running "
+                "verify"
+            )
+        if re.match(r"\A---\n.*?\n---", big_plan_text, re.DOTALL) is None:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} has no "
+                "parseable frontmatter; fix the plan file before running "
+                "verify"
+            )
         return (
             "no active phase: the big plan has no current_phase set (it is "
             "complete or not yet started); open the next small plan before "
             "running verify"
         )
     small_plan = root / ".claude/plans" / f"{phase}.md"
-    if not PHASE_SLUG.fullmatch(phase) or not small_plan.is_file():
+    if not PHASE_SLUG.fullmatch(phase):
         return (
-            f"active phase metadata is malformed: current_phase '{phase}' has "
-            "no matching readable plan file under .claude/plans; fix the plan "
-            "frontmatter before running verify"
+            f"active phase metadata is malformed: current_phase '{phase}' is "
+            "not a safe plan slug; fix the plan frontmatter before running "
+            "verify"
+        )
+    try:
+        small_plan.read_bytes()
+    except OSError:
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' "
+            f"names {small_plan.name}, which could not be read; fix the plan "
+            "frontmatter or file permissions before running verify"
         )
     return None
 
@@ -2518,6 +2551,7 @@ def main() -> int:
         root,
         branch if isinstance(branch, str) else "",
         phase_value if isinstance(phase_value, str) else "",
+        requires_phase=args.mode != "fast",
     )
     if reason is not None:
         print(reason, file=sys.stderr)
