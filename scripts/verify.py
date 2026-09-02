@@ -1858,8 +1858,43 @@ def _strip_fenced_code_blocks(text: str) -> str:
     return "\n".join(kept)
 
 
+def is_final_phase(root: Path, phase: str) -> bool:
+    """Return whether ``phase`` is the big plan's own last declared phase.
+
+    Finality is derived solely from the big plan's ``phases:`` frontmatter
+    list, reached via the small plan's own ``parent_plan`` - the same
+    source ``frontmatter_phases`` already serves elsewhere - so "final
+    phase" cannot become a second definition that drifts from the big
+    plan's own phase list. Any unreadable or malformed frontmatter returns
+    False rather than guessing, so an ambiguous state never spuriously
+    requires evidence a phase was never asked to produce.
+    """
+    if not PHASE_SLUG.fullmatch(phase):
+        return False
+    try:
+        small_plan_source = (root / ".claude/plans" / f"{phase}.md").read_bytes()
+    except OSError:
+        return False
+    values = small_plan_frontmatter(small_plan_source)
+    parent_plan = values.get("parent_plan", "") if values else ""
+    if not PHASE_SLUG.fullmatch(parent_plan):
+        return False
+    try:
+        big_plan_text = (root / ".claude/plans" / f"{parent_plan}.md").read_text(
+            encoding="utf-8"
+        )
+    except (OSError, UnicodeDecodeError):
+        return False
+    match = re.match(r"\A---\n(?P<body>.*?)\n---", big_plan_text, re.DOTALL)
+    if match is None:
+        return False
+    phases = frontmatter_phases(match.group("body"))
+    return phases is not None and bool(phases) and phases[-1] == phase
+
+
 def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
-    """Keep completed-log and LEARN authority bound to the receipt path.
+    """Keep completed-log, LEARN, and final-phase-audit authority bound to
+    the receipt path.
 
     LEARN evidence lives entirely inside the session log's own
     ``## [LEARN] Entries`` section, outside any fenced code block: either
@@ -1868,6 +1903,12 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
     here - it can still be updated as a separate persistence action, but its
     timestamp never substitutes for a session-log section the receipt hash
     actually binds.
+
+    When ``phase`` is the big plan's own final phase, the same log must also
+    carry a non-empty ``## Stale-claims surfaces checked`` section - the
+    heading already used by the conditional per-phase stale-claims review -
+    recording the standing documentation, memory, and LEARN audit's
+    surface list. This checks the evidence's shape only, not its judgement.
     """
     expected = closeout_log_path(root, phase)
     if path.resolve() != expected.resolve():
@@ -1878,19 +1919,36 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
         return ["closeout session log is unreadable"]
     if not re.search(r"^\*\*Status:\*\*[ \t]+COMPLETED\b", text, re.MULTILINE):
         return ["closeout session log is not completed"]
+    errors: list[str] = []
     section = re.search(
         r"^## \[LEARN\] Entries[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
         text,
         re.MULTILINE | re.DOTALL,
     )
     if section is None:
-        return ["closeout session log is missing the ## [LEARN] Entries section"]
-    prose = _strip_fenced_code_blocks(section.group("body"))
-    if "[LEARN] none - no new lessons this session" in prose:
-        return []
-    if re.search(r"^-[ \t]*\[LEARN[:\]]", prose, re.MULTILINE):
-        return []
-    return ["LEARN evidence is missing"]
+        errors.append("closeout session log is missing the ## [LEARN] Entries section")
+    else:
+        prose = _strip_fenced_code_blocks(section.group("body"))
+        no_lessons = "[LEARN] none - no new lessons this session" in prose
+        has_entries = bool(re.search(r"^-[ \t]*\[LEARN[:\]]", prose, re.MULTILINE))
+        if not no_lessons and not has_entries:
+            errors.append("LEARN evidence is missing")
+    if is_final_phase(root, phase):
+        audit_section = re.search(
+            r"^## Stale-claims surfaces checked[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        if (
+            audit_section is None
+            or not _strip_fenced_code_blocks(audit_section.group("body")).strip()
+        ):
+            errors.append(
+                "final-phase closeout session log is missing a non-empty "
+                "## Stale-claims surfaces checked section recording the "
+                "standing documentation, memory, and LEARN audit"
+            )
+    return errors
 
 
 def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
