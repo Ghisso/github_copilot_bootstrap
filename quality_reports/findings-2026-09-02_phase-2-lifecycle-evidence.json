@@ -2,7 +2,7 @@
   "counts": {
     "critical": 0,
     "major": 0,
-    "minor": 0
+    "minor": 2
   },
   "profiles_reviewed": [
     "architecture",
@@ -12,8 +12,27 @@
     "security",
     "tests"
   ],
-  "findings": [],
-  "generated_at": "2026-09-02T05:42:19Z",
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "No regression test for merge-commit topology in historical_chain_errors ancestry-path resolution",
+      "file": "shared/scripts/verify.py",
+      "line": 1388,
+      "profile": "tests",
+      "disposition": "accepted",
+      "reason": "The whole lifecycle already assumes <plan>_implementation branches are linear: the commit-count and ancestor checks that predate this phase share that assumption, and nothing creates a merge inside an implementation branch. Adding a merge-topology test here would test a state the system does not produce, while leaving the real assumption undocumented everywhere else. If merges inside implementation branches are ever tolerated, the assumption needs addressing across the whole gate, not patched at this one call site."
+    },
+    {
+      "severity": "MINOR",
+      "title": "Reversed-order historical-chain test still builds its receipt with the old tree_sha == head_sha^{tree} shorthand",
+      "file": "tests/test_verify.py",
+      "line": 817,
+      "profile": "tests",
+      "disposition": "accepted",
+      "reason": "The sibling ancestor-failure test was fixed to use an explicit never-read sentinel. This one cannot take the same treatment: its phase-two receipt tree value is genuinely read before the ordering violation is detected, so the value is load-bearing and a sentinel would make the test fail for the wrong reason. Rewriting it correctly means giving each commit distinct content and computing each receipt's certified-commit tree by hand, which risks encoding a new wrong assumption in a test whose current behavior the reviewer confirmed correct. Deferred rather than half-fixed."
+    }
+  ],
+  "generated_at": "2026-09-02T06:32:17Z",
   "branch": "verification-gate-semantic-hardening_implementation",
   "head_sha": "2af3df76c45c3beda11d25a01def24c9dc99ee9a",
   "base_ref": "dev",
@@ -21,7 +40,7 @@
   "phase": "2026-09-02_phase-2-lifecycle-evidence",
   "target": ".",
   "dirty": false,
-  "content_hash": "beebd1e052a76df0d07356d0ccf9671905fc47be",
+  "content_hash": "497ea0bd79ae0cf25ba6f213a247df076f3d16e9",
   "changed_files": [
     "README.md",
     "docs/architecture.md",

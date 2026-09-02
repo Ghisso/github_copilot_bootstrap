@@ -562,3 +562,23 @@
 - [LEARN:workflow] A gate flag derived from plan status at gate time needs no
   separate "is this the completion commit" signal, and stays correct through
   amend and re-commit for free.
+- [LEARN:verification] A closeout receipt's `head_sha` is the PARENT of the
+  commit it certifies, and its `tree_sha` is the staged tree that becomes that
+  commit's tree, because receipts are generated before the completion commit.
+  Any check comparing the two against the same commit is wrong. Resolve the
+  certified commit as the first entry of
+  `git rev-list --ancestry-path --reverse <head_sha>..<later_head>`.
+- [LEARN:testing] A fixture that synthesizes an artifact to match the
+  implementation's assumption cannot catch that assumption being wrong. Build
+  fixtures from what the lifecycle actually produces.
+- [LEARN:verification] A changed-path set legitimately includes deletions, so
+  never hand it straight to a tool that must open each file. Filter at the tool
+  boundary and leave recorded metadata unfiltered, since content and freshness
+  hashes depend on deletions being represented.
+- [LEARN:workflow] A small plan's `name:` frontmatter must equal its file
+  basename; that is how phase resolution matches a plan. A short name can slip
+  past the terminal check on a digest match and only fail later in the
+  historical chain.
+- [LEARN:workflow] `update_consumers.py --allow-self` removes unmanaged files
+  from `.claude/`. Stage scratch inputs such as a findings JSON outside that
+  tree.

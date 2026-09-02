@@ -29,6 +29,34 @@ Phase 2 of the `verification-gate-semantic-hardening` big plan.
   tests pass, all canonical checks green.
 - **14:00** - Review round 2: **PASS**, zero surviving findings. Independent
   from-scratch sweep found nothing new.
+- **14:10** - The completion commit was blocked twice by the gate acting on
+  itself, surfacing two real bugs review could not have caught.
+  First: `is_complete_small_plan` requires a small plan's `name:` to equal its
+  file basename. All three of this plan's files used short names. Phase 1 had
+  slipped through its terminal check on a digest match; the new chain check
+  caught it. Corrected all three.
+  Second, and more serious: the new historical tree rule was wrong. It required
+  `tree_sha == head_sha^{tree}`, but receipts are generated before the
+  completion commit, so `head_sha` is the parent and `tree_sha` is the staged
+  tree that becomes the certified commit's tree. Measured on this repo: Phase
+  1's receipt has `head_sha=7d16b64`, `tree_sha=cce376c6`; `7d16b64^{tree}` is
+  `e7888f80`, while `2af3df7^{tree}` — the Phase 1 completion commit, child of
+  `7d16b64` — is `cce376c6`. The rule would have blocked every legitimate
+  second-phase commit.
+- **14:30** - Delegated the fix. The rule now resolves the certified commit as
+  the first entry of `git rev-list --ancestry-path --reverse
+  earlier_head..chain_head` and compares that commit's tree. The fixture was
+  rebuilt to real lifecycle shape, including one case built via `git write-tree`
+  against a dirty index to reproduce the exact pre-commit window.
+- **14:45** - The same coder flagged that `verify.py fast` was returning FAIL
+  because Phase 1's deletion of `quality_score.py` left a deleted path in
+  `relevant_paths`, which Ruff cannot open. `fast` is a shipped command the
+  quality policy tells agents to run during IMPLEMENT, so this was pulled into
+  scope rather than deferred. Fixed at root with an `existing_paths` filter
+  applied only where a list reaches a tool that must open each file.
+- **15:00** - Review round 3 on both fixes: **PASS**, three advisory MINORs.
+  Fixed one (a reject-path fixture now uses an explicit never-read sentinel);
+  dispositioned two with reasons.
 
 ## Design decisions
 
@@ -78,6 +106,21 @@ Phase 2 of the `verification-gate-semantic-hardening` big plan.
   unit tests assumed the receipt file exists, so retiring the integration
   scenario silently dropped the only coverage of a completed phase with no
   receipt at all — the exact migration boundary the design verdict rested on.
+- [LEARN:verification] A closeout receipt's `head_sha` is the **parent** of the
+  commit it certifies, and its `tree_sha` is the staged tree that becomes that
+  commit's tree, because receipts are generated before the completion commit.
+  Any check comparing the two against the same commit is wrong. Resolve the
+  certified commit as the first entry of `git rev-list --ancestry-path
+  --reverse <head_sha>..<later_head>`.
+- [LEARN:testing] A fixture that synthesizes an artifact to match the
+  implementation's assumption cannot catch that assumption being wrong. The
+  historical-chain tests passed review while building receipts as
+  `tree_sha=head_sha^{tree}` — the exact error in the code. Build fixtures from
+  what the lifecycle actually produces, not from what the code expects.
+- [LEARN:verification] A changed-path set legitimately includes deletions, so
+  never hand it straight to a tool that must open each file. Filter at the tool
+  boundary and leave the recorded metadata unfiltered, since content and
+  freshness hashes depend on deletions being represented.
 - [LEARN:workflow] A gate flag that reads plan status at gate time needs no
   separate "is this the completion commit" signal. Status is already the
   single source of truth, and deriving from it keeps amend and re-commit
