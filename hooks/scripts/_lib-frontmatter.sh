@@ -1081,6 +1081,33 @@ assert_completed_receipt() {
   fi
 }
 
+# Hard-validate every plan file's frontmatter schema (required fields, status
+# enums, body phase inventory, paused/cancelled contracts) with the shipped
+# stdlib-only validator - the same authoritative source the authoring repo
+# uses, so consumers no longer get a weaker partial bash-only schema check.
+# Runs unconditionally (before the paused/complete/cancelled dispatch below)
+# so a paused checkpoint commit is still covered.
+assert_plan_frontmatter() {
+  local repo_root="$1"
+  local validator="$repo_root/.claude/scripts/validate_plan_frontmatter.py"
+  if [[ ! -f "$validator" ]]; then
+    failures+=("missing plan-frontmatter validator: .claude/scripts/validate_plan_frontmatter.py")
+    return
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    failures+=("plan frontmatter validation requires python3")
+    return
+  fi
+  local output status=0
+  output="$(cd "$repo_root" && python3 "$validator" 2>&1)" || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    local line
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && failures+=("$line")
+    done <<< "$output"
+  fi
+}
+
 # Single home for the plan/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
@@ -1099,7 +1126,10 @@ assert_commit_invariants() {
     failures+=("missing big-plan file: .claude/plans/$slug.md")
   fi
 
+  assert_plan_frontmatter "$repo_root"
+
   local big_status="" current_phase="" small_plan="" phase_listed=0
+  local -a all_phases=()
   if [[ -f "$big_plan" ]]; then
     big_status="$(fm_read_unique_status "$big_plan" || true)"
     if [[ "$big_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
@@ -1114,16 +1144,29 @@ assert_commit_invariants() {
       small_plan="$repo_root/.claude/plans/$current_phase.md"
       local listed_phase
       while IFS= read -r listed_phase; do
-        if [[ "$listed_phase" == "$current_phase" ]]; then
-          phase_listed=1
-          break
-        fi
+        [[ -n "$listed_phase" ]] || continue
+        all_phases+=("$listed_phase")
+        [[ "$listed_phase" == "$current_phase" ]] && phase_listed=1
       done < <(fm_read_list "$big_plan" "phases")
       if [[ "$phase_listed" -ne 1 ]]; then
         failures+=("big plan current_phase must be listed in phases")
       fi
     fi
   fi
+
+  # R-LIFECYCLE-02: cancellation evidence is a commit-time gate, not only a
+  # push/PR-time one - a cancelled sibling phase must already carry the full
+  # audit contract before any further commit lands on this branch.
+  local other_phase other_plan="" other_status=""
+  for other_phase in "${all_phases[@]}"; do
+    [[ "$other_phase" == "$current_phase" ]] && continue
+    other_plan="$repo_root/.claude/plans/$other_phase.md"
+    [[ -f "$other_plan" ]] || continue
+    other_status="$(fm_read_unique_status "$other_plan" || true)"
+    if [[ "$other_status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$other_plan" "$other_phase"
+    fi
+  done
 
   local small_status="" closeout_log="" small_type="" small_parent=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
@@ -1173,7 +1216,12 @@ assert_commit_invariants() {
   if diff_requires_ponytail "$repo_root" ""; then
     require_ponytail="true"
   fi
-  assert_completed_receipt "$repo_root" "$current_branch" "$current_phase" "$commit_gate_head" "exact" "false" "$require_ponytail" "true"
+  # R-LIFECYCLE-01: an open MAJOR finding blocks only the phase-completion
+  # commit (small_status == complete), not every commit attempt while the
+  # phase remains in progress - see docs/plan-deterministic-commit-gate.md.
+  local require_major="false"
+  [[ "$small_status" == "complete" ]] && require_major="true"
+  assert_completed_receipt "$repo_root" "$current_branch" "$current_phase" "$commit_gate_head" "exact" "$require_major" "$require_ponytail" "true"
 }
 
 # Strict final closeout ceremony shared by PR creation and terminal pushes.
@@ -1262,9 +1310,11 @@ assert_closeout_invariants() {
     done < "$repo_root/.claude/session_logs/hooks-bypass.log"
   fi
 
-  # The terminal completed phase verifies the whole dev..tip branch state.
-  # Earlier phases may predate the receipt schema, so lifecycle status and the
-  # one-commit-per-phase rule cover them without inventing retroactive receipts.
+  # The terminal completed phase gets strict current-state freshness; every
+  # earlier completed phase in the big plan's declared order is additionally
+  # walked by historical_chain_errors (verify.py), which requires its own
+  # valid receipt with ancestor/tree/artifact-hash integrity - a completed
+  # phase can no longer silently skip the receipt chain.
   if [[ "$completed_count" -gt 0 ]]; then
     local require_ponytail="false"
     if diff_requires_ponytail "$repo_root" "$local_sha"; then

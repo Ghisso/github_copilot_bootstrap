@@ -155,8 +155,9 @@ control-plane/high-risk, multi-file, dependency, script, generator, or
 reviewer-selected complexity. Ordinary low-complexity and exactly one
 documentation OR exactly one mutable workflow-state file do not require it unless
 control-plane/high-risk precedence applies. Ponytail findings use the ordinary
-severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
-advisory. There is no special zero-Ponytail gate.
+severity gates: CRITICAL and MAJOR both block the phase-completion commit
+(not only push/PR), and a surviving MINOR needs an explicit disposition and
+reason but is otherwise advisory. There is no special zero-Ponytail gate.
 
 ---
 

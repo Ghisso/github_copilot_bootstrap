@@ -544,3 +544,7 @@
 - [LEARN:verification] Keep a detail-string enricher off the status path. Let
   PASS/FAIL stay decided solely by the return code so a parsing bug in the
   human-readable summary cannot flip a FAIL into a PASS.
+- [LEARN:workflow] Pass a commit message with `-F <file>` pointing at a real
+  file. A `-F -` heredoc commits successfully but the closeout hook cannot
+  parse the subject from the intercepted command, so it skips advancing
+  `current_phase` and the next phase must be advanced by hand.
