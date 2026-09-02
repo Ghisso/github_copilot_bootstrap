@@ -378,11 +378,18 @@ the terminal completed phase. `verify.py`'s `historical_chain_errors` walks
 the big plan's declared phase order backwards from the terminal phase and, for
 every earlier completed phase, validates that its receipt's `head_sha`
 resolves to a real commit, is an ancestor of the next completed phase's head,
-and that the certified commit - the first entry of `git rev-list
---ancestry-path --reverse <head_sha>..<later_head>`, since a receipt's
-`head_sha` is the *parent* of the commit it certifies (receipts are generated
-before their completion commit) - introduces a tree matching the receipt's
-`tree_sha`. It then re-verifies every `phase_receipt`/`findings`/`closeout_log`
+and that the certified commit introduces a tree matching the receipt's
+`tree_sha`. A receipt's `head_sha` is the *parent* of the commit it certifies,
+because receipts are generated before their completion commit, so the
+certified commit is identified as the one commit on the ancestry path from
+`head_sha` to the next completed phase's head whose own parent set contains
+`head_sha`. Parentage is proven rather than inferred from list position: if
+that path holds no such commit, the chain fails closed noting the missing
+ancestry path; if it holds more than one - as a merge inside the
+implementation branch could produce - it fails closed with a diagnostic
+naming the ambiguity, rather than selecting whichever commit git happened to
+list first. It then re-verifies every
+`phase_receipt`/`findings`/`closeout_log`
 artifact hash against the current file bytes. Only the terminal completed
 phase receives current-tree/current-runtime freshness checks; every earlier
 phase gets this ancestor/tree/artifact-hash chain instead.

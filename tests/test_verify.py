@@ -579,6 +579,60 @@ def test_closeout_log_rejects_learn_entry_inside_indented_fence(
     ]
 
 
+def test_strip_fenced_code_blocks_recognizes_crlf_terminated_fence() -> None:
+    """A CRLF-terminated closing fence must be recognized as a close, not
+    treated as unterminated - the shipped verifier runs in consumer
+    repositories whose line-ending settings are not controlled here. This
+    calls the scanner directly with literal CRLF input: going through
+    ``closeout_log_errors`` instead would round-trip the text through
+    ``Path.read_text()``, whose universal-newlines mode silently normalizes
+    CRLF to LF before the scanner ever runs, masking the very condition
+    under test. The explicit CRLF/CR/LF split consumes the full ``\\r\\n``
+    pair as one separator, so no ``\\r`` remains attached to either kept
+    line."""
+    text = "before\r\n```\r\n- [LEARN:category] example entry\r\n```\r\nafter\r\n"
+    assert verify._strip_fenced_code_blocks(text) == "before\nafter\n"
+
+
+def test_strip_fenced_code_blocks_swallows_unterminated_crlf_fence() -> None:
+    """A genuinely unterminated fence opened with a CRLF line ending must
+    still swallow to the end of the text, preserving the fail-closed
+    posture for CRLF input the same as for LF."""
+    text = "before\r\n```\r\n- [LEARN:category] fence never closes\r\n"
+    assert verify._strip_fenced_code_blocks(text) == "before"
+
+
+def test_strip_fenced_code_blocks_recognizes_lone_cr_terminated_fence() -> None:
+    """A lone-CR line ending (classic pre-OS X Mac) is a line boundary too,
+    not just CRLF - splitting only on ``"\\n"`` would treat a lone-CR
+    document as a single unsplit line, so a fenced example inside it would
+    never be recognized as a fence at all and would leak straight into the
+    scanner unstripped."""
+    text = "before\r```\r- [LEARN:category] example entry\r```\rafter\r"
+    stripped = verify._strip_fenced_code_blocks(text)
+    assert "[LEARN:category] example entry" not in stripped
+
+
+def test_strip_fenced_code_blocks_swallows_unterminated_lone_cr_fence() -> None:
+    """A genuinely unterminated fence opened with a lone-CR line ending
+    must still swallow to the end of the text, preserving the fail-closed
+    posture for lone-CR input the same as for LF and CRLF."""
+    text = "before\r```\r- [LEARN:category] fence never closes\r"
+    assert verify._strip_fenced_code_blocks(text) == "before"
+
+
+def test_strip_fenced_code_blocks_keeps_real_entry_after_closed_lone_cr_fence() -> None:
+    """A real LEARN entry after a properly-closed lone-CR fence must survive
+    stripping, matching the CRLF and LF cases."""
+    text = (
+        "before\r```\r- [LEARN:category] example entry\r```\r"
+        "- [LEARN:workflow] actually learned this\r"
+    )
+    stripped = verify._strip_fenced_code_blocks(text)
+    assert "[LEARN:category] example entry" not in stripped
+    assert "[LEARN:workflow] actually learned this" in stripped
+
+
 def _findings_report(**updates: object) -> dict[str, object]:
     """Return a findings report suitable for focused schema checks."""
     report: dict[str, object] = {
@@ -1036,12 +1090,21 @@ def test_historical_chain_tolerates_sibling_errata_file(tmp_path: Path) -> None:
 def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
     """Two earlier completed phases whose actual commit order contradicts the
     big plan's declared phase order fail the chain, even though each
-    individual receipt is otherwise well-formed on its own."""
+    individual receipt uses the real lifecycle shape - head_sha is each
+    phase's own parent commit, tree_sha is that phase's own completion
+    commit's tree, per ``_historical_chain_fixture`` - with genuinely
+    distinct trees per commit, so the failure cannot be a tree mismatch or a
+    tree-equality coincidence; it must be the ordering-specific ancestor
+    check."""
     _init_repo(tmp_path)
+    base_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
     sha_two = _commit_all(tmp_path, "phase two commit")  # completed first in history
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
     sha_one = _commit_all(
         tmp_path, "phase one commit"
     )  # declared first, completed second
+    (tmp_path / "phase-three.txt").write_text("phase three content\n", encoding="utf-8")
     sha_three = _commit_all(tmp_path, "phase three commit")
     _write_big_plan(
         tmp_path, slug="big", phases=["phase-one", "phase-two", "phase-three"]
@@ -1051,7 +1114,7 @@ def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
         branch="big_implementation",
         phase="phase-one",
         parent_plan="big",
-        head_sha=sha_one,
+        head_sha=sha_two,
         tree_sha=_git(["rev-parse", f"{sha_one}^{{tree}}"], tmp_path),
     )
     _write_historical_phase(
@@ -1059,7 +1122,7 @@ def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
         branch="big_implementation",
         phase="phase-two",
         parent_plan="big",
-        head_sha=sha_two,
+        head_sha=base_sha,
         tree_sha=_git(["rev-parse", f"{sha_two}^{{tree}}"], tmp_path),
     )
     errors = verify.historical_chain_errors(
@@ -1069,6 +1132,45 @@ def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
         receipt_head=sha_three,
     )
     assert any("is not an ancestor of" in error for error in errors)
+
+
+def test_historical_chain_rejects_ambiguous_merge_topology(tmp_path: Path) -> None:
+    """A receipt's ``head_sha`` with two divergent children that reconverge
+    in a merge before the next completed phase's head must fail closed.
+    Position inside ``git rev-list --ancestry-path`` does not prove which
+    side is the true completion commit that ``tree_sha`` certifies, so an
+    ambiguous topology must be diagnosed rather than silently resolved by
+    whichever commit happens to sort first."""
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    _git(["checkout", "-q", "-b", "side-a"], tmp_path)
+    (tmp_path / "side-a.txt").write_text("side a content\n", encoding="utf-8")
+    sha_a = _commit_all(tmp_path, "side a commit")
+    _git(["checkout", "-q", "-b", "side-b", parent_sha], tmp_path)
+    (tmp_path / "side-b.txt").write_text("side b content\n", encoding="utf-8")
+    _commit_all(tmp_path, "side b commit")
+    _git(["checkout", "-q", "side-a"], tmp_path)
+    _git(
+        ["merge", "-q", "--no-ff", "side-b", "-m", "merge side-b into side-a"],
+        tmp_path,
+    )
+    sha_merge = _git(["rev-parse", "HEAD"], tmp_path)
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=_git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path),
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-two",
+        receipt_head=sha_merge,
+    )
+    assert any("candidate" in error for error in errors)
 
 
 def test_gate_receipt_errors_wires_in_historical_chain_validation(
