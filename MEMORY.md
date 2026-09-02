@@ -626,3 +626,28 @@
   a phase, set status back to `in-progress`, point `current_phase` at it, and
   record in the plan why it grew. Branching fresh from `dev` is wrong when
   `dev` does not yet have the earlier phases.
+- [LEARN:workflow] Editing a big plan after its final phase closes invalidates
+  the closeout receipt's bound plan digest, and with no active phase there is
+  nothing to regenerate the receipt against. Land plan-narrative corrections
+  while a phase is still open, or they cannot be bound at all.
+- [LEARN:code] `Path.is_file()` is not a readability check — it reads the
+  file-type bit, so a `chmod 000` file passes. Where a later step will actually
+  open the file, and especially where that step swallows `OSError` and returns
+  an empty digest, the guard must attempt the same read or it certifies a
+  condition it never tested.
+- [LEARN:verification] A fix that removes an exception can leave the same
+  exception reachable by another route. Enumerate every way the failing state
+  can arise, not just the reported one; the inactive-phase guard initially
+  missed non-implementation branches, detached HEAD, an unreadable plan file,
+  and an unsafe explicit `--phase`.
+- [LEARN:testing] Gate a permission-dependent test on `os.geteuid() == 0` and
+  skip, or it passes vacuously under a root-run CI where `chmod 000` does not
+  deny reads.
+- [LEARN:code] When a guard duplicates a condition a downstream raise also
+  checks, extract it into one pure function both call against the same
+  unmutated input, so drift is structurally impossible rather than tested for.
+- [LEARN:verification] The documented canonical `mypy src/` and
+  `ruff check src/ tests/` commands do not run in this authoring repository —
+  there is no `src/`. `verify.py`'s real gate runs `mypy shared scripts tests`
+  (25 files) when it detects a bootstrap authoring repository. Use the gate's
+  scope locally; `src/` is the consumer-template shape, not this repo's.

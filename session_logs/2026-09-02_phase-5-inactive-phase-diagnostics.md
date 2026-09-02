@@ -31,6 +31,46 @@ correction Phase 4 could not. Phase 5 of
   by running the CLI against real fixtures rather than by reading. The fix
   meant to remove a traceback left the same traceback reachable two ways.
 - **04:00** - Round 2: all four fixed. 1210 tests pass.
+- **04:40** - Review round 2 cleared all four, and its sweep found two more
+  reachable tracebacks, both reproducing against the pre-Phase-5 `HEAD`. I
+  pulled both into scope rather than deferring, and recorded that as an
+  explicit scope addition in the phase plan §2.5 with two added acceptance
+  criteria, so the plan of record matches what was done.
+- **05:30** - Round 3: both fixed. 1218 tests pass. One MINOR remained — a
+  test whose docstring claimed the whole success path was unchanged while
+  asserting only one of four artifact keys. Widened it to assert the full
+  artifact set and each bound path and digest.
+- **05:50** - Review round 3: Phase 5 meets its acceptance criteria including
+  both added ones. `documentation_only_paths` confirmed drift-proof by
+  construction, since both the pre-check and the raise call the same pure
+  function against the same unmutated metadata.
+
+## Findings raised outside this phase's scope
+
+The round-3 review raised one MAJOR that is **not** a finding against this
+phase's diff, and is deliberately not recorded in this phase's findings
+report. Recording it here instead keeps the audit trail complete without
+misclassifying its severity or its target.
+
+**The documented canonical type and lint commands do not run in this
+repository.** Root `CLAUDE.md`, `workspace.instructions.md:138`,
+`quality-and-testing.instructions.md:81`, `workflow.instructions.md:266`,
+`deployment.instructions.md:15`, and their `.claude/` mirrors all document
+`uv run mypy src/ ...` and `uv run ruff check src/ tests/`. There is no `src/`
+directory in this repository, so the documented mypy command exits with
+`Cannot read file 'src'`. Meanwhile `verify.py`'s own authoritative gate runs
+`mypy shared scripts tests` for a bootstrap authoring repository — 25 files
+against the 8 that `mypy scripts/` alone covers. A contributor running the
+documented command gets a hard error; one who substitutes `mypy scripts/`
+passes locally while missing most of what the gate checks.
+
+Judged out of scope for Phase 5: the affected files are untouched by phases
+1–5, the defect predates this plan, and the correct fix is not a substitution.
+`src/` is right for the consumer projects this bootstrap installs into, so the
+fix has to distinguish the authoring repository's scope from the consumer
+template's rather than simply replacing the path. That is a consumer-facing
+documentation decision, and it is being surfaced to the user rather than
+decided here.
 
 ## Design decisions
 
@@ -82,6 +122,13 @@ correction Phase 4 could not. Phase 5 of
   `--phase` override runs `phase` on a plain `dev` branch with no plan at all;
   conditioning on branch shape alone regressed it. Check what already exercises
   the code path being fenced off.
+- [LEARN:testing] A test whose docstring claims the success path is unchanged
+  must assert the whole result, not one field of it. This one checked a single
+  artifact key out of four and read as proof of something it never examined.
+- [LEARN:code] When a guard must duplicate a condition that a downstream raise
+  also checks, extract the condition into one pure function both call against
+  the same unmutated input. That makes drift structurally impossible rather
+  than merely tested for.
 
 ## Verification Results
 
