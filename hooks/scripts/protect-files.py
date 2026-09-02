@@ -780,9 +780,7 @@ def emit(
     )
     if hooks:
         decision = (
-            "deny"
-            if target_id in {"openai-codex", "google-antigravity"}
-            else "ask"
+            "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
         reason = (
             "Editing hook files is blocked because PreToolUse cannot request approval: "

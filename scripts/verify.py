@@ -54,6 +54,7 @@ CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
 MODES = frozenset({"fast", "phase", "closeout"})
 CHECK_IDS = (
     "VFY-RUFF-001",
+    "VFY-FMT-001",
     "VFY-MYPY-001",
     "VFY-PYTEST-001",
     "VFY-FRESH-001",
@@ -396,6 +397,7 @@ def validate_mode_applicability(
     """Reject caller-selected N/A states using fixed mode applicability."""
     inapplicable = {
         "fast": {
+            "VFY-FMT-001",
             "VFY-MYPY-001",
             "VFY-PYTEST-001",
             "VFY-FRESH-001",
@@ -406,6 +408,7 @@ def validate_mode_applicability(
         "phase": {"VFY-RECEIPT-001"},
         "closeout": {
             "VFY-RUFF-001",
+            "VFY-FMT-001",
             "VFY-MYPY-001",
             "VFY-PYTEST-001",
             "VFY-GEN-001",
@@ -1940,6 +1943,39 @@ def _ruff_measurement(
     return "FAIL", f"Ruff reported {len(violations)} violation(s)"
 
 
+def _ruff_format_measurement(
+    targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure Ruff formatting compliance without treating failed measurement as a clean result."""
+    try:
+        args = ["uv", "run", "ruff", "format", "--check", *targets]
+        for pattern in extend_exclude or []:
+            args.extend(("--extend-exclude", pattern))
+        rc, stdout, stderr = _run(args, cwd=cwd)
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"Ruff format did not run: {error}"
+    if rc not in {0, 1}:
+        return (
+            "UNVERIFIED",
+            f"Ruff format exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
+    output = stdout + stderr
+    reformat_count = len(re.findall(r"^Would reformat: ", output, re.MULTILINE))
+    if rc == 0 and reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format reported reformattable files with a successful exit status",
+        )
+    if rc == 1 and not reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format failed without reporting any reformattable files",
+        )
+    if rc == 0:
+        return "PASS", "Ruff format completed with 0 files needing reformatting"
+    return "FAIL", f"Ruff format would reformat {reformat_count} file(s)"
+
+
 def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, str]:
     """Measure mypy while distinguishing type failures from tool failures."""
     try:
@@ -2028,6 +2064,16 @@ def measure_ruff(
         targets, cwd=str(root), extend_exclude=extend_exclude
     )
     return check("VFY-RUFF-001", status, detail)
+
+
+def measure_ruff_format(
+    root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
+) -> dict[str, object]:
+    """Adapt the strict Ruff format measurement into a receipt check."""
+    status, detail = _ruff_format_measurement(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
+    return check("VFY-FMT-001", status, detail)
 
 
 def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
@@ -2298,10 +2344,12 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
     provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
     if is_bootstrap_authoring_repository(root):
         ruff = measure_ruff(root, ["shared", "scripts", "tests"])
+        ruff_format = measure_ruff_format(root, ["shared", "scripts", "tests"])
         mypy = measure_mypy(root, ["shared", "scripts", "tests"])
         pytest = measure_pytest(root, ["tests/"])
     else:
         ruff = measure_ruff(root, ["."], extend_exclude=[".claude"])
+        ruff_format = measure_ruff_format(root, ["."], extend_exclude=[".claude"])
         mypy_targets = consumer_mypy_targets(root)
         mypy = (
             measure_mypy(root, mypy_targets)
@@ -2315,6 +2363,7 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
         pytest = measure_pytest(root, [])
     checks = [
         ruff,
+        ruff_format,
         mypy,
         pytest,
         check(
@@ -2366,6 +2415,7 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
         )
     return [
         ruff,
+        not_applicable("VFY-FMT-001", "fast mode does not run formatting checks"),
         not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),
         not_applicable("VFY-PYTEST-001", "fast mode does not run the full test suite"),
         not_applicable(
@@ -2424,6 +2474,7 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         provenance_status = "FAIL"
     return [
         not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
+        not_applicable("VFY-FMT-001", "closeout reuses phase Ruff-format evidence"),
         not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
         not_applicable("VFY-PYTEST-001", "closeout reuses phase pytest evidence"),
         check(
@@ -2598,9 +2649,7 @@ def main() -> int:
     else:
         checks = closeout_checks(root, metadata)
     if args.mode == "closeout":
-        doc_na_reason = missing_documentation_na_reason(
-            metadata, args.documentation_na
-        )
+        doc_na_reason = missing_documentation_na_reason(metadata, args.documentation_na)
         if doc_na_reason is not None:
             print(doc_na_reason, file=sys.stderr)
             return 2

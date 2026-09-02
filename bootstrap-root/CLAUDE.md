@@ -34,12 +34,24 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 ## Exact Commands
 
+This repository is the bootstrap authoring repository — there is no `src/`
+here. Its canonical Python lives under `shared`, `scripts`, and `tests`,
+matching `phase_checks`' authoring branch in `shared/scripts/verify.py`:
+
 ```bash
 uv sync
 uv run pytest tests/ -q --tb=short
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
+uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases
+uv run ruff check shared scripts tests
+uv run ruff format --check shared scripts tests
+```
+
+Prefer routing through the deterministic verifier over restating this scope,
+since it selects the correct scope for whichever repository it runs in:
+
+```bash
+uv run python .claude/scripts/verify.py fast --format text     # during IMPLEMENT
+uv run python .claude/scripts/verify.py phase --format text    # before REVIEW
 ```
 
 Use `uv run` for project Python entrypoints and tooling; never substitute bare `python`, `pip`, `pytest`, `mypy`, or `ruff` in the normal workflow.

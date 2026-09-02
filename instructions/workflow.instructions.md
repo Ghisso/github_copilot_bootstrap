@@ -260,12 +260,14 @@ Some behaviors are automated by hooks. Others are still manual.
 
 **Manual reminders still required:**
 
-**After editing any `src/**/*.py` file:**
+**After editing any Python source file:**
 ```text
-Run: uv run pytest tests/ -q --tb=short
-Run: uv run mypy src/ --ignore-missing-imports --explicit-package-bases
-Run: uv run ruff check src/ tests/
+Run: uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`fast` selects the repository's real scope instead of assuming a `src/`
+layout, so it stays correct in both the bootstrap authoring repository and an
+installed consumer.
 
 **Every ~30 responses or before stopping:**
 ```text

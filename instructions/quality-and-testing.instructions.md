@@ -53,7 +53,10 @@ See `tests.instructions.md` for detailed mocking rules.
 
 ## Coverage Target
 
-80%+ on critical paths (`src/`). Run: `uv run pytest tests/ --cov=src --cov-report=term-missing`
+80%+ on critical paths. Bootstrap authoring repositories run
+`uv run pytest tests/ --cov=shared --cov=scripts --cov-report=term-missing`;
+installed consumers run `uv run pytest tests/ --cov=src --cov-report=term-missing`
+(or their project's own configured source root).
 
 Every bug fix MUST include a regression test.
 

@@ -32,6 +32,7 @@
 ```text
 phase: PASS
 VFY-RUFF-001: PASS - Ruff completed with 0 violations
+VFY-FMT-001: PASS - Ruff format completed with 0 files needing reformatting
 VFY-MYPY-001: PASS - mypy completed with 0 errors
 VFY-PYTEST-001: PASS - pytest completed (N tests)
 VFY-FRESH-001: PASS - phase evidence captured relevant state

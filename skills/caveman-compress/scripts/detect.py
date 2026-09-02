@@ -81,7 +81,10 @@ def _is_json_content(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
         return False
-    if not ((stripped.startswith("{") and stripped.endswith("}")) or (stripped.startswith("[") and stripped.endswith("]"))):
+    if not (
+        (stripped.startswith("{") and stripped.endswith("}"))
+        or (stripped.startswith("[") and stripped.endswith("]"))
+    ):
         return False
     try:
         json.loads(text)
@@ -120,7 +123,16 @@ def detect_file_type(filepath: Path) -> str:
         return "natural_language"
 
     if extension in SKIP_EXTENSIONS:
-        if extension in {".cfg", ".conf", ".env", ".ini", ".json", ".toml", ".yaml", ".yml"}:
+        if extension in {
+            ".cfg",
+            ".conf",
+            ".env",
+            ".ini",
+            ".json",
+            ".toml",
+            ".yaml",
+            ".yml",
+        }:
             return "config"
         return "code"
 
@@ -153,7 +165,9 @@ def protected_reason(filepath: Path) -> str | None:
     if normalized.endswith(".original.md"):
         return "Backup files are never compressed."
     if normalized.endswith("/CLAUDE.md"):
-        return "Workspace instructions are source-of-truth and must stay human-authored."
+        return (
+            "Workspace instructions are source-of-truth and must stay human-authored."
+        )
     if "/shared/policies/" in normalized and normalized.endswith(".md"):
         return "Instruction files are source-of-truth and must keep exact structure."
     if "/.claude/skills/" in normalized and normalized.endswith("/SKILL.md"):
@@ -189,7 +203,9 @@ def inspect_path(filepath: Path) -> DetectionResult:
             f"Only natural-language files can be compressed. Detected {file_type}.",
         )
 
-    return DetectionResult(str(resolved), file_type, True, "Target is safe for caveman-compress.")
+    return DetectionResult(
+        str(resolved), file_type, True, "Target is safe for caveman-compress."
+    )
 
 
 def should_compress(filepath: Path) -> bool:

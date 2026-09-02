@@ -1,7 +1,7 @@
 ---
 name: verification-gate-semantic-hardening
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: verification-gate-semantic-hardening_implementation
 phases:
@@ -10,8 +10,9 @@ phases:
   - 2026-09-02_phase-3-consistency-hardening
   - 2026-09-02_phase-4-minor-findings-closure
   - 2026-09-02_phase-5-inactive-phase-diagnostics
+  - 2026-09-02_phase-6-canonical-command-parity
 started_at: 2026-09-02T01:16:25Z
-current_phase: 
+current_phase: 2026-09-02_phase-6-canonical-command-parity
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -214,8 +215,9 @@ Relocate code by symbol or behavior. Do not trust old line numbers.
 - `2026-09-02_phase-3-consistency-hardening` — align session logs, errata/stale-claim guidance, bypass restrictions, generated surfaces, docs, and regression coverage.
 - `2026-09-02_phase-4-minor-findings-closure` — fix the three MINOR findings that phases 2 and 3 closed with an accepted disposition.
 - `2026-09-02_phase-5-inactive-phase-diagnostics` — report a clear diagnostic instead of a traceback when no phase is active, and correct the big-plan claim Phase 4 superseded.
+- `2026-09-02_phase-6-canonical-command-parity` — make the documented verification commands match what the gate runs, in both the authoring repository and consumers, and close the formatting drift the mismatch allowed.
 
-### Why this plan grew to five phases
+### Why this plan grew to six phases
 
 Phases 1–3 delivered the plan's §7 global acceptance criteria in full, and the
 plan reached `complete` on that basis. Three MINOR findings were carried out of
@@ -236,6 +238,17 @@ end of every plan. Phase 5 also lands the §3.5 correction Phase 4 could not:
 editing the plan after it closed invalidated the closeout receipt's bound plan
 digest with no active phase left to regenerate against, so the correction had
 to wait for an active phase to bind it.
+
+Phase 6 was added after Phase 5's review surfaced that the verification
+commands documented in root `CLAUDE.md` and across the shipped policies do not
+run in this repository at all — there is no `src/` here — while
+`phase_checks` has always selected the correct scope by inspecting the
+repository shape. Investigating that turned up a second mismatch in the same
+class: `ruff format --check` is documented as required but is not gated
+anywhere, which is why two files this plan itself edited drifted unformatted
+across five phases with nothing catching it. Both are §3.7 stale-claim
+failures against the plan's own design rule that the verifier is the single
+measurement authority, so a document duplicating its scope can only drift.
 
 ## 6. Phase boundaries
 

@@ -134,18 +134,17 @@ High-leverage public skills include `ponytail`, `ponytail-review`, `create-featu
 ## Verification
 
 ```bash
-uv run pytest tests/ -q --tb=short
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
+uv run python .claude/scripts/verify.py fast --format json                # during IMPLEMENT
+uv run python .claude/scripts/verify.py phase --format json --persist     # before REVIEW
+uv run python .claude/scripts/verify.py closeout --format json --persist  # after CLOSEOUT
 ```
 
-When available, run the authoritative deterministic receipt commands:
-
-```bash
-uv run python .claude/scripts/verify.py phase --format json --persist
-uv run python .claude/scripts/verify.py closeout --format json --persist
-```
+`verify.py` inspects the repository and selects the matching scope — the
+bootstrap authoring repository's explicit `shared`/`scripts`/`tests`, or an
+installed consumer's own project layout — so routing through it here cannot
+drift from what the gate actually checks. See
+`quality-and-testing.instructions.md` for the full verification and
+severity-gating contract.
 
 Quality gates:
 
