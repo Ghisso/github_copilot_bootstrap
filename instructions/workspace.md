@@ -46,7 +46,7 @@ Always consult the relevant files under `.claude/instructions/`:
 | File | Covers |
 |---|---|
 | `workflow.instructions.md` | Pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit loop |
-| `quality-and-testing.instructions.md` | Verification commands, scoring, and gates |
+| `quality-and-testing.instructions.md` | Verification commands and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
 | `tests.instructions.md` | Test authoring and mocking boundaries |

@@ -54,7 +54,6 @@ CHECK_STATES = frozenset({"PASS", "FAIL", "UNVERIFIED", "NOT_APPLICABLE"})
 MODES = frozenset({"fast", "phase", "closeout"})
 CHECK_IDS = (
     "VFY-RUFF-001",
-    "VFY-FMT-001",
     "VFY-MYPY-001",
     "VFY-PYTEST-001",
     "VFY-FRESH-001",
@@ -397,7 +396,6 @@ def validate_mode_applicability(
     """Reject caller-selected N/A states using fixed mode applicability."""
     inapplicable = {
         "fast": {
-            "VFY-FMT-001",
             "VFY-MYPY-001",
             "VFY-PYTEST-001",
             "VFY-FRESH-001",
@@ -408,7 +406,6 @@ def validate_mode_applicability(
         "phase": {"VFY-RECEIPT-001"},
         "closeout": {
             "VFY-RUFF-001",
-            "VFY-FMT-001",
             "VFY-MYPY-001",
             "VFY-PYTEST-001",
             "VFY-GEN-001",
@@ -2059,21 +2056,24 @@ def _pytest_measurement(
 def measure_ruff(
     root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
 ) -> dict[str, object]:
-    """Adapt the strict Ruff measurement into a receipt check."""
-    status, detail = _ruff_measurement(
+    """Adapt the strict Ruff lint+format measurement into one receipt check.
+
+    Folds ``ruff format --check`` into ``VFY-RUFF-001`` instead of a separate
+    check ID. ``CHECK_IDS`` is part of the receipt schema the gate validates
+    its own history against (``validate_receipt`` requires every historical
+    receipt to contain exactly this check set), so adding an ID would
+    invalidate every already-persisted phase receipt rather than only
+    affecting new ones.
+    """
+    lint_status, lint_detail = _ruff_measurement(
         targets, cwd=str(root), extend_exclude=extend_exclude
     )
+    format_status, format_detail = _ruff_format_measurement(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
+    status = aggregate_status([{"status": lint_status}, {"status": format_status}])
+    detail = f"lint: {lint_detail} | format: {format_detail}"
     return check("VFY-RUFF-001", status, detail)
-
-
-def measure_ruff_format(
-    root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
-) -> dict[str, object]:
-    """Adapt the strict Ruff format measurement into a receipt check."""
-    status, detail = _ruff_format_measurement(
-        targets, cwd=str(root), extend_exclude=extend_exclude
-    )
-    return check("VFY-FMT-001", status, detail)
 
 
 def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
@@ -2344,12 +2344,10 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
     provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
     if is_bootstrap_authoring_repository(root):
         ruff = measure_ruff(root, ["shared", "scripts", "tests"])
-        ruff_format = measure_ruff_format(root, ["shared", "scripts", "tests"])
         mypy = measure_mypy(root, ["shared", "scripts", "tests"])
         pytest = measure_pytest(root, ["tests/"])
     else:
         ruff = measure_ruff(root, ["."], extend_exclude=[".claude"])
-        ruff_format = measure_ruff_format(root, ["."], extend_exclude=[".claude"])
         mypy_targets = consumer_mypy_targets(root)
         mypy = (
             measure_mypy(root, mypy_targets)
@@ -2363,7 +2361,6 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
         pytest = measure_pytest(root, [])
     checks = [
         ruff,
-        ruff_format,
         mypy,
         pytest,
         check(
@@ -2415,7 +2412,6 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
         )
     return [
         ruff,
-        not_applicable("VFY-FMT-001", "fast mode does not run formatting checks"),
         not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),
         not_applicable("VFY-PYTEST-001", "fast mode does not run the full test suite"),
         not_applicable(
@@ -2474,7 +2470,6 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         provenance_status = "FAIL"
     return [
         not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
-        not_applicable("VFY-FMT-001", "closeout reuses phase Ruff-format evidence"),
         not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
         not_applicable("VFY-PYTEST-001", "closeout reuses phase pytest evidence"),
         check(

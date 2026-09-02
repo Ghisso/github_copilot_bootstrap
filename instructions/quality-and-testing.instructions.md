@@ -83,8 +83,7 @@ an abnormal exit) is `UNVERIFIED` rather than a silent pass.
 |---|---|---|
 | Any mypy type errors | `mypy --ignore-missing-imports --explicit-package-bases` | `FAIL` |
 | Any pytest failures | `pytest tests/ -q` | `FAIL` |
-| Any ruff violations | `ruff check --output-format=json` | `FAIL` |
-| Any unformatted file | `ruff format --check` | `FAIL` |
+| Any ruff violation or unformatted file | `ruff check --output-format=json` and `ruff format --check` (one `VFY-RUFF-001` check; summary names which half failed) | `FAIL` |
 
 ### Gate metadata (enforced by the commit gate)
 

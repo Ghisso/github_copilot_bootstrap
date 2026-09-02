@@ -70,7 +70,7 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 
 - Policies: `.claude/instructions/workspace.instructions.md`, `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`.
 - Skills: `.claude/skills/<name>/SKILL.md`; apply Ponytail to all coding and use task-matched skills when relevant.
-- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, review, and documentation. Verification and scoring run through canonical scripts.
+- Agents: canonical bodies in `.claude/agents/`; the orchestrator coordinates complex work and specialists own planning, implementation, review, and documentation. Verification runs through canonical scripts.
 - Hooks: target-native configuration dispatches to `.claude/hooks/scripts/`; runtime errors are recorded under `.claude/session_logs/`.
 
 ## Target Runtime
