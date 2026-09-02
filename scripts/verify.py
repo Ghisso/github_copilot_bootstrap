@@ -484,6 +484,19 @@ def scoped_paths(paths: list[str]) -> list[str]:
     return [path for path in paths if classify_path(path) != "documentation-only"]
 
 
+def existing_paths(root: Path, paths: list[str]) -> list[str]:
+    """Narrow a changed-path list to files a tool can actually open.
+
+    A deleted path is a legitimate changed path for hashing, freshness, and
+    documentation bookkeeping - the receipt's ``changed_paths`` and
+    ``relevant_paths`` metadata must record it. It is never a valid target
+    for a tool (Ruff, Mypy, ...) that opens each path directly, so callers
+    that hand a path list straight to such a tool must filter through this
+    first, keeping the persisted metadata itself unfiltered and honest.
+    """
+    return [path for path in paths if (root / path).is_file()]
+
+
 def hash_paths(root: Path, paths: list[str]) -> str:
     """Hash current path names and bytes, including deletions and untracked files."""
     digest = hashlib.sha256()
@@ -2218,16 +2231,29 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
 
 def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
     """Run cheap changed-Python feedback without establishing authority."""
+    # Applicability is decided from the full, honest changed-path record (a
+    # deleted .py path still makes VFY-RUFF-001 applicable - there was a
+    # real Python change), matching validate_mode_applicability's own
+    # unfiltered check. Only the paths actually handed to Ruff are narrowed
+    # to files that still exist, since Ruff must open each target.
     python_paths = [
         path
         for path in metadata_paths(metadata, "relevant_paths")
         if Path(path).suffix == ".py"
     ]
-    ruff = (
-        measure_ruff(root, python_paths)
-        if python_paths
-        else not_applicable("VFY-RUFF-001", "no changed Python paths")
-    )
+    if not python_paths:
+        ruff = not_applicable("VFY-RUFF-001", "no changed Python paths")
+    else:
+        surviving_paths = existing_paths(root, python_paths)
+        ruff = (
+            measure_ruff(root, surviving_paths)
+            if surviving_paths
+            else check(
+                "VFY-RUFF-001",
+                "PASS",
+                "no surviving Python paths after filtering deleted files",
+            )
+        )
     return [
         ruff,
         not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),
