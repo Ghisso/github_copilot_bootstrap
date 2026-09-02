@@ -27,6 +27,8 @@ uv run pytest tests/ -q --tb=short
 ```bash
 uv run pytest tests/ -v --cov=src --cov-report=term-missing
 ```
+Use `--cov=shared --cov=scripts` instead of `--cov=src` in this bootstrap's
+own authoring repository.
 
 ## Step 3: Specific Tests (if argument provided)
 ```bash
