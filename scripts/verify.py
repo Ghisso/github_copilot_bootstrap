@@ -1931,6 +1931,15 @@ def _ruff_exclude_config_args(
     `ruff format` rejects the `--extend-exclude` flag that `ruff check`
     accepts, so both use the generic `--config` override instead — one
     construction path for both, so the two cannot diverge again.
+
+    Values are Ruff glob patterns, not literal path segments. A pattern
+    containing `[`, `]`, `\\`, `*`, `?`, `{`, or `}` may produce valid TOML
+    that Ruff accepts while matching something other than the literal path a
+    caller intended - `[1]` is a character class and `\\` escapes. The only
+    caller passes the fixed literal `.claude`, which has no glob
+    metacharacters; a future caller passing a less trivial pattern must
+    account for this. TOML-unsafe patterns are rejected above, but a
+    glob-ambiguous one cannot be distinguished from a deliberate glob here.
     """
     if not extend_exclude:
         return [], None
