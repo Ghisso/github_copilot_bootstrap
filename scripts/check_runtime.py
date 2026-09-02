@@ -361,7 +361,7 @@ def main() -> int:
                 print(
                     "WARN optional binary missing: uv; guardrails use Bash 3.2 orchestration and "
                     "Python 3 standard-library JSON parsing for report reads without uv; "
-                    "quality_score.py and verify.py need uv"
+                    "verify.py needs uv"
                 )
             elif command == "context-mode":
                 print(

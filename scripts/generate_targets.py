@@ -272,11 +272,6 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         REPO_ROOT / "shared" / "templates", support_root / "templates", "claude-code"
     )
     copy_text_transformed(
-        REPO_ROOT / "shared" / "scripts" / "quality_score.py",
-        support_root / "scripts" / "quality_score.py",
-        "claude-code",
-    )
-    copy_text_transformed(
         REPO_ROOT / "shared" / "scripts" / "record_findings.py",
         support_root / "scripts" / "record_findings.py",
         "claude-code",
@@ -1266,8 +1261,8 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
-- Run `verify phase`, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings and score, records learning and the completed session log, then runs `verify closeout`.
-- Commit each completed small plan only after a fresh score is at least 90, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
+- Run `verify phase`, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings, records learning and the completed session log, then runs `verify closeout`.
+- Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
 
 ## Exact Commands
@@ -1413,7 +1408,7 @@ Native Copilot files under `.github/` are adapters:
 
 Before planning or implementation, load the relevant canonical instruction files from `.claude/instructions/`, especially `workflow.instructions.md`, `quality-and-testing.instructions.md`, and `tool-routing.instructions.md`. Before every coding action, load `.claude/skills/ponytail/SKILL.md` in `full` mode.
 
-Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> score -> learn -> session-log -> commit workflow. Score >= 90 plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
+Preserve the pre-flight -> branch -> plan -> implement -> verify -> review -> document -> learn -> session-log -> commit workflow. A passing `verify phase` plus required documentation updates are mandatory before commit or PR closeout. Write all plans, session logs, exploration notes, memory updates, and quality reports under `.claude/`, not target-local `.github/` or `.codex/` state directories.
 """
 
 

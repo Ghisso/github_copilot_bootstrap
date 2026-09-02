@@ -156,7 +156,7 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
 )
 ORCHESTRATOR_LIFECYCLE_REQUIRED = (
     "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
-    "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90",
+    "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
     "3. **PLAN WHEN NEEDED:**",
     "4. **IMPLEMENT:**",
     "5. **VERIFY:**",
@@ -557,8 +557,8 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/MEMORY.md",
         "<plan_name>_implementation",
         ".claude/skills/ponytail/SKILL.md",
-        "score is at least 90",
-        "CLOSEOUT updates required documentation, persists findings and score",
+        "`verify phase` reports PASS",
+        "CLOSEOUT updates required documentation, persists findings",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -2393,12 +2393,17 @@ def validate_agents(errors: list[str]) -> None:
             f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
             errors,
         )
-        # R-AGENTS-08: only the orchestrator writes persisted score reports;
-        # coder and reviewer never create final closeout artifacts.
-        if "--json --out" in text:
+        # R-AGENTS-08: only the orchestrator persists findings evidence;
+        # coder and reviewer must never gain their own record_findings.py
+        # --out invocation (the orchestrator owns final closeout evidence).
+        # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
+        # reflow wrapping the invocation across a line break.
+        # The bound must clear the canonical long-form invocation documented in
+        # quality-and-testing.instructions.md, whose flag run is 132 characters.
+        if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
             check(
                 path.stem == "orchestrator",
-                f"only the orchestrator may write a persisted score report (--json --out): {path}",
+                f"only the orchestrator may persist findings evidence (record_findings.py ... --out): {path}",
                 errors,
             )
 
@@ -3587,9 +3592,7 @@ def git_actor_env(actor: str) -> dict[str, str]:
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-    if path.parent.name == "quality_reports" and path.name.startswith(
-        ("score-", "findings-")
-    ):
+    if path.parent.name == "quality_reports" and path.name.startswith("findings-"):
         write_fixture_closeout_receipt(path.parents[2])
 
 
@@ -4066,10 +4069,11 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         write(repo / "work.txt", "work\n")
         git(repo, "add", "work.txt")
         write(
-            repo / ".claude" / "quality_reports" / "score-test.json",
+            repo / ".claude" / "quality_reports" / "findings-phase-one.json",
             json.dumps(
                 {
-                    "score": 95,
+                    "findings": [],
+                    "counts": {"critical": 0, "major": 0, "minor": 0},
                     "branch": "foo_implementation",
                     "phase": "phase-one",
                     "generated_at": "2099-01-01T00:00:00Z",
@@ -4078,7 +4082,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             )
             + "\n",
         )
-        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -4096,7 +4099,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         check(
             '"permissionDecision":"deny"' in stdout,
-            "commit gate must reject score reports missing required metadata",
+            "commit gate must reject findings reports missing required metadata",
             errors,
         )
 
@@ -4112,35 +4115,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             check=False,
         ).stdout.strip()
         reports_dir = repo / ".claude" / "quality_reports"
-
-        def score_report(**overrides: object) -> dict[str, object]:
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash,
-                "changed_files": ["work.txt"],
-            }
-            report.update(overrides)
-            return report
-
-        def clear_reports() -> None:
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-
-        def write_score(report: dict[str, object]) -> None:
-            clear_reports()
-            path = reports_dir / "score-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
 
         def findings_report(**overrides: object) -> dict[str, object]:
             report: dict[str, object] = {
@@ -4174,34 +4148,20 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 )
             return report
 
-        def clear_findings() -> None:
-            for stale in reports_dir.glob("findings-*.json"):
-                stale.unlink()
-
         def write_findings(report: dict[str, object]) -> None:
-            clear_findings()
-            path = reports_dir / "findings-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
+            write(
+                reports_dir / "findings-phase-one.json",
+                json.dumps(report, indent=2) + "\n",
+            )
 
-        # A clean findings report stays valid for every score-axis probe below
-        # (HEAD does not move until the real commit lands further down), so
-        # each probe's denial is attributable to the score axis under test,
-        # not to a findings report that happens to be missing too.
-        write_findings(findings_report())
-
-        # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
-        # dirty:true must all be denied even at a passing score.
+        # R-FINDINGS-01: dirty:true, a stale head_sha, or a stale content_hash
+        # must each be denied even with an otherwise clean findings report.
         for label, report in (
-            ("tests_passed:false", score_report(tests_passed=False)),
-            (
-                "tests_passed missing",
-                {k: v for k, v in score_report().items() if k != "tests_passed"},
-            ),
-            ("tests_skipped:true", score_report(tests_skipped=True)),
-            ("dirty:true", score_report(dirty=True)),
+            ("dirty:true", findings_report(dirty=True)),
+            ("stale head_sha", findings_report(head_sha="0" * 40)),
+            ("stale content_hash", findings_report(content_hash="deadbeef")),
         ):
-            write_score(report)
+            write_findings(report)
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-commit-gate.sh"),
                 {
@@ -4216,83 +4176,11 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             )
             check(
                 '"permissionDecision":"deny"' in stdout,
-                f"commit gate must deny score report with {label} even at score 95",
+                f"commit gate must deny a findings report with {label}",
                 errors,
             )
 
-        # R-SCORE-02: select the newest report by generated_at, not filename.
-        # Older passing report has a lexically-later filename; newer failing
-        # report has a lexically-earlier one. The gate must pick the newer.
-        clear_reports()
-        write(
-            reports_dir / "score-zzz.json",
-            json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2)
-            + "\n",
-        )
-        write(
-            reports_dir / "score-aaa.json",
-            json.dumps(
-                score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2
-            )
-            + "\n",
-        )
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0,
-            f"commit report-selection case failed to run: {stderr}",
-            errors,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must select the newest report by generated_at",
-            errors,
-        )
-
-        # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
-        write_score(score_report(head_sha="0" * 40))
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must deny a stale-HEAD report",
-            errors,
-        )
-
-        # R-SCORE-02: content edited since scoring is caught by the content hash.
-        write_score(score_report(content_hash="deadbeef"))
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must deny a content_hash mismatch",
-            errors,
-        )
-
-        write_score(score_report())
-        # findings-test.json is still the clean baseline written before the
-        # R-SCORE-01 loop above; only score-*.json has been swapped since.
+        write_findings(findings_report())
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -5454,37 +5342,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             ).stdout.strip()
             return head, content_hash
 
-        def score_report(
-            head_sha: str, content_hash_value: str, **overrides: object
-        ) -> dict[str, object]:
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash_value,
-                "changed_files": ["work.txt"],
-            }
-            report.update(overrides)
-            return report
-
-        def clear_scores() -> None:
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-
-        def write_score(report: dict[str, object]) -> None:
-            clear_scores()
-            path = reports_dir / "score-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
-
         def findings_report(
             head_sha: str, content_hash_value: str, **overrides: object
         ) -> dict[str, object]:
@@ -5525,9 +5382,8 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         def write_findings(report: dict[str, object]) -> None:
             clear_findings()
-            path = reports_dir / "findings-test.json"
+            path = reports_dir / "findings-phase-one.json"
             write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
 
         write(repo / "work.txt", "work\n")
         git(repo, "add", ".")
@@ -5537,44 +5393,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode != 0,
-            f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}",
+            f"commit-msg hook must block a commit with no findings report: {result.stdout}{result.stderr}",
             errors,
         )
 
         head_sha, content_hash = head_and_hash()
 
-        # A clean findings report stays valid for every score/plan/closeout/
-        # LEARN probe below (HEAD does not move until the "fully valid"
-        # commit lands further down), so each probe's denial is attributable
-        # to the axis under test, not to a findings report missing too.
+        # A clean findings report stays valid for every plan/closeout/LEARN
+        # probe below (HEAD does not move until the "fully valid" commit
+        # lands further down), so each probe's denial is attributable to the
+        # axis under test, not to a findings report missing too.
         write_findings(findings_report(head_sha, content_hash))
 
-        write_score(score_report(head_sha, content_hash, score=50))
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must block a quality score below 90",
-            errors,
-        )
-
-        write_score(score_report(head_sha, content_hash, content_hash="deadbeef"))
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must block a stale content_hash",
-            errors,
-        )
-
-        # From here the score itself is valid; each remaining axis breaks
-        # exactly one other input and restores it before the next.
-        write_score(score_report(head_sha, content_hash))
-
-        # R-SCORE-03e: findings-report axis probes, score held valid throughout.
+        # R-FINDINGS-01: findings-report axis probes.
         clear_findings()
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode != 0,
-            "commit-msg hook must block a commit with a valid score but no findings report",
+            "commit-msg hook must block a commit with no findings report",
             errors,
         )
 
@@ -5649,7 +5485,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         git(repo, "add", ".codex/config.toml")
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         required_report = findings_report(head_sha, content_hash)
         required_report.pop("ponytail_reviewed")
         required_report.pop("ponytail_findings")
@@ -5672,56 +5507,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             "commit-msg hook must block a stale findings content_hash",
             errors,
         )
-
-        # R-SCORE-03e: select the newest findings report by generated_at, not
-        # filename order - mirrors the score report's R-SCORE-02 rule. The
-        # older report has a lexically-LATER filename and is clean; the newer
-        # one has a lexically-EARLIER filename and carries a CRITICAL finding.
-        clear_findings()
-        write(
-            reports_dir / "findings-zzz.json",
-            json.dumps(
-                findings_report(
-                    head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"
-                ),
-                indent=2,
-            )
-            + "\n",
-        )
-        write(
-            reports_dir / "findings-aaa.json",
-            json.dumps(
-                findings_report(
-                    head_sha,
-                    content_hash,
-                    generated_at="2099-06-01T00:00:00Z",
-                    findings=[
-                        {
-                            "severity": "CRITICAL",
-                            "title": "newer critical wins",
-                            "file": "work.txt",
-                        }
-                    ],
-                    counts={"critical": 1, "major": 0, "minor": 0},
-                ),
-                indent=2,
-            )
-            + "\n",
-        )
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must select the newest findings report by generated_at",
-            errors,
-        )
-        check(
-            "newer critical wins" in result.stderr,
-            "commit-msg hook must use the newer (CRITICAL) findings report, not the lexically-later clean one",
-            errors,
-        )
-
-        # Restore the clean baseline before the remaining axis probes below.
-        write_findings(findings_report(head_sha, content_hash))
 
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
@@ -5785,9 +5570,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         write_findings(findings_report(head_sha, content_hash))
-        # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode == 0,
@@ -5819,7 +5602,7 @@ printf '%s\\n' "${{failures[@]}}"
         write(repo / "more.txt", "more\n")
         git(repo, "add", ".")
         git(repo, "config", "alias.ci", "commit")
-        clear_scores()
+        clear_findings()
         alias_result = subprocess.run(
             ["git", "ci", "-m", "invalid via alias"],
             cwd=repo,
@@ -5850,7 +5633,6 @@ printf '%s\\n' "${{failures[@]}}"
 
         # Fix the state; the same staged change now commits cleanly.
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         write_findings(findings_report(head_sha, content_hash))
         retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
         check(
@@ -5860,7 +5642,7 @@ printf '%s\\n' "${{failures[@]}}"
         )
 
         # D4-B: dev/main pass through regardless of ceremony state.
-        clear_scores()
+        clear_findings()
         git(repo, "checkout", "dev")
         write(repo / "dev-work.txt", "dev work\n")
         git(repo, "add", "dev-work.txt")
@@ -5875,7 +5657,7 @@ printf '%s\\n' "${{failures[@]}}"
 
         # `git commit --no-verify` remains the sanctioned manual escape.
         git(repo, "checkout", "foo_implementation")
-        clear_scores()
+        clear_findings()
         write(repo / "escape.txt", "escape\n")
         git(repo, "add", "escape.txt")
         escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
@@ -5889,7 +5671,7 @@ printf '%s\\n' "${{failures[@]}}"
         # commit from dev must pass through even with invalid ceremony state
         # (dev already diverged above via "direct commit on dev with no
         # ceremony at all"); the very next real commit is still gated normally.
-        clear_scores()
+        clear_findings()
         merge_result = git(
             repo,
             "merge",
@@ -5950,29 +5732,6 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                 check=False,
             ).stdout.strip()
 
-        def write_score_report(**overrides: object) -> None:
-            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
-            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "phase-work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash_for(merge_base),
-                "changed_files": ["phase-work.txt"],
-            }
-            report.update(overrides)
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-            write(reports_dir / "score-test.json", json.dumps(report, indent=2) + "\n")
-
         def write_findings_report(**overrides: object) -> None:
             # Matches the real workflow: record_findings.py runs during
             # REVIEW, before the commit it certifies lands - so head_sha here
@@ -6014,7 +5773,8 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             for stale in reports_dir.glob("findings-*.json"):
                 stale.unlink()
             write(
-                reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n"
+                reports_dir / "findings-phase-one.json",
+                json.dumps(report, indent=2) + "\n",
             )
 
         write_big_plan(repo)
@@ -6117,7 +5877,6 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
 
         write(repo / "minor-work.txt", "minor work\n")
         git(repo, "add", "minor-work.txt")
-        write_score_report()
         write_findings_report(
             counts={"critical": 0, "major": 0, "minor": 1},
             findings=[
@@ -6155,11 +5914,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             "[features]\n",
         )
         git(repo, "add", ".codex/config.toml")
-        write_score_report()
         # Build the ordinary report then remove optional metadata to exercise
         # the required-review push path without bypassing report freshness.
         write_findings_report()
-        required_path = reports_dir / "findings-test.json"
+        required_path = reports_dir / "findings-phase-one.json"
         required_report = json.loads(read(required_path))
         required_report.pop("ponytail_reviewed")
         required_report.pop("ponytail_findings")
@@ -6180,12 +5938,11 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
+        # R-FINDINGS-02: counts.critical == 0 but counts.major > 0 must still
         # allow the commit (the commit gate only checks critical) while
         # blocking the push (the push gate additionally checks major).
         write(repo / "major-work.txt", "major work\n")
         git(repo, "add", "major-work.txt")
-        write_score_report()
         write_findings_report(
             counts={"critical": 0, "major": 2, "minor": 0},
             findings=[
@@ -7241,7 +6998,6 @@ def validate_memory_security_authority(errors: list[str]) -> None:
 def validate_support_files(errors: list[str]) -> None:
     required_files = (
         "MEMORY.md",
-        "scripts/quality_score.py",
         "scripts/record_findings.py",
         "scripts/verify.py",
         "templates/session-log.md",

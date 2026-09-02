@@ -17,7 +17,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "shared" / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-import quality_score  # noqa: E402
 import verify  # noqa: E402
 from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
     bootstrap_root_paths,
@@ -38,11 +37,43 @@ HISTORICAL_SCHEMA_V2_RUNTIME = (
 )
 HISTORICAL_SCHEMA_V2_SOURCE = REPO_ROOT / "tests" / "fixtures" / "schema-v2-source.json"
 
+HISTORICAL_SCHEMA_V3_SOURCE_COMMIT = "b9a235f7d13b0d45a4383ee908ff2f18eb732692"
+HISTORICAL_SCHEMA_V3_RUNTIME_SHA256 = (
+    "c1ee21871bd2ee3956bf8ec277f3042a315e23cf3cba7ea1a90de7bf8c89f595"
+)
+HISTORICAL_SCHEMA_V3_RECEIPTS = {
+    "schema-v3-receipt.json": "262805a16d2f98eef94bd28408c5ec12f12c7e9534278f68ea05bd1f79512c71",
+    "schema-v3-closeout-receipt.json": "19acbf5f5181c19c865a9b3a1b00c6e23f3f62c902abbd6bc654142c3ee7e82b",
+}
+HISTORICAL_SCHEMA_V3_RUNTIME = (
+    REPO_ROOT / "tests" / "fixtures" / "schema-v3-verify.py.txt"
+)
+HISTORICAL_SCHEMA_V3_SOURCE = REPO_ROOT / "tests" / "fixtures" / "schema-v3-source.json"
+
 
 def test_verifier_disables_runtime_bytecode_cache() -> None:
     """Running the managed verifier must not create unmanaged runtime files."""
     source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
-    assert "sys.dont_write_bytecode = True\nimport quality_score" in source
+    assert "sys.dont_write_bytecode = True" in source
+    assert "import quality_score" not in source
+
+
+def test_quality_score_module_is_deleted_everywhere() -> None:
+    """The deleted score-era measurement module must not be reintroduced in
+    canonical source or in the generated consumer runtime."""
+    assert not (REPO_ROOT / "shared" / "scripts" / "quality_score.py").exists()
+    generated = REPO_ROOT / "dist" / "multi-agent" / ".claude" / "scripts"
+    if generated.is_dir():
+        assert not (generated / "quality_score.py").exists()
+
+
+def test_phase_text_format_reports_deterministic_per_check_detail() -> None:
+    """`verify.py phase --format text` stays a compact human-readable
+    PASS/FAIL summary: one line per deterministic check plus an overall
+    result line, with no numeric score anywhere in that output shape."""
+    source = (REPO_ROOT / "shared/scripts/verify.py").read_text(encoding="utf-8")
+    assert "print(f\"{args.mode}: {receipt['status']}\")" in source
+    assert "print(f\"{item['id']}: {item['status']} - {item['summary']}\")" in source
 
 
 def test_verifier_uses_python39_compatible_utc_clock() -> None:
@@ -96,7 +127,23 @@ def _receipt(status: str = "PASS", content_hash: str = "relevant") -> dict[str, 
     return verify.build_receipt("phase", checks, _metadata(content_hash))
 
 
-def test_historical_schema_v2_receipts_are_rejected_before_v3_validation() -> None:
+def _exec_historical_verify(
+    monkeypatch: pytest.MonkeyPatch, source: bytes, path: Path
+) -> types.ModuleType:
+    """Execute a byte-pinned historical verify.py that still imports the
+    deleted sibling measurement module; only schema/receipt validation is
+    exercised below, so a harmless stand-in module satisfies that legacy
+    import without needing the deleted file's bytes."""
+    monkeypatch.setitem(sys.modules, "quality_score", types.ModuleType("quality_score"))
+    historical = types.ModuleType("historical_verify")
+    historical.__file__ = str(path)
+    exec(compile(source, historical.__file__, "exec"), historical.__dict__)
+    return historical
+
+
+def test_historical_schema_v2_receipts_are_rejected_before_v3_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Pinned local v2 receipts are valid there, never current authority."""
     source = HISTORICAL_SCHEMA_V2_RUNTIME.read_bytes()
     source_metadata = json.loads(HISTORICAL_SCHEMA_V2_SOURCE.read_text())
@@ -105,9 +152,9 @@ def test_historical_schema_v2_receipts_are_rejected_before_v3_validation() -> No
         "runtime_sha256": HISTORICAL_SCHEMA_V2_RUNTIME_SHA256,
     }
     assert hashlib.sha256(source).hexdigest() == HISTORICAL_SCHEMA_V2_RUNTIME_SHA256
-    historical = types.ModuleType("historical_verify")
-    historical.__file__ = str(REPO_ROOT / "shared" / "scripts" / "verify.py")
-    exec(compile(source, historical.__file__, "exec"), historical.__dict__)
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
     assert historical.SCHEMA_VERSION == 2
     for fixture, digest in HISTORICAL_SCHEMA_V2_RECEIPTS.items():
         raw = (REPO_ROOT / "tests" / "fixtures" / fixture).read_bytes()
@@ -118,6 +165,107 @@ def test_historical_schema_v2_receipts_are_rejected_before_v3_validation() -> No
             ValueError, match=r"^receipt has an unsupported schema_version$"
         ):
             verify.validate_receipt(receipt)
+
+
+def test_historical_schema_v3_receipts_are_rejected_before_v4_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pinned local v3 receipts are valid there, never current (v4) authority."""
+    source = HISTORICAL_SCHEMA_V3_RUNTIME.read_bytes()
+    source_metadata = json.loads(HISTORICAL_SCHEMA_V3_SOURCE.read_text())
+    assert source_metadata == {
+        "source_commit": HISTORICAL_SCHEMA_V3_SOURCE_COMMIT,
+        "runtime_sha256": HISTORICAL_SCHEMA_V3_RUNTIME_SHA256,
+    }
+    assert hashlib.sha256(source).hexdigest() == HISTORICAL_SCHEMA_V3_RUNTIME_SHA256
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
+    assert historical.SCHEMA_VERSION == 3
+    for fixture, digest in HISTORICAL_SCHEMA_V3_RECEIPTS.items():
+        raw = (REPO_ROOT / "tests" / "fixtures" / fixture).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == digest
+        receipt = json.loads(raw)
+        assert historical.validate_receipt(receipt) == receipt
+        with pytest.raises(
+            ValueError, match=r"^receipt has an unsupported schema_version$"
+        ):
+            verify.validate_receipt(receipt)
+
+
+def test_mid_plan_schema_refresh_fails_closed_then_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale pre-refresh phase receipt fails closed; re-running `phase`
+    under the current runtime recovers without any manual receipt edit or
+    bypass - the only supported v3 -> v4 mid-plan upgrade path."""
+    source = HISTORICAL_SCHEMA_V3_RUNTIME.read_bytes()
+    historical = _exec_historical_verify(
+        monkeypatch, source, REPO_ROOT / "shared" / "scripts" / "verify.py"
+    )
+    stale_metadata = _metadata()
+    stale_checks = [
+        historical.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else historical.check(check_id, "PASS", "legacy measured")
+        for check_id in historical.CHECK_IDS
+    ]
+    stale_receipt = historical.build_receipt("phase", stale_checks, stale_metadata)
+    phase_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    phase_path.parent.mkdir(parents=True)
+    phase_path.write_text(json.dumps(stale_receipt), encoding="utf-8")
+
+    # Fail closed: the current (v4) runtime refuses the stale v3 receipt with
+    # a clear, diagnosable message rather than crashing or accepting it.
+    stale_checks_result = verify.closeout_checks(tmp_path, _metadata())
+    stale_reused = next(
+        item for item in stale_checks_result if item["id"] == "VFY-RECEIPT-001"
+    )
+    assert stale_reused["status"] == "FAIL"
+    assert "schema_version" in stale_reused["summary"]
+
+    # Recover: re-running `phase --persist` under the current runtime (no
+    # manual receipt edit, no bypass) regenerates a valid current-schema
+    # receipt at the same deterministic path.
+    fresh_receipt = _receipt()
+    phase_path.write_text(json.dumps(fresh_receipt), encoding="utf-8")
+    recovered_checks = verify.closeout_checks(tmp_path, _metadata())
+    recovered_reused = next(
+        item for item in recovered_checks if item["id"] == "VFY-RECEIPT-001"
+    )
+    assert recovered_reused["status"] == "PASS"
+
+
+def test_gate_rejects_a_schema_v3_closeout_receipt_at_the_fixed_path(
+    tmp_path: Path,
+) -> None:
+    """The literal git-hook scenario: a consumer completed a v3 closeout,
+    refreshed the runtime, and now attempts the checkpoint transition commit.
+    `gate_receipt_errors` is the function the real commit-msg/pre-push git
+    hooks call (via `verify.py gate`); it must fail closed on the pinned v3
+    closeout receipt rather than accepting or crashing on it."""
+    raw = (
+        REPO_ROOT / "tests" / "fixtures" / "schema-v3-closeout-receipt.json"
+    ).read_bytes()
+    receipt = json.loads(raw)
+    branch = receipt["metadata"]["branch"]
+    phase = receipt["metadata"]["phase"]
+    closeout_path = verify.receipt_path(tmp_path, "closeout", phase)
+    closeout_path.parent.mkdir(parents=True)
+    closeout_path.write_bytes(raw)
+
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch=branch,
+        phase=phase,
+        head="0" * 40,
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=True,
+    )
+    assert len(errors) == 1
+    assert "schema_version" in errors[0]
 
 
 def _write_root_adapter_pairs(root: Path, mode: bool = True) -> None:
@@ -154,12 +302,8 @@ def _closeout_receipt() -> dict[str, object]:
                 "path": ".claude/quality_reports/verification-phase-phase-one.json",
                 "sha256": digest,
             },
-            "score": {
-                "path": ".claude/quality_reports/score-test.json",
-                "sha256": digest,
-            },
             "findings": {
-                "path": ".claude/quality_reports/findings-test.json",
+                "path": ".claude/quality_reports/findings-phase-one.json",
                 "sha256": digest,
             },
             "closeout_log": {
@@ -259,7 +403,6 @@ def _findings_errors(tmp_path: Path, report: dict[str, object]) -> list[str]:
     path.write_text(json.dumps(report), encoding="utf-8")
     return verify.report_errors(
         path,
-        kind="findings",
         branch="verification-test",
         phase="phase-one",
         head="head",
@@ -328,8 +471,8 @@ def test_closeout_receipt_rejects_missing_or_unsafe_artifact_references() -> Non
     receipt = _closeout_receipt()
     artifacts = receipt["artifacts"]
     assert isinstance(artifacts, dict)
-    artifacts["score"] = {"path": "../score.json", "sha256": "a" * 64}
-    with pytest.raises(ValueError, match="artifact score is invalid"):
+    artifacts["findings"] = {"path": "../findings.json", "sha256": "a" * 64}
+    with pytest.raises(ValueError, match="artifact findings is invalid"):
         verify.validate_receipt(receipt)
 
 
@@ -348,7 +491,7 @@ def test_ruff_measurement_is_fail_closed(
 ) -> None:
     """Ruff cannot turn a failed or malformed measurement into PASS."""
     monkeypatch.setattr(
-        quality_score, "_run", lambda *_args, **_kwargs: (returncode, stdout, "")
+        verify, "_run", lambda *_args, **_kwargs: (returncode, stdout, "")
     )
     result = verify.measure_ruff(REPO_ROOT, ["shared"])
     assert result["status"] == expected
@@ -357,7 +500,7 @@ def test_ruff_measurement_is_fail_closed(
 def test_ruff_missing_executable_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
     """A missing verification tool is unverified rather than clean."""
     monkeypatch.setattr(
-        quality_score,
+        verify,
         "_run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("uv")),
     )
@@ -367,7 +510,7 @@ def test_ruff_missing_executable_is_unverified(monkeypatch: pytest.MonkeyPatch) 
 def test_timeout_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
     """A timed out command cannot be accepted as a passing check."""
     monkeypatch.setattr(
-        quality_score,
+        verify,
         "_run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             subprocess.TimeoutExpired(["uv"], 1)
@@ -379,7 +522,7 @@ def test_timeout_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mypy_abnormal_exit_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
     """mypy operational failures remain distinct from type errors."""
     monkeypatch.setattr(
-        quality_score,
+        verify,
         "_run",
         lambda *_args, **_kwargs: (2, "", "internal error"),
     )
@@ -391,11 +534,40 @@ def test_pytest_infrastructure_exit_is_unverified(
 ) -> None:
     """pytest collection/tool errors are not represented as ordinary failures."""
     monkeypatch.setattr(
-        quality_score,
+        verify,
         "_run",
         lambda *_args, **_kwargs: (2, "", "collection error"),
     )
     assert verify.measure_pytest(REPO_ROOT)["status"] == "UNVERIFIED"
+
+
+@pytest.mark.parametrize(
+    ("stdout", "expected"),
+    (
+        ("12 passed in 0.34s", "12 passed in 0.34s"),
+        ("===== 3 failed, 9 passed in 1.02s =====", "3 failed, 9 passed in 1.02s"),
+        ("5 passed, 1 skipped in 0.12s", "5 passed, 1 skipped in 0.12s"),
+        ("no summary line here", ""),
+    ),
+    ids=("passed", "failed-and-passed", "skipped", "no-match"),
+)
+def test_pytest_result_summary_extracts_trailing_counts(
+    stdout: str, expected: str
+) -> None:
+    """The pytest detail line carries a test count, matching ruff/mypy."""
+    assert verify._pytest_result_summary(stdout) == expected
+
+
+def test_pytest_measurement_includes_test_count_in_detail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A passing pytest measurement reports its count, like ruff/mypy do."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (0, "12 passed in 0.34s\n", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=".")
+    assert status == "PASS"
+    assert detail == "pytest completed (12 passed in 0.34s)"
 
 
 def test_closeout_rejects_stale_relevant_evidence(tmp_path: Path) -> None:
@@ -1296,37 +1468,14 @@ def test_generation_check_detects_drift(tmp_path: Path) -> None:
     generated.parent.mkdir(parents=True)
     source.write_text("source\n", encoding="utf-8")
     generated.write_text("generated\n", encoding="utf-8")
-    (tmp_path / "shared/scripts/quality_score.py").write_text(
-        "same\n", encoding="utf-8"
-    )
-    (tmp_path / ".claude/scripts/quality_score.py").write_text(
-        "same\n", encoding="utf-8"
-    )
     assert verify.generation_check(tmp_path)["status"] == "FAIL"
 
 
-def test_generation_check_detects_measurement_module_drift(tmp_path: Path) -> None:
-    """The verifier cannot pass with stale generated measurement semantics."""
-    source_dir = tmp_path / "shared/scripts"
-    generated_dir = tmp_path / ".claude/scripts"
-    source_dir.mkdir(parents=True)
-    generated_dir.mkdir(parents=True)
-    (source_dir / "verify.py").write_text("same\n", encoding="utf-8")
-    (generated_dir / "verify.py").write_text("same\n", encoding="utf-8")
-    (source_dir / "quality_score.py").write_text("new\n", encoding="utf-8")
-    (generated_dir / "quality_score.py").write_text("old\n", encoding="utf-8")
-    assert verify.generation_check(tmp_path)["status"] == "FAIL"
-
-
-def test_generation_check_requires_generated_measurement_module(tmp_path: Path) -> None:
-    """A missing generated measurement dependency remains unverified."""
-    source_dir = tmp_path / "shared/scripts"
-    generated_dir = tmp_path / ".claude/scripts"
-    source_dir.mkdir(parents=True)
-    generated_dir.mkdir(parents=True)
-    (source_dir / "verify.py").write_text("same\n", encoding="utf-8")
-    (generated_dir / "verify.py").write_text("same\n", encoding="utf-8")
-    (source_dir / "quality_score.py").write_text("required\n", encoding="utf-8")
+def test_generation_check_requires_generated_verifier(tmp_path: Path) -> None:
+    """A missing generated verifier file remains unverified."""
+    source = tmp_path / "shared/scripts/verify.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("same\n", encoding="utf-8")
     assert verify.generation_check(tmp_path)["status"] == "UNVERIFIED"
 
 
@@ -1338,10 +1487,10 @@ def test_canonical_serialization_is_stable() -> None:
 @pytest.mark.parametrize(
     ("runner", "result", "status"),
     (
-        (quality_score.measure_ruff, (1, "", ""), "UNVERIFIED"),
-        (quality_score.measure_ruff, (1, "{", ""), "UNVERIFIED"),
-        (quality_score.measure_ruff, (1, "[]", ""), "UNVERIFIED"),
-        (quality_score.measure_mypy, (2, "", "internal error"), "UNVERIFIED"),
+        (verify._ruff_measurement, (1, "", ""), "UNVERIFIED"),
+        (verify._ruff_measurement, (1, "{", ""), "UNVERIFIED"),
+        (verify._ruff_measurement, (1, "[]", ""), "UNVERIFIED"),
+        (verify._mypy_measurement, (2, "", "internal error"), "UNVERIFIED"),
     ),
     ids=(
         "quality-ruff-empty",
@@ -1350,16 +1499,16 @@ def test_canonical_serialization_is_stable() -> None:
         "quality-mypy-abnormal",
     ),
 )
-def test_quality_score_does_not_report_failed_measurement_clean(
+def test_measurement_does_not_report_failed_measurement_clean(
     monkeypatch: pytest.MonkeyPatch,
     runner: object,
     result: tuple[int, str, str],
     status: str,
 ) -> None:
-    """Legacy scoring fences its former fail-open paths with measurement state."""
-    monkeypatch.setattr(quality_score, "_run", lambda *_args, **_kwargs: result)
-    measurement = runner("shared")  # type: ignore[operator]
-    assert measurement.status == status
+    """Fail-open tool exits never resolve to a clean measurement state."""
+    monkeypatch.setattr(verify, "_run", lambda *_args, **_kwargs: result)
+    measured_status, _detail = runner("shared")  # type: ignore[operator]
+    assert measured_status == status
 
 
 def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
@@ -1373,12 +1522,12 @@ def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
         assert cwd == "consumer"
         return 0, "[]", ""
 
-    monkeypatch.setattr(quality_score, "_run", fake_run)
-    measurement = quality_score.measure_ruff(
+    monkeypatch.setattr(verify, "_run", fake_run)
+    status, _detail = verify._ruff_measurement(
         ["."], cwd="consumer", extend_exclude=[".claude"]
     )
 
-    assert measurement.status == "PASS"
+    assert status == "PASS"
     assert captured == [
         "uv",
         "run",

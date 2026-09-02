@@ -31,10 +31,8 @@ identifier when applicable.
 # pytest output
 # mypy output
 # ruff output
-# quality_score.py output/report path
+# verify.py phase/closeout receipt path
 ```
-
-## Score: N/100
 
 ## Open Questions / Next Steps
 

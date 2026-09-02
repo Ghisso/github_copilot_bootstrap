@@ -17,4 +17,3 @@ Closeout logs must include:
 - `**Plan:**` pointing at the small-plan file
 - `**Status:** COMPLETED`
 - `## [LEARN] Entries` with either `[LEARN:category] ...` entries or `[LEARN] none - no new lessons this session`
-- `## Score: N/100`

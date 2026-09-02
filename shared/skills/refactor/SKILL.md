@@ -3,8 +3,8 @@ name: refactor
 visibility: public
 description: |
   Safe refactoring with test verification at every step. Establishes baseline,
-  applies one change at a time, verifies after each, then scores the result.
-  Use when asked to refactor, clean up, or restructure code.
+  applies one change at a time, verifies after each, then runs full
+  verification. Use when asked to refactor, clean up, or restructure code.
 argument-hint: "[target file or description]"
 ---
 

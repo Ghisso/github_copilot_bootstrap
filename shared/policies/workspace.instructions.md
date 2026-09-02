@@ -35,7 +35,7 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 - Prefer config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Review with profile-driven checks before commit or PR.
-- After the code review converges, update documentation for changed public interfaces, config, workflows, and user-facing behavior before the persisted score/findings gate (so both reports bind to the final code+docs) and before commit/PR closeout.
+- After the code review converges, update documentation for changed public interfaces, config, workflows, and user-facing behavior before the persisted findings gate (so the report binds to the final code+docs) and before commit/PR closeout.
 - Keep hook guardrails enabled.
 - Capture reusable lessons in `.claude/MEMORY.md`.
 
@@ -95,7 +95,7 @@ and maintainability outrank reducing physical line count.
 | `planner` | Creates implementation plans with required skills and review profiles |
 | `coder` | Implements backend/code changes and Gradio/Streamlit UI changes (loads the `gradio-streamlit` skill), and performs local simplification |
 | `reviewer` | Runs profile-driven reviews as two sequential passes (primary then adversarial), with no helper agents |
-| `documenter` | Updates documentation after code review converges, before the persisted score/findings gate and commit/PR closeout |
+| `documenter` | Updates documentation after code review converges, before the persisted findings gate and commit/PR closeout |
 
 ## Review Profiles
 
@@ -140,18 +140,19 @@ uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 ```
 
-When available, run:
+When available, run the authoritative deterministic receipt commands:
 
 ```bash
-uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
+uv run python .claude/scripts/verify.py phase --format json --persist
+uv run python .claude/scripts/verify.py closeout --format json --persist
 ```
 
 Quality gates:
 
-| Score | Gate |
+| Verification | Gate |
 |---|---|
-| >= 90 | Commit/PR closeout ready after required documentation updates |
-| < 90 | Blocked |
+| `verify phase`/`verify closeout` PASS | Commit/PR closeout ready after required documentation updates |
+| `FAIL` | Blocked |
 
 ## Project State
 

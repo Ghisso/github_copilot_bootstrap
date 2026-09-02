@@ -5,7 +5,7 @@ applicability: always
 
 # Tool Routing
 
-This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble is the optional semantic retrieval helper. Context Mode is available as both lifecycle hooks and a filtered Model Context Protocol (MCP) server; the MCP surface exposes exactly four guarded tools: `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`. Neither replaces the pre-flight, branch, plan, verify, review, score, document, learn, session-log, commit workflow, hook guardrails, or project-specific instructions.
+This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble is the optional semantic retrieval helper. Context Mode is available as both lifecycle hooks and a filtered Model Context Protocol (MCP) server; the MCP surface exposes exactly four guarded tools: `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`. Neither replaces the pre-flight, branch, plan, verify, review, document, learn, session-log, commit workflow, hook guardrails, or project-specific instructions.
 
 ## Routing Contract
 

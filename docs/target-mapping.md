@@ -23,7 +23,7 @@ installed consumer project:
 - `.claude/rules/*.instructions.md` for conditional Claude policy adapters
 - `.claude/agents/*.md`
 - `.claude/prompts/*.prompt.md`
-- `.claude/scripts/quality_score.py`
+- `.claude/scripts/verify.py` and `.claude/scripts/record_findings.py`
 - `.claude/templates/*.md`, including big-plan, small-plan, session-log, and quality-report templates
 - `.claude/MEMORY.md`, `.claude/plans/`, `.claude/session_logs/`, `.claude/quality_reports/`, `.claude/explorations/`
 - `.claude/hooks/scripts/*.sh`

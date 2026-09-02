@@ -169,18 +169,7 @@ def _write_lifecycle_reports(consumer: Path, metadata: dict[str, object]) -> Non
     }
     reports = consumer / ".claude" / "quality_reports"
     reports.mkdir(exist_ok=True)
-    (reports / "score-lifecycle.json").write_text(
-        json.dumps(
-            {
-                **report_fields,
-                "score": 100,
-                "tests_passed": True,
-                "tests_skipped": False,
-            }
-        ),
-        encoding="utf-8",
-    )
-    (reports / "findings-lifecycle.json").write_text(
+    (reports / f"findings-{phase}.json").write_text(
         json.dumps(
             {
                 **report_fields,
@@ -433,7 +422,7 @@ testpaths = ["tests"]
     assert legacy_receipt.read_bytes() == legacy_receipt_bytes
     assert legacy_closeout_receipt.read_bytes() == legacy_closeout_receipt_bytes
     assert small_plan.read_bytes() == legacy_small_plan_bytes
-    assert "SCHEMA_VERSION = 3" in legacy_runtime.read_text(encoding="utf-8")
+    assert "SCHEMA_VERSION = 4" in legacy_runtime.read_text(encoding="utf-8")
     assert _trace_remote_git_commands(refresh_trace) == set()
     assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
     small_plan.write_text(legacy_complete_small_plan, encoding="utf-8")
@@ -592,8 +581,7 @@ testpaths = ["tests"]
 
     for artifact in (
         consumer / ".claude" / "quality_reports" / "verification-phase-phase-one.json",
-        consumer / ".claude" / "quality_reports" / "score-lifecycle.json",
-        consumer / ".claude" / "quality_reports" / "findings-lifecycle.json",
+        consumer / ".claude" / "quality_reports" / "findings-phase-one.json",
         consumer / ".claude" / "session_logs" / "lifecycle.md",
         consumer
         / ".claude"

@@ -82,7 +82,7 @@ Expected:
   no target-local state directory is generated.
 - Claude and Codex outputs do not contain Copilot model pins.
 - Codex does not generate deprecated `.codex/rules/` output.
-- Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `quality_score.py` in the shared `.claude/` basis.
+- Generated output contains `MEMORY.md`, workflow directories, templates, prompts, hook scripts, and `verify.py`/`record_findings.py` in the shared `.claude/` basis.
 - A fresh install seeds `.claude/MEMORY.md`; repeat installs and legacy pre-git migration preserve an existing consumer `MEMORY.md` byte-for-byte.
 - Generated output contains `templates/plan-big.md`, `templates/plan-small.md`, and `templates/session-log.md`.
 - Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, `.devcontainer/state-sync.sh`, and `.devcontainer/restore-root-adapters.sh`.
@@ -208,7 +208,7 @@ Expected:
 - A valid paused checkpoint commit requires real outer work and pause evidence;
   it does not create an empty outer-repository commit, advance the phase, or
   waive the unfinished-phase PR/final-closeout gate. Normal completion commits retain the
-  score, findings, LEARN, DOCUMENT, and closeout requirements.
+  findings, LEARN, DOCUMENT, and closeout requirements.
 
 ## Google Antigravity Native Evidence Boundary
 
@@ -238,7 +238,7 @@ tier proof, bounded Flash-only task, skill discovery or use, specialist MCP,
 or PreToolUse hard-deny execution was completed. This remains an external
 acceptance gap/blocker.
 - Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.
-- Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh score >= 90 report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
+- Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh findings report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Commit closeout advances plan state only when the intercepted commit subject can be correlated with `HEAD`.
 - PR creation uses `--base dev`, and implementation-branch pushes are blocked until every phase is complete or fully evidenced as cancelled and at least one phase is complete.
 - SessionStart hooks in a configured consumer retain `state-sync.sh pull` for mutable AI state on the git-backed `ai-state` branch. Codex and Claude Stop each use one sequential wrapper: session log, session-log check, `checkpoint`, then best-effort `publish`; no event uses concurrent checkpoint/publish handlers. Codex emits one valid JSON response with no child stdout; Claude emits no wrapper stdout.
@@ -249,7 +249,7 @@ acceptance gap/blocker.
 - `CONTEXT_MODE_DIR` is honoured only at or beneath `.claude/.cache/context-mode`. Any other absolute path — inside the repository or external — warns and falls back to the project-local cache, and the refused path is never created, stamped with a provenance marker, or renamed to a `.untrusted.*` sibling.
 - GitHub Copilot hook config remains native at `.github/hooks/hooks.json` but calls shared `.claude` scripts.
 - `.claude/hooks/git-hooks/commit-msg` exists and is executable in generated output.
-- With `core.hooksPath` set to the generated `git-hooks` directory, on a `<plan_name>_implementation` branch: a `git commit` with no score report, a score below 90, a stale `content_hash`, an incomplete small plan, a closeout log missing `**Status:** COMPLETED`, or missing `[LEARN]` evidence is each rejected by git; a fully valid commit succeeds.
+- With `core.hooksPath` set to the generated `git-hooks` directory, on a `<plan_name>_implementation` branch: a `git commit` with no findings report, a findings report with a CRITICAL finding, a stale `content_hash`, an incomplete small plan, a closeout log missing `**Status:** COMPLETED`, or missing `[LEARN]` evidence is each rejected by git; a fully valid commit succeeds.
 - The `git ci` alias (`git config alias.ci commit`) and `git -C <path> commit` invoked from outside the repo are rejected identically to a bare invalid `git commit` — there is no command string for either to evade.
 - Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
 - `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
@@ -258,7 +258,6 @@ acceptance gap/blocker.
 - Pushing `dev`/`main`, or deleting a branch (`git push origin :foo_implementation`), passes through `pre-push` regardless of ceremony state.
 - `git push --no-verify` bypasses `pre-push` on an implementation branch — the same sanctioned escape as the commit layer.
 - `gh pr create --base dev` is checked only at the `PreToolUse` layer; `pre-push` has no PR-creation concept.
-- A valid score report with no matching `findings-*.json` report blocks the commit.
 - The coder's implementation path applies Ponytail `full` once, then performs a
   changed-scope simplification and re-verification; lifecycle output has no
   standalone Ponytail phase.
@@ -275,7 +274,7 @@ acceptance gap/blocker.
   `MAJOR` blocks push/PR, and `MINOR` is advisory. There is no zero-Ponytail
   gate.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
-- A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit, mirroring the score report's freshness check.
+- A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit.
 - Completed gates use only the exact findings path and SHA-256 hash recorded by the final closeout receipt; an extra newer or lexically-later report cannot replace it.
 - A findings report with `counts.critical == 0` but `counts.major > 0` allows the commit (the commit gate only checks `critical`) but blocks the push, naming a `MAJOR` finding.
 - A findings report generated pre-commit (its `head_sha` is the certified commit's parent) still satisfies the push gate, since `pre-push` accepts any ancestor of the pushed commit, not only an exact match.
