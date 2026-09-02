@@ -1,7 +1,7 @@
 ---
 name: verification-gate-semantic-hardening
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: verification-gate-semantic-hardening_implementation
 phases:
@@ -9,8 +9,9 @@ phases:
   - 2026-09-02_phase-2-lifecycle-evidence
   - 2026-09-02_phase-3-consistency-hardening
   - 2026-09-02_phase-4-minor-findings-closure
+  - 2026-09-02_phase-5-inactive-phase-diagnostics
 started_at: 2026-09-02T01:16:25Z
-current_phase: 
+current_phase: 2026-09-02_phase-5-inactive-phase-diagnostics
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -98,15 +99,26 @@ Do not re-run the terminal current-state validation unchanged for every old phas
 **Corrected in Phase 2, per its own investigation:** a receipt is generated
 *before* the completion commit it certifies (stage everything, generate
 reports and the receipt, then commit), so a historical receipt's `head_sha`
-is the *parent* of the commit it certifies, not that commit itself. The
-certified commit is resolved as the first entry of `git rev-list
---ancestry-path --reverse <earlier_head>..<chain_head>` (the ancestry path
-from that receipt's `head_sha` toward the next completed phase's head), and
+is the *parent* of the commit it certifies, not that commit itself, and
 `tree_sha` must equal that certified commit's tree — not
 `git rev-parse <receipt-head>^{tree}`, which would check `head_sha`'s own
 (parent) tree and always fail for a real lifecycle receipt. This is settled
 Phase 2 behavior; do not revert to the equality this section originally
 proposed.
+
+**Refined in Phase 4, per its own investigation:** the certified commit is
+not simply the first entry of `git rev-list --ancestry-path --reverse
+<earlier_head>..<chain_head>`, because list position alone cannot tell a
+linear implementation branch apart from one where `earlier_head` gained two
+divergent, reconverging children. Selection instead queries that same
+ancestry path with `--parents` and filters to the commit(s) whose own parent
+set contains `earlier_head` — proof by parentage, not position — and fails
+closed (records a chain error, produces no receipt) when that yields zero or
+more than one candidate. Merges inside an implementation branch remain
+unsupported: a well-formed range is assumed linear, and the fail-closed
+branch is what catches a violation of that assumption instead of guessing.
+This is settled Phase 4 behavior; do not revert to plain ancestry-path
+position.
 
 For each historical completed phase:
 
@@ -201,8 +213,9 @@ Relocate code by symbol or behavior. Do not trust old line numbers.
 - `2026-09-02_phase-2-lifecycle-evidence` — harden findings, plan-frontmatter, cancellation, and all-phase historical receipt-chain enforcement.
 - `2026-09-02_phase-3-consistency-hardening` — align session logs, errata/stale-claim guidance, bypass restrictions, generated surfaces, docs, and regression coverage.
 - `2026-09-02_phase-4-minor-findings-closure` — fix the three MINOR findings that phases 2 and 3 closed with an accepted disposition.
+- `2026-09-02_phase-5-inactive-phase-diagnostics` — report a clear diagnostic instead of a traceback when no phase is active, and correct the big-plan claim Phase 4 superseded.
 
-### Why this plan grew to four phases
+### Why this plan grew to five phases
 
 Phases 1–3 delivered the plan's §7 global acceptance criteria in full, and the
 plan reached `complete` on that basis. Three MINOR findings were carried out of
@@ -212,6 +225,17 @@ those findings to be fixed rather than accepted, so the dispositions are
 withdrawn and Phase 4 resolves each on its merits. Phase 4 adds no new scope:
 it closes recorded residuals of earlier phases, and its non-goals forbid
 widening anything those phases established.
+
+Phase 5 was added after Phase 4's closeout surfaced a pre-existing defect that
+this plan's own lifecycle makes newly visible: with a big plan `complete` and
+`current_phase` empty, every receipt-producing `verify.py` mode exits with an
+unhandled traceback rather than a diagnostic. The affected provenance
+functions are byte-identical to `dev`, so this is not a regression from
+phases 1–4, but the window it occurs in is one every consumer reaches at the
+end of every plan. Phase 5 also lands the §3.5 correction Phase 4 could not:
+editing the plan after it closed invalidated the closeout receipt's bound plan
+digest with no active phase left to regenerate against, so the correction had
+to wait for an active phase to bind it.
 
 ## 6. Phase boundaries
 

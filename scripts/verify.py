@@ -2436,6 +2436,39 @@ def receipt_path(root: Path, mode: str, phase: str) -> Path:
     return root / Path(str(pattern).format(phase=phase))
 
 
+def unresolved_phase_reason(root: Path, branch: str, phase: str) -> str | None:
+    """Diagnose an implementation branch with no phase bound to real plan files.
+
+    Speaks only to whether the active phase resolves to readable plan files
+    on disk; it never inspects nested runtime provenance, so any other
+    provenance failure still surfaces through the normal receipt validation
+    path unchanged. Returns None when a phase is resolved (or no phase is
+    required, because ``branch`` is not an implementation branch).
+    """
+    if not branch.endswith("_implementation"):
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None or not big_plan.is_file():
+        return (
+            "no active phase: no big plan is bound to this implementation "
+            "branch; open a plan before running verify"
+        )
+    if not phase:
+        return (
+            "no active phase: the big plan has no current_phase set (it is "
+            "complete or not yet started); open the next small plan before "
+            "running verify"
+        )
+    small_plan = root / ".claude/plans" / f"{phase}.md"
+    if not PHASE_SLUG.fullmatch(phase) or not small_plan.is_file():
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' has "
+            "no matching readable plan file under .claude/plans; fix the plan "
+            "frontmatter before running verify"
+        )
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     """Parse the intentionally small public verifier interface."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -2479,6 +2512,16 @@ def main() -> int:
         print(json.dumps({"errors": errors}, separators=(",", ":")))
         return 0 if not errors else 1
     metadata = state_metadata(root, args.base_ref, args.phase)
+    branch = metadata.get("branch")
+    phase_value = metadata.get("phase")
+    reason = unresolved_phase_reason(
+        root,
+        branch if isinstance(branch, str) else "",
+        phase_value if isinstance(phase_value, str) else "",
+    )
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        return 2
     if args.mode == "fast":
         checks = fast_checks(root, metadata)
     elif args.mode == "phase":
