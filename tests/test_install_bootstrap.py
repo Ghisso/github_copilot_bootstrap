@@ -195,6 +195,9 @@ def _write_lifecycle_plans(consumer: Path) -> tuple[Path, Path]:
 name: consumer-lifecycle
 type: big-plan
 status: in-progress
+originating_branch: dev
+implementation_branch: consumer-lifecycle_implementation
+started_at: 2026-01-01T00:00:00Z
 current_phase: phase-one
 phases:
   - phase-one

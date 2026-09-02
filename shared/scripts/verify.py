@@ -484,6 +484,19 @@ def scoped_paths(paths: list[str]) -> list[str]:
     return [path for path in paths if classify_path(path) != "documentation-only"]
 
 
+def existing_paths(root: Path, paths: list[str]) -> list[str]:
+    """Narrow a changed-path list to files a tool can actually open.
+
+    A deleted path is a legitimate changed path for hashing, freshness, and
+    documentation bookkeeping - the receipt's ``changed_paths`` and
+    ``relevant_paths`` metadata must record it. It is never a valid target
+    for a tool (Ruff, Mypy, ...) that opens each path directly, so callers
+    that hand a path list straight to such a tool must filter through this
+    first, keeping the persisted metadata itself unfiltered and honest.
+    """
+    return [path for path in paths if (root / path).is_file()]
+
+
 def hash_paths(root: Path, paths: list[str]) -> str:
     """Hash current path names and bytes, including deletions and untracked files."""
     digest = hashlib.sha256()
@@ -1255,6 +1268,163 @@ def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, obje
     }
 
 
+def artifact_reference_errors(
+    root: Path, phase: str, key: str, artifact: object
+) -> tuple[list[str], Path | None]:
+    """Verify one closeout artifact reference's expected path, safety, and hash.
+
+    Shared by the terminal closeout gate and the historical receipt chain so
+    both apply identical tamper checks to the same ``ARTIFACT_KEYS`` shape.
+    """
+    if not isinstance(artifact, dict) or set(artifact) != {"path", "sha256"}:
+        return [f"closeout receipt artifact {key} is malformed"], None
+    path_value = artifact.get("path")
+    if not isinstance(path_value, str) or not is_safe_relative_path(path_value):
+        return [f"closeout receipt artifact {key} has an unsafe path"], None
+    expected = {
+        "phase_receipt": receipt_path(root, "phase", phase)
+        .relative_to(root)
+        .as_posix(),
+        "findings": f".claude/quality_reports/findings-{phase}.json",
+    }.get(key)
+    if expected is not None and path_value != expected:
+        return [f"closeout receipt {key} path is invalid"], None
+    try:
+        path = confined_path(root, path_value, regular=True)
+        actual_digest = file_digest(path)
+    except ValueError:
+        return [f"closeout receipt artifact {key} is missing or unsafe"], None
+    if artifact.get("sha256") != actual_digest:
+        return [f"closeout receipt artifact {key} was tampered with"], None
+    return [], path
+
+
+def historical_chain_errors(
+    root: Path, *, branch: str, phase: str, receipt_head: str
+) -> list[str]:
+    """Validate every completed phase before the terminal ``phase``.
+
+    ``phase``/``receipt_head`` identify the terminal completed phase already
+    checked by the caller with current-state freshness rules. This instead
+    walks the big plan's declared phase order backwards from ``phase`` and
+    applies ancestor/tree/artifact-chain semantics to each earlier completed
+    phase, per the design rule that current-state checks apply only to the
+    terminal receipt. Each historical receipt's ``head_sha`` is the *parent*
+    of the commit it certifies (receipts are generated before their
+    completion commit), so the tree check resolves the certified commit via
+    the ancestry path to the next completed phase rather than comparing
+    against ``head_sha``'s own tree. A missing or unreadable big plan is
+    treated as having no historical chain to validate, since the caller
+    already fails closed on that condition through its own required-file
+    checks.
+    """
+    if not branch.endswith("_implementation"):
+        return []
+    slug = branch.removesuffix("_implementation")
+    try:
+        text = (root / ".claude/plans" / f"{slug}.md").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", text, re.DOTALL)
+    phases = frontmatter_phases(frontmatter.group("body")) if frontmatter else None
+    if phases is None or phase not in phases:
+        return ["historical receipt chain needs a valid big-plan phase order"]
+
+    errors: list[str] = []
+    chain_head = receipt_head
+    for earlier in reversed(phases[: phases.index(phase)]):
+        try:
+            source = (root / ".claude/plans" / f"{earlier}.md").read_bytes()
+        except OSError:
+            errors.append(f"historical phase {earlier} is missing its plan file")
+            break
+        if is_cancelled_small_plan(root, source, earlier, slug):
+            continue
+        if not is_complete_small_plan(source, earlier, slug):
+            errors.append(
+                f"historical phase {earlier} is neither complete nor cancelled"
+            )
+            break
+        try:
+            receipt = load_receipt(receipt_path(root, "closeout", earlier))
+        except ValueError as error:
+            errors.append(f"historical phase {earlier} receipt is invalid: {error}")
+            break
+        metadata = receipt.get("metadata")
+        if (
+            receipt.get("mode") != "closeout"
+            or receipt.get("status") != "PASS"
+            or not isinstance(metadata, dict)
+            or metadata.get("branch") != branch
+            or metadata.get("phase") != earlier
+        ):
+            errors.append(
+                f"historical phase {earlier} receipt is not a valid completion"
+            )
+            break
+        earlier_head = metadata.get("head_sha")
+        if not isinstance(earlier_head, str) or not earlier_head:
+            errors.append(f"historical phase {earlier} receipt is missing head_sha")
+            break
+        if not git_output(
+            ["rev-parse", "--verify", "--quiet", f"{earlier_head}^{{commit}}"], root
+        ):
+            errors.append(
+                f"historical phase {earlier} receipt head_sha does not resolve to a commit"
+            )
+            break
+        if not git_is_ancestor(root, earlier_head, chain_head):
+            errors.append(
+                f"historical phase {earlier} receipt head_sha is not an ancestor of "
+                "the next completed phase"
+            )
+            break
+        # Receipts are generated before their completion commit (stage, then
+        # report, then commit), so head_sha is the *parent* of the commit the
+        # receipt certifies, not that commit itself. The certified commit is
+        # head_sha's immediate descendant on the ancestry path toward
+        # chain_head; its tree - not head_sha's own tree - must match
+        # tree_sha. An empty path (or an unresolvable tree) fails closed.
+        ancestry_path = git_output(
+            [
+                "rev-list",
+                "--ancestry-path",
+                "--reverse",
+                f"{earlier_head}..{chain_head}",
+            ],
+            root,
+        )
+        certified_commit = ancestry_path.splitlines()[0] if ancestry_path else ""
+        if not certified_commit:
+            errors.append(
+                f"historical phase {earlier} receipt head_sha has no ancestry path "
+                "to the next completed phase"
+            )
+            break
+        expected_tree = git_output(["rev-parse", f"{certified_commit}^{{tree}}"], root)
+        if not expected_tree or metadata.get("tree_sha") != expected_tree:
+            errors.append(
+                f"historical phase {earlier} receipt tree_sha does not match the "
+                "tree introduced by its certified completion commit"
+            )
+            break
+        artifacts = receipt.get("artifacts")
+        if not isinstance(artifacts, dict):
+            errors.append(f"historical phase {earlier} receipt artifacts are malformed")
+            break
+        chain_errors: list[str] = []
+        for key in ("phase_receipt", "findings", "closeout_log"):
+            key_errors, _ = artifact_reference_errors(
+                root, earlier, key, artifacts.get(key)
+            )
+            chain_errors.extend(key_errors)
+        if chain_errors:
+            errors.extend(chain_errors)
+            break
+        chain_head = earlier_head
+    return errors
+
+
 def gate_receipt_errors(
     root: Path,
     *,
@@ -1329,12 +1499,6 @@ def gate_receipt_errors(
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, dict):
         return errors + ["closeout receipt artifacts are malformed"]
-    expected_paths = {
-        "phase_receipt": receipt_path(root, "phase", phase)
-        .relative_to(root)
-        .as_posix(),
-        "findings": f".claude/quality_reports/findings-{phase}.json",
-    }
     loaded: dict[str, object] = {}
     for key in ARTIFACT_KEYS:
         artifact = artifacts.get(key)
@@ -1344,26 +1508,10 @@ def gate_receipt_errors(
             except ValueError as error:
                 errors.append(str(error))
             continue
-        if not isinstance(artifact, dict):
-            errors.append(f"closeout receipt artifact {key} is missing")
-            continue
-        path_value = artifact.get("path")
-        if not isinstance(path_value, str) or not is_safe_relative_path(path_value):
-            errors.append(f"closeout receipt artifact {key} has an unsafe path")
-            continue
-        if key in {"phase_receipt", "findings"} and path_value != expected_paths[key]:
-            errors.append(f"closeout receipt {key} path is invalid")
-            continue
-        try:
-            path = confined_path(root, path_value, regular=True)
-            actual_digest = file_digest(path)
-        except ValueError:
-            errors.append(f"closeout receipt artifact {key} is missing or unsafe")
-            continue
-        if artifact.get("sha256") != actual_digest:
-            errors.append(f"closeout receipt artifact {key} was tampered with")
-            continue
-        loaded[key] = path
+        key_errors, path = artifact_reference_errors(root, phase, key, artifact)
+        errors.extend(key_errors)
+        if path is not None:
+            loaded[key] = path
 
     documentation = artifacts.get("documentation")
     if isinstance(documentation, dict):
@@ -1425,6 +1573,12 @@ def gate_receipt_errors(
     log_path = loaded.get("closeout_log")
     if isinstance(log_path, Path):
         errors.extend(closeout_log_errors(root, phase, log_path))
+    if isinstance(receipt_head, str) and receipt_head:
+        errors.extend(
+            historical_chain_errors(
+                root, branch=branch, phase=phase, receipt_head=receipt_head
+            )
+        )
     return errors
 
 
@@ -1454,7 +1608,14 @@ def report_errors(
     require_ponytail: bool,
     verify_current_content: bool,
 ) -> list[str]:
-    """Validate the findings report without provider-specific policy."""
+    """Validate the findings report without provider-specific policy.
+
+    ``require_major`` doubles as the phase-completion signal: when set, an
+    open MAJOR finding blocks and every surviving MINOR finding must carry an
+    explicit, non-empty ``disposition``/``reason`` pair. Intermediate,
+    non-completion validation passes ``require_major=False`` and skips both
+    checks; the gate never asserts the disposition is *true*, only present.
+    """
     label = "findings report"
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
@@ -1533,6 +1694,19 @@ def report_errors(
             )
             continue
         observed[str(severity).lower()] += 1
+        if require_major and severity == "MINOR":
+            disposition = finding.get("disposition")
+            disposition_reason = finding.get("reason")
+            if (
+                not isinstance(disposition, str)
+                or not disposition.strip()
+                or not isinstance(disposition_reason, str)
+                or not disposition_reason.strip()
+            ):
+                errors.append(
+                    "findings report MINOR finding needs an explicit disposition "
+                    f"and reason: {title}"
+                )
     counts = report.get("counts")
     if not isinstance(counts, dict) or any(
         type(counts.get(name)) is not int or counts[name] < 0
@@ -2057,16 +2231,29 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
 
 def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
     """Run cheap changed-Python feedback without establishing authority."""
+    # Applicability is decided from the full, honest changed-path record (a
+    # deleted .py path still makes VFY-RUFF-001 applicable - there was a
+    # real Python change), matching validate_mode_applicability's own
+    # unfiltered check. Only the paths actually handed to Ruff are narrowed
+    # to files that still exist, since Ruff must open each target.
     python_paths = [
         path
         for path in metadata_paths(metadata, "relevant_paths")
         if Path(path).suffix == ".py"
     ]
-    ruff = (
-        measure_ruff(root, python_paths)
-        if python_paths
-        else not_applicable("VFY-RUFF-001", "no changed Python paths")
-    )
+    if not python_paths:
+        ruff = not_applicable("VFY-RUFF-001", "no changed Python paths")
+    else:
+        surviving_paths = existing_paths(root, python_paths)
+        ruff = (
+            measure_ruff(root, surviving_paths)
+            if surviving_paths
+            else check(
+                "VFY-RUFF-001",
+                "PASS",
+                "no surviving Python paths after filtering deleted files",
+            )
+        )
     return [
         ruff,
         not_applicable("VFY-MYPY-001", "fast mode does not run global typing"),

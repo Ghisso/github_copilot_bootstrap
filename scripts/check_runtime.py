@@ -338,6 +338,27 @@ def context_mode_dispatch_errors() -> list[str]:
     return errors
 
 
+def plan_frontmatter_errors(repo_root: Path) -> list[str]:
+    """Run the shipped plan-frontmatter validator and surface failures as
+    hard errors. A missing validator script is not itself an error here; the
+    REQUIRED_FILES/REQUIRED_DIRS checks already gate on the generated tree."""
+    validator = repo_root / "scripts" / "validate_plan_frontmatter.py"
+    if not validator.exists():
+        return []
+    result = subprocess.run(
+        [sys.executable, str(validator)],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        print("PASS plan frontmatter validation")
+        return []
+    output = (result.stdout + result.stderr).strip()
+    return [f"plan frontmatter validation reported issues: {output}"]
+
+
 def main() -> int:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
@@ -346,6 +367,8 @@ def main() -> int:
     for relative_path in REQUIRED_DIRS:
         if not (REPO_ROOT / relative_path).is_dir():
             errors.append(f"missing runtime directory: {relative_path}")
+
+    errors.extend(plan_frontmatter_errors(REPO_ROOT))
 
     for command in OPTIONAL_BINARIES:
         path = shutil.which(command)
@@ -395,21 +418,6 @@ def main() -> int:
         for error in errors:
             print(f"FAIL {error}", file=sys.stderr)
         return 1
-
-    validator = REPO_ROOT / "scripts" / "validate_plan_frontmatter.py"
-    if validator.exists():
-        result = subprocess.run(
-            [sys.executable, str(validator)],
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        if result.returncode == 0:
-            print("PASS plan frontmatter validation")
-        else:
-            output = (result.stdout + result.stderr).strip()
-            print(f"WARN plan frontmatter validation reported issues: {output}")
 
     print("PASS generated runtime wiring is present")
     return 0

@@ -32,8 +32,9 @@ Prefix the title with one of:
 - `shrink:` state the smaller equivalent.
 
 Every finding must use `profile: "ponytail"`. Ponytail findings use the ordinary
-severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
-advisory.
+severity gates: CRITICAL and MAJOR both block the phase-completion commit
+(not only push/PR), and a surviving MINOR needs an explicit disposition and
+reason but is otherwise advisory.
 
 ## Severity
 

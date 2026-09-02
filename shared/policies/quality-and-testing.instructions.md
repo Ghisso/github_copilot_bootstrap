@@ -115,8 +115,12 @@ An empty findings list (`[]`) is valid and yields all-zero counts — the normal
 
 | Gate | Requires |
 |---|---|
-| Commit | `counts.critical == 0` in a fresh, matching findings report |
-| Push / PR | `counts.critical == 0` **and** `counts.major == 0` |
+| Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, and an explicit `disposition` plus non-empty `reason` on every surviving MINOR |
+| Push / PR | the same contract, re-checked across every completed phase |
+
+An intermediate commit made while the phase is still in progress is not
+blocked merely because an unresolved MAJOR finding exists. MAJOR blocks the
+phase-completion commit, not the work leading up to it.
 
 The findings remain agent-authored — the gate verifies the contract (fresh,
 matching, severity-counted), not the reviewer's honesty. That is a
@@ -145,8 +149,9 @@ Commit and push gates read the persisted JSON, not the reviewer's prose
 report. A findings report must match the current branch and phase, be as
 fresh as the phase receipt (push gates accept a report generated for an
 ancestor of the pushed commit, since REVIEW happens before COMMIT), and carry
-`counts.critical == 0` (commit) or `counts.critical == 0` and
-`counts.major == 0` (push/PR). The metadata matrix is exact: selecting the
+`counts.critical == 0` and `counts.major == 0` at the phase-completion commit
+and again at push/PR, with an explicit `disposition` and non-empty `reason` on
+every surviving MINOR. The metadata matrix is exact: selecting the
 `ponytail` profile always emits `ponytail_reviewed: true` and a numeric
 `ponytail_findings` count; a report for an unselected profile omits both
 fields. A routed high-risk review requires true evidence. The
@@ -155,8 +160,9 @@ control-plane/high-risk, multi-file, dependency, script, generator, or
 reviewer-selected complexity. Ordinary low-complexity and exactly one
 documentation OR exactly one mutable workflow-state file do not require it unless
 control-plane/high-risk precedence applies. Ponytail findings use the ordinary
-severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
-advisory. There is no special zero-Ponytail gate.
+severity gates: CRITICAL and MAJOR both block the phase-completion commit
+(not only push/PR), and a surviving MINOR needs an explicit disposition and
+reason but is otherwise advisory. There is no special zero-Ponytail gate.
 
 ---
 

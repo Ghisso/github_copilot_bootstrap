@@ -3735,7 +3735,7 @@ type: big-plan
 status: {status}
 {duplicate_status_line}originating_branch: dev
 implementation_branch: foo_implementation
-started_at:
+started_at: 2026-01-01T00:00:00Z
 phases:
 {phase_lines}
 current_phase: {current_phase}
@@ -4382,6 +4382,14 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             "paused checkpoint must require a matching current small-plan identity",
             errors,
         )
+        # assert_plan_frontmatter now hard-validates every .claude/plans/*.md
+        # file, not only the ones the active big plan references; the rogue
+        # fixtures above (rogue.md, phase-rogue.md) are deliberately malformed
+        # stand-ins for a different bash-level check and must not leak into
+        # the real commit-gate invocation below.
+        for stale_plan in (repo / ".claude" / "plans").glob("*.md"):
+            if stale_plan.name not in {"foo.md", "phase-paused.md"}:
+                stale_plan.unlink()
         write_big_plan(
             repo,
             status="in-progress",
@@ -5113,6 +5121,72 @@ printf '%s\\n' "${{failures[@]}}"
                 errors,
             )
 
+        def commit_failures() -> list[str]:
+            """Exercise assert_commit_invariants with receipt/findings
+            machinery stubbed out, isolating the plan/status/cancellation
+            ceremony it enforces from the separately-tested receipt gate."""
+            expression = f"""
+. {shlex.quote(str(library))}
+assert_completed_receipt() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(repo))} foo_implementation
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
+"""
+            result = subprocess.run(
+                ["bash", "-lc", expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"cancelled commit invariant fixture failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        # R-LIFECYCLE-02: a sibling cancelled phase (not the current phase)
+        # must satisfy the standard cancellation evidence contract at commit
+        # time too, not only at push/PR time.
+        # assert_plan_frontmatter now hard-validates every .claude/plans/*.md
+        # file, not only the ones this scenario's big plan references; clear
+        # earlier scenarios' disposable, intentionally-malformed fixtures
+        # (duplicate-status probes, the six-cancelled-phase inventory) first
+        # so they cannot leak into this narrower scenario.
+        for stale_plan in (repo / ".claude" / "plans").glob("*.md"):
+            if stale_plan.name != "foo.md":
+                stale_plan.unlink()
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-cancelled"),
+            current_phase="phase-complete",
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-complete-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n",
+        )
+        write_small_plan(
+            repo, status="cancelled", phase="phase-cancelled", evidence_exists=False
+        )
+        (repo / ".claude" / "session_logs" / "phase-cancelled-cancelled.md").unlink(
+            missing_ok=True
+        )
+        check(
+            any("evidence file is missing" in failure for failure in commit_failures()),
+            "commit gate must reject a sibling cancelled phase without cancellation evidence",
+            errors,
+        )
+
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        check(
+            commit_failures() == [],
+            "commit gate must accept a valid sibling cancelled phase alongside a completed current phase",
+            errors,
+        )
+
         def run_closeout() -> None:
             returncode, _, stderr = run_hook(
                 lifecycle_script(repo, "record-commit-closeout.sh"),
@@ -5440,6 +5514,35 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        # R-LIFECYCLE-01: an open MAJOR finding now blocks the
+        # phase-completion commit itself (small plan status: complete),
+        # rather than only the later push/PR.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MAJOR",
+                        "title": "missing input validation on upload handler",
+                        "file": "work.txt",
+                    }
+                ],
+                counts={"critical": 0, "major": 1, "minor": 0},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block the phase-completion commit with an open MAJOR finding",
+            errors,
+        )
+        check(
+            "missing input validation on upload handler" in result.stderr,
+            "commit-msg hook's MAJOR-finding failure must name the finding",
+            errors,
+        )
+
         optional_report = findings_report(head_sha, content_hash)
         optional_report.pop("ponytail_reviewed")
         optional_report.pop("ponytail_findings")
@@ -5454,6 +5557,9 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         if result.returncode == 0:
             git(repo, "reset", "--soft", "HEAD~1")
 
+        # R-LIFECYCLE-01: a surviving MINOR finding needs an explicit
+        # disposition and reason at the phase-completion commit; without one
+        # it now blocks, matching the MAJOR/CRITICAL findings-report gate.
         write_findings(
             findings_report(
                 head_sha,
@@ -5471,8 +5577,33 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
+            result.returncode != 0
+            and "explicit disposition and reason" in result.stderr,
+            "commit-msg hook must block a MINOR finding without an explicit disposition",
+            errors,
+        )
+
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MINOR",
+                        "title": "yagni: unused abstraction",
+                        "file": "work.txt",
+                        "profile": "ponytail",
+                        "disposition": "accepted",
+                        "reason": "tracked for a later cleanup phase",
+                    }
+                ],
+                counts={"critical": 0, "major": 0, "minor": 1},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
             result.returncode == 0,
-            "commit-msg hook must allow an advisory Ponytail MINOR finding",
+            "commit-msg hook must allow an advisory Ponytail MINOR finding with an explicit disposition and reason",
             errors,
         )
         if result.returncode == 0:
@@ -5508,6 +5639,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        # R-LIFECYCLE-01: the same open MAJOR finding must not, by itself,
+        # additionally block a commit that is not the phase-completion one -
+        # this one is already blocked for an unrelated reason (status is not
+        # yet complete), and the MAJOR finding must not appear as a reason too.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MAJOR",
+                        "title": "in-progress MAJOR finding",
+                        "file": "work.txt",
+                    }
+                ],
+                counts={"critical": 0, "major": 1, "minor": 0},
+            )
+        )
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
@@ -5515,7 +5664,13 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             "commit-msg hook must block an incomplete small plan",
             errors,
         )
+        check(
+            "MAJOR findings" not in result.stderr,
+            "commit-msg hook must not cite an open MAJOR finding as a reason for a non-completion commit block",
+            errors,
+        )
         write_small_plan(repo, status="complete")
+        write_findings(findings_report(head_sha, content_hash))
 
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
@@ -5842,14 +5997,21 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
 
         # Complete the small plan/closeout/LEARN so the commit-count check
-        # (>= one commit per phase) is also satisfied.
+        # (>= one commit per phase) is also satisfied. A completed phase no
+        # longer gets a free pass from the historical receipt chain
+        # (R-LIFECYCLE-03 removed that allowance), so this scenario stays
+        # single-phase. The multi-phase contract is covered directly at the
+        # verify.py unit level by test_verify.py::test_historical_chain_*,
+        # including test_historical_chain_rejects_missing_receipt_file, which
+        # is the case this scenario used to assert the opposite of: a completed
+        # phase with no closeout receipt now fails closed instead of being
+        # covered by the terminal receipt.
         write_big_plan(
             repo,
             status="in-progress",
-            phases=("phase-legacy", "phase-one"),
+            phases=("phase-one",),
             current_phase="phase-one",
         )
-        write_small_plan(repo, status="complete", phase="phase-legacy")
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
@@ -5871,7 +6033,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         check(
             push_result.returncode == 0,
-            f"pre-push hook must allow a terminal receipt to cover completed phases that predate the receipt schema: {push_result.stdout}{push_result.stderr}",
+            f"pre-push hook must allow a completed phase with a fresh terminal receipt: {push_result.stdout}{push_result.stderr}",
             errors,
         )
 
@@ -5885,13 +6047,15 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                     "title": "yagni: optional simplification",
                     "file": "minor-work.txt",
                     "profile": "ponytail",
+                    "disposition": "accepted",
+                    "reason": "tracked for a later cleanup phase",
                 }
             ],
         )
         minor_commit = git(repo, "commit", "-m", "phase 1 advisory minor")
         check(
             minor_commit.returncode == 0,
-            "commit-msg hook must allow a Ponytail MINOR finding",
+            f"commit-msg hook must allow a Ponytail MINOR finding with an explicit disposition and reason: {minor_commit.stdout}{minor_commit.stderr}",
             errors,
         )
         minor_push = subprocess.run(
@@ -5938,9 +6102,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        # R-FINDINGS-02: counts.critical == 0 but counts.major > 0 must still
-        # allow the commit (the commit gate only checks critical) while
-        # blocking the push (the push gate additionally checks major).
+        # R-LIFECYCLE-01: counts.critical == 0 but counts.major > 0 now blocks
+        # the phase-completion commit itself. MAJOR moved from a push/PR-only
+        # gate to the phase-completion commit gate; it does not get a second,
+        # separate push-time check once the commit already enforces it.
         write(repo / "major-work.txt", "major work\n")
         git(repo, "add", "major-work.txt")
         write_findings_report(
@@ -5964,28 +6129,19 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             repo, "commit", "-m", "phase 1 followup with major findings"
         )
         check(
-            commit_result.returncode == 0,
-            f"commit-msg hook must allow a commit whose findings report has MAJOR findings but zero CRITICAL: {commit_result.stdout}{commit_result.stderr}",
-            errors,
-        )
-        major_push = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"],
-            cwd=repo,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(
-            major_push.returncode != 0,
-            "pre-push hook must block a push whose findings report has MAJOR findings",
+            commit_result.returncode != 0,
+            f"commit-msg hook must block the phase-completion commit whose findings report has open MAJOR findings: {commit_result.stdout}{commit_result.stderr}",
             errors,
         )
         check(
-            "unbounded query" in major_push.stderr
-            or "missing pagination" in major_push.stderr,
-            "pre-push hook's MAJOR-finding failure must name at least one finding",
+            "unbounded query" in commit_result.stderr
+            or "missing pagination" in commit_result.stderr,
+            "commit-msg hook's MAJOR-finding failure must name at least one finding",
             errors,
         )
+        # The blocked commit leaves major-work.txt staged but never landed;
+        # discard it so the next scenario starts from a clean, committed tree.
+        git(repo, "reset", "--hard")
 
         # D4-B: dev passthrough regardless of ceremony state.
         git(repo, "checkout", "dev")
@@ -7000,6 +7156,7 @@ def validate_support_files(errors: list[str]) -> None:
         "MEMORY.md",
         "scripts/record_findings.py",
         "scripts/verify.py",
+        "scripts/validate_plan_frontmatter.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",

@@ -799,9 +799,10 @@ Quality gates:
 
 - `verify phase`/`verify closeout` PASS: required for a normal completion commit and PR/final closeout; a paused checkpoint does not make a final quality claim, may be pushed only as a valid remote checkpoint, and remains unfinished
 - `FAIL`: blocked until implementation, verification, and review are rerun
-- findings report `counts.critical == 0`: required for a normal completion commit
-- findings report `counts.major == 0`: additionally required for PR/push closeout
-- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
+- findings report `counts.critical == 0` and `counts.major == 0`: required for a normal completion commit. An intermediate commit made while the phase is still in progress is not blocked merely because an unresolved MAJOR exists
+- every surviving MINOR finding carries an explicit `disposition` and non-empty `reason`: required for a normal completion commit. The gate checks that the disposition is present and well-formed, not that it is correct
+- PR/push closeout re-checks that same contract across every completed phase, not only the last one
+- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL and MAJOR both block the phase-completion commit, and a surviving MINOR needs a disposition and reason but is otherwise advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
 
 Documentation gate:
 

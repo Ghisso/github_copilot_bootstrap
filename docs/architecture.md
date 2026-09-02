@@ -124,8 +124,11 @@ applies; every multi-file diff is high-risk. The metadata matrix is exact:
 selecting the profile always emits `ponytail_reviewed: true` and a numeric
 `ponytail_findings` count, while a new unselected report omits both. Optional
 diffs can read compatible legacy `false`/`0` reports, but high-risk routing
-requires true evidence. Ponytail findings use the ordinary gates: CRITICAL
-blocks commit, MAJOR blocks push/PR, and MINOR is advisory. There is no special
+requires true evidence. Ponytail findings use the ordinary gates: CRITICAL and
+MAJOR both block the phase-completion commit, and a surviving MINOR needs an
+explicit `disposition` and non-empty `reason` but is otherwise advisory. An
+intermediate commit made while the phase is still in progress is not blocked
+merely because an unresolved MAJOR exists. There is no special
 zero-Ponytail-finding gate.
 
 Do not edit `dist/` manually. Regenerate it with:

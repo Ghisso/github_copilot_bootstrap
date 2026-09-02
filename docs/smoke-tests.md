@@ -270,13 +270,15 @@ acceptance gap/blocker.
   `ponytail_findings` count. New unselected reports omit both fields; optional
   diffs can read compatible legacy `false`/`0` reports, while high-risk routing
   requires true evidence.
-- Ponytail findings follow ordinary severity gates: `CRITICAL` blocks commit,
-  `MAJOR` blocks push/PR, and `MINOR` is advisory. There is no zero-Ponytail
-  gate.
+- Ponytail findings follow ordinary severity gates: `CRITICAL` and `MAJOR` both
+  block the phase-completion commit, and a surviving `MINOR` needs an explicit
+  `disposition` and non-empty `reason` but is otherwise advisory. There is no
+  zero-Ponytail gate.
 - A findings report with any `CRITICAL` finding blocks the commit, and the failure message names the finding's title.
 - A stale findings `content_hash` (edited since the reviewer generated it) blocks the commit.
 - Completed gates use only the exact findings path and SHA-256 hash recorded by the final closeout receipt; an extra newer or lexically-later report cannot replace it.
-- A findings report with `counts.critical == 0` but `counts.major > 0` allows the commit (the commit gate only checks `critical`) but blocks the push, naming a `MAJOR` finding.
+- A findings report with `counts.critical == 0` but `counts.major > 0` blocks the phase-completion commit, naming a `MAJOR` finding. It does not block an intermediate commit made while the small plan is still `in-progress`.
+- A surviving `MINOR` finding without an explicit `disposition`, or with an empty `reason`, blocks the phase-completion commit.
 - A findings report generated pre-commit (its `head_sha` is the certified commit's parent) still satisfies the push gate, since `pre-push` accepts any ancestor of the pushed commit, not only an exact match.
 - All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.
 

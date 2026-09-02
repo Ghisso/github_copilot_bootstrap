@@ -397,7 +397,9 @@ def _findings_report(**updates: object) -> dict[str, object]:
     return report
 
 
-def _findings_errors(tmp_path: Path, report: dict[str, object]) -> list[str]:
+def _findings_errors(
+    tmp_path: Path, report: dict[str, object], *, require_major: bool = False
+) -> list[str]:
     """Persist and validate one focused findings fixture."""
     path = tmp_path / "findings.json"
     path.write_text(json.dumps(report), encoding="utf-8")
@@ -409,7 +411,7 @@ def _findings_errors(tmp_path: Path, report: dict[str, object]) -> list[str]:
         head_relation="exact",
         expected_base="base",
         root=tmp_path,
-        require_major=False,
+        require_major=require_major,
         require_ponytail=False,
         verify_current_content=False,
     )
@@ -419,6 +421,473 @@ def test_findings_rejects_nonstring_changed_file(tmp_path: Path) -> None:
     """Changed-file evidence cannot contain untyped JSON values."""
     errors = _findings_errors(tmp_path, _findings_report(changed_files=[1]))
     assert "findings report changed_files must be a list of strings" in errors
+
+
+def _major_finding() -> dict[str, object]:
+    return {
+        "severity": "MAJOR",
+        "profile": "code",
+        "title": "unresolved MAJOR finding",
+    }
+
+
+def test_open_major_blocks_only_when_phase_completion_is_required(
+    tmp_path: Path,
+) -> None:
+    """An open MAJOR finding blocks phase-completion (require_major=True) but
+    is not, by itself, a blocking reason for a non-completion validation pass
+    (require_major=False) - the distinction Phase 2 must draw correctly."""
+    report = _findings_report(
+        findings=[_major_finding()], counts={"critical": 0, "major": 1, "minor": 0}
+    )
+    completion_errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("MAJOR findings" in error for error in completion_errors)
+
+    intermediate_errors = _findings_errors(tmp_path, report, require_major=False)
+    assert not any("MAJOR findings" in error for error in intermediate_errors)
+
+
+def _minor_finding(**updates: object) -> dict[str, object]:
+    finding: dict[str, object] = {
+        "severity": "MINOR",
+        "profile": "code",
+        "title": "advisory MINOR finding",
+    }
+    finding.update(updates)
+    return finding
+
+
+def test_minor_finding_without_disposition_blocks_completion(tmp_path: Path) -> None:
+    """A surviving MINOR finding with no disposition fails phase completion."""
+    report = _findings_report(
+        findings=[_minor_finding()], counts={"critical": 0, "major": 0, "minor": 1}
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("explicit disposition and reason" in error for error in errors)
+
+
+def test_minor_finding_with_empty_reason_blocks_completion(tmp_path: Path) -> None:
+    """A disposition without meaningful reason text still fails completion."""
+    report = _findings_report(
+        findings=[_minor_finding(disposition="accepted", reason="   ")],
+        counts={"critical": 0, "major": 0, "minor": 1},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert any("explicit disposition and reason" in error for error in errors)
+
+
+def test_minor_finding_with_disposition_and_reason_passes(tmp_path: Path) -> None:
+    """An explicit disposition and non-empty reason satisfies the contract."""
+    report = _findings_report(
+        findings=[
+            _minor_finding(disposition="accepted", reason="tracked for a later phase")
+        ],
+        counts={"critical": 0, "major": 0, "minor": 1},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert not any("disposition" in error for error in errors)
+
+
+def test_minor_disposition_is_not_required_outside_phase_completion(
+    tmp_path: Path,
+) -> None:
+    """Non-completion validation (require_major=False) does not demand a
+    MINOR disposition; that contract is phase-completion-specific."""
+    report = _findings_report(
+        findings=[_minor_finding()], counts={"critical": 0, "major": 0, "minor": 1}
+    )
+    errors = _findings_errors(tmp_path, report, require_major=False)
+    assert not any("disposition" in error for error in errors)
+
+
+def test_forged_counts_inconsistent_with_findings_are_rejected(tmp_path: Path) -> None:
+    """An independently asserted count must match the derived finding list."""
+    report = _findings_report(
+        findings=[_minor_finding(disposition="accepted", reason="tracked")],
+        counts={"critical": 0, "major": 0, "minor": 0},
+    )
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert "findings report counts do not match findings" in errors
+
+
+def _git(args: list[str], cwd: Path) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _init_repo(root: Path) -> None:
+    _git(["init", "-q"], root)
+    _git(["config", "user.email", "test@example.com"], root)
+    _git(["config", "user.name", "Test"], root)
+
+
+def _commit_all(root: Path, message: str) -> str:
+    """Commit the current working tree (or an empty commit) and return its sha."""
+    _git(["add", "-A"], root)
+    _git(["commit", "-q", "--allow-empty", "-m", message], root)
+    return _git(["rev-parse", "HEAD"], root)
+
+
+def _write_big_plan(root: Path, *, slug: str, phases: list[str]) -> None:
+    plans = root / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    phase_lines = "\n".join(f"  - {phase}" for phase in phases)
+    (plans / f"{slug}.md").write_text(
+        "---\n"
+        f"name: {slug}\n"
+        "type: big-plan\n"
+        "status: in-progress\n"
+        "originating_branch: dev\n"
+        f"implementation_branch: {slug}_implementation\n"
+        "phases:\n"
+        f"{phase_lines}\n"
+        f"current_phase: {phases[-1]}\n"
+        "---\n\n# Big Plan\n",
+        encoding="utf-8",
+    )
+
+
+def _historical_metadata(
+    *, branch: str, phase: str, head_sha: str, tree_sha: str
+) -> dict[str, object]:
+    metadata = _metadata()
+    metadata.update(
+        {"branch": branch, "phase": phase, "head_sha": head_sha, "tree_sha": tree_sha}
+    )
+    metadata["control_plane_provenance"] = {
+        "schema_version": verify.CONTROL_PLANE_PROVENANCE_SCHEMA_VERSION,
+        "nested_head": "a" * 40,
+        "runtime_fingerprint": "b" * 64,
+        "tracked_state_fingerprint": "c" * 64,
+        "big_plan_digest": "d" * 64,
+        "small_plan_digest": "e" * 64,
+    }
+    return metadata
+
+
+def _write_historical_phase(
+    root: Path,
+    *,
+    branch: str,
+    phase: str,
+    parent_plan: str,
+    head_sha: str,
+    tree_sha: str,
+) -> None:
+    """Write one complete, hash-consistent historical completed-phase fixture."""
+    plans = root / ".claude" / "plans"
+    reports = root / ".claude" / "quality_reports"
+    logs = root / ".claude" / "session_logs"
+    for directory in (plans, reports, logs):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        f"parent_plan: {parent_plan}\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    phase_receipt_bytes = f"phase-receipt-for-{phase}\n".encode()
+    findings_bytes = json.dumps(
+        {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+    ).encode()
+    log_bytes = b"**Status:** COMPLETED\n"
+    (reports / f"verification-phase-{phase}.json").write_bytes(phase_receipt_bytes)
+    (reports / f"findings-{phase}.json").write_bytes(findings_bytes)
+    (logs / f"{phase}-closeout.md").write_bytes(log_bytes)
+
+    checks = [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+    receipt = verify.build_receipt(
+        "closeout",
+        checks,
+        _historical_metadata(
+            branch=branch, phase=phase, head_sha=head_sha, tree_sha=tree_sha
+        ),
+        {
+            "phase_receipt": {
+                "path": f".claude/quality_reports/verification-phase-{phase}.json",
+                "sha256": hashlib.sha256(phase_receipt_bytes).hexdigest(),
+            },
+            "findings": {
+                "path": f".claude/quality_reports/findings-{phase}.json",
+                "sha256": hashlib.sha256(findings_bytes).hexdigest(),
+            },
+            "closeout_log": {
+                "path": f".claude/session_logs/{phase}-closeout.md",
+                "sha256": hashlib.sha256(log_bytes).hexdigest(),
+            },
+            "documentation": {"status": "NOT_APPLICABLE", "reason": "no docs changed"},
+        },
+    )
+    (reports / f"verification-closeout-{phase}.json").write_text(
+        json.dumps(receipt), encoding="utf-8"
+    )
+
+
+def _historical_chain_fixture(tmp_path: Path) -> tuple[str, str]:
+    """Build one valid two-phase historical chain; return (parent_sha, sha_b).
+
+    Mirrors the real closeout lifecycle: a phase's closeout receipt is
+    generated before its completion commit (stage everything, generate
+    reports and receipts, then commit), so the receipt's ``head_sha`` is the
+    *parent* commit and ``tree_sha`` is the tree of the commit that phase's
+    completion commit actually introduced - never the same commit's own
+    tree. Real file changes are committed at each step so the parent,
+    phase-one, and phase-two trees are genuinely distinct.
+    """
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
+    sha_a = _commit_all(tmp_path, "phase one commit")
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
+    sha_b = _commit_all(tmp_path, "phase two commit")
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=_git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path),
+    )
+    return parent_sha, sha_b
+
+
+def test_historical_chain_accepts_ordered_completed_phase(tmp_path: Path) -> None:
+    """A single earlier completed phase, built the way the real lifecycle
+    produces it - head_sha is the phase's parent commit, tree_sha is the
+    tree its own completion commit introduced, not head_sha's own tree -
+    produces no historical chain errors."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
+
+
+def test_historical_chain_rejects_missing_receipt_head(tmp_path: Path) -> None:
+    """A historical receipt whose head_sha does not resolve to a commit fails."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["head_sha"] = "0" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("does not resolve to a commit" in error for error in errors)
+
+
+def test_historical_chain_rejects_missing_receipt_file(tmp_path: Path) -> None:
+    """A completed historical phase with no closeout receipt at all must fail
+    closed. This is the legacy/migration boundary: a phase predating receipts
+    gets no implicit pass from the terminal receipt covering it."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt_path.unlink()
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("phase-one receipt is invalid" in error for error in errors)
+
+
+def test_historical_chain_rejects_tree_sha_mismatch(tmp_path: Path) -> None:
+    """A historical receipt whose tree_sha matches nothing real must fail."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["tree_sha"] = "f" * 40
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any(
+        "tree_sha does not match the tree introduced by its certified completion "
+        "commit" in error
+        for error in errors
+    )
+
+
+def test_historical_chain_rejects_certified_commit_tree_mismatch(
+    tmp_path: Path,
+) -> None:
+    """A historical receipt's tree_sha must match the tree its certified
+    completion commit introduced, not the tree of head_sha itself. head_sha
+    is the *parent* of the commit the receipt certifies (receipts are
+    generated before their completion commit), so a receipt that instead
+    claims head_sha's own tree - the old, wrong assumption this check used
+    to make - is rejected."""
+    parent_sha, sha_b = _historical_chain_fixture(tmp_path)
+    receipt_path = (
+        tmp_path / ".claude/quality_reports/verification-closeout-phase-one.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["metadata"]["tree_sha"] = _git(
+        ["rev-parse", f"{parent_sha}^{{tree}}"], tmp_path
+    )
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any(
+        "tree_sha does not match the tree introduced by its certified completion "
+        "commit" in error
+        for error in errors
+    )
+
+
+def test_historical_chain_accepts_real_lifecycle_receipt(tmp_path: Path) -> None:
+    """Reproduces the exact real-lifecycle window: stage a phase's changes,
+    capture tree_sha via ``git write-tree`` against that dirty index while
+    head_sha is still the parent commit (as closeout does, since receipts
+    are generated before the completion commit), then commit. The resulting
+    receipt must be accepted once its staged tree becomes a real commit."""
+    _init_repo(tmp_path)
+    parent_sha = _commit_all(tmp_path, "base commit")
+    (tmp_path / "phase-one.txt").write_text("phase one content\n", encoding="utf-8")
+    _git(["add", "-A"], tmp_path)
+    staged_tree = _git(["write-tree"], tmp_path)
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=parent_sha,
+        tree_sha=staged_tree,
+    )
+    _git(["commit", "-q", "-m", "phase one commit"], tmp_path)
+    sha_a = _git(["rev-parse", "HEAD"], tmp_path)
+    assert _git(["rev-parse", f"{sha_a}^{{tree}}"], tmp_path) == staged_tree
+    (tmp_path / "phase-two.txt").write_text("phase two content\n", encoding="utf-8")
+    sha_b = _commit_all(tmp_path, "phase two commit")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
+
+
+def test_historical_chain_rejects_tampered_artifact_bytes(tmp_path: Path) -> None:
+    """Changed findings bytes since the historical receipt was bound must fail."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    findings_path = tmp_path / ".claude/quality_reports/findings-phase-one.json"
+    findings_path.write_text('{"tampered": true}', encoding="utf-8")
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("was tampered with" in error for error in errors)
+
+
+def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
+    """Two earlier completed phases whose actual commit order contradicts the
+    big plan's declared phase order fail the chain, even though each
+    individual receipt is otherwise well-formed on its own."""
+    _init_repo(tmp_path)
+    sha_two = _commit_all(tmp_path, "phase two commit")  # completed first in history
+    sha_one = _commit_all(
+        tmp_path, "phase one commit"
+    )  # declared first, completed second
+    sha_three = _commit_all(tmp_path, "phase three commit")
+    _write_big_plan(
+        tmp_path, slug="big", phases=["phase-one", "phase-two", "phase-three"]
+    )
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=sha_one,
+        tree_sha=_git(["rev-parse", f"{sha_one}^{{tree}}"], tmp_path),
+    )
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-two",
+        parent_plan="big",
+        head_sha=sha_two,
+        tree_sha=_git(["rev-parse", f"{sha_two}^{{tree}}"], tmp_path),
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-three",
+        receipt_head=sha_three,
+    )
+    assert any("is not an ancestor of" in error for error in errors)
+
+
+def test_gate_receipt_errors_wires_in_historical_chain_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The public gate entrypoint - not just the internal helper - calls the
+    historical chain validator once a terminal receipt head is known."""
+    receipt = _closeout_receipt()
+    metadata = receipt["metadata"]
+    assert isinstance(metadata, dict)
+    branch, phase, head = metadata["branch"], metadata["phase"], metadata["head_sha"]
+    assert isinstance(branch, str) and isinstance(phase, str) and isinstance(head, str)
+    closeout_path = verify.receipt_path(tmp_path, "closeout", phase)
+    closeout_path.parent.mkdir(parents=True)
+    closeout_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    monkeypatch.setattr(
+        verify, "historical_chain_errors", lambda *a, **k: ["SENTINEL-HISTORICAL-ERROR"]
+    )
+    errors = verify.gate_receipt_errors(
+        tmp_path,
+        branch=branch,
+        phase=phase,
+        head=head,
+        head_relation="exact",
+        require_major=False,
+        require_ponytail=False,
+        enforce_final_state=False,
+    )
+    assert "SENTINEL-HISTORICAL-ERROR" in errors
+
+
+def test_historical_chain_rejects_ancestor_failure(tmp_path: Path) -> None:
+    """A historical receipt head that is not an ancestor of the next
+    completed phase's head fails the chain."""
+    _init_repo(tmp_path)
+    sha_a = _commit_all(tmp_path, "phase one commit")
+    # sha_b is a sibling branch commit, not a descendant of sha_a.
+    _git(["checkout", "-q", "--orphan", "sibling"], tmp_path)
+    sha_b = _commit_all(tmp_path, "unrelated sibling commit")
+    _write_big_plan(tmp_path, slug="big", phases=["phase-one", "phase-two"])
+    _write_historical_phase(
+        tmp_path,
+        branch="big_implementation",
+        phase="phase-one",
+        parent_plan="big",
+        head_sha=sha_a,
+        # Deliberately never read: the ancestor check runs before the tree
+        # check, so this value must not matter. A sentinel makes that explicit
+        # and fails loudly if the check order ever changes, rather than quietly
+        # depending on the old tree_sha == head_sha^{tree} assumption.
+        tree_sha="0" * 40,
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("is not an ancestor of" in error for error in errors)
 
 
 @pytest.mark.parametrize(
@@ -1437,6 +1906,107 @@ def test_git_paths_preserve_newline_filename(tmp_path: Path) -> None:
     before = verify.hash_paths(tmp_path, paths)
     unusual.write_text("VALUE = 2\n", encoding="utf-8")
     assert verify.hash_paths(tmp_path, paths) != before
+
+
+def test_existing_paths_filters_only_deleted_entries(tmp_path: Path) -> None:
+    """existing_paths keeps files still on disk and drops the rest, nothing
+    more - it is the sole gate between a changed-path list and a tool that
+    must open each target."""
+    (tmp_path / "present.py").write_text("VALUE = 1\n", encoding="utf-8")
+    assert verify.existing_paths(tmp_path, ["present.py", "gone.py"]) == ["present.py"]
+
+
+def test_fast_checks_skips_ruff_when_all_python_paths_are_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reproduces the real defect: a tracked Python file deleted since the
+    base ref (as Phase 1 deleted shared/scripts/quality_score.py) is a
+    legitimate changed path, so VFY-RUFF-001 stays applicable, but it must
+    never be handed to Ruff as an open target - and with no surviving
+    Python path, Ruff must not run at all (an empty target list would
+    silently widen its scope to the whole tree)."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    _commit_all(tmp_path, "delete module")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert metadata["relevant_paths"] == ["mod.py"]
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> tuple[int, str, str]:
+        raise AssertionError("Ruff must not run with no surviving targets")
+
+    monkeypatch.setattr(verify, "_run", fail_if_called)
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["applicable"] is True
+    assert ruff["status"] == "PASS"
+
+
+def test_fast_checks_excludes_deleted_paths_from_ruff_target_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deleted Python path must be dropped from the actual Ruff
+    invocation while a surviving changed Python path is still measured."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    (tmp_path / "kept.py").write_text("VALUE = 2\n", encoding="utf-8")
+    _commit_all(tmp_path, "delete mod.py, add kept.py")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert set(metadata["relevant_paths"]) == {"mod.py", "kept.py"}
+
+    seen_targets: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        seen_targets.extend(arg for arg in args if arg.endswith(".py"))
+        return 0, "[]", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["applicable"] is True
+    assert ruff["status"] == "PASS"
+    assert seen_targets == ["kept.py"]
+
+
+def test_fast_checks_still_fails_a_real_violation_beside_a_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Filtering a deleted path out of Ruff's target list must not weaken a
+    genuine violation reported for a file that still exists."""
+    _init_repo(tmp_path)
+    (tmp_path / "mod.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _commit_all(tmp_path, "add module")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "mod.py").unlink()
+    (tmp_path / "bad.py").write_text("import os\n", encoding="utf-8")
+    _commit_all(tmp_path, "delete mod.py, add bad.py")
+    metadata = verify.state_metadata(tmp_path, "dev")
+    assert set(metadata["relevant_paths"]) == {"mod.py", "bad.py"}
+    violation = [
+        {
+            "cell": None,
+            "code": "F401",
+            "end_location": {"column": 1, "row": 1},
+            "filename": str(tmp_path / "bad.py"),
+            "fix": None,
+            "location": {"column": 1, "row": 1},
+            "message": "`os` imported but unused",
+            "noqa_row": 1,
+            "severity": "error",
+            "url": "https://docs.astral.sh/ruff/rules/unused-import",
+        }
+    ]
+    monkeypatch.setattr(
+        verify, "_run", lambda *_a, **_k: (1, json.dumps(violation), "")
+    )
+    checks = verify.fast_checks(tmp_path, metadata)
+    ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
+    assert ruff["status"] == "FAIL"
 
 
 def test_hash_paths_includes_mode_and_symlink_identity(tmp_path: Path) -> None:

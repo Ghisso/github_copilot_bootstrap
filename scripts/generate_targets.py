@@ -288,6 +288,13 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         REPO_ROOT / "scripts" / "runtime_ownership.py",
         support_root / "scripts" / "runtime_ownership.py",
     )
+    # Plan-frontmatter validation is target-neutral pure-stdlib logic (no
+    # provider paths to transform) and must reach consumers as a hard commit
+    # gate, not stay authoring-repo-only tooling.
+    copy_file(
+        REPO_ROOT / "scripts" / "validate_plan_frontmatter.py",
+        support_root / "scripts" / "validate_plan_frontmatter.py",
+    )
 
     for name in ("plans", "quality_reports", "session_logs"):
         source = REPO_ROOT / "shared" / name / "README.md"
