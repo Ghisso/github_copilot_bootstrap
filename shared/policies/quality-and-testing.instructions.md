@@ -53,7 +53,10 @@ See `tests.instructions.md` for detailed mocking rules.
 
 ## Coverage Target
 
-80%+ on critical paths (`src/`). Run: `uv run pytest tests/ --cov=src --cov-report=term-missing`
+80%+ on critical paths. Bootstrap authoring repositories run
+`uv run pytest tests/ --cov=shared --cov=scripts --cov-report=term-missing`;
+installed consumers run `uv run pytest tests/ --cov=src --cov-report=term-missing`
+(or their project's own configured source root).
 
 Every bug fix MUST include a regression test.
 
@@ -80,7 +83,7 @@ an abnormal exit) is `UNVERIFIED` rather than a silent pass.
 |---|---|---|
 | Any mypy type errors | `mypy --ignore-missing-imports --explicit-package-bases` | `FAIL` |
 | Any pytest failures | `pytest tests/ -q` | `FAIL` |
-| Any ruff violations | `ruff check --output-format=json` | `FAIL` |
+| Any ruff violation or unformatted file | `ruff check --output-format=json` and `ruff format --check` (one `VFY-RUFF-001` check; summary names which half failed) | `FAIL` |
 
 ### Gate metadata (enforced by the commit gate)
 

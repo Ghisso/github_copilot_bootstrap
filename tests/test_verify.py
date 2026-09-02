@@ -130,6 +130,46 @@ def _receipt(status: str = "PASS", content_hash: str = "relevant") -> dict[str, 
     return verify.build_receipt("phase", checks, _metadata(content_hash))
 
 
+# Every phase 1-5 receipt already on disk was persisted with exactly this
+# fixed check set. It is a literal, independent of ``verify.CHECK_IDS``, on
+# purpose: every other receipt fixture in this file derives its check list
+# from ``verify.CHECK_IDS`` (``for check_id in verify.CHECK_IDS``), which
+# means those fixtures always mirror whatever the schema is *today* and can
+# never see a schema change break an *already-persisted* receipt. Adding
+# ``VFY-FMT-001`` to ``CHECK_IDS`` passed 1225 green tests for exactly this
+# reason while invalidating every real phase 1-5 receipt on disk. This
+# literal is the regression guard: if a future change adds, removes, or
+# renames a check ID without a compatibility path, this receipt - built the
+# way real historical receipts were - stops validating against current code.
+_PERSISTED_PHASE_1_5_CHECK_IDS = (
+    "VFY-RUFF-001",
+    "VFY-MYPY-001",
+    "VFY-PYTEST-001",
+    "VFY-FRESH-001",
+    "VFY-FRESH-002",
+    "VFY-GEN-001",
+    "VFY-RECEIPT-001",
+)
+
+
+def test_validate_receipt_accepts_the_already_persisted_check_schema() -> None:
+    """A receipt built with the historical check set must still validate.
+
+    `CHECK_IDS` is part of the receipt schema the gate validates its own
+    history against (`validate_receipt` requires exact set equality), so
+    this must keep holding for any change that does not also migrate every
+    already-persisted receipt.
+    """
+    checks = [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in _PERSISTED_PHASE_1_5_CHECK_IDS
+    ]
+    receipt = verify.build_receipt("phase", checks, _metadata())  # must not raise
+    assert verify.validate_receipt(receipt)["schema_version"] == verify.SCHEMA_VERSION
+
+
 def _exec_historical_verify(
     monkeypatch: pytest.MonkeyPatch, source: bytes, path: Path
 ) -> types.ModuleType:
@@ -291,7 +331,13 @@ def _closeout_receipt() -> dict[str, object]:
     """Build minimal syntactically valid completed evidence references."""
     checks = [
         verify.not_applicable(check_id, "closeout reuses phase evidence")
-        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        if check_id
+        in {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        }
         else verify.check(check_id, "PASS", "measured")
         for check_id in verify.CHECK_IDS
     ]
@@ -861,7 +907,13 @@ def _write_historical_phase(
 
     checks = [
         verify.not_applicable(check_id, "closeout reuses phase evidence")
-        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        if check_id
+        in {
+            "VFY-RUFF-001",
+            "VFY-MYPY-001",
+            "VFY-PYTEST-001",
+            "VFY-GEN-001",
+        }
         else verify.check(check_id, "PASS", "measured")
         for check_id in verify.CHECK_IDS
     ]
@@ -1326,6 +1378,171 @@ def test_timeout_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     assert verify.measure_ruff(REPO_ROOT, ["shared"])["status"] == "UNVERIFIED"
+
+
+@pytest.mark.parametrize(
+    ("stdout", "returncode", "expected"),
+    (
+        ("", 1, "UNVERIFIED"),
+        ("1 file already formatted\n", 1, "UNVERIFIED"),
+        ("1 file already formatted\n", 0, "PASS"),
+        (
+            "Would reformat: shared/scripts/verify.py\n"
+            "1 file would be reformatted, 0 files already formatted\n",
+            1,
+            "FAIL",
+        ),
+        (
+            "Would reformat: shared/scripts/verify.py\n"
+            "1 file would be reformatted, 0 files already formatted\n",
+            0,
+            "UNVERIFIED",
+        ),
+    ),
+    ids=(
+        "empty-nonzero",
+        "clean-output-nonzero",
+        "clean-output-success",
+        "reformat-failure",
+        "reformat-with-success-exit",
+    ),
+)
+def test_ruff_format_measurement_helper_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, stdout: str, returncode: int, expected: str
+) -> None:
+    """The private Ruff-format helper cannot turn a failed measurement into PASS."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (returncode, stdout, "")
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == expected
+
+
+def test_ruff_format_measurement_helper_missing_executable_is_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing verification tool is unverified rather than clean."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("uv")),
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == "UNVERIFIED"
+
+
+def test_ruff_format_measurement_helper_abnormal_exit_is_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-0/1 Ruff format exit is not accepted as a passing or failing check."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        lambda *_args, **_kwargs: (2, "", "internal error"),
+    )
+    status, _detail = verify._ruff_format_measurement(["shared"], cwd=str(REPO_ROOT))
+    assert status == "UNVERIFIED"
+
+
+def _fake_ruff_run(
+    *,
+    lint_rc: int,
+    lint_stdout: str,
+    format_rc: int,
+    format_stdout: str,
+):
+    """Return a `_run` stand-in that answers `ruff check` and `ruff format --check`
+    calls differently, keyed on the literal `"format"` argument the format
+    invocation carries and the lint invocation never does."""
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        if "format" in args:
+            return format_rc, format_stdout, ""
+        return lint_rc, lint_stdout, ""
+
+    return fake_run
+
+
+def test_measure_ruff_folds_lint_and_format_into_one_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """VFY-RUFF-001 stays the single check ID and reports both PASS."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=0,
+            lint_stdout="[]",
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "PASS"
+    assert "lint:" in result["summary"] and "format:" in result["summary"]
+
+
+def test_measure_ruff_fails_on_lint_violation_and_names_lint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lint-only failure still fails VFY-RUFF-001, and the summary says why."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=1,
+            lint_stdout='[{"code": "F401"}]',
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "violation" in result["summary"]
+
+
+def test_measure_ruff_fails_on_format_drift_and_names_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A format-only failure still fails VFY-RUFF-001, and the summary says why."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=0,
+            lint_stdout="[]",
+            format_rc=1,
+            format_stdout=(
+                "Would reformat: shared/scripts/verify.py\n"
+                "1 file would be reformatted, 0 files already formatted\n"
+            ),
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "reformat" in result["summary"]
+
+
+def test_measure_ruff_is_unverified_when_either_half_is_unmeasurable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A tool failure on either half stays UNVERIFIED, never a silent PASS."""
+    monkeypatch.setattr(
+        verify,
+        "_run",
+        _fake_ruff_run(
+            lint_rc=2,
+            lint_stdout="",
+            format_rc=0,
+            format_stdout="1 file already formatted\n",
+        ),
+    )
+    result = verify.measure_ruff(REPO_ROOT, ["shared"])
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "UNVERIFIED"
 
 
 def test_mypy_abnormal_exit_is_unverified(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2320,7 +2537,10 @@ def test_fast_checks_excludes_deleted_paths_from_ruff_target_list(
     ruff = next(item for item in checks if item["id"] == "VFY-RUFF-001")
     assert ruff["applicable"] is True
     assert ruff["status"] == "PASS"
-    assert seen_targets == ["kept.py"]
+    # VFY-RUFF-001 folds `ruff check` and `ruff format --check` into one
+    # check, so the surviving target list reaches Ruff twice - once per
+    # sub-measurement - and "mod.py" must be absent from both.
+    assert seen_targets == ["kept.py", "kept.py"]
 
 
 def test_fast_checks_still_fails_a_real_violation_beside_a_deletion(
@@ -2434,7 +2654,14 @@ def test_measurement_does_not_report_failed_measurement_clean(
 def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Consumer linting adds the runtime exclusion without bypassing Ruff config."""
+    """Consumer linting adds the runtime exclusion without bypassing Ruff config.
+
+    `--config extend-exclude=[...]`, not the bare `--extend-exclude` flag:
+    `ruff check` accepts `--extend-exclude` but `ruff format` rejects it, so
+    both sub-measurements share the `--config` form (see
+    `_ruff_exclude_config_args`) instead of each growing its own flag
+    construction that can silently diverge.
+    """
     captured: list[str] = []
 
     def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
@@ -2455,9 +2682,115 @@ def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
         "check",
         ".",
         "--output-format=json",
-        "--extend-exclude",
-        ".claude",
+        "--config",
+        'extend-exclude=[".claude"]',
     ]
+
+
+def test_consumer_ruff_format_scope_uses_the_same_config_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The format half builds its exclude args identically to the lint half."""
+    captured: list[str] = []
+
+    def fake_run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
+        captured.extend(args)
+        assert cwd == "consumer"
+        return 0, "1 file already formatted\n", ""
+
+    monkeypatch.setattr(verify, "_run", fake_run)
+    status, _detail = verify._ruff_format_measurement(
+        ["."], cwd="consumer", extend_exclude=[".claude"]
+    )
+
+    assert status == "PASS"
+    assert captured == [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        ".",
+        "--config",
+        'extend-exclude=[".claude"]',
+    ]
+    assert "--extend-exclude" not in captured
+
+
+def test_ruff_exclude_config_args_reports_an_unsafe_pattern_instead_of_dropping_it() -> (
+    None
+):
+    """A pattern that cannot round-trip through valid UTF-8 text (an
+    unpaired surrogate) is reported rather than silently dropped."""
+    args, error = verify._ruff_exclude_config_args(["\udc80"])
+    assert args == []
+    assert error == "Ruff exclude pattern cannot be safely represented in TOML"
+
+
+def test_ruff_exclude_config_args_escapes_a_quote_in_the_pattern() -> None:
+    """A pattern containing a double quote produces valid, escaped TOML."""
+    args, error = verify._ruff_exclude_config_args(['weird"name'])
+    assert error is None
+    assert args == ["--config", 'extend-exclude=["weird\\"name"]']
+
+
+def _write_consumer_project(root: Path) -> None:
+    """Write the minimum real files a consumer repo has for Ruff to run."""
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "example-consumer"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (root / "pkg").mkdir()
+
+
+def test_measure_ruff_passes_against_real_ruff_with_excluded_dotclaude(
+    tmp_path: Path,
+) -> None:
+    """End-to-end against installed Ruff, no mocked `_run`.
+
+    A consumer-shaped repo with real, tracked-shaped content passes both
+    halves of VFY-RUFF-001 even though `.claude/` contains a file Ruff would
+    otherwise reformat and flag, proving the `--config` exclusion
+    construction genuinely works against real Ruff. Every prior
+    consumer-scope test either mocked `_run` (argument shape only) or
+    mocked `measure_ruff` itself (`phase_checks` wiring only), which is
+    exactly the gap that let a format-flag regression (`--extend-exclude`
+    on `ruff format`, which real Ruff rejects) survive 1230 green tests.
+    """
+    _write_consumer_project(tmp_path)
+    (tmp_path / "pkg" / "clean.py").write_text(
+        '"""Clean module."""\n\n\ndef greet() -> str:\n    return "hi"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "unformatted.py").write_text("x=1\n", encoding="utf-8")
+
+    result = verify.measure_ruff(tmp_path, ["."], extend_exclude=[".claude"])
+
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "PASS", result["summary"]
+
+
+def test_measure_ruff_still_fails_for_unformatted_file_outside_dotclaude(
+    tmp_path: Path,
+) -> None:
+    """The `.claude` exclusion is scoped, not a blanket pass.
+
+    An unformatted file outside `.claude/` still fails VFY-RUFF-001 against
+    real Ruff, in the same repo shape that would otherwise silently pass if
+    the exclusion construction were broken in the opposite direction (too
+    broad instead of not working at all).
+    """
+    _write_consumer_project(tmp_path)
+    (tmp_path / "pkg" / "unformatted.py").write_text("x=1\n", encoding="utf-8")
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "also_unformatted.py").write_text("y=2\n", encoding="utf-8")
+
+    result = verify.measure_ruff(tmp_path, ["."], extend_exclude=[".claude"])
+
+    assert result["id"] == "VFY-RUFF-001"
+    assert result["status"] == "FAIL"
+    assert "format" in result["summary"]
 
 
 @pytest.mark.parametrize(
@@ -2716,9 +3049,7 @@ def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
     )
 
     # No big plan file is bound to this branch yet.
-    no_plan = verify.unresolved_phase_reason(
-        tmp_path, branch, "", requires_phase=True
-    )
+    no_plan = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
     assert no_plan is not None
     assert "no active phase" in no_plan
 
@@ -2727,9 +3058,7 @@ def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
     )
 
     # A big plan exists but current_phase is blank.
-    no_phase = verify.unresolved_phase_reason(
-        tmp_path, branch, "", requires_phase=True
-    )
+    no_phase = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
     assert no_phase is not None
     assert "no active phase" in no_phase
 
@@ -2743,9 +3072,7 @@ def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
     assert "no active phase" not in malformed
 
     # A resolvable phase leaves nothing to diagnose.
-    (plans / "phase-one.md").write_text(
-        "---\nname: phase-one\n---\n", encoding="utf-8"
-    )
+    (plans / "phase-one.md").write_text("---\nname: phase-one\n---\n", encoding="utf-8")
     assert (
         verify.unresolved_phase_reason(
             tmp_path, branch, "phase-one", requires_phase=True
@@ -2767,9 +3094,7 @@ def test_unresolved_phase_reason_requires_phase_off_implementation_branch(
         assert reason is not None
         assert "no active phase" in reason
         assert (
-            verify.unresolved_phase_reason(
-                tmp_path, branch, "", requires_phase=False
-            )
+            verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=False)
             is None
         )
 
@@ -2842,9 +3167,7 @@ def test_unreadable_small_plan_reports_malformed_not_traceback(
     UID mismatch) must be caught by an actual read attempt, not the
     file-type check alone, and must not crash the run."""
     _skip_if_root()
-    _write_inactive_phase_repo(
-        tmp_path, slug="sample-plan", current_phase="phase-one"
-    )
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
     small_plan = tmp_path / ".claude" / "plans" / "phase-one.md"
     small_plan.write_text("---\nname: phase-one\n---\n", encoding="utf-8")
     small_plan.chmod(0o000)
@@ -2895,9 +3218,7 @@ def test_unresolved_phase_reason_reports_unparseable_frontmatter_distinctly(
     (plans / "sample-plan.md").write_text(
         "not a frontmatter document at all\n", encoding="utf-8"
     )
-    reason = verify.unresolved_phase_reason(
-        tmp_path, branch, "", requires_phase=True
-    )
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
     assert reason is not None
     assert "malformed" in reason
     assert "complete or not yet started" not in reason
@@ -2969,9 +3290,7 @@ def test_closeout_missing_documentation_na_reports_diagnostic_not_traceback(
     """closeout without --documentation-na, when no documentation changed,
     must report a clean diagnostic instead of crashing - this fires on a
     fully valid active phase, unrelated to phase resolution."""
-    _write_inactive_phase_repo(
-        tmp_path, slug="sample-plan", current_phase="phase-one"
-    )
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="phase-one")
     (tmp_path / ".claude" / "plans" / "phase-one.md").write_text(
         "---\nname: phase-one\n---\n", encoding="utf-8"
     )
@@ -3002,9 +3321,7 @@ def test_closeout_artifacts_accepts_documentation_na_unchanged(
     )
     reports = tmp_path / ".claude" / "quality_reports"
     reports.mkdir(parents=True)
-    (reports / f"verification-phase-{phase}.json").write_text(
-        "{}", encoding="utf-8"
-    )
+    (reports / f"verification-phase-{phase}.json").write_text("{}", encoding="utf-8")
     (reports / f"findings-{phase}.json").write_text("{}", encoding="utf-8")
     logs = tmp_path / ".claude" / "session_logs"
     logs.mkdir(parents=True)

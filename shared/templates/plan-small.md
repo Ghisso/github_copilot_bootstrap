@@ -29,10 +29,8 @@ closeout_session_log:
 ## Verification
 
 ```bash
-uv run pytest tests/ -q --tb=short
-uv run mypy src/ --ignore-missing-imports --explicit-package-bases
-uv run ruff check src/ tests/
-uv run python .claude/scripts/verify.py phase --format json --persist
+uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
+uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
 
 ## Closeout Checklist

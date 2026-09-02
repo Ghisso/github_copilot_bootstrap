@@ -56,8 +56,11 @@ git log --oneline -5
 
 ### 5. Quality Check (quick)
 ```bash
-uv run ruff check src/ tests/ --statistics 2>/dev/null | tail -3
+uv run python .claude/scripts/verify.py fast --format json 2>/dev/null
 ```
+
+`fast` selects the repository's real scope instead of assuming a `src/`
+layout.
 
 ## Report Format
 

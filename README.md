@@ -251,6 +251,15 @@ governing plan or runtime do make it stale and require the affected evidence
 to be regenerated before continuing. If a governing plan or runtime change
 occurs during the upgrade, rerun the verification and closeout sequence.
 
+`verify phase`/`verify closeout` also measure `ruff format --check`, folded
+into the existing `VFY-RUFF-001` check rather than a new check ID (a new ID
+would invalidate every already-persisted receipt, since the gate validates
+its own history against the exact recorded check set). A consumer refreshed
+mid-plan whose already-tracked files are not yet formatted will newly fail
+`VFY-RUFF-001`'s format half even though nothing about their plan changed.
+Recovery is one command — `uv run ruff format` — then rerun the verification
+and closeout sequence above.
+
 When self-installing this repository, ignored generated overlays under the root
 `.github/` tree are valid only when they are byte-identical to generated output.
 Validation rejects a tracked, unignored, or stale overlay; keep editable source
@@ -782,7 +791,7 @@ Expected verification commands after implementation:
 - uv run pytest tests/ -q --tb=short
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
-- uv run ruff format src/ tests/
+- uv run ruff format --check src/ tests/
 - uv run python .claude/scripts/verify.py fast --format json
 - uv run python .claude/scripts/verify.py phase --format json --persist
 - uv run python .claude/scripts/verify.py closeout --format json --persist [--documentation-na "<reason>"]

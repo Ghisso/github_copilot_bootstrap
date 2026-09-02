@@ -350,7 +350,15 @@ The bootstrap authoring repository retains its explicit `shared`, `scripts`,
 and `tests` scope. The commit/push/PR gates themselves are Bash 3.2 plus
 Python 3 standard-library JSON parsing; they have no `uv` dependency and
 remain enforceable when `uv` is absent. Only `verify.py phase`/`closeout`
-(which run `ruff`, `mypy`, and `pytest`) need the project environment.
+(which run `ruff check`, `ruff format --check`, `mypy`, and `pytest`) need the
+project environment. `VFY-RUFF-001` folds `ruff format --check` in alongside
+`ruff check` under the same scope selection, rather than a separate check ID
+— `CHECK_IDS` is part of the receipt schema the gate validates its own
+history against, so a new ID would invalidate every already-persisted
+receipt. The summary distinguishes `lint:`/`format:` so a failure is still
+diagnosable. A consumer refreshed mid-plan whose tracked files are not yet
+formatted will newly fail `VFY-RUFF-001`'s format half; the recovery is
+`uv run ruff format` (see "Mid-plan consumer upgrade" above).
 
 When routing selects the `ponytail` profile, `record_findings.py --profile
 ponytail` always emits `ponytail_reviewed: true` and a numeric

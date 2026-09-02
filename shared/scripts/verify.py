@@ -1905,14 +1905,70 @@ def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+def _toml_basic_string(value: str) -> str | None:
+    """Return a quoted TOML basic-string literal for value, or None when
+    value cannot round-trip through valid UTF-8 text (for example an
+    unpaired surrogate), which TOML requires and which no amount of
+    character escaping can repair."""
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return None
+    named = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+    escaped = "".join(
+        named.get(ch, ch if 0x20 <= ord(ch) != 0x7F else f"\\u{ord(ch):04x}")
+        for ch in value
+    )
+    return f'"{escaped}"'
+
+
+def _ruff_exclude_config_args(
+    extend_exclude: list[str] | None,
+) -> tuple[list[str], str | None]:
+    """Return shared `--config extend-exclude=[...]` args for both Ruff
+    subcommands, or an error summary if a pattern is unsafe.
+
+    `ruff format` rejects the `--extend-exclude` flag that `ruff check`
+    accepts, so both use the generic `--config` override instead — one
+    construction path for both, so the two cannot diverge again.
+
+    Values are Ruff glob patterns, not literal path segments. A pattern
+    containing `[`, `]`, `\\`, `*`, `?`, `{`, or `}` may produce valid TOML
+    that Ruff accepts while matching something other than the literal path a
+    caller intended - `[1]` is a character class and `\\` escapes. The only
+    caller passes the fixed literal `.claude`, which has no glob
+    metacharacters; a future caller passing a less trivial pattern must
+    account for this. TOML-unsafe patterns are rejected above, but a
+    glob-ambiguous one cannot be distinguished from a deliberate glob here.
+    """
+    if not extend_exclude:
+        return [], None
+    literals: list[str] = []
+    for pattern in extend_exclude:
+        literal = _toml_basic_string(pattern)
+        if literal is None:
+            return [], "Ruff exclude pattern cannot be safely represented in TOML"
+        literals.append(literal)
+    return ["--config", "extend-exclude=[" + ",".join(literals) + "]"], None
+
+
 def _ruff_measurement(
     targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
 ) -> tuple[str, str]:
     """Measure Ruff without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
     try:
-        args = ["uv", "run", "ruff", "check", *targets, "--output-format=json"]
-        for pattern in extend_exclude or []:
-            args.extend(("--extend-exclude", pattern))
+        args = [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            *targets,
+            "--output-format=json",
+            *config_args,
+        ]
         rc, stdout, stderr = _run(args, cwd=cwd)
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff did not run: {error}"
@@ -1938,6 +1994,40 @@ def _ruff_measurement(
     if rc == 0:
         return "PASS", "Ruff completed with 0 violations"
     return "FAIL", f"Ruff reported {len(violations)} violation(s)"
+
+
+def _ruff_format_measurement(
+    targets: list[str], cwd: str = ".", *, extend_exclude: list[str] | None = None
+) -> tuple[str, str]:
+    """Measure Ruff formatting compliance without treating failed measurement as a clean result."""
+    config_args, config_error = _ruff_exclude_config_args(extend_exclude)
+    if config_error is not None:
+        return "UNVERIFIED", config_error
+    try:
+        args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
+        rc, stdout, stderr = _run(args, cwd=cwd)
+    except (OSError, subprocess.SubprocessError) as error:
+        return "UNVERIFIED", f"Ruff format did not run: {error}"
+    if rc not in {0, 1}:
+        return (
+            "UNVERIFIED",
+            f"Ruff format exited abnormally ({rc}): {(stderr or stdout).strip()}",
+        )
+    output = stdout + stderr
+    reformat_count = len(re.findall(r"^Would reformat: ", output, re.MULTILINE))
+    if rc == 0 and reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format reported reformattable files with a successful exit status",
+        )
+    if rc == 1 and not reformat_count:
+        return (
+            "UNVERIFIED",
+            "Ruff format failed without reporting any reformattable files",
+        )
+    if rc == 0:
+        return "PASS", "Ruff format completed with 0 files needing reformatting"
+    return "FAIL", f"Ruff format would reformat {reformat_count} file(s)"
 
 
 def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, str]:
@@ -2023,10 +2113,23 @@ def _pytest_measurement(
 def measure_ruff(
     root: Path, targets: list[str], *, extend_exclude: list[str] | None = None
 ) -> dict[str, object]:
-    """Adapt the strict Ruff measurement into a receipt check."""
-    status, detail = _ruff_measurement(
+    """Adapt the strict Ruff lint+format measurement into one receipt check.
+
+    Folds ``ruff format --check`` into ``VFY-RUFF-001`` instead of a separate
+    check ID. ``CHECK_IDS`` is part of the receipt schema the gate validates
+    its own history against (``validate_receipt`` requires every historical
+    receipt to contain exactly this check set), so adding an ID would
+    invalidate every already-persisted phase receipt rather than only
+    affecting new ones.
+    """
+    lint_status, lint_detail = _ruff_measurement(
         targets, cwd=str(root), extend_exclude=extend_exclude
     )
+    format_status, format_detail = _ruff_format_measurement(
+        targets, cwd=str(root), extend_exclude=extend_exclude
+    )
+    status = aggregate_status([{"status": lint_status}, {"status": format_status}])
+    detail = f"lint: {lint_detail} | format: {format_detail}"
     return check("VFY-RUFF-001", status, detail)
 
 
@@ -2598,9 +2701,7 @@ def main() -> int:
     else:
         checks = closeout_checks(root, metadata)
     if args.mode == "closeout":
-        doc_na_reason = missing_documentation_na_reason(
-            metadata, args.documentation_na
-        )
+        doc_na_reason = missing_documentation_na_reason(metadata, args.documentation_na)
         if doc_na_reason is not None:
             print(doc_na_reason, file=sys.stderr)
             return 2

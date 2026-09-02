@@ -99,7 +99,8 @@ asyncio_mode = auto
 
 ## Coverage Requirements
 
-- 80%+ coverage on `src/` paths
+- 80%+ coverage on critical paths (`src/` for an installed consumer, or
+  `shared`/`scripts` in the bootstrap authoring repository)
 - Every bug fix includes a regression test
 - Edge cases: empty input, None, boundary values, error paths
 

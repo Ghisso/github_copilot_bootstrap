@@ -159,7 +159,9 @@ def test_native_role_matrix_uses_the_calibrated_codex_planner_tier() -> None:
     assert native.valid_universal_role_matrix(
         role_records(native.CODEX_HISTORICAL_UNIVERSAL_ROLES)
     )
-    assert not native.valid_role_matrix(role_records(native.CODEX_HISTORICAL_UNIVERSAL_ROLES))
+    assert not native.valid_role_matrix(
+        role_records(native.CODEX_HISTORICAL_UNIVERSAL_ROLES)
+    )
     for role in native.CODEX_CURRENT_UNIVERSAL_ROLES:
         drifted_roles = dict(EXPECTED_CURRENT_CODEX_ROLES)
         role_type, _model, effort = drifted_roles[role]
