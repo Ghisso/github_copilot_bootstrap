@@ -99,11 +99,24 @@ and must appear in the big plan's `phases` list. Fill:
   function/class signatures (contracts, with type hints), the behavior and edge
   cases in prose, must/must-not constraints, and the test scenarios + verify
   command. Let the coding agent adapt bodies to the actual codebase.
-- **Verification** — the exact commands (pytest, mypy, ruff, and the
-  `quality_score.py` invocation with `--phase`/`--base-ref dev`/`--out`).
+- **Verification** — the exact commands (pytest, mypy, ruff, and
+  `uv run python .claude/scripts/verify.py phase --format json --persist`).
 - **Closeout Checklist** — leave the template's checklist; it gates the normal
   completion commit. An explicitly requested paused checkpoint uses its own
   evidence path and does not complete or advance the phase.
+
+**The last phase in the big plan's `phases:` list must add a documentation,
+memory, and LEARN audit step**: sweep every live-advice surface (root
+guidance, `docs/`, shared policies/skills/templates/agents/review-profiles,
+state READMEs, and `.claude/MEMORY.md`) for claims this plan or earlier work
+invalidated, correct or supersede each one, leave dated records (archived
+plans, dated design narratives, closed session logs) unchanged unless an
+entry would actively mislead a reader and no receipt binds its log, and
+record the audited surfaces and each one's outcome under a `## Stale-claims
+surfaces checked` heading in that phase's closeout session log. Do not limit
+the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
+closeout gate requires it, with non-empty content, whenever the phase it is
+closing out is this list's last entry.
 
 ### Step 5: Cross-Phase Consistency
 

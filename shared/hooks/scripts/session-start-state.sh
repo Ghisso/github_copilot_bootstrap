@@ -37,16 +37,8 @@ for phase in ${phases[@]+"${phases[@]}"}; do
 done
 
 current_phase="$(fm_read "$BIG_PLAN" "current_phase" || true)"
-last_score=""
-score_file="$(find "$REPO_ROOT/.claude/quality_reports" -maxdepth 1 -name 'score-*.json' -type f 2>/dev/null | sort -r | sed -n '1p')"
-if [[ -n "$score_file" ]]; then
-  last_score="$(json_file_number_value "$score_file" "score" 2>/dev/null || true)"
-fi
 
 message="Implementation branch $CURRENT_BRANCH: big plan $SLUG, phases done=$done_count pending=$pending_count, current_phase=${current_phase:-none}"
-if [[ -n "$last_score" ]]; then
-  message="$message, last_score=$last_score"
-fi
 
 if git -C "$REPO_ROOT" rev-parse --verify origin/dev >/dev/null 2>&1; then
   if git -C "$REPO_ROOT" branch -r --merged origin/dev | grep -Eq "origin/${CURRENT_BRANCH}$"; then

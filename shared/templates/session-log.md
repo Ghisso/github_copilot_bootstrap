@@ -22,8 +22,11 @@ identifier when applicable.
 
 ## [LEARN] Entries
 
-- [LEARN:category] [what was learned]
-- [LEARN] none - no new lessons this session
+Add one bullet per real lesson, formatted as `[LEARN:category] what was
+learned`. If nothing new was learned this session, use the exact
+no-new-lessons marker documented in `.claude/session_logs/README.md`
+instead. Delete this paragraph; an untouched template with no bullet line
+here fails closeout.
 
 ## Verification Results
 
@@ -31,10 +34,8 @@ identifier when applicable.
 # pytest output
 # mypy output
 # ruff output
-# quality_score.py output/report path
+# verify.py phase/closeout receipt path
 ```
-
-## Score: N/100
 
 ## Open Questions / Next Steps
 

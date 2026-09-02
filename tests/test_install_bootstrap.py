@@ -169,18 +169,7 @@ def _write_lifecycle_reports(consumer: Path, metadata: dict[str, object]) -> Non
     }
     reports = consumer / ".claude" / "quality_reports"
     reports.mkdir(exist_ok=True)
-    (reports / "score-lifecycle.json").write_text(
-        json.dumps(
-            {
-                **report_fields,
-                "score": 100,
-                "tests_passed": True,
-                "tests_skipped": False,
-            }
-        ),
-        encoding="utf-8",
-    )
-    (reports / "findings-lifecycle.json").write_text(
+    (reports / f"findings-{phase}.json").write_text(
         json.dumps(
             {
                 **report_fields,
@@ -206,6 +195,9 @@ def _write_lifecycle_plans(consumer: Path) -> tuple[Path, Path]:
 name: consumer-lifecycle
 type: big-plan
 status: in-progress
+originating_branch: dev
+implementation_branch: consumer-lifecycle_implementation
+started_at: 2026-01-01T00:00:00Z
 current_phase: phase-one
 phases:
   - phase-one
@@ -228,7 +220,10 @@ closeout_session_log: .claude/session_logs/lifecycle.md
     log = consumer / ".claude" / "session_logs" / "lifecycle.md"
     log.parent.mkdir(exist_ok=True)
     log.write_text(
-        "**Status:** COMPLETED\n\n[LEARN] none - no new lessons this session\n",
+        "**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n"
+        "## Stale-claims surfaces checked\n\n"
+        "Checked README.md; no stale claims found.\n",
         encoding="utf-8",
     )
     return big_plan, small_plan
@@ -433,7 +428,7 @@ testpaths = ["tests"]
     assert legacy_receipt.read_bytes() == legacy_receipt_bytes
     assert legacy_closeout_receipt.read_bytes() == legacy_closeout_receipt_bytes
     assert small_plan.read_bytes() == legacy_small_plan_bytes
-    assert "SCHEMA_VERSION = 3" in legacy_runtime.read_text(encoding="utf-8")
+    assert "SCHEMA_VERSION = 4" in legacy_runtime.read_text(encoding="utf-8")
     assert _trace_remote_git_commands(refresh_trace) == set()
     assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
     small_plan.write_text(legacy_complete_small_plan, encoding="utf-8")
@@ -592,8 +587,7 @@ testpaths = ["tests"]
 
     for artifact in (
         consumer / ".claude" / "quality_reports" / "verification-phase-phase-one.json",
-        consumer / ".claude" / "quality_reports" / "score-lifecycle.json",
-        consumer / ".claude" / "quality_reports" / "findings-lifecycle.json",
+        consumer / ".claude" / "quality_reports" / "findings-phase-one.json",
         consumer / ".claude" / "session_logs" / "lifecycle.md",
         consumer
         / ".claude"

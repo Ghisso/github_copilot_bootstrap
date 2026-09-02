@@ -36,6 +36,7 @@ from generate_targets import (
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
+    STATE_DIR_OWNED_README_PATHS,
     bootstrap_root_paths,
     render_restore_script,
 )
@@ -156,7 +157,7 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
 )
 ORCHESTRATOR_LIFECYCLE_REQUIRED = (
     "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
-    "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90",
+    "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
     "3. **PLAN WHEN NEEDED:**",
     "4. **IMPLEMENT:**",
     "5. **VERIFY:**",
@@ -557,8 +558,8 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         ".claude/MEMORY.md",
         "<plan_name>_implementation",
         ".claude/skills/ponytail/SKILL.md",
-        "score is at least 90",
-        "CLOSEOUT updates required documentation, persists findings and score",
+        "`verify phase` reports PASS",
+        "CLOSEOUT updates required documentation, persists findings",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -2393,12 +2394,17 @@ def validate_agents(errors: list[str]) -> None:
             f"generated agent must not diff against main...HEAD (use originating_branch/dev): {path}",
             errors,
         )
-        # R-AGENTS-08: only the orchestrator writes persisted score reports;
-        # coder and reviewer never create final closeout artifacts.
-        if "--json --out" in text:
+        # R-AGENTS-08: only the orchestrator persists findings evidence;
+        # coder and reviewer must never gain their own record_findings.py
+        # --out invocation (the orchestrator owns final closeout evidence).
+        # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
+        # reflow wrapping the invocation across a line break.
+        # The bound must clear the canonical long-form invocation documented in
+        # quality-and-testing.instructions.md, whose flag run is 132 characters.
+        if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
             check(
                 path.stem == "orchestrator",
-                f"only the orchestrator may write a persisted score report (--json --out): {path}",
+                f"only the orchestrator may persist findings evidence (record_findings.py ... --out): {path}",
                 errors,
             )
 
@@ -3587,9 +3593,7 @@ def git_actor_env(actor: str) -> dict[str, str]:
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
-    if path.parent.name == "quality_reports" and path.name.startswith(
-        ("score-", "findings-")
-    ):
+    if path.parent.name == "quality_reports" and path.name.startswith("findings-"):
         write_fixture_closeout_receipt(path.parents[2])
 
 
@@ -3732,7 +3736,7 @@ type: big-plan
 status: {status}
 {duplicate_status_line}originating_branch: dev
 implementation_branch: foo_implementation
-started_at:
+started_at: 2026-01-01T00:00:00Z
 phases:
 {phase_lines}
 current_phase: {current_phase}
@@ -4061,15 +4065,16 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         write(repo / "work.txt", "work\n")
         git(repo, "add", "work.txt")
         write(
-            repo / ".claude" / "quality_reports" / "score-test.json",
+            repo / ".claude" / "quality_reports" / "findings-phase-one.json",
             json.dumps(
                 {
-                    "score": 95,
+                    "findings": [],
+                    "counts": {"critical": 0, "major": 0, "minor": 0},
                     "branch": "foo_implementation",
                     "phase": "phase-one",
                     "generated_at": "2099-01-01T00:00:00Z",
@@ -4078,7 +4083,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             )
             + "\n",
         )
-        os.utime(repo / ".claude" / "quality_reports" / "score-test.json", None)
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -4096,7 +4100,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         check(
             '"permissionDecision":"deny"' in stdout,
-            "commit gate must reject score reports missing required metadata",
+            "commit gate must reject findings reports missing required metadata",
             errors,
         )
 
@@ -4112,35 +4116,6 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             check=False,
         ).stdout.strip()
         reports_dir = repo / ".claude" / "quality_reports"
-
-        def score_report(**overrides: object) -> dict[str, object]:
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash,
-                "changed_files": ["work.txt"],
-            }
-            report.update(overrides)
-            return report
-
-        def clear_reports() -> None:
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-
-        def write_score(report: dict[str, object]) -> None:
-            clear_reports()
-            path = reports_dir / "score-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
 
         def findings_report(**overrides: object) -> dict[str, object]:
             report: dict[str, object] = {
@@ -4174,34 +4149,20 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
                 )
             return report
 
-        def clear_findings() -> None:
-            for stale in reports_dir.glob("findings-*.json"):
-                stale.unlink()
-
         def write_findings(report: dict[str, object]) -> None:
-            clear_findings()
-            path = reports_dir / "findings-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
+            write(
+                reports_dir / "findings-phase-one.json",
+                json.dumps(report, indent=2) + "\n",
+            )
 
-        # A clean findings report stays valid for every score-axis probe below
-        # (HEAD does not move until the real commit lands further down), so
-        # each probe's denial is attributable to the score axis under test,
-        # not to a findings report that happens to be missing too.
-        write_findings(findings_report())
-
-        # R-SCORE-01: tests_passed:false / missing, tests_skipped:true, or
-        # dirty:true must all be denied even at a passing score.
+        # R-FINDINGS-01: dirty:true, a stale head_sha, or a stale content_hash
+        # must each be denied even with an otherwise clean findings report.
         for label, report in (
-            ("tests_passed:false", score_report(tests_passed=False)),
-            (
-                "tests_passed missing",
-                {k: v for k, v in score_report().items() if k != "tests_passed"},
-            ),
-            ("tests_skipped:true", score_report(tests_skipped=True)),
-            ("dirty:true", score_report(dirty=True)),
+            ("dirty:true", findings_report(dirty=True)),
+            ("stale head_sha", findings_report(head_sha="0" * 40)),
+            ("stale content_hash", findings_report(content_hash="deadbeef")),
         ):
-            write_score(report)
+            write_findings(report)
             returncode, stdout, stderr = run_hook(
                 lifecycle_script(repo, "enforce-commit-gate.sh"),
                 {
@@ -4216,83 +4177,11 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
             )
             check(
                 '"permissionDecision":"deny"' in stdout,
-                f"commit gate must deny score report with {label} even at score 95",
+                f"commit gate must deny a findings report with {label}",
                 errors,
             )
 
-        # R-SCORE-02: select the newest report by generated_at, not filename.
-        # Older passing report has a lexically-later filename; newer failing
-        # report has a lexically-earlier one. The gate must pick the newer.
-        clear_reports()
-        write(
-            reports_dir / "score-zzz.json",
-            json.dumps(score_report(generated_at="2099-01-01T00:00:00Z"), indent=2)
-            + "\n",
-        )
-        write(
-            reports_dir / "score-aaa.json",
-            json.dumps(
-                score_report(score=50, generated_at="2099-06-01T00:00:00Z"), indent=2
-            )
-            + "\n",
-        )
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0,
-            f"commit report-selection case failed to run: {stderr}",
-            errors,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must select the newest report by generated_at",
-            errors,
-        )
-
-        # R-SCORE-02: an amended-HEAD / stale report yields a diagnosable message.
-        write_score(score_report(head_sha="0" * 40))
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must deny a stale-HEAD report",
-            errors,
-        )
-
-        # R-SCORE-02: content edited since scoring is caught by the content hash.
-        write_score(score_report(content_hash="deadbeef"))
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "enforce-commit-gate.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1 closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            '"permissionDecision":"deny"' in stdout,
-            "commit gate must deny a content_hash mismatch",
-            errors,
-        )
-
-        write_score(score_report())
-        # findings-test.json is still the clean baseline written before the
-        # R-SCORE-01 loop above; only score-*.json has been swapped since.
+        write_findings(findings_report())
 
         returncode, stdout, stderr = run_hook(
             lifecycle_script(repo, "enforce-commit-gate.sh"),
@@ -4494,6 +4383,14 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             "paused checkpoint must require a matching current small-plan identity",
             errors,
         )
+        # assert_plan_frontmatter now hard-validates every .claude/plans/*.md
+        # file, not only the ones the active big plan references; the rogue
+        # fixtures above (rogue.md, phase-rogue.md) are deliberately malformed
+        # stand-ins for a different bash-level check and must not leak into
+        # the real commit-gate invocation below.
+        for stale_plan in (repo / ".claude" / "plans").glob("*.md"):
+            if stale_plan.name not in {"foo.md", "phase-paused.md"}:
+                stale_plan.unlink()
         write_big_plan(
             repo,
             status="in-progress",
@@ -5225,6 +5122,72 @@ printf '%s\\n' "${{failures[@]}}"
                 errors,
             )
 
+        def commit_failures() -> list[str]:
+            """Exercise assert_commit_invariants with receipt/findings
+            machinery stubbed out, isolating the plan/status/cancellation
+            ceremony it enforces from the separately-tested receipt gate."""
+            expression = f"""
+. {shlex.quote(str(library))}
+assert_completed_receipt() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(repo))} foo_implementation
+if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
+"""
+            result = subprocess.run(
+                ["bash", "-lc", expression],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                result.returncode == 0,
+                f"cancelled commit invariant fixture failed: {result.stderr}",
+                errors,
+            )
+            return result.stdout.splitlines()
+
+        # R-LIFECYCLE-02: a sibling cancelled phase (not the current phase)
+        # must satisfy the standard cancellation evidence contract at commit
+        # time too, not only at push/PR time.
+        # assert_plan_frontmatter now hard-validates every .claude/plans/*.md
+        # file, not only the ones this scenario's big plan references; clear
+        # earlier scenarios' disposable, intentionally-malformed fixtures
+        # (duplicate-status probes, the six-cancelled-phase inventory) first
+        # so they cannot leak into this narrower scenario.
+        for stale_plan in (repo / ".claude" / "plans").glob("*.md"):
+            if stale_plan.name != "foo.md":
+                stale_plan.unlink()
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-complete", "phase-cancelled"),
+            current_phase="phase-complete",
+        )
+        write_small_plan(repo, status="complete", phase="phase-complete")
+        write(
+            repo / ".claude" / "session_logs" / "phase-complete-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n",
+        )
+        write_small_plan(
+            repo, status="cancelled", phase="phase-cancelled", evidence_exists=False
+        )
+        (repo / ".claude" / "session_logs" / "phase-cancelled-cancelled.md").unlink(
+            missing_ok=True
+        )
+        check(
+            any("evidence file is missing" in failure for failure in commit_failures()),
+            "commit gate must reject a sibling cancelled phase without cancellation evidence",
+            errors,
+        )
+
+        write_small_plan(repo, status="cancelled", phase="phase-cancelled")
+        check(
+            commit_failures() == [],
+            "commit gate must accept a valid sibling cancelled phase alongside a completed current phase",
+            errors,
+        )
+
         def run_closeout() -> None:
             returncode, _, stderr = run_hook(
                 lifecycle_script(repo, "record-commit-closeout.sh"),
@@ -5429,13 +5392,8 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
-        # Pin MEMORY.md's mtime safely in the past so the mtime-based LEARN
-        # fallback (memory_mtime >= plan_mtime) cannot flip true/false on
-        # filesystem clock resolution during the "missing LEARN" case below.
-        old = 1_000_000_000
-        os.utime(repo / ".claude" / "MEMORY.md", (old, old))
 
         reports_dir = repo / ".claude" / "quality_reports"
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
@@ -5453,37 +5411,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
                 check=False,
             ).stdout.strip()
             return head, content_hash
-
-        def score_report(
-            head_sha: str, content_hash_value: str, **overrides: object
-        ) -> dict[str, object]:
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash_value,
-                "changed_files": ["work.txt"],
-            }
-            report.update(overrides)
-            return report
-
-        def clear_scores() -> None:
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-
-        def write_score(report: dict[str, object]) -> None:
-            clear_scores()
-            path = reports_dir / "score-test.json"
-            write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
 
         def findings_report(
             head_sha: str, content_hash_value: str, **overrides: object
@@ -5525,9 +5452,8 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
 
         def write_findings(report: dict[str, object]) -> None:
             clear_findings()
-            path = reports_dir / "findings-test.json"
+            path = reports_dir / "findings-phase-one.json"
             write(path, json.dumps(report, indent=2) + "\n")
-            os.utime(path, None)
 
         write(repo / "work.txt", "work\n")
         git(repo, "add", ".")
@@ -5537,44 +5463,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode != 0,
-            f"commit-msg hook must block a commit with no quality report: {result.stdout}{result.stderr}",
+            f"commit-msg hook must block a commit with no findings report: {result.stdout}{result.stderr}",
             errors,
         )
 
         head_sha, content_hash = head_and_hash()
 
-        # A clean findings report stays valid for every score/plan/closeout/
-        # LEARN probe below (HEAD does not move until the "fully valid"
-        # commit lands further down), so each probe's denial is attributable
-        # to the axis under test, not to a findings report missing too.
+        # A clean findings report stays valid for every plan/closeout/LEARN
+        # probe below (HEAD does not move until the "fully valid" commit
+        # lands further down), so each probe's denial is attributable to the
+        # axis under test, not to a findings report missing too.
         write_findings(findings_report(head_sha, content_hash))
 
-        write_score(score_report(head_sha, content_hash, score=50))
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must block a quality score below 90",
-            errors,
-        )
-
-        write_score(score_report(head_sha, content_hash, content_hash="deadbeef"))
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must block a stale content_hash",
-            errors,
-        )
-
-        # From here the score itself is valid; each remaining axis breaks
-        # exactly one other input and restores it before the next.
-        write_score(score_report(head_sha, content_hash))
-
-        # R-SCORE-03e: findings-report axis probes, score held valid throughout.
+        # R-FINDINGS-01: findings-report axis probes.
         clear_findings()
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode != 0,
-            "commit-msg hook must block a commit with a valid score but no findings report",
+            "commit-msg hook must block a commit with no findings report",
             errors,
         )
 
@@ -5604,6 +5510,35 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
+        # R-LIFECYCLE-01: an open MAJOR finding now blocks the
+        # phase-completion commit itself (small plan status: complete),
+        # rather than only the later push/PR.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MAJOR",
+                        "title": "missing input validation on upload handler",
+                        "file": "work.txt",
+                    }
+                ],
+                counts={"critical": 0, "major": 1, "minor": 0},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0,
+            "commit-msg hook must block the phase-completion commit with an open MAJOR finding",
+            errors,
+        )
+        check(
+            "missing input validation on upload handler" in result.stderr,
+            "commit-msg hook's MAJOR-finding failure must name the finding",
+            errors,
+        )
+
         optional_report = findings_report(head_sha, content_hash)
         optional_report.pop("ponytail_reviewed")
         optional_report.pop("ponytail_findings")
@@ -5618,6 +5553,9 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         if result.returncode == 0:
             git(repo, "reset", "--soft", "HEAD~1")
 
+        # R-LIFECYCLE-01: a surviving MINOR finding needs an explicit
+        # disposition and reason at the phase-completion commit; without one
+        # it now blocks, matching the MAJOR/CRITICAL findings-report gate.
         write_findings(
             findings_report(
                 head_sha,
@@ -5635,8 +5573,33 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
+            result.returncode != 0
+            and "explicit disposition and reason" in result.stderr,
+            "commit-msg hook must block a MINOR finding without an explicit disposition",
+            errors,
+        )
+
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MINOR",
+                        "title": "yagni: unused abstraction",
+                        "file": "work.txt",
+                        "profile": "ponytail",
+                        "disposition": "accepted",
+                        "reason": "tracked for a later cleanup phase",
+                    }
+                ],
+                counts={"critical": 0, "major": 0, "minor": 1},
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
             result.returncode == 0,
-            "commit-msg hook must allow an advisory Ponytail MINOR finding",
+            "commit-msg hook must allow an advisory Ponytail MINOR finding with an explicit disposition and reason",
             errors,
         )
         if result.returncode == 0:
@@ -5649,7 +5612,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         )
         git(repo, "add", ".codex/config.toml")
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         required_report = findings_report(head_sha, content_hash)
         required_report.pop("ponytail_reviewed")
         required_report.pop("ponytail_findings")
@@ -5673,56 +5635,24 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        # R-SCORE-03e: select the newest findings report by generated_at, not
-        # filename order - mirrors the score report's R-SCORE-02 rule. The
-        # older report has a lexically-LATER filename and is clean; the newer
-        # one has a lexically-EARLIER filename and carries a CRITICAL finding.
-        clear_findings()
-        write(
-            reports_dir / "findings-zzz.json",
-            json.dumps(
-                findings_report(
-                    head_sha, content_hash, generated_at="2099-01-01T00:00:00Z"
-                ),
-                indent=2,
+        # R-LIFECYCLE-01: the same open MAJOR finding must not, by itself,
+        # additionally block a commit that is not the phase-completion one -
+        # this one is already blocked for an unrelated reason (status is not
+        # yet complete), and the MAJOR finding must not appear as a reason too.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                findings=[
+                    {
+                        "severity": "MAJOR",
+                        "title": "in-progress MAJOR finding",
+                        "file": "work.txt",
+                    }
+                ],
+                counts={"critical": 0, "major": 1, "minor": 0},
             )
-            + "\n",
         )
-        write(
-            reports_dir / "findings-aaa.json",
-            json.dumps(
-                findings_report(
-                    head_sha,
-                    content_hash,
-                    generated_at="2099-06-01T00:00:00Z",
-                    findings=[
-                        {
-                            "severity": "CRITICAL",
-                            "title": "newer critical wins",
-                            "file": "work.txt",
-                        }
-                    ],
-                    counts={"critical": 1, "major": 0, "minor": 0},
-                ),
-                indent=2,
-            )
-            + "\n",
-        )
-        result = git(repo, "commit", "-m", "phase 1 closeout")
-        check(
-            result.returncode != 0,
-            "commit-msg hook must select the newest findings report by generated_at",
-            errors,
-        )
-        check(
-            "newer critical wins" in result.stderr,
-            "commit-msg hook must use the newer (CRITICAL) findings report, not the lexically-later clean one",
-            errors,
-        )
-
-        # Restore the clean baseline before the remaining axis probes below.
-        write_findings(findings_report(head_sha, content_hash))
-
         write_small_plan(repo, status="in-progress")
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
@@ -5730,7 +5660,13 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             "commit-msg hook must block an incomplete small plan",
             errors,
         )
+        check(
+            "MAJOR findings" not in result.stderr,
+            "commit-msg hook must not cite an open MAJOR finding as a reason for a non-completion commit block",
+            errors,
+        )
         write_small_plan(repo, status="complete")
+        write_findings(findings_report(head_sha, content_hash))
 
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
@@ -5751,6 +5687,22 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(
             result.returncode != 0,
             "commit-msg hook must block missing LEARN evidence",
+            errors,
+        )
+
+        # R-LEARN-01: MEMORY.md's mtime is not evidence of anything here - an
+        # empty ## [LEARN] Entries section still blocks the commit even when
+        # MEMORY.md is freshly touched well after the plan file.
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n",
+        )
+        future = time.time() + 3600
+        os.utime(repo / ".claude" / "MEMORY.md", (future, future))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0,
+            "commit-msg hook must not accept a fresh MEMORY.md mtime as LEARN evidence",
             errors,
         )
 
@@ -5782,12 +5734,10 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         write_findings(findings_report(head_sha, content_hash))
-        # findings-test.json is still the clean baseline written above.
         result = git(repo, "commit", "-m", "phase 1 closeout")
         check(
             result.returncode == 0,
@@ -5819,7 +5769,7 @@ printf '%s\\n' "${{failures[@]}}"
         write(repo / "more.txt", "more\n")
         git(repo, "add", ".")
         git(repo, "config", "alias.ci", "commit")
-        clear_scores()
+        clear_findings()
         alias_result = subprocess.run(
             ["git", "ci", "-m", "invalid via alias"],
             cwd=repo,
@@ -5850,7 +5800,6 @@ printf '%s\\n' "${{failures[@]}}"
 
         # Fix the state; the same staged change now commits cleanly.
         head_sha, content_hash = head_and_hash()
-        write_score(score_report(head_sha, content_hash))
         write_findings(findings_report(head_sha, content_hash))
         retry_result = git(repo, "commit", "-m", "phase 1 closeout take 2")
         check(
@@ -5860,7 +5809,7 @@ printf '%s\\n' "${{failures[@]}}"
         )
 
         # D4-B: dev/main pass through regardless of ceremony state.
-        clear_scores()
+        clear_findings()
         git(repo, "checkout", "dev")
         write(repo / "dev-work.txt", "dev work\n")
         git(repo, "add", "dev-work.txt")
@@ -5875,7 +5824,7 @@ printf '%s\\n' "${{failures[@]}}"
 
         # `git commit --no-verify` remains the sanctioned manual escape.
         git(repo, "checkout", "foo_implementation")
-        clear_scores()
+        clear_findings()
         write(repo / "escape.txt", "escape\n")
         git(repo, "add", "escape.txt")
         escape_result = git(repo, "commit", "-m", "escape hatch", "--no-verify")
@@ -5889,7 +5838,7 @@ printf '%s\\n' "${{failures[@]}}"
         # commit from dev must pass through even with invalid ceremony state
         # (dev already diverged above via "direct commit on dev with no
         # ceremony at all"); the very next real commit is still gated normally.
-        clear_scores()
+        clear_findings()
         merge_result = git(
             repo,
             "merge",
@@ -5950,29 +5899,6 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                 check=False,
             ).stdout.strip()
 
-        def write_score_report(**overrides: object) -> None:
-            head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
-            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
-            report: dict[str, object] = {
-                "score": 95,
-                "branch": "foo_implementation",
-                "phase": "phase-one",
-                "generated_at": "2099-01-01T00:00:00Z",
-                "base_ref": "dev",
-                "merge_base_sha": merge_base,
-                "head_sha": head_sha,
-                "target": str(repo / "phase-work.txt"),
-                "dirty": False,
-                "tests_passed": True,
-                "tests_skipped": False,
-                "content_hash": content_hash_for(merge_base),
-                "changed_files": ["phase-work.txt"],
-            }
-            report.update(overrides)
-            for stale in reports_dir.glob("score-*.json"):
-                stale.unlink()
-            write(reports_dir / "score-test.json", json.dumps(report, indent=2) + "\n")
-
         def write_findings_report(**overrides: object) -> None:
             # Matches the real workflow: record_findings.py runs during
             # REVIEW, before the commit it certifies lands - so head_sha here
@@ -6014,7 +5940,8 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             for stale in reports_dir.glob("findings-*.json"):
                 stale.unlink()
             write(
-                reports_dir / "findings-test.json", json.dumps(report, indent=2) + "\n"
+                reports_dir / "findings-phase-one.json",
+                json.dumps(report, indent=2) + "\n",
             )
 
         write_big_plan(repo)
@@ -6082,18 +6009,25 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
 
         # Complete the small plan/closeout/LEARN so the commit-count check
-        # (>= one commit per phase) is also satisfied.
+        # (>= one commit per phase) is also satisfied. A completed phase no
+        # longer gets a free pass from the historical receipt chain
+        # (R-LIFECYCLE-03 removed that allowance), so this scenario stays
+        # single-phase. The multi-phase contract is covered directly at the
+        # verify.py unit level by test_verify.py::test_historical_chain_*,
+        # including test_historical_chain_rejects_missing_receipt_file, which
+        # is the case this scenario used to assert the opposite of: a completed
+        # phase with no closeout receipt now fails closed instead of being
+        # covered by the terminal receipt.
         write_big_plan(
             repo,
             status="in-progress",
-            phases=("phase-legacy", "phase-one"),
+            phases=("phase-one",),
             current_phase="phase-one",
         )
-        write_small_plan(repo, status="complete", phase="phase-legacy")
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         git(repo, "add", ".")
         # Generated pre-commit (matching REVIEW-before-COMMIT in the real
@@ -6111,13 +6045,12 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
         check(
             push_result.returncode == 0,
-            f"pre-push hook must allow a terminal receipt to cover completed phases that predate the receipt schema: {push_result.stdout}{push_result.stderr}",
+            f"pre-push hook must allow a completed phase with a fresh terminal receipt: {push_result.stdout}{push_result.stderr}",
             errors,
         )
 
         write(repo / "minor-work.txt", "minor work\n")
         git(repo, "add", "minor-work.txt")
-        write_score_report()
         write_findings_report(
             counts={"critical": 0, "major": 0, "minor": 1},
             findings=[
@@ -6126,13 +6059,15 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
                     "title": "yagni: optional simplification",
                     "file": "minor-work.txt",
                     "profile": "ponytail",
+                    "disposition": "accepted",
+                    "reason": "tracked for a later cleanup phase",
                 }
             ],
         )
         minor_commit = git(repo, "commit", "-m", "phase 1 advisory minor")
         check(
             minor_commit.returncode == 0,
-            "commit-msg hook must allow a Ponytail MINOR finding",
+            f"commit-msg hook must allow a Ponytail MINOR finding with an explicit disposition and reason: {minor_commit.stdout}{minor_commit.stderr}",
             errors,
         )
         minor_push = subprocess.run(
@@ -6155,11 +6090,10 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             "[features]\n",
         )
         git(repo, "add", ".codex/config.toml")
-        write_score_report()
         # Build the ordinary report then remove optional metadata to exercise
         # the required-review push path without bypassing report freshness.
         write_findings_report()
-        required_path = reports_dir / "findings-test.json"
+        required_path = reports_dir / "findings-phase-one.json"
         required_report = json.loads(read(required_path))
         required_report.pop("ponytail_reviewed")
         required_report.pop("ponytail_findings")
@@ -6180,12 +6114,12 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             errors,
         )
 
-        # R-SCORE-03e: counts.critical == 0 but counts.major > 0 must still
-        # allow the commit (the commit gate only checks critical) while
-        # blocking the push (the push gate additionally checks major).
+        # R-LIFECYCLE-01: counts.critical == 0 but counts.major > 0 now blocks
+        # the phase-completion commit itself. MAJOR moved from a push/PR-only
+        # gate to the phase-completion commit gate; it does not get a second,
+        # separate push-time check once the commit already enforces it.
         write(repo / "major-work.txt", "major work\n")
         git(repo, "add", "major-work.txt")
-        write_score_report()
         write_findings_report(
             counts={"critical": 0, "major": 2, "minor": 0},
             findings=[
@@ -6207,28 +6141,19 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             repo, "commit", "-m", "phase 1 followup with major findings"
         )
         check(
-            commit_result.returncode == 0,
-            f"commit-msg hook must allow a commit whose findings report has MAJOR findings but zero CRITICAL: {commit_result.stdout}{commit_result.stderr}",
-            errors,
-        )
-        major_push = subprocess.run(
-            ["git", "push", "origin", "foo_implementation"],
-            cwd=repo,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        check(
-            major_push.returncode != 0,
-            "pre-push hook must block a push whose findings report has MAJOR findings",
+            commit_result.returncode != 0,
+            f"commit-msg hook must block the phase-completion commit whose findings report has open MAJOR findings: {commit_result.stdout}{commit_result.stderr}",
             errors,
         )
         check(
-            "unbounded query" in major_push.stderr
-            or "missing pagination" in major_push.stderr,
-            "pre-push hook's MAJOR-finding failure must name at least one finding",
+            "unbounded query" in commit_result.stderr
+            or "missing pagination" in commit_result.stderr,
+            "commit-msg hook's MAJOR-finding failure must name at least one finding",
             errors,
         )
+        # The blocked commit leaves major-work.txt staged but never landed;
+        # discard it so the next scenario starts from a clean, committed tree.
+        git(repo, "reset", "--hard")
 
         # D4-B: dev passthrough regardless of ceremony state.
         git(repo, "checkout", "dev")
@@ -6292,6 +6217,293 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         check(
             delete_push.returncode == 0,
             f"pre-push hook must allow branch deletion pushes: {delete_push.stdout}{delete_push.stderr}",
+            errors,
+        )
+
+
+def _write_findings_only(path: Path, text: str) -> None:
+    """Write a findings report without ``write()``'s phase-one-only
+    auto-receipt side effect (``write_fixture_closeout_receipt`` always
+    defaults to ``phase="phase-one"``, which would silently overwrite an
+    already-committed earlier phase's receipt with stale-context bytes once
+    a second phase's findings are written). Callers regenerate the correct
+    phase's receipt explicitly via ``write_fixture_closeout_receipt``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
+    """R-E2E-01: drive two real phases through the real installed git hooks
+    (commit-msg, pre-push) and PreToolUse gate (enforce-pr-gate.sh) on a
+    throwaway consumer repo pushed to a bare remote, covering the full §6
+    end-to-end contract in one flow: a plan starting, a phase-completion
+    commit landing through the real commit-msg gate, a genuine MINOR finding
+    with a disposition, a second phase closing the big plan, a push that
+    must validate both the historical (phase-one) and terminal (phase-two)
+    receipts, rejection of a hand-edited closed session log, a sibling
+    errata file preserving the old receipt, and a final push/PR gate that
+    only passes once the full chain is valid again.
+
+    This repo's real gate only permits a commit when the current phase's
+    small plan is ``complete`` or ``paused`` (``assert_commit_invariants``);
+    there is no separate mid-phase WIP-commit path outside an explicit
+    paused checkpoint, which already has dedicated coverage in
+    ``validate_paused_phase_gate_cases``. "Implementation commits occur"
+    is exercised here as real tracked file changes staged during each
+    phase and landed by that phase's own completion commit - the actual
+    one-phase/one-completion-commit lifecycle this repo implements.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        initial_push = git(repo, "push", "origin", "dev")
+        check(
+            initial_push.returncode == 0,
+            f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}",
+            errors,
+        )
+
+        # 1. Plan starts: a two-phase big plan, current_phase phase-one.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-one", "phase-two"),
+            current_phase="phase-one",
+        )
+        git(repo, "checkout", "-b", "foo_implementation")
+
+        reports_dir = repo / ".claude" / "quality_reports"
+
+        def content_hash_for(base: str) -> str:
+            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", base).stdout
+            return subprocess.run(
+                ["git", "-C", str(repo), "hash-object", "--stdin"],
+                input=diff_out,
+                text=True,
+                capture_output=True,
+                check=False,
+            ).stdout.strip()
+
+        def complete_phase(
+            phase: str,
+            work_file: str,
+            *,
+            final: bool = False,
+            **finding_overrides: object,
+        ) -> None:
+            """Stage real implementation content, mark the small plan
+            complete, write a completed closeout log, persist a matching
+            findings report, and generate that phase's phase/closeout
+            receipts - the exact pre-commit sequence the real lifecycle
+            uses, since receipts are generated before the commit they
+            certify. ``final`` additionally writes the standing
+            documentation, memory, and LEARN audit section the big plan's
+            own last phase requires."""
+            write(repo / work_file, f"{phase} implementation work\n")
+            git(repo, "add", work_file)
+            write_small_plan(repo, status="complete", phase=phase)
+            write(
+                repo / ".claude" / "session_logs" / f"{phase}-closeout.md",
+                "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+                + (
+                    "- [LEARN] none - no new lessons this session\n"
+                    if not finding_overrides
+                    else "- [LEARN:workflow] real entry from the end-to-end flow\n"
+                )
+                + (
+                    "\n## Stale-claims surfaces checked\n\n"
+                    "Checked README.md and docs/; no stale claims found.\n"
+                    if final
+                    else ""
+                ),
+            )
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+                "profiles_reviewed": ["code", "ponytail"],
+                "branch": "foo_implementation",
+                "phase": phase,
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": git(repo, "rev-parse", "HEAD").stdout.strip(),
+                "target": str(repo / work_file),
+                "dirty": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": [work_file],
+            }
+            report.update(finding_overrides)
+            _write_findings_only(
+                reports_dir / f"findings-{phase}.json",
+                json.dumps(report, indent=2) + "\n",
+            )
+            write_fixture_closeout_receipt(repo, phase=phase)
+
+        # --- Phase one: real completion commit through the real commit-msg
+        # hook, with a genuine MINOR finding the reviewer dispositioned. ---
+        # record-commit-closeout.sh's phase-advance requires the *next*
+        # phase's small-plan file to already exist (it validates that
+        # candidate before advancing current_phase to it), so both phases'
+        # small plans are staged up front, matching a planner that lays out
+        # every phase before implementation starts.
+        write_small_plan(repo, status="in-progress", phase="phase-one")
+        write_small_plan(repo, status="in-progress", phase="phase-two")
+        complete_phase(
+            "phase-one",
+            "phase-one-work.txt",
+            findings=[
+                {
+                    "severity": "MINOR",
+                    "profile": "code",
+                    "title": "advisory style nit",
+                    "disposition": "accepted",
+                    "reason": "tracked for a later cleanup pass",
+                }
+            ],
+            counts={"critical": 0, "major": 0, "minor": 1},
+        )
+        completion_one = git(repo, "commit", "-m", "phase one: complete")
+        check(
+            completion_one.returncode == 0,
+            "phase-one completion commit with a dispositioned MINOR must succeed "
+            f"through the real commit-msg hook: {completion_one.stdout}{completion_one.stderr}",
+            errors,
+        )
+        run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase one: complete"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            "current_phase: phase-two" in read(repo / ".claude" / "plans" / "foo.md"),
+            "phase-one completion must advance current_phase to phase-two through "
+            "the real commit-msg + record-commit-closeout PostToolUse wiring",
+            errors,
+        )
+
+        # --- Phase two: a second real completion commit closes the big
+        # plan; this phase's receipt gets terminal current-state freshness,
+        # phase-one's gets historical ancestor/tree/artifact-chain checks. ---
+        write_small_plan(repo, status="in-progress", phase="phase-two")
+        complete_phase("phase-two", "phase-two-work.txt", final=True)
+        completion_two = git(repo, "commit", "-m", "phase two: complete")
+        check(
+            completion_two.returncode == 0,
+            "phase-two completion commit must succeed through the real commit-msg "
+            f"hook: {completion_two.stdout}{completion_two.stderr}",
+            errors,
+        )
+        run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase two: complete"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
+            "big plan must be marked complete after the final phase's completion commit",
+            errors,
+        )
+
+        # 7. Push validates both the historical (phase-one) and terminal
+        # (phase-two) receipts, through the real installed pre-push hook.
+        push_result = git(repo, "push", "origin", "foo_implementation")
+        check(
+            push_result.returncode == 0,
+            "push with a fully valid two-phase historical+terminal chain must "
+            f"succeed through the real pre-push hook: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+        pr_allowed = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' not in pr_allowed[1],
+            f"PR gate must allow PR creation once the full two-phase chain is valid: {pr_allowed[1]}",
+            errors,
+        )
+
+        # 8. Old session log mutation is rejected. A hand-edit is filesystem
+        # state with no new outer-repo commit, so the real git pre-push hook
+        # has nothing new to negotiate and git skips invoking it ("Everything
+        # up-to-date") - the PreToolUse push/PR layer re-evaluates
+        # assert_push_invariants unconditionally on every call regardless, so
+        # it is the layer that actually observes the tamper here.
+        old_log_path = repo / ".claude" / "session_logs" / "phase-one-closeout.md"
+        original_bytes = old_log_path.read_bytes()
+        old_log_path.write_text(
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+            "- [LEARN:workflow] edited after closeout, must be rejected\n",
+            encoding="utf-8",
+        )
+        pr_after_mutation = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' in pr_after_mutation[1],
+            "PR gate must reject a hand-edited closed session log via the "
+            f"historical receipt chain: {pr_after_mutation[1]}",
+            errors,
+        )
+        check(
+            "tampered" in pr_after_mutation[1] or "phase-one" in pr_after_mutation[1],
+            f"PR gate denial must name the tampered historical artifact: {pr_after_mutation[1]}",
+            errors,
+        )
+
+        # 9. Sibling errata preserves the old receipt: revert the illegal
+        # mutation (real corrections never rewrite a closed log) and add a
+        # sibling `<log>.errata.md` file instead - its mere existence must
+        # not disturb phase-one's already-bound receipt hash.
+        old_log_path.write_bytes(original_bytes)
+        errata_path = (
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md.errata.md"
+        )
+        write(
+            errata_path,
+            "# Errata for phase-one-closeout.md\n\n"
+            "- 2099-01-01\n"
+            "  - Supersedes: an illustrative stale claim\n"
+            "  - Corrected conclusion: the corrected claim\n"
+            "  - Evidence/reference: phase-two\n",
+        )
+
+        # 10. Final PR/push gate passes only with the full chain valid again.
+        pr_after_errata = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' not in pr_after_errata[1],
+            "PR gate must pass again once the closed log is restored and the "
+            f"correction lives in a sibling errata file: {pr_after_errata[1]}",
             errors,
         )
 
@@ -7241,9 +7453,9 @@ def validate_memory_security_authority(errors: list[str]) -> None:
 def validate_support_files(errors: list[str]) -> None:
     required_files = (
         "MEMORY.md",
-        "scripts/quality_score.py",
         "scripts/record_findings.py",
         "scripts/verify.py",
+        "scripts/validate_plan_frontmatter.py",
         "templates/session-log.md",
         "templates/plan-big.md",
         "templates/plan-small.md",
@@ -7782,6 +7994,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             state_path = temp_repo / ".claude" / relative_path
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_bytes(content)
+
+        # A state-directory README is bootstrap-owned documentation that
+        # merely lives beside consumer state, not consumer state itself
+        # (unlike its siblings above). Simulate a pre-fix install carrying
+        # stale README content and confirm a refresh replaces it, while every
+        # sibling file in the same directory stays byte-for-byte untouched.
+        stale_readmes = {
+            relative_readme: b"stale score-era README content\n"
+            for relative_readme in STATE_DIR_OWNED_README_PATHS
+        }
+        for relative_readme, content in stale_readmes.items():
+            readme_path = temp_repo / ".claude" / relative_readme
+            readme_path.parent.mkdir(parents=True, exist_ok=True)
+            readme_path.write_bytes(content)
+
         subprocess.run(
             [
                 "git",
@@ -7825,6 +8052,15 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             f"installer repeat state refresh failed: {state_reinstall.stderr}",
             errors,
         )
+        for relative_readme in stale_readmes:
+            refreshed = temp_repo / ".claude" / relative_readme
+            canonical = (TARGET_ROOT / ".claude" / relative_readme).read_bytes()
+            check(
+                refreshed.read_bytes() == canonical,
+                "installer repeat run must refresh bootstrap-owned state directory "
+                f"README {relative_readme}, not preserve stale content",
+                errors,
+            )
         for relative_path, content in consumer_state.items():
             check(
                 (temp_repo / ".claude" / relative_path).read_bytes() == content,
@@ -9549,6 +9785,173 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         )
 
 
+def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
+    """`chore(typo):`/`docs(typo):` bypass only a documentation-only diff, so
+    a substantive runtime/code change cannot hide under a typo subject.
+    `fixup!`/`squash!` keep their unconditional recovery bypass regardless of
+    changed paths."""
+    library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = Path(temp_dir) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "dev", str(repo)], check=False)
+        env = git_actor_env("TypoBypassClassifier")
+        write(repo / "README.md", "# Fixture\n")
+        subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False
+        )
+        subprocess.run(
+            ["git", "switch", "-q", "-c", "fixture_implementation"],
+            cwd=repo,
+            env=env,
+            check=False,
+        )
+
+        def bypass_status(subject: str, *refs: str) -> int:
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; commit_bypass_eligible "$2" "$3" "${4:-}"',
+                    "_",
+                    str(library),
+                    str(repo),
+                    subject,
+                    *refs,
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            return result.returncode
+
+        # docs typo subject + allowed docs-only diff -> follows the intended
+        # bypass path.
+        write(repo / "docs" / "guide.md", "# Guide\n")
+        git(repo, "add", "docs/guide.md")
+        check(
+            bypass_status("docs(typo): fix a word") == 0,
+            "typo bypass must allow a docs-only diff under docs(typo):",
+            errors,
+        )
+        git(repo, "reset", "docs/guide.md")
+        (repo / "docs" / "guide.md").unlink()
+
+        # docs typo subject + runtime/code path -> bypass rejected.
+        write(repo / "app.py", "print('fixture')\n")
+        git(repo, "add", "app.py")
+        check(
+            bypass_status("docs(typo): fix a word") != 0,
+            "typo bypass must reject a runtime/code path under docs(typo):",
+            errors,
+        )
+        git(repo, "reset", "app.py")
+        (repo / "app.py").unlink()
+
+        # chore typo subject + disallowed code path -> rejected.
+        write(repo / "shared" / "scripts" / "verify.py", "print('fixture')\n")
+        git(repo, "add", "shared/scripts/verify.py")
+        check(
+            bypass_status("chore(typo): fix a word") != 0,
+            "typo bypass must reject a shared/scripts/ path under chore(typo):",
+            errors,
+        )
+        git(repo, "reset", "shared/scripts/verify.py")
+        (repo / "shared" / "scripts" / "verify.py").unlink()
+
+        # A Markdown file inside an excluded runtime directory must not
+        # qualify merely because of its extension.
+        write(repo / "tests" / "notes.md", "# Notes\n")
+        git(repo, "add", "tests/notes.md")
+        check(
+            bypass_status("docs(typo): fix a word") != 0,
+            "typo bypass must reject a Markdown file inside an excluded runtime directory",
+            errors,
+        )
+        git(repo, "reset", "tests/notes.md")
+        (repo / "tests" / "notes.md").unlink()
+
+        # R-BYPASS-01: every shared/ subdirectory generate_targets.py copies
+        # into the generated .claude/.devcontainer runtime consumers actually
+        # run must be excluded, not just shared/scripts/ and shared/hooks/ -
+        # a hand-picked subset of shared/ drifts as new subdirectories are
+        # added, so the exclusion is the entire shared/ tree.
+        for relative_path in (
+            "shared/agents/coder/prompt.md",
+            "shared/policies/workflow.instructions.md",
+            "shared/skills/ponytail/SKILL.md",
+            "shared/templates/session-log.md",
+            "shared/review-profiles/code.md",
+            "shared/plans/README.md",
+            "shared/quality_reports/README.md",
+            "shared/session_logs/README.md",
+        ):
+            write(repo / relative_path, "# Fixture\n")
+            git(repo, "add", relative_path)
+            check(
+                bypass_status("docs(typo): fix a word") != 0,
+                f"typo bypass must reject shared/ runtime guidance: {relative_path}",
+                errors,
+            )
+            git(repo, "reset", relative_path)
+            (repo / relative_path).unlink()
+
+        # R-BYPASS-02: root-level control-plane files and directories named
+        # verbatim by shared/policies/workspace.instructions.md's
+        # control-plane definition ("Control-plane files include
+        # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
+        # .mcp.json, .devcontainer/, CLAUDE.md, and AGENTS.md") must also be
+        # excluded - a docs(typo): commit must never rewrite root guidance
+        # or the .codex/.devcontainer control-plane surfaces unreviewed.
+        for relative_path in (
+            "CLAUDE.md",
+            "AGENTS.md",
+            ".codex/notes.md",
+            ".devcontainer/notes.md",
+        ):
+            write(repo / relative_path, "# Fixture\n")
+            git(repo, "add", relative_path)
+            check(
+                bypass_status("docs(typo): fix a word") != 0,
+                f"typo bypass must reject root control-plane guidance: {relative_path}",
+                errors,
+            )
+            git(repo, "reset", relative_path)
+            (repo / relative_path).unlink()
+
+        # fixup!/squash! retain their unconditional recovery bypass even for
+        # a runtime/code path.
+        write(repo / "app.py", "print('fixture')\n")
+        git(repo, "add", "app.py")
+        check(
+            bypass_status("fixup! earlier work") == 0,
+            "fixup! must retain its unconditional recovery bypass",
+            errors,
+        )
+        check(
+            bypass_status("squash! earlier work") == 0,
+            "squash! must retain its unconditional recovery bypass",
+            errors,
+        )
+        check(
+            bypass_status("chore: not a typo bypass") != 0,
+            "an ordinary subject must not be treated as a bypass",
+            errors,
+        )
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "runtime fixture"],
+            cwd=repo,
+            env=env,
+            check=False,
+        )
+        check(
+            bypass_status("fixup! earlier work", "HEAD") == 0,
+            "typo bypass classifier must apply the same rule to a pushed diff_ref",
+            errors,
+        )
+
+
 def validate_json_report_readers(errors: list[str]) -> None:
     """Report readers must ignore nested reserved keys and key order."""
     library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
@@ -9890,6 +10293,8 @@ def main() -> int:
         validate_root_source_mirror_cases(errors)
         validate_runtime_drift_cases(errors)
         validate_ponytail_diff_classifier(errors)
+        validate_typo_bypass_path_restriction(errors)
+        validate_end_to_end_receipt_chain_lifecycle(errors)
         validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)

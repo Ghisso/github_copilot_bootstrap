@@ -450,8 +450,8 @@ def test_orchestrator_checklist_rejects_stale_plan_and_comma_lifecycles() -> Non
             "PRE-FLIGHT, BRANCH, PLAN, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
         ),
         (
-            "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90",
-            "VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY/SCORE - repeat until score >= 90",
+            "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
+            "VERIFY/REVIEW/FIX/DOCUMENT/RE-VERIFY - repeat until checks pass",
         ),
         ("**PLAN WHEN NEEDED:**", "**PLAN:**"),
         ("7. **CLOSEOUT:**", "7. **DOCUMENT:**"),
@@ -1222,8 +1222,7 @@ def test_readme_agent_contract_uses_target_eligibility_and_codex_tiers() -> None
     documenter_model = codex_tiers["documenter"]["model"]
     documenter_effort = codex_tiers["documenter"]["effort"]
     documenter_row = (
-        f"| documenter | — | — | `{documenter_model}` | "
-        f"`{documenter_effort}` |\n"
+        f"| documenter | — | — | `{documenter_model}` | `{documenter_effort}` |\n"
     )
     for name, replacement, expected_error in (
         (
@@ -1992,6 +1991,43 @@ def test_validate_agents_rejects_codex_agent_local_override(
 
     assert any(
         "must not define per-agent overrides" in error and field in error
+        for error in errors
+    )
+
+
+@pytest.mark.parametrize(
+    "invocation",
+    (
+        "persist findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`",
+        "persist findings with `record_findings.py\n--out .claude/quality_reports/findings-<current_phase>.json`",
+        "uv run python .claude/scripts/record_findings.py src/ --profile code"
+        " --profile security [--profile ponytail] --phase <current_phase>"
+        " --base-ref dev --findings-json <path-or-stdin>"
+        " --out .claude/quality_reports/findings-<current_phase>.json",
+    ),
+    ids=("same-line", "reflowed-newline", "canonical-long-form"),
+)
+def test_validate_agents_rejects_non_orchestrator_findings_persistence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invocation: str
+) -> None:
+    """Only the orchestrator may persist findings evidence. A synthetic
+    reviewer body gaining its own record_findings.py --out invocation must be
+    flagged, including when a markdown reflow wraps it across a line break."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "reviewer.md"
+    agent_path.write_text(
+        f"{agent_path.read_text(encoding='utf-8')}\n\n{invocation}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert any(
+        "only the orchestrator may persist findings evidence" in error
+        and str(agent_path) in error
         for error in errors
     )
 

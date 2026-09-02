@@ -64,7 +64,7 @@ to stop or checkpoint and resume later. A paused phase requires:
   containing the same-line prefix `**Status:** PAUSED`
 
 A paused phase has no `closeout_session_log` requirement and may make a
-checkpoint commit without final score, findings, LEARN, DOCUMENT, or completed
+checkpoint commit without final findings, LEARN, DOCUMENT, or completed
 closeout evidence. It keeps the big plan `in-progress` and leaves
 `current_phase` unchanged. On resume, read the PAUSED log and current Git state,
 set the same small plan back to `in-progress`, and continue it without creating
@@ -81,6 +81,6 @@ Cancelled big plans and small plans require all three of these fields:
   repository and resolves to an existing regular, readable UTF-8 text artifact
   containing the same-line prefix `**Status:** CANCELLED`
 
-A cancelled phase requires no commit, findings report, score, or closeout
+A cancelled phase requires no commit, findings report, or closeout
 session log. Its cancellation evidence is required instead and provides the
 auditable record for work that will never run.

@@ -657,6 +657,98 @@ diff_requires_ponytail() {
   return 1
 }
 
+# Return success only when every path changed since the branch's merge-base
+# with `dev` is eligible for a typo-subject bypass: Markdown documentation
+# outside runtime/execution directories. A single ineligible path - or an
+# empty/unresolvable diff - fails closed, so the caller
+# (commit_bypass_eligible) treats the typo subject as ineligible and falls
+# through to the normal ceremony gate instead of granting a free pass.
+# Mirrors diff_requires_ponytail's diff-ref convention: empty `diff_ref`
+# checks the live working tree/index (commit gate), a ref checks that landed
+# commit (push gate).
+#
+# The exclusion list is the entire `shared/` tree, not a hand-picked list of
+# its subdirectories, because `scripts/generate_targets.py`'s
+# `render_shared_basis`/`render_devcontainer` copy essentially all of
+# `shared/` into the generated `.claude/`/`.devcontainer/` runtime consumers
+# actually run: agent prompts (`shared/agents/*/prompt.md`), policies
+# (`shared/policies/*.instructions.md`), skills (`shared/skills/*/SKILL.md`),
+# templates, review profiles, prompts, third_party, hook scripts/git-hooks,
+# and even the `plans`/`quality_reports`/`session_logs` README stubs. Any
+# `.md` file anywhere under `shared/` is therefore live runtime guidance, not
+# authoring-only prose, and a hand-listed subset of it (the earlier,
+# falsified version of this function) drifts silently as new `shared/`
+# subdirectories are added. `scripts/*` (the authoring repo's own generator
+# scripts, distinct from `shared/scripts/`) stays excluded too.
+#
+# `.codex/*` and `.devcontainer/*` are the remaining control-plane
+# directories, and `AGENTS.md`/`CLAUDE.md` the remaining control-plane root
+# files, named verbatim by `shared/policies/workspace.instructions.md`'s
+# control-plane definition ("Control-plane files include `.claude/hooks/`,
+# `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
+# `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by root guidance
+# itself (`CLAUDE.md`'s own "Safety And Control Plane" section). This is the
+# same canonical control-plane set `diff_requires_ponytail` above already
+# encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
+# `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
+# `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
+# cannot drift from each other. A bash `case` pattern cannot glob "every
+# root file the policy calls control-plane" the way a directory prefix can,
+# so root files are named explicitly and stay in lockstep with that same
+# short, already-tracked list `diff_requires_ponytail` names.
+typo_bypass_diff_allowed() {
+  local repo_root="$1"
+  local diff_ref="${2:-}"
+  local head_ref="${diff_ref:-HEAD}"
+  local merge_base path
+  merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
+  [[ -n "$merge_base" ]] || return 1
+
+  local -a paths=()
+  if [[ -n "$diff_ref" ]]; then
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+  else
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" 2>/dev/null)
+  fi
+  [[ "${#paths[@]}" -gt 0 ]] || return 1
+
+  for path in "${paths[@]}"; do
+    case "$path" in
+      *.md)
+        case "$path" in
+          scripts/*|shared/*|tests/*|.github/*|.claude/*|.codex/*|.devcontainer/*|dist/*|AGENTS.md|CLAUDE.md) return 1 ;;
+        esac
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  return 0
+}
+
+# Full bypass eligibility for one commit subject. `fixup!`/`squash!` bypass
+# unconditionally (recovery/history subjects; deliberately no diff-path
+# restriction, per the recovery use-case they exist for).
+# `chore(typo):`/`docs(typo):` bypass only when typo_bypass_diff_allowed
+# confirms every changed path is eligible documentation content outside
+# runtime/execution directories, so a substantive runtime/code change cannot
+# hide under a typo subject. A subject `is_bypass_subject` never matches, or
+# a typo subject with an ineligible diff, is simply not a bypass: it falls
+# through to the normal ceremony gate below like any other commit.
+commit_bypass_eligible() {
+  local repo_root="$1"
+  local subject="$2"
+  local diff_ref="${3:-}"
+  is_bypass_subject "$subject" || return 1
+  case "$subject" in
+    fixup!*|squash!*) return 0 ;;
+  esac
+  typo_bypass_diff_allowed "$repo_root" "$diff_ref"
+}
+
 repo_root_from_script() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
@@ -1081,7 +1173,34 @@ assert_completed_receipt() {
   fi
 }
 
-# Single home for the plan/score/findings/closeout/LEARN ceremony shared by
+# Hard-validate every plan file's frontmatter schema (required fields, status
+# enums, body phase inventory, paused/cancelled contracts) with the shipped
+# stdlib-only validator - the same authoritative source the authoring repo
+# uses, so consumers no longer get a weaker partial bash-only schema check.
+# Runs unconditionally (before the paused/complete/cancelled dispatch below)
+# so a paused checkpoint commit is still covered.
+assert_plan_frontmatter() {
+  local repo_root="$1"
+  local validator="$repo_root/.claude/scripts/validate_plan_frontmatter.py"
+  if [[ ! -f "$validator" ]]; then
+    failures+=("missing plan-frontmatter validator: .claude/scripts/validate_plan_frontmatter.py")
+    return
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    failures+=("plan frontmatter validation requires python3")
+    return
+  fi
+  local output status=0
+  output="$(cd "$repo_root" && python3 "$validator" 2>&1)" || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    local line
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && failures+=("$line")
+    done <<< "$output"
+  fi
+}
+
+# Single home for the plan/findings/closeout/LEARN ceremony shared by
 # every commit gate entry point (PreToolUse and the commit-msg git hook).
 # Branch-shape is deliberately NOT checked here - callers diverge on it (see
 # D4 in docs/plan-deterministic-commit-gate.md) - so `branch` is assumed
@@ -1099,7 +1218,10 @@ assert_commit_invariants() {
     failures+=("missing big-plan file: .claude/plans/$slug.md")
   fi
 
+  assert_plan_frontmatter "$repo_root"
+
   local big_status="" current_phase="" small_plan="" phase_listed=0
+  local -a all_phases=()
   if [[ -f "$big_plan" ]]; then
     big_status="$(fm_read_unique_status "$big_plan" || true)"
     if [[ "$big_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
@@ -1114,16 +1236,29 @@ assert_commit_invariants() {
       small_plan="$repo_root/.claude/plans/$current_phase.md"
       local listed_phase
       while IFS= read -r listed_phase; do
-        if [[ "$listed_phase" == "$current_phase" ]]; then
-          phase_listed=1
-          break
-        fi
+        [[ -n "$listed_phase" ]] || continue
+        all_phases+=("$listed_phase")
+        [[ "$listed_phase" == "$current_phase" ]] && phase_listed=1
       done < <(fm_read_list "$big_plan" "phases")
       if [[ "$phase_listed" -ne 1 ]]; then
         failures+=("big plan current_phase must be listed in phases")
       fi
     fi
   fi
+
+  # R-LIFECYCLE-02: cancellation evidence is a commit-time gate, not only a
+  # push/PR-time one - a cancelled sibling phase must already carry the full
+  # audit contract before any further commit lands on this branch.
+  local other_phase other_plan="" other_status=""
+  for other_phase in "${all_phases[@]}"; do
+    [[ "$other_phase" == "$current_phase" ]] && continue
+    other_plan="$repo_root/.claude/plans/$other_phase.md"
+    [[ -f "$other_plan" ]] || continue
+    other_status="$(fm_read_unique_status "$other_plan" || true)"
+    if [[ "$other_status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$other_plan" "$other_phase"
+    fi
+  done
 
   local small_status="" closeout_log="" small_type="" small_parent=""
   if [[ -n "$small_plan" && -f "$small_plan" ]]; then
@@ -1173,7 +1308,12 @@ assert_commit_invariants() {
   if diff_requires_ponytail "$repo_root" ""; then
     require_ponytail="true"
   fi
-  assert_completed_receipt "$repo_root" "$current_branch" "$current_phase" "$commit_gate_head" "exact" "false" "$require_ponytail" "true"
+  # R-LIFECYCLE-01: an open MAJOR finding blocks only the phase-completion
+  # commit (small_status == complete), not every commit attempt while the
+  # phase remains in progress - see docs/plan-deterministic-commit-gate.md.
+  local require_major="false"
+  [[ "$small_status" == "complete" ]] && require_major="true"
+  assert_completed_receipt "$repo_root" "$current_branch" "$current_phase" "$commit_gate_head" "exact" "$require_major" "$require_ponytail" "true"
 }
 
 # Strict final closeout ceremony shared by PR creation and terminal pushes.
@@ -1262,9 +1402,11 @@ assert_closeout_invariants() {
     done < "$repo_root/.claude/session_logs/hooks-bypass.log"
   fi
 
-  # The terminal completed phase verifies the whole dev..tip branch state.
-  # Earlier phases may predate the receipt schema, so lifecycle status and the
-  # one-commit-per-phase rule cover them without inventing retroactive receipts.
+  # The terminal completed phase gets strict current-state freshness; every
+  # earlier completed phase in the big plan's declared order is additionally
+  # walked by historical_chain_errors (verify.py), which requires its own
+  # valid receipt with ancestor/tree/artifact-hash integrity - a completed
+  # phase can no longer silently skip the receipt chain.
   if [[ "$completed_count" -gt 0 ]]; then
     local require_ponytail="false"
     if diff_requires_ponytail "$repo_root" "$local_sha"; then

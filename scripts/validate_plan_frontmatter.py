@@ -11,7 +11,15 @@ from pathlib import Path
 from typing import Any, Sequence
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# Resolved from the current working directory, not __file__: this module is
+# shipped byte-for-byte into consumer runtimes at .claude/scripts/ (see
+# scripts/generate_targets.py), where a __file__-relative parent index would
+# resolve to .claude instead of the repository root. Every caller - the
+# authoring `uv run python scripts/validate_plan_frontmatter.py` entrypoint,
+# check_runtime.py's subprocess (cwd=REPO_ROOT), and the shipped git-hook
+# invocation (`cd "$repo_root" && python3 ...`) - already runs from the
+# repository root, matching verify.py's own `Path.cwd()` convention.
+REPO_ROOT = Path.cwd()
 BIG_PLAN_STATUSES = {"planning", "in-progress", "complete", "cancelled"}
 SMALL_PLAN_STATUSES = {"in-progress", "paused", "complete", "cancelled"}
 CANCELLED_FIELDS = ("cancelled_at", "cancelled_reason", "cancelled_evidence")

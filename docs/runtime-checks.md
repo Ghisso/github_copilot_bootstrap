@@ -198,7 +198,7 @@ paths, and protected hook configuration files; do not treat prose or ordinary
 source filenames containing `secret` as credentials, and do not require denial
 of unknown commands that carry none of those path literals.
 
-The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
+The runtime checker also runs the shipped `scripts/validate_plan_frontmatter.py` when it is present, and surfaces its failures as hard `FAIL` errors, not `WARN` — plan-frontmatter validation is a hard runtime contract, not an advisory check. A missing validator script is not itself an error here; the required-files/required-directories checks already gate on the generated tree.
 
 Runtime verification also expects the installer and updater defaults to create
 and publish nested `ai-state` commits. With `--local-only`, they must instead
@@ -301,7 +301,7 @@ without claiming that it changed hooks. If sync is not progressing after you
 approve updated hooks, run `state-sync.sh status` and inspect
 `.claude/session_logs/hooks-errors.log`.
 
-Lifecycle score reports must be written as `.claude/quality_reports/score-<timestamp>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records exact score and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; score evidence must record `tests_passed: true`, must not be `tests_skipped`, must be `dirty: false` (no unstaged changes), and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
+Findings reports must be written as `.claude/quality_reports/findings-<phase>.json`. Each completed phase has its own immutable `verification-closeout-<phase>.json` receipt, which records the exact phase-receipt and findings paths plus SHA-256 hashes, so completed gates never choose a “newest” report. The referenced reports must match branch, phase, base ref, merge-base SHA, and current HEAD SHA; every bound report must be `dirty: false` (no unstaged changes) and must carry a `content_hash` (`git hash-object` of the diff against the merge base) that still matches the working tree.
 
 Phase and closeout receipts also bind the governing nested control plane. Their
 `control_plane_provenance` records the nested `.claude` HEAD, relevant nested
@@ -319,13 +319,19 @@ schema and verifier; they are not represented as synthetic PASS check IDs.
 
 For a consumer with active work, use the installer or updater with
 `--local-only`. The refresh preserves active plans, user-owned state, and
-schema-v2 receipts. Those receipts remain available for history, but the
-current schema-v3 verifier rejects them as authorization for current gates.
+historical schema-v2/schema-v3 receipts. Those receipts remain available for
+history, but the current schema-v4 verifier rejects them as authorization for
+current gates: `validate_receipt` requires an exact `schema_version` match, so
+a stale receipt fails closed (`VFY-RECEIPT-001`/receipt validation reports
+`FAIL` with a diagnosable message) rather than crashing or silently passing.
+Recovery needs no manual receipt rewrite or bypass — re-running `verify phase
+--persist` then `verify closeout --persist` under the refreshed runtime
+regenerates a valid current-schema receipt at the same deterministic path.
 Before verification, confirm that nested `.claude` has a valid `HEAD` and a
 clean worktree.
 
 Regenerate fast and phase evidence with the current verifier, then regenerate
-the score, findings, documentation, `[LEARN]`, and completed session closeout
+the findings, documentation, `[LEARN]`, and completed session closeout
 evidence. Persist phase and closeout evidence with `verify phase --persist` and
 `verify closeout --persist`. Run the native commit gate and native pre-push gate
 only after this sequence passes; commit and push are supported only after those
@@ -341,7 +347,18 @@ layout. It excludes `.claude` from consumer Ruff coverage, honors configured
 Mypy `files`, `packages`, or `modules`, and falls back only to a conventional
 `src` root. If required Mypy scope cannot be proven, it reports `UNVERIFIED`.
 The bootstrap authoring repository retains its explicit `shared`, `scripts`,
-and `tests` scope. Gate orchestration is Bash 3.2 plus Python 3 standard-library JSON parsing; it has no `uv` dependency and remains enforceable when `uv` is absent. Only the optional `quality_score.py` command needs the project environment.
+and `tests` scope. The commit/push/PR gates themselves are Bash 3.2 plus
+Python 3 standard-library JSON parsing; they have no `uv` dependency and
+remain enforceable when `uv` is absent. Only `verify.py phase`/`closeout`
+(which run `ruff check`, `ruff format --check`, `mypy`, and `pytest`) need the
+project environment. `VFY-RUFF-001` folds `ruff format --check` in alongside
+`ruff check` under the same scope selection, rather than a separate check ID
+— `CHECK_IDS` is part of the receipt schema the gate validates its own
+history against, so a new ID would invalidate every already-persisted
+receipt. The summary distinguishes `lint:`/`format:` so a failure is still
+diagnosable. A consumer refreshed mid-plan whose tracked files are not yet
+formatted will newly fail `VFY-RUFF-001`'s format half; the recovery is
+`uv run ruff format` (see "Mid-plan consumer upgrade" above).
 
 When routing selects the `ponytail` profile, `record_findings.py --profile
 ponytail` always emits `ponytail_reviewed: true` and a numeric
@@ -357,12 +374,45 @@ every multi-file diff is high-risk.
 
 Two workflow invariants are each enforced twice, from a single shared contract per invariant:
 
-- **Commit invariant** — the plan/score/closeout/LEARN ceremony, via `assert_commit_invariants` in `_lib-frontmatter.sh`:
+- **Commit invariant** — the plan/findings/closeout/LEARN ceremony, via `assert_commit_invariants` in `_lib-frontmatter.sh`:
   - **`PreToolUse` (`enforce-commit-gate.sh`)** gates the AI agent's own Bash tool calls. It can `ask`/`deny` before a turn is wasted and denies an agent commit on any branch that isn't `<plan_name>_implementation`. It exempts commits that target the nested `ai-state` repo (`git -C .claude commit`, `--git-dir=.claude/.git`, `--work-tree .claude`) — `state-sync.sh` commits there constantly and has no ceremony of its own to satisfy — but only when the *matching commit invocation itself* carries the nested-repo flag, not merely because some other `git` call earlier or later in the same compound command happens to touch `.claude/`.
   - **`commit-msg` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every commit that reaches git itself — human, IDE, script, or alias (`git ci`) — on one code path, with no command string to classify and no timeout to fail open on. It only runs the ceremony checks on `<plan_name>_implementation` branches — `dev`/`main` commits pass through untouched.
 - **Push invariant** — the big-plan/phase-completeness/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
   - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
   - **`pre-push` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every push that reaches git itself, reading ref lines from stdin (`<local-ref> <local-sha> <remote-ref> <remote-sha>`). It derives the branch and the commit-count check from the *pushed* ref/sha, not from whatever is checked out, so a push of `foo_implementation` from elsewhere is still gated. It skips branch deletions (all-zero local sha) and only runs the ceremony checks on `<plan_name>_implementation` refs — `dev`/`main` pushes pass through untouched.
+
+**Historical receipt-chain validation** — the push/PR gate does not check only
+the terminal completed phase. `verify.py`'s `historical_chain_errors` walks
+the big plan's declared phase order backwards from the terminal phase and, for
+every earlier completed phase, validates that its receipt's `head_sha`
+resolves to a real commit, is an ancestor of the next completed phase's head,
+and that the certified commit introduces a tree matching the receipt's
+`tree_sha`. A receipt's `head_sha` is the *parent* of the commit it certifies,
+because receipts are generated before their completion commit, so the
+certified commit is identified as the one commit on the ancestry path from
+`head_sha` to the next completed phase's head whose own parent set contains
+`head_sha`. Parentage is proven rather than inferred from list position: if
+that path holds no such commit, the chain fails closed noting the missing
+ancestry path; if it holds more than one - as a merge inside the
+implementation branch could produce - it fails closed with a diagnostic
+naming the ambiguity, rather than selecting whichever commit git happened to
+list first. It then re-verifies every
+`phase_receipt`/`findings`/`closeout_log`
+artifact hash against the current file bytes. Only the terminal completed
+phase receives current-tree/current-runtime freshness checks; every earlier
+phase gets this ancestor/tree/artifact-hash chain instead.
+
+**Closed session logs are immutable.** Because a closeout log's bytes are
+hashed into its phase's receipt, editing a log after its phase closes breaks
+that historical artifact-hash check above. Corrections use a sibling
+`<log-name>.errata.md` file next to the closed log instead of rewriting it; an
+erratum discovered during a later active phase may be bound as that later
+phase's own evidence without touching the earlier receipt.
+
+**LEARN evidence** lives entirely inside a closeout log's own `## [LEARN]
+Entries` section: either one or more explicit `[LEARN:category] ...` entries,
+or the exact sanctioned marker `[LEARN] none - no new lessons this session`.
+`MEMORY.md`'s mtime is never accepted as a substitute for this section.
 
 Both git-hook layers are installed by setting `git config core.hooksPath .claude/hooks/git-hooks` (done by `install_bootstrap.py` and, for containers, by `post-start.sh`).
 
@@ -376,7 +426,7 @@ GNU-vs-BSD `stat`/`find` fallbacks are exercised.
 
 `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored, a fresh clone has no `.claude/hooks/git-hooks/` until it is checked out — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`). That window shrank when AI state moved from a Hugging Face bucket to a nested git repo (`plans/adr-002-git-backed-state-sync.md`): `post-start.sh` now checks `.claude/` out via `state-sync.sh setup` using the same git credentials as the code checkout, with no separate authenticated pull to wait on, and sets `core.hooksPath` immediately after.
 
-Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit`). A plain merge commit authors no content of its own, so the hook passes merge commits through unledgered on an implementation branch — the ceremony re-attaches at the next real commit, since the score's `merge_base_sha`/`content_hash` checks force a fresh report once new content lands. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (this is git behavior, not a bootstrap bug); commits they create skip the git layer, but the next real commit on the branch is still gated normally. `git commit --amend` *does* invoke `commit-msg`, and the `content_hash` check is designed to survive a content-preserving amend (the diff against the merge base is unchanged, so a report scored before the amend still matches). **Known, accepted escape:** the `MERGE_HEAD`-based passthrough cannot distinguish a pure merge from `git merge --no-commit` followed by manually staging extra changes before completing the commit — this is a second, undetected way to land ungated content on an implementation branch, alongside the sanctioned `--no-verify` escape. It requires deliberately reaching for `--no-commit`, the same trust boundary as `--no-verify`.
+Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit`). A plain merge commit authors no content of its own, so the hook passes merge commits through unledgered on an implementation branch — the ceremony re-attaches at the next real commit, since the findings report's `merge_base_sha`/`content_hash` checks force a fresh report once new content lands. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (this is git behavior, not a bootstrap bug); commits they create skip the git layer, but the next real commit on the branch is still gated normally. `git commit --amend` *does* invoke `commit-msg`, and the `content_hash` check is designed to survive a content-preserving amend (the diff against the merge base is unchanged, so a report generated before the amend still matches). **Known, accepted escape:** the `MERGE_HEAD`-based passthrough cannot distinguish a pure merge from `git merge --no-commit` followed by manually staging extra changes before completing the commit — this is a second, undetected way to land ungated content on an implementation branch, alongside the sanctioned `--no-verify` escape. It requires deliberately reaching for `--no-commit`, the same trust boundary as `--no-verify`.
 
 ## Devcontainer And Git-Backed State Sync
 

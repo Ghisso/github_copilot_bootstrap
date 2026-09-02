@@ -48,14 +48,14 @@ Choose one explicit commit path.
 
 For a normal completion commit, commit exactly one completed small plan after
 all gates pass: `status: complete`, a closeout log containing
-`**Status:** COMPLETED`, LEARN evidence, and a fresh score ≥ 90 report matching
-the branch, phase, and HEAD.
+`**Status:** COMPLETED`, LEARN evidence, and a passing `verify phase`/`verify
+closeout` receipt matching the branch, phase, and HEAD.
 
 For a paused checkpoint, commit only after the user explicitly asks to stop and
 resume later. The same small plan must be `status: paused` with `paused_at`,
 `paused_reason`, and `pause_session_log`; that log must contain
 `**Status:** PAUSED`. A checkpoint needs real outer-repository work, does not
-advance the phase machine, and does not require final score, findings, LEARN,
+advance the phase machine, and does not require final findings, LEARN,
 DOCUMENT, or a COMPLETED closeout. Never create an empty outer commit for only
 AI-state files. It keeps the big plan `in-progress` with the same
 `current_phase`.

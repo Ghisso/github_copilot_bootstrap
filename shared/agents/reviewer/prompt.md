@@ -37,8 +37,9 @@ executes identically on every runtime.
    - While refuting, if you discover a genuinely new critical issue, add it to the set.
 4. **Convergence:** if Pass 2 changed the set (dropped or added anything), run another verification pass over the updated set. Stop when a pass yields nothing new — no drops and no additions — twice in a row, or after at most 3 rounds.
 5. Apply the ordinary severity model to every surviving finding, including
-   `ponytail`: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is
-   advisory.
+   `ponytail`: CRITICAL and MAJOR both block the phase-completion commit; a
+   surviving MINOR needs an explicit disposition and reason from the
+   orchestrator at closeout but is otherwise advisory.
 6. Output one consolidated report of the findings that survived verification.
 7. Also emit the reviewed profile names and the surviving findings as a JSON
    list (see **Findings JSON** below), for the orchestrator to persist with
@@ -79,6 +80,9 @@ Immediately after the Report Format block, emit a fenced ```json block containin
 
 - `severity` is exactly one of `CRITICAL`, `MAJOR`, `MINOR` (matching the Report Format sections).
 - `title` is required and non-empty; `file`, `line`, `profile` are included whenever known.
+- A `MINOR` finding the orchestrator intends to let survive phase completion
+  needs `disposition` (e.g. `"accepted"`) and a non-empty `reason` added at
+  closeout; this is audit legibility, not proof the judgment is correct.
 - Every Ponytail finding uses exactly `profile: "ponytail"`.
 - An empty list `[]` is a valid, normal output when nothing survived verification — it is the "review passed clean" signal the commit/push gates expect, not an omission.
 - Return the exact reviewed profile names separately so the orchestrator can

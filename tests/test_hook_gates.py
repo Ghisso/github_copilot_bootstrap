@@ -73,6 +73,129 @@ def _git_targets_nested_claude(command: str, subcommand: str) -> int:
     return int(result.stdout.strip())
 
 
+def _assert_plan_frontmatter_failures(tmp_path: Path) -> list[str]:
+    """Invoke the shipped ``assert_plan_frontmatter`` gate against a fixture
+    repo root, returning its accumulated failures (empty when valid)."""
+    scripts_dir = tmp_path / ".claude" / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        REPO_ROOT / "scripts" / "validate_plan_frontmatter.py",
+        scripts_dir / "validate_plan_frontmatter.py",
+    )
+    expression = f"""
+failures=()
+assert_plan_frontmatter {shlex.quote(str(tmp_path))}
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def test_assert_plan_frontmatter_blocks_missing_required_field(
+    tmp_path: Path,
+) -> None:
+    """R-LIFECYCLE-04: consumers now receive a hard plan-frontmatter gate, not
+    only the authoring repo's own tooling."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any("missing required field: name" in failure for failure in failures)
+
+
+def test_assert_plan_frontmatter_blocks_small_plan_missing_phase_index(
+    tmp_path: Path,
+) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: in-progress\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any("missing required field: phase_index" in failure for failure in failures)
+
+
+def test_assert_plan_frontmatter_blocks_invalid_body_phase_inventory(
+    tmp_path: Path,
+) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "name: example\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n## Phase\n\n- `phase-two`\n",
+        encoding="utf-8",
+    )
+    failures = _assert_plan_frontmatter_failures(tmp_path)
+    assert any(
+        "body phase inventory must match frontmatter phases" in failure
+        for failure in failures
+    )
+
+
+def test_assert_plan_frontmatter_accepts_valid_plans(tmp_path: Path) -> None:
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\n"
+        "name: example\n"
+        "type: big-plan\n"
+        "status: planning\n"
+        "originating_branch: dev\n"
+        "implementation_branch: example_implementation\n"
+        "phases:\n  - phase-one\n"
+        "---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "phase_index: 1\n"
+        "status: in-progress\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    assert _assert_plan_frontmatter_failures(tmp_path) == []
+
+
+def test_assert_plan_frontmatter_missing_validator_fails_closed(
+    tmp_path: Path,
+) -> None:
+    """No shipped validator on disk is a hard failure, not a silent skip."""
+    (tmp_path / ".claude" / "plans").mkdir(parents=True)
+    expression = f"""
+failures=()
+assert_plan_frontmatter {shlex.quote(str(tmp_path))}
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    assert "missing plan-frontmatter validator" in result.stdout
+
+
 def _write_cancelled_plan(
     root: Path,
     *,

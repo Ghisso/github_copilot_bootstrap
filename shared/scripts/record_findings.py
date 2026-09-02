@@ -9,9 +9,9 @@ schema the commit/push gates verify against
 Usage:
     uv run python .claude/scripts/record_findings.py src/ --profile code \
         --profile ponytail --phase phase-one \
-        --findings-json findings.json --out .claude/quality_reports/findings-<ts>.json
+        --findings-json findings.json --out .claude/quality_reports/findings-phase-one.json
     echo '[]' | uv run python .claude/scripts/record_findings.py src/ --profile ponytail --phase phase-one \
-        --out .claude/quality_reports/findings-<ts>.json
+        --out .claude/quality_reports/findings-phase-one.json
 """
 
 from __future__ import annotations
@@ -40,13 +40,11 @@ def _git(args: list[str], cwd: Path) -> str:
 
 
 def _content_hash(base: str, cwd: Path) -> str:
-    """Twin of quality_score.py's `_content_hash`: a content signature of the
-    branch's changes relative to `base`, computed as `git hash-object` of the
-    raw `git diff <base>` output. The commit/push gates recompute the
-    identical value against whichever report (score or findings) they are
-    checking, so both scripts must derive it the same way. Duplicated rather
-    than imported - these are deliberately single-file, no-dependency
-    scripts (see shared/scripts/quality_score.py, this script's twin)."""
+    """A content signature of the branch's changes relative to `base`,
+    computed as `git hash-object` of the raw `git diff <base>` output. The
+    commit/push gates recompute the identical value against the findings
+    report they are checking. This is a deliberately single-file,
+    no-dependency script, so the logic is not imported from elsewhere."""
     if not base:
         return ""
     diff = subprocess.run(
@@ -68,9 +66,8 @@ def _content_hash(base: str, cwd: Path) -> str:
 
 
 def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
-    """Twin of quality_score.py's `git_metadata`; see that file for the
-    rationale behind each field. Duplicated deliberately - see module
-    docstring and `_content_hash` above."""
+    """Capture the git-metadata freshness binding for a findings report; see
+    the module docstring and `_content_hash` above for the rationale."""
     cwd = Path.cwd()
     inside = _git(["rev-parse", "--is-inside-work-tree"], cwd)
     if inside != "true":
@@ -99,8 +96,10 @@ def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
             continue
         output = _git(command, cwd)
         changed.update(line for line in output.splitlines() if line.strip())
-    # See quality_score.py's git_metadata for why staged-only changes do not
-    # count as "dirty".
+    # Staged changes destined for the commit are expected and do NOT count
+    # as dirty, so the commit gate can require a fully-staged tree without
+    # blocking every commit; this also catches edits made after findings
+    # were recorded.
     unstaged = _git(["diff", "--name-only"], cwd)
     try:
         target_str = str(target.resolve().relative_to(Path(repo_root)))

@@ -42,3 +42,14 @@ uv run python scripts/generate_targets.py --all
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
 ```
+
+## Completion Evidence
+
+The final phase listed under `phases:` must also run a documentation,
+memory, and LEARN audit: sweep every live-advice surface for claims this plan
+or earlier work invalidated, correct or supersede each one, leave dated
+records (archived plans, dated design narratives, closed session logs)
+unchanged, and record the audited surfaces and each one's outcome under a
+`## Stale-claims surfaces checked` heading in that phase's closeout session
+log. `verify.py`'s closeout gate requires that exact heading, non-empty,
+whenever the phase it is closing out is this list's last entry.

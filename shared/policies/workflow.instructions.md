@@ -54,7 +54,7 @@ unaffected scope.
 - Each big plan creates exactly one implementation branch named `<plan_name>_implementation` from `dev`.
 - Big plans live at `.claude/plans/<plan_name>.md` and must use `type: big-plan` frontmatter.
 - Small plans live at `.claude/plans/<phase_slug>.md` and must use `type: small-plan` frontmatter.
-- Commit once per completed small plan after DOCUMENT, LEARN, session log, and score gates pass.
+- Commit once per completed small plan after DOCUMENT, LEARN, session log, and verification gates pass.
 - Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
 
@@ -72,7 +72,7 @@ format, meaningful single-line `paused_reason`, and repository-relative
 verification already run, incomplete checks, and the exact resume point.
 
 After the evidence is recorded, a checkpoint commit may preserve tracked outer
-repository work without final score, findings, LEARN, DOCUMENT, or COMPLETED
+repository work without final findings, LEARN, DOCUMENT, or COMPLETED
 closeout. It is not a bypass, does not advance `current_phase`, and leaves the
 big plan `in-progress`. Do not create an empty outer-repository checkpoint
 commit when only AI-state files changed; persist the PAUSED plan and session log
@@ -98,7 +98,7 @@ and a repository-relative `cancelled_evidence` path that stays inside the
 repository and resolves to an existing regular, readable UTF-8 text artifact
 containing the same-line prefix `**Status:** CANCELLED`.
 
-A cancelled phase requires no commit, findings report, score, or closeout
+A cancelled phase requires no commit, findings report, or closeout
 session log. A cancelled big plan is terminal and cannot start an implementation
 branch. A branch containing cancelled phases reaches final push/PR closeout only
 when at least one phase is complete, every cancelled phase has the full evidence
@@ -121,8 +121,8 @@ For each small plan:
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
 3. **VERIFY:** The orchestrator runs `uv run python .claude/scripts/verify.py phase --format json --persist`. Route a deterministic failure to the coder with its receipt and changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
-5. **CLOSEOUT:** In this fixed order: (a) delegate documentation applicability/update; (b) persist converged review findings with one `--profile <name>` per profile; (c) write the final quality score with `quality_score.py --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json`; (d) run `learn` or record `[LEARN] none - no new lessons this session`; (e) update the `COMPLETED` session log; then (f) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation precedes binding reports so score and findings remain fresh. The reviewer is not the score writer and the coder cannot create final verification receipts.
-6. **FIX LOOP:** If verification, review, closeout, or score fails, update TodoWrite, return to IMPLEMENT, and repeat until score is >= 90 and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory.
+5. **CLOSEOUT:** In this fixed order: (a) delegate documentation applicability/update; (b) give every surviving MINOR finding an explicit `disposition` (e.g. `"accepted"`) and non-empty `reason`, then persist converged review findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (c) run `learn` or record `[LEARN] none - no new lessons this session`; (d) update the `COMPLETED` session log; then (e) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation precedes binding reports so findings remain fresh. The reviewer does not persist findings itself, and the coder cannot create final verification receipts.
+6. **FIX LOOP:** If verification, review, or closeout fails, update TodoWrite, return to IMPLEMENT, and repeat until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
 7. **COMMIT:** On normal completion, commit the completed small plan atomically.
 
 **Conditional checkpoint branch:** When the user explicitly requests a pause,
@@ -131,7 +131,7 @@ tracked outer-repository work. Do not run this branch merely because a gate
 failed. The checkpoint leaves the phase active; on resume, reopen that same
 small plan and run the full loop before its normal completion commit.
 
-**Score >= 90 plus a matching findings report with `counts.critical == 0` is required before a normal completion commit; `counts.major == 0` in that same report is additionally required before PR/push closeout. An explicitly evidenced paused checkpoint follows its separate non-final path. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
+**A passing `verify phase`/`verify closeout` receipt plus a matching findings report with `counts.critical == 0` and `counts.major == 0`, and an explicit disposition and non-empty reason on every surviving MINOR, is required before a normal completion commit; the same contract is re-checked across every completed phase at PR/push closeout. An intermediate commit while the phase is still in progress is not blocked merely because an unresolved MAJOR exists. An explicitly evidenced paused checkpoint follows its separate non-final path. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
 
 ---
 
@@ -139,10 +139,15 @@ small plan and run the full loop before its normal completion commit.
 
 Commit-gate bypasses are allowed only for commit subjects beginning with:
 
-- `fixup!`
-- `squash!`
-- `chore(typo):`
-- `docs(typo):`
+- `fixup!` and `squash!` — unconditional recovery/history bypass, regardless
+  of changed paths.
+- `chore(typo):` and `docs(typo):` — bypass only when every changed path is
+  eligible documentation content outside runtime/execution directories (for
+  example ordinary Markdown docs, not `shared/scripts/`, hook logic,
+  generated runtime, behavior-changing tests, or other executable code). A
+  typo subject over an ineligible diff is not a bypass at all: it falls
+  through to the full ceremony gate like any other commit, so a substantive
+  runtime/code change cannot hide under a typo subject.
 
 Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. A PR is blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
 
@@ -164,13 +169,58 @@ communication and agent-to-agent status or handoffs.
 **Log when:**
 - After plan approval (goal, approach, rationale)
 - During work: design decisions, problems solved, verification results, `[LEARN]` entries
-- Before stopping: summary, scores, open questions, next steps
+- Before stopping: summary, verification results, open questions, next steps
 - At small-plan closeout: `**Status:** COMPLETED`, `**Plan:** <small-plan path>`, `[LEARN]` entries or explicit no-lessons marker
 - At an explicit checkpoint: `**Status:** PAUSED`, `**Plan:** <small-plan path>`, pause reason, completed and remaining work, verification state, incomplete checks, and resume point
 
 **Frequency:** Every 30 responses or at session end, whichever comes first.
 
 Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
+
+**Immutability:** A session log already bound by a completed phase's closeout
+receipt must not be edited afterward; the receipt hashes its exact bytes, and
+historical receipt-chain validation depends on that byte stability. Write a
+correction to a sibling `<log-name>.errata.md` file next to the closed log
+instead. An erratum discovered and written during a later active phase is
+evidence of that later phase and may be bound by its own receipt; the earlier
+phase's receipt is never edited or regenerated. An erratum written outside an
+active plan may remain unbound until a later phase reviews or changes it.
+
+**Conditional stale-claims review:** When a phase changes a previously
+documented fact, number/count, behavior, API, decision, conclusion, or
+pipeline/runtime description, search likely-affected active plans, `docs/`,
+`README.md`, workflow/policy documentation, and `.claude/MEMORY.md`, then
+update or explicitly supersede the stale claim. Record which surfaces were
+checked in the session log when this rule triggers. Do not run this sweep
+mechanically when nothing documented actually changed.
+
+`.claude/MEMORY.md` is live advice, loaded into every session, not a dated
+record. A superseded entry must be corrected or removed in place; appending a
+correction elsewhere in the file and leaving the wrong entry standing is not
+sufficient, because a reader can act on the wrong entry before ever reaching
+the correction. Archived plans, dated design narratives, and closed session
+logs are dated records instead — they describe what was true at the time and
+are left unchanged; a closed session log's correction uses a sibling
+`<log-name>.errata.md` file only where the original entry would actively
+mislead a reader into reintroducing a defect, and only when no closeout
+receipt binds that log.
+
+**Standing final-phase audit:** The final phase of every big plan must run a
+documentation, memory, and LEARN audit: sweep the live-advice surfaces above
+for claims that this plan or earlier work invalidated (not only this plan's
+own changes), correct or supersede each one under the live-advice/dated-record
+distinction, and record the audited surfaces and each one's outcome under a
+`## Stale-claims surfaces checked` heading in that phase's closeout session
+log - the same heading the conditional review above already uses. This
+recorded-surface-list evidence is a deterministic gate, not only documented
+process: `verify.py`'s closeout check derives "final phase" from the big
+plan's own `phases:` frontmatter list (the same source used elsewhere, so it
+cannot become a second, independently drifting definition) and requires a
+non-empty `## Stale-claims surfaces checked` section only when the phase
+being closed out is that list's last entry - it never fires on an earlier
+phase. It checks the section's presence and non-emptiness, not the
+correctness of its judgement, matching the shape of the existing `## [LEARN]
+Entries` evidence requirement next to it.
 
 ---
 
@@ -197,9 +247,8 @@ Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
 [ ] Working tree clean before branch creation
 [ ] Big plan and current small plan saved under .claude/plans/
 [ ] TodoWrite reflects canonical workflow and current loop
-[ ] Verification passed (pytest + mypy + ruff)
+[ ] Verification passed (pytest + mypy + ruff via `verify phase`)
 [ ] Review passed; findings persisted via record_findings.py (including Ponytail metadata when the profile was required)
-[ ] Score >= 90 with persisted matching quality report
 [ ] Docs updated or explicitly skipped as pure-internal
 [ ] Learn entries flushed or explicit no-lessons marker recorded
 [ ] Closeout session log has Status: COMPLETED
@@ -230,8 +279,8 @@ Some behaviors are automated by hooks. Others are still manual.
 - Protected file edits are denied.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
-- Commit closeout is gated on small-plan completion, score >= 90, a matching findings report with `counts.critical == 0`, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
-- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and the last completed phase's findings report additionally having `counts.major == 0`.
+- Commit closeout is gated on small-plan completion, a passing `verify phase`/`verify closeout` receipt, a matching findings report with `counts.critical == 0` and `counts.major == 0` plus an explicit disposition and non-empty reason on every surviving MINOR, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
+- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and a valid historical receipt chain across every completed phase, each with `counts.critical == 0` and `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.
@@ -239,12 +288,14 @@ Some behaviors are automated by hooks. Others are still manual.
 
 **Manual reminders still required:**
 
-**After editing any `src/**/*.py` file:**
+**After editing any Python source file:**
 ```text
-Run: uv run pytest tests/ -q --tb=short
-Run: uv run mypy src/ --ignore-missing-imports --explicit-package-bases
-Run: uv run ruff check src/ tests/
+Run: uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`fast` selects the repository's real scope instead of assuming a `src/`
+layout, so it stays correct in both the bootstrap authoring repository and an
+installed consumer.
 
 **Every ~30 responses or before stopping:**
 ```text

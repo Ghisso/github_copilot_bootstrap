@@ -37,7 +37,7 @@ Core principles:
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
-- Ship only after score >= 90, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
+- Ship only after a passing `verify phase`/`verify closeout` receipt, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
 - Preserve lessons learned in memory and session logs.
 
 For the authority, privacy, and conflict rules for that shared state, read
@@ -227,15 +227,20 @@ uv run python scripts/update_consumers.py --local-only /path/to/repo
 
 Use the supported mid-plan refresh when a consumer already has active plans,
 receipts, or other user state. Run the refresh with `--local-only` first. The
-installer preserves the active and user-owned state, including schema-v2
-receipts, but schema-v2 receipts cannot authorize current schema-v3 gates.
+installer preserves the active and user-owned state, including historical
+schema-v2/schema-v3 receipts, but those receipts cannot authorize current
+schema-v4 gates: `verify.py` fails closed on a schema mismatch (a clear
+"unsupported schema_version" error, never a silent pass or a crash) rather
+than accepting or bypassing them. Recovery needs no manual receipt edit or
+gate bypass — step 1 below regenerates a valid current-schema phase receipt
+at its normal deterministic path.
 
 After the refresh, verify the consumer's nested `.claude` repository has a
 valid `HEAD` and a clean worktree. Then regenerate evidence with the current
 runtime, in order:
 
 1. Run fast verification and `verify phase --persist`.
-2. Regenerate the score, findings, documentation, and `[LEARN]` evidence, and
+2. Regenerate the findings, documentation, and `[LEARN]` evidence, and
    write the completed session closeout evidence.
 3. Run `verify closeout --persist`.
 4. Run the native commit and pre-push gates. Commit and push only after those
@@ -245,6 +250,15 @@ Evidence-only checkpoints do not make current evidence stale. Changes to the
 governing plan or runtime do make it stale and require the affected evidence
 to be regenerated before continuing. If a governing plan or runtime change
 occurs during the upgrade, rerun the verification and closeout sequence.
+
+`verify phase`/`verify closeout` also measure `ruff format --check`, folded
+into the existing `VFY-RUFF-001` check rather than a new check ID (a new ID
+would invalidate every already-persisted receipt, since the gate validates
+its own history against the exact recorded check set). A consumer refreshed
+mid-plan whose already-tracked files are not yet formatted will newly fail
+`VFY-RUFF-001`'s format half even though nothing about their plan changed.
+Recovery is one command — `uv run ruff format` — then rerun the verification
+and closeout sequence above.
 
 When self-installing this repository, ignored generated overlays under the root
 `.github/` tree are valid only when they are byte-identical to generated output.
@@ -353,7 +367,7 @@ Interpretation:
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
-- Templates, prompts, memory, plans, session logs, quality reports, quality scoring, and deterministic verification receipts rendered into the shared `.claude/` basis
+- Templates, prompts, memory, plans, session logs, quality reports, and deterministic verification receipts rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
 
@@ -364,12 +378,12 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Agent and review-profile overview
   - Skill visibility and verification defaults
 - [workflow.instructions.md](shared/policies/workflow.instructions.md)
-  - Pre-flight, branch, plan, implementation, verification, review, documentation, score, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
+  - Pre-flight, branch, plan, implementation, verification, review, documentation, learn, session-log, commit protocol; coder-time Ponytail discipline and conditional review routing are defined here
   - Branch lifecycle and commit/PR gates
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
-  - Quality scoring rubric and gates
+  - Deterministic PASS/FAIL verification detail and severity-gated findings contract (CRITICAL/MAJOR block phase completion, MINOR needs an explicit disposition and reason) — there is no numeric score
 - [code-standards.instructions.md](shared/policies/code-standards.instructions.md)
   - Naming, architecture patterns, deprecation protocol
 - [tests.instructions.md](shared/policies/tests.instructions.md)
@@ -654,7 +668,7 @@ summary explains how to use it without creating a second classifier.
 | Lane | Typical example | Owner and outcome |
 | --- | --- | --- |
 | Read-only/reporting | Explain a failing test or review a diff. | The main agent gathers evidence only. A diagnosis stays read-only until you ask for a fix. |
-| Lightweight edit | Correct one explicit typo in `README.md`, with no requested commit or PR. | The main agent makes the one low-risk, non-control-plane edit and runs focused verification. It creates no plan, score, session log, or other lifecycle artifact. |
+| Lightweight edit | Correct one explicit typo in `README.md`, with no requested commit or PR. | The main agent makes the one low-risk, non-control-plane edit and runs focused verification. It creates no plan, receipt, session log, or other lifecycle artifact. |
 | Standard implementation | Make a requested single-file behavior change, or any change for which you request a commit or PR. | The main-thread orchestrator runs the specialist loop and completes the lifecycle. |
 | Control-plane/high-risk | Change a hook, script, generator, dependency or lockfile, migration, security-sensitive behavior, user-data handling, or more than one file. | The orchestrator uses a full plan and the required `code`, `architecture`, `security`, `tests`, and `ponytail` review. |
 
@@ -670,11 +684,14 @@ a full plan is for ambiguous, multi-phase, or new-module work, and is mandatory
 for control-plane/high-risk work. A lightweight edit is not a micro-plan: it
 does not enter the lifecycle at all.
 
-The narrow `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` commit
-bypasses are audited recovery exceptions. They do not classify a task as
-lightweight, do not permit skipping safety safeguards, and still require the
-branch-shape check; acknowledge any bypass before PR or push closeout. Existing
-hook gates remain in force for their normal lifecycle checks.
+The narrow `fixup!` and `squash!` commit bypasses are unconditional audited
+recovery exceptions; `chore(typo):` and `docs(typo):` bypass only when every
+changed path is eligible documentation content outside runtime/execution
+directories, so a substantive runtime/code change cannot hide under a typo
+subject. None of these classify a task as lightweight, permit skipping safety
+safeguards, or skip the branch-shape check; acknowledge any bypass before PR
+or push closeout. Existing hook gates remain in force for their normal
+lifecycle checks.
 
 Orchestrator routing details:
 
@@ -712,7 +729,7 @@ Generated Claude and Codex hook configs execute `run-hook.sh` directly, so the g
 Configured events:
 
 - SessionStart
-  - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, latest score report, and any open lifecycle state
+  - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, and any open lifecycle state
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events when available
 - PreToolUse
   - Claude matches native edits with `Edit|MultiEdit|Write`; Codex matches `Edit|Write`. Only these mutation tools call [protect-files.sh](shared/hooks/scripts/protect-files.sh), so `Read` and MCP calls do not invoke a mutation classifier.
@@ -749,7 +766,7 @@ Configured events:
 
 Two layers, two invariants, one shared contract each:
 
-- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh). A `complete` phase keeps the existing closeout, score, findings, LEARN, and documentation gates. A current small plan with valid explicit pause evidence may take the separate checkpoint path: it records durable incomplete work without final score/findings/LEARN/DOCUMENT/COMPLETED closeout and does not advance the phase. `in-progress` and `cancelled` phases still cannot certify commits; cancellation semantics are unchanged.
+- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh). A `complete` phase keeps the existing closeout, findings, LEARN, and documentation gates. A current small plan with valid explicit pause evidence may take the separate checkpoint path: it records durable incomplete work without final findings/LEARN/DOCUMENT/COMPLETED closeout and does not advance the phase. `in-progress` and `cancelled` phases still cannot certify commits; cancellation semantics are unchanged.
 - **Push invariant** — `pre-push` (git hook) calls the public `assert_push_invariants`, which allows a valid paused current phase to publish its checkpoint as a durable remote backup. Its `dev..local_sha` count includes every prior completed phase plus the checkpoint commit, and future pre-created phases do not block that backup. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `enforce-pr-gate.sh` sends `git push` through that public path but sends `gh pr create --base dev` directly through strict `assert_closeout_invariants`. PR/final closeout still requires every phase to be complete or carry the full cancellation evidence contract, at least one completed phase, completed-phase commit counts, bypass acknowledgement, and final findings/Ponytail gates.
 
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
@@ -774,18 +791,17 @@ Expected verification commands after implementation:
 - uv run pytest tests/ -q --tb=short
 - uv run mypy src/ --ignore-missing-imports --explicit-package-bases
 - uv run ruff check src/ tests/
-- uv run ruff format src/ tests/
+- uv run ruff format --check src/ tests/
 - uv run python .claude/scripts/verify.py fast --format json
 - uv run python .claude/scripts/verify.py phase --format json --persist
 - uv run python .claude/scripts/verify.py closeout --format json --persist [--documentation-na "<reason>"]
-- uv run python .claude/scripts/quality_score.py src/ --phase <current_phase> --base-ref dev --json --out .claude/quality_reports/score-<timestamp>.json
-- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<timestamp>.json
+- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
 
 The generated `verify.py` commands produce machine-readable Phase A receipts:
 `fast` gives focused feedback, `phase` persists reusable evidence, and
 `closeout` reuses fresh phase evidence while binding the final tracked state.
 Run `phase` only after the ordinary checks are clean, and run `closeout` during
-final closeout after documentation, score, and findings are current. The
+final closeout after documentation and findings are current. The
 optional `--documentation-na` requires an explicit reason and is used only
 when the documentation review concludes that no update applies. The
 completed receipt is immutable per phase, binds exact child artifact paths and hashes, and is the sole
@@ -793,16 +809,16 @@ completed-phase evidence entry point for commit, push, and PR gates.
 
 Quality gates:
 
-- >= 95: excellence target
-- >= 90: required for a normal completion commit and PR/final closeout; a paused checkpoint does not make a final quality claim, may be pushed only as a valid remote checkpoint, and remains unfinished
-- < 90: blocked until implementation, verification, review, and score are rerun
-- findings report `counts.critical == 0`: required for a normal completion commit
-- findings report `counts.major == 0`: additionally required for PR/push closeout
-- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL blocks commit, MAJOR blocks push/PR, and MINOR is advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
+- `verify phase`/`verify closeout` PASS: required for a normal completion commit and PR/final closeout; a paused checkpoint does not make a final quality claim, may be pushed only as a valid remote checkpoint, and remains unfinished
+- `FAIL`: blocked until implementation, verification, and review are rerun
+- findings report `counts.critical == 0` and `counts.major == 0`: required for a normal completion commit. An intermediate commit made while the phase is still in progress is not blocked merely because an unresolved MAJOR exists
+- every surviving MINOR finding carries an explicit `disposition` and non-empty `reason`: required for a normal completion commit. The gate checks that the disposition is present and well-formed, not that it is correct
+- PR/push closeout re-checks that same contract across every completed phase, not only the last one
+- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL and MAJOR both block the phase-completion commit, and a surviving MINOR needs a disposition and reason but is otherwise advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
 
 Documentation gate:
 
-- after review converges, update docs for changed public interfaces, config, workflows, and user-facing behavior before persisting findings and score; this binds their hashes to the final tree before commit or PR closeout
+- after review converges, update docs for changed public interfaces, config, workflows, and user-facing behavior before persisting findings; this binds their hashes to the final tree before commit or PR closeout
 
 ## Optional Retrieval Helpers
 

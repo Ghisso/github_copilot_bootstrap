@@ -19,7 +19,10 @@ applicability:
 - **S/B**: Security and common bugs
 - **SIM/C4**: Simplification and comprehension style
 
-Run `uv run ruff check src/ tests/` — zero violations required before commit.
+Run `uv run python .claude/scripts/verify.py fast --format json` — zero
+violations required before commit. `fast` selects the repository's real
+scope instead of assuming a `src/` layout, so it stays correct whether this
+file attached because of a `src/**/*.py` or a `tests/**/*.py` match.
 
 ---
 

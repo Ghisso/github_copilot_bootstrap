@@ -14,7 +14,7 @@ edits remain with the main agent and create no lifecycle artifacts.
 You MUST maintain task tracking throughout the entire workflow:
 
 1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT, and PR-on-request when relevant.
-2. **Loop task:** Include a parameterized task for `IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass and score >= 90`.
+2. **Loop task:** Include a parameterized task for `IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
 5. **On changes:** If new tasks emerge or plans change, update task tracking accordingly.
@@ -50,15 +50,31 @@ editing it.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
 5. **VERIFY:** Run `uv run python .claude/scripts/verify.py phase --format json --persist` yourself. Give deterministic failures and their receipt to the coder; do not delegate repetitive test execution to another model.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
-7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); persist converged findings with `record_findings.py`; write the final `quality_score.py --json --out` report and require score >= 90; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings and score so both bind to final code+docs. The reviewer is not the score writer and the coder cannot create final receipts. If score, verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); when the current phase is the big plan's last entry in `phases:`, also run the standing final-phase documentation, memory, and LEARN audit below; give every surviving MINOR finding an explicit `disposition` and non-empty `reason`, then persist converged findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; record LEARN or no-learn evidence; update the COMPLETED session log; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings so findings bind to final code+docs. The reviewer does not persist findings itself, and the coder cannot create final receipts. An open CRITICAL or MAJOR finding blocks the phase-completion commit; resolve it before COMMIT rather than deferring it to push/PR. If verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+
+### Standing final-phase audit
+
+When the current phase is the big plan's last phase, sweep every live-advice
+surface — root guidance (`CLAUDE.md`, `AGENTS.md`, `README.md`), `docs/`
+except dated documents, this repository's canonical policy/skill/template/
+agent/review-profile source, state READMEs, and `.claude/MEMORY.md` — for
+claims this plan or earlier work invalidated; correct or supersede each
+stale claim, leave dated records (archived plans, dated design narratives,
+closed session logs) alone, and write a sibling `<log-name>.errata.md` only
+where a closed log's entry would actively mislead a reader and no closeout
+receipt binds that log. Record the audited surfaces and each one's outcome
+under a `## Stale-claims surfaces checked` heading in the closeout session
+log before running `verify.py closeout`: the gate requires that exact
+heading with non-empty content whenever the phase being closed out is the
+big plan's own last declared phase, and rejects the closeout otherwise.
 8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
 9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ### Conditional pause and resume
 
 Use `paused` only for the current small plan and only after the user explicitly
-asks to stop, pause, or checkpoint and resume later. A failed check, low score,
-review finding, timeout, or agent fatigue does not authorize a pause. If the
+asks to stop, pause, or checkpoint and resume later. A failed check, review
+finding, timeout, or agent fatigue does not authorize a pause. If the
 user names a safe boundary, reach it before pausing when it is safe to do so.
 
 Before a checkpoint commit, set `status: paused`, retain the big plan's
@@ -67,7 +83,7 @@ Before a checkpoint commit, set `status: paused`, retain the big plan's
 `**Status:** PAUSED` and describe completed work, verification, incomplete
 checks, remaining work, and the precise resume point. This is an explicit
 checkpoint path, not a bypass: it may commit tracked incomplete work without
-final score, findings, LEARN, DOCUMENT, or COMPLETED closeout, but it does not
+final findings, LEARN, DOCUMENT, or COMPLETED closeout, but it does not
 advance the phase. After that checkpoint commit, it may be pushed as a durable
 remote backup when paused-publication invariants pass. It still blocks PR
 creation and final closeout. Do not create an empty outer-repository commit
@@ -123,7 +139,7 @@ same severity gates as every other profile.
 
 ## Quality Gates
 
-- Score >= 90 plus required documentation updates is mandatory before a normal completion commit or PR closeout; an explicitly evidenced paused checkpoint follows its separate non-final path.
+- A passing `verify phase`/`verify closeout` receipt plus required documentation updates is mandatory before a normal completion commit or PR closeout; an explicitly evidenced paused checkpoint follows its separate non-final path.
 - Ensure verification commands are executed for code changes.
 - If a gate fails, delegate fixes before reporting done.
 
@@ -136,10 +152,12 @@ Before returning a normally completed phase, you MUST complete these steps:
 3. **Update session log:** Create or update the session log in `.claude/session_logs/YYYY-MM-DD_description.md` with:
    - Summary of what was done
    - Design decisions and rationale
-   - Verification results and scores
+   - Verification results
    - Open questions and next steps
 
-Do not skip this step even if the task seems small.
+Do not skip this step even if the task seems small. A session log already
+bound by a completed phase's receipt is immutable; write corrections to a
+sibling `<log-name>.errata.md` file instead of editing the closed log.
 
 ## Safety and Policy
 

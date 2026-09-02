@@ -1,0 +1,71 @@
+{
+  "schema_version": 3,
+  "mode": "phase",
+  "status": "PASS",
+  "checks": [
+    {
+      "id": "VFY-RUFF-001",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-MYPY-001",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-PYTEST-001",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-FRESH-001",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-FRESH-002",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-GEN-001",
+      "status": "PASS",
+      "summary": "legacy measured",
+      "applicable": true
+    },
+    {
+      "id": "VFY-RECEIPT-001",
+      "status": "NOT_APPLICABLE",
+      "summary": "phase does not consume evidence",
+      "applicable": false
+    }
+  ],
+  "metadata": {
+    "base_ref": "dev",
+    "branch": "verification-test",
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "merge_base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "phase": "phase-one",
+    "content_hash": "relevant",
+    "tracked_state_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "generated_at": "2026-08-29T00:00:00Z",
+    "changed_paths": [],
+    "relevant_paths": [],
+    "path_discovery_ok": true,
+    "control_plane_provenance": {
+      "schema_version": 1,
+      "nested_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "runtime_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tracked_state_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "big_plan_digest": "",
+      "small_plan_digest": ""
+    }
+  }
+}
