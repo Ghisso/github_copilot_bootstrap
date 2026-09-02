@@ -75,16 +75,16 @@ editing it.
 ### Standing final-phase audit
 
 When the current phase is the big plan's last phase, sweep every live-advice
-surface (`CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` except dated
-documents, `shared/policies/`, `shared/skills/`, `shared/templates/`,
-`shared/agents/`, `shared/review-profiles/`, state READMEs, and
-`.claude/MEMORY.md`) for claims this plan or earlier work invalidated;
-correct or supersede each stale claim, leave dated records (archived plans,
-dated design narratives, closed session logs) alone, and write a sibling
-`<log-name>.errata.md` only where a closed log's entry would actively mislead
-a reader and no closeout receipt binds that log. Record the audited surfaces
-and each one's outcome in the closeout session log — this is documented
-process, not a gate; there is no deterministic check for its presence.
+surface — root guidance (`CLAUDE.md`, `AGENTS.md`, `README.md`), `docs/`
+except dated documents, this repository's canonical policy/skill/template/
+agent/review-profile source, state READMEs, and `.claude/MEMORY.md` — for
+claims this plan or earlier work invalidated; correct or supersede each
+stale claim, leave dated records (archived plans, dated design narratives,
+closed session logs) alone, and write a sibling `<log-name>.errata.md` only
+where a closed log's entry would actively mislead a reader and no closeout
+receipt binds that log. Record the audited surfaces and each one's outcome
+in the closeout session log — this is documented process, not a gate; there
+is no deterministic check for its presence.
 8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
 9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
