@@ -24,7 +24,8 @@ fi
 
 # githooks(5): commit-msg also fires for git-merge. A merge commit authors
 # no content of its own; ceremony re-attaches at the next real commit
-# (the score's merge_base/content_hash checks force a fresh report then).
+# (the findings report's merge_base/content_hash checks force a fresh report
+# then).
 if git -C "$REPO_ROOT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
   exit 0
 fi

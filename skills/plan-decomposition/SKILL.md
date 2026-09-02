@@ -99,8 +99,8 @@ and must appear in the big plan's `phases` list. Fill:
   function/class signatures (contracts, with type hints), the behavior and edge
   cases in prose, must/must-not constraints, and the test scenarios + verify
   command. Let the coding agent adapt bodies to the actual codebase.
-- **Verification** — the exact commands (pytest, mypy, ruff, and the
-  `quality_score.py` invocation with `--phase`/`--base-ref dev`/`--out`).
+- **Verification** — the exact commands (pytest, mypy, ruff, and
+  `uv run python .claude/scripts/verify.py phase --format json --persist`).
 - **Closeout Checklist** — leave the template's checklist; it gates the normal
   completion commit. An explicitly requested paused checkpoint uses its own
   evidence path and does not complete or advance the phase.
