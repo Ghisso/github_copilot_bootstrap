@@ -67,6 +67,21 @@ If a target doc does not exist yet:
 - Do not create a `docs/` directory if none exists — in that case, absorb the content into `README.md` under the appropriate section.
 - When creating a new file, use the structure from `.claude/skills/documentation/SKILL.md` for the relevant file type.
 
+## Step 2.5 — Conditional Stale-Claims Review
+
+When the diff changes a previously documented fact, number/count, behavior,
+API, decision, conclusion, or pipeline/runtime description, search for other
+places that claim now-superseded to be true, then update or explicitly
+supersede them. Minimum surfaces to check: active/relevant plan files under
+`.claude/plans/`, `docs/`, `README.md`, and workflow/policy documentation when
+relevant. Do not run this sweep mechanically on every task — only when a
+prior documented claim actually changed. Record which surfaces you checked in
+the session log when this rule triggers.
+
+A closed session log bound by a phase's completion receipt must not be
+edited; a correction to one uses a sibling `<log-name>.errata.md` file next
+to it instead of rewriting the original.
+
 ## Step 3 — Update Docs
 
 Edit only the sections that are stale. Do not rewrite sections that are still accurate.

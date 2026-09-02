@@ -358,7 +358,7 @@ Interpretation:
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
 - Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
-- Templates, prompts, memory, plans, session logs, quality reports, quality scoring, and deterministic verification receipts rendered into the shared `.claude/` basis
+- Templates, prompts, memory, plans, session logs, quality reports, and deterministic verification receipts rendered into the shared `.claude/` basis
 
 ## Most Important Instructions
 
@@ -374,7 +374,7 @@ These are the source files that render into `.claude/instructions/` in every gen
   - Session logging and recovery reminders
 - [quality-and-testing.instructions.md](shared/policies/quality-and-testing.instructions.md)
   - Verification commands and required testing order
-  - Quality scoring rubric and gates
+  - Deterministic PASS/FAIL verification detail and severity-gated findings contract (CRITICAL/MAJOR block phase completion, MINOR needs an explicit disposition and reason) — there is no numeric score
 - [code-standards.instructions.md](shared/policies/code-standards.instructions.md)
   - Naming, architecture patterns, deprecation protocol
 - [tests.instructions.md](shared/policies/tests.instructions.md)
@@ -675,11 +675,14 @@ a full plan is for ambiguous, multi-phase, or new-module work, and is mandatory
 for control-plane/high-risk work. A lightweight edit is not a micro-plan: it
 does not enter the lifecycle at all.
 
-The narrow `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` commit
-bypasses are audited recovery exceptions. They do not classify a task as
-lightweight, do not permit skipping safety safeguards, and still require the
-branch-shape check; acknowledge any bypass before PR or push closeout. Existing
-hook gates remain in force for their normal lifecycle checks.
+The narrow `fixup!` and `squash!` commit bypasses are unconditional audited
+recovery exceptions; `chore(typo):` and `docs(typo):` bypass only when every
+changed path is eligible documentation content outside runtime/execution
+directories, so a substantive runtime/code change cannot hide under a typo
+subject. None of these classify a task as lightweight, permit skipping safety
+safeguards, or skip the branch-shape check; acknowledge any bypass before PR
+or push closeout. Existing hook gates remain in force for their normal
+lifecycle checks.
 
 Orchestrator routing details:
 

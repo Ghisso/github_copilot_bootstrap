@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -374,6 +377,206 @@ def test_closeout_requires_explicit_documentation_na(tmp_path: Path) -> None:
     """No documentation diff is not evidence that documentation is unnecessary."""
     with pytest.raises(ValueError, match="--documentation-na"):
         verify.closeout_artifacts(tmp_path, _metadata())
+
+
+def _closeout_log_setup(tmp_path: Path, log_text: str) -> tuple[Path, str, Path]:
+    """Write a minimal phase plan + closeout log pair for closeout_log_errors."""
+    phase = "phase-one"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        "parent_plan: big\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    log_path = tmp_path / ".claude" / "session_logs" / f"{phase}-closeout.md"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text(log_text, encoding="utf-8")
+    return tmp_path, phase, log_path
+
+
+def test_closeout_log_requires_learn_section(tmp_path: Path) -> None:
+    """A completed closeout log missing the ``## [LEARN] Entries`` heading
+    entirely fails closeout, regardless of any other content."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n"
+    )
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("[LEARN] Entries" in error for error in errors)
+
+
+def test_closeout_log_accepts_exact_no_lessons_marker(tmp_path: Path) -> None:
+    """The exact sanctioned no-new-lessons marker satisfies LEARN evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_accepts_real_learn_entries(tmp_path: Path) -> None:
+    """One or more explicit ``[LEARN:category]`` entries satisfy LEARN
+    evidence without the exact no-lessons marker."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] use the shared helper\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_rejects_empty_learn_section(tmp_path: Path) -> None:
+    """A present but empty LEARN section - no marker, no entries - still
+    fails; the heading alone is not evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n## Verification Results\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_memory_mtime_does_not_satisfy_learn(tmp_path: Path) -> None:
+    """``MEMORY.md``'s mtime being fresher than the plan must not substitute
+    for session-log LEARN evidence - the removed shortcut this phase closes."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+    )
+    memory = root / ".claude" / "MEMORY.md"
+    memory.write_text("# Memory\n", encoding="utf-8")
+    future = time.time() + 3600
+    os.utime(memory, (future, future))
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_fenced_code_block(
+    tmp_path: Path,
+) -> None:
+    """An illustrative example of the entry format placed inside a fenced
+    code block is not real evidence - the fence must be scanned past, not
+    scanned into."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] example entry\n```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_unedited_template_learn_section(tmp_path: Path) -> None:
+    """The canonical session-log template's own ``## [LEARN] Entries``
+    section, copied verbatim and unedited into a closeout log, must not
+    itself satisfy LEARN evidence - its example text names the format, it is
+    not a well-formed entry the acceptance regex should match."""
+    template_text = (REPO_ROOT / "shared" / "templates" / "session-log.md").read_text(
+        encoding="utf-8"
+    )
+    section = re.search(
+        r"^## \[LEARN\] Entries.*?(?=^## |\Z)", template_text, re.MULTILINE | re.DOTALL
+    )
+    assert section is not None, "template must define a ## [LEARN] Entries section"
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path, "# Session\n\n**Status:** COMPLETED\n\n" + section.group(0)
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_marker_inside_fenced_code_block(tmp_path: Path) -> None:
+    """The sanctioned no-lessons marker only counts outside a fence too."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN] none - no new lessons this session\n```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_accepts_real_entry_alongside_fenced_example(
+    tmp_path: Path,
+) -> None:
+    """A fenced example does not poison a genuine entry elsewhere in the
+    same section."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] [what was learned]\n```\n"
+        "- [LEARN:workflow] actually learned this\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_rejects_learn_entry_inside_tilde_fenced_code_block(
+    tmp_path: Path,
+) -> None:
+    """GFM's alternate ``~~~`` fence syntax must be recognized too, not
+    just triple-backtick fences."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "~~~\n- [LEARN:category] example entry via tilde fence\n~~~\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_unterminated_fence(
+    tmp_path: Path,
+) -> None:
+    """An unterminated fence must strip to the end of the section - content
+    inside a never-closed fence is not evidence, so this fails closed
+    rather than leaving it exposed to the scanner."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "```\n- [LEARN:category] fence never closes\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
+
+
+def test_closeout_log_rejects_learn_entry_inside_indented_fence(
+    tmp_path: Path,
+) -> None:
+    """A fence delimiter indented with leading whitespace must still be
+    recognized as a fence, not treated as literal prose. The delimiters are
+    indented while the fake entry line inside is not, which is exactly the
+    case a fence matcher anchored to column 0 fails to recognize as a
+    fence at all - leaving the column-0 entry line exposed to the scanner."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n"
+        "  ```\n"
+        "- [LEARN:category] fake entry, fence delimiter indented but content is not\n"
+        "  ```\n",
+    )
+    assert verify.closeout_log_errors(root, phase, log_path) == [
+        "LEARN evidence is missing"
+    ]
 
 
 def _findings_report(**updates: object) -> dict[str, object]:
@@ -793,6 +996,41 @@ def test_historical_chain_rejects_tampered_artifact_bytes(tmp_path: Path) -> Non
         tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
     )
     assert any("was tampered with" in error for error in errors)
+
+
+def test_historical_chain_rejects_mutated_closed_session_log(tmp_path: Path) -> None:
+    """A closed, receipt-bound session log must be byte-immutable: editing it
+    after closeout - not just findings/phase-receipt bytes - fails the
+    historical chain, since historical hashes depend on log byte stability."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    log_path = tmp_path / ".claude/session_logs/phase-one-closeout.md"
+    log_path.write_text(
+        "**Status:** COMPLETED\n\nedited after closeout\n", encoding="utf-8"
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert any("closeout_log" in error and "tampered" in error for error in errors)
+
+
+def test_historical_chain_tolerates_sibling_errata_file(tmp_path: Path) -> None:
+    """A sibling ``<log>.errata.md`` correction file living next to a closed
+    log does not invalidate that log's own receipt-bound hash - errata uses a
+    new file, never a rewrite of the original."""
+    _, sha_b = _historical_chain_fixture(tmp_path)
+    errata_path = tmp_path / ".claude/session_logs/phase-one-closeout.md.errata.md"
+    errata_path.write_text(
+        "# Errata for phase-one-closeout.md\n\n"
+        "- 2026-09-02\n"
+        "  - Supersedes: stale claim\n"
+        "  - Corrected conclusion: fixed\n"
+        "  - Evidence/reference: phase-two\n",
+        encoding="utf-8",
+    )
+    errors = verify.historical_chain_errors(
+        tmp_path, branch="big_implementation", phase="phase-two", receipt_head=sha_b
+    )
+    assert errors == []
 
 
 def test_historical_chain_rejects_reversed_phase_order(tmp_path: Path) -> None:
@@ -1833,6 +2071,16 @@ def test_unknown_source_and_build_paths_fail_closed(path: str) -> None:
 def test_ordinary_documentation_remains_reusable() -> None:
     """Only narrow ordinary documentation paths are excluded from code evidence."""
     assert verify.classify_path("docs/guide.md") == "documentation-only"
+
+
+def test_errata_sibling_file_binds_under_the_normal_receipt_mechanism() -> None:
+    """A sibling ``<log>.errata.md`` file lives under ``.claude/session_logs/``
+    and therefore classifies as evidence-relevant control-plane state, not
+    excluded documentation - the discovering phase's own ``content_hash``
+    already covers it with no dedicated errata receipt ceremony needed."""
+    path = ".claude/session_logs/phase-one-closeout.md.errata.md"
+    assert verify.classify_path(path) == "control-plane"
+    assert verify.scoped_paths([path]) == [path]
 
 
 def test_phase_receipt_rejects_required_check_marked_not_applicable() -> None:

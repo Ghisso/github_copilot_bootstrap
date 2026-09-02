@@ -1784,8 +1784,61 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
     return hashed.stdout.strip() if hashed.returncode == 0 else ""
 
 
+_FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*$")
+
+
+def _strip_fenced_code_blocks(text: str) -> str:
+    """Remove fenced code blocks from LEARN evidence scanning line by line,
+    so an illustrative example of the entry/marker format placed inside one
+    is never mistaken for real evidence.
+
+    Handles both GFM fence characters (```` ``` ```` or ``~~~``), an
+    indented fence delimiter, and an unterminated fence - which strips to
+    the end of the text rather than leaving its contents exposed to the
+    scanner, since unclosed fenced content is not evidence either way. A
+    closing fence must reuse the same character and be at least as long as
+    the opening one, matching GFM; a single regex cannot express "no
+    matching close -> swallow to end" without this line-by-line state
+    machine, which is exactly the gap an unterminated fence exploited.
+    """
+    kept: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line in text.split("\n"):
+        match = _FENCE_OPEN_RE.match(line)
+        if not in_fence:
+            if match:
+                in_fence = True
+                fence_char = match.group(1)[0]
+                fence_len = len(match.group(1))
+            else:
+                kept.append(line)
+            continue
+        if (
+            match
+            and match.group(1)[0] == fence_char
+            and len(match.group(1)) >= fence_len
+            and _FENCE_CLOSE_SUFFIX_RE.match(line[match.end() :])
+        ):
+            in_fence = False
+        # else: still inside the fence (including to end of text if it is
+        # never closed) - the line stays swallowed.
+    return "\n".join(kept)
+
+
 def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
-    """Keep completed-log and LEARN authority bound to the receipt path."""
+    """Keep completed-log and LEARN authority bound to the receipt path.
+
+    LEARN evidence lives entirely inside the session log's own
+    ``## [LEARN] Entries`` section, outside any fenced code block: either
+    one or more explicit ``[LEARN...`` entries, or the exact sanctioned
+    no-lessons marker. ``MEMORY.md``'s mtime is not evidence of anything
+    here - it can still be updated as a separate persistence action, but its
+    timestamp never substitutes for a session-log section the receipt hash
+    actually binds.
+    """
     expected = closeout_log_path(root, phase)
     if path.resolve() != expected.resolve():
         return ["closeout receipt log does not match phase frontmatter"]
@@ -1795,15 +1848,17 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
         return ["closeout session log is unreadable"]
     if not re.search(r"^\*\*Status:\*\*[ \t]+COMPLETED\b", text, re.MULTILINE):
         return ["closeout session log is not completed"]
-    if "[LEARN] none - no new lessons this session" in text:
+    section = re.search(
+        r"^## \[LEARN\] Entries[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        return ["closeout session log is missing the ## [LEARN] Entries section"]
+    prose = _strip_fenced_code_blocks(section.group("body"))
+    if "[LEARN] none - no new lessons this session" in prose:
         return []
-    memory = root / ".claude/MEMORY.md"
-    plan = root / ".claude/plans" / f"{phase}.md"
-    if (
-        memory.is_file()
-        and plan.is_file()
-        and memory.stat().st_mtime >= plan.stat().st_mtime
-    ):
+    if re.search(r"^-[ \t]*\[LEARN[:\]]", prose, re.MULTILINE):
         return []
     return ["LEARN evidence is missing"]
 

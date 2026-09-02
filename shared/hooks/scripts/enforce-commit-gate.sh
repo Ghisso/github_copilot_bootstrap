@@ -34,7 +34,7 @@ fi
 
 SUBJECT="$(commit_subject_from_command "$COMMAND")"
 BYPASS=0
-if is_bypass_subject "$SUBJECT"; then
+if commit_bypass_eligible "$REPO_ROOT" "$SUBJECT" ""; then
   BYPASS=1
 fi
 
@@ -45,11 +45,13 @@ if ! is_implementation_branch "$CURRENT_BRANCH"; then
   failures+=("commits must happen on a <plan_name>_implementation branch, not ${CURRENT_BRANCH:-unknown}")
 fi
 
-# Bypass subjects (fixup!/squash!/chore(typo):/docs(typo):) skip only the
-# plan-ceremony checks below (small-plan/closeout/findings/LEARN); branch-shape
-# validation above still applies, and the bypass is still ledgered by
-# record-commit-closeout.sh. This keeps the recovery use-case without turning
-# the strictest gate into a blank check.
+# Eligible bypass subjects (fixup!/squash!/path-restricted chore(typo):/
+# docs(typo):) skip only the plan-ceremony checks below
+# (small-plan/closeout/findings/LEARN); branch-shape validation above still
+# applies, and the bypass is still ledgered by record-commit-closeout.sh.
+# This keeps the recovery use-case without turning the strictest gate into a
+# blank check. A typo subject whose diff is not eligible is not a bypass at
+# all here - it falls through to the full ceremony gate below.
 if [[ "$BYPASS" -eq 1 ]]; then
   if [[ "${#failures[@]}" -gt 0 ]]; then
     reason="$(printf '%s; ' "${failures[@]}")"

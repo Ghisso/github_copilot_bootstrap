@@ -657,6 +657,98 @@ diff_requires_ponytail() {
   return 1
 }
 
+# Return success only when every path changed since the branch's merge-base
+# with `dev` is eligible for a typo-subject bypass: Markdown documentation
+# outside runtime/execution directories. A single ineligible path - or an
+# empty/unresolvable diff - fails closed, so the caller
+# (commit_bypass_eligible) treats the typo subject as ineligible and falls
+# through to the normal ceremony gate instead of granting a free pass.
+# Mirrors diff_requires_ponytail's diff-ref convention: empty `diff_ref`
+# checks the live working tree/index (commit gate), a ref checks that landed
+# commit (push gate).
+#
+# The exclusion list is the entire `shared/` tree, not a hand-picked list of
+# its subdirectories, because `scripts/generate_targets.py`'s
+# `render_shared_basis`/`render_devcontainer` copy essentially all of
+# `shared/` into the generated `.claude/`/`.devcontainer/` runtime consumers
+# actually run: agent prompts (`shared/agents/*/prompt.md`), policies
+# (`shared/policies/*.instructions.md`), skills (`shared/skills/*/SKILL.md`),
+# templates, review profiles, prompts, third_party, hook scripts/git-hooks,
+# and even the `plans`/`quality_reports`/`session_logs` README stubs. Any
+# `.md` file anywhere under `shared/` is therefore live runtime guidance, not
+# authoring-only prose, and a hand-listed subset of it (the earlier,
+# falsified version of this function) drifts silently as new `shared/`
+# subdirectories are added. `scripts/*` (the authoring repo's own generator
+# scripts, distinct from `shared/scripts/`) stays excluded too.
+#
+# `.codex/*` and `.devcontainer/*` are the remaining control-plane
+# directories, and `AGENTS.md`/`CLAUDE.md` the remaining control-plane root
+# files, named verbatim by `shared/policies/workspace.instructions.md`'s
+# control-plane definition ("Control-plane files include `.claude/hooks/`,
+# `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
+# `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by root guidance
+# itself (`CLAUDE.md`'s own "Safety And Control Plane" section). This is the
+# same canonical control-plane set `diff_requires_ponytail` above already
+# encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
+# `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
+# `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
+# cannot drift from each other. A bash `case` pattern cannot glob "every
+# root file the policy calls control-plane" the way a directory prefix can,
+# so root files are named explicitly and stay in lockstep with that same
+# short, already-tracked list `diff_requires_ponytail` names.
+typo_bypass_diff_allowed() {
+  local repo_root="$1"
+  local diff_ref="${2:-}"
+  local head_ref="${diff_ref:-HEAD}"
+  local merge_base path
+  merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
+  [[ -n "$merge_base" ]] || return 1
+
+  local -a paths=()
+  if [[ -n "$diff_ref" ]]; then
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+  else
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" 2>/dev/null)
+  fi
+  [[ "${#paths[@]}" -gt 0 ]] || return 1
+
+  for path in "${paths[@]}"; do
+    case "$path" in
+      *.md)
+        case "$path" in
+          scripts/*|shared/*|tests/*|.github/*|.claude/*|.codex/*|.devcontainer/*|dist/*|AGENTS.md|CLAUDE.md) return 1 ;;
+        esac
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  return 0
+}
+
+# Full bypass eligibility for one commit subject. `fixup!`/`squash!` bypass
+# unconditionally (recovery/history subjects; deliberately no diff-path
+# restriction, per the recovery use-case they exist for).
+# `chore(typo):`/`docs(typo):` bypass only when typo_bypass_diff_allowed
+# confirms every changed path is eligible documentation content outside
+# runtime/execution directories, so a substantive runtime/code change cannot
+# hide under a typo subject. A subject `is_bypass_subject` never matches, or
+# a typo subject with an ineligible diff, is simply not a bypass: it falls
+# through to the normal ceremony gate below like any other commit.
+commit_bypass_eligible() {
+  local repo_root="$1"
+  local subject="$2"
+  local diff_ref="${3:-}"
+  is_bypass_subject "$subject" || return 1
+  case "$subject" in
+    fixup!*|squash!*) return 0 ;;
+  esac
+  typo_bypass_diff_allowed "$repo_root" "$diff_ref"
+}
+
 repo_root_from_script() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"

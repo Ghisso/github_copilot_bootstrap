@@ -253,6 +253,9 @@ acceptance gap/blocker.
 - The `git ci` alias (`git config alias.ci commit`) and `git -C <path> commit` invoked from outside the repo are rejected identically to a bare invalid `git commit` — there is no command string for either to evade.
 - Commits on `dev`/`main` pass through the `commit-msg` hook regardless of ceremony state.
 - `git commit --no-verify` bypasses the `commit-msg` hook on an implementation branch — the documented, sanctioned escape.
+- `fixup!`/`squash!` subjects bypass commit ceremony unconditionally; `chore(typo):`/`docs(typo):` subjects bypass it only when every changed path is eligible documentation content outside runtime/execution directories, and are rejected back into the full ceremony gate otherwise.
+- Every earlier completed phase (not only the terminal one) is validated at push/PR time by the historical receipt chain: ancestor `head_sha`, certified-commit `tree_sha`, and `phase_receipt`/`findings`/`closeout_log` artifact hashes.
+- A closeout log edited after its phase's receipt is bound fails historical-chain validation; a sibling `<log-name>.errata.md` correction file does not.
 - `.claude/hooks/git-hooks/pre-push` exists and is executable in generated output; it shares `assert_push_invariants` with `enforce-pr-gate.sh`.
 - With `core.hooksPath` set to the generated `git-hooks` directory, pushing a `<plan_name>_implementation` ref with an incomplete or invalidly cancelled small plan, no completed phase, too few commits for completed phases, or an unacknowledged bypass log is rejected by git and names the phase; a push with at least one completed phase and full evidence for every cancelled phase succeeds, and findings bind to the last completed phase.
 - Pushing `dev`/`main`, or deleting a branch (`git push origin :foo_implementation`), passes through `pre-push` regardless of ceremony state.

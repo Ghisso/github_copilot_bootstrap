@@ -5393,11 +5393,6 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
             "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
         )
-        # Pin MEMORY.md's mtime safely in the past so the mtime-based LEARN
-        # fallback (memory_mtime >= plan_mtime) cannot flip true/false on
-        # filesystem clock resolution during the "missing LEARN" case below.
-        old = 1_000_000_000
-        os.utime(repo / ".claude" / "MEMORY.md", (old, old))
 
         reports_dir = repo / ".claude" / "quality_reports"
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
@@ -5691,6 +5686,22 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         check(
             result.returncode != 0,
             "commit-msg hook must block missing LEARN evidence",
+            errors,
+        )
+
+        # R-LEARN-01: MEMORY.md's mtime is not evidence of anything here - an
+        # empty ## [LEARN] Entries section still blocks the commit even when
+        # MEMORY.md is freshly touched well after the plan file.
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n",
+        )
+        future = time.time() + 3600
+        os.utime(repo / ".claude" / "MEMORY.md", (future, future))
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0,
+            "commit-msg hook must not accept a fresh MEMORY.md mtime as LEARN evidence",
             errors,
         )
 
@@ -6205,6 +6216,281 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         check(
             delete_push.returncode == 0,
             f"pre-push hook must allow branch deletion pushes: {delete_push.stdout}{delete_push.stderr}",
+            errors,
+        )
+
+
+def _write_findings_only(path: Path, text: str) -> None:
+    """Write a findings report without ``write()``'s phase-one-only
+    auto-receipt side effect (``write_fixture_closeout_receipt`` always
+    defaults to ``phase="phase-one"``, which would silently overwrite an
+    already-committed earlier phase's receipt with stale-context bytes once
+    a second phase's findings are written). Callers regenerate the correct
+    phase's receipt explicitly via ``write_fixture_closeout_receipt``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
+    """R-E2E-01: drive two real phases through the real installed git hooks
+    (commit-msg, pre-push) and PreToolUse gate (enforce-pr-gate.sh) on a
+    throwaway consumer repo pushed to a bare remote, covering the full §6
+    end-to-end contract in one flow: a plan starting, a phase-completion
+    commit landing through the real commit-msg gate, a genuine MINOR finding
+    with a disposition, a second phase closing the big plan, a push that
+    must validate both the historical (phase-one) and terminal (phase-two)
+    receipts, rejection of a hand-edited closed session log, a sibling
+    errata file preserving the old receipt, and a final push/PR gate that
+    only passes once the full chain is valid again.
+
+    This repo's real gate only permits a commit when the current phase's
+    small plan is ``complete`` or ``paused`` (``assert_commit_invariants``);
+    there is no separate mid-phase WIP-commit path outside an explicit
+    paused checkpoint, which already has dedicated coverage in
+    ``validate_paused_phase_gate_cases``. "Implementation commits occur"
+    is exercised here as real tracked file changes staged during each
+    phase and landed by that phase's own completion commit - the actual
+    one-phase/one-completion-commit lifecycle this repo implements.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        initial_push = git(repo, "push", "origin", "dev")
+        check(
+            initial_push.returncode == 0,
+            f"initial push to bare remote failed: {initial_push.stdout}{initial_push.stderr}",
+            errors,
+        )
+
+        # 1. Plan starts: a two-phase big plan, current_phase phase-one.
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-one", "phase-two"),
+            current_phase="phase-one",
+        )
+        git(repo, "checkout", "-b", "foo_implementation")
+
+        reports_dir = repo / ".claude" / "quality_reports"
+
+        def content_hash_for(base: str) -> str:
+            diff_out = git(repo, "diff", "--no-color", "--no-ext-diff", base).stdout
+            return subprocess.run(
+                ["git", "-C", str(repo), "hash-object", "--stdin"],
+                input=diff_out,
+                text=True,
+                capture_output=True,
+                check=False,
+            ).stdout.strip()
+
+        def complete_phase(
+            phase: str, work_file: str, **finding_overrides: object
+        ) -> None:
+            """Stage real implementation content, mark the small plan
+            complete, write a completed closeout log, persist a matching
+            findings report, and generate that phase's phase/closeout
+            receipts - the exact pre-commit sequence the real lifecycle
+            uses, since receipts are generated before the commit they
+            certify."""
+            write(repo / work_file, f"{phase} implementation work\n")
+            git(repo, "add", work_file)
+            write_small_plan(repo, status="complete", phase=phase)
+            write(
+                repo / ".claude" / "session_logs" / f"{phase}-closeout.md",
+                "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+                + (
+                    "- [LEARN] none - no new lessons this session\n"
+                    if not finding_overrides
+                    else "- [LEARN:workflow] real entry from the end-to-end flow\n"
+                ),
+            )
+            merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+            report: dict[str, object] = {
+                "findings": [],
+                "counts": {"critical": 0, "major": 0, "minor": 0},
+                "ponytail_reviewed": True,
+                "ponytail_findings": 0,
+                "profiles_reviewed": ["code", "ponytail"],
+                "branch": "foo_implementation",
+                "phase": phase,
+                "generated_at": "2099-01-01T00:00:00Z",
+                "base_ref": "dev",
+                "merge_base_sha": merge_base,
+                "head_sha": git(repo, "rev-parse", "HEAD").stdout.strip(),
+                "target": str(repo / work_file),
+                "dirty": False,
+                "content_hash": content_hash_for(merge_base),
+                "changed_files": [work_file],
+            }
+            report.update(finding_overrides)
+            _write_findings_only(
+                reports_dir / f"findings-{phase}.json",
+                json.dumps(report, indent=2) + "\n",
+            )
+            write_fixture_closeout_receipt(repo, phase=phase)
+
+        # --- Phase one: real completion commit through the real commit-msg
+        # hook, with a genuine MINOR finding the reviewer dispositioned. ---
+        # record-commit-closeout.sh's phase-advance requires the *next*
+        # phase's small-plan file to already exist (it validates that
+        # candidate before advancing current_phase to it), so both phases'
+        # small plans are staged up front, matching a planner that lays out
+        # every phase before implementation starts.
+        write_small_plan(repo, status="in-progress", phase="phase-one")
+        write_small_plan(repo, status="in-progress", phase="phase-two")
+        complete_phase(
+            "phase-one",
+            "phase-one-work.txt",
+            findings=[
+                {
+                    "severity": "MINOR",
+                    "profile": "code",
+                    "title": "advisory style nit",
+                    "disposition": "accepted",
+                    "reason": "tracked for a later cleanup pass",
+                }
+            ],
+            counts={"critical": 0, "major": 0, "minor": 1},
+        )
+        completion_one = git(repo, "commit", "-m", "phase one: complete")
+        check(
+            completion_one.returncode == 0,
+            "phase-one completion commit with a dispositioned MINOR must succeed "
+            f"through the real commit-msg hook: {completion_one.stdout}{completion_one.stderr}",
+            errors,
+        )
+        run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase one: complete"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            "current_phase: phase-two" in read(repo / ".claude" / "plans" / "foo.md"),
+            "phase-one completion must advance current_phase to phase-two through "
+            "the real commit-msg + record-commit-closeout PostToolUse wiring",
+            errors,
+        )
+
+        # --- Phase two: a second real completion commit closes the big
+        # plan; this phase's receipt gets terminal current-state freshness,
+        # phase-one's gets historical ancestor/tree/artifact-chain checks. ---
+        write_small_plan(repo, status="in-progress", phase="phase-two")
+        complete_phase("phase-two", "phase-two-work.txt")
+        completion_two = git(repo, "commit", "-m", "phase two: complete")
+        check(
+            completion_two.returncode == 0,
+            "phase-two completion commit must succeed through the real commit-msg "
+            f"hook: {completion_two.stdout}{completion_two.stderr}",
+            errors,
+        )
+        run_hook(
+            lifecycle_script(repo, "record-commit-closeout.sh"),
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": 'git commit -m "phase two: complete"'},
+            },
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
+            "big plan must be marked complete after the final phase's completion commit",
+            errors,
+        )
+
+        # 7. Push validates both the historical (phase-one) and terminal
+        # (phase-two) receipts, through the real installed pre-push hook.
+        push_result = git(repo, "push", "origin", "foo_implementation")
+        check(
+            push_result.returncode == 0,
+            "push with a fully valid two-phase historical+terminal chain must "
+            f"succeed through the real pre-push hook: {push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+        pr_allowed = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' not in pr_allowed[1],
+            f"PR gate must allow PR creation once the full two-phase chain is valid: {pr_allowed[1]}",
+            errors,
+        )
+
+        # 8. Old session log mutation is rejected. A hand-edit is filesystem
+        # state with no new outer-repo commit, so the real git pre-push hook
+        # has nothing new to negotiate and git skips invoking it ("Everything
+        # up-to-date") - the PreToolUse push/PR layer re-evaluates
+        # assert_push_invariants unconditionally on every call regardless, so
+        # it is the layer that actually observes the tamper here.
+        old_log_path = repo / ".claude" / "session_logs" / "phase-one-closeout.md"
+        original_bytes = old_log_path.read_bytes()
+        old_log_path.write_text(
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+            "- [LEARN:workflow] edited after closeout, must be rejected\n",
+            encoding="utf-8",
+        )
+        pr_after_mutation = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' in pr_after_mutation[1],
+            "PR gate must reject a hand-edited closed session log via the "
+            f"historical receipt chain: {pr_after_mutation[1]}",
+            errors,
+        )
+        check(
+            "tampered" in pr_after_mutation[1] or "phase-one" in pr_after_mutation[1],
+            f"PR gate denial must name the tampered historical artifact: {pr_after_mutation[1]}",
+            errors,
+        )
+
+        # 9. Sibling errata preserves the old receipt: revert the illegal
+        # mutation (real corrections never rewrite a closed log) and add a
+        # sibling `<log>.errata.md` file instead - its mere existence must
+        # not disturb phase-one's already-bound receipt hash.
+        old_log_path.write_bytes(original_bytes)
+        errata_path = (
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md.errata.md"
+        )
+        write(
+            errata_path,
+            "# Errata for phase-one-closeout.md\n\n"
+            "- 2099-01-01\n"
+            "  - Supersedes: an illustrative stale claim\n"
+            "  - Corrected conclusion: the corrected claim\n"
+            "  - Evidence/reference: phase-two\n",
+        )
+
+        # 10. Final PR/push gate passes only with the full chain valid again.
+        pr_after_errata = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "gh pr create --base dev"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' not in pr_after_errata[1],
+            "PR gate must pass again once the closed log is restored and the "
+            f"correction lives in a sibling errata file: {pr_after_errata[1]}",
             errors,
         )
 
@@ -9462,6 +9748,173 @@ def validate_ponytail_diff_classifier(errors: list[str]) -> None:
         )
 
 
+def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
+    """`chore(typo):`/`docs(typo):` bypass only a documentation-only diff, so
+    a substantive runtime/code change cannot hide under a typo subject.
+    `fixup!`/`squash!` keep their unconditional recovery bypass regardless of
+    changed paths."""
+    library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo = Path(temp_dir) / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "dev", str(repo)], check=False)
+        env = git_actor_env("TypoBypassClassifier")
+        write(repo / "README.md", "# Fixture\n")
+        subprocess.run(["git", "add", "."], cwd=repo, env=env, check=False)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "base"], cwd=repo, env=env, check=False
+        )
+        subprocess.run(
+            ["git", "switch", "-q", "-c", "fixture_implementation"],
+            cwd=repo,
+            env=env,
+            check=False,
+        )
+
+        def bypass_status(subject: str, *refs: str) -> int:
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    '. "$1"; commit_bypass_eligible "$2" "$3" "${4:-}"',
+                    "_",
+                    str(library),
+                    str(repo),
+                    subject,
+                    *refs,
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            return result.returncode
+
+        # docs typo subject + allowed docs-only diff -> follows the intended
+        # bypass path.
+        write(repo / "docs" / "guide.md", "# Guide\n")
+        git(repo, "add", "docs/guide.md")
+        check(
+            bypass_status("docs(typo): fix a word") == 0,
+            "typo bypass must allow a docs-only diff under docs(typo):",
+            errors,
+        )
+        git(repo, "reset", "docs/guide.md")
+        (repo / "docs" / "guide.md").unlink()
+
+        # docs typo subject + runtime/code path -> bypass rejected.
+        write(repo / "app.py", "print('fixture')\n")
+        git(repo, "add", "app.py")
+        check(
+            bypass_status("docs(typo): fix a word") != 0,
+            "typo bypass must reject a runtime/code path under docs(typo):",
+            errors,
+        )
+        git(repo, "reset", "app.py")
+        (repo / "app.py").unlink()
+
+        # chore typo subject + disallowed code path -> rejected.
+        write(repo / "shared" / "scripts" / "verify.py", "print('fixture')\n")
+        git(repo, "add", "shared/scripts/verify.py")
+        check(
+            bypass_status("chore(typo): fix a word") != 0,
+            "typo bypass must reject a shared/scripts/ path under chore(typo):",
+            errors,
+        )
+        git(repo, "reset", "shared/scripts/verify.py")
+        (repo / "shared" / "scripts" / "verify.py").unlink()
+
+        # A Markdown file inside an excluded runtime directory must not
+        # qualify merely because of its extension.
+        write(repo / "tests" / "notes.md", "# Notes\n")
+        git(repo, "add", "tests/notes.md")
+        check(
+            bypass_status("docs(typo): fix a word") != 0,
+            "typo bypass must reject a Markdown file inside an excluded runtime directory",
+            errors,
+        )
+        git(repo, "reset", "tests/notes.md")
+        (repo / "tests" / "notes.md").unlink()
+
+        # R-BYPASS-01: every shared/ subdirectory generate_targets.py copies
+        # into the generated .claude/.devcontainer runtime consumers actually
+        # run must be excluded, not just shared/scripts/ and shared/hooks/ -
+        # a hand-picked subset of shared/ drifts as new subdirectories are
+        # added, so the exclusion is the entire shared/ tree.
+        for relative_path in (
+            "shared/agents/coder/prompt.md",
+            "shared/policies/workflow.instructions.md",
+            "shared/skills/ponytail/SKILL.md",
+            "shared/templates/session-log.md",
+            "shared/review-profiles/code.md",
+            "shared/plans/README.md",
+            "shared/quality_reports/README.md",
+            "shared/session_logs/README.md",
+        ):
+            write(repo / relative_path, "# Fixture\n")
+            git(repo, "add", relative_path)
+            check(
+                bypass_status("docs(typo): fix a word") != 0,
+                f"typo bypass must reject shared/ runtime guidance: {relative_path}",
+                errors,
+            )
+            git(repo, "reset", relative_path)
+            (repo / relative_path).unlink()
+
+        # R-BYPASS-02: root-level control-plane files and directories named
+        # verbatim by shared/policies/workspace.instructions.md's
+        # control-plane definition ("Control-plane files include
+        # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
+        # .mcp.json, .devcontainer/, CLAUDE.md, and AGENTS.md") must also be
+        # excluded - a docs(typo): commit must never rewrite root guidance
+        # or the .codex/.devcontainer control-plane surfaces unreviewed.
+        for relative_path in (
+            "CLAUDE.md",
+            "AGENTS.md",
+            ".codex/notes.md",
+            ".devcontainer/notes.md",
+        ):
+            write(repo / relative_path, "# Fixture\n")
+            git(repo, "add", relative_path)
+            check(
+                bypass_status("docs(typo): fix a word") != 0,
+                f"typo bypass must reject root control-plane guidance: {relative_path}",
+                errors,
+            )
+            git(repo, "reset", relative_path)
+            (repo / relative_path).unlink()
+
+        # fixup!/squash! retain their unconditional recovery bypass even for
+        # a runtime/code path.
+        write(repo / "app.py", "print('fixture')\n")
+        git(repo, "add", "app.py")
+        check(
+            bypass_status("fixup! earlier work") == 0,
+            "fixup! must retain its unconditional recovery bypass",
+            errors,
+        )
+        check(
+            bypass_status("squash! earlier work") == 0,
+            "squash! must retain its unconditional recovery bypass",
+            errors,
+        )
+        check(
+            bypass_status("chore: not a typo bypass") != 0,
+            "an ordinary subject must not be treated as a bypass",
+            errors,
+        )
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "runtime fixture"],
+            cwd=repo,
+            env=env,
+            check=False,
+        )
+        check(
+            bypass_status("fixup! earlier work", "HEAD") == 0,
+            "typo bypass classifier must apply the same rule to a pushed diff_ref",
+            errors,
+        )
+
+
 def validate_json_report_readers(errors: list[str]) -> None:
     """Report readers must ignore nested reserved keys and key order."""
     library = TARGET_ROOT / ".claude" / "hooks" / "scripts" / "_lib-frontmatter.sh"
@@ -9803,6 +10256,8 @@ def main() -> int:
         validate_root_source_mirror_cases(errors)
         validate_runtime_drift_cases(errors)
         validate_ponytail_diff_classifier(errors)
+        validate_typo_bypass_path_restriction(errors)
+        validate_end_to_end_receipt_chain_lifecycle(errors)
         validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)

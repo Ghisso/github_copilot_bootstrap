@@ -198,7 +198,7 @@ paths, and protected hook configuration files; do not treat prose or ordinary
 source filenames containing `secret` as credentials, and do not require denial
 of unknown commands that carry none of those path literals.
 
-The runtime checker also runs the plan frontmatter validator when it is present. Invalid lifecycle metadata produces `WARN`, not `FAIL`, so partially migrated consumer repos can still start while showing exactly what needs cleanup.
+The runtime checker also runs the shipped `scripts/validate_plan_frontmatter.py` when it is present, and surfaces its failures as hard `FAIL` errors, not `WARN` — plan-frontmatter validation is a hard runtime contract, not an advisory check. A missing validator script is not itself an error here; the required-files/required-directories checks already gate on the generated tree.
 
 Runtime verification also expects the installer and updater defaults to create
 and publish nested `ai-state` commits. With `--local-only`, they must instead
@@ -372,6 +372,32 @@ Two workflow invariants are each enforced twice, from a single shared contract p
 - **Push invariant** — the big-plan/phase-completeness/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
   - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
   - **`pre-push` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every push that reaches git itself, reading ref lines from stdin (`<local-ref> <local-sha> <remote-ref> <remote-sha>`). It derives the branch and the commit-count check from the *pushed* ref/sha, not from whatever is checked out, so a push of `foo_implementation` from elsewhere is still gated. It skips branch deletions (all-zero local sha) and only runs the ceremony checks on `<plan_name>_implementation` refs — `dev`/`main` pushes pass through untouched.
+
+**Historical receipt-chain validation** — the push/PR gate does not check only
+the terminal completed phase. `verify.py`'s `historical_chain_errors` walks
+the big plan's declared phase order backwards from the terminal phase and, for
+every earlier completed phase, validates that its receipt's `head_sha`
+resolves to a real commit, is an ancestor of the next completed phase's head,
+and that the certified commit - the first entry of `git rev-list
+--ancestry-path --reverse <head_sha>..<later_head>`, since a receipt's
+`head_sha` is the *parent* of the commit it certifies (receipts are generated
+before their completion commit) - introduces a tree matching the receipt's
+`tree_sha`. It then re-verifies every `phase_receipt`/`findings`/`closeout_log`
+artifact hash against the current file bytes. Only the terminal completed
+phase receives current-tree/current-runtime freshness checks; every earlier
+phase gets this ancestor/tree/artifact-hash chain instead.
+
+**Closed session logs are immutable.** Because a closeout log's bytes are
+hashed into its phase's receipt, editing a log after its phase closes breaks
+that historical artifact-hash check above. Corrections use a sibling
+`<log-name>.errata.md` file next to the closed log instead of rewriting it; an
+erratum discovered during a later active phase may be bound as that later
+phase's own evidence without touching the earlier receipt.
+
+**LEARN evidence** lives entirely inside a closeout log's own `## [LEARN]
+Entries` section: either one or more explicit `[LEARN:category] ...` entries,
+or the exact sanctioned marker `[LEARN] none - no new lessons this session`.
+`MEMORY.md`'s mtime is never accepted as a substitute for this section.
 
 Both git-hook layers are installed by setting `git config core.hooksPath .claude/hooks/git-hooks` (done by `install_bootstrap.py` and, for containers, by `post-start.sh`).
 

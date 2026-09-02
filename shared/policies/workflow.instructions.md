@@ -139,10 +139,15 @@ small plan and run the full loop before its normal completion commit.
 
 Commit-gate bypasses are allowed only for commit subjects beginning with:
 
-- `fixup!`
-- `squash!`
-- `chore(typo):`
-- `docs(typo):`
+- `fixup!` and `squash!` — unconditional recovery/history bypass, regardless
+  of changed paths.
+- `chore(typo):` and `docs(typo):` — bypass only when every changed path is
+  eligible documentation content outside runtime/execution directories (for
+  example ordinary Markdown docs, not `shared/scripts/`, hook logic,
+  generated runtime, behavior-changing tests, or other executable code). A
+  typo subject over an ineligible diff is not a bypass at all: it falls
+  through to the full ceremony gate like any other commit, so a substantive
+  runtime/code change cannot hide under a typo subject.
 
 Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. A PR is blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
 
@@ -171,6 +176,23 @@ communication and agent-to-agent status or handoffs.
 **Frequency:** Every 30 responses or at session end, whichever comes first.
 
 Merge-time review reports should be stored in `.claude/quality_reports/merges/`.
+
+**Immutability:** A session log already bound by a completed phase's closeout
+receipt must not be edited afterward; the receipt hashes its exact bytes, and
+historical receipt-chain validation depends on that byte stability. Write a
+correction to a sibling `<log-name>.errata.md` file next to the closed log
+instead. An erratum discovered and written during a later active phase is
+evidence of that later phase and may be bound by its own receipt; the earlier
+phase's receipt is never edited or regenerated. An erratum written outside an
+active plan may remain unbound until a later phase reviews or changes it.
+
+**Conditional stale-claims review:** When a phase changes a previously
+documented fact, number/count, behavior, API, decision, conclusion, or
+pipeline/runtime description, search likely-affected active plans, `docs/`,
+`README.md`, and workflow/policy documentation, then update or explicitly
+supersede the stale claim. Record which surfaces were checked in the session
+log when this rule triggers. Do not run this sweep mechanically when nothing
+documented actually changed.
 
 ---
 
