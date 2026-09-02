@@ -565,12 +565,11 @@
 - [LEARN:verification] A closeout receipt's `head_sha` is the PARENT of the
   commit it certifies, and its `tree_sha` is the staged tree that becomes that
   commit's tree, because receipts are generated before the completion commit.
-  Any check comparing the two against the same commit is wrong. Resolve the
-  certified commit as the first entry of
-  `git rev-list --ancestry-path --reverse <head_sha>..<later_head>`.
-- [LEARN:testing] A fixture that synthesizes an artifact to match the
-  implementation's assumption cannot catch that assumption being wrong. Build
-  fixtures from what the lifecycle actually produces.
+  Any check comparing the two against the same commit is wrong. For how to
+  resolve the certified commit, see the parentage-proof entry below — this
+  entry originally said "the first entry of `git rev-list --ancestry-path
+  --reverse`", which was later proved to accept an unproven commit on a
+  non-linear range. Do not use that.
 - [LEARN:verification] A changed-path set legitimately includes deletions, so
   never hand it straight to a tool that must open each file. Filter at the tool
   boundary and leave recorded metadata unfiltered, since content and freshness
@@ -660,12 +659,21 @@
   exact set equality, which breaks the push/PR gate on the plan's own commits.
   Extend an existing check instead, unless a schema bump plus migration is
   intended.
-- [LEARN:testing] A fixture that builds both sides of a comparison from the
-  current code can never detect a contract that changed between them. This
-  blind spot hid three separate defects in one plan: the certified-commit tree
-  rule, the `CHECK_IDS` break, and an invalid Ruff flag. Pin the previously
-  persisted shape as a literal, and cover real binaries as well as argument
-  shapes.
+- [LEARN:testing] **The highest-yield test smell in this repository.** A
+  fixture that derives both sides of a comparison from the current code can
+  never detect a contract that changed between them, so it passes while the
+  real artifact fails. This one blind spot hid three separate defects in a
+  single plan, each behind a fully green suite: the certified-commit tree rule
+  (fixture computed `tree_sha` with the same wrong formula as the code), the
+  `CHECK_IDS` break (every historical-chain fixture built its check set from
+  the live constant, so growing it invalidated real receipts invisibly), and
+  an invalid Ruff flag (consumer tests mocked `_run` and asserted which
+  arguments *would* be passed, never that the command runs). The fix has three
+  parts: pin a previously persisted shape as a literal independent of the
+  constant under test; exercise real binaries as well as argument shapes; and
+  validate against artifacts actually on disk, not only `tmp_path` fixtures.
+  When a check reads its own history, treat its identifier set as part of the
+  schema contract.
 - [LEARN:verification] A flag valid on one Ruff subcommand may be invalid on
   its sibling: `ruff check` accepts `--extend-exclude`, `ruff format` rejects
   it. Build a shared option once via the generic `--config "key=value"`
