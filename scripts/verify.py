@@ -1785,7 +1785,15 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
 
 
 def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
-    """Keep completed-log and LEARN authority bound to the receipt path."""
+    """Keep completed-log and LEARN authority bound to the receipt path.
+
+    LEARN evidence lives entirely inside the session log's own
+    ``## [LEARN] Entries`` section: either one or more explicit
+    ``[LEARN...`` entries, or the exact sanctioned no-lessons marker.
+    ``MEMORY.md``'s mtime is not evidence of anything here - it can still be
+    updated as a separate persistence action, but its timestamp never
+    substitutes for a session-log section the receipt hash actually binds.
+    """
     expected = closeout_log_path(root, phase)
     if path.resolve() != expected.resolve():
         return ["closeout receipt log does not match phase frontmatter"]
@@ -1795,15 +1803,17 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
         return ["closeout session log is unreadable"]
     if not re.search(r"^\*\*Status:\*\*[ \t]+COMPLETED\b", text, re.MULTILINE):
         return ["closeout session log is not completed"]
-    if "[LEARN] none - no new lessons this session" in text:
+    section = re.search(
+        r"^## \[LEARN\] Entries[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        return ["closeout session log is missing the ## [LEARN] Entries section"]
+    body = section.group("body")
+    if "[LEARN] none - no new lessons this session" in body:
         return []
-    memory = root / ".claude/MEMORY.md"
-    plan = root / ".claude/plans" / f"{phase}.md"
-    if (
-        memory.is_file()
-        and plan.is_file()
-        and memory.stat().st_mtime >= plan.stat().st_mtime
-    ):
+    if re.search(r"^-[ \t]*\[LEARN[:\]]", body, re.MULTILINE):
         return []
     return ["LEARN evidence is missing"]
 

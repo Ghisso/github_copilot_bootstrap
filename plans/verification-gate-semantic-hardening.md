@@ -9,7 +9,7 @@ phases:
   - 2026-09-02_phase-2-lifecycle-evidence
   - 2026-09-02_phase-3-consistency-hardening
 started_at: 2026-09-02T01:16:25Z
-current_phase: 2026-09-02_phase-2-lifecycle-evidence
+current_phase: 2026-09-02_phase-3-consistency-hardening
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -94,11 +94,24 @@ Git history already preserves prior versions.
 
 Do not re-run the terminal current-state validation unchanged for every old phase.
 
+**Corrected in Phase 2, per its own investigation:** a receipt is generated
+*before* the completion commit it certifies (stage everything, generate
+reports and the receipt, then commit), so a historical receipt's `head_sha`
+is the *parent* of the commit it certifies, not that commit itself. The
+certified commit is resolved as the first entry of `git rev-list
+--ancestry-path --reverse <earlier_head>..<chain_head>` (the ancestry path
+from that receipt's `head_sha` toward the next completed phase's head), and
+`tree_sha` must equal that certified commit's tree — not
+`git rev-parse <receipt-head>^{tree}`, which would check `head_sha`'s own
+(parent) tree and always fail for a real lifecycle receipt. This is settled
+Phase 2 behavior; do not revert to the equality this section originally
+proposed.
+
 For each historical completed phase:
 
 - receipt schema and required fields are valid;
 - recorded receipt HEAD exists;
-- `tree_sha` equals `git rev-parse <receipt-head>^{tree}`;
+- the certified commit's tree (resolved via the ancestry path above) equals `tree_sha`;
 - receipt HEAD is ordered correctly relative to neighboring phase receipts and is an ancestor of the pushed/current terminal HEAD;
 - immutable receipt artifacts still hash-match;
 - phase identity and plan identity remain consistent.

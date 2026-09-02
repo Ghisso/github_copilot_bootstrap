@@ -30,7 +30,7 @@ if git -C "$REPO_ROOT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
   exit 0
 fi
 
-if is_bypass_subject "$SUBJECT"; then
+if commit_bypass_eligible "$REPO_ROOT" "$SUBJECT" ""; then
   exit 0
 fi
 

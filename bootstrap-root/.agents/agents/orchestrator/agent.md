@@ -159,7 +159,9 @@ Before returning a normally completed phase, you MUST complete these steps:
    - Verification results
    - Open questions and next steps
 
-Do not skip this step even if the task seems small.
+Do not skip this step even if the task seems small. A session log already
+bound by a completed phase's receipt is immutable; write corrections to a
+sibling `<log-name>.errata.md` file instead of editing the closed log.
 
 ## Safety and Policy
 

@@ -46,7 +46,7 @@ if [[ "$correlated" -ne 1 ]]; then
   exit 0
 fi
 
-if is_bypass_subject "$SUBJECT"; then
+if commit_bypass_eligible "$REPO_ROOT" "$SUBJECT" ""; then
   mkdir -p "$REPO_ROOT/.claude/session_logs"
   printf '%s,branch=%s,subject=%s,target=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CURRENT_BRANCH" "$SUBJECT" "$TARGET_ID" >> "$REPO_ROOT/.claude/session_logs/hooks-bypass.log"
   exit 0

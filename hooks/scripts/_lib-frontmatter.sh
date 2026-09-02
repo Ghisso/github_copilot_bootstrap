@@ -657,6 +657,71 @@ diff_requires_ponytail() {
   return 1
 }
 
+# Return success only when every path changed since the branch's merge-base
+# with `dev` is eligible for a typo-subject bypass: Markdown documentation
+# outside runtime/execution directories. A single ineligible path - or an
+# empty/unresolvable diff - fails closed, so the caller
+# (commit_bypass_eligible) treats the typo subject as ineligible and falls
+# through to the normal ceremony gate instead of granting a free pass.
+# Mirrors diff_requires_ponytail's diff-ref convention: empty `diff_ref`
+# checks the live working tree/index (commit gate), a ref checks that landed
+# commit (push gate). The excluded directories hold no legitimate typo-only
+# Markdown today (hook logic and scripts are `.sh`/`.py`, generated runtime
+# lives under `.claude/`/`dist/`), so this stays narrow without excluding any
+# real current documentation surface.
+typo_bypass_diff_allowed() {
+  local repo_root="$1"
+  local diff_ref="${2:-}"
+  local head_ref="${diff_ref:-HEAD}"
+  local merge_base path
+  merge_base="$(git -C "$repo_root" merge-base dev "$head_ref" 2>/dev/null || true)"
+  [[ -n "$merge_base" ]] || return 1
+
+  local -a paths=()
+  if [[ -n "$diff_ref" ]]; then
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" "$diff_ref" 2>/dev/null)
+  else
+    while IFS= read -r path; do
+      [[ -n "$path" ]] && paths+=("$path")
+    done < <(git -C "$repo_root" diff --no-renames --name-only "$merge_base" 2>/dev/null)
+  fi
+  [[ "${#paths[@]}" -gt 0 ]] || return 1
+
+  for path in "${paths[@]}"; do
+    case "$path" in
+      *.md)
+        case "$path" in
+          scripts/*|shared/scripts/*|shared/hooks/*|tests/*|.github/*|.claude/*|dist/*) return 1 ;;
+        esac
+        ;;
+      *) return 1 ;;
+    esac
+  done
+  return 0
+}
+
+# Full bypass eligibility for one commit subject. `fixup!`/`squash!` bypass
+# unconditionally (recovery/history subjects; deliberately no diff-path
+# restriction, per the recovery use-case they exist for).
+# `chore(typo):`/`docs(typo):` bypass only when typo_bypass_diff_allowed
+# confirms every changed path is eligible documentation content outside
+# runtime/execution directories, so a substantive runtime/code change cannot
+# hide under a typo subject. A subject `is_bypass_subject` never matches, or
+# a typo subject with an ineligible diff, is simply not a bypass: it falls
+# through to the normal ceremony gate below like any other commit.
+commit_bypass_eligible() {
+  local repo_root="$1"
+  local subject="$2"
+  local diff_ref="${3:-}"
+  is_bypass_subject "$subject" || return 1
+  case "$subject" in
+    fixup!*|squash!*) return 0 ;;
+  esac
+  typo_bypass_diff_allowed "$repo_root" "$diff_ref"
+}
+
 repo_root_from_script() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
