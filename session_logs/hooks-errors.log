@@ -2241,3 +2241,39 @@ error: Please commit or stash them.
 2026-09-02T06:30:54Z WARN hook fail-closed: unparseable tool payload
 2026-09-02T06:30:54Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-02T06:30:54Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:49:27Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T06:49:27Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:49:27Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T06:49:27Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:51:42Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T06:51:42Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:51:42Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T06:51:42Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:53:52Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T06:53:53Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:53:53Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T06:53:53Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:55:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T06:55:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:55:35Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T06:55:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:58:27Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T06:58:28Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T06:58:28Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T06:58:28Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:01:14Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T07:01:14Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:01:14Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T07:01:15Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:03:27Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T07:03:27Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:03:27Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T07:03:27Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:05:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T07:05:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:05:35Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T07:05:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:07:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T07:07:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T07:07:35Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T07:07:35Z WARN hook fail-closed: unparseable tool payload
