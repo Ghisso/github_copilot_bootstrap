@@ -680,6 +680,22 @@ diff_requires_ponytail() {
 # falsified version of this function) drifts silently as new `shared/`
 # subdirectories are added. `scripts/*` (the authoring repo's own generator
 # scripts, distinct from `shared/scripts/`) stays excluded too.
+#
+# `.codex/*` and `.devcontainer/*` are the remaining control-plane
+# directories, and `AGENTS.md`/`CLAUDE.md` the remaining control-plane root
+# files, named verbatim by `shared/policies/workspace.instructions.md`'s
+# control-plane definition ("Control-plane files include `.claude/hooks/`,
+# `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
+# `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by root guidance
+# itself (`CLAUDE.md`'s own "Safety And Control Plane" section). This is the
+# same canonical control-plane set `diff_requires_ponytail` above already
+# encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
+# `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
+# `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
+# cannot drift from each other. A bash `case` pattern cannot glob "every
+# root file the policy calls control-plane" the way a directory prefix can,
+# so root files are named explicitly and stay in lockstep with that same
+# short, already-tracked list `diff_requires_ponytail` names.
 typo_bypass_diff_allowed() {
   local repo_root="$1"
   local diff_ref="${2:-}"
@@ -704,7 +720,7 @@ typo_bypass_diff_allowed() {
     case "$path" in
       *.md)
         case "$path" in
-          scripts/*|shared/*|tests/*|.github/*|.claude/*|dist/*) return 1 ;;
+          scripts/*|shared/*|tests/*|.github/*|.claude/*|.codex/*|.devcontainer/*|dist/*|AGENTS.md|CLAUDE.md) return 1 ;;
         esac
         ;;
       *) return 1 ;;
