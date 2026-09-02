@@ -1296,9 +1296,14 @@ def historical_chain_errors(
     walks the big plan's declared phase order backwards from ``phase`` and
     applies ancestor/tree/artifact-chain semantics to each earlier completed
     phase, per the design rule that current-state checks apply only to the
-    terminal receipt. A missing or unreadable big plan is treated as having
-    no historical chain to validate, since the caller already fails closed on
-    that condition through its own required-file checks.
+    terminal receipt. Each historical receipt's ``head_sha`` is the *parent*
+    of the commit it certifies (receipts are generated before their
+    completion commit), so the tree check resolves the certified commit via
+    the ancestry path to the next completed phase rather than comparing
+    against ``head_sha``'s own tree. A missing or unreadable big plan is
+    treated as having no historical chain to validate, since the caller
+    already fails closed on that condition through its own required-file
+    checks.
     """
     if not branch.endswith("_implementation"):
         return []
@@ -1355,16 +1360,39 @@ def historical_chain_errors(
                 f"historical phase {earlier} receipt head_sha does not resolve to a commit"
             )
             break
-        expected_tree = git_output(["rev-parse", f"{earlier_head}^{{tree}}"], root)
-        if not expected_tree or metadata.get("tree_sha") != expected_tree:
-            errors.append(
-                f"historical phase {earlier} receipt tree_sha does not match its own head"
-            )
-            break
         if not git_is_ancestor(root, earlier_head, chain_head):
             errors.append(
                 f"historical phase {earlier} receipt head_sha is not an ancestor of "
                 "the next completed phase"
+            )
+            break
+        # Receipts are generated before their completion commit (stage, then
+        # report, then commit), so head_sha is the *parent* of the commit the
+        # receipt certifies, not that commit itself. The certified commit is
+        # head_sha's immediate descendant on the ancestry path toward
+        # chain_head; its tree - not head_sha's own tree - must match
+        # tree_sha. An empty path (or an unresolvable tree) fails closed.
+        ancestry_path = git_output(
+            [
+                "rev-list",
+                "--ancestry-path",
+                "--reverse",
+                f"{earlier_head}..{chain_head}",
+            ],
+            root,
+        )
+        certified_commit = ancestry_path.splitlines()[0] if ancestry_path else ""
+        if not certified_commit:
+            errors.append(
+                f"historical phase {earlier} receipt head_sha has no ancestry path "
+                "to the next completed phase"
+            )
+            break
+        expected_tree = git_output(["rev-parse", f"{certified_commit}^{{tree}}"], root)
+        if not expected_tree or metadata.get("tree_sha") != expected_tree:
+            errors.append(
+                f"historical phase {earlier} receipt tree_sha does not match the "
+                "tree introduced by its certified completion commit"
             )
             break
         artifacts = receipt.get("artifacts")

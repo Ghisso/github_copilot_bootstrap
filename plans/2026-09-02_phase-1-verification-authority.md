@@ -1,5 +1,5 @@
 ---
-name: verification-authority
+name: 2026-09-02_phase-1-verification-authority
 type: small-plan
 parent_plan: verification-gate-semantic-hardening
 phase_index: 1

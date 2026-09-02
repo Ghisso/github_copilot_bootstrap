@@ -1,5 +1,5 @@
 ---
-name: consistency-hardening
+name: 2026-09-02_phase-3-consistency-hardening
 type: small-plan
 parent_plan: verification-gate-semantic-hardening
 phase_index: 3

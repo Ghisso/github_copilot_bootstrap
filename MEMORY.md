@@ -548,3 +548,17 @@
   file. A `-F -` heredoc commits successfully but the closeout hook cannot
   parse the subject from the intercepted command, so it skips advancing
   `current_phase` and the next phase must be advanced by hand.
+- [LEARN:review] A phase that changes documented behavior owns the affected
+  claims, even in files an earlier scope note deferred. Deferral covers stale
+  prose, never a statement the current change just falsified. Expect
+  self-contradicting files when prose is fixed in one section and left in
+  another.
+- [LEARN:workflow] When a delegated agent dies mid-task, file mtimes are not
+  evidence of progress; they may be from an earlier round of the same agent.
+  Re-read content against the finding list before deciding what remains.
+- [LEARN:verification] Retiring a test because "a unit test covers it" requires
+  checking the specific case, not the test family. A family that all assumes
+  the artifact exists cannot cover the artifact-missing case.
+- [LEARN:workflow] A gate flag derived from plan status at gate time needs no
+  separate "is this the completion commit" signal, and stays correct through
+  amend and re-commit for free.
