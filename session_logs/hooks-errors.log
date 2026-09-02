@@ -2165,3 +2165,19 @@ error: Please commit or stash them.
 2026-09-02T04:14:30Z WARN hook fail-closed: unparseable tool payload
 2026-09-02T04:14:30Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-02T04:14:30Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:16:48Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T04:16:49Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:16:49Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T04:16:49Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:18:48Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T04:18:48Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:18:48Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T04:18:48Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:21:04Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T04:21:04Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:21:04Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T04:21:04Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:22:57Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-02T04:22:57Z WARN hook fail-closed: unparseable tool payload
+2026-09-02T04:22:57Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-02T04:22:58Z WARN hook fail-closed: unparseable tool payload
