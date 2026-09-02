@@ -1,7 +1,7 @@
 ---
 name: verification-gate-semantic-hardening
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: verification-gate-semantic-hardening_implementation
 phases:
@@ -11,8 +11,9 @@ phases:
   - 2026-09-02_phase-4-minor-findings-closure
   - 2026-09-02_phase-5-inactive-phase-diagnostics
   - 2026-09-02_phase-6-canonical-command-parity
+  - 2026-09-02_phase-7-stale-knowledge-audit
 started_at: 2026-09-02T01:16:25Z
-current_phase: 
+current_phase: 2026-09-02_phase-7-stale-knowledge-audit
 ---
 
 # Big Plan — Verification Gate Semantic Hardening
@@ -216,8 +217,9 @@ Relocate code by symbol or behavior. Do not trust old line numbers.
 - `2026-09-02_phase-4-minor-findings-closure` — fix the three MINOR findings that phases 2 and 3 closed with an accepted disposition.
 - `2026-09-02_phase-5-inactive-phase-diagnostics` — report a clear diagnostic instead of a traceback when no phase is active, and correct the big-plan claim Phase 4 superseded.
 - `2026-09-02_phase-6-canonical-command-parity` — make the documented verification commands match what the gate runs, in both the authoring repository and consumers, and close the formatting drift the mismatch allowed.
+- `2026-09-02_phase-7-stale-knowledge-audit` — make a documentation, memory, and LEARN audit a required final step of every big plan, bring the stale-claims rule to cover the memory index, then run that audit over every live-advice surface.
 
-### Why this plan grew to six phases
+### Why this plan grew to seven phases
 
 Phases 1–3 delivered the plan's §7 global acceptance criteria in full, and the
 plan reached `complete` on that basis. Three MINOR findings were carried out of
