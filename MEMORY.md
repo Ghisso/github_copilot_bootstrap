@@ -688,3 +688,31 @@
   drift. `ruff format --check` was required in prose and gated nowhere, so
   edits to `verify.py` and `test_verify.py` went unformatted across five
   phases. Either gate a requirement or stop claiming it.
+- [LEARN:installer] Bootstrap-owned documentation seeded inside a preserved
+  consumer-state directory can never be updated again: the installer's tree
+  walk skips such a directory by name before looking inside. Separate
+  ownership from location — `STATE_DIR_OWNED_README_PATHS` names the owned
+  paths and the installer refreshes exactly those, leaving
+  `CONSUMER_STATE_PATHS` untouched. Test by corrupting the file and confirming
+  a refresh restores it while a sibling state file survives byte-for-byte.
+- [LEARN:review] Auditing a canonical source is not auditing what runs. The
+  `shared/` state READMEs were correct for months while the installed
+  `.claude/` copies agents actually read still demanded a deleted score.
+  Include the installed overlay in any documentation audit of this repository.
+- [LEARN:review] A plausible analogy to a real lesson is a good way to talk
+  yourself out of the right fix. The `CHECK_IDS` lesson genuinely forbids
+  extending the receipt's check set, and it was cited to decline an evidence
+  gate living in a different, historically-isolated mechanism. Verify an
+  analogy applies before accepting it as a constraint; one grep for the caller
+  settled it.
+- [LEARN:verification] `closeout_log_errors` is the schema-free extension
+  point for closeout-log evidence: one caller, and `historical_chain_errors`
+  never invokes it, so a requirement added there cannot retroactively
+  invalidate a closed phase — unlike anything touching `CHECK_IDS` or the
+  receipt's artifact set. Every big plan's final phase must now record a
+  non-empty `## Stale-claims surfaces checked` section in its closeout log,
+  with `is_final_phase` deriving finality from the big plan's own `phases`
+  list and failing closed to not-final.
+- [LEARN:workflow] A gate a phase adds must be satisfied by that phase's own
+  closeout. Write the required section as you write the requirement, or the
+  phase blocks its own commit.
