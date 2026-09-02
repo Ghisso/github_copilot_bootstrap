@@ -104,6 +104,37 @@ before this phase's receipts are generated and is bound by them.
 Record the Phase 4 rule and keep the Phase 2 correction it builds on, so the
 section reads as a history rather than a contradiction.
 
+### 2.5 Two further reachable tracebacks, added to scope after review
+
+The Phase 5 review's from-scratch sweep found two more unhandled tracebacks in
+receipt-producing modes. Both reproduce identically against the pre-Phase-5
+`HEAD`, so neither is a regression from this work. Both are being fixed here
+rather than deferred, and this section records that as a deliberate scope
+addition rather than leaving the plan of record silent about it.
+
+1. **Unsafe explicit `--phase` slug on a non-implementation branch.** The
+   guard short-circuits to `None` on any truthy `--phase`, so it never reaches
+   the `PHASE_SLUG` check it already performs two lines below for the
+   implementation-branch path. `phase` then crashes with `receipt metadata
+   base_ref or phase is invalid` and `closeout` with `receipt persistence
+   needs a safe phase slug`. This is phase-resolution behavior in the exact
+   function this phase adds, and the docstring's claim that a `--phase`
+   override means the phase "is resolved" overclaims: an unsafe override is
+   untested, not resolved. No traversal is possible — both crash sites
+   validate the slug before touching a path — so this is a diagnostics gap,
+   not a security hole.
+
+2. **`closeout` without `--documentation-na` when documentation was not
+   updated.** Raised from `closeout_artifacts`, unrelated to phase
+   resolution, and reachable on a fully valid active phase. It is in scope
+   only because `closeout` is run at the end of every phase, so this is the
+   traceback a consumer is most likely to meet in normal use.
+
+Both take the same treatment as §2.1: a clean stderr message and a non-zero
+exit, with no relaxation of any check. Fixing them must not turn a real
+measurement failure into a diagnostic, and must not make either state a
+supported way to produce evidence.
+
 ## 3. Non-goals
 
 - Do not restructure `main()`'s argument handling or mode dispatch.
@@ -130,6 +161,10 @@ unhandled exception, then implement.
 
 - [ ] `fast`, `phase`, and `closeout` all report a clean diagnostic and a
       non-zero exit when no phase is active, with no traceback.
+- [ ] an unsafe explicit `--phase` slug on a non-implementation branch is
+      diagnosed rather than crashing.
+- [ ] `closeout` without `--documentation-na` is diagnosed rather than
+      crashing.
 - [ ] the message distinguishes no-active-plan from malformed-plan-metadata.
 - [ ] no mode reports `PASS` when it could not measure.
 - [ ] no receipt is persisted without an active plan.
