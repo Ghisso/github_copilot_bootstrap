@@ -18,6 +18,7 @@ from pathlib import Path, PurePosixPath
 from runtime_ownership import (
     COPILOT_SURFACE_PATHS,
     RESTORABLE_ROOT_PATHS,
+    STATE_DIR_OWNED_README_PATHS,
     active_ignore_patterns,
     bootstrap_root_paths,
     install_mode_from_manifest,
@@ -536,6 +537,24 @@ def copy_generated_tree(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(child, destination)
         strip_quarantine(destination)
+
+    # The per-directory ignore logic above protects the whole consumer-state
+    # directory a README lives in (real plans, logs, and reports), which
+    # also means copytree never looks inside it to find that README. Refresh
+    # each one explicitly and unconditionally so a pre-existing install picks
+    # up canonical-source fixes; every other file in the same directory is
+    # untouched because this only ever names the one allowlisted path.
+    for relative_readme in STATE_DIR_OWNED_README_PATHS:
+        seed = source / ".claude" / relative_readme
+        if not seed.is_file():
+            continue
+        destination_readme = target / ".claude" / relative_readme
+        destination_readme.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(seed, destination_readme)
+        strip_quarantine(destination_readme)
+        info(
+            f"refresh bootstrap-owned state directory README .claude/{relative_readme}"
+        )
 
 
 def _legacy_install_mode(text: str) -> bool | None:

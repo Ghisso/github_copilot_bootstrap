@@ -221,7 +221,9 @@ closeout_session_log: .claude/session_logs/lifecycle.md
     log.parent.mkdir(exist_ok=True)
     log.write_text(
         "**Status:** COMPLETED\n\n"
-        "## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+        "## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n"
+        "## Stale-claims surfaces checked\n\n"
+        "Checked README.md; no stale claims found.\n",
         encoding="utf-8",
     )
     return big_plan, small_plan

@@ -189,10 +189,38 @@ active plan may remain unbound until a later phase reviews or changes it.
 **Conditional stale-claims review:** When a phase changes a previously
 documented fact, number/count, behavior, API, decision, conclusion, or
 pipeline/runtime description, search likely-affected active plans, `docs/`,
-`README.md`, and workflow/policy documentation, then update or explicitly
-supersede the stale claim. Record which surfaces were checked in the session
-log when this rule triggers. Do not run this sweep mechanically when nothing
-documented actually changed.
+`README.md`, workflow/policy documentation, and `.claude/MEMORY.md`, then
+update or explicitly supersede the stale claim. Record which surfaces were
+checked in the session log when this rule triggers. Do not run this sweep
+mechanically when nothing documented actually changed.
+
+`.claude/MEMORY.md` is live advice, loaded into every session, not a dated
+record. A superseded entry must be corrected or removed in place; appending a
+correction elsewhere in the file and leaving the wrong entry standing is not
+sufficient, because a reader can act on the wrong entry before ever reaching
+the correction. Archived plans, dated design narratives, and closed session
+logs are dated records instead — they describe what was true at the time and
+are left unchanged; a closed session log's correction uses a sibling
+`<log-name>.errata.md` file only where the original entry would actively
+mislead a reader into reintroducing a defect, and only when no closeout
+receipt binds that log.
+
+**Standing final-phase audit:** The final phase of every big plan must run a
+documentation, memory, and LEARN audit: sweep the live-advice surfaces above
+for claims that this plan or earlier work invalidated (not only this plan's
+own changes), correct or supersede each one under the live-advice/dated-record
+distinction, and record the audited surfaces and each one's outcome under a
+`## Stale-claims surfaces checked` heading in that phase's closeout session
+log - the same heading the conditional review above already uses. This
+recorded-surface-list evidence is a deterministic gate, not only documented
+process: `verify.py`'s closeout check derives "final phase" from the big
+plan's own `phases:` frontmatter list (the same source used elsewhere, so it
+cannot become a second, independently drifting definition) and requires a
+non-empty `## Stale-claims surfaces checked` section only when the phase
+being closed out is that list's last entry - it never fires on an earlier
+phase. It checks the section's presence and non-emptiness, not the
+correctness of its judgement, matching the shape of the existing `## [LEARN]
+Entries` evidence requirement next to it.
 
 ---
 

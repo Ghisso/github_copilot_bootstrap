@@ -54,6 +54,18 @@ CONSUMER_STATE_PATHS = (
     "settings.local.json",
 )
 
+# Each of these README files is bootstrap-authored reference documentation
+# that merely lives inside an otherwise consumer-owned state directory above.
+# Unlike the rest of that directory's content (real plans, logs, and
+# reports), it must always match the shipped copy, so a refresh regenerates
+# it even though the directory it lives in is exempt from that comparison.
+# A repeat install must still leave every sibling file in the same
+# directory untouched.
+STATE_DIR_OWNED_README_PATHS = tuple(
+    f"{state_dir}/README.md"
+    for state_dir in ("plans", "explorations", "session_logs", "quality_reports")
+)
+
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
 
 

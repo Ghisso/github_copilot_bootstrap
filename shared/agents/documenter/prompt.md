@@ -73,10 +73,18 @@ When the diff changes a previously documented fact, number/count, behavior,
 API, decision, conclusion, or pipeline/runtime description, search for other
 places that claim now-superseded to be true, then update or explicitly
 supersede them. Minimum surfaces to check: active/relevant plan files under
-`.claude/plans/`, `docs/`, `README.md`, and workflow/policy documentation when
-relevant. Do not run this sweep mechanically on every task — only when a
-prior documented claim actually changed. Record which surfaces you checked in
-the session log when this rule triggers.
+`.claude/plans/`, `docs/`, `README.md`, workflow/policy documentation, and
+`.claude/MEMORY.md` when relevant. Do not run this sweep mechanically on every
+task — only when a prior documented claim actually changed. Record which
+surfaces you checked in the session log when this rule triggers.
+
+`.claude/MEMORY.md` is live advice loaded into every session, not a dated
+record: a superseded entry must be corrected or deleted in place, never left
+for a later, contradicting entry elsewhere in the file to silently supersede
+it. A session log, once closed, is a dated record instead — leave it alone
+unless an entry would actively mislead a reader into reintroducing a defect,
+and only when no closeout receipt binds it; write a sibling
+`<log-name>.errata.md` for that case rather than editing the log.
 
 A closed session log bound by a phase's completion receipt must not be
 edited; a correction to one uses a sibling `<log-name>.errata.md` file next

@@ -625,6 +625,85 @@ def test_closeout_log_rejects_learn_entry_inside_indented_fence(
     ]
 
 
+def test_is_final_phase_true_for_the_big_plans_last_declared_phase(
+    tmp_path: Path,
+) -> None:
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    assert verify.is_final_phase(root, phase) is True
+
+
+def test_is_final_phase_false_for_a_non_final_phase(tmp_path: Path) -> None:
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    _write_big_plan(root, slug="big", phases=[phase, "phase-two"])
+    assert verify.is_final_phase(root, phase) is False
+
+
+def test_is_final_phase_false_when_the_big_plan_is_missing(tmp_path: Path) -> None:
+    """``parent_plan: big`` names a big plan that does not exist on disk;
+    finality must not be guessed from that ambiguous state."""
+    root, phase, _ = _closeout_log_setup(tmp_path, "# Session\n")
+    assert verify.is_final_phase(root, phase) is False
+
+
+def test_closeout_log_requires_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    """The big plan's final phase must additionally record the standing
+    documentation, memory, and LEARN audit's checked surfaces."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("Stale-claims surfaces checked" in error for error in errors)
+
+
+def test_closeout_log_rejects_empty_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    """The heading alone, with no recorded surfaces, is not evidence."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n\n"
+        "## Stale-claims surfaces checked\n\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    errors = verify.closeout_log_errors(root, phase, log_path)
+    assert any("Stale-claims surfaces checked" in error for error in errors)
+
+
+def test_closeout_log_accepts_stale_claims_section_on_final_phase(
+    tmp_path: Path,
+) -> None:
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n\n"
+        "## Stale-claims surfaces checked\n\n"
+        "Checked README.md, docs/, and .claude/MEMORY.md; no stale claims found.\n",
+    )
+    _write_big_plan(root, slug="big", phases=["phase-zero", phase])
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
+def test_closeout_log_does_not_require_stale_claims_section_on_non_final_phase(
+    tmp_path: Path,
+) -> None:
+    """A phase that is not the big plan's last declared phase never needs
+    the standing audit section - the new check must not fire early."""
+    root, phase, log_path = _closeout_log_setup(
+        tmp_path,
+        "# Session\n\n**Status:** COMPLETED\n\n"
+        "## [LEARN] Entries\n\n- [LEARN:workflow] example\n",
+    )
+    _write_big_plan(root, slug="big", phases=[phase, "phase-two"])
+    assert verify.closeout_log_errors(root, phase, log_path) == []
+
+
 def test_strip_fenced_code_blocks_recognizes_crlf_terminated_fence() -> None:
     """A CRLF-terminated closing fence must be recognized as a close, not
     treated as unterminated - the shipped verifier runs in consumer

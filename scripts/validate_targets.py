@@ -36,6 +36,7 @@ from generate_targets import (
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
+    STATE_DIR_OWNED_README_PATHS,
     bootstrap_root_paths,
     render_restore_script,
 )
@@ -4064,7 +4065,7 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         write(repo / "work.txt", "work\n")
         git(repo, "add", "work.txt")
@@ -5391,7 +5392,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
 
         reports_dir = repo / ".claude" / "quality_reports"
@@ -5733,7 +5734,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         head_sha, content_hash = head_and_hash()
         write_findings(findings_report(head_sha, content_hash))
@@ -6026,7 +6027,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         write_small_plan(repo, status="complete")
         write(
             repo / ".claude" / "session_logs" / "phase-one-closeout.md",
-            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n- [LEARN] none - no new lessons this session\n\n## Stale-claims surfaces checked\n\nChecked README.md; no stale claims found.\n",
         )
         git(repo, "add", ".")
         # Generated pre-commit (matching REVIEW-before-COMMIT in the real
@@ -6293,14 +6294,20 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             ).stdout.strip()
 
         def complete_phase(
-            phase: str, work_file: str, **finding_overrides: object
+            phase: str,
+            work_file: str,
+            *,
+            final: bool = False,
+            **finding_overrides: object,
         ) -> None:
             """Stage real implementation content, mark the small plan
             complete, write a completed closeout log, persist a matching
             findings report, and generate that phase's phase/closeout
             receipts - the exact pre-commit sequence the real lifecycle
             uses, since receipts are generated before the commit they
-            certify."""
+            certify. ``final`` additionally writes the standing
+            documentation, memory, and LEARN audit section the big plan's
+            own last phase requires."""
             write(repo / work_file, f"{phase} implementation work\n")
             git(repo, "add", work_file)
             write_small_plan(repo, status="complete", phase=phase)
@@ -6311,6 +6318,12 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
                     "- [LEARN] none - no new lessons this session\n"
                     if not finding_overrides
                     else "- [LEARN:workflow] real entry from the end-to-end flow\n"
+                )
+                + (
+                    "\n## Stale-claims surfaces checked\n\n"
+                    "Checked README.md and docs/; no stale claims found.\n"
+                    if final
+                    else ""
                 ),
             )
             merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
@@ -6388,7 +6401,7 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
         # plan; this phase's receipt gets terminal current-state freshness,
         # phase-one's gets historical ancestor/tree/artifact-chain checks. ---
         write_small_plan(repo, status="in-progress", phase="phase-two")
-        complete_phase("phase-two", "phase-two-work.txt")
+        complete_phase("phase-two", "phase-two-work.txt", final=True)
         completion_two = git(repo, "commit", "-m", "phase two: complete")
         check(
             completion_two.returncode == 0,
@@ -7981,6 +7994,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             state_path = temp_repo / ".claude" / relative_path
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_bytes(content)
+
+        # A state-directory README is bootstrap-owned documentation that
+        # merely lives beside consumer state, not consumer state itself
+        # (unlike its siblings above). Simulate a pre-fix install carrying
+        # stale README content and confirm a refresh replaces it, while every
+        # sibling file in the same directory stays byte-for-byte untouched.
+        stale_readmes = {
+            relative_readme: b"stale score-era README content\n"
+            for relative_readme in STATE_DIR_OWNED_README_PATHS
+        }
+        for relative_readme, content in stale_readmes.items():
+            readme_path = temp_repo / ".claude" / relative_readme
+            readme_path.parent.mkdir(parents=True, exist_ok=True)
+            readme_path.write_bytes(content)
+
         subprocess.run(
             [
                 "git",
@@ -8024,6 +8052,15 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             f"installer repeat state refresh failed: {state_reinstall.stderr}",
             errors,
         )
+        for relative_readme in stale_readmes:
+            refreshed = temp_repo / ".claude" / relative_readme
+            canonical = (TARGET_ROOT / ".claude" / relative_readme).read_bytes()
+            check(
+                refreshed.read_bytes() == canonical,
+                "installer repeat run must refresh bootstrap-owned state directory "
+                f"README {relative_readme}, not preserve stale content",
+                errors,
+            )
         for relative_path, content in consumer_state.items():
             check(
                 (temp_repo / ".claude" / relative_path).read_bytes() == content,
