@@ -665,10 +665,21 @@ diff_requires_ponytail() {
 # through to the normal ceremony gate instead of granting a free pass.
 # Mirrors diff_requires_ponytail's diff-ref convention: empty `diff_ref`
 # checks the live working tree/index (commit gate), a ref checks that landed
-# commit (push gate). The excluded directories hold no legitimate typo-only
-# Markdown today (hook logic and scripts are `.sh`/`.py`, generated runtime
-# lives under `.claude/`/`dist/`), so this stays narrow without excluding any
-# real current documentation surface.
+# commit (push gate).
+#
+# The exclusion list is the entire `shared/` tree, not a hand-picked list of
+# its subdirectories, because `scripts/generate_targets.py`'s
+# `render_shared_basis`/`render_devcontainer` copy essentially all of
+# `shared/` into the generated `.claude/`/`.devcontainer/` runtime consumers
+# actually run: agent prompts (`shared/agents/*/prompt.md`), policies
+# (`shared/policies/*.instructions.md`), skills (`shared/skills/*/SKILL.md`),
+# templates, review profiles, prompts, third_party, hook scripts/git-hooks,
+# and even the `plans`/`quality_reports`/`session_logs` README stubs. Any
+# `.md` file anywhere under `shared/` is therefore live runtime guidance, not
+# authoring-only prose, and a hand-listed subset of it (the earlier,
+# falsified version of this function) drifts silently as new `shared/`
+# subdirectories are added. `scripts/*` (the authoring repo's own generator
+# scripts, distinct from `shared/scripts/`) stays excluded too.
 typo_bypass_diff_allowed() {
   local repo_root="$1"
   local diff_ref="${2:-}"
@@ -693,7 +704,7 @@ typo_bypass_diff_allowed() {
     case "$path" in
       *.md)
         case "$path" in
-          scripts/*|shared/scripts/*|shared/hooks/*|tests/*|.github/*|.claude/*|dist/*) return 1 ;;
+          scripts/*|shared/*|tests/*|.github/*|.claude/*|dist/*) return 1 ;;
         esac
         ;;
       *) return 1 ;;

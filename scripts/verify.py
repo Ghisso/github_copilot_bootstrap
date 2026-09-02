@@ -1784,15 +1784,25 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
     return hashed.stdout.strip() if hashed.returncode == 0 else ""
 
 
+def _strip_fenced_code_blocks(text: str) -> str:
+    """Remove fenced ```code``` blocks from LEARN evidence scanning, so an
+    illustrative example of the entry/marker format placed inside one is
+    never mistaken for real evidence."""
+    return re.sub(
+        r"^```[^\n]*\n.*?^```[ \t]*$\n?", "", text, flags=re.MULTILINE | re.DOTALL
+    )
+
+
 def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
     """Keep completed-log and LEARN authority bound to the receipt path.
 
     LEARN evidence lives entirely inside the session log's own
-    ``## [LEARN] Entries`` section: either one or more explicit
-    ``[LEARN...`` entries, or the exact sanctioned no-lessons marker.
-    ``MEMORY.md``'s mtime is not evidence of anything here - it can still be
-    updated as a separate persistence action, but its timestamp never
-    substitutes for a session-log section the receipt hash actually binds.
+    ``## [LEARN] Entries`` section, outside any fenced code block: either
+    one or more explicit ``[LEARN...`` entries, or the exact sanctioned
+    no-lessons marker. ``MEMORY.md``'s mtime is not evidence of anything
+    here - it can still be updated as a separate persistence action, but its
+    timestamp never substitutes for a session-log section the receipt hash
+    actually binds.
     """
     expected = closeout_log_path(root, phase)
     if path.resolve() != expected.resolve():
@@ -1810,10 +1820,10 @@ def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
     )
     if section is None:
         return ["closeout session log is missing the ## [LEARN] Entries section"]
-    body = section.group("body")
-    if "[LEARN] none - no new lessons this session" in body:
+    prose = _strip_fenced_code_blocks(section.group("body"))
+    if "[LEARN] none - no new lessons this session" in prose:
         return []
-    if re.search(r"^-[ \t]*\[LEARN[:\]]", body, re.MULTILINE):
+    if re.search(r"^-[ \t]*\[LEARN[:\]]", prose, re.MULTILINE):
         return []
     return ["LEARN evidence is missing"]
 
