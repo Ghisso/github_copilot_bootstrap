@@ -2166,6 +2166,35 @@ def closeout_log_path(root: Path, phase: str) -> Path:
     return confined_path(root, match.group(1), regular=True)
 
 
+def documentation_only_paths(metadata: dict[str, object]) -> list[str]:
+    """Return the changed paths that are documentation-only content."""
+    return [
+        path
+        for path in metadata_paths(metadata, "changed_paths")
+        if classify_path(path) == "documentation-only"
+    ]
+
+
+def missing_documentation_na_reason(
+    metadata: dict[str, object], documentation_na: str
+) -> str | None:
+    """Diagnose a closeout that needs ``--documentation-na`` but lacks one.
+
+    Mirrors ``closeout_artifacts``'s own requirement without changing its
+    raising contract for other callers - a genuine artifact error there
+    (missing phase plan, unsafe closeout log path, ...) still crashes
+    unchanged. This only pre-empts the one case that is a missing CLI flag,
+    not a broken plan or artifact, so it never swallows a real error.
+    """
+    if documentation_only_paths(metadata) or documentation_na.strip():
+        return None
+    return (
+        "closeout needs --documentation-na REASON: no documentation-only "
+        "path changed and no reason was given; pass --documentation-na "
+        "'<reason>' before running verify"
+    )
+
+
 def closeout_artifacts(
     root: Path, metadata: dict[str, object], documentation_na: str = ""
 ) -> dict[str, object]:
@@ -2179,11 +2208,7 @@ def closeout_artifacts(
         or not phase
     ):
         raise ValueError("closeout receipt needs branch and phase metadata")
-    documentation_paths = [
-        path
-        for path in metadata_paths(metadata, "changed_paths")
-        if classify_path(path) == "documentation-only"
-    ]
+    documentation_paths = documentation_only_paths(metadata)
     if not documentation_paths and not documentation_na.strip():
         raise ValueError(
             "closeout needs --documentation-na REASON when documentation was not updated"
@@ -2436,6 +2461,82 @@ def receipt_path(root: Path, mode: str, phase: str) -> Path:
     return root / Path(str(pattern).format(phase=phase))
 
 
+def unresolved_phase_reason(
+    root: Path, branch: str, phase: str, *, requires_phase: bool
+) -> str | None:
+    """Diagnose an active phase that cannot be bound to real plan files.
+
+    Attempts to actually read each plan file rather than trusting a
+    file-type check, and reads the big plan itself to tell a legitimately
+    blank ``current_phase`` apart from a big plan that cannot be read or
+    parsed. Never inspects nested runtime provenance, so any other
+    provenance failure still surfaces through the normal receipt validation
+    path unchanged. Returns None when a phase is resolved - including a
+    safe explicit ``--phase`` override on a non-implementation branch, the
+    supported way to run ``phase``/``closeout`` outside this bootstrap's own
+    plan machinery; an *unsafe* override is diagnosed, not treated as
+    resolved. Also returns None when ``branch`` is not an implementation
+    branch and ``requires_phase`` is False (``fast`` never needs one).
+    """
+    if not branch.endswith("_implementation"):
+        if requires_phase and not phase:
+            return (
+                f"no active phase: branch '{branch}' does not follow the "
+                "<slug>_implementation convention and no --phase was given; "
+                "pass --phase explicitly or switch to the plan's "
+                "implementation branch before running verify"
+            )
+        if requires_phase and phase and not PHASE_SLUG.fullmatch(phase):
+            return (
+                f"active phase metadata is malformed: --phase '{phase}' is "
+                "not a safe plan slug; pass a plain identifier before "
+                "running verify"
+            )
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None or not big_plan.is_file():
+        return (
+            "no active phase: no big plan is bound to this implementation "
+            "branch; open a plan before running verify"
+        )
+    if not phase:
+        try:
+            big_plan_text = big_plan.read_text(encoding="utf-8")
+        except OSError:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} exists "
+                "but could not be read; fix file permissions before running "
+                "verify"
+            )
+        if re.match(r"\A---\n.*?\n---", big_plan_text, re.DOTALL) is None:
+            return (
+                f"active phase metadata is malformed: {big_plan.name} has no "
+                "parseable frontmatter; fix the plan file before running "
+                "verify"
+            )
+        return (
+            "no active phase: the big plan has no current_phase set (it is "
+            "complete or not yet started); open the next small plan before "
+            "running verify"
+        )
+    small_plan = root / ".claude/plans" / f"{phase}.md"
+    if not PHASE_SLUG.fullmatch(phase):
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' is "
+            "not a safe plan slug; fix the plan frontmatter before running "
+            "verify"
+        )
+    try:
+        small_plan.read_bytes()
+    except OSError:
+        return (
+            f"active phase metadata is malformed: current_phase '{phase}' "
+            f"names {small_plan.name}, which could not be read; fix the plan "
+            "frontmatter or file permissions before running verify"
+        )
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     """Parse the intentionally small public verifier interface."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -2479,12 +2580,30 @@ def main() -> int:
         print(json.dumps({"errors": errors}, separators=(",", ":")))
         return 0 if not errors else 1
     metadata = state_metadata(root, args.base_ref, args.phase)
+    branch = metadata.get("branch")
+    phase_value = metadata.get("phase")
+    reason = unresolved_phase_reason(
+        root,
+        branch if isinstance(branch, str) else "",
+        phase_value if isinstance(phase_value, str) else "",
+        requires_phase=args.mode != "fast",
+    )
+    if reason is not None:
+        print(reason, file=sys.stderr)
+        return 2
     if args.mode == "fast":
         checks = fast_checks(root, metadata)
     elif args.mode == "phase":
         checks = phase_checks(root, metadata)
     else:
         checks = closeout_checks(root, metadata)
+    if args.mode == "closeout":
+        doc_na_reason = missing_documentation_na_reason(
+            metadata, args.documentation_na
+        )
+        if doc_na_reason is not None:
+            print(doc_na_reason, file=sys.stderr)
+            return 2
     artifacts = (
         closeout_artifacts(root, metadata, args.documentation_na)
         if args.mode == "closeout"

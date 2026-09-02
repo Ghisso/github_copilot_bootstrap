@@ -2609,3 +2609,430 @@ def test_bootstrap_phase_checks_keep_explicit_authoring_targets(
     assert ruff_calls == [(["shared", "scripts", "tests"], None)]
     assert mypy_calls == [["shared", "scripts", "tests"]]
     assert pytest_calls == [["tests/"]]
+
+
+def _write_inactive_phase_repo(
+    tmp_path: Path,
+    *,
+    slug: str = "sample-plan",
+    current_phase: str = "",
+    branch: str | None = None,
+    detach: bool = False,
+    big_plan_text: str | None = None,
+) -> None:
+    """Build one full repo with otherwise-valid nested control-plane
+    provenance, matching the plan's measured reproduction: only phase
+    resolution fails, nothing else. ``branch`` overrides the checked-out
+    branch name (default: the implementation branch for ``slug``);
+    ``detach`` checks out that branch's commit directly, detached."""
+    _write_root_adapter_pairs(tmp_path)
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / f"{slug}.md").write_text(
+        big_plan_text
+        if big_plan_text is not None
+        else (
+            "---\n"
+            f"name: {slug}\n"
+            "type: big-plan\n"
+            "status: complete\n"
+            f"current_phase: {current_phase}\n"
+            "phases:\n"
+            "  - phase-one\n"
+            "---\n\n# Big Plan\n"
+        ),
+        encoding="utf-8",
+    )
+    _init_repo(nested)
+    _commit_all(nested, "nested state")
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _git(["checkout", "-q", "-b", branch or f"{slug}_implementation"], tmp_path)
+    head = _commit_all(tmp_path, "outer state")
+    if detach:
+        _git(["checkout", "-q", head], tmp_path)
+
+
+def _skip_if_root() -> None:
+    """chmod 000 does not deny reads for root; skip cleanly rather than pass
+    for the wrong reason."""
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("chmod 000 does not deny root reads")
+
+
+@pytest.mark.parametrize("mode", ("fast", "phase", "closeout"))
+def test_inactive_phase_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """A completed big plan with a blank current_phase must produce a clean
+    non-zero exit and a diagnostic naming the condition, never a traceback,
+    for every receipt-producing mode."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", current_phase="")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", mode, "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "no active phase" in captured.err.lower()
+
+
+def test_malformed_active_phase_reports_distinct_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A current_phase naming a plan file that does not exist is a different
+    condition from no phase being active, and must say so distinctly."""
+    _write_inactive_phase_repo(
+        tmp_path, slug="sample-plan", current_phase="missing-phase"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "phase", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "malformed" in captured.err.lower()
+    assert "no active phase" not in captured.err.lower()
+
+
+def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
+    """No-active-phase and malformed-active-phase are reported distinctly,
+    and a resolved phase (or a non-implementation branch) is left alone."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+
+    # Not an implementation branch and the mode does not require a phase
+    # (fast): left alone.
+    assert (
+        verify.unresolved_phase_reason(tmp_path, "dev", "", requires_phase=False)
+        is None
+    )
+
+    # No big plan file is bound to this branch yet.
+    no_plan = verify.unresolved_phase_reason(
+        tmp_path, branch, "", requires_phase=True
+    )
+    assert no_plan is not None
+    assert "no active phase" in no_plan
+
+    (plans / "sample-plan.md").write_text(
+        "---\nname: sample-plan\n---\n", encoding="utf-8"
+    )
+
+    # A big plan exists but current_phase is blank.
+    no_phase = verify.unresolved_phase_reason(
+        tmp_path, branch, "", requires_phase=True
+    )
+    assert no_phase is not None
+    assert "no active phase" in no_phase
+
+    # current_phase names a phase with no matching plan file: malformed,
+    # not "no active phase" - a different diagnostic for a different cause.
+    malformed = verify.unresolved_phase_reason(
+        tmp_path, branch, "missing-phase", requires_phase=True
+    )
+    assert malformed is not None
+    assert "malformed" in malformed
+    assert "no active phase" not in malformed
+
+    # A resolvable phase leaves nothing to diagnose.
+    (plans / "phase-one.md").write_text(
+        "---\nname: phase-one\n---\n", encoding="utf-8"
+    )
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, branch, "phase-one", requires_phase=True
+        )
+        is None
+    )
+
+
+def test_unresolved_phase_reason_requires_phase_off_implementation_branch(
+    tmp_path: Path,
+) -> None:
+    """phase/closeout need an active phase even off an implementation
+    branch (including detached HEAD, which git reports as branch 'HEAD');
+    fast does not."""
+    for branch in ("dev", "HEAD"):
+        reason = verify.unresolved_phase_reason(
+            tmp_path, branch, "", requires_phase=True
+        )
+        assert reason is not None
+        assert "no active phase" in reason
+        assert (
+            verify.unresolved_phase_reason(
+                tmp_path, branch, "", requires_phase=False
+            )
+            is None
+        )
+
+
+def test_unresolved_phase_reason_allows_explicit_phase_override(
+    tmp_path: Path,
+) -> None:
+    """An explicit --phase on a non-implementation branch is the supported
+    consumer-native path (no bootstrap plan machinery required) and must
+    not be diagnosed as an inactive phase."""
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, "dev", "consumer-native-fixture", requires_phase=True
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("mode", ("phase", "closeout"))
+def test_phase_and_closeout_report_diagnostic_on_non_implementation_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """phase/closeout must not crash on a branch that never named a plan
+    at all - they still require an active phase and must say so cleanly."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", mode, "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "no active phase" in captured.err.lower()
+
+
+def test_fast_is_unaffected_on_non_implementation_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """fast never required plan provenance and must keep working normally
+    off an implementation branch."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "fast", "--format", "text"])
+    exit_code = verify.main()
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert exit_code == 0
+
+
+def test_phase_reports_diagnostic_on_detached_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A detached HEAD (git reports branch 'HEAD') must not crash phase."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", detach=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "phase", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "no active phase" in captured.err.lower()
+
+
+def test_unreadable_small_plan_reports_malformed_not_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A small-plan file that exists but cannot be read (permission drift,
+    UID mismatch) must be caught by an actual read attempt, not the
+    file-type check alone, and must not crash the run."""
+    _skip_if_root()
+    _write_inactive_phase_repo(
+        tmp_path, slug="sample-plan", current_phase="phase-one"
+    )
+    small_plan = tmp_path / ".claude" / "plans" / "phase-one.md"
+    small_plan.write_text("---\nname: phase-one\n---\n", encoding="utf-8")
+    small_plan.chmod(0o000)
+    try:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["verify.py", "fast", "--format", "text"])
+        exit_code = verify.main()
+        assert exit_code not in (0, None)
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.err
+        assert "malformed" in captured.err.lower()
+    finally:
+        small_plan.chmod(0o644)
+
+
+def test_unresolved_phase_reason_reports_unreadable_big_plan_distinctly(
+    tmp_path: Path,
+) -> None:
+    """An unreadable big plan is reported as malformed metadata, not as
+    'no active phase' - the plan may have a valid current_phase that we
+    simply could not read to confirm."""
+    _skip_if_root()
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    big_plan = plans / "sample-plan.md"
+    big_plan.write_text("---\nname: sample-plan\n---\n", encoding="utf-8")
+    big_plan.chmod(0o000)
+    try:
+        reason = verify.unresolved_phase_reason(
+            tmp_path, branch, "", requires_phase=True
+        )
+        assert reason is not None
+        assert "malformed" in reason
+        assert "complete or not yet started" not in reason
+    finally:
+        big_plan.chmod(0o644)
+
+
+def test_unresolved_phase_reason_reports_unparseable_frontmatter_distinctly(
+    tmp_path: Path,
+) -> None:
+    """A big plan with no parseable frontmatter block is reported as
+    malformed metadata, not conflated with a legitimately blank phase."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "not a frontmatter document at all\n", encoding="utf-8"
+    )
+    reason = verify.unresolved_phase_reason(
+        tmp_path, branch, "", requires_phase=True
+    )
+    assert reason is not None
+    assert "malformed" in reason
+    assert "complete or not yet started" not in reason
+
+
+@pytest.mark.parametrize(
+    "unsafe_phase", ("../../etc/passwd", "has/a/slash", "-leading-dash")
+)
+def test_unresolved_phase_reason_diagnoses_unsafe_explicit_override(
+    tmp_path: Path, unsafe_phase: str
+) -> None:
+    """An unsafe explicit --phase on a non-implementation branch is
+    diagnosed as malformed, not treated as resolved: it is untested, not
+    resolved. A safe override on the same branch is unaffected."""
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "dev", unsafe_phase, requires_phase=True
+    )
+    assert reason is not None
+    assert "malformed" in reason
+    assert (
+        verify.unresolved_phase_reason(
+            tmp_path, "dev", "consumer-native-fixture", requires_phase=True
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize("mode", ("phase", "closeout"))
+def test_unsafe_phase_override_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    mode: str,
+) -> None:
+    """An unsafe --phase on a non-implementation branch must not crash
+    phase/closeout with an unhandled ValueError from receipt validation."""
+    _write_inactive_phase_repo(tmp_path, slug="sample-plan", branch="dev")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", mode, "--format", "text", "--phase", "../../etc/passwd"],
+    )
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "malformed" in captured.err.lower()
+
+
+def test_missing_documentation_na_reason_distinguishes_cases() -> None:
+    """The pre-check mirrors closeout_artifacts's own requirement exactly:
+    a reason is needed only when no documentation-only path changed and no
+    --documentation-na was given."""
+    no_docs: dict[str, object] = {"changed_paths": []}
+    assert verify.missing_documentation_na_reason(no_docs, "") is not None
+    assert verify.missing_documentation_na_reason(no_docs, "explained") is None
+    assert verify.missing_documentation_na_reason(no_docs, "   ") is not None
+
+    with_docs: dict[str, object] = {"changed_paths": ["docs/readme.md"]}
+    assert verify.missing_documentation_na_reason(with_docs, "") is None
+
+
+def test_closeout_missing_documentation_na_reports_diagnostic_not_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """closeout without --documentation-na, when no documentation changed,
+    must report a clean diagnostic instead of crashing - this fires on a
+    fully valid active phase, unrelated to phase resolution."""
+    _write_inactive_phase_repo(
+        tmp_path, slug="sample-plan", current_phase="phase-one"
+    )
+    (tmp_path / ".claude" / "plans" / "phase-one.md").write_text(
+        "---\nname: phase-one\n---\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["verify.py", "closeout", "--format", "text"])
+    exit_code = verify.main()
+    assert exit_code not in (0, None)
+    captured = capsys.readouterr()
+    assert "Traceback" not in captured.err
+    assert "--documentation-na" in captured.err
+
+
+def test_closeout_artifacts_accepts_documentation_na_unchanged(
+    tmp_path: Path,
+) -> None:
+    """A correct --documentation-na reason still produces the same
+    artifact set as before: the fix only changed how the missing-reason
+    case is reported, never the requirement or the success path."""
+    phase = "phase-one"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / f"{phase}.md").write_text(
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: big\n"
+        "phase_index: 1\nstatus: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    reports = tmp_path / ".claude" / "quality_reports"
+    reports.mkdir(parents=True)
+    (reports / f"verification-phase-{phase}.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    (reports / f"findings-{phase}.json").write_text("{}", encoding="utf-8")
+    logs = tmp_path / ".claude" / "session_logs"
+    logs.mkdir(parents=True)
+    (logs / f"{phase}-closeout.md").write_text(
+        "**Status:** COMPLETED\n", encoding="utf-8"
+    )
+    metadata = _metadata()  # defaults to phase "phase-one", no changed paths
+    assert verify.missing_documentation_na_reason(metadata, "reason recorded") is None
+    artifacts = verify.closeout_artifacts(tmp_path, metadata, "reason recorded")
+    # Assert the whole artifact set, not just the documentation key: the
+    # docstring claims the success path is unchanged, so the other three
+    # bound artifacts have to be checked for that claim to mean anything.
+    assert set(artifacts) == {
+        "phase_receipt",
+        "findings",
+        "closeout_log",
+        "documentation",
+    }
+    assert artifacts["documentation"] == {
+        "status": "NOT_APPLICABLE",
+        "reason": "reason recorded",
+    }
+    for key, relative in (
+        ("phase_receipt", f".claude/quality_reports/verification-phase-{phase}.json"),
+        ("findings", f".claude/quality_reports/findings-{phase}.json"),
+        ("closeout_log", f".claude/session_logs/{phase}-closeout.md"),
+    ):
+        bound = artifacts[key]
+        assert isinstance(bound, dict)
+        assert bound["path"] == relative
+        assert re.fullmatch(r"[0-9a-f]{64}", str(bound["sha256"]))
