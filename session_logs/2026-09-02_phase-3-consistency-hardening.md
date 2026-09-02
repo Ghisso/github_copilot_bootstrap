@@ -41,6 +41,15 @@ end-to-end regression coverage. Final phase of the
   already encoded in the sibling `diff_requires_ponytail` so the two
   classifiers cannot drift. Fence handling replaced with a GFM-aware line-by-
   line state machine. README inventory swept. 1190 tests pass.
+- **20:20** - Review round 4: **PASS**, no surviving findings. Verified by
+  execution that `CLAUDE.md`, `AGENTS.md`, `.codex/*`, and `.devcontainer/*`
+  are denied while `docs/**` and `README.md` stay eligible, and that
+  `.mcp.json` and `.claude/settings.json` are structurally unreachable as
+  bypass candidates because any non-`.md` path is denied before the directory
+  list is consulted. The fence state machine was re-implemented and exercised
+  against mismatched fence characters, short closing runs, four-backtick
+  fences, and nested-looking fences, all behaving per GFM. Phase 3 acceptance
+  criteria met; all 18 big-plan global criteria confirmed satisfied.
 
 ## Design decisions
 
@@ -140,4 +149,9 @@ Triggered because this plan changed documented behavior. Surfaces reviewed:
   `tests/test_check_native_clients.py`.
 - No compatibility allowance exists anywhere in this plan, so none carries a
   removal condition.
+- One dispositioned MINOR: the fence scanner's closing-delimiter check uses
+  `[ \t]*$`, so a CRLF-terminated closing fence would not match. Pre-existing
+  (the earlier single-regex form had the same check), mitigated by
+  `.gitattributes` LF normalization on text files, and outside what this phase
+  changed. Recorded rather than fixed.
 - The user owns the merge decision; no PR was opened.

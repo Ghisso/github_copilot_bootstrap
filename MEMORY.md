@@ -582,3 +582,23 @@
 - [LEARN:workflow] `update_consumers.py --allow-self` removes unmanaged files
   from `.claude/`. Stage scratch inputs such as a findings JSON outside that
   tree.
+- [LEARN:security] A path-based bypass allowlist must be derived from what the
+  build actually ships, never hand-listed. Two review rounds were spent on
+  enumerated subsets that each missed a live runtime surface: first the
+  non-script `shared/` subdirectories, then the root control-plane files
+  (`CLAUDE.md`, `AGENTS.md`). When a sibling function already encodes the same
+  policy sentence, reuse its pattern so the two classifiers cannot drift.
+- [LEARN:verification] Replacing a hollow gate can produce another hollow gate.
+  The `MEMORY.md` mtime shortcut was swapped for a regex that accepted the
+  shipped session-log template's own placeholder text, and fenced examples, as
+  learning evidence. Check a new evidence rule against the artifact a user
+  actually starts from, and tie the regression test to the real template file
+  rather than a hardcoded copy.
+- [LEARN:testing] A test reproducing an exploit must reproduce its exact shape.
+  An indented-fence test that also indented the entry line passed against the
+  buggy code for an unrelated reason (the entry regex was column-0-anchored
+  too). Confirm a new test fails against the old code for the intended reason.
+- [LEARN:review] Ask for execution, not inspection, on any gate that classifies
+  paths or parses text. Every CRITICAL in the hardening plan's final phase was
+  found by running the shell function or regex against real inputs; static
+  review had passed the same code twice.
