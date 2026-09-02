@@ -1711,6 +1711,19 @@ def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, s
     )
 
 
+def _pytest_result_summary(output: str) -> str:
+    """Return pytest's trailing result-count line (e.g. "12 passed in 0.3s"),
+    or an empty string when no such line is present."""
+    for line in reversed(output.splitlines()):
+        stripped = line.strip(" =")
+        if re.search(
+            r"\b\d+\s+(passed|failed|error|errors|skipped|deselected|xfailed|xpassed)\b",
+            stripped,
+        ):
+            return stripped
+    return ""
+
+
 def _pytest_measurement(
     cwd: str = ".", targets: list[str] | None = None
 ) -> tuple[str, str]:
@@ -1729,10 +1742,19 @@ def _pytest_measurement(
         )
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"pytest did not run: {error}"
+    summary = _pytest_result_summary(stdout)
     if rc == 0:
-        return "PASS", "pytest completed"
+        return (
+            "PASS",
+            f"pytest completed ({summary})" if summary else "pytest completed",
+        )
     if rc == 1:
-        return "FAIL", "pytest reported test failures"
+        return (
+            "FAIL",
+            f"pytest reported test failures ({summary})"
+            if summary
+            else "pytest reported test failures",
+        )
     return (
         "UNVERIFIED",
         f"pytest infrastructure exit ({rc}): {(stderr or stdout).strip() or 'no output'}",

@@ -4,7 +4,7 @@
 **Branch:** <plan_name>_implementation
 **Phase:** <current_phase>
 **Base Ref:** dev
-**Status:** PR-READY / BLOCKED
+**Status:** PASS / FAIL
 
 ---
 
@@ -16,39 +16,36 @@
 
 ## Files Modified
 
-| File | Type | Quality Score |
-|------|------|---------------|
-| `src/...` | Code | --/100 |
-| `tests/...` | Test | --/100 |
-| `configs/...` | Config | --/100 |
-| `docs/...` | Docs | --/100 |
-
----
-
-## Scoring Breakdown
-
-| Category | Deductions | Details |
-|----------|------------|---------|
-| Type errors (mypy) | -0 | Clean |
-| Security | -0 | No issues |
-| Missing tests | -0 | All covered |
-| Docstrings | -0 | All present |
-| Lint (ruff) | -0 | Clean |
-| **Total** | **100/100** | |
+| File | Type | Notes |
+|------|------|-------|
+| `src/...` | Code | |
+| `tests/...` | Test | |
+| `configs/...` | Config | |
+| `docs/...` | Docs | |
 
 ---
 
 ## Verification
 
+`verify.py phase --format text` deterministic result, one line per check:
+
+```text
+phase: PASS
+VFY-RUFF-001: PASS - Ruff completed with 0 violations
+VFY-MYPY-001: PASS - mypy completed with 0 errors
+VFY-PYTEST-001: PASS - pytest completed (N tests)
+VFY-FRESH-001: PASS - phase evidence captured relevant state
+VFY-FRESH-002: PASS - phase evidence captured governing control-plane provenance
+VFY-GEN-001: PASS - generated verifier runtime matches source
+```
+
 | Check | Status |
 |-------|--------|
-| All tests pass | [ ] |
-| mypy clean | [ ] |
-| ruff clean | [ ] |
-| E2E passes | [ ] |
-| Quality >= 90 | [ ] |
-| Report persisted under `.claude/quality_reports/` | [ ] |
-| Report newer than changed files | [ ] |
+| `verify phase` receipt | [ ] |
+| `verify closeout` receipt | [ ] |
+| E2E passes (if applicable) | [ ] |
+| Findings report persisted under `.claude/quality_reports/` | [ ] |
+| Findings report newer than changed files | [ ] |
 
 ---
 
