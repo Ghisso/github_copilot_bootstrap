@@ -1784,13 +1784,48 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
     return hashed.stdout.strip() if hashed.returncode == 0 else ""
 
 
+_FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*$")
+
+
 def _strip_fenced_code_blocks(text: str) -> str:
-    """Remove fenced ```code``` blocks from LEARN evidence scanning, so an
-    illustrative example of the entry/marker format placed inside one is
-    never mistaken for real evidence."""
-    return re.sub(
-        r"^```[^\n]*\n.*?^```[ \t]*$\n?", "", text, flags=re.MULTILINE | re.DOTALL
-    )
+    """Remove fenced code blocks from LEARN evidence scanning line by line,
+    so an illustrative example of the entry/marker format placed inside one
+    is never mistaken for real evidence.
+
+    Handles both GFM fence characters (```` ``` ```` or ``~~~``), an
+    indented fence delimiter, and an unterminated fence - which strips to
+    the end of the text rather than leaving its contents exposed to the
+    scanner, since unclosed fenced content is not evidence either way. A
+    closing fence must reuse the same character and be at least as long as
+    the opening one, matching GFM; a single regex cannot express "no
+    matching close -> swallow to end" without this line-by-line state
+    machine, which is exactly the gap an unterminated fence exploited.
+    """
+    kept: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line in text.split("\n"):
+        match = _FENCE_OPEN_RE.match(line)
+        if not in_fence:
+            if match:
+                in_fence = True
+                fence_char = match.group(1)[0]
+                fence_len = len(match.group(1))
+            else:
+                kept.append(line)
+            continue
+        if (
+            match
+            and match.group(1)[0] == fence_char
+            and len(match.group(1)) >= fence_len
+            and _FENCE_CLOSE_SUFFIX_RE.match(line[match.end() :])
+        ):
+            in_fence = False
+        # else: still inside the fence (including to end of text if it is
+        # never closed) - the line stays swallowed.
+    return "\n".join(kept)
 
 
 def closeout_log_errors(root: Path, phase: str, path: Path) -> list[str]:
