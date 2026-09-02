@@ -84,6 +84,7 @@ an abnormal exit) is `UNVERIFIED` rather than a silent pass.
 | Any mypy type errors | `mypy --ignore-missing-imports --explicit-package-bases` | `FAIL` |
 | Any pytest failures | `pytest tests/ -q` | `FAIL` |
 | Any ruff violations | `ruff check --output-format=json` | `FAIL` |
+| Any unformatted file | `ruff format --check` | `FAIL` |
 
 ### Gate metadata (enforced by the commit gate)
 
