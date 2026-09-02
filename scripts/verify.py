@@ -1803,7 +1803,8 @@ def content_hash_for(root: Path, merge_base: str, ref: str) -> str:
 
 
 _FENCE_OPEN_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
-_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*\r?$")
+_FENCE_CLOSE_SUFFIX_RE = re.compile(r"^[ \t]*$")
+_LINE_BOUNDARY_RE = re.compile(r"\r\n|\r|\n")
 
 
 def _strip_fenced_code_blocks(text: str) -> str:
@@ -1812,25 +1813,30 @@ def _strip_fenced_code_blocks(text: str) -> str:
     is never mistaken for real evidence.
 
     Handles both GFM fence characters (```` ``` ```` or ``~~~``), an
-    indented fence delimiter, a CRLF-terminated fence line, and an
-    unterminated fence - which strips to the end of the text rather than
-    leaving its contents exposed to the scanner, since unclosed fenced
-    content is not evidence either way. A closing fence must reuse the same
-    character and be at least as long as the opening one, matching GFM; a
-    single regex cannot express "no matching close -> swallow to end"
-    without this line-by-line state machine, which is exactly the gap an
-    unterminated fence exploited. Splitting on ``"\\n"`` leaves a trailing
-    ``\\r`` on each line of CRLF input, so the closing-delimiter check
-    tolerates an optional trailing ``\\r`` the same way it already tolerates
-    trailing spaces or tabs; this caller's actual input arrives pre-
+    indented fence delimiter, and an unterminated fence - which strips to
+    the end of the text rather than leaving its contents exposed to the
+    scanner, since unclosed fenced content is not evidence either way. A
+    closing fence must reuse the same character and be at least as long as
+    the opening one, matching GFM; a single regex cannot express "no
+    matching close -> swallow to end" without this line-by-line state
+    machine, which is exactly the gap an unterminated fence exploited.
+    Lines are split on any of CRLF, lone CR (classic pre-OS X Mac), or LF -
+    not just ``"\\n"`` - via an explicit alternation, deliberately not
+    ``str.splitlines()``, which also treats ``\\v``, ``\\f``,
+    ``\\x1c``-``\\x1e``, and ``\\x85``/``\\u2028``/``\\u2029`` as line
+    boundaries and would silently widen what counts as a line break in this
+    security-relevant scanner. This caller's actual input arrives pre-
     normalized to LF via ``Path.read_text()``'s universal newlines, but the
-    shipped verifier's callers are not guaranteed to normalize first.
+    shipped verifier's callers are not guaranteed to normalize first. Every
+    ``\\r`` this split consumes is part of a separator, so no line can ever
+    retain a trailing ``\\r``; the closing-delimiter suffix check needs no
+    ``\\r`` tolerance of its own as a result.
     """
     kept: list[str] = []
     in_fence = False
     fence_char = ""
     fence_len = 0
-    for line in text.split("\n"):
+    for line in _LINE_BOUNDARY_RE.split(text):
         match = _FENCE_OPEN_RE.match(line)
         if not in_fence:
             if match:
