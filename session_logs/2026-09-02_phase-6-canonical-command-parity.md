@@ -38,6 +38,29 @@ formatting drift the mismatch allowed. Final phase of
   applies everywhere else resolves it too.
 - **09:40** - Review round 1: **FAIL**, 1 CRITICAL + 3 MAJOR + 1 MINOR.
 - **10:30** - Round 2: all five fixed. 1230 tests pass.
+- **11:10** - Review round 2: the historical-chain break confirmed fixed
+  against the real receipts, but a second CRITICAL, also found by execution
+  and also invisible to the suite. `ruff format` rejects the
+  `--extend-exclude` flag that `ruff check` accepts, and the consumer branch
+  is the only caller passing it — so `verify.py phase` could never report
+  PASS for any installed consumer, and `closeout` inherited the block. Worse
+  for the ecosystem than the drift this phase set out to fix. It predated the
+  fold; the fold merely kept the flag construction.
+- **11:50** - Round 3: both Ruff sub-measurements now share one
+  `_ruff_exclude_config_args` path emitting `--config
+  "extend-exclude=[...]"`, which works on both subcommands. Real-Ruff
+  consumer tests added with no mocked `_run`. 1235 tests pass. Verified
+  independently: a consumer with an unformatted file outside `.claude` FAILs
+  and one only inside `.claude` PASSes, so the exclusion is real and scoped.
+- **12:20** - Review round 3: **PASS**, nothing above MINOR — the first such
+  round in this plan. The MINOR was a genuine glob-semantics edge in the new
+  helper: `[1]` is a character class and `\` escapes, so a pattern containing
+  glob metacharacters can produce valid TOML that Ruff accepts while matching
+  something other than the intended literal path. Unreachable today since the
+  only caller passes `.claude`. Documented in the helper's own contract rather
+  than dispositioned. The reviewer also confirmed unprompted that `--config`
+  **adds to** rather than replaces a consumer's own `[tool.ruff]
+  extend-exclude`, which is the behavior we want.
 
 ## Design decisions
 
@@ -115,6 +138,16 @@ intentionally unformatted file still produces
   drift. `ruff format --check` was required in prose and gated nowhere, so
   this plan's own edits to `verify.py` and `test_verify.py` went unformatted
   across five phases. Either gate a requirement or stop claiming it.
+- [LEARN:verification] A flag valid on one subcommand is not valid on its
+  sibling. `ruff check` accepts `--extend-exclude`; `ruff format` rejects it
+  outright. Where two measurements must share an option, build it once and
+  use the generic `--config` override that both subcommands accept, rather
+  than copying a flag between them.
+- [LEARN:testing] A test that asserts which arguments a command *would*
+  receive proves nothing about whether the command works. Every consumer-path
+  Ruff test mocked `_run` or `measure_ruff` and checked argument shape, so an
+  invalid flag passed the suite while breaking every consumer. Argument-shape
+  coverage and real-binary coverage are different layers; keep both.
 - [LEARN:review] A word-boundary grep for `score` misses `scoring`. Root
   `CLAUDE.md` — the file governing every session — kept score-era text through
   three phases of sweeps by me and by the reviewer for exactly that reason.
@@ -123,7 +156,7 @@ intentionally unformatted file still produces
 
 ```bash
 uv run pytest tests/ -q --tb=short
-# 1230 passed (1135 on dev at the start of this plan; +95 across six phases)
+# 1235 passed (1135 on dev at the start of this plan; +100 across six phases)
 
 uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases
 # Success: no issues found in 25 source files

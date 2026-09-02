@@ -3,7 +3,8 @@ name: 2026-09-02_phase-6-canonical-command-parity
 type: small-plan
 parent_plan: verification-gate-semantic-hardening
 phase_index: 6
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-02_phase-6-canonical-command-parity.md
 ---
 
 # Phase 6 — Canonical Command Parity

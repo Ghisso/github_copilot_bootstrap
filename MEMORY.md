@@ -651,3 +651,31 @@
   there is no `src/`. `verify.py`'s real gate runs `mypy shared scripts tests`
   (25 files) when it detects a bootstrap authoring repository. Use the gate's
   scope locally; `src/` is the consumer-template shape, not this repo's.
+  Root `CLAUDE.md` now documents the authoring scope; `uv sync` also does not
+  apply here because no `pyproject.toml` exists, and the devcontainer already
+  guards it with `[ -f pyproject.toml ]`.
+- [LEARN:verification] `CHECK_IDS` is part of the receipt schema contract,
+  because the gate validates its own history. Adding or removing a check ID
+  invalidates every previously persisted receipt through `validate_receipt`'s
+  exact set equality, which breaks the push/PR gate on the plan's own commits.
+  Extend an existing check instead, unless a schema bump plus migration is
+  intended.
+- [LEARN:testing] A fixture that builds both sides of a comparison from the
+  current code can never detect a contract that changed between them. This
+  blind spot hid three separate defects in one plan: the certified-commit tree
+  rule, the `CHECK_IDS` break, and an invalid Ruff flag. Pin the previously
+  persisted shape as a literal, and cover real binaries as well as argument
+  shapes.
+- [LEARN:verification] A flag valid on one Ruff subcommand may be invalid on
+  its sibling: `ruff check` accepts `--extend-exclude`, `ruff format` rejects
+  it. Build a shared option once via the generic `--config "key=value"`
+  override, which both accept. Note `--config extend-exclude=[...]` adds to,
+  rather than replaces, a consumer's own `[tool.ruff]` setting.
+- [LEARN:review] Validate against artifacts actually on disk, not only
+  synthetic fixtures. The most serious defect in this plan was found by running
+  the real validation function over the real persisted receipts after three
+  review rounds and a fully green suite had missed it.
+- [LEARN:verification] A documented requirement that nothing enforces will
+  drift. `ruff format --check` was required in prose and gated nowhere, so
+  edits to `verify.py` and `test_verify.py` went unformatted across five
+  phases. Either gate a requirement or stop claiming it.
