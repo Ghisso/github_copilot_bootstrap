@@ -524,3 +524,23 @@
   checkpointed completed small-plan bytes to the receipt digest. The receipt's
   nested HEAD may legitimately predate those dirty closeout bytes, so reading
   the plan only from that HEAD rejects the supported lifecycle.
+- [LEARN:workflow] A big plan's `phases:` list and `current_phase` must hold
+  small-plan file basenames at two-space indent. Branch and commit hooks
+  resolve them as `.claude/plans/<value>.md`, so bare phase slugs never match,
+  and a one-space indent surfaces as the misleading "missing required field:
+  phases".
+- [LEARN:workflow] When deleting a cross-cutting concept, "shipped runtime
+  surface" is decided by whether `generate_targets.py` copies the file or
+  `validate_targets.py` requires it, not by whether it reads like prose. A
+  skill or template that reaches consumers is runtime; deferring it to a later
+  documentation phase leaves a live contract pointing at deleted code.
+- [LEARN:review] A sweep authored by the agent that wrote the change inherits
+  that agent's blind spot. Instruct the reviewer to re-derive the affected file
+  set from scratch rather than verify the change list.
+- [LEARN:verification] Size a bounded guard regex against the longest form the
+  repository itself documents, not against its own test examples. A bound fitted
+  to short fixtures passes every test while silently missing the canonical
+  long-form invocation printed in the policy file.
+- [LEARN:verification] Keep a detail-string enricher off the status path. Let
+  PASS/FAIL stay decided solely by the return code so a parsing bug in the
+  human-readable summary cannot flip a FAIL into a PASS.

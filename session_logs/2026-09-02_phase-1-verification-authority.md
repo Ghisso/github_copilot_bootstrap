@@ -37,8 +37,18 @@ upgrades. Phase 1 of the `verification-gate-semantic-hardening` big plan.
   sweep found and fixed 2 further instances (`refactor/SKILL.md`,
   `git-hooks/commit-msg`). 1146 tests pass.
 - **03:30** - Verified independently: zero `quality_score`/`EXCELLENCE`
-  references remain outside `validate_targets.py`'s intentional
-  forbidden-phrase guard lists.
+  references remain anywhere in `shared/`, `scripts/`, or `README.md`.
+- **03:40** - Review round 3: **PASS**. All 4 prior findings closed, the 2
+  self-found edits confirmed correct, and the `commit-msg` change confirmed
+  comment-only and inert. One new MINOR: the R-AGENTS-08 bound of 120
+  characters is narrower than the 132-character canonical long-form
+  `record_findings.py` invocation documented in
+  `quality-and-testing.instructions.md`, so that form would silently evade the
+  check. Reviewer demonstrated the miss directly.
+- **03:45** - Fixed that MINOR rather than dispositioning it: bound widened to
+  240 with a comment naming the constraint, plus a `canonical-long-form`
+  parametrize case. Confirmed it is a real regression test — the string does
+  not match at 120 and does match at 240.
 
 ## Design decisions
 
@@ -91,6 +101,10 @@ upgrades. Phase 1 of the `verification-gate-semantic-hardening` big plan.
   inherits that agent's blind spot. Both blocking review rounds here were found
   by an independent from-scratch sweep, not by re-checking the change list.
   Instruct the reviewer to re-derive the affected set rather than verify it.
+- [LEARN:verification] Size a bounded guard regex against the longest form the
+  repository itself documents, not against the examples in its own test. The
+  R-AGENTS-08 bound of 120 passed every test while silently missing the
+  132-character canonical invocation printed in the policy file.
 - [LEARN:verification] A detail-string enricher must not sit on the status
   path. `_pytest_result_summary()` only decorates the message; PASS/FAIL is
   still decided solely by the return code, so a parsing bug cannot flip a FAIL
@@ -101,7 +115,7 @@ upgrades. Phase 1 of the `verification-gate-semantic-hardening` big plan.
 
 ```bash
 uv run pytest tests/ -q --tb=short
-# 1146 passed (baseline on dev: 1135; +11 net new)
+# 1147 passed (baseline on dev: 1135; +12 net new)
 
 uv run mypy scripts/ --ignore-missing-imports --explicit-package-bases
 # Success: no issues found in 8 source files
@@ -119,7 +133,7 @@ uv run python .claude/scripts/verify.py phase --format text --persist
 # phase: PASS
 # VFY-RUFF-001: PASS - Ruff completed with 0 violations
 # VFY-MYPY-001: PASS - mypy completed with 0 errors
-# VFY-PYTEST-001: PASS - pytest completed (1146 passed in 73.85s)
+# VFY-PYTEST-001: PASS - pytest completed (1147 passed in 74.25s)
 # VFY-FRESH-001: PASS - phase evidence captured relevant state
 # VFY-FRESH-002: PASS - phase evidence captured governing control-plane provenance
 # VFY-GEN-001: PASS - generated verifier runtime matches source
