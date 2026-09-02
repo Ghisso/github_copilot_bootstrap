@@ -2166,6 +2166,35 @@ def closeout_log_path(root: Path, phase: str) -> Path:
     return confined_path(root, match.group(1), regular=True)
 
 
+def documentation_only_paths(metadata: dict[str, object]) -> list[str]:
+    """Return the changed paths that are documentation-only content."""
+    return [
+        path
+        for path in metadata_paths(metadata, "changed_paths")
+        if classify_path(path) == "documentation-only"
+    ]
+
+
+def missing_documentation_na_reason(
+    metadata: dict[str, object], documentation_na: str
+) -> str | None:
+    """Diagnose a closeout that needs ``--documentation-na`` but lacks one.
+
+    Mirrors ``closeout_artifacts``'s own requirement without changing its
+    raising contract for other callers - a genuine artifact error there
+    (missing phase plan, unsafe closeout log path, ...) still crashes
+    unchanged. This only pre-empts the one case that is a missing CLI flag,
+    not a broken plan or artifact, so it never swallows a real error.
+    """
+    if documentation_only_paths(metadata) or documentation_na.strip():
+        return None
+    return (
+        "closeout needs --documentation-na REASON: no documentation-only "
+        "path changed and no reason was given; pass --documentation-na "
+        "'<reason>' before running verify"
+    )
+
+
 def closeout_artifacts(
     root: Path, metadata: dict[str, object], documentation_na: str = ""
 ) -> dict[str, object]:
@@ -2179,11 +2208,7 @@ def closeout_artifacts(
         or not phase
     ):
         raise ValueError("closeout receipt needs branch and phase metadata")
-    documentation_paths = [
-        path
-        for path in metadata_paths(metadata, "changed_paths")
-        if classify_path(path) == "documentation-only"
-    ]
+    documentation_paths = documentation_only_paths(metadata)
     if not documentation_paths and not documentation_na.strip():
         raise ValueError(
             "closeout needs --documentation-na REASON when documentation was not updated"
@@ -2446,11 +2471,12 @@ def unresolved_phase_reason(
     blank ``current_phase`` apart from a big plan that cannot be read or
     parsed. Never inspects nested runtime provenance, so any other
     provenance failure still surfaces through the normal receipt validation
-    path unchanged. Returns None when a phase is resolved - including an
-    explicit ``--phase`` override on a non-implementation branch, the
+    path unchanged. Returns None when a phase is resolved - including a
+    safe explicit ``--phase`` override on a non-implementation branch, the
     supported way to run ``phase``/``closeout`` outside this bootstrap's own
-    plan machinery - or when ``branch`` is not an implementation branch and
-    ``requires_phase`` is False (``fast`` never needs one).
+    plan machinery; an *unsafe* override is diagnosed, not treated as
+    resolved. Also returns None when ``branch`` is not an implementation
+    branch and ``requires_phase`` is False (``fast`` never needs one).
     """
     if not branch.endswith("_implementation"):
         if requires_phase and not phase:
@@ -2459,6 +2485,12 @@ def unresolved_phase_reason(
                 "<slug>_implementation convention and no --phase was given; "
                 "pass --phase explicitly or switch to the plan's "
                 "implementation branch before running verify"
+            )
+        if requires_phase and phase and not PHASE_SLUG.fullmatch(phase):
+            return (
+                f"active phase metadata is malformed: --phase '{phase}' is "
+                "not a safe plan slug; pass a plain identifier before "
+                "running verify"
             )
         return None
     big_plan = active_big_plan_path(root, branch)
@@ -2565,6 +2597,13 @@ def main() -> int:
         checks = phase_checks(root, metadata)
     else:
         checks = closeout_checks(root, metadata)
+    if args.mode == "closeout":
+        doc_na_reason = missing_documentation_na_reason(
+            metadata, args.documentation_na
+        )
+        if doc_na_reason is not None:
+            print(doc_na_reason, file=sys.stderr)
+            return 2
     artifacts = (
         closeout_artifacts(root, metadata, args.documentation_na)
         if args.mode == "closeout"
