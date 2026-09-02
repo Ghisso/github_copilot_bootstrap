@@ -2446,15 +2446,18 @@ def unresolved_phase_reason(
     blank ``current_phase`` apart from a big plan that cannot be read or
     parsed. Never inspects nested runtime provenance, so any other
     provenance failure still surfaces through the normal receipt validation
-    path unchanged. Returns None when a phase is resolved, or when
-    ``branch`` is not an implementation branch and ``requires_phase`` is
-    False (``fast`` never needs one).
+    path unchanged. Returns None when a phase is resolved - including an
+    explicit ``--phase`` override on a non-implementation branch, the
+    supported way to run ``phase``/``closeout`` outside this bootstrap's own
+    plan machinery - or when ``branch`` is not an implementation branch and
+    ``requires_phase`` is False (``fast`` never needs one).
     """
     if not branch.endswith("_implementation"):
-        if requires_phase:
+        if requires_phase and not phase:
             return (
                 f"no active phase: branch '{branch}' does not follow the "
-                "<slug>_implementation convention; switch to the plan's "
+                "<slug>_implementation convention and no --phase was given; "
+                "pass --phase explicitly or switch to the plan's "
                 "implementation branch before running verify"
             )
         return None
