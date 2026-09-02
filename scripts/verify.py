@@ -1400,11 +1400,11 @@ def historical_chain_errors(
             ],
             root,
         )
-        candidates = [
-            parts[0]
-            for parts in (line.split() for line in ancestry_path.splitlines())
-            if parts and earlier_head in parts[1:]
-        ]
+        candidates: list[str] = []
+        for line in ancestry_path.splitlines():
+            parts = line.split()
+            if parts and earlier_head in parts[1:]:
+                candidates.append(parts[0])
         if not candidates:
             errors.append(
                 f"historical phase {earlier} receipt head_sha has no ancestry path "
