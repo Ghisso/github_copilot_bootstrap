@@ -31,6 +31,16 @@ reached `complete`.
   MINOR was a lone-`\r` blind spot in the same scanner item 3 had touched.
 - **23:10** - Fixed the doc myself; delegated the lone-`\r` fix.
 - **23:40** - Round 2 returned. 1196 tests pass.
+- **00:10** - Review round 2: both prior findings resolved, verified by
+  execution — an exhaustive split over every string of length 0–6 from
+  `{\r, \n, a}` plus 2000 randomized strings produced no segment ending in
+  `\r`, confirming the `\r?` removal was genuinely redundant rather than
+  reintroducing the earlier bug; LF output was byte-identical across all three
+  code versions on a 10-case battery; and the three new tests fail against the
+  prior round for the intended reason. One new MINOR: my own doc edit
+  overclaimed that both fail-closed branches name an ambiguity, when the
+  zero-candidate branch reports a missing ancestry path. Fixed by splitting
+  the clause.
 
 ## Design decisions
 

@@ -602,3 +602,27 @@
   paths or parses text. Every CRITICAL in the hardening plan's final phase was
   found by running the shell function or regex against real inputs; static
   review had passed the same code twice.
+- [LEARN:verification] A gate that picks one item from an ordered list is
+  asserting an invariant it has not checked. Selecting "the first entry of
+  `git rev-list --ancestry-path --reverse`" silently accepted an unproven
+  commit whenever the range was not linear. Filter on the property that
+  actually matters — the candidate's parent set containing the expected
+  commit — and fail closed unless exactly one candidate holds it.
+- [LEARN:review] A dispositioned MINOR is not necessarily a shallow one.
+  Reopening three accepted MINORs surfaced a latent silent-accept in the
+  receipt chain. An accepted disposition records that a finding was not worth
+  fixing at the time, not that it was small.
+- [LEARN:workflow] Fixing a finding can create one. Improving the
+  certified-commit selection made `docs/runtime-checks.md` describe a
+  superseded algorithm, which the same review then raised as MAJOR. When a
+  change alters a documented mechanism, update its documentation in the same
+  round.
+- [LEARN:code] Prefer an explicit `\r\n|\r|\n` alternation over
+  `str.splitlines()` in any scanner that decides whether evidence is real.
+  `splitlines()` also breaks on `\v`, `\f`, `\x1c`-`\x1e`, `\x85`, and the
+  Unicode separators, silently widening what counts as a line boundary. When
+  such a fix makes an earlier guard redundant, delete the guard.
+- [LEARN:workflow] To extend a big plan that already reached `complete`, append
+  a phase, set status back to `in-progress`, point `current_phase` at it, and
+  record in the plan why it grew. Branching fresh from `dev` is wrong when
+  `dev` does not yet have the earlier phases.
