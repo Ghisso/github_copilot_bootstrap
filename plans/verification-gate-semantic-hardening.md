@@ -171,14 +171,31 @@ except a sibling `<log-name>.errata.md` where an entry would actively
 mislead a reader into reintroducing a defect and no closeout receipt binds
 that log.
 
-This is review guidance, not a deterministic hook. Phase 7 additionally makes
-a documentation, memory, and LEARN audit a **required final-phase step** of
-every big plan (see §10), also documented process rather than a gate: the
-required evidence is a recorded surface list in the final phase's closeout
-log, deliberately left unenforced by any check because this plan's own
-non-goals forbid changing gate behavior, strictness, or scope, and because the
-only enforceable shape (a new required closeout-log section) is a receipt/
-evidence-contract change this plan also declines to make.
+The conditional per-phase sweep above remains review guidance, not a
+deterministic hook. Phase 7 additionally makes a documentation, memory, and
+LEARN audit a **required final-phase step** of every big plan (see §10), and
+that required evidence — a non-empty `## Stale-claims surfaces checked`
+section in the final phase's closeout log — **is** gated, not merely
+documented.
+
+**Corrected during Phase 7's own review:** the first draft of this section
+declined to gate the evidence, reasoning that any enforceable shape would be
+a receipt/evidence-contract change and would risk a second, drifting
+definition of "final phase" — citing the `CHECK_IDS` lesson from Phase 6 as
+the analogy. That reasoning does not hold: `closeout_log_errors` (the
+function that already gates the sibling `## [LEARN] Entries` evidence) has
+exactly one caller (`gate_receipt_errors`), and `historical_chain_errors`
+never calls it, so extending it touches no `CHECK_IDS` and can never be
+re-evaluated against an already-closed historical receipt from phases 1–6.
+"Final phase" needs no new definition either: `frontmatter_phases` already
+reads the big plan's own `phases:` list elsewhere in this same file, and the
+new `is_final_phase` helper reuses it directly (small plan `parent_plan` ->
+big plan `phases:` -> compare against the last entry), so it cannot drift
+from the big plan's own phase list. The gate therefore fires only when the
+phase being closed out is that list's last entry, fails closed on any
+unreadable or malformed frontmatter (treated as "not final," never as
+"final"), and touches neither the receipt schema nor the LEARN evidence
+contract next to it. Nothing in this plan's non-goals blocks it.
 
 ### 3.8 Schema migration must be safe mid-plan
 
@@ -380,8 +397,12 @@ The final phase of **every** big plan — not only this one — must also run a
 documentation, memory, and LEARN audit: sweep every live-advice surface for
 claims this plan or earlier work invalidated, correct or supersede each one,
 leave dated records unchanged, and record the audited surfaces and each
-one's outcome in the closeout session log. This requirement is stated in
+one's outcome under a `## Stale-claims surfaces checked` heading in the
+closeout session log. This requirement is stated in
 `shared/policies/workflow.instructions.md`, `shared/agents/orchestrator/prompt.md`,
 `shared/templates/plan-big.md`, and `shared/skills/plan-decomposition/SKILL.md`
-so every future big plan inherits it. It is documented process, not a gate;
-see §3.7 for why.
+so every future big plan inherits it, and the recorded-evidence half of it is
+gated: `verify.py`'s closeout check (`closeout_log_errors` /
+`is_final_phase`) requires that exact heading, non-empty, whenever the
+closing phase is the big plan's own last declared phase. See §3.7 for the
+reasoning and why an earlier draft's decision to leave it ungated was wrong.

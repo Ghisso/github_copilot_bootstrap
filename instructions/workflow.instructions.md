@@ -209,10 +209,18 @@ receipt binds that log.
 documentation, memory, and LEARN audit: sweep the live-advice surfaces above
 for claims that this plan or earlier work invalidated (not only this plan's
 own changes), correct or supersede each one under the live-advice/dated-record
-distinction, and record the audited surfaces and each one's outcome in that
-phase's closeout session log. This is documented lifecycle process, not a
-deterministic hook: no gate currently checks for the recorded surface list,
-so its absence is a review-time finding rather than a blocked commit.
+distinction, and record the audited surfaces and each one's outcome under a
+`## Stale-claims surfaces checked` heading in that phase's closeout session
+log - the same heading the conditional review above already uses. This
+recorded-surface-list evidence is a deterministic gate, not only documented
+process: `verify.py`'s closeout check derives "final phase" from the big
+plan's own `phases:` frontmatter list (the same source used elsewhere, so it
+cannot become a second, independently drifting definition) and requires a
+non-empty `## Stale-claims surfaces checked` section only when the phase
+being closed out is that list's last entry - it never fires on an earlier
+phase. It checks the section's presence and non-emptiness, not the
+correctness of its judgement, matching the shape of the existing `## [LEARN]
+Entries` evidence requirement next to it.
 
 ---
 

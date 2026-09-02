@@ -112,8 +112,11 @@ state READMEs, and `.claude/MEMORY.md`) for claims this plan or earlier work
 invalidated, correct or supersede each one, leave dated records (archived
 plans, dated design narratives, closed session logs) unchanged unless an
 entry would actively mislead a reader and no receipt binds its log, and
-record the audited surfaces and each one's outcome in that phase's closeout
-session log. Do not limit the sweep to that phase's own changes.
+record the audited surfaces and each one's outcome under a `## Stale-claims
+surfaces checked` heading in that phase's closeout session log. Do not limit
+the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
+closeout gate requires it, with non-empty content, whenever the phase it is
+closing out is this list's last entry.
 
 ### Step 5: Cross-Phase Consistency
 

@@ -15,6 +15,13 @@ reader into reintroducing a defect Phase 4 removed.
 > Resolve the certified commit as the first entry of `git rev-list
 > --ancestry-path --reverse <head_sha>..<later_head>`.
 
+The same superseded method is also restated once more, in different variable
+names, in the 14:30 Work Log entry: "The rule now resolves the certified
+commit as the first entry of `git rev-list --ancestry-path --reverse
+earlier_head..chain_head` and compares that commit's tree." Both statements
+describe the identical disproven position-based selection and are superseded
+together by this errata.
+
 ## Why it is wrong
 
 Selecting by list position alone cannot distinguish a linear implementation

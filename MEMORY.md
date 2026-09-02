@@ -185,9 +185,10 @@
   shared failure. Compatibility shims stay until repeated native PASS across
   supported client versions, not on documentation silence.
 - [LEARN:testing] A probe that has never executed against its real target is
-  untested code with a reassuring name. Phase I scored 100/100 offline while
-  carrying three defects its first real run found immediately. Require at least
-  one genuine execution before claiming an acceptance surface works.
+  untested code with a reassuring name. Phase I passed every automated check
+  offline while carrying three defects its first real run found immediately.
+  Require at least one genuine execution before claiming an acceptance
+  surface works.
 - [LEARN:testing] Mapping every non-zero exit to a single diagnosis makes a
   tool assert what it never measured (a CLI argv bug reported as `untrusted`).
   Classify the failure precisely or report it as unclassified.

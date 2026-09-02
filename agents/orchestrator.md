@@ -69,8 +69,10 @@ stale claim, leave dated records (archived plans, dated design narratives,
 closed session logs) alone, and write a sibling `<log-name>.errata.md` only
 where a closed log's entry would actively mislead a reader and no closeout
 receipt binds that log. Record the audited surfaces and each one's outcome
-in the closeout session log — this is documented process, not a gate; there
-is no deterministic check for its presence.
+under a `## Stale-claims surfaces checked` heading in the closeout session
+log before running `verify.py closeout`: the gate requires that exact
+heading with non-empty content whenever the phase being closed out is the
+big plan's own last declared phase, and rejects the closeout otherwise.
 8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
 9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
