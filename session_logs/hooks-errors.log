@@ -2695,3 +2695,5 @@ fatal: Cannot rebase onto multiple branches.
 2026-09-03T06:45:53Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-03T06:46:04Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: empty shell command segment)
 2026-09-03T06:46:04Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-03T07:12:59Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-03T07:12:59Z WARN hook fail-closed: protect-files.sh exited with status 2
