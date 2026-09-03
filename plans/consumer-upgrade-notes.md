@@ -1,12 +1,12 @@
 ---
 name: consumer-upgrade-notes
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: consumer-upgrade-notes_implementation
 phases:
   - 2026-09-03_phase-1-consumer-upgrade-notes
-current_phase: 2026-09-03_phase-1-consumer-upgrade-notes
+current_phase: 
 started_at: 2026-09-03T07:34:05Z
 ---
 
