@@ -260,6 +260,27 @@ mid-plan whose already-tracked files are not yet formatted will newly fail
 Recovery is one command — `uv run ruff format` — then rerun the verification
 and closeout sequence above.
 
+More gates can newly block a first refresh — invalid plan status, an open
+MAJOR finding, a missing final-phase stale-claims section, and more. See
+[Other gates that newly block a refresh](docs/runtime-checks.md#other-gates-that-newly-block-a-refresh)
+for the full table and recovery commands. The two most likely to surprise an
+operator, and two practical notes worth knowing before you refresh:
+
+- **Plan status.** A tracked plan with an invalid `status` (for example
+  `planned`, which has never been a valid value) blocks the next commit.
+  Valid small-plan values: `in-progress`, `paused`, `complete`, `cancelled`.
+  Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled`.
+- **Unformatted tracked files.** Any unformatted tracked file now fails
+  verification; run `uv run ruff format` before refreshing.
+- **Root-owned tracked files.** If a tracked file is owned by `root` (a
+  container artifact, not a bootstrap defect), `ruff format` fails with
+  `Permission denied`; fix ownership first —
+  `sudo chown "$(id -un):$(id -gn)" <path>`.
+- **`.devcontainer/hf-ai-sync.py` disappears.** It (and its earlier `.sh`
+  form) is obsolete and the refresh deletes it; nothing to fix. Fix ownership
+  and formatting, then refresh, in that order — after that, the obsolete
+  file stops mattering because it is already gone.
+
 When self-installing this repository, ignored generated overlays under the root
 `.github/` tree are valid only when they are byte-identical to generated output.
 Validation rejects a tracked, unignored, or stale overlay; keep editable source
