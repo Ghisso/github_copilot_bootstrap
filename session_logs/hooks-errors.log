@@ -2747,3 +2747,4 @@ fatal: Cannot rebase onto multiple branches.
 2026-09-03T09:03:25Z WARN hook fail-closed: unparseable tool payload
 2026-09-03T09:03:25Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-03T09:03:26Z WARN hook fail-closed: unparseable tool payload
+2026-09-03T13:54:39.000Z state-sync: push skipped: checkpoint failed; publication was not attempted.
