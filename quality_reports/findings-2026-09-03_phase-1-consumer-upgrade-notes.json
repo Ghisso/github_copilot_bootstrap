@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "documentation",
+    "ponytail"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-03T07:53:06Z",
+  "branch": "consumer-upgrade-notes_implementation",
+  "head_sha": "1e0036406d7f9cfa9823e80353208d66875681ff",
+  "base_ref": "dev",
+  "merge_base_sha": "1e0036406d7f9cfa9823e80353208d66875681ff",
+  "phase": "2026-09-03_phase-1-consumer-upgrade-notes",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "3417c6656eb1e853a72a61efdec6956c4c65a138",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

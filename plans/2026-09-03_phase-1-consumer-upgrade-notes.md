@@ -3,7 +3,8 @@ name: 2026-09-03_phase-1-consumer-upgrade-notes
 type: small-plan
 parent_plan: consumer-upgrade-notes
 phase_index: 1
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-03_phase-1-consumer-upgrade-notes.md
 ---
 
 # Phase 1 — Consumer Upgrade Notes
@@ -20,7 +21,7 @@ The measured evidence is in the big plan's §2.
 
 | Change | Consumer-visible effect | Recovery |
 |---|---|---|
-| `validate_plan_frontmatter.py` shipped and gated at commit (Phase 2) | A plan with invalid frontmatter blocks the next commit. `check_runtime.py` also promotes this from WARN to FAIL | Fix the frontmatter. Valid small-plan statuses are exactly `in-progress`, `paused`, `complete`, `cancelled` |
+| `validate_plan_frontmatter.py` shipped and gated at commit (Phase 2) | A plan with invalid frontmatter blocks the next commit, via `assert_plan_frontmatter` in `_lib-frontmatter.sh` calling the shipped `.claude/scripts/validate_plan_frontmatter.py` | Fix the frontmatter. Valid small-plan statuses are exactly `in-progress`, `paused`, `complete`, `cancelled`; valid big-plan statuses are `planning`, `in-progress`, `complete`, `cancelled` |
 | `ruff format --check` folded into `VFY-RUFF-001` (Phase 6) | Any unformatted tracked file now fails verification | `uv run ruff format .` |
 | Receipt schema v4, v3 rejected unconditionally (Phase 1) | A stale v3 receipt fails closed | Re-run `verify.py phase --persist` then `closeout --persist` |
 | `MEMORY.md` mtime no longer LEARN evidence (Phase 3) | A closeout log relying on it no longer satisfies the gate | Add a `## [LEARN] Entries` section with real entries or the exact no-lessons marker |
