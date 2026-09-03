@@ -272,10 +272,15 @@ operator, and two practical notes worth knowing before you refresh:
   Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled`.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
-- **Root-owned tracked files.** If a tracked file is owned by `root` (a
-  container artifact, not a bootstrap defect), `ruff format` fails with
-  `Permission denied`; fix ownership first —
-  `sudo chown "$(id -un):$(id -gn)" <path>`.
+- **Root-owned tracked files.** A tracked file owned by `root` is a container
+  artifact, not a bootstrap defect. The check itself still reports an ordinary
+  formatting diff, but `ruff format` cannot clear it —
+  `Permission denied`. Expect more such files than are currently failing, since
+  an already-formatted file is never rewritten and so stays silent until
+  something needs to change it. See
+  [Other gates that newly block a refresh](docs/runtime-checks.md#other-gates-that-newly-block-a-refresh)
+  for a command that enumerates the extent before you refresh, and for why a
+  recursive `chown` deserves care.
 - **`.devcontainer/hf-ai-sync.py` disappears.** It (and its earlier `.sh`
   form) is obsolete and the refresh deletes it; nothing to fix. Fix ownership
   and formatting, then refresh, in that order — after that, the obsolete

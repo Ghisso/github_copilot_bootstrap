@@ -388,10 +388,34 @@ of this changes what a gate checks, only what an operator should expect.
 
 Three practical notes worth knowing before a refresh:
 
-- **Root-owned tracked files.** If a tracked file is owned by `root` (a
-  container artifact, not a bootstrap defect), `ruff format`/`ruff format
-  --check` fails with `Permission denied` rather than reporting a formatting
-  diff. Fix ownership first: `sudo chown "$(id -un):$(id -gn)" <path>`.
+- **Root-owned tracked files.** A tracked file owned by `root` is a container
+  artifact, not a bootstrap defect, and it breaks the *fix* rather than the
+  check. `VFY-RUFF-001` runs `ruff format --check`, which only reads: it
+  reports an ordinary formatting diff even on a file it could never write. The
+  failure appears when you run `ruff format` to fix that diff, as
+  `error: Failed to write <path>: Permission denied (os error 13)`. So the
+  symptom is a formatting failure you cannot clear, not a misreported check.
+
+  Expect more such files than are currently failing. An already-formatted file
+  is never rewritten, so it stays silent until something needs to change it —
+  fixing only today's failures leaves the rest to surface one at a time.
+  Enumerate the extent once, before refreshing:
+
+  ```bash
+  git ls-files -z | while IFS= read -r -d '' f; do
+    [ "$(stat -c '%U' -- "$f")" = "$(id -un)" ] || printf '%s\n' "$f"
+  done
+  ```
+
+  That lists every **tracked** file not owned by you. It reads the index
+  instead of walking the tree, so it changes nothing and does not stop on an
+  unreadable directory, and it ignores untracked caches and vendored assets no
+  gate inspects. The NUL-delimited loop keeps each path bound to its own owner
+  lookup, so a filename containing a space or a newline is still reported
+  correctly. Then take ownership of what it reports. A recursive `chown` over
+  a source tree is quicker but changes every file beneath it, including
+  anything deliberately owned by another user, so prefer the enumerated list
+  unless you know the whole tree is yours.
 - **`.devcontainer/hf-ai-sync.py` disappears.** It (and its earlier `.sh`
   form) is obsolete — `state-sync.sh` replaced it — and a refresh deletes it
   while pruning obsolete generated files. No fix is needed; do not spend time
