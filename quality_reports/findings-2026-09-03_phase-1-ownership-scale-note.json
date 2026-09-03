@@ -1,0 +1,27 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "documentation",
+    "ponytail"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-03T09:03:15Z",
+  "branch": "upgrade-note-ownership-scale_implementation",
+  "head_sha": "36c8e7dbfb047d9ee2fa71aec8ed2c0956b90a4c",
+  "base_ref": "dev",
+  "merge_base_sha": "36c8e7dbfb047d9ee2fa71aec8ed2c0956b90a4c",
+  "phase": "2026-09-03_phase-1-ownership-scale-note",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "ed57619e17af3098f4c787fb70a545e052a01b7a",
+  "changed_files": [
+    "README.md",
+    "docs/runtime-checks.md"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
