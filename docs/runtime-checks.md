@@ -370,6 +370,37 @@ evidence. An exemption is exactly one documentation OR one mutable
 workflow-state file, only when no control-plane/high-risk condition applies;
 every multi-file diff is high-risk.
 
+#### Other gates that newly block a refresh
+
+Beyond the receipt-schema and formatting gates above, a consumer refreshed
+onto this runtime can hit more gates that either did not exist before or did
+not previously block. Each row states the effect and the exact recovery; none
+of this changes what a gate checks, only what an operator should expect.
+
+| Gate | Effect on a refreshed consumer | Recovery |
+| --- | --- | --- |
+| Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit. `planned` looks plausible but has never been a valid value | Fix the plan's `status`. Valid small-plan values: `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
+| A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
+| `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
+| An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
+| `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
+| `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
+
+Three practical notes worth knowing before a refresh:
+
+- **Root-owned tracked files.** If a tracked file is owned by `root` (a
+  container artifact, not a bootstrap defect), `ruff format`/`ruff format
+  --check` fails with `Permission denied` rather than reporting a formatting
+  diff. Fix ownership first: `sudo chown "$(id -un):$(id -gn)" <path>`.
+- **`.devcontainer/hf-ai-sync.py` disappears.** It (and its earlier `.sh`
+  form) is obsolete — `state-sync.sh` replaced it — and a refresh deletes it
+  while pruning obsolete generated files. No fix is needed; do not spend time
+  repairing it.
+- **Order matters.** Fix file ownership and run `uv run ruff format` before
+  refreshing, not after. Once tracked files are owned correctly and
+  formatted, and the refresh has run, the obsolete `hf-ai-sync.py` stops
+  mattering because it is already gone.
+
 ## Two Layers, Two Invariants: Commit And Push Enforcement
 
 Two workflow invariants are each enforced twice, from a single shared contract per invariant:
