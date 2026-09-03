@@ -155,7 +155,7 @@ Quality gates:
 
 ## Project State
 
-**Project:** github_copilot_bootstrap
+**Project:** github_copilot_bootstrap — a source-of-truth, multi-target agent-workflow bootstrap (Claude Code, Codex, Copilot, Antigravity), not an application. Details: `.claude/instructions/project-context.instructions.md`.
 **Stack:** Python 3.12+ with uv; adapt framework guidance to the target repo.
 **Active work:** Check `.claude/plans/` and `.claude/explorations/`.
 

@@ -26,7 +26,8 @@ this repository's bootstrap scripts, shell hooks, or generated adapters.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
 - `shared/hooks/`: lifecycle configuration and shell guardrails.
-- `shared/mcp/servers.json`: Semble, context-mode, and context7 definitions.
+- `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
+  (Context Mode is filtered to exactly four guarded tools).
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader.
 - `shared/scripts/` and `shared/templates/`: shared scoring, findings, and
   workflow artifacts rendered into targets.
@@ -36,6 +37,8 @@ this repository's bootstrap scripts, shell hooks, or generated adapters.
 - `scripts/update_consumers.py`: regenerates and updates consumer repositories.
 - `scripts/validate_targets.py`: structural and behavioral target validator.
 - `scripts/check_runtime.py`: runtime-file and optional-helper checker.
+- `scripts/check_native_clients.py`: validates native-adapter parity (Claude
+  `.claude/rules/*`, Codex `AGENTS.md`, Copilot secondary-coverage checks).
 - `plans/`: ADRs, implementation plans, closeouts, and architecture reviews.
 - `dist/multi-agent/`: generated and gitignored; never hand-edit it.
 
