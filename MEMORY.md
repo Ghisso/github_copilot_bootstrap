@@ -4,10 +4,10 @@
 
 ## Domain-Specific
 
-- [LEARN:security] Shell mutation guards must preserve expansion provenance and
-  consider plausible effective cwd, Git work-tree, symlink targets, and
-  supported expansion. Raw command-word matching causes both noisy false
-  positives and protected-file bypasses.
+- [LEARN:security] Shell mutation guards must track expansion provenance and
+  check effective cwd, Git work-tree, symlink targets, and expansion — raw
+  command-word matching causes both false positives and protected-file
+  bypasses.
 - [LEARN:testing] Pair newly allowed guard regressions with adjacent denied
   mutations, then run adversarial refutation; happy-path glob tests alone do
   not establish a fail-closed operation classifier.
@@ -21,86 +21,86 @@
 
 - [LEARN:workflow] An implementation branch named `<slug>_implementation`
   requires a matching `.claude/plans/<slug>.md` big plan; a governing design
-  under top-level `plans/` does not satisfy the commit lifecycle gate.
+  under top-level `plans/` doesn't satisfy the commit lifecycle gate.
 - [LEARN:workflow] Configuration and validator allow-list migrations should be
   one atomic phase when the previous validator rejects the new contract, so
   every phase boundary remains green.
 - [LEARN:quality] The authoring repository uses `scripts/validate_targets.py`
   as its adversarial suite. Keep `tests/test_validate_targets.py` as the
-  pytest integration entrypoint so `verify.py`'s pytest measurement exercises
-  that real suite instead of reporting a false no-tests failure.
+  pytest entrypoint, or `verify.py`'s pytest measurement reports a false
+  no-tests failure instead of exercising that suite.
 - [LEARN:runtime] Codex 0.144.x MultiAgent V2 hides custom-agent spawn routing
   metadata by default. Set
   `[features.multi_agent_v2].hide_spawn_agent_metadata = false` and
   `tool_namespace = "agents"` so named `.codex/agents/*.toml` model and effort
   overrides reach child threads instead of inheriting the parent session.
 - [LEARN:installer] Generated seeds for consumer-owned mutable state must be
-  copy-if-absent. State migration and git history cannot protect content that
-  the installer overwrites before synchronization begins.
+  copy-if-absent — state migration and git history cannot protect content the
+  installer overwrites before sync begins.
 - [LEARN:installer] A warn-never-fail sync hook cannot prove an installer
-  preserved state; the installer must verify nested Git postconditions before
-  copying generated files. Local-only promises also need Git Trace2 coverage,
-  because unchanged remote refs prove no push but not no remote read. See
+  preserved state; verify nested Git postconditions before copying generated
+  files. Local-only promises also need Git Trace2 coverage — unchanged remote
+  refs prove no push, not no remote read. See
   `.claude/skills/safe-consumer-bootstrap-refresh/SKILL.md`.
 - [LEARN:testing] Cover state-sync entry points directly from the generated
   `.devcontainer` copy: installer coverage cannot prove that `pull
   --local-only` initializes a fresh nested repository or that an invalid
   `AI_STATE_REPO_ROOT` falls back to the consumer root.
 - [LEARN:quality] The commit gate's `content_hash` is `git hash-object` of
-  `git diff <base>`, which excludes untracked files. Stage every file destined
-  for the commit BEFORE running `record_findings.py`, or the report's hash and
-  `changed_files` will not match what the gate recomputes at commit time (and
-  `dirty` will be `true`, which the gate rejects).
+  `git diff <base>`, which excludes untracked files. Stage every file before
+  running `record_findings.py`, or the report's hash and `changed_files` won't
+  match what the gate recomputes at commit time (`dirty` becomes `true`,
+  which the gate rejects).
 - [LEARN:domain] `state-sync.sh` `cmd_pull` must return non-zero on a rebase
-  conflict and `cmd_push` must guard its push on that result; otherwise a push
-  is attempted after an aborted rebase and rejected non-fast-forward. The
-  top-level dispatch still converts the non-zero return into a warning +
-  `exit 0` so hooks never block Codex shutdown. The same guard now applies to
+  conflict, and `cmd_push` must guard its push on that result — otherwise a
+  push follows an aborted rebase and gets rejected non-fast-forward.
+  Top-level dispatch still converts the non-zero return into a warning +
+  `exit 0` so hooks never block Codex shutdown. The same guard applies to
   `cmd_migrate` via `commit_and_reconcile` returning non-zero on merge abort
-  (phase-3); `cmd_setup` keeps ignoring that result since it never pushes.
+  (phase-3); `cmd_setup` ignores that result since it never pushes.
 - [LEARN:security] Automated recovery must distinguish state that existed at
-  entry from state created by the current operation. Auto-clean only an exact,
-  observed orphan shape; preserve valid or unknown pre-existing state without
-  mutation, and reserve broader abort/fallback cleanup for state the operation
-  can prove it owns.
-- [LEARN:testing] A regression test for a bug fix must FAIL if the fix is
-  reverted. When the buggy code was "harmless" only because a lower layer
-  already blocked the bad outcome (e.g. git rejecting a non-fast-forward push
-  either way), assert on a marker unique to the fixed path (a new warning
-  string) and on the absence of the old path's marker — outcome-only
-  assertions can pass under both old and new code and prove nothing.
-- [LEARN:testing] Recovery and control-flow regressions must also record the
-  actual command invocations in a side channel or trace and assert their exact
-  order. A successful outcome or shared diagnostic can pass when the old path
-  still runs or when required fallback steps never execute.
-- [LEARN:domain] AI-state durability must not depend on a `Stop` event: browser/
-  editor tab closure does not guarantee Stop fires. The durable checkpoints are
-  the `post-commit` git hook (best-effort push after every outer commit) and the
-  explicit "AI state: push" VS Code task; Stop stays a best-effort checkpoint.
+  entry from state the current operation created. Auto-clean only an exact,
+  observed orphan shape; leave valid or unknown pre-existing state untouched,
+  and reserve broader abort/fallback cleanup for state the operation can
+  prove it owns.
+- [LEARN:testing] A regression test must FAIL if the fix is reverted. When
+  buggy code was "harmless" only because a lower layer already blocked the bad
+  outcome (e.g. git rejecting a non-fast-forward push either way), assert a
+  marker unique to the fixed path (a new warning string) and the absence of
+  the old path's marker — outcome-only assertions can pass under both old and
+  new code and prove nothing.
+- [LEARN:testing] Recovery and control-flow regressions must record actual
+  command invocations in a side channel or trace and assert their exact
+  order — a successful outcome or shared diagnostic can pass even when the
+  old path still runs or required fallback steps never execute.
+- [LEARN:domain] AI-state durability must not depend on a `Stop` event —
+  browser/editor tab closure doesn't guarantee Stop fires. Durable checkpoints
+  are the `post-commit` git hook (best-effort push after every outer commit)
+  and the explicit "AI state: push" VS Code task; Stop stays best-effort.
 - [LEARN:quality] Structural checks over generated text must assert the literal
   invocation (e.g. `'"$STATE_SYNC" push'`), not loose independent substrings — a
   stray word in a comment (`cmd_push`) can satisfy `"push" in text` and mask a
   regression. Guard any unconditional `read()` of a required-but-maybe-missing
   file so a miss is a clean accumulated failure, not an uncaught exception.
 - [LEARN:workflow] Never create a tracked worktree diagnostic before
-  reconciling unrelated histories: the diagnostic itself can cause a merge
-  conflict or dirty-tree refusal. Capture the evidence externally, reconcile,
-  then append and checkpoint the diagnostic afterward.
+  reconciling unrelated histories — the diagnostic itself can cause a merge
+  conflict or dirty-tree refusal. Capture evidence externally, reconcile, then
+  append and checkpoint the diagnostic after.
 - [LEARN:testing] A no-I/O Git Trace2 test must first assert that the trace
   exists and contains parseable start events before checking that forbidden
   remote commands are absent; otherwise an empty or unreadable trace can make
   the absence assertion pass vacuously.
 - [LEARN:workflow] A clean-only publication retry can deadlock behind its own
-  tracked failure diagnostics. Prompt/retry boundaries must checkpoint and
-  then publish (`push`), or store diagnostics outside tracked state. This is
-  required whenever a failed publication writes its diagnostics into a tracked
-  file before the next retry boundary.
+  tracked failure diagnostics. Prompt/retry boundaries must checkpoint then
+  publish (`push`), or store diagnostics outside tracked state — required
+  whenever a failed publication writes diagnostics into a tracked file before
+  the next retry boundary.
 - [LEARN:testing] Exact generated hook-schema validation must check handler
   types and reject extra fields, not only command text. Shared test mechanics
   may be parameterized, but production wrappers remain platform-specific where
   their output contracts differ.
-- [LEARN:installer] Dry-run output is part of the safety contract: preview
-  paths must never claim that files, hooks, or trust state were applied.
+- [LEARN:installer] Dry-run output is part of the safety contract — preview
+  paths must never claim files, hooks, or trust state were applied.
   Distinguish "would install or update" from completion wording in direct and
   batch installer flows.
 - [LEARN:quality] Generator verification must run after concurrent source and
@@ -111,14 +111,14 @@
   review, findings, documentation, and learning evidence are recorded.
 - [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
   checklist, session log, and big-plan checklist from the actual commit SHAs;
-  do not infer completion from a clean outer worktree alone.
+  don't infer completion from a clean outer worktree alone.
 - [LEARN:installer] Runtime ownership metadata must be inert, mode-aware, and
-  single-sourced. Persist the active install mode, remove paths that become
-  inactive during migrations, and generate restoration allowlists from the
-  same Python contract instead of duplicating them in shell.
+  single-sourced: persist the active install mode, remove paths inactive
+  after migrations, and generate restoration allowlists from one Python
+  contract, not duplicated shell.
 - [LEARN:testing] Ownership/pruning suites must cover equal or overlapping
   installer roots and nested `.git` in both directory and gitfile forms. Normal
-  generated-target tests do not expose recursive self-copy or worktree metadata
+  generated-target tests don't expose recursive self-copy or worktree metadata
   deletion failures.
 - [LEARN:architecture] Generated root guidance should be a compact discovery
   entrypoint, not a concatenated policy mirror. Keep lifecycle and safety gates
@@ -138,10 +138,10 @@
   cannot by itself retire a compatibility shim that fixed a historical runtime
   routing failure.
 - [LEARN:testing] Routing-shim removal and nesting-limit removal need different
-  native probes: exact role/model metadata does not prove that child agents
+  native probes: exact role/model metadata doesn't prove that child agents
   cannot spawn grandchildren.
 - [LEARN:codex] Project custom-agent `developer_instructions` should embed the
-  canonical transformed role contract directly. Requiring a spawned agent to
+  canonical transformed role contract directly — requiring a spawned agent to
   read a Claude-native agent file adds avoidable tool dependence and can leave
   the role under-specified before its first read.
 - [LEARN:config] Omit per-agent MCP and skill tables when Codex's documented
@@ -173,8 +173,8 @@
   structural validation, executed native run, and unavailable/untrusted.
   Collapsing the third tier into a pass reports confidence never measured;
   keep it a `WARN` by default and non-zero only under `--require`.
-- [LEARN:testing] Model prose cannot prove client routing metadata. Assert on
-  client-reported agent type/model/effort fields, never on the model's own
+- [LEARN:testing] Model prose cannot prove client routing metadata — assert
+  client-reported agent type/model/effort fields, never the model's own
   description of which agent or model it is.
 - [LEARN:security] Trusted-project probes need a stable, operator-inspected
   workspace. Throwaway temp dirs cannot be manually trusted, and a probe must
@@ -184,7 +184,7 @@
   independently; one combined run cannot distinguish a real difference from a
   shared failure. Compatibility shims stay until repeated native PASS across
   supported client versions, not on documentation silence.
-- [LEARN:testing] A probe that has never executed against its real target is
+- [LEARN:testing] A probe that never executed against its real target is
   untested code with a reassuring name. Phase I passed every automated check
   offline while carrying three defects its first real run found immediately.
   Require at least one genuine execution before claiming an acceptance
@@ -204,17 +204,17 @@
   `project_doc_max_bytes` 32 KiB); Claude and Copilot scope by glob. One shared
   question made a working system look intermittently broken.
 - [LEARN:testing] Non-deterministic model output is a symptom to trace, not a
-  flake to retry. Here it pointed at a scoped surface the generator never
+  flake to retry — it pointed at a scoped surface the generator never
   produced for Codex.
 - [LEARN:testing] "Cannot be measured" is a finding, not a failure to deliver.
-  Record why a gate is unmet with reproducible evidence rather than leaving it
-  reporting a generic `unexercised` forever.
-- [LEARN:testing] Never write a parser for an event shape you have not
+  Record why a gate is unmet with reproducible evidence instead of a generic
+  `unexercised` forever.
+- [LEARN:testing] Never write a parser for an event shape you haven't
   captured. When the payload is unobserved, write less code and document the
   gap; guessing is how a probe ships broken.
 - [LEARN:config] A config key can be silently inert. Codex 0.147.0 exposes
   `collaboration.*` tools, so the MultiAgent V2 shim's
-  `tool_namespace = "agents"` has no observable effect. Config presence is not
+  `tool_namespace = "agents"` has no observable effect. Config presence isn't
   config effect - verify against the running client.
 - [LEARN:tooling] Least-privilege flags can preclude the behavior under test:
   Codex `--ephemeral` makes agent spawning structurally impossible
@@ -229,11 +229,11 @@
   correctly while its printed `install_bootstrap.py <consumer-repo>` fix can
   never target this repo (installer refuses overlapping source/target).
 - [LEARN:architecture] `codex exec` has no persistent thread and cannot spawn
-  agents at all; interactive CLI and the VS Code extension can. Interface
-  choice, not client capability, decided what the probe could observe.
-- [LEARN:documentation] Appending phases to a plan's frontmatter does not update
-  the plan. Narrative sections are what a reader actually reads; a checklist
-  entry explains nothing about why the plan grew or what it found.
+  agents; interactive CLI and the VS Code extension can. Interface choice,
+  not client capability, decided what the probe could observe.
+- [LEARN:documentation] Appending phases to a plan's frontmatter doesn't update
+  the plan. Narrative sections are what a reader reads; a checklist entry
+  explains nothing about why the plan grew or what it found.
 - [LEARN:documentation] A wrong mechanism claim propagates across files ("spawn
   metadata through the `agents` namespace" appeared in three). Single-home
   volatile status in one dated record and point at it from everywhere else.
@@ -255,12 +255,12 @@
   substitution, heredocs piped into an interpreter, and write targets built from
   shell variables. Use literal paths and plain commands, or run a script file.
 - [LEARN:architecture] A file living only in the generated `.claude/` overlay is
-  not content, it is pending deletion. Authored material belongs in `shared/`,
+  not content, it's pending deletion. Authored material belongs in `shared/`,
   where it regenerates; `check_runtime.py` naming a path "absent from generated
   target" is the signal to promote it, not to restore it again. Shared skills
   must declare `visibility: public|background`.
 - [LEARN:testing] Authoring-adapter preservation needs separate regressions for
-  installer refresh and state restoration. A passing copy/update test does not
+  installer refresh and state restoration. A passing copy/update test doesn't
   prove the real restore script honors tracked root ownership.
 - [LEARN:security] Native probes need explicit human authorization plus
   marker-owned writable HOME/XDG/client/tmp state around read-only generated
@@ -289,32 +289,32 @@
   cannot represent string-keyed pipeline wiring
   (`pipeline.add_component("result_joiner", ...)`), `import_module()` shims with
   `sys.modules[__name__]` rebinding, or identities built inside f-strings. Judge
-  such a tool against the idioms the target repositories actually use, not
-  against a generic call graph.
+  such a tool against the idioms the target repos actually use, not a generic
+  call graph.
 - [LEARN:quality] Score a candidate tool per question at its best reasonable
   effort, not at its default. Graphify returned zero edges on every
   mid-sized-repo question at the default `--budget 2000`; a 15x budget produced
   250+ edges. Applying escalation to one project but not another silently
-  biases the comparison, which is exactly what review caught here.
+  biases the comparison — review caught exactly this.
 - [LEARN:quality] A gate result is stronger when it states its own robustness.
-  Recording that the decision is unchanged even if the single borderline
-  question were scored the other way removes the incentive to argue that
-  question and keeps the conclusion falsifiable.
+  Recording that the decision holds even if the single borderline question
+  scored the other way removes the incentive to argue it and keeps the
+  conclusion falsifiable.
 - [LEARN:security] Prove a sandbox boundary with a positive control, not with
   an exit code. `--network none` plus a successful run only shows the tool never
   needed the network; a deliberate connect attempt failing with
   `OSError [Errno -3]`, and a deliberate `touch` refused with
   `Read-only file system`, are the actual evidence.
 - [LEARN:workflow] Never write a cleanup or completion claim before performing
-  the action. Ordering the write first creates false provenance even when the
-  action follows immediately, and this artifact had already been corrected once
-  for exactly that defect.
+  the action — writing it first creates false provenance even when the action
+  follows immediately; this file had already been corrected once for the same
+  defect.
 - [LEARN:tooling] The fail-closed Bash guard rejects multi-line shell with
-  `for`/`while`/`{ }`/heredocs by raising `AmbiguousCommand` (exit 2). That is
+  `for`/`while`/`{ }`/heredocs by raising `AmbiguousCommand` (exit 2). That's
   the classifier working as designed, not a broken hook. Put complex logic in a
   script file and invoke it as `bash script.sh`, which stays classifiable and
   keeps the guard active rather than routing around it.
-- [LEARN:shell] Bash `errexit` is not reliable inside a function invoked from a
+- [LEARN:shell] Bash `errexit` isn't reliable inside a function invoked from a
   status-tested context such as `if ! function_name`; explicitly guard each
   fallible command and return its failure so a later successful command cannot
   mask it.
@@ -339,7 +339,7 @@
   reconcile the final hardened contract before findings and closeout.
 - [LEARN:security] Action-time gates must revalidate mutable lifecycle evidence
   immediately before granting commit, push, closeout, or branch actions; an
-  earlier validator pass is not authorization for frontmatter or artifacts
+  earlier validator pass isn't authorization for frontmatter or artifacts
   that can change afterward.
 - [LEARN:security] When lifecycle state crosses multiple parsers, ambiguous
   duplicate gate keys must be rejected everywhere rather than resolved by
@@ -352,7 +352,7 @@
   transient fault into a permanent one. `git rebase --abort 2>/dev/null ||
   true` cannot clear a half-initialized rebase; `--quit` can because it clears
   state without moving `HEAD`.
-- [LEARN:recovery] `--autostash` is not free insurance. It can write the
+- [LEARN:recovery] `--autostash` isn't free insurance. It can write the
   autostash commit and rebase directory before discovering new dirty state, so
   a self-writing repository can manufacture the latch it meant to avoid.
 - [LEARN:observability] A warn-never-fail subsystem needs a health surface.
@@ -379,13 +379,13 @@
 - [LEARN:security] Bounding a security-relevant tracking map by evicting the
   oldest entry is fail-open: eviction untracks a still-pending request, so its
   later response bypasses the filter that entry existed to apply. Refuse new
-  entries at capacity instead. I introduced exactly this regression while
+  entries at capacity instead — this exact regression was introduced while
   fixing an unbounded-growth note, and review caught it.
 - [LEARN:security] Anti-forgery state must live outside every channel that can
-  restore it. A provenance marker made only of public constants and a
-  predictable path, stored inside the synced working tree, is forgeable by a
-  hostile remote; bind it to a locally generated secret kept outside that tree,
-  and ignore the secret's temp-file glob too, not just its final name.
+  restore it. A marker built only from public constants and a predictable
+  path in the synced working tree is forgeable by a hostile remote; bind it to
+  a locally generated secret kept outside that tree, and ignore the secret's
+  temp-file glob too, not just its final name.
 - [LEARN:tests] An assertion that cannot fail is worse than no assertion,
   because it advertises coverage. `process.stderr.read(0)` always returns `""`,
   so a "must not be logged" check passed unconditionally. Prove a new guard by
@@ -396,7 +396,7 @@
 - [LEARN:verification] Reconcile agent claims against the artifact, not the
   report. A subagent described this phase's own changed files as "pre-existing
   unrelated drift"; `check_runtime.py` disagreed, and it was a required gate.
-- [LEARN:security] `trap ... RETURN INT TERM` in one bash call is not uniformly
+- [LEARN:security] `trap ... RETURN INT TERM` in one bash call isn't uniformly
   scoped: `RETURN` is function-local but `INT`/`TERM` are process-wide, so a
   handler referencing a function `local` survives the frame and aborts under
   `set -u`. Reset signal traps on every exit path, including early returns.
@@ -405,14 +405,14 @@
   equality test in the same change and prove it fails when one copy drifts.
 - [LEARN:architecture] Duplication between shipped and authoring-only code is
   legitimate when the shipped copy must run without dependencies, but it needs
-  both a recorded rationale and a test pinning the shared rules; otherwise it is
+  both a recorded rationale and a test pinning the shared rules; otherwise it's
   indistinguishable from drift waiting to happen.
-- [LEARN:security] Enforcing a version pin on one transport does not pin the
+- [LEARN:security] Enforcing a version pin on one transport doesn't pin the
   dependency. A stdio `serverInfo.version` handshake made the Context Mode pin
   look complete while hook mode still executed whatever was on `PATH`. Enumerate
   every path that launches a pinned dependency, not just the one with the
   obvious handshake.
-- [LEARN:security] A tool-call argument allow-list does not close the public
+- [LEARN:security] A tool-call argument allow-list doesn't close the public
   capability boundary if `tools/list` still advertises forbidden arguments.
   Filter both invocation arguments and the advertised input schema from the
   same allow-list, then test both surfaces.
@@ -470,7 +470,7 @@
   completion, and push validation. Resetting the checkpoint away tests two
   isolated commits, not the promised lifecycle.
 - [LEARN:security] Matching content in an outer generated directory and its
-  backup mirror does not prove bootstrap ownership; both may contain copied
+  backup mirror doesn't prove bootstrap ownership; both may contain copied
   private data. Before destructive refresh, require current generated bytes or
   strictly validated ownership provenance, classify every tree that can be
   replaced, and prove refusal leaves the full consumer snapshot unchanged. See
@@ -493,7 +493,7 @@
 - [LEARN:verification] Match Mypy native config discovery precisely: skip shared
   config files that lack a Mypy section, continue in documented precedence,
   and fail closed only after selecting a malformed Mypy configuration. A
-  generic project config file is not automatically a Mypy config file.
+  generic project config file isn't automatically a Mypy config file.
 - [LEARN:security] Nested provenance must bind relevant Git index entries and
   dirty status independently of worktree bytes. Include active plan paths even
   when other mutable plan/evidence roots are excluded, or a staged change plus
@@ -554,7 +554,7 @@
   prose, never a statement the current change just falsified. Expect
   self-contradicting files when prose is fixed in one section and left in
   another.
-- [LEARN:workflow] When a delegated agent dies mid-task, file mtimes are not
+- [LEARN:workflow] When a delegated agent dies mid-task, file mtimes aren't
   evidence of progress; they may be from an earlier round of the same agent.
   Re-read content against the finding list before deciding what remains.
 - [LEARN:verification] Retiring a test because "a unit test covers it" requires
@@ -566,28 +566,28 @@
 - [LEARN:verification] A closeout receipt's `head_sha` is the PARENT of the
   commit it certifies, and its `tree_sha` is the staged tree that becomes that
   commit's tree, because receipts are generated before the completion commit.
-  Any check comparing the two against the same commit is wrong. For how to
-  resolve the certified commit, see the parentage-proof entry below — this
-  entry originally said "the first entry of `git rev-list --ancestry-path
-  --reverse`", which was later proved to accept an unproven commit on a
-  non-linear range. Do not use that.
+  Any check comparing the two against the same commit is wrong. To resolve
+  the certified commit, see the parentage-proof entry below — this entry
+  originally said "the first entry of `git rev-list --ancestry-path
+  --reverse`", later shown to accept an unproven commit on a non-linear range.
+  Don't use that.
 - [LEARN:verification] A changed-path set legitimately includes deletions, so
-  never hand it straight to a tool that must open each file. Filter at the tool
+  never hand it to a tool that must open each file. Filter at the tool
   boundary and leave recorded metadata unfiltered, since content and freshness
   hashes depend on deletions being represented.
 - [LEARN:workflow] A small plan's `name:` frontmatter must equal its file
-  basename; that is how phase resolution matches a plan. A short name can slip
+  basename; that's how phase resolution matches a plan. A short name can slip
   past the terminal check on a digest match and only fail later in the
   historical chain.
 - [LEARN:workflow] `update_consumers.py --allow-self` removes unmanaged files
   from `.claude/`. Stage scratch inputs such as a findings JSON outside that
   tree.
 - [LEARN:security] A path-based bypass allowlist must be derived from what the
-  build actually ships, never hand-listed. Two review rounds were spent on
-  enumerated subsets that each missed a live runtime surface: first the
-  non-script `shared/` subdirectories, then the root control-plane files
-  (`CLAUDE.md`, `AGENTS.md`). When a sibling function already encodes the same
-  policy sentence, reuse its pattern so the two classifiers cannot drift.
+  build actually ships, never hand-listed. Two review rounds missed a live
+  runtime surface via enumerated subsets: first the non-script `shared/`
+  subdirectories, then the root control-plane files (`CLAUDE.md`,
+  `AGENTS.md`). When a sibling function already encodes the same policy
+  sentence, reuse its pattern so the two classifiers cannot drift.
 - [LEARN:verification] Replacing a hollow gate can produce another hollow gate.
   The `MEMORY.md` mtime shortcut was swapped for a regex that accepted the
   shipped session-log template's own placeholder text, and fenced examples, as
@@ -603,14 +603,14 @@
   found by running the shell function or regex against real inputs; static
   review had passed the same code twice.
 - [LEARN:verification] A gate that picks one item from an ordered list is
-  asserting an invariant it has not checked. Selecting "the first entry of
+  asserting an invariant it hasn't checked. Selecting "the first entry of
   `git rev-list --ancestry-path --reverse`" silently accepted an unproven
-  commit whenever the range was not linear. Filter on the property that
-  actually matters — the candidate's parent set containing the expected
-  commit — and fail closed unless exactly one candidate holds it.
-- [LEARN:review] A dispositioned MINOR is not necessarily a shallow one.
+  commit whenever the range wasn't linear. Filter on the property that
+  matters — the candidate's parent set containing the expected commit — and
+  fail closed unless exactly one candidate holds it.
+- [LEARN:review] A dispositioned MINOR isn't necessarily a shallow one.
   Reopening three accepted MINORs surfaced a latent silent-accept in the
-  receipt chain. An accepted disposition records that a finding was not worth
+  receipt chain. An accepted disposition records that a finding wasn't worth
   fixing at the time, not that it was small.
 - [LEARN:workflow] Fixing a finding can create one. Improving the
   certified-commit selection made `docs/runtime-checks.md` describe a
@@ -625,35 +625,35 @@
 - [LEARN:workflow] To extend a big plan that already reached `complete`, append
   a phase, set status back to `in-progress`, point `current_phase` at it, and
   record in the plan why it grew. Branching fresh from `dev` is wrong when
-  `dev` does not yet have the earlier phases.
+  `dev` doesn't yet have the earlier phases.
 - [LEARN:workflow] Editing a big plan after its final phase closes invalidates
-  the closeout receipt's bound plan digest, and with no active phase there is
+  the closeout receipt's bound plan digest, and with no active phase there's
   nothing to regenerate the receipt against. Land plan-narrative corrections
   while a phase is still open, or they cannot be bound at all.
-- [LEARN:code] `Path.is_file()` is not a readability check — it reads the
-  file-type bit, so a `chmod 000` file passes. Where a later step will actually
-  open the file, and especially where that step swallows `OSError` and returns
-  an empty digest, the guard must attempt the same read or it certifies a
-  condition it never tested.
+- [LEARN:code] `Path.is_file()` isn't a readability check — it reads the
+  file-type bit, so a `chmod 000` file passes. Where a later step opens the
+  file — especially one that swallows `OSError` and returns an empty digest —
+  the guard must attempt the same read, or it certifies a condition it never
+  tested.
 - [LEARN:verification] A fix that removes an exception can leave the same
   exception reachable by another route. Enumerate every way the failing state
   can arise, not just the reported one; the inactive-phase guard initially
   missed non-implementation branches, detached HEAD, an unreadable plan file,
   and an unsafe explicit `--phase`.
 - [LEARN:testing] Gate a permission-dependent test on `os.geteuid() == 0` and
-  skip, or it passes vacuously under a root-run CI where `chmod 000` does not
+  skip, or it passes vacuously under a root-run CI where `chmod 000` doesn't
   deny reads.
 - [LEARN:code] When a guard duplicates a condition a downstream raise also
   checks, extract it into one pure function both call against the same
   unmutated input, so drift is structurally impossible rather than tested for.
 - [LEARN:verification] The documented canonical `mypy src/` and
-  `ruff check src/ tests/` commands do not run in this authoring repository —
-  there is no `src/`. `verify.py`'s real gate runs `mypy shared scripts tests`
+  `ruff check src/ tests/` commands don't run in this authoring repository —
+  there's no `src/`. `verify.py`'s real gate runs `mypy shared scripts tests`
   (25 files) when it detects a bootstrap authoring repository. Use the gate's
-  scope locally; `src/` is the consumer-template shape, not this repo's.
-  Root `CLAUDE.md` now documents the authoring scope; `uv sync` also does not
-  apply here because no `pyproject.toml` exists, and the devcontainer already
-  guards it with `[ -f pyproject.toml ]`.
+  scope locally; `src/` is the consumer-template shape, not this repo's. Root
+  `CLAUDE.md` documents the authoring scope; `uv sync` doesn't apply either —
+  no `pyproject.toml` exists, and the devcontainer already guards it with
+  `[ -f pyproject.toml ]`.
 - [LEARN:verification] `CHECK_IDS` is part of the receipt schema contract,
   because the gate validates its own history. Adding or removing a check ID
   invalidates every previously persisted receipt through `validate_receipt`'s
@@ -662,19 +662,18 @@
   intended.
 - [LEARN:testing] **The highest-yield test smell in this repository.** A
   fixture that derives both sides of a comparison from the current code can
-  never detect a contract that changed between them, so it passes while the
-  real artifact fails. This one blind spot hid three separate defects in a
-  single plan, each behind a fully green suite: the certified-commit tree rule
-  (fixture computed `tree_sha` with the same wrong formula as the code), the
-  `CHECK_IDS` break (every historical-chain fixture built its check set from
-  the live constant, so growing it invalidated real receipts invisibly), and
-  an invalid Ruff flag (consumer tests mocked `_run` and asserted which
-  arguments *would* be passed, never that the command runs). The fix has three
-  parts: pin a previously persisted shape as a literal independent of the
-  constant under test; exercise real binaries as well as argument shapes; and
-  validate against artifacts actually on disk, not only `tmp_path` fixtures.
-  When a check reads its own history, treat its identifier set as part of the
-  schema contract.
+  never detect a contract that changed between them — it passes while the
+  real artifact fails. This blind spot hid three defects in one plan behind a
+  fully green suite: the certified-commit tree rule (fixture computed
+  `tree_sha` with the same wrong formula as the code), the `CHECK_IDS` break
+  (every historical-chain fixture built its check set from the live constant,
+  so growing it invalidated real receipts invisibly), and an invalid Ruff flag
+  (tests mocked `_run` and asserted which arguments *would* be passed, never
+  that the command runs). Fix: pin a persisted shape as a literal independent
+  of the tested constant, exercise real binaries as well as argument shapes,
+  and validate against artifacts on disk, not only `tmp_path` fixtures. When a
+  check reads its own history, its identifier set is part of the schema
+  contract.
 - [LEARN:verification] A flag valid on one Ruff subcommand may be invalid on
   its sibling: `ruff check` accepts `--extend-exclude`, `ruff format` rejects
   it. Build a shared option once via the generic `--config "key=value"`
@@ -689,22 +688,22 @@
   edits to `verify.py` and `test_verify.py` went unformatted across five
   phases. Either gate a requirement or stop claiming it.
 - [LEARN:installer] Bootstrap-owned documentation seeded inside a preserved
-  consumer-state directory can never be updated again: the installer's tree
-  walk skips such a directory by name before looking inside. Separate
+  consumer-state directory can never be updated again — the installer's tree
+  walk skips it by name before looking inside. Separate
   ownership from location — `STATE_DIR_OWNED_README_PATHS` names the owned
   paths and the installer refreshes exactly those, leaving
   `CONSUMER_STATE_PATHS` untouched. Test by corrupting the file and confirming
   a refresh restores it while a sibling state file survives byte-for-byte.
-- [LEARN:review] Auditing a canonical source is not auditing what runs. The
+- [LEARN:review] Auditing a canonical source isn't auditing what runs. The
   `shared/` state READMEs were correct for months while the installed
   `.claude/` copies agents actually read still demanded a deleted score.
   Include the installed overlay in any documentation audit of this repository.
 - [LEARN:review] A plausible analogy to a real lesson is a good way to talk
   yourself out of the right fix. The `CHECK_IDS` lesson genuinely forbids
-  extending the receipt's check set, and it was cited to decline an evidence
-  gate living in a different, historically-isolated mechanism. Verify an
-  analogy applies before accepting it as a constraint; one grep for the caller
-  settled it.
+  extending the receipt's check set, but it was cited to decline an evidence
+  gate in a different, historically-isolated mechanism. Verify an analogy
+  applies before accepting it as a constraint; one grep for the caller settled
+  it.
 - [LEARN:verification] `closeout_log_errors` is the schema-free extension
   point for closeout-log evidence: one caller, and `historical_chain_errors`
   never invokes it, so a requirement added there cannot retroactively
