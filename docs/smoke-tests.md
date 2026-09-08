@@ -87,6 +87,29 @@ Expected:
 - Generated output contains `templates/plan-big.md`, `templates/plan-small.md`, and `templates/session-log.md`.
 - Generated output contains `.devcontainer/devcontainer.json`, `.devcontainer/Dockerfile`, `.devcontainer/post-start.sh`, `.devcontainer/state-sync.sh`, and `.devcontainer/restore-root-adapters.sh`.
 
+## Reporting reminders
+
+Expected:
+
+- The static `agent-reporting.instructions.md` policy is present for all four
+  supported targets.
+- Claude Code and OpenAI Codex add one prompt-start reminder and one selected
+  late-report reminder through `reporting-reminder.sh`; existing state-sync,
+  PostToolUse, and Context Mode handlers remain present.
+- The reminder text is exactly 183 bytes and no more than 200 bytes. Prompt mode
+  emits one parseable `UserPromptSubmit` context object. Late mode emits one
+  `PostToolUse` context object for a `verify.py closeout` command or a
+  `record_findings.py` invocation with `--out`; both match on command shape
+  only and do not inspect the command's outcome, so a failed run of either
+  can still produce one reminder. It also emits one for a phase-completion
+  commit command, which is confirmed against the plan state committed in
+  the nested `.claude` repository.
+- Ordinary commands, malformed payloads, and unsupported arguments do not block:
+  ordinary commands emit no output, while diagnostics go to stderr.
+- No periodic every-N-tool reminder, Stop rewriting, or PreCompact reminder is
+  generated. Copilot and Antigravity event sets are unchanged, and no Gemini
+  adapter is generated.
+
 ## MCP Routing
 
 Expected:

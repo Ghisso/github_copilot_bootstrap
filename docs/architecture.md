@@ -23,7 +23,10 @@ It selects audience-appropriate prose: clear, direct language for people and
 optional compact `caveman full` handoffs between agents. The documenter also
 performs a targeted `humanize edit` self-check on prose it changes. Generated
 agent prompts point to this policy instead of copying its rules, while exact paths,
-identifiers, commands, logs, and other evidence remain unchanged.
+identifiers, commands, logs, and other evidence remain unchanged. This static
+reporting guidance applies to all four supported targets. The generated
+`reporting-reminder.sh` adds recurring prompt-start and selected late-turn
+reminders only for Claude Code and OpenAI Codex.
 
 ### Policy applicability and native discovery
 
@@ -295,6 +298,25 @@ Lifecycle hook scripts keep that workflow stateful without mutating during valid
 - `record-commit-closeout.sh` runs after successful commits and advances the big-plan phase or marks the big plan complete only after the intercepted commit subject correlates with `HEAD`. `commit_subject_from_command` tokenizes the command (honoring quotes) to read `-m`/`--message`/`-F <file>`/`--file=<file>`; `-F -`/`--file=-` (message piped via stdin) has no subject the hook can read from the command string alone, so it leaves a clear `additionalContext` note naming the supported forms and pointing at manual phase advancement instead of silently skipping the phase advance with no explanation.
 - `enforce-pr-gate.sh` blocks PRs or pushes unless every phase is complete or fully evidenced as cancelled, at least one phase is complete, the base is `dev`, and bypass commits have been acknowledged. Commit counts include completed phases only, and findings bind to the last completed phase. Every earlier completed phase in the big plan's declared order is additionally validated by `verify.py`'s historical receipt-chain check (ancestor/tree/artifact-hash integrity against its certified completion commit); only the terminal completed phase gets current-tree/current-runtime freshness. It exempts nested `.claude/` pushes (`state-sync.sh push`) the same way and with the same per-invocation scoping as the commit gate above.
 - `session-start-state.sh` and `stop-session-log-check.sh` provide reminders for stale phase and session-log state.
+
+### Reporting reminders
+
+`reporting-reminder.sh` is a short, warn-never-fail context reminder. Prompt
+mode emits one `UserPromptSubmit` context object for Claude Code and OpenAI
+Codex. Late-report mode emits one `PostToolUse` context object after a
+`verify.py closeout` command or a `record_findings.py` invocation with
+`--out`; both match on command shape only and do not inspect the command's
+outcome, so a failed run of either can still produce one reminder. It also
+emits one after a phase-completion commit, which is confirmed against
+the plan state committed in the nested `.claude` repository. Its current
+reminder is 183 bytes and stays below
+the 200-byte ceiling. Ordinary commands produce no
+output; malformed input and internal errors warn on stderr, never block, and
+exit successfully.
+
+The reminder is deliberately not periodic and does not rewrite output at
+`Stop` or inject at `PreCompact`. GitHub Copilot and Google Antigravity keep
+their existing hook events, and Gemini CLI is not supported.
 
 ### Deterministic verification and provenance
 

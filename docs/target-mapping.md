@@ -30,6 +30,14 @@ installed consumer project:
 
 `run-hook.sh` is the executable dispatcher for target-native hook configs. Generated output marks it runnable because Claude and Codex call it directly.
 
+The canonical `reporting-reminder.sh` script is included in that shared hook
+inventory. Static reporting guidance is installed for GitHub Copilot, Claude
+Code, OpenAI Codex, and Google Antigravity. Recurring prompt-start and selected
+late-turn reminders are wired only in Claude Code and OpenAI Codex. They are
+non-blocking and warn-never-fail. No periodic every-N-tool, `Stop`, or
+`PreCompact` reminder is generated; Copilot and Antigravity hook events remain
+unchanged, and Gemini CLI has no adapter.
+
 Keep `.claude/` when pruning optional tool adapters, because it is the shared basis for all supported systems.
 
 Put consumer-specific facts in

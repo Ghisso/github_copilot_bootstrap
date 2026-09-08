@@ -23,11 +23,16 @@ from generate_targets import (  # noqa: E402
 )
 from validate_targets import (  # noqa: E402
     antigravity_hook_errors,
+    reporting_reminder_hook_errors,
+    reporting_reminder_script_errors,
     validate_claude_lifecycle_hooks,
 )
 
 CODEX_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "codex-stop.sh"
 CLAUDE_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "claude-stop.sh"
+REPORTING_REMINDER_SOURCE = (
+    REPO_ROOT / "shared" / "hooks" / "scripts" / "reporting-reminder.sh"
+)
 HOOK_SCRIPTS_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts"
 STOP_CHILD_FIXTURE = """#!/usr/bin/env bash
 set -euo pipefail
@@ -330,9 +335,27 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
 
     prompt = hooks["UserPromptSubmit"]
     assert len(prompt) == 1
-    assert len(prompt[0]["hooks"]) == 1
+    assert len(prompt[0]["hooks"]) == 2
     assert "state-sync.sh push" in prompt[0]["hooks"][0]["command"]
     assert prompt[0]["hooks"][0]["timeout"] == 60
+    assert (
+        "reporting-reminder.sh prompt openai-codex" in prompt[0]["hooks"][1]["command"]
+    )
+
+    posttool = hooks["PostToolUse"]
+    assert len(posttool) == 1
+    assert [
+        "record-branch-state.sh" in handler["command"]
+        or "record-commit-closeout.sh" in handler["command"]
+        or "context-mode-dispatch.sh" in handler["command"]
+        or "reporting-reminder.sh late-report openai-codex" in handler["command"]
+        for handler in posttool[0]["hooks"]
+    ] == [True, True, True, True]
+    assert reporting_reminder_hook_errors(hooks, "openai-codex") == []
+    prompt[0]["hooks"][1]["timeout"] = 99
+    assert reporting_reminder_hook_errors(hooks, "openai-codex") == [
+        "openai-codex UserPromptSubmit must exactly retain state sync and add one reminder"
+    ]
 
     session_end = hooks["SessionEnd"]
     assert len(session_end) == 1
@@ -390,9 +413,22 @@ def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
 
     prompt = hooks["UserPromptSubmit"]
     assert len(prompt) == 1
-    assert len(prompt[0]["hooks"]) == 1
+    assert len(prompt[0]["hooks"]) == 2
     assert "state-sync.sh push" in prompt[0]["hooks"][0]["command"]
     assert prompt[0]["hooks"][0]["timeout"] == 60
+    assert (
+        "reporting-reminder.sh prompt claude-code" in prompt[0]["hooks"][1]["command"]
+    )
+
+    posttool = hooks["PostToolUse"]
+    assert len(posttool) == 1
+    assert [
+        "record-branch-state.sh" in handler["command"]
+        or "record-commit-closeout.sh" in handler["command"]
+        or "context-mode-dispatch.sh" in handler["command"]
+        or "reporting-reminder.sh late-report claude-code" in handler["command"]
+        for handler in posttool[0]["hooks"]
+    ] == [True, True, True, True]
 
     stop_failure = hooks["StopFailure"]
     assert len(stop_failure) == 1
@@ -426,4 +462,328 @@ def test_claude_lifecycle_validation_rejects_non_command_prompt_handler(
     hooks["UserPromptSubmit"][0]["hooks"][0]["type"] = "prompt"
     validate_claude_lifecycle_hooks(hooks, errors)
 
-    assert errors == ["Claude UserPromptSubmit handler must be a command"]
+    assert errors == [
+        "claude-code UserPromptSubmit must exactly retain state sync and add one reminder"
+    ]
+
+
+def run_reporting_reminder(
+    mode: str, provider: str, payload: str, script: Path = REPORTING_REMINDER_SOURCE
+) -> subprocess.CompletedProcess[str]:
+    """Run the canonical reminder hook with controlled input."""
+    return subprocess.run(
+        ["bash", str(script), mode, provider],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=REPO_ROOT,
+    )
+
+
+def test_reporting_reminder_prompt_is_one_bounded_context_object() -> None:
+    """Prompt mode emits only its fixed UserPromptSubmit context object."""
+    result = run_reporting_reminder(
+        "prompt", "claude-code", '{"hook_event_name":"UserPromptSubmit"}'
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout.count("\n") == 1
+    output = json.loads(result.stdout)
+    context = output["hookSpecificOutput"]
+    assert context["hookEventName"] == "UserPromptSubmit"
+    assert context["additionalContext"] == (
+        "For user-facing updates, use direct language; explain internal labels and "
+        "uncommon abbreviations, and avoid idioms. State what options mean in "
+        "practice. Preserve exact technical text."
+    )
+    assert len(context["additionalContext"].encode()) <= 200
+    assert set(context) == {"hookEventName", "additionalContext"}
+    assert (
+        reporting_reminder_script_errors(
+            REPORTING_REMINDER_SOURCE.read_text(encoding="utf-8")
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "uv run python .claude/scripts/verify.py closeout --format json --persist",
+        "uv run python .claude/scripts/record_findings.py shared --out findings.json",
+    ),
+)
+def test_reporting_reminder_emits_once_at_selected_late_boundaries(
+    command: str,
+) -> None:
+    """Late mode only injects after one recognized closeout command."""
+    payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "tool_response": {},
+        }
+    )
+    result = run_reporting_reminder("late-report", "openai-codex", payload)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert result.stdout.count("\n") == 1
+    assert (
+        json.loads(result.stdout)["hookSpecificOutput"]["hookEventName"]
+        == "PostToolUse"
+    )
+
+
+def copy_reporting_reminder(root: Path, library_text: str | None = None) -> Path:
+    """Copy the reminder and helper into a disposable generated-hook root."""
+    hooks_dir = root / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True)
+    script = hooks_dir / "reporting-reminder.sh"
+    shutil.copy(REPORTING_REMINDER_SOURCE, script)
+    script.chmod(0o755)
+    library = hooks_dir / "_lib-frontmatter.sh"
+    if library_text is None:
+        shutil.copy(HOOK_SCRIPTS_SOURCE / "_lib-frontmatter.sh", library)
+    else:
+        library.write_text(library_text, encoding="utf-8")
+    library.chmod(0o755)
+    return script
+
+
+def reminder_payload(command: str) -> str:
+    """Return one representative completed Bash PostToolUse payload."""
+    return json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "tool_response": {},
+        }
+    )
+
+
+def run_git(args: list[str], cwd: Path) -> None:
+    """Run one git command with a hermetic identity, matching the shipped hook."""
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Lifecycle Test",
+            "-c",
+            "user.email=lifecycle@example.com",
+            *args,
+        ],
+        cwd=cwd,
+        check=True,
+    )
+
+
+def phase_completion_reminder_script(tmp_path: Path, status: str = "complete") -> Path:
+    """Create the minimum implementation-plan state for a completion commit.
+
+    Mirrors the shipped topology (docs/architecture.md): the outer repository
+    gitignores `.claude/`, and a separate nested Git repository rooted at
+    `.claude/` holds the committed plan files that `head_frontmatter_value`
+    reads from its own HEAD. A flat single repository tracking
+    `.claude/plans/*.md` directly (the previous shape of this fixture) hides
+    the defect it is meant to catch, because that shape never exists outside
+    tests.
+    """
+    script = copy_reporting_reminder(tmp_path)
+    run_git(["init", "-q"], tmp_path)
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    (tmp_path / "seed.txt").write_text("seed\n", encoding="utf-8")
+    run_git(["add", "seed.txt", ".gitignore"], tmp_path)
+    run_git(["commit", "-q", "-m", "seed"], tmp_path)
+    subprocess.run(
+        ["git", "checkout", "-q", "-b", "phase_implementation"],
+        cwd=tmp_path,
+        check=True,
+    )
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir()
+    (plans / "phase.md").write_text(
+        "---\nstatus: in-progress\ncurrent_phase: phase-one\n---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        f"---\nstatus: {status}\n---\n", encoding="utf-8"
+    )
+    nested = tmp_path / ".claude"
+    run_git(["init", "-q"], nested)
+    run_git(["add", "plans"], nested)
+    run_git(["commit", "-q", "-m", "phase state"], nested)
+    return script
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'git -C . commit -m "phase complete"',
+        'git --git-dir .git --work-tree . commit -m "phase complete"',
+    ),
+)
+def test_reporting_reminder_emits_after_a_phase_completion_commit(
+    tmp_path: Path, command: str
+) -> None:
+    """A completed current phase permits direct commits targeting this repository."""
+    script = phase_completion_reminder_script(tmp_path)
+    result = run_reporting_reminder(
+        "late-report",
+        "claude-code",
+        reminder_payload(command),
+        script,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        json.loads(result.stdout)["hookSpecificOutput"]["hookEventName"]
+        == "PostToolUse"
+    )
+
+
+def test_reporting_reminder_survives_post_closeout_phase_advance(
+    tmp_path: Path,
+) -> None:
+    """Late classification reads the commit, not mutable post-closeout state."""
+    script = phase_completion_reminder_script(tmp_path)
+    plan = tmp_path / ".claude" / "plans" / "phase.md"
+    plan.write_text("---\nstatus: complete\ncurrent_phase: \n---\n", encoding="utf-8")
+    result = run_reporting_reminder(
+        "late-report",
+        "claude-code",
+        reminder_payload('git commit -m "phase complete"'),
+        script,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        json.loads(result.stdout)["hookSpecificOutput"]["hookEventName"]
+        == "PostToolUse"
+    )
+
+
+def test_reporting_reminder_excludes_uncommitted_status_advance(
+    tmp_path: Path,
+) -> None:
+    """An uncommitted working-tree edit cannot manufacture a false reminder."""
+    script = phase_completion_reminder_script(tmp_path, status="in-progress")
+    plan = tmp_path / ".claude" / "plans" / "phase-one.md"
+    plan.write_text("---\nstatus: complete\n---\n", encoding="utf-8")
+    result = run_reporting_reminder(
+        "late-report",
+        "claude-code",
+        reminder_payload('git commit -m "phase complete"'),
+        script,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_reporting_reminder_rejects_external_git_repositories(tmp_path: Path) -> None:
+    """Global Git repository options must resolve back to the hook repository."""
+    script = phase_completion_reminder_script(tmp_path)
+    external = tmp_path.parent / "external-repository"
+    external.mkdir()
+    run_git(["init", "-q"], external)
+    (external / "seed.txt").write_text("seed\n", encoding="utf-8")
+    run_git(["add", "seed.txt"], external)
+    run_git(["commit", "-q", "-m", "seed"], external)
+
+    for command in (
+        f'git -C "{external}" commit -m "phase complete"',
+        f'git --git-dir "{external / ".git"}" --work-tree "{external}" commit -m "phase complete"',
+    ):
+        result = run_reporting_reminder(
+            "late-report", "openai-codex", reminder_payload(command), script
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "uv run python .claude/scripts/verify.py phase --format json --persist",
+        "git status",
+        "printf 'uv run python .claude/scripts/verify.py closeout'",
+        "uv run python .claude/scripts/verify.py closeout || true",
+        "uv run python .claude/scripts/record_findings.py shared ; printf -- --out",
+    ),
+)
+def test_reporting_reminder_ignores_non_boundary_bash_commands(command: str) -> None:
+    """Normal Bash commands leave standard output empty."""
+    payload = json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": command},
+            "tool_response": {},
+        }
+    )
+    result = run_reporting_reminder("late-report", "claude-code", payload)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize(
+    ("command", "status"),
+    (
+        ('git -C .claude commit -m "phase complete"', "complete"),
+        ('git commit -m "fixup! phase complete"', "complete"),
+        ('git commit -m "checkpoint work"', "paused"),
+        ('git commit -m "ordinary work"', "in-progress"),
+    ),
+)
+def test_reporting_reminder_excludes_non_phase_commits(
+    tmp_path: Path, command: str, status: str
+) -> None:
+    """Nested, bypass, paused, and ordinary commits do not inject a reminder."""
+    script = phase_completion_reminder_script(tmp_path, status)
+    result = run_reporting_reminder(
+        "late-report", "openai-codex", reminder_payload(command), script
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_reporting_reminder_fails_open_when_a_helper_fails(tmp_path: Path) -> None:
+    """An unexpected helper failure emits no partial decision."""
+    script = copy_reporting_reminder(
+        tmp_path,
+        'repo_root_from_script() { cd "$SCRIPT_DIR/../../.." && pwd; }\n'
+        "payload_parseable() { return 0; }\n"
+        "additional_context() { return 1; }\n",
+    )
+    result = run_reporting_reminder("prompt", "claude-code", "{}", script)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "WARN reporting-reminder: internal error; skipping reminder" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("mode", "provider", "payload"),
+    (
+        ("late-report", "claude-code", "not json"),
+        ("invalid", "claude-code", "{}"),
+        ("prompt", "unsupported", "{}"),
+    ),
+)
+def test_reporting_reminder_warns_and_never_blocks_invalid_inputs(
+    mode: str, provider: str, payload: str
+) -> None:
+    """Malformed input and unsupported arguments fail open without JSON output."""
+    result = run_reporting_reminder(mode, provider, payload)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert "WARN reporting-reminder:" in result.stderr
