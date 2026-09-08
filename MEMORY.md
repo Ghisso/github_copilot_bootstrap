@@ -716,3 +716,27 @@
 - [LEARN:workflow] A gate a phase adds must be satisfied by that phase's own
   closeout. Write the required section as you write the requirement, or the
   phase blocks its own commit.
+- [LEARN:testing] A hook that needs committed AI state must read the nested
+  `.claude` repository (`git -C "$ROOT/.claude" show "HEAD:plans/<plan>.md"`),
+  not the outer repository. The outer repository gitignores `.claude/`, so
+  `git -C "$ROOT" show "HEAD:.claude/plans/<plan>.md"` always fails and quietly
+  turns a fail-closed boundary into dead code. A fixture that tracks
+  `.claude/plans/*.md` in one flat repository hides this completely, so a
+  fixture for such a hook must nest a real second repository inside `.claude/`
+  behind an outer `.gitignore`.
+- [LEARN:testing] Review shell hooks by executing them, not by reading them. A
+  reading-only review pass judged a dead-code git read "correct"; running the
+  real script against a fixture exposed it immediately.
+- [LEARN:architecture] Do not add outcome gating to an advisory hook when the
+  runtime payload has no verified tool-outcome field. Either classify from
+  command shape and document that honestly, or correlate against real committed
+  state where the boundary allows it. Inventing a success field to satisfy a
+  documentation sentence is worse than correcting the sentence.
+- [LEARN:workflow] A PAUSED session log's remaining-work list can be stale: the
+  interrupted agent may have already finished it. On resume, verify the working
+  tree and the suite before re-delegating that work.
+- [LEARN:testing] The repository's own branch guard and commit gate intercept
+  `git checkout -b <slug>_implementation` and `git commit` issued through Bash
+  even when they target a throwaway fixture directory, because they validate the
+  real repository's plan state. Prove hook behavior in pytest, which runs git
+  inside the test process, instead of ad-hoc shell fixtures.

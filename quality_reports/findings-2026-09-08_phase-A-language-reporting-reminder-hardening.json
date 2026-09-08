@@ -1,0 +1,39 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-08T16:04:37Z",
+  "branch": "language-reporting-reminder-hardening_implementation",
+  "head_sha": "a803d3dff9f0c4020c6c33574728dab284d290ba",
+  "base_ref": "dev",
+  "merge_base_sha": "a803d3dff9f0c4020c6c33574728dab284d290ba",
+  "phase": "2026-09-08_phase-A-language-reporting-reminder-hardening",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "faeabe4db8b6b479ca12a091899d96ac0bb31edc",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/reporting-reminder.sh",
+    "shared/policies/agent-reporting.instructions.md",
+    "tests/test_lifecycle_hooks.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
