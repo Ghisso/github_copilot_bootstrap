@@ -3,8 +3,8 @@ name: 2026-09-09_phase-A-claude-todo-tool-contract
 type: small-plan
 parent_plan: claude-todo-tool-contract
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-09_claude-todo-tool-contract.md
 ---
 
 # Small Plan: 2026-09-09_phase-A-claude-todo-tool-contract

@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-08T23:52:42Z",
+  "branch": "claude-todo-tool-contract_implementation",
+  "head_sha": "e239d853d41e6644506da225c0993909b0f0c40e",
+  "base_ref": "dev",
+  "merge_base_sha": "e239d853d41e6644506da225c0993909b0f0c40e",
+  "phase": "2026-09-09_phase-A-claude-todo-tool-contract",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "293179702c150575b47c621de5462365bee20a78",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/policies/workflow.instructions.md",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

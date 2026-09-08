@@ -740,3 +740,31 @@
   even when they target a throwaway fixture directory, because they validate the
   real repository's plan state. Prove hook behavior in pytest, which runs git
   inside the test process, instead of ad-hoc shell fixtures.
+- [LEARN:runtime] A Claude Code tool name that the generator emits is not
+  necessarily a tool the runtime provides, and the failure modes differ. A
+  removed name (`MultiEdit`) is silently dropped from an agent's `tools:` with
+  no error, because Claude Code normalizes each entry through a legacy alias
+  table (`Task`->`Agent`, `KillShell`->`TaskStop`) that a removed name is
+  simply absent from. A disabled name (`TodoWrite`) stays in the registry and
+  fails only when called. Verify emitted names against the documented tool
+  table (code.claude.com/docs/en/tools-reference), not against whether the
+  agent appears to work.
+- [LEARN:runtime] Claude Code task tracking is conditional, not a fixed tool
+  list. `TodoWrite` and the four task tools are mutually exclusive and selected
+  by `CLAUDE_CODE_ENABLE_TASKS` (default: task tools, so `TodoWrite` is off);
+  v2.1.233+ omits all five on Opus 4.8/Sonnet 5/Fable 5/Mythos 5 and later
+  unless `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`; and background subagents lose the
+  four task tools regardless of `tools:`. Generated subagents therefore cannot
+  rely on any written task tracker and must track phases as prose.
+- [LEARN:quality] A generated-output allowlist must be sourced independently of
+  the generator's own map. Deriving `CLAUDE_ALLOWED_NATIVE_TOOLS` from
+  `CLAUDE_TOOL_MAP` would accept whatever that map contains, which is precisely
+  where the bad entries lived, making the check tautological.
+  `ANTIGRAVITY_ALLOWED_TOOLS` is still derived this way and is a candidate for
+  the same treatment.
+- [LEARN:testing] A guard nested inside an unrelated condition can pass its own
+  adversarial test when the fixture happens to satisfy that condition. The
+  native-tool check sat inside `if "tool-routing.instructions.md" in text:` and
+  its injection test used a file containing that string, so the fail-open path
+  was untestable until the guard was hoisted. Test a guard with its gating
+  condition removed.
