@@ -1,13 +1,13 @@
 ---
 name: language-reporting-reminder-hardening
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: language-reporting-reminder-hardening_implementation
 started_at: 2026-09-08T13:54:23Z
 phases:
   - 2026-09-08_phase-A-language-reporting-reminder-hardening
-current_phase: 2026-09-08_phase-A-language-reporting-reminder-hardening
+current_phase: 
 ---
 
 # Big Plan: language-reporting-reminder-hardening
