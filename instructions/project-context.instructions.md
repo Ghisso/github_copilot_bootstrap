@@ -1,5 +1,5 @@
 ---
-description: "Always-on: what this bootstrap repository is, how it is generated, and which guidance applies."
+description: "Always-on: what this specific repo is and how it's built. Not part of the generated shared/ bootstrap — safe to hand-edit."
 ---
 
 # Project Context
@@ -37,8 +37,8 @@ this repository's bootstrap scripts, shell hooks, or generated adapters.
 - `scripts/update_consumers.py`: regenerates and updates consumer repositories.
 - `scripts/validate_targets.py`: structural and behavioral target validator.
 - `scripts/check_runtime.py`: runtime-file and optional-helper checker.
-- `scripts/check_native_clients.py`: validates native-adapter parity (Claude
-  `.claude/rules/*`, Codex `AGENTS.md`, Copilot secondary-coverage checks).
+- `scripts/check_native_clients.py`: runs optional native-client probes and
+  records evidence for Claude Code, Codex, Copilot, and Google Antigravity.
 - `plans/`: ADRs, implementation plans, closeouts, and architecture reviews.
 - `dist/multi-agent/`: generated and gitignored; never hand-edit it.
 
@@ -49,7 +49,8 @@ shared/ source files
     -> generate_targets.py
 dist/multi-agent/ generated bundle
     -> install_bootstrap.py
-consumer repo: native adapters + .claude shared basis
+consumer repo: Copilot + Claude Code + Codex + Antigravity adapters
+    + .claude shared basis
     -> hooks and state-sync.sh
 consumer workflow: plan -> implement -> verify -> review -> score -> document
     -> learn/session log -> gated commit or PR
@@ -57,8 +58,9 @@ consumer workflow: plan -> implement -> verify -> review -> score -> document
 
 ## Design decisions
 
-- One shared basis produces thin Copilot, Claude Code, and Codex adapters so
-  workflow semantics stay aligned while each target keeps native wiring.
+- One shared basis produces thin Copilot, Claude Code, Codex, and Google
+  Antigravity adapters so workflow semantics stay aligned while each target
+  keeps native wiring.
 - Ponytail is vendored as portable skills so coding/review behavior does not
   depend on a per-user plugin or network availability.
 - Guardrails are shared shell scripts, while commit/push invariants also run as
@@ -71,11 +73,17 @@ consumer workflow: plan -> implement -> verify -> review -> score -> document
 
 ## Current status and verification
 
-The repository is on `dev`. Ponytail integration and per-agent model/effort
-tiering are present in the recent history; the generated target currently
-passes `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
-scripts/validate_targets.py` with `PASS generated target is structurally
+The repository was checked on `dev` on 2026-09-08. A fresh generation followed
+by `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
+scripts/validate_targets.py` passed with `PASS generated target is structurally
 valid`.
+
+`scripts/check_runtime.py` did not pass in that check. The installed
+`.claude/instructions/workspace.md` and `workspace.instructions.md` differ from
+the freshly generated bundle, and `.claude/scripts/__pycache__/` contains a
+runtime file absent from the bundle. Before merge, regenerate and reinstall
+locally with `install_bootstrap.py . --allow-self --local-only`, then rerun the
+runtime check. Do not delete or overwrite consumer-owned state by hand.
 
 Before merging bootstrap changes, run:
 

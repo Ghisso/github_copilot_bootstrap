@@ -12,9 +12,10 @@
   mutations, then run adversarial refutation; happy-path glob tests alone do
   not establish a fail-closed operation classifier.
 
-- [LEARN:domain] This repository is a source-of-truth multi-target agent
-  bootstrap, not a Hydra/BentoML/Haystack/Gradio application. Generated output
-  is `dist/multi-agent/`; durable project findings are in
+- [LEARN:domain] This repository generates one bootstrap for Copilot, Claude
+  Code, Codex, and Google Antigravity; it is not a
+  Hydra/BentoML/Haystack/Gradio application. Generated output is
+  `dist/multi-agent/`; durable project findings are in
   `.claude/instructions/project-context.instructions.md`.
 
 ## Workflow

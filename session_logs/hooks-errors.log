@@ -2753,3 +2753,4 @@ fatal: Cannot rebase onto multiple branches.
 2026-09-03T13:54:39.000Z state-sync: push failed; continuing.
 2026-09-03T13:54:39.000Z state-sync: publish skipped: local ai-state worktree is dirty; run checkpoint before publishing.
 2026-09-03T13:54:39.000Z state-sync: push failed; continuing.
+2026-09-08T07:58:17Z WARN stop-session-log-check: worktree changed but no session log was updated today
