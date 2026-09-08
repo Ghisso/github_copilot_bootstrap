@@ -84,6 +84,11 @@
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh claude-code posttooluse",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report claude-code",
+            "timeout": 10
           }
         ]
       }
@@ -117,6 +122,11 @@
             "type": "command",
             "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh prompt claude-code",
+            "timeout": 10
           }
         ]
       }

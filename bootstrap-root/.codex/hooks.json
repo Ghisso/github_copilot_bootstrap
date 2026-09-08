@@ -77,6 +77,11 @@
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex posttooluse",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report openai-codex",
+            "timeout": 10
           }
         ]
       }
@@ -110,6 +115,11 @@
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" state-sync.sh push",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh prompt openai-codex",
+            "timeout": 10
           }
         ]
       }

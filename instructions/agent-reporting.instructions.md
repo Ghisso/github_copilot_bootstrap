@@ -41,6 +41,20 @@ Do not make a general rewrite stage mandatory. The documenter has a narrow
 mandatory `humanize` `edit` self-check for prose it creates or changes. It does
 not replace authorial judgment, and exact-content protection always wins.
 
+## Violations to recognize
+
+Correct these common reporting failures before sending a human-facing message:
+
+- Do not use a bare label such as `P1`, `G2`, or `Phase Q`. State what the
+  label represents, for example: `P1, the first implementation priority`.
+- Expand an uncommon abbreviation such as `YAGNI` ("you aren't going to need
+  it") on first use, or omit it when it does not improve precision.
+- Replace idioms such as "say the word" or "arena" with direct wording that
+  states the requested action or subject.
+- When offering options, state each option's practical result or tradeoff. For
+  example, say whether an option changes scope, time, risk, or a user-visible
+  result.
+
 ## Agent-to-agent status and handoffs
 
 For compact internal status messages and handoffs, `caveman full` may be the
