@@ -76,7 +76,13 @@ is_findings_persistence() {
 
 head_frontmatter_value() {
   local plan="$1" key="$2"
-  git -C "$REPO_ROOT" show "HEAD:.claude/plans/$plan.md" 2>/dev/null | awk -v key="$key" '
+  # Plans live in the nested .claude/ repository, not the outer repository:
+  # the outer .gitignore excludes .claude/ (docs/architecture.md), so
+  # "HEAD:.claude/plans/$plan.md" against $REPO_ROOT never exists there. Read
+  # committed state the same way scripts/validate_targets.py already does
+  # (git -C <repo>/.claude show HEAD:<path-relative-to-.claude>) so a
+  # concurrent working-tree rewrite of the plan cannot change the result.
+  git -C "$REPO_ROOT/.claude" show "HEAD:plans/$plan.md" 2>/dev/null | awk -v key="$key" '
     NR == 1 && $0 == "---" { in_frontmatter = 1; next }
     in_frontmatter && $0 == "---" {
       if (count == 1) print value
