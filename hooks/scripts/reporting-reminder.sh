@@ -74,11 +74,55 @@ is_findings_persistence() {
     && [[ " ${_TOKENS[*]} " == *" --out "* ]]
 }
 
+head_frontmatter_value() {
+  local plan="$1" key="$2"
+  git -C "$REPO_ROOT" show "HEAD:.claude/plans/$plan.md" 2>/dev/null | awk -v key="$key" '
+    NR == 1 && $0 == "---" { in_frontmatter = 1; next }
+    in_frontmatter && $0 == "---" {
+      if (count == 1) print value
+      exit
+    }
+    in_frontmatter && $0 ~ "^" key "[[:space:]]*:" {
+      line = $0
+      sub("^[^:]*:[[:space:]]*", "", line)
+      gsub(/^['\''"]|['\''"]$/, "", line)
+      value = line
+      count++
+    }
+  '
+}
+
+git_command_targets_repo_root() {
+  local index=1 token effective
+  local -a options=(-C "$REPO_ROOT")
+  _shell_tokenize "$COMMAND"
+  [[ "${_TOKENS[0]:-}" == "git" ]] || return 1
+  while (( index < ${#_TOKENS[@]} )); do
+    token="${_TOKENS[$index]}"
+    case "$token" in
+      -C|--git-dir|--work-tree)
+        (( index + 1 < ${#_TOKENS[@]} )) || return 1
+        options+=("$token" "${_TOKENS[$((index + 1))]}")
+        index=$((index + 2))
+        ;;
+      --git-dir=*|--work-tree=*)
+        options+=("$token")
+        index=$((index + 1))
+        ;;
+      -*) return 1 ;;
+      *) [[ "$token" == "commit" ]] || return 1; break ;;
+    esac
+  done
+  effective="$(git "${options[@]}" rev-parse --show-toplevel 2>/dev/null || true)"
+  [[ -n "$effective" && "$(cd "$effective" && pwd -P)" == "$REPO_ROOT" ]]
+}
+
 is_phase_completion_commit() {
   local subject branch slug big_plan current_phase current_plan status
   command_starts_with "$COMMAND" git || return 1
   is_git_commit_command "$COMMAND" || return 1
   git_targets_nested_claude "$COMMAND" commit && return 1
+  git_command_targets_repo_root || return 1
   subject="$(commit_subject_from_command "$COMMAND")"
   [[ -n "$subject" ]] || return 1
   is_bypass_subject "$subject" && return 1
@@ -87,11 +131,9 @@ is_phase_completion_commit() {
   slug="${branch%_implementation}"
   big_plan="$REPO_ROOT/.claude/plans/$slug.md"
   [[ -f "$big_plan" ]] || return 1
-  current_phase="$(fm_read "$big_plan" "current_phase" || true)"
-  [[ -n "$current_phase" ]] || return 1
-  current_plan="$REPO_ROOT/.claude/plans/$current_phase.md"
-  [[ -f "$current_plan" ]] || return 1
-  status="$(fm_read_unique_status "$current_plan" || true)"
+  current_phase="$(head_frontmatter_value "$slug" "current_phase")"
+  is_plan_slug "$current_phase" || return 1
+  status="$(head_frontmatter_value "$current_phase" "status")"
   [[ "$status" == "complete" ]]
 }
 
