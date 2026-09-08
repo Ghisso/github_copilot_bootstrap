@@ -1057,6 +1057,7 @@ def render_claude_settings(path: Path) -> None:
                         cmd("record-branch-state.sh", "claude-code"),
                         cmd("record-commit-closeout.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "posttooluse"),
+                        cmd("reporting-reminder.sh", "late-report", "claude-code"),
                     ],
                 }
             ],
@@ -1074,7 +1075,14 @@ def render_claude_settings(path: Path) -> None:
                     ]
                 }
             ],
-            "UserPromptSubmit": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
+            "UserPromptSubmit": [
+                {
+                    "hooks": [
+                        cmd("state-sync.sh", "push", timeout=60),
+                        cmd("reporting-reminder.sh", "prompt", "claude-code"),
+                    ]
+                }
+            ],
             "StopFailure": [{"hooks": [cmd("state-sync.sh", "checkpoint")]}],
             "SessionEnd": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
         },
@@ -1138,6 +1146,7 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("record-branch-state.sh", "openai-codex"),
                         cmd("record-commit-closeout.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
+                        cmd("reporting-reminder.sh", "late-report", "openai-codex"),
                     ],
                 }
             ],
@@ -1155,7 +1164,14 @@ def render_codex_hooks(path: Path) -> None:
                     ]
                 }
             ],
-            "UserPromptSubmit": [{"hooks": [cmd("state-sync.sh", "push", timeout=60)]}],
+            "UserPromptSubmit": [
+                {
+                    "hooks": [
+                        cmd("state-sync.sh", "push", timeout=60),
+                        cmd("reporting-reminder.sh", "prompt", "openai-codex"),
+                    ]
+                }
+            ],
             "SessionEnd": [{"hooks": [cmd("state-sync.sh", "checkpoint", timeout=3)]}],
         },
     }

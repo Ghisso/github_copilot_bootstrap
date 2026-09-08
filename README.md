@@ -770,6 +770,7 @@ Configured events:
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
   - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; a normal `complete` commit advances the phase, while a valid `paused` checkpoint records durable incomplete work and leaves the same `current_phase` and big plan `in-progress`; it completes the big plan after the final phase and logs allowed bypass commits
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
+  - [reporting-reminder.sh](shared/hooks/scripts/reporting-reminder.sh) emits a 183-byte, non-blocking reporting reminder at prompt start and selected late-turn boundaries for Claude Code and OpenAI Codex only; the static reporting policy still applies to all four supported targets
 - SessionStart / Stop
   - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
 - SessionStart

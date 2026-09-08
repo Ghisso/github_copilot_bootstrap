@@ -172,8 +172,23 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 - `record-commit-closeout.sh`
 - `enforce-pr-gate.sh`
 - `stop-session-log-check.sh`
+- `reporting-reminder.sh`
 
 The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
+
+The static reporting policy applies to all four supported targets. The
+`reporting-reminder.sh` runtime reminder is narrower: prompt-start and selected
+late-turn reminders are wired only for Claude Code and OpenAI Codex. It is
+warn-never-fail and non-blocking. The 183-byte reminder must remain under the
+200-byte ceiling; it emits no output for ordinary commands and writes
+diagnostics only to stderr. The `verify.py closeout` and findings-persistence
+late reminders match on command shape only and do not inspect the command's
+outcome, so a failed run of either command can still produce one reminder;
+the phase-completion commit reminder is confirmed against the plan state
+committed in the nested `.claude` repository. There are no periodic
+every-N-tool reminders, `Stop` rewriting, or
+`PreCompact` reminders. Copilot and Antigravity hook events are unchanged, and
+Gemini CLI is out of scope.
 
 For the primary targets, generated `PreToolUse` routing must remain split into
 three groups: native file mutations (`Edit|MultiEdit|Write` for Claude,

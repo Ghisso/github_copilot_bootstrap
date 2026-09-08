@@ -194,6 +194,7 @@ REQUIRED_HOOK_SCRIPTS = (
     "stop-session-log-check.sh",
     "claude-stop.sh",
     "codex-stop.sh",
+    "reporting-reminder.sh",
 )
 # Approved Context Mode capability contract (Phase F). The allowlist is exact
 # and closed; a new upstream tool needs a later approved plan before it can
@@ -208,6 +209,12 @@ CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_upgrade",
     "ctx_purge",
     "ctx_insight",
+)
+REPORTING_REMINDER_MAX_BYTES = 200
+REPORTING_REMINDER_TEXT = (
+    "For user-facing updates, use direct language; explain internal labels and "
+    "uncommon abbreviations, and avoid idioms. State what options mean in "
+    "practice. Preserve exact technical text."
 )
 REQUIRED_HOOK_LIBRARIES = ("_lib-frontmatter.sh",)
 REQUIRED_GIT_HOOKS = (
@@ -319,6 +326,11 @@ REPORTING_POLICY_REQUIRED_FRAGMENTS = (
     "mandatory `humanize` `edit` self-check",
     "Before sending a human-facing response, perform a send-time self-check",
     "not as a separate rewrite lifecycle",
+    "## Violations to recognize",
+    "Do not use a bare label such as `P1`, `G2`, or `Phase Q`",
+    "Expand an uncommon abbreviation such as `YAGNI`",
+    'Replace idioms such as "say the word" or "arena"',
+    "state each option's practical result or tradeoff",
     "## Agent-to-agent status and handoffs",
     "`caveman full` may be the default",
     "not the default for user communication",
@@ -1181,12 +1193,74 @@ CLAUDE_EXPECTED_EVENTS = {
     "StopFailure",
     "SessionEnd",
 }
+COPILOT_EXPECTED_EVENTS = {
+    "SessionStart",
+    "PreToolUse",
+    "PostToolUse",
+    "PreCompact",
+    "Stop",
+}
 CLAUDE_LIFECYCLE_HOOKS = {
     "Stop": ("claude-stop.sh", (), 180),
-    "UserPromptSubmit": ("state-sync.sh", ("push",), 60),
     "StopFailure": ("state-sync.sh", ("checkpoint",), 10),
     "SessionEnd": ("state-sync.sh", ("push",), 60),
 }
+
+
+def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
+    """Return lifecycle wiring errors for the bounded reporting reminder."""
+    errors: list[str] = []
+    if not isinstance(hooks, dict):
+        return [f"{target} hooks must be an object"]
+
+    command = claude_hook_command if target == "claude-code" else codex_hook_command
+
+    def handler(script: str, *args: str, timeout: int = 10) -> dict[str, object]:
+        return {
+            "type": "command",
+            "command": command(script, *args),
+            "timeout": timeout,
+        }
+
+    prompt_groups = hooks.get("UserPromptSubmit")
+    expected_prompt = {
+        "hooks": [
+            handler("state-sync.sh", "push", timeout=60),
+            handler("reporting-reminder.sh", "prompt", target),
+        ]
+    }
+    if prompt_groups != [expected_prompt]:
+        errors.append(
+            f"{target} UserPromptSubmit must exactly retain state sync and add one reminder"
+        )
+
+    post_groups = hooks.get("PostToolUse")
+    expected_post = {
+        "matcher": "Bash",
+        "hooks": [
+            handler("record-branch-state.sh", target),
+            handler("record-commit-closeout.sh", target),
+            handler("context-mode-dispatch.sh", target, "posttooluse"),
+            handler("reporting-reminder.sh", "late-report", target),
+        ],
+    }
+    if post_groups != [expected_post]:
+        errors.append(
+            f"{target} Bash PostToolUse must exactly retain handlers and append one late reminder"
+        )
+    return errors
+
+
+def reporting_reminder_script_errors(text: str) -> list[str]:
+    """Return errors when the generated reminder script drifts from its contract."""
+    errors: list[str] = []
+    if f'REMINDER="{REPORTING_REMINDER_TEXT}"' not in text:
+        errors.append("reporting reminder must use the canonical bounded text")
+    if len(REPORTING_REMINDER_TEXT.encode()) > REPORTING_REMINDER_MAX_BYTES:
+        errors.append("reporting reminder exceeds its byte ceiling")
+    if REPORTING_REMINDER_TEXT.count(".") > 3:
+        errors.append("reporting reminder must use no more than three sentences")
+    return errors
 
 
 def pretool_routing_errors(hooks: object, target: str) -> list[str]:
@@ -1282,6 +1356,7 @@ def validate_claude_lifecycle_hooks(hooks: object, errors: list[str]) -> None:
     check(isinstance(hooks, dict), "Claude settings hooks must be an object", errors)
     if not isinstance(hooks, dict):
         return
+    errors.extend(reporting_reminder_hook_errors(hooks, "claude-code"))
     check(
         set(hooks) == CLAUDE_EXPECTED_EVENTS,
         "Claude hooks must use only the supported generated lifecycle events",
@@ -2617,6 +2692,13 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     context_dispatcher = read(
         REPO_ROOT / "shared" / "hooks" / "scripts" / "context-mode-dispatch.sh"
     )
+    errors.extend(
+        reporting_reminder_script_errors(
+            read(
+                TARGET_ROOT / ".claude" / "hooks" / "scripts" / "reporting-reminder.sh"
+            )
+        )
+    )
     check(
         'openai-codex) CONTEXT_MODE_TARGET="codex"' in context_dispatcher,
         "Context Mode dispatcher must map OpenAI Codex hooks to upstream target id 'codex'",
@@ -2650,6 +2732,17 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         errors,
     )
     errors.extend(antigravity_hook_errors(antigravity_hooks))
+    check(
+        not (TARGET_ROOT / "GEMINI.md").exists()
+        and not (TARGET_ROOT / ".gemini").exists(),
+        "generated target must not add Gemini CLI files",
+        errors,
+    )
+    check(
+        "def render_gemini" not in read(REPO_ROOT / "scripts" / "generate_targets.py"),
+        "generator must not add a Gemini renderer",
+        errors,
+    )
 
     codex_config = read(TARGET_ROOT / ".codex" / "config.toml")
     codex_config_data: dict[str, object] = {}
@@ -2760,6 +2853,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             "Codex hooks must use only the supported generated lifecycle events",
             errors,
         )
+        errors.extend(reporting_reminder_hook_errors(hooks_by_event, "openai-codex"))
     # R-CODEX-01: PreCompact is a documented Codex event and must be wired.
     check(
         "PreCompact" in codex_hooks.get("hooks", {}),
@@ -2811,7 +2905,6 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
 
     expected_lifecycle_hooks = {
         "Stop": ("codex-stop.sh", (), 180),
-        "UserPromptSubmit": ("state-sync.sh", ("push",), 60),
         "SessionEnd": ("state-sync.sh", ("checkpoint",), 3),
     }
     if isinstance(hooks_by_event, dict):
@@ -3005,6 +3098,11 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
         )
 
     github_hooks = json.loads(read(TARGET_ROOT / ".github" / "hooks" / "hooks.json"))
+    check(
+        set(github_hooks.get("hooks", {})) == COPILOT_EXPECTED_EVENTS,
+        "GitHub Copilot hooks must retain the exact supported event set",
+        errors,
+    )
     github_hook_text = json.dumps(github_hooks)
     check(
         ".claude/hooks/scripts/" in github_hook_text,
