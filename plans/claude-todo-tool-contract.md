@@ -1,13 +1,13 @@
 ---
 name: claude-todo-tool-contract
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: claude-todo-tool-contract_implementation
-started_at:
+started_at: 2026-09-08T23:17:15Z
 phases:
   - 2026-09-09_phase-A-claude-todo-tool-contract
-current_phase:
+current_phase: 2026-09-09_phase-A-claude-todo-tool-contract
 ---
 
 # Big Plan: claude-todo-tool-contract
