@@ -122,7 +122,7 @@ For each small plan:
 3. **VERIFY:** The orchestrator runs `uv run python .claude/scripts/verify.py phase --format json --persist`. Route a deterministic failure to the coder with its receipt and changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
 5. **CLOSEOUT:** In this fixed order: (a) delegate documentation applicability/update; (b) give every surviving MINOR finding an explicit `disposition` (e.g. `"accepted"`) and non-empty `reason`, then persist converged review findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (c) run `learn` or record `[LEARN] none - no new lessons this session`; (d) update the `COMPLETED` session log; then (e) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation precedes binding reports so findings remain fresh. The reviewer does not persist findings itself, and the coder cannot create final verification receipts.
-6. **FIX LOOP:** If verification, review, or closeout fails, update TodoWrite, return to IMPLEMENT, and repeat until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
+6. **FIX LOOP:** If verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
 7. **COMMIT:** On normal completion, commit the completed small plan atomically.
 
 **Conditional checkpoint branch:** When the user explicitly requests a pause,
@@ -246,7 +246,7 @@ Entries` evidence requirement next to it.
 [ ] On dev before branch creation
 [ ] Working tree clean before branch creation
 [ ] Big plan and current small plan saved under .claude/plans/
-[ ] TodoWrite reflects canonical workflow and current loop
+[ ] Task tracking reflects canonical workflow and current loop
 [ ] Verification passed (pytest + mypy + ruff via `verify phase`)
 [ ] Review passed; findings persisted via record_findings.py (including Ponytail metadata when the profile was required)
 [ ] Docs updated or explicitly skipped as pure-internal

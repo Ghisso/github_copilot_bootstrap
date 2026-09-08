@@ -199,7 +199,7 @@ never approves or changes trust.
 Expected:
 
 - Guardrail scripts exist under `.claude/hooks/scripts/`.
-- Claude `PreToolUse` has native mutation (`Edit|MultiEdit|Write`), ordered `Bash`, and wildcard observability matcher groups; Codex has the equivalent `Edit|Write`, `Bash`, and wildcard groups. `Read` and MCP tools do not invoke mutation guards.
+- Claude `PreToolUse` has native mutation (`Edit|Write`), ordered `Bash`, and wildcard observability matcher groups; Codex has the same `Edit|Write`, `Bash`, and wildcard groups. `Read` and MCP tools do not invoke mutation guards.
 - `protect-files.sh` requires direct `python3` classification (not `uv run`) and denies protected files through structured write tools and per-segment Bash writes such as `touch .env`; absence of Python, malformed input, or classifier ambiguity fails closed. A read-only `cat`/`git diff` inspection of a protected configuration remains allowed.
 - Copy/install/move commands that resolve to a protected source as well as a destination are denied, including sources selected through shell-expanded wildcards, `cd`, Git `-C`, or symlinks, preventing protected-source exfiltration through a write-bearing command.
 - Unknown, archive, and interpreter-style commands are denied only when they carry a high-confidence protected path literal: `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key`, a hook path, or protected hook configuration. Prose and ordinary source filenames containing `secret` remain allowed. Their safe parsing failure still fails closed; the explicit read-only command set remains allowed.

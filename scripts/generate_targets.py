@@ -69,13 +69,26 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # server only ever advertises its filtered ctx_index/ctx_search/ctx_stats/
 # ctx_doctor allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
 # granting the whole server here cannot expose a blocked tool.
+#
+# `todo` has no entry here: confirmed against the installed Claude Code
+# binary and the documented tool table (code.claude.com/docs/en/
+# tools-reference) that `TodoWrite` is disabled whenever the runtime's task
+# tools are enabled (the default), and that Claude Code v2.1.233+ omits both
+# `TodoWrite` and the four task tools on current model families unless
+# `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`; the task tools are also stripped from
+# background subagents regardless of `tools:`, so they are not a usable
+# replacement. `MultiEdit` has no tool definition in the binary or the
+# documented table, so `edit` maps only to `Edit`/`Write`. `Task` is a
+# deprecated spelling of the documented `Agent` tool, resolved only through a
+# legacy compatibility table, so `delegate` maps to `Agent`.
+# `render_claude_tools()` skips unmapped capabilities through its existing
+# `.get(capability, [])` default, so no other generator change is needed.
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
     "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode"],
-    "edit": ["Edit", "MultiEdit", "Write"],
+    "edit": ["Edit", "Write"],
     "execute": ["Bash"],
-    "delegate": ["Task"],
-    "todo": ["TodoWrite"],
+    "delegate": ["Agent"],
     "web": ["WebFetch", "WebSearch"],
 }
 # The "vscode" capability is intentionally Copilot-only: it maps to a Copilot
@@ -1034,7 +1047,7 @@ def render_claude_settings(path: Path) -> None:
             ],
             "PreToolUse": [
                 {
-                    "matcher": "Edit|MultiEdit|Write",
+                    "matcher": "Edit|Write",
                     "hooks": [
                         cmd("protect-files.sh", "claude-code"),
                     ],

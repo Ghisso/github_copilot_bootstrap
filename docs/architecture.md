@@ -171,11 +171,10 @@ Hook errors (from `state-sync.sh` and others) are written to `.claude/session_lo
 ### Target-native PreToolUse routing
 
 Claude and Codex use target-native matcher groups to keep the safety lane narrow.
-Claude sends `Edit|MultiEdit|Write` to `protect-files.sh`; Codex sends
-`Edit|Write`. Both send `Bash` to `pretool-bash-guard.sh`, while the wildcard
-matcher runs only optional `context-mode-dispatch.sh` observability. Read and
-MCP tools have no mutation guard handler, so they do not incur a no-op safety
-classification.
+Both send `Edit|Write` to `protect-files.sh` and `Bash` to
+`pretool-bash-guard.sh`, while the wildcard matcher runs only optional
+`context-mode-dispatch.sh` observability. Read and MCP tools have no mutation
+guard handler, so they do not incur a no-op safety classification.
 
 `pretool-bash-guard.sh` is one ordered Bash lane: `protect-files.sh`,
 `git-protection.sh`, `enforce-branch-state.sh`, `enforce-commit-gate.sh`, then

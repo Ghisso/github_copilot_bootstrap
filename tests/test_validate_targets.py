@@ -2071,6 +2071,125 @@ def test_validate_agents_reports_canonical_loader_failure(
     assert errors == [f"{metadata_path}: {expected}"]
 
 
+def test_claude_generated_agents_never_name_runtime_disabled_tools() -> None:
+    """`TodoWrite` (disabled by default) and `MultiEdit` (no tool definition)
+    must never regenerate into Claude agent frontmatter."""
+    claude_agents = sorted(
+        (REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents").glob("*.md")
+    )
+    assert claude_agents
+    for path in claude_agents:
+        text = path.read_text(encoding="utf-8")
+        assert "TodoWrite" not in text, f"{path} names disabled tool TodoWrite"
+        assert "MultiEdit" not in text, f"{path} names nonexistent tool MultiEdit"
+
+
+def test_render_claude_tools_skips_todo_and_maps_delegate_to_agent() -> None:
+    """`todo` has no Claude tool mapping; `delegate` resolves to `Agent`."""
+    assert target_generator.render_claude_tools(["todo"]) == ""
+
+    orchestrator, _orchestrator_dir = next(
+        (agent, agent_dir)
+        for agent, agent_dir in shared_agents()
+        if agent["id"] == "orchestrator"
+    )
+    assert orchestrator["capabilities"] == [
+        "delegate",
+        "edit",
+        "execute",
+        "read",
+        "search",
+        "todo",
+    ]
+    assert target_generator.render_claude_tools(orchestrator["capabilities"]) == (
+        "Agent, Edit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode"
+    )
+
+
+def test_claude_role_agents_emit_nonempty_tools_line() -> None:
+    """A `tools:` field that resolves to nothing is a documented Claude Code
+    spawn error; dropping the `todo` mapping must not zero out any agent."""
+    for agent_id in ("coder", "orchestrator", "planner"):
+        path = (
+            REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents" / f"{agent_id}.md"
+        )
+        tools_line = next(
+            (
+                line
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.startswith("tools:")
+            ),
+            "",
+        )
+        assert tools_line, f"{agent_id} is missing a tools: line"
+        assert tools_line.removeprefix("tools:").strip()
+
+
+def test_claude_agent_native_tool_allowlist_is_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unsupported native tool name injected into `tools:` must be reported,
+    paired with a permitted addition that must not be."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    tools_line = next(line for line in text.splitlines() if line.startswith("tools:"))
+    mutated_line = f"{tools_line}, Agent, TodoWrite"
+    agent_path.write_text(text.replace(tools_line, mutated_line, 1), encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert (
+        f"Claude agent has unknown native tools ['TodoWrite']: {agent_path}" in errors
+    )
+
+
+def test_claude_agent_tool_allowlist_runs_without_the_routing_string(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The native-tool allowlist must not be gated on the unrelated
+    tool-routing.instructions.md substring: an agent prompt that omits it
+    entirely must still be checked for an unsupported tool name."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    assert "tool-routing.instructions.md" in text
+    tools_line = next(line for line in text.splitlines() if line.startswith("tools:"))
+    mutated_text = text.replace("tool-routing.instructions.md", "removed-for-test")
+    mutated_text = mutated_text.replace(tools_line, f"{tools_line}, TodoWrite", 1)
+    assert "tool-routing.instructions.md" not in mutated_text
+    agent_path.write_text(mutated_text, encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert (
+        f"Claude agent has unknown native tools ['TodoWrite']: {agent_path}" in errors
+    )
+
+
+def test_todo_capability_unchanged_for_other_runtimes() -> None:
+    """The `todo` capability keeps its existing Copilot, Antigravity, and Codex
+    meaning; only the Claude mapping was removed."""
+    assert target_generator.COPILOT_TOOL_MAP["todo"] == ["todo", "todos"]
+    assert "todo" not in target_generator.ANTIGRAVITY_TOOL_MAP
+
+    orchestrator, _orchestrator_dir = next(
+        (agent, agent_dir)
+        for agent, agent_dir in shared_agents()
+        if agent["id"] == "orchestrator"
+    )
+    assert "todo" not in render_antigravity_agent_adapter(orchestrator)
+    assert codex_agent_metadata_header(orchestrator).endswith(
+        "capability intents: delegate, edit, execute, read, search, todo."
+    )
+
+
 def test_validate_targets() -> None:
     """The real generated-target validator accepts the current repository."""
     result = subprocess.run(
