@@ -86,10 +86,16 @@ inventory does not already discover the new script.
   - Late-report mode must parse the `PostToolUse` Bash payload using existing
     helper patterns. Emit exactly one reminder only when the completed command
     is a recognized final lifecycle boundary. Begin with the smallest justified
-    set: successful `verify.py closeout`, successful findings persistence when it
-    is the last closeout operation, and a successful phase-completion commit.
+    set: `verify.py closeout`, findings persistence when it is the last closeout
+    operation, and a phase-completion commit.
     Use tokenized or existing command-classification helpers where available;
     do not rely on an unrestricted substring that can match quoted prose.
+  - Recognize the two script boundaries from command shape only. This
+    repository has no verified tool-outcome field in a Claude Code or OpenAI
+    Codex hook payload, and a false match costs one short advisory sentence, so
+    do not add outcome correlation for them. Confirm the phase-completion commit
+    against committed plan state, which the existing helper patterns already
+    support.
   - A normal non-match must emit no standard output and exit zero.
   - Malformed payloads, unknown modes/providers, unavailable optional helpers,
     and internal errors must warn on standard error, emit no blocking decision,
@@ -124,7 +130,7 @@ inventory does not already discover the new script.
     and assert:
     - prompt mode emits one parseable object with the correct event and exact
       bounded reminder;
-    - recognized successful late commands emit one `PostToolUse` context object;
+    - recognized late commands emit one `PostToolUse` context object;
     - ordinary Bash commands emit no output;
     - malformed input and unknown arguments warn but never block;
     - standard output never contains diagnostics or more than one JSON object.
