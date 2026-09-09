@@ -191,8 +191,8 @@ every-N-tool reminders, `Stop` rewriting, or
 Gemini CLI is out of scope.
 
 For the primary targets, generated `PreToolUse` routing must remain split into
-three groups: native file mutations (`Edit|MultiEdit|Write` for Claude,
-`Edit|Write` for Codex) call `protect-files.sh`; `Bash` calls the single ordered
+three groups: native file mutations (`Edit|Write` for both Claude and Codex)
+call `protect-files.sh`; `Bash` calls the single ordered
 `pretool-bash-guard.sh`; and `*` calls only best-effort
 `context-mode-dispatch.sh`. `Read` and MCP tools must have no mutation handler.
 The Bash wrapper must preserve the guard order: protected files, dangerous Git,

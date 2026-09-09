@@ -69,6 +69,8 @@ Claude Code:
 
 `CLAUDE.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Claude receives exactly five universal agents: `orchestrator`, `planner`, `coder`, `reviewer`, and `documenter`. Eligible agent names are not renamed between targets. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
 
+Generated Claude agent frontmatter has no `todo` tool mapping, so `CLAUDE_TOOL_MAP` in `scripts/generate_targets.py` omits the capability entirely; `render_claude_tools()` skips it through its existing default. The runtime confirms this is correct rather than an oversight: `TodoWrite` and the four task tools (`TaskCreate`, `TaskGet`, `TaskList`, `TaskUpdate`) are mutually exclusive and selected by `CLAUDE_CODE_ENABLE_TASKS`, which defaults to on and therefore leaves `TodoWrite` off by default. Claude Code v2.1.233 and later omit all five names on Opus 4.8, Sonnet 5, Fable 5, Mythos 5, and later versions of those families unless a consumer sets `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Background subagents lose the four task tools regardless of their `tools:` field; only agent-team teammates keep them. A generated Claude subagent therefore has no written task-tracking tool on current models, and tracks phases as prose instead, which `shared/agents/orchestrator/prompt.md` already instructs. This is a runtime limitation the bootstrap does not work around, and the bootstrap sets no environment variable to change it.
+
 OpenAI Codex:
 
 - `AGENTS.md`
@@ -178,7 +180,8 @@ Codex skills are stored under `.claude/skills/` and enabled through `[[skills.co
 For Claude and Codex, generated `PreToolUse` separates mutation safety from
 observability: native edit matchers call `protect-files.sh`, `Bash` calls one
 ordered guard wrapper, and `*` calls only context-mode dispatch. The Codex
-native-edit matcher is `Edit|Write`; Claude additionally supports `MultiEdit`.
+native-edit matcher is `Edit|Write`; Claude uses the same matcher, since
+`MultiEdit` has no tool definition in the runtime.
 The Bash wrapper invokes direct `python3` target classification rather than
 `uv run`, allowing protection before a project environment exists. It classifies
 mutation targets segment by segment, allows proven read-only inspection, checks

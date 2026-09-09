@@ -54,6 +54,26 @@ CLAUDE_ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
 # Models that do NOT support the effort field: Haiku is absent from the
 # model-config.md effort table, so any effort on a Haiku agent is invalid.
 CLAUDE_NO_EFFORT_MODELS = {"haiku"}
+# Reviewed allowlist of Claude built-in tool names confirmed present in the
+# documented tool table (code.claude.com/docs/en/tools-reference), checked
+# 2026-09-09 against installed binary ~/.local/share/claude/versions/2.1.226.
+# Deliberately an explicit literal set, NOT derived from CLAUDE_TOOL_MAP: a
+# derived allowlist accepts whatever the map contains, which is exactly what
+# let the map emit `TodoWrite` (disabled by default; superseded by task tools
+# the runtime strips from background subagents regardless of `tools:`) and
+# `MultiEdit` (no tool definition in the runtime or the documented table) in
+# the first place. This constant exists to reject those two names.
+CLAUDE_ALLOWED_NATIVE_TOOLS = {
+    "Read",
+    "Grep",
+    "Glob",
+    "Edit",
+    "Write",
+    "Bash",
+    "Agent",
+    "WebFetch",
+    "WebSearch",
+}
 # GPT-5.6 model and effort values (developers.openai.com/api/docs/guides/latest-model,
 # checked 2026-07-18). Keep these strict so misspelled or retired values fail
 # generation validation instead of reaching consumer sessions.
@@ -1265,7 +1285,7 @@ def reporting_reminder_script_errors(text: str) -> list[str]:
 
 def pretool_routing_errors(hooks: object, target: str) -> list[str]:
     """Return errors for the deterministic mutation/observer hook split."""
-    native_matcher = "Edit|MultiEdit|Write" if target == "claude-code" else "Edit|Write"
+    native_matcher = "Edit|Write"
     errors: list[str] = []
     if not isinstance(hooks, dict) or not isinstance(hooks.get("PreToolUse"), list):
         return [f"{target} PreToolUse routing is missing"]
@@ -2244,6 +2264,9 @@ def validate_agents(errors: list[str]) -> None:
             f"Claude agent must route retrieval through tool-routing instructions: {path}",
             errors,
         )
+        tools_line = next(
+            (line for line in text.splitlines() if line.startswith("tools:")), ""
+        )
         # An agent told to route through tool-routing.instructions.md (which
         # names Semble and Context Mode) but whose own tools: allowlist
         # omits the matching mcp__ wildcard physically cannot follow that
@@ -2252,14 +2275,29 @@ def validate_agents(errors: list[str]) -> None:
         # subagent had the instruction but not the tool); guard against it
         # regenerating.
         if "tool-routing.instructions.md" in text:
-            tools_line = next(
-                (line for line in text.splitlines() if line.startswith("tools:")), ""
-            )
             check(
                 "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
                 f"Claude agent must allow both Semble and Context Mode MCP: {path}",
                 errors,
             )
+        # Unlike the Semble/Context-Mode check above, this must run for every
+        # agent regardless of whether its prompt happens to mention
+        # tool-routing.instructions.md — tool-name validity has nothing to do
+        # with that instruction, and gating it on an unrelated string would
+        # fail open for any future agent whose prompt omits it. An agent with
+        # no tools: line at all (inherits the default set) yields an empty
+        # native_tools list, which is not an error.
+        native_tools = [
+            tool.strip()
+            for tool in tools_line.removeprefix("tools:").split(",")
+            if tool.strip() and not tool.strip().startswith("mcp__")
+        ]
+        unknown_tools = sorted(set(native_tools) - CLAUDE_ALLOWED_NATIVE_TOOLS)
+        check(
+            not unknown_tools,
+            f"Claude agent has unknown native tools {unknown_tools}: {path}",
+            errors,
+        )
         # Per-agent model/effort tiering: validate any emitted frontmatter fields
         # against the allow-lists, and reject effort on models that lack it.
         frontmatter_block = text.split("---\n", 2)
