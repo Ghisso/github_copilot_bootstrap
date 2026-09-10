@@ -37,6 +37,20 @@ if [[ -z "$FIRST_PHASE" ]]; then
   exit 0
 fi
 
+# Activate exactly the first selected phase. A legacy `in-progress` first
+# phase is left untouched for compatibility; any other unexpected status
+# (paused, complete, invalid, duplicate, or missing) is reported instead of
+# silently overwritten.
+FIRST_PLAN="$REPO_ROOT/.claude/plans/$FIRST_PHASE.md"
+if [[ -f "$FIRST_PLAN" ]]; then
+  FIRST_STATUS="$(fm_read_unique_status "$FIRST_PLAN" || true)"
+  if [[ "$FIRST_STATUS" == "planned" ]]; then
+    fm_write "$FIRST_PLAN" "status" "in-progress"
+  elif [[ "$FIRST_STATUS" != "in-progress" ]]; then
+    additional_context "PostToolUse" "first phase $FIRST_PHASE was not activated because its status is ${FIRST_STATUS:-missing}, not planned or in-progress"
+  fi
+fi
+
 fm_write "$BIG_PLAN" "implementation_branch" "$BRANCH"
 fm_write "$BIG_PLAN" "originating_branch" "dev"
 if [[ -z "$(fm_read "$BIG_PLAN" "started_at" || true)" ]]; then

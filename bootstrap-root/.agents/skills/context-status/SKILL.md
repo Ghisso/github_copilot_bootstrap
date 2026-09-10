@@ -33,9 +33,12 @@ PY
 
 Report the active big plan from its parsed `type: big-plan` and live status
 (`planning`, `in-progress`, `complete`, or `cancelled`). Report the current
-small plan from `type: small-plan` and its live status (`in-progress`,
-`paused`, `complete`, or `cancelled`); prefer an `in-progress` or `paused`
-small plan when more than one file exists.
+small plan from `type: small-plan` and its live status (`planned`,
+`in-progress`, `paused`, `complete`, or `cancelled`); prefer an `in-progress`
+or `paused` small plan as the active phase. A `planned` phase is pending
+work, not the active phase: list each one under Pending Phases and never
+select one as the active small plan, even when it is the only other
+small-plan file present.
 
 ### 2. Session Log Recency
 ```bash
@@ -68,6 +71,7 @@ layout.
 Session Status:
   Active Big Plan: [filename] ([planning/in-progress/complete/cancelled]) or none
   Active Small Plan: [filename] ([in-progress/paused/complete/cancelled]) or none
+  Pending Phases: [N] planned or none
   Session Log: [filename] (updated [N] min ago) or none
   MEMORY.md:   [N] lines, [M] [LEARN] entries
   Git:         [branch] ([N] uncommitted changes)

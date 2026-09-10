@@ -58,6 +58,20 @@ unaffected scope.
 - Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
 
+### Declaring future phases
+
+`planned` is a small-plan-only status for a phase that has not started. New
+small-plan files default to `planned` and need only the ordinary identity
+fields; they carry no pause, cancellation, or closeout evidence. Branch
+creation activates the first phase, and a completed-phase commit activates the
+next non-cancelled phase, by flipping exactly that one phase from `planned` to
+`in-progress`; every other declared phase is left untouched. An unexpected
+next-phase status (`paused`, `complete`, invalid, duplicate, missing, or
+unreadable) is never overwritten; the transition warns and leaves the phase
+machine at its current phase instead. `planned` is unfinished and blocks the
+same push/PR and completion gates as `in-progress`. Plans already installed
+with a future phase marked `in-progress` remain valid.
+
 ### Pausing a phase for a checkpoint
 
 `paused` is a small-plan-only, non-terminal status. Enter it only after an
