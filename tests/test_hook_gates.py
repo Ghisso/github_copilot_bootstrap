@@ -196,6 +196,112 @@ printf '%s\\n' "${{failures[@]}}"
     assert "missing plan-frontmatter validator" in result.stdout
 
 
+def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> None:
+    """Phase B2 (2026-09-11_phase-B2-hook-empty-array-safety): each of the
+    seven Confirmed Reachable Instances, plus the ``expected`` site in
+    ``reporting-reminder.sh`` found while widening the regression scanner to
+    the ``[*]``/indices shapes, must use the repository's
+    ``${arr[@]+"${arr[@]}"}`` guard, not a bare ``${arr[@]}``/``${arr[*]}``/
+    ``${!arr[@]}`` form. Bash 3.2 (the declared consumer orchestration
+    baseline) aborts on every one of those bare forms with 'unbound
+    variable' under `set -u` when the array is empty. This host's newer
+    Bash cannot reproduce that abort, so the fix is pinned at the source
+    level instead of behaviorally."""
+    frontmatter_text = (SCRIPT_SRC / "_lib-frontmatter.sh").read_text(encoding="utf-8")
+    git_protection_text = (SCRIPT_SRC / "git-protection.sh").read_text(encoding="utf-8")
+    reporting_reminder_text = (SCRIPT_SRC / "reporting-reminder.sh").read_text(
+        encoding="utf-8"
+    )
+    expectations = (
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "all_phases",
+            'for other_phase in ${all_phases[@]+"${all_phases[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "paths",
+            'for path in ${paths[@]+"${paths[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "_TOKENS",
+            'tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})',
+            3,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens",
+            '_git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1',
+            1,
+        ),
+        (
+            git_protection_text,
+            "git-protection.sh",
+            "tokens",
+            'if reason="$(_git_danger_from_tokens ${tokens[@]+"${tokens[@]}"})"; then',
+            1,
+        ),
+        (
+            reporting_reminder_text,
+            "reporting-reminder.sh",
+            "expected",
+            'for index in ${expected[@]+"${!expected[@]}"}; do',
+            1,
+        ),
+    )
+    for text, filename, variable, snippet, expected_count in expectations:
+        assert text.count(snippet) == expected_count, (
+            f"{filename}: expected {expected_count} guarded expansion(s) of "
+            f"{variable!r} via {snippet!r}; source drifted from the Phase B2 fix"
+        )
+
+
+def test_assert_commit_invariants_reports_missing_current_phase_without_aborting(
+    tmp_path: Path,
+) -> None:
+    """An empty ``current_phase`` must surface as its own gate failure, and
+    the cancellation sweep immediately below it must run zero iterations
+    over the still-empty ``all_phases`` rather than partially executing. On
+    Bash 3.2 an unguarded ``"${all_phases[@]}"`` there aborts with an
+    unbound-variable error before this message is ever printed; this host's
+    newer Bash cannot reproduce that abort, so this test pins the intended
+    message and confirms the sibling sweep never runs (no cancellation-
+    evidence failure for the sibling plan below, even though it is
+    cancelled and missing its evidence fields)."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\nname: example\nstatus: in-progress\ncurrent_phase:\n---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    # A sibling plan that looks cancelled-and-incomplete: if the sweep ever
+    # ran despite the empty current_phase, assert_cancellation_evidence
+    # would append failures for it.
+    (plans / "sibling.md").write_text(
+        "---\nname: sibling\nstatus: cancelled\n---\n\n# Sibling\n",
+        encoding="utf-8",
+    )
+    expression = f"""
+assert_plan_frontmatter() {{ :; }}
+assert_completed_receipt() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(tmp_path))} example_implementation
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    failures = result.stdout.splitlines()
+    assert "big plan has no current_phase" in failures
+    assert not any("evidence" in failure for failure in failures), failures
+
+
 def _write_cancelled_plan(
     root: Path,
     *,

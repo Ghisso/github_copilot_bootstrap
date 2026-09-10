@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -359,6 +360,124 @@ def plan_frontmatter_errors(repo_root: Path) -> list[str]:
     return [f"plan frontmatter validation reported issues: {output}"]
 
 
+# Bash 3.2 (the declared consumer orchestration baseline; see
+# docs/runtime-checks.md) raises "unbound variable" under `set -u` when `arr`
+# has zero elements and is expanded as `${arr[@]}`, `${arr[*]}`, or the
+# indices form `${!arr[@]}`/`${!arr[*]}`; Bash 4.4+ does not. Confirmed
+# against Chet Ramey's own bash-4.3 transcript on bug-bash@gnu.org
+# (2019-05-13, "set -u and empty arrays"), which reproduces the failure for
+# BOTH `${a[@]}` and `${a[*]}` UNQUOTED, and against the current bash(1)
+# manual's nounset exception text ("array variables subscripted with @ or
+# *"), which does not exempt the indices form either - so quoting never
+# changes vulnerability, and the indices form is the same bug class as the
+# value form (this repository's own record-commit-closeout.sh already
+# guards a bare `${!phases[@]}` the same way). The repository's guard idiom
+# is `${arr[@]+"${arr[@]}"}` (or, for the indices form,
+# `${arr[@]+"${!arr[@]}"}` - the guard check always tests values, even when
+# the protected alternate is the indices list); a naive scan for
+# `${arr[@]}` would also match the guarded idiom's own inner quoted part, so
+# the guarded form is masked out first, allowing the guard-check subscript
+# and the inner alternate's subscript/indices-prefix to differ.
+_GUARDED_ARRAY_EXPANSION = re.compile(r'\$\{(\w+)\[[@*]\]\+"\$\{!?\1\[[@*]\]\}"\}')
+_ARRAY_EXPANSION = re.compile(r"\$\{(!?)(\w+)\[([@*])\]\}")
+
+# Sites that still expand an array the unguarded way, each verified safe by an
+# explicit preceding emptiness guard or by a literal non-empty initializer
+# that is never cleared. Keyed by the exact stripped source line so the entry
+# stays tied to the reviewed code rather than a line number that drifts with
+# unrelated edits. Keep this list short, and say why each entry is safe.
+_ALREADY_SAFE_ARRAY_EXPANSIONS: dict[str, dict[str, str]] = {
+    "shared/hooks/git-hooks/pre-push": {
+        'reason="$(printf \'%s; \' "${failures[@]}")"': (
+            'guarded above by [[ "${#failures[@]}" -gt 0 ]]'
+        ),
+    },
+    "shared/hooks/git-hooks/commit-msg": {
+        'reason="$(printf \'%s; \' "${failures[@]}")"': (
+            'guarded above by [[ "${#failures[@]}" -gt 0 ]]'
+        ),
+    },
+    "shared/hooks/scripts/enforce-commit-gate.sh": {
+        'reason="$(printf \'%s; \' "${failures[@]}")"': (
+            'guarded above by [[ "${#failures[@]}" -gt 0 ]]'
+        ),
+    },
+    "shared/hooks/scripts/enforce-pr-gate.sh": {
+        'reason="$(printf \'%s; \' "${failures[@]}")"': (
+            'guarded above by [[ "${#failures[@]}" -gt 0 ]]'
+        ),
+    },
+    "shared/hooks/scripts/_lib-frontmatter.sh": {
+        'for path in "${paths[@]}"; do': (
+            'guarded above by [[ "${#paths[@]}" -gt 0 ]] || return 1'
+        ),
+        'output="$(cd "$repo_root" && python3 "$reader" "${args[@]}" 2>&1)" || status=$?': (
+            "args is a literal with seven elements; never empty"
+        ),
+        'for phase in "${phases[@]}"; do': (
+            'guarded above by [[ "${#phases[@]}" -eq 0 ]] with an early return'
+        ),
+    },
+    "shared/hooks/scripts/reporting-reminder.sh": {
+        'effective="$(git "${options[@]}" rev-parse --show-toplevel 2>/dev/null || true)"': (
+            'options is initialized with -C "$REPO_ROOT" and only ever appended '
+            "to; never empty"
+        ),
+        '&& [[ " ${_TOKENS[*]} " == *" --out "* ]]': (
+            "reached only when the preceding command_starts_with ... && "
+            "short-circuit already returned success, which requires "
+            "${#_TOKENS[@]} -ge ${#expected[@]} with expected non-empty; "
+            "never empty here"
+        ),
+    },
+    "shared/hooks/scripts/restore-root-adapters.sh": {
+        'for relative in "${paths[@]}"; do': (
+            "guarded above by ((${#paths[@]})) || fail"
+        ),
+    },
+}
+
+
+def unguarded_array_expansion_errors(repo_root: Path = REPO_ROOT) -> list[str]:
+    """Flag hook scripts under ``shared/hooks/`` that expand a bash array with
+    a Bash-3.2-unsafe form - ``${arr[@]}``, ``${arr[*]}``, ``${!arr[@]}``, or
+    ``${!arr[*]}``, quoted or not - and neither the repository's
+    ``${arr[@]+"<form>"}`` guard nor a listed reason. Scans every ``.sh`` file
+    and every extensionless file whose first line names bash (the git hook
+    entry points)."""
+    hooks_root = repo_root / "shared" / "hooks"
+    if not hooks_root.is_dir():
+        return []
+    errors: list[str] = []
+    for path in sorted(hooks_root.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        lines = text.splitlines()
+        first_line = lines[0] if lines else ""
+        if path.suffix != ".sh" and "bash" not in first_line:
+            continue
+        relative = path.relative_to(repo_root).as_posix()
+        allowlisted = _ALREADY_SAFE_ARRAY_EXPANSIONS.get(relative, {})
+        for line_number, line in enumerate(lines, start=1):
+            masked = _GUARDED_ARRAY_EXPANSION.sub(lambda m: " " * len(m.group(0)), line)
+            for match in _ARRAY_EXPANSION.finditer(masked):
+                if line.strip() in allowlisted:
+                    continue
+                _, name, _ = match.groups()
+                errors.append(
+                    f"unguarded array expansion: {relative}:{line_number} expands "
+                    f"{match.group(0)!r} without the "
+                    f'${{{name}[@]+"{match.group(0)}"}} guard or a listed reason; '
+                    "Bash 3.2 raises 'unbound variable' under set -u when "
+                    f"{name} is empty (docs/runtime-checks.md)"
+                )
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     for relative_path in REQUIRED_FILES:
@@ -413,6 +532,10 @@ def main() -> int:
 
     errors.extend(runtime_drift_errors())
     errors.extend(context_mode_dispatch_errors())
+    array_errors = unguarded_array_expansion_errors()
+    if not array_errors:
+        print("PASS hook scripts guard empty-array expansions for Bash 3.2")
+    errors.extend(array_errors)
 
     if errors:
         for error in errors:

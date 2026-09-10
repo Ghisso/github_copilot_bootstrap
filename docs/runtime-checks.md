@@ -513,9 +513,14 @@ Both git-hook layers are installed by setting `git config core.hooksPath .claude
 Gate orchestration uses Bash 3.2 plus Python 3 standard-library JSON parsing,
 with no dependency on `uv`; the surrounding hook scripts are not all pure Bash.
 The Bash baseline avoids bash-4-only builtins (`mapfile`/`readarray`),
-associative arrays, and negative array indices. This keeps the gates working
-identically on a stock macOS consumer machine and on the `macos-latest` CI
-runner (`.github/workflows/validate.yml`), where `_lib-frontmatter.sh`'s
+associative arrays, and negative array indices. It also guards every array
+expansion that can be empty: `"${arr[@]}"` on an empty array aborts under
+`set -u` on Bash 3.2 (but not 4.4+), so hook scripts use the repository's
+`${arr[@]+"${arr[@]}"}` idiom instead, and `check_runtime.py` fails a hook
+script under `shared/hooks/` that reintroduces the unguarded form. This keeps
+the gates working identically on a stock macOS consumer machine and on the
+`macos-latest` CI runner (`.github/workflows/validate.yml`), where
+`_lib-frontmatter.sh`'s
 GNU-vs-BSD `stat`/`find` fallbacks are exercised.
 
 `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes from the `commit-msg` / `pre-push` layers respectively (git skips the hook entirely; no git hook fires when hooks are skipped). Because `.claude/` is gitignored, a fresh clone has no `.claude/hooks/git-hooks/` until it is checked out — git warns and runs no hook in that window, which is a known, accepted degradation (see `docs/plan-deterministic-commit-gate.md`). That window shrank when AI state moved from a Hugging Face bucket to a nested git repo (`plans/adr-002-git-backed-state-sync.md`): `post-start.sh` now checks `.claude/` out via `state-sync.sh setup` using the same git credentials as the code checkout, with no separate authenticated pull to wait on, and sets `core.hooksPath` immediately after.

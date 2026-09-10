@@ -102,7 +102,7 @@ git_danger_reason() {
     tokens=()
     local _t
     for _t in ${_TOKENS[@]+"${_TOKENS[@]}"}; do tokens+=("$(hook_to_lower "$_t")"); done
-    if reason="$(_git_danger_from_tokens "${tokens[@]}")"; then
+    if reason="$(_git_danger_from_tokens ${tokens[@]+"${tokens[@]}"})"; then
       printf '%s' "$reason"
       return 0
     fi
