@@ -570,11 +570,6 @@ def confined_adapter_path(root: Path, relative: str) -> Path | None:
     return candidate
 
 
-def regular_tree_fingerprint(path: Path) -> bytes | None:
-    """Fingerprint a regular root adapter tree while rejecting links and special files."""
-    return regular_tree_fingerprint_diagnostic(path)[0]
-
-
 def regular_tree_fingerprint_diagnostic(path: Path) -> tuple[bytes | None, str | None]:
     """Fingerprint one adapter and identify a safe, content-free failure kind."""
     try:
