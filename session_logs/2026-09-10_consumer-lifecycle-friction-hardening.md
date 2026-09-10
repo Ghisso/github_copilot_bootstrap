@@ -31,7 +31,10 @@ Phase A: `.claude/plans/2026-09-10_phase-A-commit-closeout-reliability.md`
   major correctness/test gaps, and one minor untracked-path safety issue. The
   findings are recorded in
   `.claude/quality_reports/2026-09-10_review_phase-A-commit-closeout-reliability.md`
-  and are being remediated before re-review.
+  and were remediated.
+- Phase A remediation verification passed: 215 focused hook/verifier tests,
+  generated-target validation, runtime drift checks, Ruff, Mypy, and fast
+  verification. Independent re-review is in progress.
 
 ## Verification state
 
@@ -41,6 +44,5 @@ Phase A: `.claude/plans/2026-09-10_phase-A-commit-closeout-reliability.md`
 
 ## Resume point
 
-Complete Phase A review remediation and re-review. Then perform documentation
-closeout, persist findings, run phase and closeout verification, and commit
-Phase A.
+Complete Phase A re-review. Then perform documentation closeout, persist
+findings, run phase and closeout verification, and commit Phase A.
