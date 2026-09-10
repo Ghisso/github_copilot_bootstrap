@@ -2,7 +2,7 @@
 name: 2026-09-10_phase-D-shell-classifier-runtime-guidance
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
-phase_index: 4
+phase_index: 5
 status: in-progress
 closeout_session_log:
 ---

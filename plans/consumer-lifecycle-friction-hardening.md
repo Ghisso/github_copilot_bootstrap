@@ -8,6 +8,7 @@ started_at: 2026-09-10T02:08:57Z
 phases:
   - 2026-09-10_phase-A-commit-closeout-reliability
   - 2026-09-10_phase-B-root-adapter-recovery-diagnostics
+  - 2026-09-11_phase-B2-hook-empty-array-safety
   - 2026-09-10_phase-C-plan-and-delegation-semantics
   - 2026-09-10_phase-D-shell-classifier-runtime-guidance
 current_phase: 2026-09-10_phase-B-root-adapter-recovery-diagnostics
@@ -116,6 +117,7 @@ shell policy engine.
 
 - [x] `2026-09-10_phase-A-commit-closeout-reliability`
 - [ ] `2026-09-10_phase-B-root-adapter-recovery-diagnostics`
+- [ ] `2026-09-11_phase-B2-hook-empty-array-safety`
 - [ ] `2026-09-10_phase-C-plan-and-delegation-semantics`
 - [ ] `2026-09-10_phase-D-shell-classifier-runtime-guidance`
 
@@ -128,6 +130,9 @@ shell policy engine.
 - Phase B retains the ownership manifest as the only authority for restorable
   root paths. Diagnostics may expose relative paths and failure categories,
   never file contents.
+- Phase B2 changes shell expansion safety only. It adds no gate, alters no
+  severity, message text, or protected-path inventory, and must land before
+  Phase C because Phase C edits the same frontmatter library.
 - Phase C keeps compatibility with installed plans whose future phases already
   say `in-progress`; new templates use `planned`.
 - Phase D changes parsing only. The protected-path inventory, target-specific

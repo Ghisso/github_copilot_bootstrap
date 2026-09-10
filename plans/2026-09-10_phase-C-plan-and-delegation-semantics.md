@@ -2,7 +2,7 @@
 name: 2026-09-10_phase-C-plan-and-delegation-semantics
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
-phase_index: 3
+phase_index: 4
 status: in-progress
 closeout_session_log:
 ---
