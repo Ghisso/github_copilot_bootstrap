@@ -270,10 +270,11 @@ MAJOR finding, a missing final-phase stale-claims section, and more. See
 for the full table and recovery commands. The two most likely to surprise an
 operator, and two practical notes worth knowing before you refresh:
 
-- **Plan status.** A tracked plan with an invalid `status` (for example
-  `planned`, which has never been a valid value) blocks the next commit.
-  Valid small-plan values: `in-progress`, `paused`, `complete`, `cancelled`.
-  Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled`.
+- **Plan status.** A tracked plan with an invalid `status` blocks the next
+  commit. Valid small-plan values: `planned`, `in-progress`, `paused`,
+  `complete`, `cancelled` (new small-plan files default to `planned` for a
+  phase that has not started yet). Valid big-plan values: `planning`,
+  `in-progress`, `complete`, `cancelled`.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container

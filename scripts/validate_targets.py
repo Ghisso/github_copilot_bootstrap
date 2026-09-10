@@ -3586,6 +3586,17 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "deny",
             "openai-codex",
         ),
+        (
+            # `.agents/hooks.json` is not in protect-files.py's HOOK_CONFIGS,
+            # but the shared `.claude/hooks/scripts/` tree every client
+            # bridges into is protected regardless of which native config
+            # names it, so Google Antigravity's copy is exercised the same
+            # way as the other three clients.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".claude/hooks/scripts/guard.sh",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
         patch = f"*** Begin Patch\n*** Update File: {protected_path}\n@@\n x\n*** End Patch\n"
@@ -3607,6 +3618,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         ("github-copilot", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
         ("claude-code", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
         ("openai-codex", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("google-antigravity", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
     ):
         returncode, stdout, stderr = run_hook(
             hook_root / "protect-files.sh",
@@ -3813,6 +3825,12 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "deny",
             "openai-codex",
         ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            "cat > .claude/hooks/scripts/guard.sh",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, command, expected_decision, target_id in bash_hook_cases:
         returncode, stdout, stderr = run_hook(
@@ -3830,6 +3848,70 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             f"hook guardrail did not protect Bash hook edit with {expected_decision}: {script}",
             errors,
         )
+
+    # Phase D: the recursive heredoc/process-substitution classifier lives in
+    # one shared script file, but every native client bridges into it with
+    # its own target id, so each generated copy is exercised with the same
+    # positive (must allow) and negative (must deny) corpus. Protected-path
+    # categories and each target's existing hook-file ask/deny behavior are
+    # unchanged by this corpus - the earlier cases in this function already
+    # cover that; these only exercise heredoc/<( )> parsing.
+    heredoc_and_procsub_corpus: tuple[tuple[str, str | None], ...] = (
+        # Positive: safe read-only process substitution and data heredocs.
+        ("diff <(cat .env) <(cat CLAUDE.md)", None),
+        (
+            "cat <<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF",
+            None,
+        ),
+        (
+            "git commit -F - <<'EOF'\n"
+            'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\nEOF',
+            None,
+        ),
+        # Negative controls: a mutator inside process substitution, a shell
+        # heredoc that writes a protected file, an interpreter heredoc using
+        # an opaque write call, and a heredoc redirected to a protected
+        # target. `.env` (not a hook file) is "deny" on every target, so
+        # this corpus stays independent of each target's own ask/deny
+        # hook-file wording, which the hook_cases/bash_hook_cases tables
+        # above already cover.
+        ("diff <(touch .env) <(cat CLAUDE.md)", "deny"),
+        ("bash <<'EOF'\ntouch .env\nEOF", "deny"),
+        ('python3 <<\'PY\'\nopen(".env", "w").write("x")\nPY', "deny"),
+        ("cat <<'EOF' > .env\necho hi\nEOF", "deny"),
+    )
+    for target_id, hook_root in (
+        ("github-copilot", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("claude-code", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("openai-codex", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("google-antigravity", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+    ):
+        for heredoc_command, heredoc_decision in heredoc_and_procsub_corpus:
+            returncode, stdout, stderr = run_hook(
+                hook_root / "protect-files.sh",
+                {"tool_name": "Bash", "tool_input": {"command": heredoc_command}},
+                target_id,
+            )
+            check(
+                returncode == 0,
+                f"heredoc/process-substitution guardrail failed to run for "
+                f"{heredoc_command!r}: {hook_root}: {stderr}",
+                errors,
+            )
+            if heredoc_decision is None:
+                check(
+                    stdout == "",
+                    f"heredoc/process-substitution guardrail wrongly denied "
+                    f"a safe command {heredoc_command!r}: {hook_root}: {stdout}",
+                    errors,
+                )
+            else:
+                check(
+                    f'"permissionDecision":"{heredoc_decision}"' in stdout,
+                    f"heredoc/process-substitution guardrail did not "
+                    f"{heredoc_decision} {heredoc_command!r}: {hook_root}",
+                    errors,
+                )
 
     validate_lifecycle_hook_guardrails(errors)
     validate_cancelled_phase_gate_cases(errors)

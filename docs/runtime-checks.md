@@ -58,10 +58,20 @@ A self-refresh writes the consumer ignore block into `.gitignore`
 tracked stay tracked; the installer prints a `git rm --cached` hint if you want
 to untrack them.
 
-The refreshed hook guards are stricter than older installed copies. They fail
-closed on opaque shell syntax — process substitution and heredocs piped into an
-interpreter are denied even when the command is read-only. Prefer plain
-commands, or run a script from a file, inside a refreshed repository.
+The refreshed hook guards are stricter than older installed copies. Process
+substitutions (`<(...)`/`>(...)`) and heredocs (`<<WORD`, `<<'WORD'`,
+`<<"WORD"`, `<<-WORD`) are extracted quote-aware and recursively classified,
+so a safe read-only use of either no longer fails just because the guard
+cannot parse it, and a mutation nested inside one is still detected regardless
+of the outer command. Wider syntax support does not weaken that nested
+detection. A malformed, unbalanced, or unterminated construct still fails
+closed. `for`/`while`/`{ }` and other complex control flow remain unmodeled by
+the lightweight parser — put that logic in a script file and run it, which
+stays classifiable and keeps the guard active rather than routing around it.
+Known, unchanged limitation: the guard never recursively parses `-c` script
+content (`bash -c '...'`, `python3 -c '...'`); it only scans that text for
+literal protected paths, so a path assembled from pieces inside `-c` (for
+example `bash -c 'E=env; touch ".$E"'`) is not detected.
 
 It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
 files in this source checkout must match freshly generated output (after the
@@ -336,6 +346,16 @@ Changes to governing runtime files, relevant nested state, or either active
 plan make the receipt stale. Structural receipt invariants are enforced by the
 schema and verifier; they are not represented as synthetic PASS check IDs.
 
+The relevant nested tracked/dirty state that provenance binds to is not
+informational the way the nested HEAD is: it must persist last, while the
+nested `.claude` repository still holds the closeout run's own uncommitted
+changes. Do not run `state-sync.sh checkpoint`/`publish`/`push` by hand before
+`verify.py closeout --persist` — that commits nested state early and changes
+what the persisted receipt is bound to, so the next commit fails closed with
+`closeout receipt governing control-plane provenance is stale`. Persist the
+phase and closeout receipts, commit the outer repository, and let the native
+`post-commit` hook checkpoint and publish nested state afterward.
+
 When control-plane provenance is unavailable because of a root-adapter
 mismatch, the verifier's message names each affected path from the ownership
 manifest, a `side` (`live`, `mirror`, `pair`, or `manifest`), and a `category`
@@ -418,7 +438,7 @@ of this changes what a gate checks, only what an operator should expect.
 
 | Gate | Effect on a refreshed consumer | Recovery |
 | --- | --- | --- |
-| Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit. `planned` looks plausible but has never been a valid value | Fix the plan's `status`. Valid small-plan values: `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
+| Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit | Fix the plan's `status`. Valid small-plan values: `planned`, `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
 | A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
 | `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
@@ -533,7 +553,7 @@ Generated output includes `.devcontainer/`:
 
 - `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
 - `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
-- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere), sets `core.hooksPath` to `.claude/hooks/git-hooks` immediately after — so the commit-msg gate is wired the instant the checkout populates the hook directory — then `state-sync.sh pull` and `restore-root-adapters.sh` (restores `.claude/bootstrap-root/**` to the repo root: `CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.). `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
+- `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere), sets `core.hooksPath` to `.claude/hooks/git-hooks` immediately after — so the commit-msg gate is wired the instant the checkout populates the hook directory — then runs `state-sync.sh pull`. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
 
 There is **no separate credential to configure** — by default the nested `.claude/`
 repo's remote is the outer repo's own `origin`, so it authenticates the same way the
