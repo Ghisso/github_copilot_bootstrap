@@ -11,7 +11,7 @@ phases:
   - 2026-09-11_phase-B2-hook-empty-array-safety
   - 2026-09-10_phase-C-plan-and-delegation-semantics
   - 2026-09-10_phase-D-shell-classifier-runtime-guidance
-current_phase: 2026-09-11_phase-B2-hook-empty-array-safety
+current_phase: 2026-09-10_phase-C-plan-and-delegation-semantics
 review_profiles:
   - code
   - architecture

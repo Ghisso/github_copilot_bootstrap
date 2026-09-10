@@ -787,3 +787,15 @@
   cannot reproduce the failure, and `BASH_COMPAT=3.2` does not restore the old
   behavior, so this class of defect must be found by reading and pinned by
   asserting the guarded form in source.
+- [LEARN:review] When a reported defect is one instance of an idiom applied
+  inconsistently, sweep the whole class before fixing the reported line. A
+  report naming one unguarded array expansion turned out to cover seven, and
+  widening the resulting regression check surfaced an eighth that the narrower
+  check could not see.
+- [LEARN:review] Replacing an abort with a silent zero-iteration loop is not
+  automatically safe. An abort under `set -e` is fail-closed; a clean skip may
+  be fail-open. Decide per site whether zero iterations is correct rather than
+  assuming a guard is always an improvement.
+- [LEARN:quality] A regression check that claims to prevent a defect class must
+  cover the class, not one syntactic shape of it. Restricting a scanner to the
+  quoted `@`-subscript form hid a real unguarded `${!arr[@]}` site.

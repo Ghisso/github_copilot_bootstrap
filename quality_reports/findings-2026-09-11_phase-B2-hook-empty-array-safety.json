@@ -1,0 +1,69 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "check_runtime allowlist is keyed on exact source-line text and does not re-verify that each entry's claimed preceding guard is still present",
+      "file": "scripts/check_runtime.py",
+      "line": 389,
+      "profile": "code",
+      "disposition": "accepted",
+      "reason": "Re-verifying guard presence would require parsing shell control flow, which is the over-engineering this phase's plan forbids. All 12 current entries were individually verified correct. Noting the weaker sub-case explicitly: entry 12, reporting-reminder.sh:74, is justified by cross-function control flow (command_starts_with's internal count check short-circuits before the expansion) rather than a directly preceding local guard. The reviewer independently traced and confirmed that claim holds today. If a future edit removes a guard while leaving an allowlisted line's text unchanged, the scanner would keep treating it as safe."
+    }
+  ],
+  "generated_at": "2026-09-10T16:18:39Z",
+  "branch": "consumer-lifecycle-friction-hardening_implementation",
+  "head_sha": "c38442b0cbc85f20648d0529745e2f956e880efb",
+  "base_ref": "dev",
+  "merge_base_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
+  "phase": "2026-09-11_phase-B2-hook-empty-array-safety",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "1e9376497bb0a69cf5b8c0610e4dea5e002d9f88",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/devcontainer/post-start.sh",
+    "shared/hooks/git-hooks/post-commit",
+    "shared/hooks/hooks.json",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/hooks/scripts/git-protection.sh",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/hooks/scripts/reporting-reminder.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/policies/workspace.instructions.md",
+    "shared/scripts/record_findings.py",
+    "shared/scripts/verify.py",
+    "shared/skills/commit/SKILL.md",
+    "shared/templates/plan-small.md",
+    "tests/test_check_runtime.py",
+    "tests/test_commit_closeout.py",
+    "tests/test_hook_gates.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_state_sync.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

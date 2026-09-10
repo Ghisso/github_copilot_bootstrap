@@ -3,8 +3,8 @@ name: 2026-09-11_phase-B2-hook-empty-array-safety
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_consumer-lifecycle-friction-hardening-phase-B2-closeout.md
 ---
 
 # Small Plan: Phase B2 — Hook Empty-Array Safety On Bash 3.2
@@ -132,12 +132,12 @@ a redundant guard would obscure the real invariant.
 
 ## Acceptance Criteria
 
-- [ ] Every location in Confirmed Reachable Instances uses the guarded idiom.
-- [ ] No location in Confirmed Already Safe was modified.
-- [ ] An empty `current_phase` yields `big plan has no current_phase`, not a shell error.
-- [ ] Tests assert the guarded form at each fixed site and do not depend on the host Bash version.
-- [ ] Gate decisions, severities, message text, and the protected-path inventory are unchanged.
-- [ ] A regression check exists, or its absence is explicitly justified in the closeout.
+- [x] Every location in Confirmed Reachable Instances uses the guarded idiom.
+- [x] No location in Confirmed Already Safe was modified.
+- [x] An empty `current_phase` yields `big plan has no current_phase`, not a shell error.
+- [x] Tests assert the guarded form at each fixed site and do not depend on the host Bash version.
+- [x] Gate decisions, severities, message text, and the protected-path inventory are unchanged.
+- [x] A regression check exists, or its absence is explicitly justified in the closeout.
 
 ## Verification
 
@@ -154,12 +154,12 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 
 ## Closeout Checklist
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
 
 ## Pause Checkpoint
 
