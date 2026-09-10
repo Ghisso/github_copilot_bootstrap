@@ -91,7 +91,7 @@ done
 [[ "$found" -eq 1 ]] || skip
 
 tmp="$(mktemp "${BIG_PLAN}.XXXXXX")" || exit 1
-awk -v current="$CURRENT_PHASE" -v next_phase="$next_phase" '
+awk -v next_phase="$next_phase" '
   NR == 1 && $0 == "---" { in_frontmatter = 1 }
   in_frontmatter && $0 ~ "^current_phase[[:space:]]*:" {
     print "current_phase: " next_phase
