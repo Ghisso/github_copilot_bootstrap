@@ -3,8 +3,8 @@ name: 2026-09-10_phase-B-root-adapter-recovery-diagnostics
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_consumer-lifecycle-friction-hardening-phase-B-closeout.md
 paused_at: 2026-09-10T12:24:00Z
 paused_reason: User requested a usage-limit checkpoint during Phase B review remediation
 pause_session_log: .claude/session_logs/2026-09-10_consumer-lifecycle-friction-hardening-phase-B.md
@@ -87,13 +87,13 @@ behavior while testing the durable filesystem postconditions directly.
 
 ## Acceptance Criteria
 
-- [ ] Every successful session-start pull restores missing installer-owned ignored adapters from the validated mirror.
-- [ ] Failed reconciliation never restores potentially stale pulled state.
-- [ ] Tracked root adapters remain untouched.
-- [ ] Provenance errors name the relative manifest path and exact failure category.
-- [ ] Recoverable live-side errors suggest `restore-root-adapters.sh`; invalid source-side errors do not.
-- [ ] Diagnostics expose no adapter contents or unsafe external paths.
-- [ ] Warn-never-fail hooks remain non-blocking, while tests verify durable postconditions directly.
+- [x] Every successful session-start pull restores missing installer-owned ignored adapters from the validated mirror.
+- [x] Failed reconciliation never restores potentially stale pulled state.
+- [x] Tracked root adapters remain untouched.
+- [x] Provenance errors name the relative manifest path and exact failure category.
+- [x] Recoverable live-side errors suggest `restore-root-adapters.sh`; invalid source-side errors do not.
+- [x] Diagnostics expose no adapter contents or unsafe external paths.
+- [x] Warn-never-fail hooks remain non-blocking, while tests verify durable postconditions directly.
 
 ## Verification
 
@@ -109,11 +109,11 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed (`verify phase` PASS)
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
 
 ## Pause Checkpoint
 

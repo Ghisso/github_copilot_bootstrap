@@ -1,0 +1,63 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "nested-kind-mismatch test case is confounded by an incidental extra-entry effect and does not independently prove nested kind-checking",
+      "file": "tests/test_verify.py",
+      "line": 2168,
+      "profile": "tests",
+      "disposition": "accepted",
+      "reason": "root-kind-mismatch in the same parametrize group already proves kind is compared for this regression class; the reviewer confirmed no realistic regression shape passes root-kind-mismatch but evades detection through nested-kind-mismatch's confound, so no real coverage gap remains. Tightening the case to use an empty directory would remove the confound but is not required for correctness."
+    }
+  ],
+  "generated_at": "2026-09-10T15:21:54Z",
+  "branch": "consumer-lifecycle-friction-hardening_implementation",
+  "head_sha": "9838cc4061e8d835b9ad53137d1c420ecd17eb14",
+  "base_ref": "dev",
+  "merge_base_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
+  "phase": "2026-09-10_phase-B-root-adapter-recovery-diagnostics",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "a98637d468034d00d80b80bf46d9e62e886c2b7b",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/devcontainer/post-start.sh",
+    "shared/hooks/git-hooks/post-commit",
+    "shared/hooks/hooks.json",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/policies/workspace.instructions.md",
+    "shared/scripts/record_findings.py",
+    "shared/scripts/verify.py",
+    "shared/skills/commit/SKILL.md",
+    "shared/templates/plan-small.md",
+    "tests/test_commit_closeout.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_state_sync.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

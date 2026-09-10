@@ -768,3 +768,22 @@
   its injection test used a file containing that string, so the fail-open path
   was untestable until the guard was hoisted. Test a guard with its gating
   condition removed.
+- [LEARN:review] Extracting a shared helper can silently drop a side effect the
+  original function performed. Splitting `cmd_setup` into `setup_local_state`
+  plus a caller dropped its `restore_root_adapters` call, and the regression
+  test that protected it was moved rather than preserved. Treat a moved
+  assertion as a deleted assertion until its original invariant is shown to
+  still hold.
+- [LEARN:testing] When a repair step only adds and overwrites and never
+  deletes, the correct repairability test is subset, not equality. An equality
+  check fails safe but withholds valid recovery advice for the ordinary case
+  where the source gained a file the destination has not received yet.
+- [LEARN:testing] An assertion placed after a step is only probative if the
+  precondition was destroyed first. Asserting a file exists after `pull` proves
+  nothing when the identical assertion already passed after `setup`.
+- [LEARN:runtime] This repository declares Bash 3.2 (stock macOS) as the
+  orchestration baseline, so under `set -u` every reachable empty-array
+  expansion needs the `${arr[@]+"${arr[@]}"}` idiom. A modern Bash 4.4+ host
+  cannot reproduce the failure, and `BASH_COMPAT=3.2` does not restore the old
+  behavior, so this class of defect must be found by reading and pinned by
+  asserting the guarded form in source.
