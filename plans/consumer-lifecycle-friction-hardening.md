@@ -114,7 +114,7 @@ shell policy engine.
 
 ## Phases
 
-- [ ] `2026-09-10_phase-A-commit-closeout-reliability`
+- [x] `2026-09-10_phase-A-commit-closeout-reliability`
 - [ ] `2026-09-10_phase-B-root-adapter-recovery-diagnostics`
 - [ ] `2026-09-10_phase-C-plan-and-delegation-semantics`
 - [ ] `2026-09-10_phase-D-shell-classifier-runtime-guidance`
@@ -185,4 +185,3 @@ The final phase must run the repository-wide stale-claims audit, record its
 results under `## Stale-claims surfaces checked` in the closeout session log,
 and prove one generated consumer can complete all four lifecycle phases and
 pass its terminal push gate without manual plan edits or receipt repair.
-

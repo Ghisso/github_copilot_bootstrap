@@ -1,0 +1,49 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-10T07:07:21Z",
+  "branch": "consumer-lifecycle-friction-hardening_implementation",
+  "head_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
+  "base_ref": "dev",
+  "merge_base_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
+  "phase": "2026-09-10_phase-A-commit-closeout-reliability",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "2802881d6e474cee88da5327b2500d98881655e5",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/hooks/git-hooks/post-commit",
+    "shared/hooks/hooks.json",
+    "shared/hooks/scripts/record-commit-closeout.sh",
+    "shared/policies/quality-and-testing.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/policies/workspace.instructions.md",
+    "shared/scripts/record_findings.py",
+    "shared/scripts/verify.py",
+    "shared/skills/commit/SKILL.md",
+    "shared/templates/plan-small.md",
+    "tests/test_commit_closeout.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

@@ -3,8 +3,8 @@ name: 2026-09-10_phase-A-commit-closeout-reliability
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-10_consumer-lifecycle-friction-hardening.md
 ---
 
 # Small Plan: Phase A — Commit and Closeout Reliability
@@ -116,15 +116,15 @@ make one closeout order authoritative and test it end to end.
 
 ## Acceptance Criteria
 
-- [ ] `-m`, `-F <file>`, `-F -`, heredoc, GUI/editor, and equivalent successful commits advance the same completed phase exactly once.
-- [ ] Failed, paused, incomplete, bypass, merge, repeated, and non-implementation commit paths do not advance normal phase state.
-- [ ] Phase advancement runs before post-commit state synchronization.
-- [ ] A generated consumer completes the terminal commit and real local push without manual plan or receipt repair.
-- [ ] Only the exact automatic terminal big-plan transition receives the existing provenance exception.
-- [ ] A complete plan's no-active-phase message names `--phase <last completed slug>` instead of advising another phase.
-- [ ] One canonical closeout sequence matches the gate's real staged-tree and dirty semantics.
-- [ ] `record_findings.py` warns about untracked files inside its target without changing report schema.
-- [ ] No automatic broad staging or post-commit verification command is introduced.
+- [x] `-m`, `-F <file>`, `-F -`, heredoc, GUI/editor, and equivalent successful commits advance the same completed phase exactly once.
+- [x] Failed, paused, incomplete, bypass, merge, repeated, and non-implementation commit paths do not advance normal phase state.
+- [x] Phase advancement runs before post-commit state synchronization.
+- [x] A generated consumer completes the terminal commit and real local push without manual plan or receipt repair.
+- [x] Only the exact automatic terminal big-plan transition receives the existing provenance exception.
+- [x] A complete plan's no-active-phase message names `--phase <last completed slug>` instead of advising another phase.
+- [x] One canonical closeout sequence matches the gate's real staged-tree and dirty semantics.
+- [x] `record_findings.py` warns about untracked files inside its target without changing report schema.
+- [x] No automatic broad staging or post-commit verification command is introduced.
 
 ## Verification
 
@@ -140,11 +140,11 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed (`verify phase` PASS)
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
 
 ## Pause Checkpoint
 
@@ -152,4 +152,3 @@ Use only after the user explicitly asks to stop or checkpoint and resume later.
 Set `status: paused`, record `paused_at`, `paused_reason`, and
 `pause_session_log`, and keep the big plan `in-progress` with this same
 `current_phase`. Resume this file rather than creating a replacement phase.
-
