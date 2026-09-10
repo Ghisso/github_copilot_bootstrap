@@ -32,8 +32,13 @@ current_phase:
 
 ## Phases
 
+<!-- Each item's slug must match `phases:` exactly and in order. An optional
+     trailing annotation may follow the closing backtick, but only after a
+     whitespace boundary and only when it starts with one of `—`, `--`, `:`,
+     `-`, or `(` (for example ` — description` or ` (note)`); anything else
+     right after the backtick, including glued text, is rejected: -->
 - [ ] `<small-plan-slug-1>`
-- [ ] `<small-plan-slug-2>`
+- [ ] `<small-plan-slug-2>` (optional parenthetical note)
 
 ## Verification
 

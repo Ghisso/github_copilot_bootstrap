@@ -119,14 +119,22 @@ for index in ${phases[@]+"${!phases[@]}"}; do
     candidate_status="$(fm_read_unique_status "$candidate_plan" || true)"
     [[ "$candidate_status" != "$DUPLICATE_STATUS_VALUE" ]] || fail "declared phase has duplicate status metadata: $candidate_phase"
     case "$candidate_status" in
-      in-progress|paused|complete|cancelled) ;;
+      in-progress|planned|paused|complete|cancelled) ;;
       '') fail "declared phase has missing status metadata: $candidate_phase" ;;
       *) fail "declared phase has invalid status metadata: $candidate_phase" ;;
     esac
-    if [[ "$candidate_status" == "in-progress" ]]; then
+    if [[ "$candidate_status" == "planned" ]]; then
+      # Activate the candidate before pointing current_phase at it: if the
+      # current_phase rewrite below fails partway, a retry finds the phase
+      # already in-progress and only needs to retry the pointer update.
+      fm_write "$candidate_plan" "status" "in-progress" || fail "could not activate declared phase: $candidate_phase"
+      next_phase="$candidate_phase"
+      break
+    elif [[ "$candidate_status" == "in-progress" ]]; then
       next_phase="$candidate_phase"
       break
     elif [[ "$candidate_status" != "cancelled" ]]; then
+      printf 'warning: declared phase %s has status %s and was not activated; leaving current_phase unadvanced\n' "$candidate_phase" "$candidate_status" >&2
       skip
     fi
   fi

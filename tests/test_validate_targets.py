@@ -48,6 +48,8 @@ from validate_targets import (  # noqa: E402
     CONTEXT_MODE_ALLOWED_TOOLS,
     CONTEXT_MODE_BLOCKED_TOOLS,
     CONTEXT_MODE_PINNED_VERSION,
+    ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS,
+    ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS,
     POLICY_SCOPE_FIXTURES,
     codex_agent_instruction_errors,
     canonical_agent_contract_errors,
@@ -56,6 +58,7 @@ from validate_targets import (  # noqa: E402
     codex_orchestrator_routing_errors,
     claude_rule_paths,
     codex_config_contract_errors,
+    coder_incremental_intent_contract_errors,
     copilot_instruction_paths,
     github_agent_model_errors,
     agent_membership_errors,
@@ -65,7 +68,9 @@ from validate_targets import (  # noqa: E402
     memory_security_authority_errors,
     pretool_routing_errors,
     readme_agent_contract_errors,
+    reviewer_diff_evidence_contract_errors,
     root_guidance_errors,
+    tool_routing_recommendation_errors,
     documenter_humanize_errors,
     execution_defaults_policy_errors,
     humanize_contract_errors,
@@ -298,6 +303,59 @@ def test_planner_supervision_contract_requires_bounded_evidence_and_waits() -> N
     )
     errors = planner_supervision_contract_errors(stale_mandates, orchestrator)
     assert any("stale unconditional mandate" in error for error in errors)
+
+    assert any(
+        "evidence packet you give `coder` must name existing builders" in fragment
+        for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS
+    )
+    assert any(
+        "`reviewer` has no `execute` capability" in fragment
+        for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS
+    )
+    assert not any(
+        "evidence packet you give `coder`" in fragment
+        or "`reviewer` has no `execute` capability" in fragment
+        for fragment in ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS
+    )
+
+    missing_delegation_evidence = orchestrator.replace(
+        "`reviewer` has no `execute` capability and cannot produce this evidence itself",
+        "reviewer can gather this itself",
+        1,
+    )
+    errors = planner_supervision_contract_errors(planner, missing_delegation_evidence)
+    assert any(
+        "delegation-evidence contract" in error and "planner-supervision" not in error
+        for error in errors
+    )
+
+
+def test_incremental_intent_and_reviewer_diff_evidence_contracts() -> None:
+    """A full rebuild needs coder-reported evidence and orchestrator approval;
+    reviewer delegation must carry diff-scoped evidence, not full-file reads."""
+    coder = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+    reviewer = (REPO_ROOT / "shared" / "agents" / "reviewer" / "prompt.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert coder_incremental_intent_contract_errors(coder) == []
+    assert reviewer_diff_evidence_contract_errors(reviewer) == []
+
+    missing_deviation = coder.replace(
+        "treat a full rebuild as a material deviation", "consider a rebuild", 1
+    )
+    errors = coder_incremental_intent_contract_errors(missing_deviation)
+    assert any("incremental-intent contract" in error for error in errors)
+
+    missing_diff_evidence = reviewer.replace(
+        "You have no `execute` capability, so you cannot produce this evidence yourself",
+        "You can gather this yourself",
+        1,
+    )
+    errors = reviewer_diff_evidence_contract_errors(missing_diff_evidence)
+    assert any("diff-evidence contract" in error for error in errors)
 
 
 def test_github_agent_model_contract_uses_frontmatter_not_body_substrings() -> None:
@@ -2271,6 +2329,115 @@ def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:
     ).read_text()
     allowed = ", ".join(f'"{tool}"' for tool in CONTEXT_MODE_ALLOWED_TOOLS)
     assert f"new Set([{allowed}])" in filter_text
+
+
+def test_reviewer_stays_read_search_only_without_execute() -> None:
+    """The reviewer keeps read/search capabilities; execute access must not
+    reappear anywhere it is declared."""
+    agent_yaml = json.loads(
+        (REPO_ROOT / "shared" / "agents" / "reviewer" / "agent.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert set(agent_yaml["capabilities"]) == {"read", "search"}
+
+    generated_reviewer = (
+        REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents" / "reviewer.md"
+    )
+    if generated_reviewer.exists():
+        tools_line = next(
+            line
+            for line in generated_reviewer.read_text(encoding="utf-8").splitlines()
+            if line.startswith("tools:")
+        )
+        assert "Bash" not in tools_line and "execute" not in tools_line.lower()
+
+
+def test_tool_routing_states_only_callable_tools_without_host_precedence_claim() -> (
+    None
+):
+    """Generated tool-routing guidance says agents use only tools actually
+    callable in their runtime and never claims precedence over host-injected
+    context, and it never recommends a filtered Context Mode operation."""
+    target_root = REPO_ROOT / "dist" / "multi-agent"
+    tool_routing_path = (
+        target_root / ".claude" / "instructions" / "tool-routing.instructions.md"
+    )
+    if not tool_routing_path.exists():
+        pytest.skip("dist/multi-agent not generated in this checkout")
+    text = tool_routing_path.read_text(encoding="utf-8").lower()
+
+    assert (
+        "agents use only tools their own runtime actually exposes as callable" in text
+    )
+    assert (
+        "does not claim precedence over host-injected system or developer context"
+        in text
+    )
+    assert tool_routing_recommendation_errors(text) == []
+
+
+def test_tool_routing_recommendation_errors_catches_paraphrases_and_spares_negation() -> (
+    None
+):
+    """The recommendation scan survives backtick formatting and synonym/gap
+    paraphrasing, and does not flag a genuine negated prohibition."""
+    backtick_violation = "Reviewers should recommend `ctx_execute` for this."
+    errors = tool_routing_recommendation_errors(backtick_violation, ["ctx_execute"])
+    assert any("ctx_execute" in error for error in errors)
+
+    synonym_and_gap_violation = (
+        "You should leverage the built-in ctx_batch_execute capability here."
+    )
+    errors = tool_routing_recommendation_errors(
+        synonym_and_gap_violation, ["ctx_batch_execute"]
+    )
+    assert any("ctx_batch_execute" in error for error in errors)
+
+    negated_prohibition = "Never call or recommend ctx_purge; it stays filtered."
+    assert tool_routing_recommendation_errors(negated_prohibition, ["ctx_purge"]) == []
+
+    explicit_negated_use = "Agents must not use `ctx_insight` for any reason."
+    assert (
+        tool_routing_recommendation_errors(explicit_negated_use, ["ctx_insight"]) == []
+    )
+
+
+def test_tool_routing_recommendation_errors_survives_sentence_boundary_misfires() -> (
+    None
+):
+    """Reproductions of the three sentence-boundary misfires from the prior
+    review round must not be flagged, while a genuine violation inside one
+    sentence is still caught."""
+    long_clause_negation = (
+        "Agents should never, under any special or unusual circumstances "
+        "whatsoever, use ctx_execute."
+    )
+    assert (
+        tool_routing_recommendation_errors(long_clause_negation, ["ctx_execute"]) == []
+    )
+
+    sentence_boundary = (
+        "Prefer the four allowed tools; you may use others sparingly. "
+        "ctx_execute stays blocked regardless."
+    )
+    assert tool_routing_recommendation_errors(sentence_boundary, ["ctx_execute"]) == []
+
+    punctuation_between_negation_and_verb = "Do not, ever, use ctx_execute for this."
+    assert (
+        tool_routing_recommendation_errors(
+            punctuation_between_negation_and_verb, ["ctx_execute"]
+        )
+        == []
+    )
+
+    still_caught_within_one_sentence = (
+        "Some say you could invoke ctx_purge here, which is wrong."
+    )
+    errors = tool_routing_recommendation_errors(
+        still_caught_within_one_sentence, ["ctx_purge"]
+    )
+    assert any("ctx_purge" in error for error in errors)
 
 
 def test_memory_security_authority_contract_requires_headings_and_links() -> None:

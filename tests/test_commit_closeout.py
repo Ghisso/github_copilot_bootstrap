@@ -101,6 +101,21 @@ def add_declared_next_phase(root: Path, plan: Path, status: str | None) -> None:
         )
 
 
+def add_declared_phases(root: Path, plan: Path, phases: dict[str, str]) -> None:
+    """Declare several additional phases in order and write each plan's status."""
+    phase_lines = "".join(f"  - {phase}\n" for phase in phases)
+    plan.write_text(
+        plan.read_text(encoding="utf-8").replace(
+            "  - phase-one\n", f"  - phase-one\n{phase_lines}"
+        ),
+        encoding="utf-8",
+    )
+    for phase, status in phases.items():
+        (root / ".claude" / "plans" / f"{phase}.md").write_text(
+            f"---\nstatus: {status}\n---\n", encoding="utf-8"
+        )
+
+
 @pytest.mark.parametrize(
     ("args", "input_text"),
     (
@@ -282,6 +297,134 @@ def test_recorded_head_cannot_advance_a_second_phase(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert result.stdout == "skipped\n"
     assert "current_phase: phase-two" in plan.read_text(encoding="utf-8")
+
+
+def test_post_commit_activates_an_intermediate_planned_phase(tmp_path: Path) -> None:
+    """A `planned` phase becomes `in-progress` when it becomes current, mid-sequence."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_phases(root, plan, {"phase-two": "planned", "phase-three": "planned"})
+    (root / "work.txt").write_text("complete\n", encoding="utf-8")
+    run_git(root, "add", "work.txt")
+
+    run_git(root, "commit", "-m", "phase closeout")
+
+    assert "current_phase: phase-two" in plan.read_text(encoding="utf-8")
+    assert "status: in-progress" in (
+        root / ".claude" / "plans" / "phase-two.md"
+    ).read_text(encoding="utf-8")
+    assert "status: planned" in (
+        root / ".claude" / "plans" / "phase-three.md"
+    ).read_text(encoding="utf-8")
+
+
+def test_post_commit_activates_a_final_planned_phase(tmp_path: Path) -> None:
+    """A `planned` phase that is the last declared phase still activates."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_next_phase(root, plan, "planned")
+    (root / "work.txt").write_text("complete\n", encoding="utf-8")
+    run_git(root, "add", "work.txt")
+
+    run_git(root, "commit", "-m", "phase closeout")
+
+    assert "current_phase: phase-two" in plan.read_text(encoding="utf-8")
+    assert "status: in-progress" in (
+        root / ".claude" / "plans" / "phase-two.md"
+    ).read_text(encoding="utf-8")
+
+
+def test_post_commit_activates_the_first_planned_phase_after_a_cancelled_tail(
+    tmp_path: Path,
+) -> None:
+    """A cancelled phase is skipped over so the next planned phase still activates."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_phases(
+        root, plan, {"phase-two": "cancelled", "phase-three": "planned"}
+    )
+    (root / "work.txt").write_text("complete\n", encoding="utf-8")
+    run_git(root, "add", "work.txt")
+
+    run_git(root, "commit", "-m", "phase closeout")
+
+    assert "current_phase: phase-three" in plan.read_text(encoding="utf-8")
+    assert "status: cancelled" in (
+        root / ".claude" / "plans" / "phase-two.md"
+    ).read_text(encoding="utf-8")
+    assert "status: in-progress" in (
+        root / ".claude" / "plans" / "phase-three.md"
+    ).read_text(encoding="utf-8")
+
+
+def test_post_commit_preserves_a_legacy_in_progress_next_phase(tmp_path: Path) -> None:
+    """A pre-existing `in-progress` next phase activates without being rewritten."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_next_phase(root, plan, "in-progress")
+    phase_two = root / ".claude" / "plans" / "phase-two.md"
+    original_text = phase_two.read_text(encoding="utf-8")
+    (root / "work.txt").write_text("complete\n", encoding="utf-8")
+    run_git(root, "add", "work.txt")
+
+    run_git(root, "commit", "-m", "phase closeout")
+
+    assert "current_phase: phase-two" in plan.read_text(encoding="utf-8")
+    assert phase_two.read_text(encoding="utf-8") == original_text
+
+
+def test_repeated_invocation_after_activating_a_planned_phase_is_a_no_op(
+    tmp_path: Path,
+) -> None:
+    """Re-running the recorder for an already-recorded commit cannot reactivate it."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_next_phase(root, plan, "planned")
+    (root / "work.txt").write_text("complete\n", encoding="utf-8")
+    run_git(root, "add", "work.txt")
+    run_git(root, "commit", "-m", "phase closeout")
+    phase_two = root / ".claude" / "plans" / "phase-two.md"
+    activated_text = phase_two.read_text(encoding="utf-8")
+    assert "status: in-progress" in activated_text
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(root / ".claude" / "hooks" / "scripts" / "record-commit-closeout.sh"),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "skipped\n"
+    assert phase_two.read_text(encoding="utf-8") == activated_text
+    assert "current_phase: phase-two" in plan.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("phase_status", ("paused", "complete"))
+def test_post_commit_warns_and_leaves_an_unexpected_next_phase_unadvanced(
+    tmp_path: Path, phase_status: str
+) -> None:
+    """A paused or already-complete next phase is reported, not silently skipped."""
+    root, plan = hook_repo(tmp_path)
+    add_declared_next_phase(root, plan, phase_status)
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(root / ".claude" / "hooks" / "scripts" / "record-commit-closeout.sh"),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == "skipped\n"
+    assert f"declared phase phase-two has status {phase_status}" in result.stderr
+    assert "current_phase: phase-one" in plan.read_text(encoding="utf-8")
+    assert f"status: {phase_status}" in (
+        root / ".claude" / "plans" / "phase-two.md"
+    ).read_text(encoding="utf-8")
 
 
 def test_merge_head_does_not_advance_a_completed_phase(tmp_path: Path) -> None:

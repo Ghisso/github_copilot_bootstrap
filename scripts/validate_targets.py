@@ -17,6 +17,7 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
@@ -175,6 +176,22 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
     "Reuse or continue an existing role when the follow-up is in the same role and phase and its context remains valid",
     "Do not reuse a coder as reviewer merely to save usage",
 )
+ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS = (
+    "the evidence packet you give `coder` must name existing builders and scoped entry points to inspect first",
+    "approve it yourself rather than granting a generic rebuild allowance",
+    "`reviewer` has no `execute` capability and cannot produce this evidence itself",
+    "full-file reads alone are not equivalent to diff review",
+)
+CODER_PROMPT_REQUIRED_FRAGMENTS = (
+    "treat a full rebuild as a material deviation",
+    "report that gap and the evidence for it to the orchestrator before implementing",
+)
+REVIEWER_PROMPT_REQUIRED_FRAGMENTS = (
+    "the changed paths plus either the scoped diff, a repository artifact containing it",
+    "You have no `execute` capability, so you cannot produce this evidence yourself",
+    "full-file reads alone are not equivalent to diff review",
+    "diff-of-diffs isolating only what changed since the previous round",
+)
 ORCHESTRATOR_LIFECYCLE_REQUIRED = (
     "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
     "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
@@ -229,6 +246,28 @@ CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_upgrade",
     "ctx_purge",
     "ctx_insight",
+)
+# Recommendation-phrasing scan for CONTEXT_MODE_BLOCKED_TOOLS in prose: broader
+# than the four literal verbs it replaced, tolerant of backtick-wrapped tool
+# names, and negation-aware so an explicit prohibition ("do not use
+# ctx_execute") does not itself count as a violation.
+TOOL_ROUTING_RECOMMENDATION_VERBS = (
+    "use",
+    "call",
+    "run",
+    "recommend",
+    "invoke",
+    "leverage",
+    "try",
+)
+TOOL_ROUTING_NEGATION_PHRASES = (
+    "do not",
+    "does not",
+    "never",
+    "don't",
+    "doesn't",
+    "must not",
+    "avoid",
 )
 REPORTING_REMINDER_MAX_BYTES = 200
 REPORTING_REMINDER_TEXT = (
@@ -813,6 +852,11 @@ def planner_supervision_contract_errors(
             errors.append(
                 f"orchestrator prompt is missing planner-supervision contract: {fragment}"
             )
+    for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS:
+        if fragment not in orchestrator_text:
+            errors.append(
+                f"orchestrator prompt is missing delegation-evidence contract: {fragment}"
+            )
     for fragment in ORCHESTRATOR_LIFECYCLE_REQUIRED:
         if fragment not in orchestrator_prompt:
             errors.append(f"orchestrator prompt is missing lifecycle step: {fragment}")
@@ -822,6 +866,67 @@ def planner_supervision_contract_errors(
                 f"orchestrator prompt contains stale lifecycle step: {fragment}"
             )
     return errors
+
+
+def coder_incremental_intent_contract_errors(coder_prompt: str) -> list[str]:
+    """Return missing full-rebuild-as-material-deviation clauses."""
+    return [
+        f"coder prompt is missing incremental-intent contract: {fragment}"
+        for fragment in CODER_PROMPT_REQUIRED_FRAGMENTS
+        if fragment not in coder_prompt
+    ]
+
+
+TOOL_ROUTING_SENTENCE_SPLIT_PATTERN = re.compile(r"[.;:!?]")
+
+
+def tool_routing_recommendation_errors(
+    text: str, blocked_tools: Sequence[str] = CONTEXT_MODE_BLOCKED_TOOLS
+) -> list[str]:
+    """Return violations where prose appears to recommend a filtered Context
+    Mode tool: a recommendation verb followed, within a short word gap, by a
+    blocked tool name. Backtick formatting is stripped before matching so
+    `recommend \\`ctx_execute\\`` is caught the same as unformatted prose. Text
+    is scanned one sentence at a time (split on `.;:!?`) so an unrelated
+    neighboring sentence can never join the verb and the tool name, and a
+    negation phrase ("do not", "never", ...) anywhere earlier in the same
+    sentence — not just immediately before the verb — exempts a genuine
+    prohibition from counting as a violation."""
+    normalized = text.replace("`", "").lower()
+    verb_pattern = "|".join(
+        re.escape(verb) for verb in TOOL_ROUTING_RECOMMENDATION_VERBS
+    )
+    negation_pattern = re.compile(
+        r"\b(?:"
+        + "|".join(re.escape(n) for n in TOOL_ROUTING_NEGATION_PHRASES)
+        + r")\b"
+    )
+    errors: list[str] = []
+    for tool in blocked_tools:
+        # `[,]?` tolerates punctuation glued directly to the verb (e.g. "use,
+        # ctx_execute") without requiring immediate whitespace.
+        pattern = re.compile(
+            rf"\b(?:{verb_pattern})\b[,]?(?:\s+\S+){{0,3}}\s+{re.escape(tool)}\b"
+        )
+        for sentence in TOOL_ROUTING_SENTENCE_SPLIT_PATTERN.split(normalized):
+            for match in pattern.finditer(sentence):
+                preceding = sentence[: match.start()]
+                if negation_pattern.search(preceding):
+                    continue
+                errors.append(
+                    f"tool-routing instructions must not recommend filtered tool {tool}: "
+                    f"{match.group(0)!r}"
+                )
+    return errors
+
+
+def reviewer_diff_evidence_contract_errors(reviewer_prompt: str) -> list[str]:
+    """Return missing diff-scoped evidence clauses in the reviewer's input contract."""
+    return [
+        f"reviewer prompt is missing diff-evidence contract: {fragment}"
+        for fragment in REVIEWER_PROMPT_REQUIRED_FRAGMENTS
+        if fragment not in reviewer_prompt
+    ]
 
 
 def task_lane_for(**inputs: Unpack[TaskLaneInputs]) -> str:
@@ -2079,10 +2184,20 @@ def validate_agents(errors: list[str]) -> None:
         errors.append(str(error))
         return
     planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
+    orchestrator_prompt = read(
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    )
     errors.extend(
-        planner_supervision_contract_errors(
-            planner_prompt,
-            read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"),
+        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+    )
+    errors.extend(
+        coder_incremental_intent_contract_errors(
+            read(REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md")
+        )
+    )
+    errors.extend(
+        reviewer_diff_evidence_contract_errors(
+            read(REPO_ROOT / "shared" / "agents" / "reviewer" / "prompt.md")
         )
     )
     for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
@@ -2179,6 +2294,15 @@ def validate_agents(errors: list[str]) -> None:
             check(
                 not missing,
                 f"orchestrator capabilities must cover its prompt-declared actions; missing {sorted(missing)}",
+                errors,
+            )
+        if agent_id == "reviewer":
+            # Settled decision: the reviewer stays read/search only and relies
+            # on the orchestrator for diff-scoped evidence instead of gaining
+            # generic shell access.
+            check(
+                "execute" not in capabilities,
+                "reviewer must not gain execute capability; it relies on orchestrator-supplied diff evidence instead",
                 errors,
             )
 
@@ -6801,6 +6925,8 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
         "context-status": (
             "planning/in-progress/complete/cancelled",
             "in-progress/paused/complete/cancelled",
+            "never select one as the active small plan",
+            "pending phases",
             "frontmatter",
             "type: big-plan",
             "type: small-plan",
@@ -7228,6 +7354,16 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         "MCP tools",
         errors,
     )
+    check(
+        "agents use only tools their own runtime actually exposes as callable"
+        in tool_routing_text
+        and "does not claim precedence over host-injected system or developer context"
+        in tool_routing_text,
+        "tool-routing instructions must state that agents use only actually "
+        "callable tools and must not claim precedence over host-injected context",
+        errors,
+    )
+    errors.extend(tool_routing_recommendation_errors(tool_routing_text))
 
     validate_support_files(errors)
     validate_generated_hygiene(errors)
