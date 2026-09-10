@@ -2898,3 +2898,15 @@ error: Please commit or stash them.
 2026-09-10T07:09:27Z WARN hook fail-closed: unparseable tool payload
 2026-09-10T07:09:27Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-10T07:09:27Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T11:44:22Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/.local/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-09-10T11:44:22Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T11:45:05Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/.local/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-09-10T11:45:05Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T11:45:15Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/.local/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-09-10T11:45:15Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T11:45:26Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/.local/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-09-10T11:45:26Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T11:50:21Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T11:50:22Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T11:50:22Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T11:50:22Z WARN hook fail-closed: unparseable tool payload

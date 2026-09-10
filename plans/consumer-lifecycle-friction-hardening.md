@@ -10,7 +10,7 @@ phases:
   - 2026-09-10_phase-B-root-adapter-recovery-diagnostics
   - 2026-09-10_phase-C-plan-and-delegation-semantics
   - 2026-09-10_phase-D-shell-classifier-runtime-guidance
-current_phase: 2026-09-10_phase-A-commit-closeout-reliability
+current_phase: 2026-09-10_phase-B-root-adapter-recovery-diagnostics
 review_profiles:
   - code
   - architecture

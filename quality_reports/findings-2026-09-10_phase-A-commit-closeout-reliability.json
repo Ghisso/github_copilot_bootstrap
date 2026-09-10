@@ -13,7 +13,7 @@
     "tests"
   ],
   "findings": [],
-  "generated_at": "2026-09-10T07:07:21Z",
+  "generated_at": "2026-09-10T11:49:54Z",
   "branch": "consumer-lifecycle-friction-hardening_implementation",
   "head_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
   "base_ref": "dev",
@@ -21,7 +21,7 @@
   "phase": "2026-09-10_phase-A-commit-closeout-reliability",
   "target": ".",
   "dirty": false,
-  "content_hash": "2802881d6e474cee88da5327b2500d98881655e5",
+  "content_hash": "254a574c1b3aa458e9b4f11c8aa4041758997504",
   "changed_files": [
     "README.md",
     "docs/architecture.md",
@@ -41,6 +41,7 @@
     "shared/skills/commit/SKILL.md",
     "shared/templates/plan-small.md",
     "tests/test_commit_closeout.py",
+    "tests/test_install_bootstrap.py",
     "tests/test_lifecycle_hooks.py",
     "tests/test_verify.py"
   ],
