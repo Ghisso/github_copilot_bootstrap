@@ -3,8 +3,11 @@ name: 2026-09-10_phase-B-root-adapter-recovery-diagnostics
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 2
-status: in-progress
+status: paused
 closeout_session_log:
+paused_at: 2026-09-10T12:24:00Z
+paused_reason: User requested a usage-limit checkpoint during Phase B review remediation
+pause_session_log: .claude/session_logs/2026-09-10_consumer-lifecycle-friction-hardening-phase-B.md
 ---
 
 # Small Plan: Phase B — Root Adapter Recovery and Diagnostics
@@ -118,4 +121,3 @@ Use only after the user explicitly asks to stop or checkpoint and resume later.
 Set `status: paused`, record `paused_at`, `paused_reason`, and
 `pause_session_log`, and keep the big plan `in-progress` with this same
 `current_phase`. Resume this file rather than creating a replacement phase.
-
