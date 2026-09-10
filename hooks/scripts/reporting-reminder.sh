@@ -60,7 +60,7 @@ command_starts_with() {
   local index
   _shell_tokenize "$command"
   (( ${#_TOKENS[@]} >= ${#expected[@]} )) || return 1
-  for index in "${!expected[@]}"; do
+  for index in ${expected[@]+"${!expected[@]}"}; do
     [[ "${_TOKENS[$index]}" == "${expected[$index]}" ]] || return 1
   done
 }
