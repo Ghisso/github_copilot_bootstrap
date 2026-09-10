@@ -70,11 +70,10 @@ def untracked_target_files(target: Path, cwd: Path) -> list[str]:
     repo_root = _git(["rev-parse", "--show-toplevel"], cwd)
     if not repo_root:
         return []
-    try:
-        target_path = target.resolve()
-        root_path = Path(repo_root).resolve()
-    except OSError:
-        return []
+    root_path = Path(repo_root).absolute()
+    target_path = (
+        (cwd / target).absolute() if not target.is_absolute() else target.absolute()
+    )
     if target_path != root_path and root_path not in target_path.parents:
         return []
     rc, output, _ = _run(
@@ -88,13 +87,19 @@ def untracked_target_files(target: Path, cwd: Path) -> list[str]:
         if not record.startswith("?? "):
             continue
         relative = record[3:]
-        try:
-            candidate = (root_path / relative).resolve()
-            candidate.relative_to(target_path)
-        except (OSError, ValueError):
+        candidate = Path(relative)
+        if candidate.is_absolute() or ".." in candidate.parts:
             continue
-        paths.append(relative)
+        if target_path == root_path or (root_path / candidate).is_relative_to(
+            target_path
+        ):
+            paths.append(relative)
     return sorted(paths)
+
+
+def display_path(path: str) -> str:
+    """Render an untracked path on one safe terminal line."""
+    return path.encode("unicode_escape").decode("ascii")
 
 
 def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
@@ -248,7 +253,7 @@ def main() -> None:
     if untracked:
         print(
             "warning: untracked target files are not included in git diff: "
-            f"{', '.join(untracked)}; stage intended files before recording again",
+            f"{', '.join(display_path(path) for path in untracked)}; stage intended files before recording again",
             file=sys.stderr,
         )
 

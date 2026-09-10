@@ -21,15 +21,26 @@ Phase A: `.claude/plans/2026-09-10_phase-A-commit-closeout-reliability.md`
   four small plans present in the nested AI-state repository.
 - Created branch `consumer-lifecycle-friction-hardening_implementation` from
   `dev`; the branch hook activated Phase A at 2026-09-10T02:08:57Z.
+- Phase A coder moved advancement to the native post-commit hook, removed
+  PostToolUse command-subject parsing, added state-specific terminal recovery,
+  added untracked-target findings warnings, aligned closeout ordering, and
+  regenerated the target runtime.
+- Phase A focused tests, target validation, runtime checks, Ruff, Mypy, and
+  `verify.py fast` passed.
+- Phase A review failed with one critical documentation inconsistency, four
+  major correctness/test gaps, and one minor untracked-path safety issue. The
+  findings are recorded in
+  `.claude/quality_reports/2026-09-10_review_phase-A-commit-closeout-reliability.md`
+  and are being remediated before re-review.
 
 ## Verification state
 
 - New plan files pass `scripts/validate_plan_frontmatter.py`.
-- No implementation changes or Phase A verification have run yet.
+- Phase A implementation verification is green; authoritative persisted phase
+  and closeout verification wait for review and documentation convergence.
 
 ## Resume point
 
-Delegate Phase A implementation to the coder using the approved small plan,
-then run focused verification, two-pass review, documentation closeout,
-persisted findings, phase and closeout receipts, and the phase commit.
-
+Complete Phase A review remediation and re-review. Then perform documentation
+closeout, persist findings, run phase and closeout verification, and commit
+Phase A.
