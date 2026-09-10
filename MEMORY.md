@@ -799,3 +799,15 @@
 - [LEARN:quality] A regression check that claims to prevent a defect class must
   cover the class, not one syntactic shape of it. Restricting a scanner to the
   quoted `@`-subscript form hid a real unguarded `${!arr[@]}` site.
+- [LEARN:security] When a refactor starts using an existing configuration value
+  to build a filesystem path, that value needs slug validation even if it was
+  previously safe as data. A phase name written into frontmatter carries no
+  path risk; the same name interpolated into a path that gets written does.
+- [LEARN:testing] Prove a security regression test is load-bearing by removing
+  the guard and confirming the intended assertion fails. A fixture that never
+  reaches the vulnerable code path makes the test pass for the wrong reason and
+  reports protection that is not actually being verified.
+- [LEARN:quality] A prose-validation check with no negation awareness punishes
+  clear prohibitions and pushes authors toward vaguer wording. Scope such a
+  check to one sentence and look for negation anywhere before the verb instead
+  of using a fixed-width character lookback.

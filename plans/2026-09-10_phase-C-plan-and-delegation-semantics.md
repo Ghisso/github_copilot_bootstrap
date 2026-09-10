@@ -3,8 +3,8 @@ name: 2026-09-10_phase-C-plan-and-delegation-semantics
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_consumer-lifecycle-friction-hardening-phase-C-closeout.md
 ---
 
 # Small Plan: Phase C — Plan and Delegation Semantics
@@ -110,14 +110,14 @@ delegation.
 
 ## Acceptance Criteria
 
-- [ ] Parenthetical and documented delimiter annotations validate while the extracted slug list must still exactly match frontmatter.
-- [ ] New future small plans default to `planned`; legacy future `in-progress` plans remain valid.
-- [ ] Branch creation and completed-phase advancement activate only the selected planned phase.
-- [ ] Unexpected next-phase states are preserved and reported rather than overwritten.
-- [ ] Context status reports planned phases as pending, not active.
-- [ ] Incremental briefs cannot silently authorize a full rebuild.
-- [ ] Reviewers receive diff-scoped evidence while retaining read/search-only capabilities.
-- [ ] Generated prompts use only the guarded context-mode surface and do not claim control over host-owned context.
+- [x] Parenthetical and documented delimiter annotations validate while the extracted slug list must still exactly match frontmatter.
+- [x] New future small plans default to `planned`; legacy future `in-progress` plans remain valid.
+- [x] Branch creation and completed-phase advancement activate only the selected planned phase.
+- [x] Unexpected next-phase states are preserved and reported rather than overwritten.
+- [x] Context status reports planned phases as pending, not active.
+- [x] Incremental briefs cannot silently authorize a full rebuild.
+- [x] Reviewers receive diff-scoped evidence while retaining read/search-only capabilities.
+- [x] Generated prompts use only the guarded context-mode surface and do not claim control over host-owned context.
 
 ## Verification
 
@@ -134,11 +134,11 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed (`verify phase` PASS)
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
 
 ## Pause Checkpoint
 
