@@ -3,7 +3,7 @@ name: 2026-09-10_phase-B-root-adapter-recovery-diagnostics
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 2
-status: paused
+status: in-progress
 closeout_session_log:
 paused_at: 2026-09-10T12:24:00Z
 paused_reason: User requested a usage-limit checkpoint during Phase B review remediation

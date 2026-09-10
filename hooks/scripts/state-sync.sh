@@ -298,9 +298,13 @@ setup_local_state() {
   fi
 }
 
-# Idempotent: safe to invoke directly when a user needs local setup plus a
-# reconciliation, while `pull` uses the local step once before its own sync.
+# Existing nested repositories retain setup's local-only contract; a fresh
+# setup reconciles once, while `pull` uses the local step once before its sync.
 cmd_setup() {
+  if [[ -d "$CLAUDE_DIR/.git" ]]; then
+    write_nested_gitignore
+    return $?
+  fi
   if ! setup_local_state; then
     return 1
   fi

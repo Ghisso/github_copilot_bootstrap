@@ -663,7 +663,61 @@ def bootstrap_root_fingerprint(root: Path) -> str:
     return bootstrap_root_fingerprint_diagnostics(root)[0]
 
 
-def root_adapter_diagnostic_detail(diagnostics: tuple[dict[str, str], ...]) -> str:
+def regular_tree_layout(path: Path) -> tuple[tuple[str, str], ...] | None:
+    """Return an adapter tree's safe shape without exposing names below its root."""
+    try:
+        info = path.lstat()
+        if path.is_symlink():
+            return None
+        if stat.S_ISREG(info.st_mode):
+            return (("", "file"),)
+        if not stat.S_ISDIR(info.st_mode):
+            return None
+        layout = [("", "directory")]
+        for descendant in path.rglob("*"):
+            child_info = descendant.lstat()
+            if descendant.is_symlink():
+                return None
+            if stat.S_ISDIR(child_info.st_mode):
+                kind = "directory"
+            elif stat.S_ISREG(child_info.st_mode):
+                kind = "file"
+            else:
+                return None
+            layout.append((descendant.relative_to(path).as_posix(), kind))
+        return tuple(sorted(layout))
+    except OSError:
+        return None
+
+
+def adapter_destination_is_replaceable(root: Path, relative: str) -> bool:
+    """Return whether restoration can replace this untracked adapter exactly."""
+    mirror = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+    if mirror is None:
+        return False
+    candidate = root
+    parts = Path(relative).parts
+    try:
+        for component in parts[:-1]:
+            candidate /= component
+            info = candidate.lstat()
+            if candidate.is_symlink() or not stat.S_ISDIR(info.st_mode):
+                return False
+        candidate /= parts[-1]
+        try:
+            candidate.lstat()
+        except FileNotFoundError:
+            return True
+    except OSError:
+        return False
+    if candidate.is_symlink() or git_output(["ls-files", "--", relative], root):
+        return False
+    return regular_tree_layout(candidate) == regular_tree_layout(mirror)
+
+
+def root_adapter_diagnostic_detail(
+    root: Path, diagnostics: tuple[dict[str, str], ...]
+) -> str:
     """Format safe provenance diagnostics and recovery advice for human output."""
     if not diagnostics:
         return ""
@@ -674,6 +728,8 @@ def root_adapter_diagnostic_detail(diagnostics: tuple[dict[str, str], ...]) -> s
         (item["side"], item["category"])
         in {("live", "missing-or-unsafe"), ("pair", "content-difference")}
         for item in diagnostics
+    ) and all(
+        adapter_destination_is_replaceable(root, item["path"]) for item in diagnostics
     )
     if recoverable_live:
         detail += "; recover with: bash .claude/hooks/scripts/restore-root-adapters.sh"
@@ -1573,7 +1629,7 @@ def gate_receipt_errors(
         current_provenance = control_plane_provenance(
             root, branch, phase, root_fingerprint=root_fingerprint
         )
-        adapter_detail = root_adapter_diagnostic_detail(adapter_diagnostics)
+        adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
         if not has_control_plane_provenance(
             {**metadata, "control_plane_provenance": current_provenance}
         ):
@@ -2541,7 +2597,7 @@ def phase_checks(
         "PASS" if metadata_has_outer_binding(metadata) else "UNVERIFIED"
     )
     provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
-    adapter_detail = root_adapter_diagnostic_detail(adapter_diagnostics)
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
     if is_bootstrap_authoring_repository(root):
         ruff = measure_ruff(root, ["shared", "scripts", "tests"])
         mypy = measure_mypy(root, ["shared", "scripts", "tests"])
@@ -2673,7 +2729,7 @@ def closeout_checks(
         provenance_status = "PASS"
     else:
         provenance_status = "FAIL"
-    adapter_detail = root_adapter_diagnostic_detail(adapter_diagnostics)
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
     return [
         not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
         not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
