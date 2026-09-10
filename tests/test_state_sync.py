@@ -128,6 +128,23 @@ def _restore(root: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _install_restorer(script: Path) -> None:
+    """Install the rendered sibling restorer used by session-start pull."""
+    script.with_name("restore-root-adapters.sh").write_text(
+        render_restore_script(RESTORE_SRC.read_text(encoding="utf-8"))
+    )
+
+
+def _install_pull_runtime(root: Path) -> Path:
+    """Install the state-sync pair at its real consumer path for restoration."""
+    scripts = root / ".claude" / "hooks" / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    state_sync = scripts / "state-sync.sh"
+    shutil.copy(SCRIPT_SRC, state_sync)
+    _install_restorer(state_sync)
+    return state_sync
+
+
 def _write_restore_manifest(root: Path, *paths: str) -> None:
     """Write the inert manifest format emitted by runtime_ownership.py."""
     manifest = root / ".claude" / "bootstrap-ownership.env"
@@ -136,6 +153,17 @@ def _write_restore_manifest(root: Path, *paths: str) -> None:
         "# Generated from scripts/runtime_ownership.py.\n"
         + "".join(f"BOOTSTRAP_ROOT_PATH={path}\n" for path in paths)
     )
+
+
+def _write_github_adapter_source(
+    root: Path, content: str = "generated agent\n"
+) -> Path:
+    """Add one ignored directory adapter to the nested restoration mirror."""
+    _write_restore_manifest(root, ".github/agents")
+    agent = root / ".claude" / "bootstrap-root/.github/agents/coder.agent.md"
+    agent.parent.mkdir(parents=True, exist_ok=True)
+    agent.write_text(content, encoding="utf-8")
+    return agent
 
 
 def _local_show(root: Path, relpath: str) -> str:
@@ -490,6 +518,22 @@ def test_publish_sends_checkpoint_without_another_commit_and_is_idempotent(
     assert _local_head(writer) == before_head == first_remote_head
     assert _local_commit_count(writer) == before_count
     assert _git(remote, "rev-parse", "ai-state").stdout.strip() == first_remote_head
+
+
+def test_setup_existing_nested_repo_does_not_checkpoint_pending_state(
+    script: Path, tmp_path: Path
+) -> None:
+    """Standalone setup leaves a caller's pending nested state for its own commit."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "existing-setup")
+    before_head = _local_head(writer)
+    _write(writer, "plans/pending-bootstrap.md", "await installer commit\n")
+
+    result = _sync(script, writer, remote, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert _local_head(writer) == before_head
+    assert "?? plans/" in _git(writer / ".claude", "status", "--porcelain").stdout
 
 
 def test_publish_refuses_dirty_state_without_committing_or_publishing(
@@ -1288,6 +1332,143 @@ def test_restore_root_adapters_parses_inert_paths_and_preserves_tracked_files(
     assert (root / "CLAUDE.md").read_text() == "generated guidance\n"
     assert (root / ".codex" / "config.toml").read_text() == "tracked config\n"
     assert (root / ".codex" / "agents" / "coder.toml").read_text() == "new agent\n"
+
+
+@pytest.mark.parametrize("local_only", (False, True), ids=("no-remote", "local-only"))
+def test_pull_restores_ignored_github_directory_after_successful_local_setup(
+    tmp_path: Path, local_only: bool
+) -> None:
+    """Successful no-remote and local-only pulls restore an ignored directory adapter."""
+    root = tmp_path / ("local-only" if local_only else "no-remote")
+    consumer_script = _install_pull_runtime(root)
+    _write_github_adapter_source(root)
+
+    result = _sync(
+        consumer_script,
+        root,
+        None,
+        "pull",
+        extra_env={"AI_STATE_LOCAL_ONLY": "1" if local_only else "0"},
+    )
+
+    restored = root / ".github/agents/coder.agent.md"
+    assert result.returncode == 0, result.stderr
+    assert restored.read_text(encoding="utf-8") == "generated agent\n"
+    assert _git(root / ".claude", "rev-parse", "--verify", "HEAD").returncode == 0
+    assert _git(root / ".claude", "status", "--porcelain").stdout == ""
+
+
+def test_pull_restores_after_successful_remote_reconciliation(tmp_path: Path) -> None:
+    """A fresh consumer restores the pulled mirror only after remote reconciliation."""
+    remote = _bare_remote(tmp_path)
+    publisher = tmp_path / "publisher"
+    publisher_script = _install_pull_runtime(publisher)
+    _write_github_adapter_source(publisher, "published agent\n")
+    assert _sync(publisher_script, publisher, remote, "setup").returncode == 0
+    assert _sync(publisher_script, publisher, remote, "push").returncode == 0
+    consumer = tmp_path / "consumer"
+    consumer_script = _install_pull_runtime(consumer)
+
+    result = _sync(consumer_script, consumer, remote, "pull")
+
+    assert result.returncode == 0, result.stderr
+    assert (consumer / ".github/agents/coder.agent.md").read_text() == (
+        "published agent\n"
+    )
+    assert _git(consumer / ".claude", "rev-parse", "--verify", "HEAD").returncode == 0
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
+
+
+def test_failed_pull_does_not_restore_root_adapters(tmp_path: Path) -> None:
+    """A failed reconciliation leaves an absent ignored adapter absent."""
+    remote = _bare_remote(tmp_path)
+    publisher = tmp_path / "publisher"
+    publisher_script = _install_pull_runtime(publisher)
+    _write_github_adapter_source(publisher)
+    assert _sync(publisher_script, publisher, remote, "setup").returncode == 0
+    assert _sync(publisher_script, publisher, remote, "push").returncode == 0
+    root = tmp_path / "failed-pull"
+    consumer_script = _install_pull_runtime(root)
+    _write_github_adapter_source(root)
+    actual_git = shutil.which("git")
+    assert actual_git is not None
+    fake_bin = tmp_path / "failed-pull-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "${3:-}" == "fetch" ]]; then\n'
+        '  printf "forced fetch failure\\n" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+        f'exec "{actual_git}" "$@"\n'
+    )
+    fake_git.chmod(0o755)
+
+    result = _sync(
+        consumer_script,
+        root,
+        remote,
+        "pull",
+        extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+
+    assert result.returncode == 0
+    assert "fetch from origin/ai-state failed" in result.stderr
+    assert not (root / ".github/agents/coder.agent.md").exists()
+
+
+def test_conflicted_pull_does_not_restore_root_adapters(
+    script: Path, tmp_path: Path
+) -> None:
+    """A real rebase conflict preserves the local state and skips restoration."""
+    remote = _bare_remote(tmp_path)
+    publisher = tmp_path / "publisher"
+    publisher_script = _install_pull_runtime(publisher)
+    _write_github_adapter_source(publisher)
+    assert _sync(publisher_script, publisher, remote, "setup").returncode == 0
+    _write(publisher, "plans/conflict.md", "base\n")
+    assert _sync(publisher_script, publisher, remote, "push").returncode == 0
+
+    consumer = tmp_path / "consumer"
+    consumer_script = _install_pull_runtime(consumer)
+    assert _sync(consumer_script, consumer, remote, "pull").returncode == 0
+    _write(consumer, "plans/conflict.md", "consumer\n")
+    assert _sync(consumer_script, consumer, remote, "checkpoint").returncode == 0
+    before_head = _local_head(consumer)
+    shutil.rmtree(consumer / ".github")
+
+    peer = _new_writer(script, tmp_path, remote, "peer")
+    _write(peer, "plans/conflict.md", "peer\n")
+    assert _sync(script, peer, remote, "push").returncode == 0
+
+    result = _sync(consumer_script, consumer, remote, "pull")
+
+    assert result.returncode == 0
+    assert "reconciliation with origin/ai-state failed" in result.stderr
+    assert _local_head(consumer) == before_head
+    assert _local_show(consumer, "plans/conflict.md") == "consumer\n"
+    assert not (consumer / ".github/agents/coder.agent.md").exists()
+    assert _no_active_rebase_or_merge(consumer)
+
+
+def test_setup_alone_restores_ignored_github_directory_on_fresh_repo(
+    tmp_path: Path,
+) -> None:
+    """Standalone `setup` (no `pull`) restores installer-owned ignored root
+    adapters too (D5 / F1 §9), matching the manual two-command bootstrap in
+    README.md where a non-devcontainer machine may run only `setup`."""
+    root = tmp_path / "standalone-setup"
+    consumer_script = _install_pull_runtime(root)
+    _write_github_adapter_source(root)
+
+    result = _sync(consumer_script, root, None, "setup")
+
+    restored = root / ".github/agents/coder.agent.md"
+    assert result.returncode == 0, result.stderr
+    assert restored.read_text(encoding="utf-8") == "generated agent\n"
+    assert _git(root / ".claude", "rev-parse", "--verify", "HEAD").returncode == 0
+    assert _git(root / ".claude", "status", "--porcelain").stdout == ""
 
 
 def test_restore_root_adapters_restores_agents_directory(tmp_path: Path) -> None:

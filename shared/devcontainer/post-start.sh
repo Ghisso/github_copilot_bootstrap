@@ -24,7 +24,6 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
 fi
 
 STATE_SYNC="$SCRIPT_DIR/state-sync.sh"
-RESTORE_ROOT_ADAPTERS="$SCRIPT_DIR/restore-root-adapters.sh"
 
 if [[ ! -f "$STATE_SYNC" ]]; then
   warn "missing state-sync helper at $STATE_SYNC; skipping AI state sync."
@@ -43,7 +42,3 @@ if [[ -d "$REPO_ROOT/.git" ]]; then
 fi
 
 bash "$STATE_SYNC" pull || warn "AI state pull failed; continuing."
-
-if [[ -f "$RESTORE_ROOT_ADAPTERS" ]]; then
-  bash "$RESTORE_ROOT_ADAPTERS" || warn "restoring root adapter files failed; continuing."
-fi

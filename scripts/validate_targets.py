@@ -7872,19 +7872,20 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             'git -C "$REPO_ROOT" config core.hooksPath'
         )
         pull_index = post_start_text.find('"$STATE_SYNC" pull')
-        restore_index = post_start_text.find('"$RESTORE_ROOT_ADAPTERS"')
         check(setup_index != -1, "post-start must run state-sync.sh setup", errors)
         check(
             hooks_path_index != -1, "post-start must configure core.hooksPath", errors
         )
         check(pull_index != -1, "post-start must run state-sync.sh pull", errors)
         check(
-            restore_index != -1, "post-start must run restore-root-adapters.sh", errors
+            "RESTORE_ROOT_ADAPTERS" not in post_start_text,
+            "post-start must let state-sync.sh pull own safe root-adapter restoration",
+            errors,
         )
         check(
-            -1 not in (setup_index, hooks_path_index, pull_index, restore_index)
-            and setup_index < hooks_path_index < pull_index < restore_index,
-            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull, then restore-root-adapters.sh, in that order",
+            -1 not in (setup_index, hooks_path_index, pull_index)
+            and setup_index < hooks_path_index < pull_index,
+            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull",
             errors,
         )
 
@@ -9044,10 +9045,19 @@ def validate_state_sync(errors: list[str]) -> None:
             "[state-sync] setup must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
             errors,
         )
+        # Remove the file `setup` just restored so the assertion below is
+        # independently probative of `pull`'s own restoration (finish_pull),
+        # rather than passing unchanged even if `pull` never restored anything.
+        (machine_b / "CLAUDE.md").unlink()
         pull_b = run_state_sync(machine_b, "pull", env_b)
         check(
             pull_b.returncode == 0,
             f"[state-sync] machine B setup+pull failed: {pull_b.stderr}",
+            errors,
+        )
+        check(
+            (machine_b / "CLAUDE.md").is_file(),
+            "[state-sync] successful pull must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
             errors,
         )
 

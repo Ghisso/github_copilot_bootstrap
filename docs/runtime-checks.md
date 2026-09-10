@@ -336,6 +336,24 @@ Changes to governing runtime files, relevant nested state, or either active
 plan make the receipt stale. Structural receipt invariants are enforced by the
 schema and verifier; they are not represented as synthetic PASS check IDs.
 
+When control-plane provenance is unavailable because of a root-adapter
+mismatch, the verifier's message names each affected path from the ownership
+manifest, a `side` (`live`, `mirror`, `pair`, or `manifest`), and a `category`
+(`missing-or-invalid`, `missing-or-unsafe`, `unsupported-file-type`,
+`unreadable-bytes`, or `content-difference`). For example, `CLAUDE.md: live
+missing-or-unsafe` means the live root copy is missing, or a symlink is
+present somewhere along its path. `CLAUDE.md: live unsupported-file-type`
+means the entry exists but is neither a regular file nor a directory (for
+example a FIFO or a device file). The diagnostic never includes file
+contents, absolute external paths, or hashes beyond what the receipt already
+records. It recommends `bash .claude/hooks/scripts/restore-root-adapters.sh`
+only when every diagnosed path is a genuinely recoverable live-side mismatch —
+the mirror under `.claude/bootstrap-root/` is valid and the live destination
+can be replaced exactly. It withholds that recommendation when the mirror
+itself is invalid or the ownership manifest (`.claude/bootstrap-ownership.env`)
+is missing or invalid, because restoring from a broken source of truth cannot
+fix the problem.
+
 ### Mid-plan consumer upgrade
 
 For a consumer with active work, use the installer or updater with

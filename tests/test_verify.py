@@ -1988,6 +1988,211 @@ def test_root_adapter_rejects_ancestor_symlink_escape(
     assert verify.bootstrap_root_fingerprint(tmp_path) == ""
 
 
+def test_root_adapter_diagnostics_name_safe_paths_and_recovery_only_when_valid(
+    tmp_path: Path,
+) -> None:
+    """Live drift names its adapter and recovery without exposing adapter bytes."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    live = tmp_path / ".github" / "agents"
+    shutil.rmtree(live)
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert fingerprint == ""
+    assert diagnostics == (
+        {
+            "path": ".github/agents",
+            "side": "live",
+            "category": "missing-or-unsafe",
+        },
+    )
+    assert ".github/agents: live missing-or-unsafe" in detail
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+    assert "adapter\n" not in detail
+    assert str(tmp_path) not in detail
+
+
+def test_root_adapter_diagnostics_report_content_difference_for_same_shape_pair(
+    tmp_path: Path,
+) -> None:
+    """A live/mirror pair with matching shape but differing bytes is reported
+    as `content-difference` and still offers restoration, without disclosing
+    either side's bytes or the filesystem path."""
+    _write_root_adapter_pairs(tmp_path)
+    relative = ".mcp.json"
+    (tmp_path / relative).write_text("live-only-bytes\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert fingerprint == ""
+    assert diagnostics == (
+        {"path": relative, "side": "pair", "category": "content-difference"},
+    )
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+    assert "live-only-bytes" not in detail
+    assert "adapter\n" not in detail
+    assert str(tmp_path) not in detail
+
+
+def test_root_adapter_diagnostics_offer_recovery_for_fully_missing_parent_directory(
+    tmp_path: Path,
+) -> None:
+    """A wholly-missing intermediate parent (`.github/` itself, not just
+    `.github/agents`) stays replaceable, since restore-root-adapters.sh's
+    ensure_destination_parent() creates missing parents. Regression for the
+    originating consumer bug: missing `.github/` adapters."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    shutil.rmtree(tmp_path / ".github")
+
+    assert verify.adapter_destination_is_replaceable(tmp_path, ".github/agents")
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert diagnostics and all(
+        item["side"] == "live" and item["category"] == "missing-or-unsafe"
+        for item in diagnostics
+    )
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+
+
+def test_root_adapter_diagnostics_offer_recovery_when_live_is_subset_of_mirror(
+    tmp_path: Path,
+) -> None:
+    """A live directory adapter missing a file the mirror still has is still
+    exactly replaceable: restore-root-adapters.sh only adds and overwrites
+    from the mirror, it never deletes, so restoring in place fills the gap
+    with no extras left behind. Regression for the ordinary consumer-upgrade
+    case: the bootstrap gained a new adapter file the consumer has not
+    picked up yet."""
+    _write_root_adapter_pairs(tmp_path, mode=False)
+    relative = ".github/agents"
+    live_agents = tmp_path / relative
+    mirror_agents = tmp_path / ".claude" / "bootstrap-root" / relative
+    for base in (live_agents, mirror_agents):
+        (base / "new-agent.md").write_text("new adapter file\n", encoding="utf-8")
+    (live_agents / "new-agent.md").unlink()
+
+    assert verify.adapter_destination_is_replaceable(tmp_path, relative)
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert {
+        "path": relative,
+        "side": "pair",
+        "category": "content-difference",
+    } in diagnostics
+    assert "bash .claude/hooks/scripts/restore-root-adapters.sh" in detail
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        (
+            "missing-mirror",
+            {"side": "mirror", "category": "missing-or-unsafe"},
+        ),
+        (
+            "unsupported-live",
+            {"side": "live", "category": "unsupported-file-type"},
+        ),
+    ),
+)
+def test_root_adapter_diagnostics_do_not_offer_recovery_for_invalid_sources(
+    tmp_path: Path, mutation: str, expected: dict[str, str]
+) -> None:
+    """Invalid ownership sources remain diagnostic-only, never false recovery hints."""
+    _write_root_adapter_pairs(tmp_path)
+    relative = ".agents"
+    target = (
+        tmp_path / ".claude" / "bootstrap-root" / relative
+        if mutation == "missing-mirror"
+        else tmp_path / relative
+    )
+    shutil.rmtree(target)
+    if mutation == "unsupported-live":
+        target.mkdir()
+        os.mkfifo(target / "unsupported")
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert {**expected, "path": relative} in diagnostics
+    assert "restore-root-adapters.sh" not in detail
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "symlink",
+        "tracked-drift",
+        "extra-live-entry",
+        "root-kind-mismatch",
+        "nested-kind-mismatch",
+        "nested-symlink",
+    ),
+)
+def test_root_adapter_diagnostics_skip_nonreplaceable_live_recovery(
+    tmp_path: Path, mutation: str
+) -> None:
+    """Recovery advice never promises to replace unsafe, tracked, extra, or
+    shape-mismatched live state."""
+    _write_root_adapter_pairs(tmp_path)
+    adapter = tmp_path / ".agents"
+    if mutation == "symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        shutil.rmtree(adapter)
+        adapter.symlink_to(outside, target_is_directory=True)
+    elif mutation == "tracked-drift":
+        managed = adapter / "fixture.txt"
+        managed.write_text("tracked drift\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "add", ".agents/fixture.txt"], check=True
+        )
+    elif mutation == "extra-live-entry":
+        (adapter / "extra.txt").write_text("extra\n", encoding="utf-8")
+    elif mutation == "root-kind-mismatch":
+        # Same relative path (the adapter root itself) on both sides, but a
+        # different kind: live is a plain file where the mirror is still a
+        # directory. `regular_tree_fingerprint_diagnostic` succeeds on both
+        # sides (each is individually valid), so this reaches
+        # `adapter_destination_is_replaceable` as `("pair", "content-difference")`
+        # rather than being rejected earlier as unsafe or unsupported.
+        shutil.rmtree(adapter)
+        adapter.write_text("not a directory\n", encoding="utf-8")
+    elif mutation == "nested-kind-mismatch":
+        # Same relative path one level down, different kind: live's
+        # `fixture.txt` becomes a directory where the mirror keeps it a file.
+        (adapter / "fixture.txt").unlink()
+        (adapter / "fixture.txt").mkdir()
+        (adapter / "fixture.txt" / "nested.txt").write_text(
+            "nested\n", encoding="utf-8"
+        )
+    else:
+        # nested-symlink: the adapter root stays an ordinary directory, but
+        # one entry inside it is a symlink. Distinct from the "symlink" case
+        # above, which replaces the adapter root itself and is caught by the
+        # earlier `candidate.is_symlink()` check before `regular_tree_layout`
+        # ever runs. This one surfaces as `("live", "missing-or-unsafe")` and
+        # reaches `regular_tree_layout`, which returns `None` for the whole
+        # tree -- proving the `None` guard in
+        # `adapter_destination_is_replaceable` is load-bearing, not dead code.
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (adapter / "link").symlink_to(outside, target_is_directory=True)
+
+    _, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    detail = verify.root_adapter_diagnostic_detail(tmp_path, diagnostics)
+
+    assert not verify.adapter_destination_is_replaceable(tmp_path, ".agents")
+    assert "restore-root-adapters.sh" not in detail
+
+
 @pytest.mark.parametrize(
     "replacement",
     (

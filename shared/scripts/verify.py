@@ -570,56 +570,185 @@ def confined_adapter_path(root: Path, relative: str) -> Path | None:
     return candidate
 
 
-def regular_tree_fingerprint(path: Path) -> bytes | None:
-    """Fingerprint a regular root adapter tree while rejecting links and special files."""
+def regular_tree_fingerprint_diagnostic(path: Path) -> tuple[bytes | None, str | None]:
+    """Fingerprint one adapter and identify a safe, content-free failure kind."""
     try:
         info = path.lstat()
         if path.is_symlink():
-            return None
-        digest = hashlib.sha256()
+            return None, "missing-or-unsafe"
         if stat.S_ISREG(info.st_mode):
-            return b"file\0" + hashlib.sha256(path.read_bytes()).digest()
+            try:
+                return b"file\0" + hashlib.sha256(path.read_bytes()).digest(), None
+            except OSError:
+                return None, "unreadable-bytes"
         if not stat.S_ISDIR(info.st_mode):
-            return None
+            return None, "unsupported-file-type"
+        digest = hashlib.sha256()
         digest.update(b"directory\0")
         for descendant in sorted(path.rglob("*")):
             relative = descendant.relative_to(path).as_posix().encode("utf-8")
             child_info = descendant.lstat()
             if descendant.is_symlink():
-                return None
+                return None, "missing-or-unsafe"
             if stat.S_ISDIR(child_info.st_mode):
                 digest.update(b"directory\0" + relative + b"\0")
             elif stat.S_ISREG(child_info.st_mode):
-                digest.update(
-                    b"file\0"
-                    + relative
-                    + b"\0"
-                    + hashlib.sha256(descendant.read_bytes()).digest()
-                )
+                try:
+                    content_digest = hashlib.sha256(descendant.read_bytes()).digest()
+                except OSError:
+                    return None, "unreadable-bytes"
+                digest.update(b"file\0" + relative + b"\0" + content_digest)
             else:
-                return None
-        return b"directory\0" + digest.digest()
+                return None, "unsupported-file-type"
+        return b"directory\0" + digest.digest(), None
     except OSError:
-        return None
+        return None, "unreadable-bytes"
+
+
+def bootstrap_root_fingerprint_diagnostics(
+    root: Path,
+) -> tuple[str, tuple[dict[str, str], ...]]:
+    """Return the legacy digest and safe path-level adapter validation failures."""
+    paths = manifest_bootstrap_root_paths(root)
+    if paths is None:
+        return "", (
+            {
+                "path": ".claude/bootstrap-ownership.env",
+                "side": "manifest",
+                "category": "missing-or-invalid",
+            },
+        )
+    digest = hashlib.sha256()
+    diagnostics: list[dict[str, str]] = []
+    for relative in paths:
+        live_path = confined_adapter_path(root, relative)
+        mirror_path = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+        if live_path is None:
+            diagnostics.append(
+                {"path": relative, "side": "live", "category": "missing-or-unsafe"}
+            )
+        if mirror_path is None:
+            diagnostics.append(
+                {"path": relative, "side": "mirror", "category": "missing-or-unsafe"}
+            )
+        if live_path is None or mirror_path is None:
+            continue
+        live, live_error = regular_tree_fingerprint_diagnostic(live_path)
+        mirror, mirror_error = regular_tree_fingerprint_diagnostic(mirror_path)
+        if live_error is not None:
+            diagnostics.append(
+                {"path": relative, "side": "live", "category": live_error}
+            )
+        if mirror_error is not None:
+            diagnostics.append(
+                {"path": relative, "side": "mirror", "category": mirror_error}
+            )
+        if live is None or mirror is None:
+            continue
+        if live != mirror:
+            diagnostics.append(
+                {"path": relative, "side": "pair", "category": "content-difference"}
+            )
+            continue
+        digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
+    if diagnostics:
+        return "", tuple(diagnostics)
+    return digest.hexdigest(), tuple(diagnostics)
 
 
 def bootstrap_root_fingerprint(root: Path) -> str:
     """Bind each installer-owned live adapter to its canonical nested mirror."""
-    paths = manifest_bootstrap_root_paths(root)
-    if paths is None:
+    return bootstrap_root_fingerprint_diagnostics(root)[0]
+
+
+def regular_tree_layout(path: Path) -> tuple[tuple[str, str], ...] | None:
+    """Return an adapter tree's safe shape without exposing names below its root."""
+    try:
+        info = path.lstat()
+        if path.is_symlink():
+            return None
+        if stat.S_ISREG(info.st_mode):
+            return (("", "file"),)
+        if not stat.S_ISDIR(info.st_mode):
+            return None
+        layout = [("", "directory")]
+        for descendant in path.rglob("*"):
+            child_info = descendant.lstat()
+            if descendant.is_symlink():
+                return None
+            if stat.S_ISDIR(child_info.st_mode):
+                kind = "directory"
+            elif stat.S_ISREG(child_info.st_mode):
+                kind = "file"
+            else:
+                return None
+            layout.append((descendant.relative_to(path).as_posix(), kind))
+        return tuple(sorted(layout))
+    except OSError:
+        return None
+
+
+def adapter_destination_is_replaceable(root: Path, relative: str) -> bool:
+    """Return whether restoration can replace this untracked adapter exactly."""
+    mirror = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
+    if mirror is None:
+        return False
+    candidate = root
+    parts = Path(relative).parts
+    try:
+        for component in parts[:-1]:
+            candidate /= component
+            try:
+                info = candidate.lstat()
+            except FileNotFoundError:
+                # A wholly missing intermediate parent directory (not just the
+                # leaf adapter) is still replaceable: restore-root-adapters.sh's
+                # ensure_destination_parent() creates missing parents, and a
+                # missing parent implies the destination itself cannot already
+                # exist.
+                return True
+            if candidate.is_symlink() or not stat.S_ISDIR(info.st_mode):
+                return False
+        candidate /= parts[-1]
+        try:
+            candidate.lstat()
+        except FileNotFoundError:
+            return True
+    except OSError:
+        return False
+    if candidate.is_symlink() or git_output(["ls-files", "--", relative], root):
+        return False
+    live_layout = regular_tree_layout(candidate)
+    mirror_layout = regular_tree_layout(mirror)
+    if live_layout is None or mirror_layout is None:
+        return False
+    # restore-root-adapters.sh only adds and overwrites files from the mirror;
+    # it never deletes. A live tree missing entries the mirror has is still
+    # exactly replaceable (restoration fills the gap), but extra live entries
+    # the mirror lacks would survive restoration untouched, so only a subset
+    # relation — not equality — is safe here.
+    return set(live_layout) <= set(mirror_layout)
+
+
+def root_adapter_diagnostic_detail(
+    root: Path, diagnostics: tuple[dict[str, str], ...]
+) -> str:
+    """Format safe provenance diagnostics and recovery advice for human output."""
+    if not diagnostics:
         return ""
-    digest = hashlib.sha256()
-    for relative in paths:
-        live_path = confined_adapter_path(root, relative)
-        mirror_path = confined_adapter_path(root, f".claude/bootstrap-root/{relative}")
-        if live_path is None or mirror_path is None:
-            return ""
-        live = regular_tree_fingerprint(live_path)
-        mirror = regular_tree_fingerprint(mirror_path)
-        if live is None or mirror is None or live != mirror:
-            return ""
-        digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
-    return digest.hexdigest()
+    detail = "; ".join(
+        f"{item['path']}: {item['side']} {item['category']}" for item in diagnostics
+    )
+    recoverable_live = all(
+        (item["side"], item["category"])
+        in {("live", "missing-or-unsafe"), ("pair", "content-difference")}
+        for item in diagnostics
+    ) and all(
+        adapter_destination_is_replaceable(root, item["path"]) for item in diagnostics
+    )
+    if recoverable_live:
+        detail += "; recover with: bash .claude/hooks/scripts/restore-root-adapters.sh"
+    return detail
 
 
 def is_relevant_nested_path(
@@ -737,14 +866,17 @@ def active_plan_paths(root: Path, branch: str, phase: str) -> frozenset[str]:
     return frozenset(paths)
 
 
-def control_plane_provenance(root: Path, branch: str, phase: str) -> dict[str, object]:
+def control_plane_provenance(
+    root: Path, branch: str, phase: str, *, root_fingerprint: str | None = None
+) -> dict[str, object]:
     """Bind the nested runtime and active plans without hashing mutable evidence."""
     active_paths = active_plan_paths(root, branch, phase)
     runtime_paths = nested_runtime_paths(root)
     nested_fingerprint = (
         hash_paths(root / ".claude", runtime_paths) if runtime_paths is not None else ""
     )
-    root_fingerprint = bootstrap_root_fingerprint(root)
+    if root_fingerprint is None:
+        root_fingerprint = bootstrap_root_fingerprint(root)
     runtime_fingerprint = (
         hashlib.sha256(
             b"nested\0"
@@ -1237,7 +1369,13 @@ def current_phase(root: Path, branch: str) -> str:
     return match.group(1) if match else ""
 
 
-def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, object]:
+def state_metadata(
+    root: Path,
+    base_ref: str,
+    phase: str = "",
+    *,
+    adapter_diagnostics: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
     """Capture Git metadata and whole/scoped content bindings."""
     merge_base = git_output(["merge-base", base_ref, "HEAD"], root)
     try:
@@ -1249,6 +1387,9 @@ def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, obje
         path_discovery_ok = True
     relevant = scoped_paths(paths)
     branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    root_fingerprint, diagnostics = bootstrap_root_fingerprint_diagnostics(root)
+    if adapter_diagnostics is not None:
+        adapter_diagnostics.extend(diagnostics)
     return {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "base_ref": base_ref,
@@ -1263,7 +1404,10 @@ def state_metadata(root: Path, base_ref: str, phase: str = "") -> dict[str, obje
         "relevant_paths": relevant,
         "path_discovery_ok": path_discovery_ok,
         "control_plane_provenance": control_plane_provenance(
-            root, branch, phase or current_phase(root, branch)
+            root,
+            branch,
+            phase or current_phase(root, branch),
+            root_fingerprint=root_fingerprint,
         ),
     }
 
@@ -1494,12 +1638,19 @@ def gate_receipt_errors(
         )
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append("closeout receipt final tracked state is stale")
-        current_provenance = control_plane_provenance(root, branch, phase)
+        root_fingerprint, adapter_diagnostics = bootstrap_root_fingerprint_diagnostics(
+            root
+        )
+        current_provenance = control_plane_provenance(
+            root, branch, phase, root_fingerprint=root_fingerprint
+        )
+        adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
         if not has_control_plane_provenance(
             {**metadata, "control_plane_provenance": current_provenance}
         ):
             errors.append(
                 "closeout receipt governing control-plane provenance is unavailable"
+                + (f": {adapter_detail}" if adapter_detail else "")
             )
         elif not control_plane_provenance_matches(
             metadata, {**metadata, "control_plane_provenance": current_provenance}
@@ -2451,12 +2602,17 @@ def metadata_has_outer_binding(metadata: dict[str, object]) -> bool:
     )
 
 
-def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
+def phase_checks(
+    root: Path,
+    metadata: dict[str, object],
+    adapter_diagnostics: tuple[dict[str, str], ...] = (),
+) -> list[dict[str, object]]:
     """Run the complete Phase-A measurement group."""
     outer_freshness_status = (
         "PASS" if metadata_has_outer_binding(metadata) else "UNVERIFIED"
     )
     provenance_status = "PASS" if metadata_is_bound(metadata) else "UNVERIFIED"
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
     if is_bootstrap_authoring_repository(root):
         ruff = measure_ruff(root, ["shared", "scripts", "tests"])
         mypy = measure_mypy(root, ["shared", "scripts", "tests"])
@@ -2490,7 +2646,8 @@ def phase_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, obje
             provenance_status,
             "phase evidence captured governing control-plane provenance"
             if provenance_status == "PASS"
-            else "governing control-plane provenance was unavailable",
+            else "governing control-plane provenance was unavailable"
+            + (f": {adapter_detail}" if adapter_detail else ""),
         ),
         generation_check(root),
         not_applicable(
@@ -2542,7 +2699,11 @@ def fast_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, objec
     ]
 
 
-def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, object]]:
+def closeout_checks(
+    root: Path,
+    metadata: dict[str, object],
+    adapter_diagnostics: tuple[dict[str, str], ...] = (),
+) -> list[dict[str, object]]:
     """Reuse validated phase evidence and bind a final full-state receipt."""
     phase = metadata.get("phase")
     phase_path = receipt_path(root, "phase", phase) if isinstance(phase, str) else root
@@ -2583,6 +2744,7 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
         provenance_status = "PASS"
     else:
         provenance_status = "FAIL"
+    adapter_detail = root_adapter_diagnostic_detail(root, adapter_diagnostics)
     return [
         not_applicable("VFY-RUFF-001", "closeout reuses phase Ruff evidence"),
         not_applicable("VFY-MYPY-001", "closeout reuses phase mypy evidence"),
@@ -2607,6 +2769,7 @@ def closeout_checks(root: Path, metadata: dict[str, object]) -> list[dict[str, o
                 "governing control-plane provenance is stale"
                 if provenance_status == "FAIL"
                 else "governing control-plane provenance was unavailable"
+                + (f": {adapter_detail}" if adapter_detail else "")
             ),
         ),
         not_applicable("VFY-GEN-001", "closeout reuses phase generation evidence"),
@@ -2801,7 +2964,10 @@ def main() -> int:
         )
         print(json.dumps({"errors": errors}, separators=(",", ":")))
         return 0 if not errors else 1
-    metadata = state_metadata(root, args.base_ref, args.phase)
+    adapter_diagnostics: list[dict[str, str]] = []
+    metadata = state_metadata(
+        root, args.base_ref, args.phase, adapter_diagnostics=adapter_diagnostics
+    )
     branch = metadata.get("branch")
     phase_value = metadata.get("phase")
     reason = unresolved_phase_reason(
@@ -2816,9 +2982,9 @@ def main() -> int:
     if args.mode == "fast":
         checks = fast_checks(root, metadata)
     elif args.mode == "phase":
-        checks = phase_checks(root, metadata)
+        checks = phase_checks(root, metadata, tuple(adapter_diagnostics))
     else:
-        checks = closeout_checks(root, metadata)
+        checks = closeout_checks(root, metadata, tuple(adapter_diagnostics))
     if args.mode == "closeout":
         doc_na_reason = missing_documentation_na_reason(metadata, args.documentation_na)
         if doc_na_reason is not None:

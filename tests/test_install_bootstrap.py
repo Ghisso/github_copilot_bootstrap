@@ -1049,6 +1049,69 @@ def test_committed_to_local_copilot_migration_refreshes_owned_files(
     assert "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n" in manifest
 
 
+def test_generated_session_pull_restores_ignored_adapter_after_branch_switch(
+    tmp_path: Path,
+) -> None:
+    """An initialized generated consumer restores ignored adapters after an outer switch."""
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    assert _git(consumer, "init", "-q").returncode == 0
+    assert _git(consumer, "config", "user.name", "Installer Test").returncode == 0
+    assert (
+        _git(consumer, "config", "user.email", "installer@example.com").returncode == 0
+    )
+    authored_guidance = consumer / "CLAUDE.md"
+    authored_guidance.write_text("project-authored guidance\n", encoding="utf-8")
+    assert _git(consumer, "add", "CLAUDE.md").returncode == 0
+    assert _git(consumer, "commit", "-qm", "author guidance").returncode == 0
+    default_branch = _git(consumer, "branch", "--show-current").stdout.strip()
+    installed = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    agent_relative = Path(".github/agents/orchestrator.agent.md")
+    agent = consumer / agent_relative
+    expected = (GENERATED / agent_relative).read_bytes()
+    assert agent.read_bytes() == expected
+
+    assert _git(consumer, "checkout", "-qb", "alternate").returncode == 0
+    (consumer / "branch-switch.txt").write_text("alternate\n", encoding="utf-8")
+    assert _git(consumer, "add", "branch-switch.txt").returncode == 0
+    assert _git(consumer, "commit", "-qm", "alternate").returncode == 0
+    assert _git(consumer, "checkout", "-q", default_branch).returncode == 0
+    agent.unlink()
+    assert _git(consumer, "checkout", "-q", "alternate").returncode == 0
+
+    pulled = subprocess.run(
+        ["bash", ".claude/hooks/scripts/state-sync.sh", "pull"],
+        cwd=consumer,
+        env={**_actor_env(), "AI_STATE_LOCAL_ONLY": "1"},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert pulled.returncode == 0, pulled.stderr
+    assert agent.read_bytes() == expected
+    assert (
+        authored_guidance.read_text(encoding="utf-8") == "project-authored guidance\n"
+    )
+    assert _git(consumer / ".claude", "rev-parse", "--verify", "HEAD").returncode == 0
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
+
+
 def test_installer_preserves_consumer_memory_bytes_on_refresh_and_migration(
     tmp_path: Path,
 ) -> None:
