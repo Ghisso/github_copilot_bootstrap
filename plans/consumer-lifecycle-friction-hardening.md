@@ -165,7 +165,7 @@ shell policy engine.
 | Later persisted verification gives the reviewer less formal evidence | Medium | Run the full phase suite twice | Change: provide focused/fast evidence before review and run authoritative persisted phase verification once after final state |
 | Automatic `planned` activation could overwrite terminal state | High | Keep all phases `in-progress` | Change: transition only exact `planned`, preserve legacy `in-progress`, and reject unexpected states |
 | Parsing more shell syntax could weaken protected-file controls | High | Continue rejecting all complex syntax | Change: recursively classify executable inner constructs and retain fail-closed malformed-input behavior |
-| Four phases add lifecycle overhead | Low | Merge unrelated adapter, plan, and shell work | Accept: each phase is independently testable and limits the blast radius of security-sensitive changes |
+| Five phases add lifecycle overhead (B2 was inserted after B during execution) | Low | Merge unrelated adapter, plan, and shell work | Accept: each phase is independently testable and limits the blast radius of security-sensitive changes |
 
 ## Verification
 
