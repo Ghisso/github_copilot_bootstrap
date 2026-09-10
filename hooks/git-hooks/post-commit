@@ -15,9 +15,18 @@ set -euo pipefail
 # stdin drain returns immediately instead of waiting on the terminal.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RECORD_CLOSEOUT="$SCRIPT_DIR/../scripts/record-commit-closeout.sh"
 STATE_SYNC="$SCRIPT_DIR/../scripts/state-sync.sh"
 
-[[ -f "$STATE_SYNC" ]] || exit 0
+if [[ -f "$RECORD_CLOSEOUT" ]]; then
+  # Git has created HEAD before this hook runs. Advance a completed phase from
+  # that native boundary, rather than trying to reconstruct a commit from an
+  # editor or shell invocation. Like state sync, a bookkeeping problem must
+  # never turn a completed outer commit into a failed one.
+  bash "$RECORD_CLOSEOUT" </dev/null || true
+fi
 
-bash "$STATE_SYNC" push </dev/null || true
+if [[ -f "$STATE_SYNC" ]]; then
+  bash "$STATE_SYNC" push </dev/null || true
+fi
 exit 0

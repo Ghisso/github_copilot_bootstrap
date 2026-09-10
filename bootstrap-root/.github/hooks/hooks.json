@@ -107,15 +107,6 @@
       },
       {
         "type": "command",
-        "bash": ".claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
-        "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
-        "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh record-commit-closeout.sh github-copilot",
-        "cwd": ".",
-        "timeout": 10,
-        "timeoutSec": 10
-      },
-      {
-        "type": "command",
         "bash": ".claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",
         "linux": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",
         "osx": "/bin/bash .claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh github-copilot posttooluse",

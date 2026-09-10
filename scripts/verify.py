@@ -2675,10 +2675,34 @@ def unresolved_phase_reason(
                 "parseable frontmatter; fix the plan file before running "
                 "verify"
             )
+        frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", big_plan_text, re.DOTALL)
+        assert frontmatter is not None
+        body = frontmatter.group("body")
+        status = re.findall(r"^status:[ \t]*([^\s#]+)[ \t]*$", body, re.MULTILINE)
+        if status == ["complete"]:
+            phases = frontmatter_phases(body)
+            if phases is not None:
+                for candidate in reversed(phases):
+                    small_plan = root / ".claude/plans" / f"{candidate}.md"
+                    try:
+                        small = small_plan_frontmatter(small_plan.read_bytes())
+                    except OSError:
+                        continue
+                    if small is not None and small.get("status") == "complete":
+                        return (
+                            "no active phase: the big plan is complete; optional "
+                            "receipt refresh: uv run python "
+                            ".claude/scripts/verify.py phase --format json "
+                            f"--persist --phase {candidate}"
+                        )
+        if status == ["planning"]:
+            return (
+                "no active phase: the big plan is still planning; start its "
+                "first phase before running verify"
+            )
         return (
-            "no active phase: the big plan has no current_phase set (it is "
-            "complete or not yet started); open the next small plan before "
-            "running verify"
+            "no active phase: the big plan has no current_phase set; fix the "
+            "plan state before running verify"
         )
     small_plan = root / ".claude/plans" / f"{phase}.md"
     if not PHASE_SLUG.fullmatch(phase):

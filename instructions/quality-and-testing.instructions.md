@@ -19,13 +19,19 @@ The generated `.claude/scripts/verify.py` is the single authority for
 deterministic measurement. It also offers machine-readable `fast`, `phase`,
 and `closeout` receipts. During IMPLEMENT, use `fast` and project-native
 focused checks; do not repeat the complete fixed suite after every small edit.
-The orchestrator runs the authoritative complete suite with `verify phase
---format json --persist` before REVIEW, then runs `verify closeout` after
-CLOSEOUT. A completed closeout receipt records exact hashes and paths for its
+After review and final documentation, plan, session-log, and LEARN updates,
+the orchestrator explicitly stages intended outer files, persists findings,
+then runs the authoritative complete suite with `verify phase --format json
+--persist` followed by `verify closeout --format json --persist`. A completed
+closeout receipt records exact hashes and paths for its
 phase receipt, findings report, and completed session log. Completed commit,
 push, and PR gates read that one strict receipt rather than rediscovering a
 newest report. `closeout` reuses fresh phase evidence and binds the final
 tracked state.
+When the native post-commit hook completes the final big-plan transition, a
+normal push uses that terminal receipt path and does not need a manual receipt
+refresh. The inactive-plan diagnostic's `--phase <slug>` command is optional
+recovery advice only.
 
 ### Consumer-native verification scope
 
@@ -93,8 +99,9 @@ receipt, findings report, and completed session log:
 - the phase receipt's aggregate `status` must be `PASS` — any `FAIL` or
   `UNVERIFIED` check blocks closeout.
 - `dirty` must be `false` in every bound report — `dirty` means the working
-  tree has **unstaged** changes to tracked files (the tree does not match the
-  index). Stage everything destined for the commit, then re-run verification.
+  tree has **unstaged tracked** changes (the tree does not match the index).
+  Untracked files are not represented by `git diff`; stage intended untracked
+  files before recording findings, then re-run verification.
 
 ### Severity-Gated Findings
 

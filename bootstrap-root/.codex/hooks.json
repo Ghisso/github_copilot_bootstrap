@@ -70,11 +70,6 @@
           },
           {
             "type": "command",
-            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" record-commit-closeout.sh openai-codex",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" context-mode-dispatch.sh openai-codex posttooluse",
             "timeout": 10
           },

@@ -42,6 +42,8 @@ git add src/changed_file.py tests/test_changed.py
 - Stage specific files (never `git add .` or `git add -A`)
 - **Never stage**: `.env`, secrets, credentials
 - Review: `git diff --cached`
+- Stage only after focused/fast checks, review, documentation, final plan/log/LEARN state, and before `record_findings.py`, `verify phase --persist`, and `verify closeout --persist`.
+- `dirty` in the findings and receipt gates means unstaged tracked changes. Untracked files do not appear in `git diff`; stage intended files before recording findings.
 
 ## Phase 4: Commit
 Choose one explicit commit path.
