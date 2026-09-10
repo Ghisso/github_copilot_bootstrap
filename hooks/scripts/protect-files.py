@@ -653,14 +653,29 @@ def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
 
 def command_name(
     tokens: list[str], variables: dict[str, str]
-) -> tuple[str, int] | None:
-    """Return (command, args-start-index) and record leading assignments.
+) -> tuple[str, int, dict[str, str]] | None:
+    """Return (command, args-start-index, prefix_assignments).
 
     Records any leading `NAME=value` tokens (including ones after a
-    sudo/env/command wrapper) into `variables` as a side effect. Returns None
-    for a segment consisting entirely of assignments (`FOO=bar`): that is
-    valid Bash with no command to classify, not an ambiguity.
+    sudo/env/command wrapper) into the persistent `variables` dict as a side
+    effect, exactly as before. `prefix_assignments` is a *separate*, fresh
+    dict holding only the NAME=value tokens recorded by this one call - a
+    prefix on this command's own invocation (`VAR=v cmd`) or an `env
+    VAR=value cmd` wrapper - not any assignment tracked earlier on a
+    different, already-processed segment.
+
+    Real bash exports a prefix assignment into only the one command it
+    precedes; a persistent bare assignment on its own segment (`VAR=v`, then
+    `cmd` later) is not exported to a child process at all. Callers that
+    need "what this invocation's own environment would contain" (a heredoc
+    consumed by a bare child shell/interpreter) must use
+    `prefix_assignments`, not `variables`, or they conflate the two.
+
+    Returns None for a segment consisting entirely of assignments
+    (`FOO=bar`): that is valid Bash with no command to classify, not an
+    ambiguity.
     """
+    prefix_assignments: dict[str, str] = {}
     index = 0
     while (
         index < len(tokens)
@@ -668,6 +683,7 @@ def command_name(
         and not tokens[index].startswith("-")
     ):
         record_assignment(tokens[index], variables)
+        record_assignment(tokens[index], prefix_assignments)
         index += 1
     if index == len(tokens):
         return None
@@ -681,10 +697,11 @@ def command_name(
             and not tokens[index].startswith("-")
         ):
             record_assignment(tokens[index], variables)
+            record_assignment(tokens[index], prefix_assignments)
             index += 1
     if index == len(tokens):
         raise AmbiguousCommand("shell wrapper has no command")
-    return tokens[index], index + 1
+    return tokens[index], index + 1, prefix_assignments
 
 
 def operands(tokens: list[str], value_options: set[str]) -> list[str]:
@@ -858,7 +875,8 @@ def heredoc_targets(
     quoted: bool,
     heredocs: dict[str, tuple[str, bool]],
     repo_root: str,
-    variables: dict[str, str],
+    outer_variables: dict[str, str],
+    prefix_assignments: dict[str, str],
     working_directories: list[str],
     confirmed: list[str],
     uncertain: list[str],
@@ -866,31 +884,47 @@ def heredoc_targets(
     """Classify one heredoc body by what its consuming command does with its
     own standard input.
 
-    An *unquoted* delimiter's body is expanded by the shell itself before
-    any consuming command runs, regardless of that command's own semantics,
-    so an embedded $( )/`...` always executes and is recursively
-    classified first, unconditionally. Like a process substitution, this
-    expansion runs in a subshell of the *current* shell, so it inherits a
-    copy of the tracked `variables` (e.g. `$TARGET` resolves inside
-    `$(touch $TARGET)` when an earlier `TARGET=.env` was seen), unlike the
-    bare-shell-heredoc case below.
+    An *unquoted* delimiter's body is expanded by the *parent* shell itself,
+    using the parent's own variable scope, before any consuming command
+    runs - so an embedded $( )/`...` always executes, and a bare shell
+    interpreter's whole body is real code the parent already resolved
+    variables in. `outer_variables` models that parent scope: it is a
+    snapshot of the persistently tracked variables taken *before* this
+    command's own leading assignments were recorded, because a prefix
+    assignment (`VAR=v cmd`) is exported only into the child process about
+    to run `cmd` - it is never visible to the parent's own word expansion
+    (verified empirically: `TARGET=x bash <<EOF\\ntouch $TARGET\\nEOF`
+    writes nothing; `$TARGET` expands empty and `touch` errors). A
+    persistent bare assignment from an earlier, separate segment *is*
+    already in `outer_variables`, because it was recorded into the shared
+    dict before this segment ever ran.
 
-    A bare shell interpreter then executes the whole body itself and is
-    classified recursively. git's own -F - stdin convention is a genuine
-    exception: its content is stored as an object-database message, never
-    a working-tree file, so nothing further is scanned. Everything else -
-    a READ_ONLY command (sed's own script language supports `w file` and
-    `e` without needing -i), an interpreter heredoc, a shell fed an
-    explicit script file, or a wholly unmodeled command - gets the same
-    conservative literal/opaque-write fallback an unmodeled command's own
-    arguments already get, rather than being skipped outright.
+    A *quoted* delimiter's body passes through to the child process
+    literally, unexpanded by the parent, so only a bare shell interpreter's
+    own recursive classification needs variables at all, and only the ones
+    that command's own environment would actually contain:
+    `prefix_assignments` (this invocation's own `VAR=v cmd` or `env
+    VAR=value cmd`), never `outer_variables` - a child process does not
+    inherit the parent's non-exported shell variables (verified
+    empirically: `TARGET=x` on its own segment, then `bash <<'EOF'\\ntouch
+    $TARGET\\nEOF`, writes nothing; `touch` receives an empty operand and
+    errors, matching a real, unexported bash variable).
+
+    git's own -F - stdin convention is a genuine exception to all of this:
+    its content is stored as an object-database message, never a
+    working-tree file, so nothing further is scanned. Everything else - a
+    READ_ONLY command (sed's own script language supports `w file` and `e`
+    without needing -i), an interpreter heredoc, a shell fed an explicit
+    script file, or a wholly unmodeled command - gets the same conservative
+    literal/opaque-write fallback an unmodeled command's own arguments
+    already get, rather than being skipped outright.
     """
     if not quoted:
         for inner in heredoc_command_substitutions(body):
             classify_command(
                 inner,
                 repo_root,
-                dict(variables),
+                dict(outer_variables),
                 list(working_directories),
                 confirmed,
                 uncertain,
@@ -900,12 +934,16 @@ def heredoc_targets(
         return
     if command in SHELL_INTERPRETERS and _heredoc_is_bare_shell(args, heredocs):
         # A bare `bash <<EOF ... EOF` starts a new interpreter process: it
-        # only inherits the working directory (a process attribute), not
-        # this classifier's tracked, non-exported shell variables.
+        # only inherits the working directory (a process attribute), plus -
+        # for a quoted delimiter only - this command's own prefix-exported
+        # environment.
+        heredoc_variables = (
+            dict(prefix_assignments) if quoted else dict(outer_variables)
+        )
         classify_command(
             body,
             repo_root,
-            {},
+            heredoc_variables,
             list(working_directories),
             confirmed,
             uncertain,
@@ -933,6 +971,13 @@ def segment_targets(
     literals seen only because the command itself is not provably safe; it is
     a softer, still-denied signal, not a confirmed mutation.
     """
+    # A snapshot of the persistent scope taken *before* this segment's own
+    # leading assignments are recorded below - the "parent shell" scope a
+    # heredoc's own unquoted-delimiter expansion or bare-shell-consumer
+    # recursion needs, which must not include this command's own prefix
+    # assignment (see heredoc_targets).
+    outer_variables = dict(variables)
+
     # command_name() records this segment's leading NAME=value assignments as
     # a side effect, so it must run on the raw tokens before substitute():
     # otherwise a same-segment `TARGET=.env rm "$TARGET"` would substitute
@@ -971,7 +1016,7 @@ def segment_targets(
 
     if command_info is None:
         return
-    command, start = command_info
+    command, start, prefix_assignments = command_info
     args = tokens[start:]
 
     for token in args:
@@ -985,7 +1030,8 @@ def segment_targets(
                 quoted,
                 heredocs,
                 repo_root,
-                variables,
+                outer_variables,
+                prefix_assignments,
                 working_directories,
                 confirmed,
                 uncertain,
