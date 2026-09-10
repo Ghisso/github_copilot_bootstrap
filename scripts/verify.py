@@ -651,11 +651,9 @@ def bootstrap_root_fingerprint_diagnostics(
             )
             continue
         digest.update(relative.encode("utf-8") + b"\0" + live + b"\0")
-    return (
-        (digest.hexdigest(), tuple(diagnostics))
-        if not diagnostics
-        else ("", tuple(diagnostics))
-    )
+    if diagnostics:
+        return "", tuple(diagnostics)
+    return digest.hexdigest(), tuple(diagnostics)
 
 
 def bootstrap_root_fingerprint(root: Path) -> str:
@@ -700,7 +698,15 @@ def adapter_destination_is_replaceable(root: Path, relative: str) -> bool:
     try:
         for component in parts[:-1]:
             candidate /= component
-            info = candidate.lstat()
+            try:
+                info = candidate.lstat()
+            except FileNotFoundError:
+                # A wholly missing intermediate parent directory (not just the
+                # leaf adapter) is still replaceable: restore-root-adapters.sh's
+                # ensure_destination_parent() creates missing parents, and a
+                # missing parent implies the destination itself cannot already
+                # exist.
+                return True
             if candidate.is_symlink() or not stat.S_ISDIR(info.st_mode):
                 return False
         candidate /= parts[-1]

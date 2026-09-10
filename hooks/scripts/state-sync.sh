@@ -317,10 +317,10 @@ cmd_setup() {
     return "$reconcile_status"
   fi
 
-  if [[ $reconcile_status -ne 0 ]]; then
-    commit_local_state
-    return $?
-  fi
+  # D5 / F1 (§9): a standalone `setup` (no devcontainer post-start.sh) must
+  # still restore the root adapters carried in bootstrap-root/, not just
+  # check out .claude/. Idempotent.
+  restore_root_adapters
   commit_local_state
 }
 
