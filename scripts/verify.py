@@ -2714,6 +2714,12 @@ def unresolved_phase_reason(
                         "active phase metadata is malformed: the complete big plan "
                         f"declares {candidate}, but {small_plan.name} has invalid status"
                     )
+                if small_status not in {"complete", "cancelled"}:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} has nonterminal "
+                        f"status '{small_status}'"
+                    )
                 if small_status == "complete":
                     last_completed = candidate
             if last_completed:

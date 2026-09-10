@@ -546,10 +546,10 @@
 - [LEARN:verification] Keep a detail-string enricher off the status path. Let
   PASS/FAIL stay decided solely by the return code so a parsing bug in the
   human-readable summary cannot flip a FAIL into a PASS.
-- [LEARN:workflow] Pass a commit message with `-F <file>` pointing at a real
-  file. A `-F -` heredoc commits successfully but the closeout hook cannot
-  parse the subject from the intercepted command, so it skips advancing
-  `current_phase` and the next phase must be advanced by hand.
+- [LEARN:workflow] Advance completed phases from the native Git `post-commit`
+  hook by reading the commit Git created. Do not parse the shell command that
+  requested it: `-m`, `-F <file>`, `-F -`, editor, GUI, and heredoc commit
+  paths must all produce the same idempotent phase transition.
 - [LEARN:review] A phase that changes documented behavior owns the affected
   claims, even in files an earlier scope note deferred. Deferral covers stale
   prose, never a statement the current change just falsified. Expect
