@@ -1,16 +1,16 @@
 ---
 name: consumer-lifecycle-friction-hardening
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-lifecycle-friction-hardening_implementation
-started_at:
+started_at: 2026-09-10T02:08:57Z
 phases:
   - 2026-09-10_phase-A-commit-closeout-reliability
   - 2026-09-10_phase-B-root-adapter-recovery-diagnostics
   - 2026-09-10_phase-C-plan-and-delegation-semantics
   - 2026-09-10_phase-D-shell-classifier-runtime-guidance
-current_phase:
+current_phase: 2026-09-10_phase-A-commit-closeout-reliability
 review_profiles:
   - code
   - architecture
