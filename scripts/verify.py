@@ -718,7 +718,16 @@ def adapter_destination_is_replaceable(root: Path, relative: str) -> bool:
         return False
     if candidate.is_symlink() or git_output(["ls-files", "--", relative], root):
         return False
-    return regular_tree_layout(candidate) == regular_tree_layout(mirror)
+    live_layout = regular_tree_layout(candidate)
+    mirror_layout = regular_tree_layout(mirror)
+    if live_layout is None or mirror_layout is None:
+        return False
+    # restore-root-adapters.sh only adds and overwrites files from the mirror;
+    # it never deletes. A live tree missing entries the mirror has is still
+    # exactly replaceable (restoration fills the gap), but extra live entries
+    # the mirror lacks would survive restoration untouched, so only a subset
+    # relation — not equality — is safe here.
+    return set(live_layout) <= set(mirror_layout)
 
 
 def root_adapter_diagnostic_detail(
