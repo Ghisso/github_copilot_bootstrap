@@ -116,7 +116,7 @@ shell policy engine.
 ## Phases
 
 - [x] `2026-09-10_phase-A-commit-closeout-reliability`
-- [ ] `2026-09-10_phase-B-root-adapter-recovery-diagnostics`
+- [x] `2026-09-10_phase-B-root-adapter-recovery-diagnostics`
 - [ ] `2026-09-11_phase-B2-hook-empty-array-safety`
 - [ ] `2026-09-10_phase-C-plan-and-delegation-semantics`
 - [ ] `2026-09-10_phase-D-shell-classifier-runtime-guidance`

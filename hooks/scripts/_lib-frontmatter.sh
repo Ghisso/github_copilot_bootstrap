@@ -389,7 +389,7 @@ _unquoted_operator_boundary() {
 _git_first_subcommand() {
   local -a tokens
   _shell_tokenize "$1"
-  tokens=("${_TOKENS[@]}")
+  tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
   local i=0 n="${#tokens[@]}" tok
   while (( i < n )); do
     tok="${tokens[$i]}"
@@ -426,7 +426,7 @@ parse_branch_create_command() {
     after="${BASH_REMATCH[2]}"
     local -a tokens
     _shell_tokenize "$after"
-    tokens=("${_TOKENS[@]}")
+    tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
     local i=0 n="${#tokens[@]}" tok sub="" branch=""
     while (( i < n )); do
       tok="${tokens[$i]}"
@@ -528,11 +528,11 @@ git_targets_nested_claude() {
     after="${BASH_REMATCH[2]}"
     local -a tokens
     _shell_tokenize "$after"
-    tokens=("${_TOKENS[@]}")
+    tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
     sub="$(_git_first_subcommand "$after")"
     if [[ "$sub" == "$want" ]]; then
       found=1
-      _git_invocation_targets_nested_claude "${tokens[@]}" || return 1
+      _git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1
     fi
     rest="$after"
   done
@@ -649,7 +649,7 @@ diff_requires_ponytail() {
   fi
 
   [[ "${#paths[@]}" -gt 1 ]] && return 0
-  for path in "${paths[@]}"; do
+  for path in ${paths[@]+"${paths[@]}"}; do
     case "$path" in
       .claude/hooks/*|.claude/settings.json|.github/hooks/*|.codex/*|.mcp.json|.devcontainer/*|AGENTS.md|CLAUDE.md|scripts/*|shared/scripts/*|pyproject.toml|*/pyproject.toml|uv.lock|*/uv.lock|requirements*.txt|*/requirements*.txt|Pipfile|*/Pipfile|Pipfile.lock|*/Pipfile.lock|poetry.lock|*/poetry.lock|package.json|*/package.json|package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|Cargo.toml|*/Cargo.toml|Cargo.lock|*/Cargo.lock|go.mod|*/go.mod|go.sum|*/go.sum) return 0 ;;
     esac
@@ -1250,7 +1250,7 @@ assert_commit_invariants() {
   # push/PR-time one - a cancelled sibling phase must already carry the full
   # audit contract before any further commit lands on this branch.
   local other_phase other_plan="" other_status=""
-  for other_phase in "${all_phases[@]}"; do
+  for other_phase in ${all_phases[@]+"${all_phases[@]}"}; do
     [[ "$other_phase" == "$current_phase" ]] && continue
     other_plan="$repo_root/.claude/plans/$other_phase.md"
     [[ -f "$other_plan" ]] || continue
