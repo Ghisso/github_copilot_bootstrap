@@ -287,15 +287,21 @@ restore_root_adapters() {
   fi
 }
 
-# Idempotent: safe to call at the top of pull/push so every entry point works
-# standalone, not just after an explicit `setup` call.
-cmd_setup() {
+setup_local_state() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
     write_nested_gitignore
     return $?
   fi
   init_nested_repo
   if ! commit_local_state "bootstrap: init ai-state"; then
+    return 1
+  fi
+}
+
+# Idempotent: safe to invoke directly when a user needs local setup plus a
+# reconciliation, while `pull` uses the local step once before its own sync.
+cmd_setup() {
+  if ! setup_local_state; then
     return 1
   fi
   local reconcile_status
@@ -307,15 +313,19 @@ cmd_setup() {
     return "$reconcile_status"
   fi
 
-  # D5 / F1 (§9): once .claude/ is first materialised here, restore the
-  # root-level adapter files that live outside .claude/ (carried in
-  # bootstrap-root/). This makes every entry point that first creates .claude/
-  # restore them — a non-devcontainer `setup`, or a `pull`/`push` that reaches
-  # setup — not just the devcontainer post-start.sh. Idempotent: it copies
-  # bytes already committed under bootstrap-root/. post-start.sh keeps its own
-  # explicit restore call for the case where a later `pull` brings a newer one.
-  restore_root_adapters
+  if [[ $reconcile_status -ne 0 ]]; then
+    commit_local_state
+    return $?
+  fi
   commit_local_state
+}
+
+finish_pull() {
+  restore_root_adapters
+  if ! commit_local_state; then
+    warn "post-pull checkpoint failed; restored adapters remain local and state sync will retry."
+    return 1
+  fi
 }
 
 # A checkpoint deliberately initializes only local Git state. Unlike setup,
@@ -453,18 +463,24 @@ cmd_publish() {
 cmd_pull() {
   local setup_status reconcile_status
   set +e
-  cmd_setup
+  setup_local_state
   setup_status=$?
   set -e
   if [[ $setup_status -ne 0 ]]; then
     return "$setup_status"
   fi
   if is_local_only; then
+    if ! finish_pull; then
+      return 1
+    fi
     info "pull: local-only mode; bootstrap complete, remote sync skipped."
     return 0
   fi
   if ! git -C "$CLAUDE_DIR" remote get-url origin >/dev/null 2>&1; then
     warn "no state remote configured; nothing to pull from."
+    if ! finish_pull; then
+      return 1
+    fi
     return 0
   fi
   set +e
@@ -473,6 +489,9 @@ cmd_pull() {
   set -e
   if [[ $reconcile_status -ne 0 ]]; then
     return "$reconcile_status"
+  fi
+  if ! finish_pull; then
+    return 1
   fi
   info "pull: up to date with origin/$BRANCH"
 }
