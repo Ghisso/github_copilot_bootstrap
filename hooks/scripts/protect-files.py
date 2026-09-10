@@ -358,6 +358,18 @@ def extract_process_substitutions(command: str) -> tuple[str, dict[str, str]]:
     tokenization sees a plain word, returning the substituted text and a
     placeholder -> inner-command mapping for recursive classification.
 
+    The placeholder is padded with a space on both sides regardless of what
+    was originally adjacent. `<` and `>` are shell metacharacters that do
+    not require surrounding whitespace (`cat<(...)` is valid bash - it word-
+    glues, exactly like `$( )`, so the process substitution still forks and
+    executes even though the resulting word is unlikely to be a real
+    command), but `shlex` has no such rule: with no separator it would merge
+    the placeholder into an adjacent word, and the substitution's own
+    placeholder token - the only thing `segment_targets` can look up in
+    `process_subs` - would vanish. The single extra space is always safe:
+    `whitespace_split=True` collapses any run of whitespace, so it can never
+    change how an already-separated case tokenizes.
+
     A construct inside a quoted string is left untouched (quoting suppresses
     process substitution in real shells too). An unbalanced construct is
     genuinely malformed shell syntax, not merely unmodeled, so it fails
@@ -389,7 +401,7 @@ def extract_process_substitutions(command: str) -> tuple[str, dict[str, str]]:
             placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, count)
             count += 1
             inner_by_placeholder[placeholder] = command[index + 2 : end - 1]
-            pieces.append(placeholder)
+            pieces.append(" " + placeholder + " ")
             index = end
             continue
         pieces.append(char)
@@ -466,6 +478,17 @@ def extract_heredocs(
     already allocated (e.g. a shared mapping accumulated across recursive
     calls), so nested extractions can never collide on the same name.
 
+    The placeholder is padded with a space on both sides regardless of what
+    was originally adjacent. `<<` is a shell metacharacter that terminates
+    the preceding word even with no space (`bash<<'EOF'` is valid bash,
+    equivalent to `bash <<'EOF'`), but `shlex` has no such rule: with no
+    separator it would merge the placeholder into an adjacent word, and
+    neither `command_name` nor the redirect-target/operand lookups that key
+    off an exact placeholder token would ever see it as its own token again.
+    The single extra space is always safe: `whitespace_split=True` collapses
+    any run of whitespace, so it can never change how an already-separated
+    case tokenizes.
+
     A missing delimiter word or a body that never reaches its terminator
     line is genuinely malformed shell syntax and fails closed rather than
     being silently ignored.
@@ -510,7 +533,9 @@ def extract_heredocs(
         bodies[placeholder] = (body_text, quoted)
         result = (
             result[:operator_index]
+            + " "
             + placeholder
+            + " "
             + rest_of_line
             + "\n"
             + after_terminator
