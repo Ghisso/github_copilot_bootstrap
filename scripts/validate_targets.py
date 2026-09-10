@@ -591,7 +591,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         "<plan_name>_implementation",
         ".claude/skills/ponytail/SKILL.md",
         "`verify phase` reports PASS",
-        "CLOSEOUT updates required documentation, persists findings",
+        "CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -1259,14 +1259,13 @@ def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
         "matcher": "Bash",
         "hooks": [
             handler("record-branch-state.sh", target),
-            handler("record-commit-closeout.sh", target),
             handler("context-mode-dispatch.sh", target, "posttooluse"),
             handler("reporting-reminder.sh", "late-report", target),
         ],
     }
     if post_groups != [expected_post]:
         errors.append(
-            f"{target} Bash PostToolUse must exactly retain handlers and append one late reminder"
+            f"{target} Bash PostToolUse must leave commit closeout to native Git and append one late reminder"
         )
     return errors
 
@@ -3042,8 +3041,15 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     post_commit = git_hook_root / "post-commit"
     if post_commit.exists():
         post_commit_text = read(post_commit)
+        record_index = post_commit_text.find('"$RECORD_CLOSEOUT"')
+        sync_index = post_commit_text.find('"$STATE_SYNC" push')
         check(
-            '"$STATE_SYNC" push' in post_commit_text,
+            record_index >= 0 and sync_index > record_index,
+            "post-commit git hook must record commit closeout before AI-state push",
+            errors,
+        )
+        check(
+            sync_index >= 0,
             "post-commit git hook must push AI state via state-sync.sh",
             errors,
         )
@@ -3971,6 +3977,7 @@ def lifecycle_script(repo: Path, name: str) -> Path:
 def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
+        install_git_hooks(repo, ("post-commit",))
         write_big_plan(repo)
         write_small_plan(repo)
 
@@ -4336,38 +4343,9 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         git(repo, "add", ".")
         git(repo, "commit", "-m", "phase 1 closeout")
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git commit"}},
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0,
-            f"record commit no-subject case failed to run: {stderr}",
-            errors,
-        )
-        check(
-            "status: complete" not in read(repo / ".claude" / "plans" / "foo.md"),
-            "record commit closeout must not complete big plan without commit correlation",
-            errors,
-        )
-        # R-HOOKS-05: a whitespace-variant subject still correlates with HEAD.
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1   closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0, f"record commit closeout failed to run: {stderr}", errors
-        )
         check(
             "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
-            "record commit closeout must complete final big plan via normalized subject match",
+            "post-commit must complete the final big plan from Git HEAD",
             errors,
         )
 
@@ -4894,6 +4872,7 @@ def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
     """Exercise the cancellation-specific lifecycle gate contract."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
+        install_git_hooks(repo, ("post-commit",))
         git(repo, "checkout", "-b", "foo_implementation")
         write(repo / "phase-work.txt", "certified work\n")
         git(repo, "add", "phase-work.txt")
@@ -5325,18 +5304,10 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
         )
 
         def run_closeout() -> None:
-            returncode, _, stderr = run_hook(
-                lifecycle_script(repo, "record-commit-closeout.sh"),
-                {
-                    "tool_name": "Bash",
-                    "tool_input": {"command": 'git commit -m "phase work"'},
-                },
-                "github-copilot",
-                cwd=repo,
-            )
+            result = git(repo, "commit", "--allow-empty", "-m", "phase work")
             check(
-                returncode == 0,
-                f"cancelled closeout fixture failed: {stderr}",
+                result.returncode == 0,
+                f"cancelled closeout fixture failed: {result.stderr}",
                 errors,
             )
 
@@ -5427,6 +5398,7 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             phases=tail_phases,
             current_phase="phase-one",
         )
+        write_small_plan(repo, status="complete", phase="phase-one")
         write_small_plan(repo, status="cancelled", phase="phase-two")
         run_closeout()
         big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
@@ -5441,7 +5413,7 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             repo,
             status="cancelled",
             phases=tail_phases,
-            current_phase="phase-one",
+            current_phase="",
         )
         run_closeout()
         big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
@@ -5499,10 +5471,15 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
         )
 
 
-def install_git_hooks(repo: Path) -> None:
+def install_git_hooks(
+    repo: Path, hook_names: tuple[str, ...] = REQUIRED_GIT_HOOKS
+) -> None:
     git_hook_root = repo / ".claude" / "hooks" / "git-hooks"
-    shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "git-hooks", git_hook_root)
-    for hook in git_hook_root.glob("*"):
+    git_hook_root.mkdir(parents=True)
+    source_root = TARGET_ROOT / ".claude" / "hooks" / "git-hooks"
+    for hook_name in hook_names:
+        hook = git_hook_root / hook_name
+        shutil.copy2(source_root / hook_name, hook)
         hook.chmod(hook.stat().st_mode | 0o111)
     git(repo, "config", "core.hooksPath", ".claude/hooks/git-hooks")
 
@@ -5513,7 +5490,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
     evasion paths this deterministic layer exists to close."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
-        install_git_hooks(repo)
+        install_git_hooks(repo, ("commit-msg",))
         write_big_plan(repo)
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
@@ -6014,7 +5991,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
 
         repo = setup_hook_repo(temp_root)
-        install_git_hooks(repo)
+        install_git_hooks(repo, ("commit-msg", "pre-push"))
         git(repo, "remote", "add", "origin", str(remote))
         initial_push = git(repo, "push", "origin", "dev")
         check(
@@ -6517,19 +6494,10 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             f"through the real commit-msg hook: {completion_one.stdout}{completion_one.stderr}",
             errors,
         )
-        run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase one: complete"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
         check(
             "current_phase: phase-two" in read(repo / ".claude" / "plans" / "foo.md"),
             "phase-one completion must advance current_phase to phase-two through "
-            "the real commit-msg + record-commit-closeout PostToolUse wiring",
+            "the real commit-msg + post-commit hook wiring",
             errors,
         )
 
@@ -6544,15 +6512,6 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             "phase-two completion commit must succeed through the real commit-msg "
             f"hook: {completion_two.stdout}{completion_two.stderr}",
             errors,
-        )
-        run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase two: complete"'},
-            },
-            "github-copilot",
-            cwd=repo,
         )
         check(
             "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),

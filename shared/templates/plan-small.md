@@ -30,16 +30,16 @@ closeout_session_log:
 
 ```bash
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
-uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
 - [ ] Documentation updated or explicitly skipped as pure-internal
 - [ ] LEARN entries saved or no-lessons marker recorded
 - [ ] Closeout session log has `**Status:** COMPLETED`
+- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [ ] Review findings resolved and persisted with branch/phase metadata
+- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
 
 ## Pause Checkpoint
 

@@ -176,6 +176,12 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 The scripts must remain executable in `dist/multi-agent/` (gitignored; regenerate before checking) and in copied consumer repos. `run-hook.sh` is especially important because Claude and Codex hook configs execute it directly; generated output is invalid if that dispatcher is not runnable.
 
+`record-commit-closeout.sh` is not a `PostToolUse` handler. The native Git
+`post-commit` hook runs it before `state-sync.sh push`, derives the commit from
+`HEAD`, and records one atomic plan transition. If the recorder fails or returns
+an unexpected result, the hook writes an actionable warning to
+`.claude/session_logs/hooks-errors.log` before state synchronization proceeds.
+
 The static reporting policy applies to all four supported targets. The
 `reporting-reminder.sh` runtime reminder is narrower: prompt-start and selected
 late-turn reminders are wired only for Claude Code and OpenAI Codex. It is
@@ -345,9 +351,9 @@ regenerates a valid current-schema receipt at the same deterministic path.
 Before verification, confirm that nested `.claude` has a valid `HEAD` and a
 clean worktree.
 
-Regenerate fast and phase evidence with the current verifier, then regenerate
-the findings, documentation, `[LEARN]`, and completed session closeout
-evidence. Persist phase and closeout evidence with `verify phase --persist` and
+Run focused and fast checks, then review. Update documentation, final plan,
+`[LEARN]`, and completed session-closeout evidence; explicitly stage intended
+outer files; persist findings; then persist `verify phase --persist` and
 `verify closeout --persist`. Run the native commit gate and native pre-push gate
 only after this sequence passes; commit and push are supported only after those
 gates allow them.

@@ -3090,7 +3090,8 @@ def test_inactive_phase_reports_diagnostic_not_traceback(
     assert exit_code not in (0, None)
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
-    assert "no active phase" in captured.err.lower()
+    assert "malformed" in captured.err.lower()
+    assert "phase-one.md could not be read" in captured.err
 
 
 def test_malformed_active_phase_reports_distinct_diagnostic(
@@ -3158,6 +3159,113 @@ def test_unresolved_phase_reason_distinguishes_cases(tmp_path: Path) -> None:
         )
         is None
     )
+
+
+def test_unresolved_phase_reason_names_last_completed_phase_for_refresh(
+    tmp_path: Path,
+) -> None:
+    """A terminal plan offers optional recovery for its final completed phase."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\n"
+        "status: complete\n"
+        "phases:\n"
+        "  - phase-one\n"
+        "  - phase-two\n"
+        "  - phase-cancelled\n"
+        "current_phase: \n"
+        "---\n",
+        encoding="utf-8",
+    )
+    for phase, status in (
+        ("phase-one", "complete"),
+        ("phase-two", "complete"),
+        ("phase-cancelled", "cancelled"),
+    ):
+        (plans / f"{phase}.md").write_text(
+            f"---\nstatus: {status}\n---\n", encoding="utf-8"
+        )
+
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+
+    assert reason is not None
+    assert "big plan is complete" in reason
+    assert "--phase phase-two" in reason
+    assert "open the next small plan" not in reason
+
+
+@pytest.mark.parametrize(
+    ("phase_text", "expected"),
+    (
+        (None, "could not be read"),
+        ("not frontmatter\n", "is malformed"),
+        ("---\nstatus: unknown\n---\n", "has invalid status"),
+    ),
+)
+def test_complete_plan_recovery_validates_each_declared_phase(
+    tmp_path: Path, phase_text: str | None, expected: str
+) -> None:
+    """Complete-plan recovery never recommends a receipt from invalid phase state."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\nstatus: complete\nphases:\n  - phase-one\ncurrent_phase: \n---\n",
+        encoding="utf-8",
+    )
+    if phase_text is not None:
+        (plans / "phase-one.md").write_text(phase_text, encoding="utf-8")
+
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "sample-plan_implementation", "", requires_phase=True
+    )
+
+    assert reason is not None
+    assert expected in reason
+    assert "receipt refresh" not in reason
+
+
+@pytest.mark.parametrize(
+    ("later_phase", "expected"),
+    (
+        (None, "phase-two.md could not be read"),
+        ("not frontmatter\n", "phase-two.md is malformed"),
+        ("---\nstatus: unknown\n---\n", "phase-two.md has invalid status"),
+        ("---\nstatus: in-progress\n---\n", "phase-two.md has nonterminal status"),
+        ("---\nstatus: paused\n---\n", "phase-two.md has nonterminal status"),
+    ),
+)
+def test_complete_plan_recovery_rejects_later_invalid_phase_before_refresh(
+    tmp_path: Path, later_phase: str | None, expected: str
+) -> None:
+    """Later declared phase faults outrank an earlier receipt recommendation."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\n"
+        "status: complete\n"
+        "phases:\n"
+        "  - phase-one\n"
+        "  - phase-two\n"
+        "current_phase: \n"
+        "---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-one.md").write_text(
+        "---\nstatus: complete\n---\n", encoding="utf-8"
+    )
+    if later_phase is not None:
+        (plans / "phase-two.md").write_text(later_phase, encoding="utf-8")
+
+    reason = verify.unresolved_phase_reason(
+        tmp_path, "sample-plan_implementation", "", requires_phase=True
+    )
+
+    assert reason is not None
+    assert expected in reason
+    assert "--phase phase-one" not in reason
+    assert "receipt refresh" not in reason
 
 
 def test_unresolved_phase_reason_requires_phase_off_implementation_branch(

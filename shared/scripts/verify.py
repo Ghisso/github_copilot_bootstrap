@@ -2675,10 +2675,71 @@ def unresolved_phase_reason(
                 "parseable frontmatter; fix the plan file before running "
                 "verify"
             )
+        frontmatter = re.match(r"\A---\n(?P<body>.*?)\n---", big_plan_text, re.DOTALL)
+        assert frontmatter is not None
+        body = frontmatter.group("body")
+        status = re.findall(r"^status:[ \t]*([^\s#]+)[ \t]*$", body, re.MULTILINE)
+        if status == ["complete"]:
+            phases = frontmatter_phases(body)
+            if phases is None:
+                return (
+                    "active phase metadata is malformed: the complete big plan "
+                    "has an unsafe, duplicate, or malformed phases list; fix the "
+                    "plan before running verify"
+                )
+            last_completed = ""
+            for candidate in phases:
+                small_plan = root / ".claude/plans" / f"{candidate}.md"
+                try:
+                    small_bytes = small_plan.read_bytes()
+                except OSError:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} could not be read"
+                    )
+                small = small_plan_frontmatter(small_bytes)
+                if small is None:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} is malformed"
+                    )
+                small_status = small.get("status")
+                if small_status not in {
+                    "in-progress",
+                    "paused",
+                    "complete",
+                    "cancelled",
+                }:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} has invalid status"
+                    )
+                if small_status not in {"complete", "cancelled"}:
+                    return (
+                        "active phase metadata is malformed: the complete big plan "
+                        f"declares {candidate}, but {small_plan.name} has nonterminal "
+                        f"status '{small_status}'"
+                    )
+                if small_status == "complete":
+                    last_completed = candidate
+            if last_completed:
+                return (
+                    "no active phase: the big plan is complete; optional receipt "
+                    "refresh: uv run python .claude/scripts/verify.py phase "
+                    f"--format json --persist --phase {last_completed}"
+                )
+            return (
+                "active phase metadata is malformed: the complete big plan has no "
+                "completed non-cancelled phase for receipt recovery"
+            )
+        if status == ["planning"]:
+            return (
+                "no active phase: the big plan is still planning; start its "
+                "first phase before running verify"
+            )
         return (
-            "no active phase: the big plan has no current_phase set (it is "
-            "complete or not yet started); open the next small plan before "
-            "running verify"
+            "no active phase: the big plan has no current_phase set; fix the "
+            "plan state before running verify"
         )
     small_plan = root / ".claude/plans" / f"{phase}.md"
     if not PHASE_SLUG.fullmatch(phase):

@@ -15,9 +15,35 @@ set -euo pipefail
 # stdin drain returns immediately instead of waiting on the terminal.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RECORD_CLOSEOUT="$SCRIPT_DIR/../scripts/record-commit-closeout.sh"
 STATE_SYNC="$SCRIPT_DIR/../scripts/state-sync.sh"
 
-[[ -f "$STATE_SYNC" ]] || exit 0
+warn_closeout() {
+  local message="$1"
+  printf 'WARN post-commit: %s\n' "$message" >&2
+  mkdir -p "$SCRIPT_DIR/../../session_logs" 2>/dev/null || true
+  printf '%s WARN post-commit: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$message" \
+    >> "$SCRIPT_DIR/../../session_logs/hooks-errors.log" 2>/dev/null || true
+}
 
-bash "$STATE_SYNC" push </dev/null || true
+if [[ -f "$RECORD_CLOSEOUT" ]]; then
+  # Git has created HEAD before this hook runs. Advance a completed phase from
+  # that native boundary, rather than trying to reconstruct a commit from an
+  # editor or shell invocation. Like state sync, a bookkeeping problem must
+  # never turn a completed outer commit into a failed one.
+  if recorder_result="$(bash "$RECORD_CLOSEOUT" </dev/null)"; then
+    recorder_status=0
+  else
+    recorder_status=$?
+  fi
+  if [[ $recorder_status -ne 0 || "$recorder_result" != "recorded" && "$recorder_result" != "skipped" ]]; then
+    warn_closeout "commit closeout was not recorded; inspect .claude/session_logs/hooks-errors.log before relying on phase state"
+  fi
+else
+  warn_closeout "record-commit-closeout.sh is missing; phase state was not advanced"
+fi
+
+if [[ -f "$STATE_SYNC" ]]; then
+  bash "$STATE_SYNC" push </dev/null || true
+fi
 exit 0

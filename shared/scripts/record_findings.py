@@ -65,6 +65,43 @@ def _content_hash(base: str, cwd: Path) -> str:
     return obj.stdout.strip() if obj.returncode == 0 else ""
 
 
+def untracked_target_files(target: Path, cwd: Path) -> list[str]:
+    """Return untracked regular paths contained by the requested review target."""
+    repo_root = _git(["rev-parse", "--show-toplevel"], cwd)
+    if not repo_root:
+        return []
+    root_path = Path(repo_root).absolute()
+    target_path = (
+        (cwd / target).absolute() if not target.is_absolute() else target.absolute()
+    )
+    if target_path != root_path and root_path not in target_path.parents:
+        return []
+    rc, output, _ = _run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=str(cwd),
+    )
+    if rc != 0:
+        return []
+    paths: list[str] = []
+    for record in output.split("\0"):
+        if not record.startswith("?? "):
+            continue
+        relative = record[3:]
+        candidate = Path(relative)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            continue
+        if target_path == root_path or (root_path / candidate).is_relative_to(
+            target_path
+        ):
+            paths.append(relative)
+    return sorted(paths)
+
+
+def display_path(path: str) -> str:
+    """Render an untracked path on one safe terminal line."""
+    return path.encode("unicode_escape").decode("ascii")
+
+
 def git_metadata(target: Path, phase: str, base_ref: str) -> dict[str, object]:
     """Capture the git-metadata freshness binding for a findings report; see
     the module docstring and `_content_hash` above for the rationale."""
@@ -211,6 +248,14 @@ def main() -> None:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+    untracked = untracked_target_files(Path(args.target), Path.cwd())
+    if untracked:
+        print(
+            "warning: untracked target files are not included in git diff: "
+            f"{', '.join(display_path(path) for path in untracked)}; stage intended files before recording again",
+            file=sys.stderr,
+        )
 
     print(
         f"recorded {len(findings)} finding(s): "

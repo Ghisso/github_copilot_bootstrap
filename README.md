@@ -37,6 +37,8 @@ Core principles:
 - Config-first design for new features.
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
+- Use the native Git `post-commit` boundary to advance a completed phase before AI-state synchronization; commit-message transport does not affect that transition.
+- Close out in one order: focused/fast checks, review, final docs/plan/log/LEARN state, explicit staging, findings, persisted phase evidence, persisted closeout evidence, then commit.
 - Ship only after a passing `verify phase`/`verify closeout` receipt, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
 - Preserve lessons learned in memory and session logs.
 
@@ -239,11 +241,13 @@ After the refresh, verify the consumer's nested `.claude` repository has a
 valid `HEAD` and a clean worktree. Then regenerate evidence with the current
 runtime, in order:
 
-1. Run fast verification and `verify phase --persist`.
-2. Regenerate the findings, documentation, and `[LEARN]` evidence, and
-   write the completed session closeout evidence.
-3. Run `verify closeout --persist`.
-4. Run the native commit and pre-push gates. Commit and push only after those
+1. Run focused/fast verification and complete review.
+2. Update documentation, final small-plan state, `[LEARN]` evidence, and the
+   completed session closeout log.
+3. Explicitly stage intended outer files, inspect the staged diff, and persist
+   the converged findings.
+4. Run `verify phase --persist`, then `verify closeout --persist`.
+5. Run the native commit and pre-push gates. Commit and push only after those
    gates pass.
 
 Evidence-only checkpoints do not make current evidence stale. Changes to the
@@ -768,7 +772,6 @@ Configured events:
   - Canonical command and mutation guards retain symlink-safe path classification, protected-source checks, and deny-by-default handling for ambiguous or unsafe requests. Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent; the bootstrap does not invent lifecycle parity. Native loading and cadence remain an external acceptance gap/blocker.
 - PostToolUse / PreCompact
   - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
-  - [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) advances the big-plan phase only after correlating the intercepted commit subject with `HEAD`; a normal `complete` commit advances the phase, while a valid `paused` checkpoint records durable incomplete work and leaves the same `current_phase` and big plan `in-progress`; it completes the big plan after the final phase and logs allowed bypass commits
   - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
   - [reporting-reminder.sh](shared/hooks/scripts/reporting-reminder.sh) emits a 183-byte, non-blocking reporting reminder at prompt start and selected late-turn boundaries for Claude Code and OpenAI Codex only; the static reporting policy still applies to all four supported targets
 - SessionStart / Stop
@@ -785,7 +788,7 @@ Configured events:
   - Codex and Claude `UserPromptSubmit` run compatible `state-sync.sh push` with a 60-second timeout. A timeout or network failure preserves the local checkpoint for a later retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` for recovery details.
   - Codex `SessionEnd` is delayed and best-effort: it runs local-only `checkpoint` with a three-second limit and does not publish. Claude `StopFailure` also runs local-only `checkpoint`; its `SessionEnd` runs compatible `push` with a 60-second limit. These do not replace post-commit or the manual **AI state: push** task.
 - post-commit (git hook)
-  - [post-commit](shared/hooks/git-hooks/post-commit) runs `state-sync.sh push` after every successful outer-repo commit, publishing plans, reports, memory, and session logs finalized by that commit without waiting on a Stop event that may never arrive. Like the Stop-hook push, it is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem never blocks or fails the commit. Installed the same way as `commit-msg` and `pre-push` below, via `core.hooksPath`.
+  - [post-commit](shared/hooks/git-hooks/post-commit) first runs [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) from the created `HEAD`, then runs `state-sync.sh push`. A completed phase advances only once to an `in-progress` next phase, or atomically completes the terminal big plan; bypass, merge, paused, incomplete, non-implementation, and repeated-HEAD paths do not advance state. Recorder failures are logged before synchronization. Like the Stop-hook push, this is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem never blocks or fails the commit. Installed the same way as `commit-msg` and `pre-push` below, via `core.hooksPath`.
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 

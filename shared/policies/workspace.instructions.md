@@ -67,7 +67,7 @@ standard, and control-plane/high-risk work follows the lifecycle. Use the
 orchestrated path for standard and control-plane/high-risk work:
 
 ```text
-orchestrator -> [planner when needed] -> coder -> verify phase -> reviewer -> closeout
+orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout
 ```
 
 Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.
@@ -135,8 +135,8 @@ High-leverage public skills include `ponytail`, `ponytail-review`, `create-featu
 
 ```bash
 uv run python .claude/scripts/verify.py fast --format json                # during IMPLEMENT
-uv run python .claude/scripts/verify.py phase --format json --persist     # before REVIEW
-uv run python .claude/scripts/verify.py closeout --format json --persist  # after CLOSEOUT
+uv run python .claude/scripts/verify.py phase --format json --persist     # after review, docs/final state, staging, and findings
+uv run python .claude/scripts/verify.py closeout --format json --persist  # immediately after persisted phase evidence
 ```
 
 `verify.py` inspects the repository and selects the matching scope — the

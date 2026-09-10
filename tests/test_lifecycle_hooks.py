@@ -346,11 +346,10 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     assert len(posttool) == 1
     assert [
         "record-branch-state.sh" in handler["command"]
-        or "record-commit-closeout.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report openai-codex" in handler["command"]
         for handler in posttool[0]["hooks"]
-    ] == [True, True, True, True]
+    ] == [True, True, True]
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == []
     prompt[0]["hooks"][1]["timeout"] = 99
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == [
@@ -424,11 +423,10 @@ def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     assert len(posttool) == 1
     assert [
         "record-branch-state.sh" in handler["command"]
-        or "record-commit-closeout.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report claude-code" in handler["command"]
         for handler in posttool[0]["hooks"]
-    ] == [True, True, True, True]
+    ] == [True, True, True]
 
     stop_failure = hooks["StopFailure"]
     assert len(stop_failure) == 1
