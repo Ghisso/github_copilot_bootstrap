@@ -3,8 +3,8 @@ name: 2026-09-10_phase-D-shell-classifier-runtime-guidance
 type: small-plan
 parent_plan: consumer-lifecycle-friction-hardening
 phase_index: 5
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_consumer-lifecycle-friction-hardening-phase-D-closeout.md
 ---
 
 # Small Plan: Phase D — Shell Classifier and Final Runtime Guidance
@@ -108,14 +108,14 @@ repository-wide documentation, memory, and LEARN audit.
 
 ## Acceptance Criteria
 
-- [ ] Safe read-only process substitutions and data heredocs no longer fail because of parser limitations.
-- [ ] Protected writes inside process substitutions, executable heredocs, interpreter heredocs, and outer redirections are still denied.
-- [ ] Nested, quoted, tab-stripped, malformed, and unterminated cases have explicit regression coverage.
-- [ ] No external shell-parser dependency or parallel protection engine is added.
-- [ ] Standalone hooks remain compatible with Python 3.9.
-- [ ] All native targets receive identical classifier behavior.
-- [ ] A fresh generated consumer completes the full lifecycle and terminal push without manual recovery.
-- [ ] The final closeout log contains a complete `## Stale-claims surfaces checked` audit.
+- [x] Safe read-only process substitutions and data heredocs no longer fail because of parser limitations.
+- [x] Protected writes inside process substitutions, executable heredocs, interpreter heredocs, and outer redirections are still denied.
+- [x] Nested, quoted, tab-stripped, malformed, and unterminated cases have explicit regression coverage.
+- [x] No external shell-parser dependency or parallel protection engine is added.
+- [x] Standalone hooks remain compatible with Python 3.9.
+- [x] All native targets receive identical classifier behavior.
+- [x] A fresh generated consumer completes the full lifecycle and terminal push without manual recovery.
+- [x] The final closeout log contains a complete `## Stale-claims surfaces checked` audit.
 
 ## Verification
 
@@ -136,11 +136,11 @@ uv run python .claude/scripts/verify.py closeout --format json --persist
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Verification passed (`verify phase` PASS)
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
 
 ## Pause Checkpoint
 

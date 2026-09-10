@@ -823,3 +823,24 @@
   clear prohibitions and pushes authors toward vaguer wording. Scope such a
   check to one sentence and look for negation anywhere before the verb instead
   of using a fixed-width character lookback.
+- [LEARN:security] Write the negative controls before relaxing a fail-closed
+  security parser. In Phase D the pre-implementation run against the unchanged
+  classifier exposed three real under-protection gaps that positive-case
+  testing would never have surfaced, and it set the baseline that made six
+  later bypasses provable.
+- [LEARN:review] Verify a reported reproduction before implementing against
+  it. Two repros in Phase D were wrong in ways that would have produced a fix
+  for already-correct behavior while leaving the real defect open. One hinged
+  on whether a heredoc delimiter was quoted, which decides whether the parent
+  or the child shell expands the body.
+- [LEARN:review] A test corpus that shares a formatting convention shares a
+  blind spot. Every heredoc test wrote a space before the operator, so glued
+  operators went unexercised through two review rounds despite being ordinary
+  valid shell.
+- [LEARN:review] Before-and-after comparison proves a delta, not security. It
+  is structurally blind to any defect present unchanged in both states, which
+  is exactly how one bypass survived a round of before/after evidence.
+- [LEARN:security] Replacing a hard failure with a silent skip is not
+  automatically safe. Confirm per site that zero iterations is correct, and
+  that a fail-closed backstop actually reaches a code path that denies rather
+  than merely raising.

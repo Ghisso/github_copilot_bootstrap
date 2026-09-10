@@ -1,7 +1,7 @@
 ---
 name: consumer-lifecycle-friction-hardening
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: consumer-lifecycle-friction-hardening_implementation
 started_at: 2026-09-10T02:08:57Z
@@ -11,7 +11,7 @@ phases:
   - 2026-09-11_phase-B2-hook-empty-array-safety
   - 2026-09-10_phase-C-plan-and-delegation-semantics
   - 2026-09-10_phase-D-shell-classifier-runtime-guidance
-current_phase: 2026-09-10_phase-D-shell-classifier-runtime-guidance
+current_phase: 
 review_profiles:
   - code
   - architecture
@@ -119,7 +119,7 @@ shell policy engine.
 - [x] `2026-09-10_phase-B-root-adapter-recovery-diagnostics`
 - [x] `2026-09-11_phase-B2-hook-empty-array-safety`
 - [x] `2026-09-10_phase-C-plan-and-delegation-semantics`
-- [ ] `2026-09-10_phase-D-shell-classifier-runtime-guidance`
+- [x] `2026-09-10_phase-D-shell-classifier-runtime-guidance`
 
 ## Cross-Phase Contracts
 
