@@ -252,9 +252,18 @@
   applied to one filename only), and a freshly generated tree failing its own
   validator (the chmod loop globbed `*.sh`, skipping required
   `protect-files.py`).
-- [LEARN:tooling] The refreshed fail-closed shell guard denies process
-  substitution, heredocs piped into an interpreter, and write targets built from
-  shell variables. Use literal paths and plain commands, or run a script file.
+- [LEARN:tooling] The fail-closed shell guard recursively classifies
+  quote-aware heredocs and process substitutions (`<(...)`/`>(...)`) for
+  nested protected writes instead of blanket-denying them; a malformed or
+  unterminated one still fails closed. Write targets built from shell
+  variables are still flagged uncertain. Use literal paths, or run a script
+  file for constructs the parser still can't model (loops, functions).
+- [LEARN:security] The shell guard never recursively parses `-c` script
+  content (`bash -c '...'`, `python3 -c '...'`): it only scans that text for
+  literal protected paths. `bash -c 'E=env; touch ".$E"'` is not detected;
+  `bash -c 'touch .env'` is, because the literal string appears. Pre-existing,
+  not a Phase D regression, and out of scope to fix (would need a recursive
+  parser per interpreter language) — recorded so it isn't rediscovered later.
 - [LEARN:architecture] A file living only in the generated `.claude/` overlay is
   not content, it's pending deletion. Authored material belongs in `shared/`,
   where it regenerates; `check_runtime.py` naming a path "absent from generated
@@ -310,11 +319,14 @@
   the action — writing it first creates false provenance even when the action
   follows immediately; this file had already been corrected once for the same
   defect.
-- [LEARN:tooling] The fail-closed Bash guard rejects multi-line shell with
-  `for`/`while`/`{ }`/heredocs by raising `AmbiguousCommand` (exit 2). That's
-  the classifier working as designed, not a broken hook. Put complex logic in a
-  script file and invoke it as `bash script.sh`, which stays classifiable and
-  keeps the guard active rather than routing around it.
+- [LEARN:tooling] The fail-closed Bash guard still can't model `for`/`while`/
+  `{ }` compound commands (an unmodeled segment falls back to a conservative
+  scan, so it's denied only when it touches a protected-looking literal).
+  Well-formed heredocs and process substitutions are no longer in this group —
+  they're now parsed and recursively classified; only malformed or
+  unterminated syntax raises `AmbiguousCommand`/`UnparseableCommand` (exit 2).
+  Put complex logic in a script file and invoke it as `bash script.sh`, which
+  stays classifiable and keeps the guard active rather than routing around it.
 - [LEARN:shell] Bash `errexit` isn't reliable inside a function invoked from a
   status-tested context such as `if ! function_name`; explicitly guard each
   fallible command and return its failure so a later successful command cannot
