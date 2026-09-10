@@ -120,6 +120,21 @@ OPTION_VALUES = {
     "perl": {"-e", "-E", "-f", "-M", "-m"},
     "sed": {"-e", "-f", "--expression", "--file"},
 }
+# command_name()'s sudo/env/command wrapper-flag skip: flags that consume a
+# separate value token (or an attached `--long=value`/`-short=value`) versus
+# flags that take no value at all. Not the full flag set of any of these
+# tools - only what is needed to keep the wrapper-skip loop from ever
+# mistaking a value token, or an unrecognized flag, for the command name.
+WRAPPER_VALUE_FLAGS: dict[str, set[str]] = {
+    "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string", "-P"},
+    "sudo": {"-u", "--user", "-g", "--group"},
+    "command": set(),
+}
+WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
+    "env": {"-i", "--ignore-environment", "-0", "--null"},
+    "sudo": set(),
+    "command": {"-p", "-v", "-V"},
+}
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
 PROCESS_SUB_PREFIX = "__PROTECT_FILES_PROCSUB_"
 HEREDOC_PREFIX = "__PROTECT_FILES_HEREDOC_"
@@ -688,9 +703,30 @@ def command_name(
     if index == len(tokens):
         return None
     while index < len(tokens) and tokens[index] in {"sudo", "env", "command"}:
+        wrapper = tokens[index]
+        value_flags = WRAPPER_VALUE_FLAGS[wrapper]
+        no_value_flags = WRAPPER_NO_VALUE_FLAGS[wrapper]
         index += 1
         while index < len(tokens) and tokens[index].startswith("-"):
-            index += 1
+            flag, _, attached_value = tokens[index].partition("=")
+            if flag in value_flags:
+                if attached_value:
+                    index += 1
+                    continue
+                if index + 1 == len(tokens):
+                    raise AmbiguousCommand(f"{wrapper} {flag} has no value")
+                index += 2
+                continue
+            if tokens[index] in no_value_flags:
+                index += 1
+                continue
+            # An unrecognized flag might take a value we do not know about
+            # (this is exactly how -u's value was mistaken for the command
+            # name before this fix): assuming "no value" is not safe, so
+            # this segment is ambiguous rather than silently guessed.
+            raise AmbiguousCommand(
+                f"{wrapper} has an unrecognized option {tokens[index]!r}"
+            )
         if (
             index < len(tokens)
             and "=" in tokens[index]
@@ -1229,6 +1265,34 @@ def classify_command(
             uncertain.extend(token for token in resolved if protected(token, repo_root))
             uncertain.extend(protected_path_literals(" ".join(resolved)))
             uncertain.extend(opaque_write_paths(" ".join(resolved)))
+            # An ambiguous segment (e.g. an unrecognized wrapper flag) is
+            # raised before segment_targets ever reaches its own heredoc/
+            # process-substitution dispatch, so a placeholder here would
+            # otherwise be invisible to this fallback scan - the literal
+            # text above is only the *outer* tokens, never a heredoc body
+            # or a process substitution's inner command. A process
+            # substitution still executes regardless of the ambiguity, so
+            # it is classified the same as the unconditional case; a
+            # heredoc's real consumer is unknown here, so its body gets the
+            # same conservative floor an unmodeled command's own arguments
+            # already get.
+            for token in resolved:
+                inner = process_subs.get(token)
+                if inner is not None:
+                    classify_command(
+                        inner,
+                        repo_root,
+                        dict(variables),
+                        list(working_directories),
+                        confirmed,
+                        uncertain,
+                        heredocs,
+                    )
+                entry = heredocs.get(token)
+                if entry is not None:
+                    body, _quoted = entry
+                    uncertain.extend(protected_path_literals(body))
+                    uncertain.extend(opaque_write_paths(body))
 
 
 def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
