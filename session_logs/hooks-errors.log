@@ -3025,3 +3025,73 @@ fatal: Cannot rebase onto multiple branches.
 2026-09-10T17:56:41Z WARN hook fail-closed: unparseable tool payload
 2026-09-10T17:56:41Z WARN hook fail-closed: protect-files.sh exited with status 2
 2026-09-10T17:56:41Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:21:43Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:21:43Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:23:05Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:23:05Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:23:05Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:23:16Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:23:16Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:23:16Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:23:16Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:23:16Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:23:16Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:23:16Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:23:31Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:23:31Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:23:32Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:23:32Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:23:32Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:23:32Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:23:32Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:29:03Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:29:03Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:29:03Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:29:03Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:29:03Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:29:03Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:29:04Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:31:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:31:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:31:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:31:35Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:31:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:31:35Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:31:35Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:34:09Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:34:09Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:34:09Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:34:09Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:34:09Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:34:09Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:34:10Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:36:18Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:36:18Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:36:18Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:36:18Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:36:18Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:36:18Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:36:19Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:36:53Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: empty shell command segment)
+2026-09-10T18:36:53Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:39:36Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:39:36Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:39:36Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:39:36Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:39:36Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:39:36Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:39:36Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:42:02Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:42:02Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:42:02Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:42:02Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:42:03Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:42:03Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:42:03Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:43:11Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-10T18:43:11Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-10T18:43:11Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-10T18:43:11Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-10T18:43:11Z WARN hook fail-closed: unparseable tool payload
+2026-09-10T18:43:11Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-10T18:43:11Z WARN hook fail-closed: unparseable tool payload
