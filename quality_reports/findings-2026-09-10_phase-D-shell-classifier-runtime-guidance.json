@@ -23,9 +23,9 @@
       "reason": "Confirmed safe-direction over-denial: it fails closed rather than open, so no protected write escapes. Correcting it would require generalizing the prefix-versus-persistent scope distinction to a second recursion point, which was deliberately deferred as scope expansion during a security-sensitive phase. Independently verified by the reviewer as over-inclusive, not incorrect."
     }
   ],
-  "generated_at": "2026-09-10T21:44:26Z",
+  "generated_at": "2026-09-10T22:40:29Z",
   "branch": "consumer-lifecycle-friction-hardening_implementation",
-  "head_sha": "a2ea6ec37bf67406cb5257136b8905280069bf13",
+  "head_sha": "f0910d633a17928a82c118dbb68c3db1070e8da6",
   "base_ref": "dev",
   "merge_base_sha": "04eab52fe741a105b804e5bc8cf7e611a2df3531",
   "phase": "2026-09-10_phase-D-shell-classifier-runtime-guidance",
