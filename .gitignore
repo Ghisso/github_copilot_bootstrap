@@ -11,3 +11,6 @@ __pycache__/
 
 # Derived local caches; never synced.
 .cache/
+
+# Local hook-runtime diagnostics only; never synced (session_logs/hooks-bypass.log stays tracked).
+session_logs/hooks-errors.log

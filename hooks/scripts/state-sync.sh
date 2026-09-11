@@ -105,6 +105,9 @@ EOF
   if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
     printf '\n# Derived local caches; never synced.\n.cache/\n' >> "$CLAUDE_DIR/.gitignore"
   fi
+  if ! grep -Fqx 'session_logs/hooks-errors.log' "$CLAUDE_DIR/.gitignore"; then
+    printf '\n# Local hook-runtime diagnostics only; never synced (session_logs/hooks-bypass.log stays tracked).\nsession_logs/hooks-errors.log\n' >> "$CLAUDE_DIR/.gitignore"
+  fi
 }
 
 untrack_nested_cache() {
@@ -112,6 +115,13 @@ untrack_nested_cache() {
   # Remove only their index entries; -f is safe with --cached and preserves
   # every working-tree byte for the local Context Mode installation.
   git -C "$CLAUDE_DIR" rm -r -f -q --cached --ignore-unmatch -- .cache
+}
+
+untrack_error_log() {
+  # Upgraded nested repositories may already track the local-only error log
+  # (see write_nested_gitignore). Remove only its index entry; the local file
+  # on disk is untouched, and session_logs/hooks-bypass.log stays tracked.
+  git -C "$CLAUDE_DIR" rm -f -q --cached --ignore-unmatch -- session_logs/hooks-errors.log
 }
 
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
@@ -167,6 +177,9 @@ commit_local_state() {
     return 1
   fi
   if ! untrack_nested_cache; then
+    return 1
+  fi
+  if ! untrack_error_log; then
     return 1
   fi
   if ! git -C "$CLAUDE_DIR" add -A; then
@@ -284,6 +297,33 @@ restore_root_adapters() {
   local restore="$SCRIPT_DIR/restore-root-adapters.sh"
   if [[ -f "$restore" ]]; then
     bash "$restore" || warn "restoring root adapters failed; continuing."
+  fi
+  configure_outer_hooks_path
+}
+
+# Activates the outer repository's post-commit/commit-msg Git hooks
+# (scripts/install_bootstrap.py:configure_git_hooks_path sets the same value
+# at install time; this keeps it active on every restore, e.g. a fresh
+# `setup`/`pull` with no install step). Idempotent: a value that already
+# matches is left alone; a different value is overwritten with a warning
+# naming the old one so a deliberate override stays visible. Never a hard
+# exit — a failure here must not block the rest of state sync.
+configure_outer_hooks_path() {
+  local hooks_path=".claude/hooks/git-hooks"
+  [[ -d "$REPO_ROOT/.git" || -f "$REPO_ROOT/.git" ]] || return 0
+  [[ -d "$CLAUDE_DIR/hooks/git-hooks" ]] || return 0
+
+  local current
+  current="$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+  if [[ "$current" == "$hooks_path" ]]; then
+    return 0
+  fi
+  if ! git -C "$REPO_ROOT" config core.hooksPath "$hooks_path"; then
+    warn "could not set core.hooksPath to $hooks_path; the post-commit and commit-msg Git hooks will not run."
+    return 0
+  fi
+  if [[ -n "$current" ]]; then
+    warn "core.hooksPath was $current; replaced it with $hooks_path so the bootstrap Git hooks are active."
   fi
 }
 

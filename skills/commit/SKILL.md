@@ -86,6 +86,11 @@ retry interactively and do not force-push. This outer-repository publication is
 separate from the nested `.claude` AI-state sync that the `post-commit` hook
 runs on its own.
 
+Always run the commit and the push as separate Bash commands, never chained
+with `&&` or `;`: the push gate evaluates the current HEAD before a chained
+command's own commit exists, so `git commit ... && git push` is denied even
+when the commit itself would have been fine.
+
 The push gate accepts three states. A valid paused checkpoint commit publishes
 as a durable remote backup; it remains unfinished, keeps the big plan
 `in-progress` with the same `current_phase`, and does not make the branch
