@@ -2,7 +2,7 @@
 
 This is the entrypoint for a reusable multi-agent bootstrap for Python AI engineering. In an installed project, `.claude/` is the canonical runtime guidance; do not hand-edit generated target adapters.
 
-**Project:** github_copilot_bootstrap
+**Project:** github_copilot_bootstrap — reusable multi-target coding-agent workflow bootstrap. Details: `.claude/instructions/project-context.instructions.md`.
 **Python:** 3.12+ | **Package Manager:** uv
 **Stack:** Python 3.12+ with uv; adapt framework guidance to the target repository.
 

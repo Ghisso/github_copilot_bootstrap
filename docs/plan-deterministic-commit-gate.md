@@ -1,6 +1,8 @@
 # Plan — Deterministic commit gate (`R-HOOKS-07`)
 
-**Status:** Proposed
+**Status:** Implemented. This is the original design record; later lifecycle
+refinements are documented in [architecture.md](architecture.md) and
+[runtime-checks.md](runtime-checks.md).
 **Date:** 2026-07-08
 **Derives from:** architecture-review-2026-07.md §4.2 ("the strategic option that obsoletes half of this") and the post-review assessment of remaining item #1.
 **Effort:** M (5 phases, each independently committable)
@@ -9,7 +11,7 @@
 
 ## 1. Problem
 
-All commit enforcement today lives in a **`PreToolUse` hook** ([enforce-commit-gate.sh](../shared/hooks/scripts/enforce-commit-gate.sh)), which can only gate the AI agent's own Bash tool calls. Four gaps follow structurally, none closable by improving the classifier:
+Before this work, all commit enforcement lived in a **`PreToolUse` hook** ([enforce-commit-gate.sh](../shared/hooks/scripts/enforce-commit-gate.sh)), which could only gate the AI agent's own Bash tool calls. Four gaps followed structurally, none closable by improving the classifier:
 
 1. **Only the agent is gated.** A human `git commit`, an IDE commit button, or a script never pass through the hook — the gate guardrails the agent, it does not guarantee a repo invariant.
 2. **git aliases bypass it.** The classifier matches the literal `commit` token; a user alias `git ci` → `commit` is invisible. `§0` of the review lists this as the one acknowledged residual.
@@ -18,7 +20,7 @@ All commit enforcement today lives in a **`PreToolUse` hook** ([enforce-commit-g
 
 ## 2. Goal
 
-Add a **second, deterministic enforcement layer that runs inside git itself**, mirroring the must-never-skip commit contract. Because it fires from git's own lifecycle, it catches human/alias/script/IDE commits uniformly, on one code path, with no payload to parse, no stdout convention, and no timeout-fail-open.
+This work added a **second, deterministic enforcement layer that runs inside git itself**, mirroring the must-never-skip commit contract. Because it fires from git's own lifecycle, it catches human/alias/script/IDE commits uniformly, on one code path, with no payload to parse, no stdout convention, and no timeout-fail-open.
 
 **Non-goal:** removing the `PreToolUse` gate. That layer stays — it provides *edit-time* protection ([protect-files.sh](../shared/hooks/scripts/protect-files.sh)) and the ability to `ask` (which a git hook cannot), and it gives the agent an actionable message *before* it wastes a turn. The git hook is belt-and-suspenders for the commit invariant specifically.
 
@@ -38,16 +40,22 @@ The hook ships as source in `shared/hooks/git-hooks/commit-msg`, generates into 
 - Reuses the executable-bit machinery the generator already runs on `hooks/scripts/*.sh` (the `§0` fix).
 - Reuses `_lib-frontmatter.sh` directly — no new parsing code.
 
-**Known degradation (accepted):** `.claude/` is gitignored + HF-synced in consumers, so on a fresh clone *before* HF sync the hook dir is absent → git prints a warning and runs no hook (fails open for humans on un-bootstrapped clones). This is consistent with how the rest of the AI state already behaves; the devcontainer `post-start` step (Phase 3) closes it for the container path. Rejected alternative: writing `.git/hooks/commit-msg` directly — not version-controlled, drifts, and `update_consumers.py` could not refresh it.
+**Known degradation (accepted):** `.claude/` is gitignored and restored from
+its nested `ai-state` repository in consumers, so on a fresh clone *before*
+`state-sync.sh setup` the hook directory is absent. Git therefore prints a
+warning and runs no hook for human commits on that un-bootstrapped clone. The
+devcontainer `post-start` step closes this window for the container path.
+Rejected alternative: writing `.git/hooks/commit-msg` directly — it is not
+version-controlled, drifts, and `update_consumers.py` could not refresh it.
 
 ### D3 — Full contract parity via a single shared function *(decided)*
 
-Rather than duplicating checks, extract the **ceremony** body of `enforce-commit-gate.sh` (big/small-plan, score JSON schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence) into one shared function `assert_commit_invariants <repo_root> <branch>` in `_lib-frontmatter.sh`. Dispatch remains explicit: a `complete` phase uses these existing completion checks, while a current small plan with valid pause evidence uses a separate checkpoint path that does not assert final score/findings/LEARN/DOCUMENT/COMPLETED closeout. **Branch-shape is deliberately *not* in the shared function** — per D4-B the two callers diverge on it, so each owns its own branch decision and then calls the shared ceremony checks:
+Rather than duplicating checks, extract the **ceremony** body of `enforce-commit-gate.sh` (big/small-plan, findings-report schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence) into one shared function `assert_commit_invariants <repo_root> <branch>` in `_lib-frontmatter.sh`. Dispatch remains explicit: a `complete` phase uses these existing completion checks, while a current small plan with valid pause evidence uses a separate checkpoint path that does not assert final findings/LEARN/DOCUMENT/COMPLETED closeout. **Branch-shape is deliberately *not* in the shared function** — per D4-B the two callers diverge on it, so each owns its own branch decision and then calls the shared ceremony checks:
 
 - `enforce-commit-gate.sh` (PreToolUse): classify Bash command → if commit → wrong branch adds a failure (unchanged) → if not bypass, `assert_commit_invariants` → emit `deny` JSON.
 - `commit-msg` git hook: read subject from `$1` → **not an `_implementation` branch → `exit 0` (passthrough)** → bypass subject → `exit 0` (skip ceremony; branch already valid) → else `assert_commit_invariants` → `exit 1` with the joined reason on failure.
 
-This is a **single-homing win** aligned with the review's `R-LIB-01`: the plan/score/closeout/LEARN contract gets exactly one definition and the two entry points cannot drift, while the intentional branch-scope difference stays visible in the callers rather than hidden in a flag. Bash 3.2 remains the orchestration baseline, while a small Python 3 standard-library helper performs top-level and `counts` JSON traversal. The helper is invoked by Bash and has no `uv` dependency, so the git hook remains enforceable without a project environment.
+This is a **single-homing win** aligned with the review's `R-LIB-01`: the plan/findings/closeout/LEARN contract gets exactly one definition and the two entry points cannot drift, while the intentional branch-scope difference stays visible in the callers rather than hidden in a flag. Bash 3.2 remains the orchestration baseline, while a small Python 3 standard-library helper performs top-level and `counts` JSON traversal. The helper is invoked by Bash and has no `uv` dependency, so the git hook remains enforceable without a project environment.
 
 ### D4 — Branch scope of the git-layer mirror *(decided — Option B)*
 
@@ -62,17 +70,17 @@ The current PreToolUse contract fails any commit not on a `<plan>_implementation
 
 ### D5 — Staged vs working-tree content is safe *(no action)*
 
-The score's `content_hash` is computed over `git diff <merge-base>` (working tree). The contract already requires `dirty == false`, i.e. working tree == index, so the committed (staged) content equals what was hashed. `HEAD` at `commit-msg` time is still the parent (the new commit object does not exist yet), identical to when `PreToolUse` fires — so the `head_sha`/`merge_base_sha` equality checks translate unchanged.
+The findings report's `content_hash` is computed over `git diff <merge-base>` (working tree). The contract already requires `dirty == false`, i.e. working tree == index, so the committed (staged) content equals what was hashed. `HEAD` at `commit-msg` time is still the parent (the new commit object does not exist yet), identical to when `PreToolUse` fires — so the `head_sha`/`merge_base_sha` equality checks translate unchanged.
 
 ---
 
 ## 4. Implementation phases
 
-Each phase is one small plan, in dependency order; each leaves the tree green (`validate_targets.py` passing) and is independently committable.
+The completed phases were one small plan each, in dependency order; each left the tree green (`validate_targets.py` passing) and was independently committable.
 
 ### Phase 1 — `R-HOOKS-07a`: extract `assert_commit_invariants` (pure refactor)
 
-- **Change:** move the **ceremony** body of [enforce-commit-gate.sh](../shared/hooks/scripts/enforce-commit-gate.sh) (big/small-plan, score JSON schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence — *not* the branch-shape check) into `assert_commit_invariants <repo_root> <branch>` in [_lib-frontmatter.sh](../shared/hooks/scripts/_lib-frontmatter.sh), appending to a caller-provided `failures` array (or printing a newline-joined reason + return code). `enforce-commit-gate.sh` keeps its own branch-shape failure + bypass handling and calls the shared fn for the rest.
+- **Change:** move the **ceremony** body of [enforce-commit-gate.sh](../shared/hooks/scripts/enforce-commit-gate.sh) (big/small-plan, findings-report schema + `content_hash` freshness, closeout `**Status:** COMPLETED`, LEARN evidence — *not* the branch-shape check) into `assert_commit_invariants <repo_root> <branch>` in [_lib-frontmatter.sh](../shared/hooks/scripts/_lib-frontmatter.sh), appending to a caller-provided `failures` array (or printing a newline-joined reason + return code). `enforce-commit-gate.sh` keeps its own branch-shape failure + bypass handling and calls the shared fn for the rest.
 - **Acceptance:** no behavior change; existing `validate_targets.py` commit-gate payloads still pass byte-identically; `dist/` regenerates drift-free.
 - **Depends:** none.
 
@@ -88,7 +96,7 @@ Each phase is one small plan, in dependency order; each leaves the tree green (`
   - [install_bootstrap.py](../scripts/install_bootstrap.py): add `configure_git_hooks_path(target, dry_run)` after `chmod_runtime_scripts` in `main()` — runs `git -C <target> config core.hooksPath .claude/hooks/git-hooks` (idempotent; skip with a warning if `<target>` is not a git repo). Extend `chmod_runtime_scripts` patterns to include `.claude/hooks/git-hooks/*`.
   - [post-start.sh](../shared/devcontainer/post-start.sh): after the `.git` ownership fix, set `core.hooksPath` so fresh container clones are gated even before other steps.
   - `update_consumers.py` inherits automatically (it regenerates + re-installs).
-- **Acceptance:** after `install_bootstrap.py <repo> --bucket ...`, `git -C <repo> config core.hooksPath` returns `.claude/hooks/git-hooks`; a crafted invalid commit in `<repo>` is rejected by git with the gate's reason; a valid one succeeds.
+- **Acceptance:** after `install_bootstrap.py <repo> --local-only`, `git -C <repo> config core.hooksPath` returns `.claude/hooks/git-hooks`; a crafted invalid commit in `<repo>` is rejected by git with the gate's reason; a valid one succeeds.
 - **Depends:** Phase 2.
 
 ### Phase 4 — `R-HOOKS-07d`: adversarial validator cases
@@ -126,7 +134,7 @@ findings report to the last completed phase.
 - Commits on `dev`/`main` are not gated by this layer (D4-B) — feature work happens on `_implementation` branches, and the `PreToolUse` gate still denies *agent* commits on the wrong branch.
 - `git commit --no-verify` — explicit, auditable, and the intended manual override.
 - Un-bootstrapped fresh clones outside the devcontainer until `.claude/` is synced (D2).
-- The score JSON / plan status remain **agent-authored** — this layer verifies the *contract*, it does not make the inputs independently trustworthy (out of scope; unchanged from today).
+- The findings report / plan status remain **agent-authored** — this layer verifies the *contract*, it does not make the inputs independently trustworthy (out of scope; unchanged from today).
 
 ---
 
