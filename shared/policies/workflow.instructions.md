@@ -3,7 +3,7 @@ description: "Always-on: Workflow protocol, branch lifecycle, session logging, c
 applicability: always
 ---
 
-# Workflow: Pre-Flight -> Branch -> Plan When Needed -> Implement -> Verify -> Review -> Closeout -> Commit
+# Workflow: Pre-Flight -> Branch -> Plan When Needed -> Implement -> Verify -> Review -> Closeout -> Commit -> Push
 
 ---
 
@@ -126,7 +126,7 @@ cancelled remains blocked.
 ## Canonical Orchestrator Loop
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH
 ```
 
 For each small plan:
@@ -138,6 +138,7 @@ For each small plan:
 5. **CLOSEOUT:** Use this fixed order: (a) update documentation, the final small-plan state, LEARN evidence, and the `COMPLETED` session log; (b) explicitly stage only intended outer-repository files and inspect `git diff --cached`; (c) give every surviving MINOR finding an explicit `disposition` (for example `"accepted"`) and non-empty `reason`, then persist converged findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (d) run `uv run python .claude/scripts/verify.py phase --format json --persist`; then (e) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation and final state precede findings so findings bind to the final code and docs. The reviewer does not persist findings itself, and the coder cannot create final verification receipts. Do not manually commit or checkpoint the nested `.claude` AI-state repository (`state-sync.sh checkpoint`/`publish`/`push`) during CLOSEOUT: leave those changes uncommitted while (c)-(e) run, then commit the outer repository. The native `post-commit` hook checkpoints and publishes nested state automatically right after. Committing nested state first changes what the receipt's `control_plane_provenance` binds to and makes the next commit fail closed with `closeout receipt governing control-plane provenance is stale`.
 6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
 7. **COMMIT:** On normal completion, commit the explicitly staged completed small plan atomically.
+8. **PUSH:** After every successful outer-repository commit, attempt a normal non-force push. Prefer the configured branch upstream with `GIT_TERMINAL_PROMPT=0 git push`; otherwise, when `origin` exists, use `GIT_TERMINAL_PROMPT=0 git push -u origin HEAD`. If no remote exists or authentication/network access fails, warn clearly and keep the local commit; do not retry interactively or fail the completed phase. This outer publication is separate from the nested `.claude` `ai-state` post-commit sync. PR creation and merge remain explicitly user-requested.
 
 **Conditional checkpoint branch:** When the user explicitly requests a pause,
 write the PAUSED session log and required pause frontmatter, then checkpoint
@@ -163,7 +164,7 @@ Commit-gate bypasses are allowed only for commit subjects beginning with:
   through to the full ceremony gate like any other commit, so a substantive
   runtime/code change cannot hide under a typo subject.
 
-Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. A PR is blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
+Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. Publication and PR creation are blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
 
 Environment-variable bypasses are not supported.
 
@@ -294,7 +295,7 @@ Some behaviors are automated by hooks. Others are still manual.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan.
 - Commit closeout is gated on small-plan completion, a passing `verify phase`/`verify closeout` receipt, a matching findings report with `counts.critical == 0` and `counts.major == 0` plus an explicit disposition and non-empty reason on every surviving MINOR, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
-- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and a valid historical receipt chain across every completed phase, each with `counts.critical == 0` and `counts.major == 0`.
+- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. A normal completed-phase commit may also be pushed after post-commit advances `current_phase`, but only when its receipt and findings directly certify that exact commit; later in-progress work cannot publish under that authority. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and a valid historical receipt chain across every completed phase, each with `counts.critical == 0` and `counts.major == 0`.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.

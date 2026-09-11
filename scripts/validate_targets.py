@@ -193,7 +193,7 @@ REVIEWER_PROMPT_REQUIRED_FRAGMENTS = (
     "diff-of-diffs isolating only what changed since the previous round",
 )
 ORCHESTRATOR_LIFECYCLE_REQUIRED = (
-    "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
+    "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT, PUSH",
     "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
     "3. **PLAN WHEN NEEDED:**",
     "4. **IMPLEMENT:**",
@@ -201,7 +201,8 @@ ORCHESTRATOR_LIFECYCLE_REQUIRED = (
     "6. **REVIEW:**",
     "7. **CLOSEOUT:**",
     "8. **COMMIT:**",
-    "9. **PR ON REQUEST:**",
+    "9. **PUSH:**",
+    "10. **PR ON REQUEST:**",
 )
 ORCHESTRATOR_LIFECYCLE_FORBIDDEN = (
     "**PLAN:**",
@@ -545,8 +546,8 @@ class TaskLaneInputs(TypedDict, total=False):
 
 ROOT_LIFECYCLE_PATTERN = re.compile(
     r"\b(?:PRE-FLIGHT|BRANCH|PLAN(?: WHEN NEEDED)?|IMPLEMENT|VERIFY|REVIEW|"
-    r"CLOSEOUT|COMMIT)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN(?: WHEN NEEDED)?|"
-    r"IMPLEMENT|VERIFY|REVIEW|CLOSEOUT|COMMIT))+\b",
+    r"CLOSEOUT|COMMIT|PUSH)(?:\s*->\s*(?:PRE-FLIGHT|BRANCH|PLAN(?: WHEN NEEDED)?|"
+    r"IMPLEMENT|VERIFY|REVIEW|CLOSEOUT|COMMIT|PUSH))+\b",
     re.IGNORECASE,
 )
 POLICY_SCOPE_FIXTURES = {
@@ -6707,6 +6708,95 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             errors,
         )
 
+        # A completed phase may publish before the next phase finishes. The
+        # post-commit hook has advanced current_phase to phase-two, so this
+        # exercises the dedicated predecessor-receipt path rather than final
+        # closeout. It must also reject a later arbitrary in-progress commit.
+        phase_one_push = git(repo, "push", "origin", "foo_implementation")
+        check(
+            phase_one_push.returncode == 0,
+            "phase-one completion must publish through the real pre-push hook "
+            "after current_phase advances: "
+            f"{phase_one_push.stdout}{phase_one_push.stderr}",
+            errors,
+        )
+        phase_one_pretool = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git push"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' not in phase_one_pretool[1],
+            "PreToolUse git push must allow a receipt-certified completed phase "
+            "after current_phase advances: "
+            f"{phase_one_pretool[1]}",
+            errors,
+        )
+
+        bypass_log = repo / ".claude" / "session_logs" / "hooks-bypass.log"
+        write(
+            bypass_log,
+            "2099-01-01T00:00:00Z, branch=foo_implementation, "
+            "subject=fixup! fixture bypass\n",
+        )
+        bypassed_publication = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git push"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' in bypassed_publication[1]
+            and "bypass_acknowledged" in bypassed_publication[1],
+            "completed-phase publication must reject an unacknowledged bypass: "
+            f"{bypassed_publication[1]}",
+            errors,
+        )
+        bypass_log.unlink()
+
+        old_log_path = repo / ".claude" / "session_logs" / "phase-one-closeout.md"
+        original_bytes = old_log_path.read_bytes()
+        old_log_path.write_text(
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+            "- [LEARN:workflow] edited after closeout, must be rejected\n",
+            encoding="utf-8",
+        )
+        tampered_publication = run_hook(
+            lifecycle_script(repo, "enforce-pr-gate.sh"),
+            {"tool_name": "Bash", "tool_input": {"command": "git push"}},
+            "github-copilot",
+            cwd=repo,
+        )
+        check(
+            '"permissionDecision":"deny"' in tampered_publication[1]
+            and "artifact closeout_log was tampered with" in tampered_publication[1],
+            "completed-phase publication must reject a tampered historical artifact "
+            f"and name the tampered artifact: {tampered_publication[1]}",
+            errors,
+        )
+        old_log_path.write_bytes(original_bytes)
+
+        write(repo / "unreviewed-phase-two-work.txt", "not receipt-certified\n")
+        git(repo, "add", "unreviewed-phase-two-work.txt")
+        arbitrary_commit = git(
+            repo, "commit", "--no-verify", "-m", "unreviewed phase-two work"
+        )
+        check(
+            arbitrary_commit.returncode == 0,
+            "fixture must create an arbitrary in-progress commit: "
+            f"{arbitrary_commit.stdout}{arbitrary_commit.stderr}",
+            errors,
+        )
+        arbitrary_push = git(repo, "push", "origin", "foo_implementation")
+        check(
+            arbitrary_push.returncode != 0
+            and "directly certify the pushed commit" in arbitrary_push.stderr,
+            "completed-phase publication must reject an arbitrary later in-progress "
+            f"commit: {arbitrary_push.stdout}{arbitrary_push.stderr}",
+            errors,
+        )
+
         # --- Phase two: a second real completion commit closes the big
         # plan; this phase's receipt gets terminal current-state freshness,
         # phase-one's gets historical ancestor/tree/artifact-chain checks. ---
@@ -6805,6 +6895,90 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             '"permissionDecision":"deny"' not in pr_after_errata[1],
             "PR gate must pass again once the closed log is restored and the "
             f"correction lives in a sibling errata file: {pr_after_errata[1]}",
+            errors,
+        )
+
+
+def validate_completed_phase_stale_receipt_rejection(errors: list[str]) -> None:
+    """A bypassed stale completion cannot use its parent's receipt to publish."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        git(repo, "push", "origin", "dev")
+        write_big_plan(
+            repo,
+            status="in-progress",
+            phases=("phase-one", "phase-two"),
+            current_phase="phase-one",
+        )
+        git(repo, "checkout", "-b", "foo_implementation")
+        write_small_plan(repo, status="complete", phase="phase-one")
+        write_small_plan(repo, status="in-progress", phase="phase-two")
+        write(repo / "phase-one-work.txt", "receipt-bound work\n")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+            "- [LEARN] none - fixture\n",
+        )
+
+        shared_scripts = str(REPO_ROOT / "shared" / "scripts")
+        if shared_scripts not in sys.path:
+            sys.path.insert(0, shared_scripts)
+        import verify as verification
+
+        metadata = verification.state_metadata(repo, "dev", "phase-one")
+        report = {
+            "findings": [],
+            "counts": {"critical": 0, "major": 0, "minor": 0},
+            "ponytail_reviewed": True,
+            "ponytail_findings": 0,
+            "profiles_reviewed": ["code", "ponytail"],
+            "branch": "foo_implementation",
+            "phase": "phase-one",
+            "generated_at": "2099-01-01T00:00:00Z",
+            "base_ref": "dev",
+            "merge_base_sha": metadata["merge_base_sha"],
+            "head_sha": metadata["head_sha"],
+            "target": str(repo / "phase-one-work.txt"),
+            "dirty": False,
+            "content_hash": metadata["content_hash"],
+            "changed_files": ["phase-one-work.txt"],
+        }
+        write(
+            repo / ".claude" / "quality_reports" / "findings-phase-one.json",
+            json.dumps(report, indent=2) + "\n",
+        )
+
+        # The receipt above certifies the index as it stood before this tail
+        # is staged. `--no-verify` can land that different commit, but its
+        # post-commit advance must not turn the stale receipt into publication
+        # authority.
+        write(repo / "receipt-stale-tail.txt", "not receipt-certified\n")
+        git(repo, "add", ".")
+        stale_commit = git(repo, "commit", "--no-verify", "-m", "stale completion")
+        check(
+            stale_commit.returncode == 0,
+            f"fixture must land the bypassed stale completion: {stale_commit.stderr}",
+            errors,
+        )
+        stale_push = git(repo, "push", "origin", "foo_implementation")
+        check(
+            stale_push.returncode != 0
+            and (
+                "final tracked state is stale" in stale_push.stderr
+                or "content_hash is stale" in stale_push.stderr
+            ),
+            "completed-phase publication must reject a receipt whose tree or "
+            f"findings hash does not match the certified commit: {stale_push.stderr}",
             errors,
         )
 
@@ -10618,6 +10792,7 @@ def main() -> int:
         validate_ponytail_diff_classifier(errors)
         validate_typo_bypass_path_restriction(errors)
         validate_end_to_end_receipt_chain_lifecycle(errors)
+        validate_completed_phase_stale_receipt_rejection(errors)
         validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)

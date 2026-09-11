@@ -491,8 +491,8 @@ Two workflow invariants are each enforced twice, from a single shared contract p
 - **Commit invariant** — the plan/findings/closeout/LEARN ceremony, via `assert_commit_invariants` in `_lib-frontmatter.sh`:
   - **`PreToolUse` (`enforce-commit-gate.sh`)** gates the AI agent's own Bash tool calls. It can `ask`/`deny` before a turn is wasted and denies an agent commit on any branch that isn't `<plan_name>_implementation`. It exempts commits that target the nested `ai-state` repo (`git -C .claude commit`, `--git-dir=.claude/.git`, `--work-tree .claude`) — `state-sync.sh` commits there constantly and has no ceremony of its own to satisfy — but only when the *matching commit invocation itself* carries the nested-repo flag, not merely because some other `git` call earlier or later in the same compound command happens to touch `.claude/`.
   - **`commit-msg` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every commit that reaches git itself — human, IDE, script, or alias (`git ci`) — on one code path, with no command string to classify and no timeout to fail open on. It only runs the ceremony checks on `<plan_name>_implementation` branches — `dev`/`main` commits pass through untouched.
-- **Push invariant** — the big-plan/phase-completeness/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
-  - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
+- **Push invariant** — the completed-phase/final-closeout/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
+  - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It permits a paused checkpoint or the exact phase-completion commit directly certified by the predecessor phase's receipt after `post-commit` advances `current_phase`; it rejects later in-progress work. It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
   - **`pre-push` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every push that reaches git itself, reading ref lines from stdin (`<local-ref> <local-sha> <remote-ref> <remote-sha>`). It derives the branch and the commit-count check from the *pushed* ref/sha, not from whatever is checked out, so a push of `foo_implementation` from elsewhere is still gated. It skips branch deletions (all-zero local sha) and only runs the ceremony checks on `<plan_name>_implementation` refs — `dev`/`main` pushes pass through untouched.
 
 **Historical receipt-chain validation** — the push/PR gate does not check only
@@ -515,6 +515,8 @@ list first. It then re-verifies every
 artifact hash against the current file bytes. Only the terminal completed
 phase receives current-tree/current-runtime freshness checks; every earlier
 phase gets this ancestor/tree/artifact-hash chain instead.
+
+The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
 
 **Closed session logs are immutable.** Because a closeout log's bytes are
 hashed into its phase's receipt, editing a log after its phase closes breaks

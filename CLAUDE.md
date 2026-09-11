@@ -24,13 +24,13 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 ## Required Lifecycle
 
-`PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT`
+`PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH`
 
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Run VERIFY with the canonical checks, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings, records learning and the completed session log, then runs the closeout checks.
 - Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
-- Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
+- After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
 
 ## Exact Commands
 

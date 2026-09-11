@@ -1625,12 +1625,18 @@ def gate_receipt_errors(
         errors.append("closeout receipt head_sha is stale")
     elif head_relation == "ancestor" and not git_is_ancestor(root, receipt_head, head):
         errors.append("closeout receipt head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, receipt_head, head
+    ):
+        errors.append(
+            "closeout receipt head_sha does not directly certify the pushed commit"
+        )
     expected_base = git_output(["merge-base", "dev", head], root)
     if not expected_base or metadata.get("merge_base_sha") != expected_base:
         errors.append("closeout receipt merge_base_sha is stale")
     if metadata.get("path_discovery_ok") is not True:
         errors.append("closeout receipt path discovery was not verified")
-    if enforce_final_state:
+    if enforce_final_state or head_relation == "certified":
         expected_tree = (
             git_output(["write-tree"], root)
             if head_relation == "exact"
@@ -1638,6 +1644,7 @@ def gate_receipt_errors(
         )
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append("closeout receipt final tracked state is stale")
+    if enforce_final_state:
         root_fingerprint, adapter_diagnostics = bootstrap_root_fingerprint_diagnostics(
             root
         )
@@ -1736,7 +1743,9 @@ def gate_receipt_errors(
                 root=root,
                 require_major=require_major,
                 require_ponytail=require_ponytail,
-                verify_current_content=enforce_final_state,
+                verify_current_content=(
+                    enforce_final_state or head_relation == "certified"
+                ),
             )
         )
     log_path = loaded.get("closeout_log")
@@ -1762,6 +1771,30 @@ def git_is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
         )
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
+    """Return whether ``child`` is a non-merge commit directly after ``parent``."""
+    resolved_child = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{child}^{{commit}}"], root
+    )
+    resolved_parent = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}"], root
+    )
+    if not resolved_child or not resolved_parent:
+        return False
+    try:
+        parents = run_process(
+            ["git", "rev-list", "--parents", "-n", "1", resolved_child], root
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if parents.returncode != 0:
+        return False
+    parts = parents.stdout.split()
+    return (
+        len(parts) == 2 and parts[0] == resolved_child and parts[1] == resolved_parent
+    )
 
 
 def report_errors(
@@ -1803,6 +1836,10 @@ def report_errors(
         errors.append(f"{label} head_sha is stale")
     elif head_relation == "ancestor" and not git_is_ancestor(root, report_head, head):
         errors.append(f"{label} head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, report_head, head
+    ):
+        errors.append(f"{label} head_sha does not directly certify the pushed commit")
     if report.get("merge_base_sha") != expected_base:
         errors.append(f"{label} merge_base_sha is stale")
     if report.get("dirty") is not False:
@@ -1826,7 +1863,9 @@ def report_errors(
         errors.append(f"{label} changed_files must be a list of strings")
     if verify_current_content:
         current_hash = content_hash_for(
-            root, expected_base, head if head_relation == "ancestor" else ""
+            root,
+            expected_base,
+            head if head_relation in {"ancestor", "certified"} else "",
         )
         if not current_hash or report.get("content_hash") != current_hash:
             errors.append(f"{label} content_hash is stale")
@@ -2933,7 +2972,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--branch", default="")
     parser.add_argument("--head", default="")
     parser.add_argument(
-        "--head-relation", choices=("exact", "ancestor"), default="exact"
+        "--head-relation", choices=("exact", "ancestor", "certified"), default="exact"
     )
     parser.add_argument("--require-major", action="store_true")
     parser.add_argument("--require-ponytail", action="store_true")
