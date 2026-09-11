@@ -307,10 +307,20 @@ retrievable from a nested Git revision, it fails closed and names
 checkpoints nested plan state after the plan, log, and memory edits are final
 and before the findings and receipts are persisted. An agent does that with
 a direct nested-repository commit rather than by invoking `state-sync.sh`, which
-the file-protection hook denies through the Bash tool. A consumer whose `.claude`
-is not its own Git repository is exempt, which is decided by looking for
-`.claude/.git` rather than by reading a nested `HEAD` — Git walks up to the
-outer repository from a plain `.claude` directory.
+the file-protection hook denies through the Bash tool.
+
+Every nested-state reader in `verify.py` (`nested_git_head`,
+`nested_tracked_state_fingerprint`, `indexed_nested_file`,
+`nested_revision_file`, and `relevant_nested_status_changes`) decides whether
+`.claude` is its own Git repository by looking for `.claude/.git`, never by
+asking Git. Git walks up to the outer repository from a plain `.claude`
+directory: `rev-parse` returns the outer `HEAD`, `git show :path` reads the
+outer file at that path, and `git status --porcelain` reports outer paths
+spelled exactly like nested ones. When `.claude/.git` is absent the readers
+report absence instead, the receipt contract fails closed, and `verify.py`
+exits with one plain message naming
+`bash .claude/hooks/scripts/state-sync.sh checkpoint` rather than building a
+receipt. Only `gate` mode, which reads persisted receipts, is exempt.
 
 ### Reporting reminders
 

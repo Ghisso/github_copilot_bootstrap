@@ -19,6 +19,7 @@ from install_bootstrap import (  # noqa: E402
     merge_gitignore,
     persisted_install_mode,
     populate_bootstrap_root,
+    require_nested_head,
     substitute_project_name,
     substitute_python_version,
     validate_agents_takeover,
@@ -880,6 +881,42 @@ def test_copy_preserves_nested_git_metadata(tmp_path: Path, gitfile: bool) -> No
     else:
         assert (nested_git / "HEAD").read_text() == "ref: refs/heads/ai-state\n"
     assert (target / ".claude" / "generated.md").read_text() == "fresh\n"
+
+
+def test_require_nested_head_rejects_plain_nested_directory(tmp_path: Path) -> None:
+    """A `.claude` that holds content but is not its own Git repository must
+    be rejected before asking Git for HEAD: `git -C .claude rev-parse HEAD`
+    walks up to the *outer* repository and is satisfied by its HEAD instead
+    of failing, which would hide a state-sync setup that never ran
+    `git init` in `.claude`. The outer repository needs a real commit so the
+    walk-up has an outer HEAD to succeed with -- an outer repo with no
+    commits at all would fail `rev-parse` for an unrelated reason."""
+    nested = tmp_path / ".claude"
+    nested.mkdir()
+    (nested / "generated.md").write_text("fresh\n", encoding="utf-8")
+    assert _git(tmp_path, "init", "-q", "-b", "main").returncode == 0
+    assert _git(tmp_path, "add", ".").returncode == 0
+    assert (
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "commit", "-q", "-m", "outer state"],
+            env=_actor_env(),
+            text=True,
+            capture_output=True,
+            check=False,
+        ).returncode
+        == 0
+    )
+    # Confirms the measured hazard: the outer repository's HEAD is what
+    # `git -C .claude rev-parse HEAD` would resolve to via walk-up.
+    outer_head = _git(tmp_path, "rev-parse", "--verify", "HEAD")
+    assert outer_head.returncode == 0
+    walked_up = _git(nested, "rev-parse", "--verify", "HEAD")
+    assert walked_up.returncode == 0
+    assert walked_up.stdout.strip() == outer_head.stdout.strip()
+
+    with pytest.raises(SystemExit) as excinfo:
+        require_nested_head(tmp_path, "state-sync setup")
+    assert ".git" in str(excinfo.value)
 
 
 def test_substitutions_update_root_guidance_and_workspace_facts(tmp_path: Path) -> None:

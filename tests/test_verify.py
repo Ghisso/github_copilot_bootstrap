@@ -2431,6 +2431,111 @@ review_profiles:
     )
 
 
+def test_terminal_predicates_refuse_outer_plan_mirror_without_nested_repository(
+    tmp_path: Path,
+) -> None:
+    """The measured fail-open: an outer repository mirroring the nested plan
+    paths at its top level must never satisfy the terminal predicates when
+    ``.claude`` has no ``.git`` of its own.
+
+    Before the guard, ``git show`` and ``git status`` run with cwd inside
+    ``.claude`` walked up to the outer repository and resolved these
+    outer-mirror paths as if they were nested state -- including reading the
+    outer ``plans/phase-two.md`` as cancelled while the nested file on disk
+    was still in progress.
+    """
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    plans.mkdir(parents=True)
+    (nested / "scripts").mkdir()
+    (nested / "scripts" / "verify.py").write_text("runtime = 1\n", encoding="utf-8")
+    _write_root_adapter_pairs(tmp_path)
+
+    big_plan_text = (
+        "---\nname: consumer-proof\ntype: big-plan\nstatus: in-progress\n"
+        "current_phase: phase-one\nphases:\n  - phase-one\n  - phase-two\n---\n"
+        "# Big\n"
+    )
+    phase_one_text = (
+        "---\nname: phase-one\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 1\nstatus: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one.md\n---\n"
+    )
+    (plans / "consumer-proof.md").write_text(big_plan_text, encoding="utf-8")
+    (plans / "phase-one.md").write_text(phase_one_text, encoding="utf-8")
+    (plans / "phase-two.md").write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: in-progress\n---\n",
+        encoding="utf-8",
+    )
+    logs = nested / "session_logs"
+    logs.mkdir(parents=True)
+    (logs / "phase-one.md").write_bytes(b"**Status:** COMPLETED\n")
+    (logs / "phase-two.md").write_bytes(b"**Status:** CANCELLED\n")
+
+    outer_plans = tmp_path / "plans"
+    outer_plans.mkdir(parents=True)
+    (outer_plans / "consumer-proof.md").write_text(big_plan_text, encoding="utf-8")
+    (outer_plans / "phase-one.md").write_text(phase_one_text, encoding="utf-8")
+    (outer_plans / "phase-two.md").write_text(
+        "---\nname: phase-two\ntype: small-plan\nparent_plan: consumer-proof\n"
+        "phase_index: 2\nstatus: cancelled\n"
+        "cancelled_at: 2026-09-11T00:00:00Z\n"
+        "cancelled_reason: descoped\n"
+        "cancelled_evidence: .claude/session_logs/phase-two.md\n---\n",
+        encoding="utf-8",
+    )
+
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "outer state")
+    _git(["checkout", "-q", "-b", "consumer-proof_implementation"], tmp_path)
+    branch = "consumer-proof_implementation"
+
+    before = verify.control_plane_provenance(tmp_path, branch, "phase-one")
+    meta: dict[str, object] = {"branch": branch, "control_plane_provenance": before}
+
+    big_plan = plans / "consumer-proof.md"
+    terminal_text = big_plan_text.replace(
+        "status: in-progress", "status: complete"
+    ).replace("current_phase: phase-one", "current_phase: ")
+    big_plan.write_text(terminal_text, encoding="utf-8")
+    outer_big_plan = outer_plans / "consumer-proof.md"
+    outer_big_plan.write_text(
+        outer_big_plan.read_text(encoding="utf-8") + "# outer noise\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        verify.has_only_terminal_big_plan_change(tmp_path, branch, "phase-one", meta)
+        is False
+    )
+    assert (
+        verify.terminal_control_plane_provenance_matches(
+            tmp_path,
+            branch,
+            "phase-one",
+            meta,
+            {
+                **meta,
+                "control_plane_provenance": verify.control_plane_provenance(
+                    tmp_path, branch, "phase-one"
+                ),
+            },
+        )
+        is False
+    )
+
+    outer_big_plan.write_text(terminal_text, encoding="utf-8")
+    _commit_all(tmp_path, "outer terminal")
+    assert (
+        verify.has_only_checkpointed_terminal_big_plan_change(
+            tmp_path, branch, "phase-one", meta
+        )
+        is False
+    )
+
+
 @pytest.mark.parametrize(
     ("replacement", "evidence"),
     (
@@ -3882,18 +3987,80 @@ def test_unpublishable_closeout_reason_skips_for_plain_nested_directory(
     """A consumer whose ``.claude`` holds content but is not its own Git
     repository must keep working unchanged.
 
-    ``nested_git_head`` cannot detect this: Git walks up from ``.claude`` and
-    resolves the outer repository's HEAD, so a precondition gated on that
-    value being empty would refuse every closeout on this branch and force an
-    unrequested nested-repository migration.
+    ``nested_git_head`` never walks up to the outer repository's HEAD: it
+    reports absence for this shape, matching ``nested_state_repository``, so
+    a precondition gated on ``nested_state_repository`` (not on
+    ``nested_git_head`` truthiness) skips instead of refusing every closeout
+    on this branch and forcing an unrequested nested-repository migration.
     """
     _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
     assert (tmp_path / ".claude").is_dir()
     assert not (tmp_path / ".claude" / ".git").exists()
-    assert verify.nested_git_head(tmp_path) != ""
+    assert verify.nested_git_head(tmp_path) == ""
     assert verify.nested_state_repository(tmp_path) is False
     metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
     assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_nested_readers_report_absence_for_plain_nested_directory(
+    tmp_path: Path,
+) -> None:
+    """Each of the five nested-state readers must report absence -- never
+    outer repository content -- when ``.claude`` is a plain directory, even
+    though an outer top-level file at the identical relative path exists and
+    would satisfy a walk-up: ``git show :plans/sample-plan.md`` and
+    ``git status --porcelain`` both resolve paths from the repository root,
+    not from the nested working directory, when Git walks up."""
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    outer_plans = tmp_path / "plans"
+    outer_plans.mkdir(parents=True, exist_ok=True)
+    (outer_plans / "sample-plan.md").write_text(
+        "---\nname: outer-mirror\ntype: big-plan\nstatus: complete\n---\n"
+        "# Outer plan, not the nested one\n",
+        encoding="utf-8",
+    )
+    outer_head = _commit_all(tmp_path, "outer top-level plan mirror")
+
+    active_paths = frozenset({"plans/sample-plan.md"})
+    assert verify.nested_git_head(tmp_path) == ""
+    assert verify.nested_tracked_state_fingerprint(tmp_path, active_paths) == ""
+    assert verify.indexed_nested_file(tmp_path, "plans/sample-plan.md") is None
+    assert (
+        verify.nested_revision_file(tmp_path, outer_head, "plans/sample-plan.md")
+        is None
+    )
+    assert verify.relevant_nested_status_changes(tmp_path, active_paths) is None
+
+    metadata = {
+        "branch": "sample-plan_implementation",
+        "control_plane_provenance": verify.control_plane_provenance(
+            tmp_path, "sample-plan_implementation", "phase-one"
+        ),
+    }
+    assert verify.has_control_plane_provenance(metadata) is False
+
+
+def test_main_reports_missing_nested_repository_plainly(tmp_path: Path) -> None:
+    """``.claude`` present but not its own Git repository must exit 2 with
+    one plain diagnostic on stderr, never the uncaught ``ValueError`` that
+    ``validate_receipt`` used to raise for a missing nested repository."""
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "shared" / "scripts" / "verify.py"),
+            "fast",
+            "--format",
+            "text",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "not its own Git repository" in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 def test_unpublishable_closeout_reason_allows_repersist_after_terminal_transition(

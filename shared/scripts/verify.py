@@ -800,9 +800,13 @@ def plan_bytes_matching_digest(
 
 
 def nested_git_head(root: Path) -> str:
-    """Return the nested AI-state HEAD only when it is available."""
+    """Return the nested AI-state HEAD only when it is available.
+
+    Never walks up to the outer repository's HEAD: when ``.claude`` is not
+    its own Git repository, this returns ``""`` instead.
+    """
     nested = root / ".claude"
-    if not nested.is_dir() or nested.is_symlink():
+    if not nested_state_repository(root):
         return ""
     return git_output(["-C", str(nested), "rev-parse", "--verify", "HEAD"], root)
 
@@ -812,7 +816,7 @@ def nested_tracked_state_fingerprint(
 ) -> str:
     """Hash relevant nested Git index and dirty state without mutable evidence."""
     nested = root / ".claude"
-    if not nested.is_dir() or nested.is_symlink():
+    if not nested_state_repository(root):
         return ""
     try:
         index = run_process(["git", "ls-files", "--stage", "-z"], nested)
@@ -990,11 +994,7 @@ def control_plane_provenance_matches(
 def indexed_nested_file(root: Path, relative: str) -> bytes | None:
     """Read one tracked nested-state file from the Git index."""
     nested = root / ".claude"
-    if (
-        not nested.is_dir()
-        or nested.is_symlink()
-        or not is_safe_relative_path(relative)
-    ):
+    if not nested_state_repository(root) or not is_safe_relative_path(relative):
         return None
     try:
         result = subprocess.run(
@@ -1013,8 +1013,7 @@ def nested_revision_file(root: Path, revision: str, relative: str) -> bytes | No
     """Read one nested-state file from a recorded immutable Git revision."""
     nested = root / ".claude"
     if (
-        not nested.is_dir()
-        or nested.is_symlink()
+        not nested_state_repository(root)
         or not re.fullmatch(r"[0-9a-f]{40,64}", revision)
         or not is_safe_relative_path(relative)
     ):
@@ -1037,6 +1036,8 @@ def relevant_nested_status_changes(
 ) -> list[tuple[str, list[str]]] | None:
     """Return only dirty nested state that contributes to provenance."""
     nested = root / ".claude"
+    if not nested_state_repository(root):
+        return None
     try:
         status = run_process(
             ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
@@ -3092,6 +3093,15 @@ def main() -> int:
         )
         print(json.dumps({"errors": errors}, separators=(",", ":")))
         return 0 if not errors else 1
+    if not nested_state_repository(root):
+        print(
+            ".claude is not its own Git repository, so nested AI-state "
+            "provenance is unavailable and no verification receipt can be "
+            "built; run `bash .claude/hooks/scripts/state-sync.sh "
+            "checkpoint` to initialize it, then re-run",
+            file=sys.stderr,
+        )
+        return 2
     adapter_diagnostics: list[dict[str, str]] = []
     metadata = state_metadata(
         root, args.base_ref, args.phase, adapter_diagnostics=adapter_diagnostics
