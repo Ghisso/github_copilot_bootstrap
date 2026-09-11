@@ -29,15 +29,19 @@ or make pull requests and merges automatic.
 - [ ] Modify the public outer-repository push contract in
   `shared/hooks/scripts/_lib-frontmatter.sh` and its callers so a push after a
   completed phase is allowed only when the committed phase has valid persisted
-  receipt/finding evidence. Preserve existing paused-checkpoint and final
-  closeout paths, and reject an arbitrary commit from an in-progress phase.
+  receipt/finding evidence. After `post-commit` advances the big plan to its
+  next phase, identify and validate the just-completed prior phase against its
+  certified completion commit; do not require the current phase to remain the
+  completed one. Preserve existing paused-checkpoint and final closeout paths,
+  and reject an arbitrary commit from an in-progress phase.
   Keep the nested `.claude` push exemption unchanged.
 - [ ] Extend the existing local-bare-remote validator and hook tests in
   `scripts/validate_targets.py`, `tests/test_hook_gates.py`, and
   `tests/test_lifecycle_hooks.py`. Cover a valid completed-phase push, an
-  in-progress or stale-evidence denial, paused and final-closeout compatibility,
-  absent/failed outer remotes, and generated prompt/policy parity. Do not make
-  network-dependent tests.
+  in-progress or stale-evidence denial, Phase A publication followed by a
+  valid Phase B completion/final push, historical Phase A artifact tampering,
+  paused and final-closeout compatibility, absent/failed outer remotes, and
+  generated prompt/policy parity. Do not make network-dependent tests.
 - [ ] Regenerate `dist/multi-agent/` from source and locally self-install it
   with `install_bootstrap.py . --allow-self --local-only`; never hand-edit
   generated files. Confirm the authoring runtime and each consumer target carry
