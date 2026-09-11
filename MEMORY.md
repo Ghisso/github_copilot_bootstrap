@@ -862,3 +862,27 @@
   bullet while this repository's own root `CLAUDE.md` stayed stale, because
   only freshly rendered guidance is gated. Shared skills have a drift gate for
   this class of problem; authoring-repo root guidance has no equivalent.
+- [LEARN:security] A receipt must only bind bytes that Git already holds. The
+  closeout receipt recorded the big plan's working-tree digest while the push
+  predicates re-derive it from a nested revision, so a plan left dirty at
+  persist time bound a digest that existed nowhere and made the completion
+  commit permanently unpublishable. Fail closed at persist time instead of
+  discovering it after the commit.
+- [LEARN:workflow] Adding a phase to a big plan defers the strict terminal
+  check; it never escapes it. Reopening a plan let the blocked commit publish
+  through the intermediate certified route, but the new final phase meets the
+  same gate with no later phase to rescue it. Never treat the deferral as the
+  fix.
+- [LEARN:review] `git -C <dir> rev-parse HEAD` walks up the directory tree, so
+  it cannot answer "is this directory its own repository". A nested-state check
+  built on that returned the outer repository's HEAD and would have refused
+  every closeout for consumers whose `.claude` is a plain directory. Test for
+  the `.git` entry instead.
+- [LEARN:testing] A fixture that works around a hazard instead of reproducing
+  it reports protection that is not being verified. The first escape-hatch test
+  omitted `.claude` entirely, with a comment explaining it was avoiding the
+  walk-up behavior — which was the very defect. Build the real shape.
+- [LEARN:quality] Check a persist path's ordering against its own status gate.
+  `--persist` wrote the receipt before returning on status, so a diagnostic run
+  overwrote a passing receipt with a failing one, which is what turned a
+  misleading recovery hint into a destructive one.
