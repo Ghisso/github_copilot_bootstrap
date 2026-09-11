@@ -412,12 +412,23 @@ def validate_mode_applicability(
             "VFY-GEN-001",
         },
     }[str(mode)]
+    # Checks a mode does measure but that can honestly resolve to
+    # NOT_APPLICABLE depending on the repository under test (a test-less
+    # consumer has no pytest evidence to collect), unlike `inapplicable`,
+    # which a mode never measures at all.
+    conditionally_applicable = {
+        "fast": set(),
+        "phase": {"VFY-PYTEST-001"},
+        "closeout": set(),
+    }[str(mode)]
     if mode == "fast" and not any(
         Path(path).suffix == ".py"
         for path in metadata_paths(metadata, "relevant_paths")
     ):
         inapplicable.add("VFY-RUFF-001")
     for item in checks:
+        if item["id"] in conditionally_applicable:
+            continue
         if item["applicable"] is not (item["id"] not in inapplicable):
             raise ValueError(f"{item['id']} has invalid applicability for {mode} mode")
 
@@ -2185,6 +2196,28 @@ def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+def _tool_missing_detail(tool: str) -> str:
+    """Return the one shared detail text for a tool absent from `uv`'s
+    project environment, so the literal exists exactly once."""
+    return (
+        f"{tool} is not installed in the project environment; "
+        "run uv add --dev ruff mypy pytest"
+    )
+
+
+def _missing_tool(tool: str, rc: int, stderr: str) -> tuple[str, str] | None:
+    """Return the missing-tool result when `uv run` failed to spawn `tool`
+    (`uv` itself present, `tool` absent), or None otherwise.
+
+    `uv run <tool>` never raises when `uv` is installed but `tool` is not;
+    it exits non-zero with `Failed to spawn: ...` on stderr instead. A bare
+    `FileNotFoundError` only fires when `uv` itself cannot be found.
+    """
+    if rc != 0 and "Failed to spawn" in stderr:
+        return "UNVERIFIED", _tool_missing_detail(tool)
+    return None
+
+
 def _toml_basic_string(value: str) -> str | None:
     """Return a quoted TOML basic-string literal for value, or None when
     value cannot round-trip through valid UTF-8 text (for example an
@@ -2251,13 +2284,12 @@ def _ruff_measurement(
         ]
         rc, stdout, stderr = _run(args, cwd=cwd)
     except FileNotFoundError:
-        return (
-            "UNVERIFIED",
-            "Ruff is not installed in the project environment; "
-            "run uv add --dev ruff mypy pytest",
-        )
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
     if rc not in {0, 1}:
         return (
             "UNVERIFIED",
@@ -2293,13 +2325,12 @@ def _ruff_format_measurement(
         args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
         rc, stdout, stderr = _run(args, cwd=cwd)
     except FileNotFoundError:
-        return (
-            "UNVERIFIED",
-            "Ruff is not installed in the project environment; "
-            "run uv add --dev ruff mypy pytest",
-        )
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff format did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
     if rc not in {0, 1}:
         return (
             "UNVERIFIED",
@@ -2337,13 +2368,12 @@ def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, s
             cwd=cwd,
         )
     except FileNotFoundError:
-        return (
-            "UNVERIFIED",
-            "mypy is not installed in the project environment; "
-            "run uv add --dev ruff mypy pytest",
-        )
+        return "UNVERIFIED", _tool_missing_detail("mypy")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"mypy did not run: {error}"
+    missing = _missing_tool("mypy", rc, stderr)
+    if missing is not None:
+        return missing
     output = stdout + stderr
     error_count = sum(1 for line in output.splitlines() if ": error:" in line)
     if rc == 0:
@@ -2371,16 +2401,40 @@ def _pytest_result_summary(output: str) -> str:
     return ""
 
 
+_TEST_DISCOVERY_SKIP_DIRS = frozenset(
+    {
+        ".claude",
+        ".venv",
+        "venv",
+        ".git",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+        "site-packages",
+        "__pycache__",
+    }
+)
+
+
 def repository_has_test_files(root: Path) -> bool:
-    """Return whether the repository has any pytest-discoverable test file."""
-    for current_dir, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in {".claude", ".venv", ".git"}]
+    """Return whether the repository has any pytest-discoverable test file.
+
+    Also returns True when the walk hits a permission (or other OS) error on
+    a subtree, treating that subtree as inconclusive rather than absent: an
+    unreadable directory could hold the only tests, and reporting absence in
+    that case would fail open into NOT_APPLICABLE instead of the honest
+    UNVERIFIED.
+    """
+    walk_errors: list[OSError] = []
+    for current_dir, dirs, files in os.walk(root, onerror=walk_errors.append):
+        dirs[:] = [d for d in dirs if d not in _TEST_DISCOVERY_SKIP_DIRS]
         if any(
             fnmatch.fnmatch(name, "test_*.py") or fnmatch.fnmatch(name, "*_test.py")
             for name in files
         ):
             return True
-    return False
+    return bool(walk_errors)
 
 
 def _pytest_measurement(
@@ -2400,13 +2454,12 @@ def _pytest_measurement(
             cwd=cwd,
         )
     except FileNotFoundError:
-        return (
-            "UNVERIFIED",
-            "pytest is not installed in the project environment; "
-            "run uv add --dev ruff mypy pytest",
-        )
+        return "UNVERIFIED", _tool_missing_detail("pytest")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"pytest did not run: {error}"
+    missing = _missing_tool("pytest", rc, stderr)
+    if missing is not None:
+        return missing
     summary = _pytest_result_summary(stdout)
     if rc == 0:
         return (
