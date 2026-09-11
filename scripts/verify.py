@@ -1793,9 +1793,7 @@ def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
         return False
     parts = parents.stdout.split()
     return (
-        len(parts) == 2
-        and parts[0] == resolved_child
-        and parts[1] == resolved_parent
+        len(parts) == 2 and parts[0] == resolved_child and parts[1] == resolved_parent
     )
 
 
