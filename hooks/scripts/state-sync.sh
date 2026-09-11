@@ -307,7 +307,15 @@ restore_root_adapters() {
 # `setup`/`pull` with no install step). Idempotent: a value that already
 # matches is left alone; a different value is overwritten with a warning
 # naming the old one so a deliberate override stays visible. Never a hard
-# exit — a failure here must not block the rest of state sync.
+# exit — a failure here must not block the rest of state sync. This is the
+# one write state-sync makes outside $CLAUDE_DIR: the value written is the
+# fixed literal $hooks_path below, nothing from the nested `.claude`
+# checkout is interpolated into the config write, so a hostile/compromised
+# ai-state remote can only affect whether the write happens (by whether
+# `hooks/git-hooks` exists in the checkout), never where the hooks path
+# points. `core.hooksPath` is also repository-wide config shared by every
+# worktree of the outer repository, so the overwrite warning below applies
+# to sibling worktrees too, not just the one state-sync ran in.
 configure_outer_hooks_path() {
   local hooks_path=".claude/hooks/git-hooks"
   [[ -d "$REPO_ROOT/.git" || -f "$REPO_ROOT/.git" ]] || return 0
