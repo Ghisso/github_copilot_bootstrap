@@ -3469,3 +3469,10 @@ fatal: Cannot rebase onto multiple branches.
 2026-09-11T07:29:25.000Z state-sync: reconciliation with origin/ai-state failed; local state left untouched. Conflicting file(s): see output below. Resolve manually: cd /home/ghisso/work/github_copilot_bootstrap/.claude && git pull --rebase origin ai-state, fix conflicts, git add <files>, git rebase --continue, then git push origin ai-state.
 2026-09-11T07:29:25.000Z state-sync: publish skipped: reconciliation with origin/ai-state failed. Local commits are safe and will retry once the conflict is resolved.
 2026-09-11T07:29:25.000Z state-sync: push failed; continuing.
+2026-09-11T07:33:10Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc delimiter 'EOF' is never terminated)
+2026-09-11T07:33:10Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: heredoc redirect has no delimiter word)
+2026-09-11T07:33:10Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: unbalanced process substitution)
+2026-09-11T07:33:12Z WARN hook fail-closed: protected-file classifier exited with status 2 (python: Python 3.13.6, path: /home/ghisso/work/github_copilot_bootstrap/.venv/bin/python3, error: protect-files classifier error: shell command could not be parsed)
+2026-09-11T07:33:12Z WARN hook fail-closed: unparseable tool payload
+2026-09-11T07:33:12Z WARN hook fail-closed: protect-files.sh exited with status 2
+2026-09-11T07:33:12Z WARN hook fail-closed: unparseable tool payload
