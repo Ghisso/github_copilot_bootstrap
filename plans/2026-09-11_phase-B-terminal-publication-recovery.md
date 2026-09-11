@@ -3,7 +3,7 @@ name: 2026-09-11_phase-B-terminal-publication-recovery
 type: small-plan
 parent_plan: 2026-09-11_outer-repo-auto-push
 phase_index: 2
-status: in-progress
+status: complete
 closeout_session_log: .claude/session_logs/2026-09-11_phase-B-terminal-publication-recovery.md
 ---
 
@@ -134,7 +134,7 @@ provenance-unavailable path.
 
 ## Steps
 
-- [ ] Refuse to persist an unpublishable closeout receipt. In `main()` of
+- [x] Refuse to persist an unpublishable closeout receipt. In `main()` of
   `shared/scripts/verify.py`, add one function shaped like the existing
   `missing_documentation_na_reason` handling, for example
   `unpublishable_closeout_reason(root, metadata) -> str | None`. Return `None`
@@ -149,7 +149,7 @@ provenance-unavailable path.
   Cover in `tests/test_verify.py`: a dirty big plan refuses and writes nothing;
   a checkpointed big plan persists normally; no nested repository skips the
   precondition; a re-persist after the terminal transition passes.
-- [ ] Make the closeout ceremony checkpoint nested plan state before persisting
+- [x] Make the closeout ceremony checkpoint nested plan state before persisting
   the closeout receipt. Update `shared/policies/workflow.instructions.md`,
   `shared/agents/orchestrator/prompt.md`, and the commit skill under
   `shared/skills/` that owns the CLOSEOUT sequence. Make the ordering explicit:
@@ -157,7 +157,7 @@ provenance-unavailable path.
   receipt. State the reason in one sentence — the receipt binds the big plan's
   bytes, and the automatic push after the completion commit can only verify
   bytes Git already holds. Name one command exactly; do not invent a new script.
-- [ ] Replace the misleading refresh suggestion in `shared/scripts/verify.py`.
+- [x] Replace the misleading refresh suggestion in `shared/scripts/verify.py`.
   The complete-big-plan message currently recommends
   `phase --format json --persist --phase <slug>` alone, which invalidates the
   closeout receipt's bound `phase_receipt` hash and adds
@@ -171,7 +171,7 @@ provenance-unavailable path.
   compares `tree_sha` against the commit's tree. Assert in `tests/test_verify.py`
   that the message names both modes in order and that a phase-then-closeout
   refresh leaves no `tampered with` error.
-- [ ] Never overwrite a passing receipt with a failing one. In the
+- [x] Never overwrite a passing receipt with a failing one. In the
   `if args.persist:` block of `shared/scripts/verify.py`, refuse the write when
   the target receipt path already holds a receipt with `status == "PASS"` and
   the new receipt does not; explain why and exit non-zero. Leaving the previous
@@ -179,7 +179,7 @@ provenance-unavailable path.
   `tree_sha` freshness checks already reject it once stale, so this cannot turn
   a stale pass into an accepted one. Keep persisting failing receipts when no
   passing receipt exists. Cover both directions in `tests/test_verify.py`.
-- [ ] Prove a single-phase big plan can publish its terminal commit. Add a
+- [x] Prove a single-phase big plan can publish its terminal commit. Add a
   validator to `scripts/validate_targets.py` beside
   `validate_end_to_end_receipt_chain_lifecycle` and
   `validate_completed_phase_stale_receipt_rejection`, reusing their local
@@ -192,12 +192,12 @@ provenance-unavailable path.
   receipt whose recorded `big_plan_digest` matches neither the nested `HEAD`
   blob nor the index is still rejected, so the fix is not a blanket allowance.
   Do not weaken `validate_completed_phase_stale_receipt_rejection`.
-- [ ] Regenerate the target adapters and install locally with
+- [x] Regenerate the target adapters and install locally with
   `uv run python scripts/generate_targets.py --all` then
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
   Never hand-edit generated files. The hook gate reads
   `.claude/scripts/verify.py`, so an unregenerated tree tests the old code.
-- [ ] Perform the final documentation, memory, and LEARN audit. This phase is
+- [x] Perform the final documentation, memory, and LEARN audit. This phase is
   the last entry in the big plan's `phases:` list, so the audit must sweep every
   live-advice surface, not only what this phase changed. Document the new
   closeout precondition, the corrected recovery sequence, and the persist guard
@@ -288,17 +288,17 @@ Phase-specific proof, beyond the suites above:
 
 ## Closeout Checklist
 
-- [ ] All steps implemented and verified
-- [ ] `uv run pytest tests/ -q` passes
-- [ ] `uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases` passes
-- [ ] `uv run ruff check shared scripts tests` and `ruff format --check` pass
-- [ ] `uv run python scripts/validate_targets.py` passes
-- [ ] `uv run python scripts/check_runtime.py` passes
-- [ ] Targets regenerated and installed locally
-- [ ] Code, architecture, security, tests, and Ponytail reviews complete
-- [ ] Critical and major findings at zero
-- [ ] `docs/` and `README.md` updated
-- [ ] `.claude/MEMORY.md` records the reusable lessons
-- [ ] Closeout session log complete, including `## Stale-claims surfaces checked`
-- [ ] Nested state checkpointed before persisting the closeout receipt
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] All steps implemented and verified
+- [x] `uv run pytest tests/ -q` passes
+- [x] `uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases` passes
+- [x] `uv run ruff check shared scripts tests` and `ruff format --check` pass
+- [x] `uv run python scripts/validate_targets.py` passes
+- [x] `uv run python scripts/check_runtime.py` passes
+- [x] Targets regenerated and installed locally
+- [x] Code, architecture, security, tests, and Ponytail reviews complete
+- [x] Critical and major findings at zero
+- [x] `docs/` and `README.md` updated
+- [x] `.claude/MEMORY.md` records the reusable lessons
+- [x] Closeout session log complete, including `## Stale-claims surfaces checked`
+- [x] Nested state checkpointed before persisting the closeout receipt
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)

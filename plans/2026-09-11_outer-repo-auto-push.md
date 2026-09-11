@@ -55,7 +55,7 @@ their existing rules.
 
 - [x] `2026-09-11_phase-A-outer-repo-auto-push` — add the publication contract,
   generated guidance, gate coverage, and documentation.
-- [ ] `2026-09-11_phase-B-terminal-publication-recovery` — make the terminal
+- [x] `2026-09-11_phase-B-terminal-publication-recovery` — make the terminal
   completion commit publishable, give a stale terminal receipt a real recovery
   path, and stop recommending a refresh that breaks the receipt chain.
 
