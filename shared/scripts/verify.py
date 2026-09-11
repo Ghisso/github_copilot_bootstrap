@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import fnmatch
 import hashlib
 import importlib.util
 import json
@@ -411,12 +412,23 @@ def validate_mode_applicability(
             "VFY-GEN-001",
         },
     }[str(mode)]
+    # Checks a mode does measure but that can honestly resolve to
+    # NOT_APPLICABLE depending on the repository under test (a test-less
+    # consumer has no pytest evidence to collect), unlike `inapplicable`,
+    # which a mode never measures at all.
+    conditionally_applicable = {
+        "fast": set(),
+        "phase": {"VFY-PYTEST-001"},
+        "closeout": set(),
+    }[str(mode)]
     if mode == "fast" and not any(
         Path(path).suffix == ".py"
         for path in metadata_paths(metadata, "relevant_paths")
     ):
         inapplicable.add("VFY-RUFF-001")
     for item in checks:
+        if item["id"] in conditionally_applicable:
+            continue
         if item["applicable"] is not (item["id"] not in inapplicable):
             raise ValueError(f"{item['id']} has invalid applicability for {mode} mode")
 
@@ -2184,6 +2196,28 @@ def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
     return result.returncode, result.stdout, result.stderr
 
 
+def _tool_missing_detail(tool: str) -> str:
+    """Return the one shared detail text for a tool absent from `uv`'s
+    project environment, so the literal exists exactly once."""
+    return (
+        f"{tool} is not installed in the project environment; "
+        "run uv add --dev ruff mypy pytest"
+    )
+
+
+def _missing_tool(tool: str, rc: int, stderr: str) -> tuple[str, str] | None:
+    """Return the missing-tool result when `uv run` failed to spawn `tool`
+    (`uv` itself present, `tool` absent), or None otherwise.
+
+    `uv run <tool>` never raises when `uv` is installed but `tool` is not;
+    it exits non-zero with `Failed to spawn: ...` on stderr instead. A bare
+    `FileNotFoundError` only fires when `uv` itself cannot be found.
+    """
+    if rc != 0 and "Failed to spawn" in stderr:
+        return "UNVERIFIED", _tool_missing_detail(tool)
+    return None
+
+
 def _toml_basic_string(value: str) -> str | None:
     """Return a quoted TOML basic-string literal for value, or None when
     value cannot round-trip through valid UTF-8 text (for example an
@@ -2249,8 +2283,13 @@ def _ruff_measurement(
             *config_args,
         ]
         rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
     if rc not in {0, 1}:
         return (
             "UNVERIFIED",
@@ -2285,8 +2324,13 @@ def _ruff_format_measurement(
     try:
         args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
         rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("Ruff")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff format did not run: {error}"
+    missing = _missing_tool("Ruff", rc, stderr)
+    if missing is not None:
+        return missing
     if rc not in {0, 1}:
         return (
             "UNVERIFIED",
@@ -2323,8 +2367,13 @@ def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, s
             ],
             cwd=cwd,
         )
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("mypy")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"mypy did not run: {error}"
+    missing = _missing_tool("mypy", rc, stderr)
+    if missing is not None:
+        return missing
     output = stdout + stderr
     error_count = sum(1 for line in output.splitlines() if ": error:" in line)
     if rc == 0:
@@ -2352,6 +2401,41 @@ def _pytest_result_summary(output: str) -> str:
     return ""
 
 
+_TEST_DISCOVERY_SKIP_DIRS = frozenset(
+    {
+        ".claude",
+        ".venv",
+        "venv",
+        ".git",
+        "node_modules",
+        ".tox",
+        "build",
+        "dist",
+        "site-packages",
+        "__pycache__",
+    }
+)
+
+
+def repository_has_test_files(root: Path) -> bool | None:
+    """Return whether the repository has any pytest-discoverable test file.
+
+    Returns None when the walk hit a permission (or other OS) error on a
+    subtree and found no test file elsewhere: an unreadable directory could
+    hold the only tests, so absence cannot be claimed and the caller must
+    stay UNVERIFIED rather than fail open into NOT_APPLICABLE.
+    """
+    walk_errors: list[OSError] = []
+    for current_dir, dirs, files in os.walk(root, onerror=walk_errors.append):
+        dirs[:] = [d for d in dirs if d not in _TEST_DISCOVERY_SKIP_DIRS]
+        if any(
+            fnmatch.fnmatch(name, "test_*.py") or fnmatch.fnmatch(name, "*_test.py")
+            for name in files
+        ):
+            return True
+    return None if walk_errors else False
+
+
 def _pytest_measurement(
     cwd: str = ".", targets: list[str] | None = None
 ) -> tuple[str, str]:
@@ -2368,8 +2452,13 @@ def _pytest_measurement(
             ],
             cwd=cwd,
         )
+    except FileNotFoundError:
+        return "UNVERIFIED", _tool_missing_detail("pytest")
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"pytest did not run: {error}"
+    missing = _missing_tool("pytest", rc, stderr)
+    if missing is not None:
+        return missing
     summary = _pytest_result_summary(stdout)
     if rc == 0:
         return (
@@ -2382,6 +2471,24 @@ def _pytest_measurement(
             f"pytest reported test failures ({summary})"
             if summary
             else "pytest reported test failures",
+        )
+    if rc == 5:
+        has_tests = repository_has_test_files(Path(cwd))
+        if has_tests:
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests although test files exist; "
+                "check testpaths and file naming",
+            )
+        if has_tests is None:
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests and part of the repository could "
+                "not be read while looking for test files; check permissions",
+            )
+        return (
+            "NOT_APPLICABLE",
+            "pytest collected no tests and the repository has no test files yet",
         )
     return (
         "UNVERIFIED",
@@ -2421,6 +2528,8 @@ def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
 def measure_pytest(root: Path, targets: list[str] | None = None) -> dict[str, object]:
     """Adapt the strict pytest measurement into a receipt check."""
     status, detail = _pytest_measurement(cwd=str(root), targets=targets)
+    if status == "NOT_APPLICABLE":
+        return not_applicable("VFY-PYTEST-001", detail)
     return check("VFY-PYTEST-001", status, detail)
 
 
@@ -2624,9 +2733,10 @@ def unpublishable_closeout_reason(
     return (
         "closeout receipt would be unpublishable: the big plan's recorded "
         "digest is not yet retrievable from nested Git, so the terminal "
-        "push gate could never accept it; run `bash "
-        ".claude/hooks/scripts/state-sync.sh checkpoint` then re-run "
-        "closeout"
+        "push gate could never accept it; run git -C .claude add -A && "
+        'git -C .claude commit -m "checkpoint: <reason>" (or, from a '
+        "terminal or editor task, bash .claude/hooks/scripts/state-sync.sh "
+        "checkpoint)"
     )
 
 
@@ -2749,7 +2859,8 @@ def phase_checks(
             else check(
                 "VFY-MYPY-001",
                 "UNVERIFIED",
-                "Mypy has no configured scope or conventional src root",
+                "mypy has no scope: add a src/ directory or set [tool.mypy] "
+                "files, packages, or modules in pyproject.toml",
             )
         )
         pytest = measure_pytest(root, [])
@@ -3097,8 +3208,9 @@ def main() -> int:
         print(
             ".claude is not its own Git repository, so nested AI-state "
             "provenance is unavailable and no verification receipt can be "
-            "built; run `bash .claude/hooks/scripts/state-sync.sh "
-            "checkpoint` to initialize it, then re-run",
+            "built; run git -C .claude add -A && git -C .claude commit -m "
+            '"checkpoint: <reason>" (or, from a terminal or editor task, '
+            "bash .claude/hooks/scripts/state-sync.sh checkpoint)",
             file=sys.stderr,
         )
         return 2

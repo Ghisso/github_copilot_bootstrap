@@ -20,16 +20,39 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from generate_targets import ANTIGRAVITY_TOOL_MAP  # noqa: E402
 
 
-def _run_antigravity_pretool(payload: dict) -> subprocess.CompletedProcess[str]:
+def _run_antigravity_pretool(
+    payload: dict, repo_root: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    root = repo_root if repo_root is not None else REPO_ROOT
     return subprocess.run(
         ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
-        cwd=REPO_ROOT,
+        cwd=root,
         input=json.dumps(payload),
         text=True,
         capture_output=True,
         check=False,
-        env={**os.environ, "REPO_ROOT": str(REPO_ROOT)},
+        env={**os.environ, "REPO_ROOT": str(root)},
     )
+
+
+def _isolated_hook_scripts_dir(repo_root: Path) -> Path:
+    """Return a `shared/hooks/scripts`-shaped path under `repo_root` whose
+    scripts still run the real `SCRIPT_SRC` bytes via a symlink.
+
+    `repo_root_from_script` (`_lib-frontmatter.sh`) derives REPO_ROOT from the
+    invoking script's own physical location, three directories up from
+    wherever `$0`/`BASH_SOURCE` says it lives. Bash's `cd`/`pwd` track that
+    location logically (through symlinks) rather than resolving it, so
+    invoking the scripts through this symlink keeps every `fail_closed`/`warn`
+    write scoped to `repo_root` instead of the live checkout, without copying
+    or editing the scripts themselves.
+    """
+    scripts_dir = repo_root / "shared" / "hooks" / "scripts"
+    if not scripts_dir.exists():
+        scripts_dir.parent.mkdir(parents=True, exist_ok=True)
+        scripts_dir.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    (repo_root / ".claude" / "session_logs").mkdir(parents=True, exist_ok=True)
+    return scripts_dir
 
 
 def _run_native_protect_files(
@@ -903,17 +926,23 @@ def test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands() -> 
     assert _git_targets_nested_claude(both_nested, "commit") == 0
 
 
-def _run_protect_files(payload: dict) -> subprocess.CompletedProcess[str]:
+def _run_protect_files(
+    payload: dict, repo_root: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    root = repo_root if repo_root is not None else REPO_ROOT
+    scripts_dir = (
+        _isolated_hook_scripts_dir(root) if repo_root is not None else SCRIPT_SRC
+    )
     return subprocess.run(
-        ["bash", str(SCRIPT_SRC / "protect-files.sh"), "openai-codex"],
-        cwd=REPO_ROOT,
+        ["bash", str(scripts_dir / "protect-files.sh"), "openai-codex"],
+        cwd=root,
         input=json.dumps(payload),
         text=True,
         capture_output=True,
         check=False,
         env={
             **os.environ,
-            "REPO_ROOT": str(REPO_ROOT),
+            "REPO_ROOT": str(root),
             "TARGET_ID": "openai-codex",
             "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", "/tmp/uv-cache"),
         },
@@ -2010,25 +2039,34 @@ def test_protect_files_denies_unknown_consumer_heredoc_with_protected_evidence()
         "printf x <<\n",
     ),
 )
-def test_protect_files_fails_closed_for_malformed_heredoc(command: str) -> None:
+def test_protect_files_fails_closed_for_malformed_heredoc(
+    command: str, tmp_path: Path
+) -> None:
     """A heredoc with no delimiter word, or whose body never reaches its
     terminator line, is genuinely malformed shell syntax - the
     infrastructure fail-closed path (exit 2), distinguishable from an
     ordinary reasoned policy denial such as the one asserted in
-    ``test_protect_files_denies_ambiguous_protected_reference_without_infra_failure``."""
+    ``test_protect_files_denies_ambiguous_protected_reference_without_infra_failure``.
+    This genuinely trips the shared library's fail-closed write, so it runs
+    against an isolated `tmp_path` root rather than the live checkout."""
     process = _run_protect_files(
-        {"tool_name": "Bash", "tool_input": {"command": command}}
+        {"tool_name": "Bash", "tool_input": {"command": command}}, repo_root=tmp_path
     )
     assert process.returncode == 2
     assert '"permissionDecision":"deny"' in process.stdout
     assert "hook could not evaluate the request safely, denying" in process.stdout
 
 
-def test_protect_files_fails_closed_for_unbalanced_process_substitution() -> None:
+def test_protect_files_fails_closed_for_unbalanced_process_substitution(
+    tmp_path: Path,
+) -> None:
     """An unbalanced <( construct is genuinely malformed shell syntax - the
-    infrastructure fail-closed path, not an ordinary reasoned denial."""
+    infrastructure fail-closed path, not an ordinary reasoned denial. This
+    genuinely trips the shared library's fail-closed write, so it runs
+    against an isolated `tmp_path` root rather than the live checkout."""
     process = _run_protect_files(
-        {"tool_name": "Bash", "tool_input": {"command": "diff <(cat README.md"}}
+        {"tool_name": "Bash", "tool_input": {"command": "diff <(cat README.md"}},
+        repo_root=tmp_path,
     )
     assert process.returncode == 2
     assert '"permissionDecision":"deny"' in process.stdout
@@ -2224,9 +2262,12 @@ def test_protect_files_confirms_glued_heredoc_redirected_to_protected_target() -
     assert "Protected file blocked by policy: .env" in process.stdout
 
 
-def test_protect_files_fails_closed_for_malformed_command_and_without_uv() -> None:
+def test_protect_files_fails_closed_for_malformed_command_and_without_uv(
+    tmp_path: Path,
+) -> None:
     malformed = _run_protect_files(
-        {"tool_name": "Bash", "tool_input": {"command": "sed -i 'unterminated .env"}}
+        {"tool_name": "Bash", "tool_input": {"command": "sed -i 'unterminated .env"}},
+        repo_root=tmp_path,
     )
     assert malformed.returncode == 2
     assert '"permissionDecision":"deny"' in malformed.stdout
@@ -2254,11 +2295,17 @@ def test_protect_files_fails_closed_for_malformed_command_and_without_uv() -> No
     assert '"permissionDecision":"deny"' in process.stdout
 
 
-def test_bash_safety_wrapper_short_circuits_first_decision_and_fails_closed() -> None:
+def test_bash_safety_wrapper_short_circuits_first_decision_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    """The malformed payload trips both `protect-files.sh`'s and this
+    wrapper's own fail-closed writes, so this runs against an isolated
+    `tmp_path` root rather than the live checkout."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
     payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "touch .env"}})
     result = subprocess.run(
-        ["bash", str(SCRIPT_SRC / "pretool-bash-guard.sh"), "openai-codex"],
-        cwd=REPO_ROOT,
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), "openai-codex"],
+        cwd=tmp_path,
         input=payload,
         text=True,
         capture_output=True,
@@ -2268,8 +2315,8 @@ def test_bash_safety_wrapper_short_circuits_first_decision_and_fails_closed() ->
     assert '"permissionDecision":"deny"' in result.stdout
 
     malformed = subprocess.run(
-        ["bash", str(SCRIPT_SRC / "pretool-bash-guard.sh"), "openai-codex"],
-        cwd=REPO_ROOT,
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), "openai-codex"],
+        cwd=tmp_path,
         input="{bad",
         text=True,
         capture_output=True,
@@ -2333,7 +2380,7 @@ def test_bash_safety_wrapper_uses_ordered_isolated_children(tmp_path: Path) -> N
     assert malformed.returncode == 2
 
 
-def test_protect_files_python_3_9_compatibility() -> None:
+def test_protect_files_python_3_9_compatibility(tmp_path: Path) -> None:
     """Regression test for Python 3.9 compatibility.
 
     Verifies that protect-files.py:
@@ -2371,10 +2418,13 @@ def test_protect_files_python_3_9_compatibility() -> None:
     assert protected.returncode == 0, protected.stderr
     assert '"permissionDecision":"deny"' in protected.stdout
 
-    # Test 4: Malformed payload should fail closed
+    # Test 4: Malformed payload should fail closed. This genuinely trips the
+    # shared library's fail-closed write, so it runs against an isolated
+    # tmp_path root rather than the live checkout.
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
     malformed = subprocess.run(
-        ["bash", str(SCRIPT_SRC / "protect-files.sh"), "openai-codex"],
-        cwd=REPO_ROOT,
+        ["bash", str(scripts_dir / "protect-files.sh"), "openai-codex"],
+        cwd=tmp_path,
         input="{bad json",
         text=True,
         capture_output=True,
@@ -2588,16 +2638,18 @@ def test_antigravity_pretool_fails_closed_for_invalid_payloads(payload: dict) ->
     assert "WARN antigravity-pretool:" in process.stderr
 
 
-def test_antigravity_pretool_fails_closed_for_raw_malformed_json() -> None:
+def test_antigravity_pretool_fails_closed_for_raw_malformed_json(
+    tmp_path: Path,
+) -> None:
     """Raw malformed hook stdin receives a protocol deny, not a crash."""
     process = subprocess.run(
         ["python3", str(SCRIPT_SRC / "antigravity-pretool.py")],
-        cwd=REPO_ROOT,
+        cwd=tmp_path,
         input="{malformed",
         text=True,
         capture_output=True,
         check=False,
-        env={**os.environ, "REPO_ROOT": str(REPO_ROOT)},
+        env={**os.environ, "REPO_ROOT": str(tmp_path)},
     )
 
     assert process.returncode == 0

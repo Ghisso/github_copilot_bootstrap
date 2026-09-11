@@ -628,10 +628,10 @@ testpaths = ["tests"]
     terminal_big_plan = big_plan.read_bytes()
     assert b"status: complete" in terminal_big_plan
     assert b"current_phase: \n" in terminal_big_plan
-    assert (
-        _git(consumer / ".claude", "status", "--porcelain").stdout
-        == " M session_logs/hooks-errors.log\n"
-    )
+    # hooks-errors.log is local-only (gitignored and untracked by
+    # write_nested_gitignore/untrack_error_log in state-sync.sh), so the real
+    # post-commit hook chain triggered above never leaves it tracked+dirty.
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
     remote = tmp_path / "remote.git"
     assert (
         _git(tmp_path, "init", "--bare", "-q", "-b", "dev", str(remote)).returncode == 0
@@ -702,10 +702,10 @@ testpaths = ["tests"]
         ).returncode
         == 0
     )
-    assert (
-        _git(consumer / ".claude", "status", "--porcelain").stdout
-        == " M session_logs/hooks-errors.log\n"
-    )
+    # hooks-errors.log is local-only (gitignored and untracked by
+    # write_nested_gitignore/untrack_error_log in state-sync.sh), so the real
+    # post-commit hook chain triggered above never leaves it tracked+dirty.
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
 
     checkpoint_remote = tmp_path / "checkpoint.git"
     assert (

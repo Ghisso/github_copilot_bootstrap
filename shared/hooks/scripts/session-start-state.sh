@@ -46,5 +46,16 @@ if git -C "$REPO_ROOT" rev-parse --verify origin/dev >/dev/null 2>&1; then
   fi
 fi
 
+# state-sync.sh's configure_outer_hooks_path activates these on every
+# setup/pull/checkpoint; a session that starts without it active (e.g. a
+# manual clone that skipped state-sync.sh) never gets record-commit-closeout.sh
+# advancing current_phase, and the next push is refused with no mention of hooks.
+if [[ -d "$REPO_ROOT/.claude/hooks/git-hooks" ]]; then
+  current_hooks_path="$(git -C "$REPO_ROOT" config --get core.hooksPath 2>/dev/null || true)"
+  if [[ "$current_hooks_path" != ".claude/hooks/git-hooks" ]]; then
+    message="$message. Git hooks are not active (core.hooksPath unset); run bash .devcontainer/state-sync.sh setup"
+  fi
+fi
+
 additional_context "SessionStart" "$message"
 exit 0

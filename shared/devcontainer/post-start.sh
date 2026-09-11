@@ -31,14 +31,10 @@ if [[ ! -f "$STATE_SYNC" ]]; then
 fi
 
 # `setup` checks out .claude/ (including .claude/hooks/git-hooks/) from the
-# ai-state branch, so core.hooksPath is configured immediately after it —
-# there is no window where a fresh container is ungated because nobody
-# re-ran this after the checkout populated the hook directory.
+# ai-state branch and then configures core.hooksPath itself
+# (configure_outer_hooks_path in state-sync.sh), so there is no window where a
+# fresh container is ungated because nobody re-ran this after the checkout
+# populated the hook directory.
 bash "$STATE_SYNC" setup || warn "AI state setup failed; continuing."
-
-if [[ -d "$REPO_ROOT/.git" ]]; then
-  git -C "$REPO_ROOT" config core.hooksPath .claude/hooks/git-hooks \
-    || warn "could not set core.hooksPath; the commit-msg gate will not run."
-fi
 
 bash "$STATE_SYNC" pull || warn "AI state pull failed; continuing."
