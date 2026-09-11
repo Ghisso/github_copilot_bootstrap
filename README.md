@@ -358,6 +358,11 @@ Both are safe to (re-)run anytime — `setup` no-ops once `.claude/.git` already
 exists. `.claude/hooks/scripts/state-sync.sh` (the copy normal hooks call) can't
 be used for this first bootstrap: it doesn't exist until `.claude/` does, which
 is exactly why `.devcontainer/` carries its own copy of the same script.
+`setup` also activates the Git hooks: once the checkout populates
+`.claude/hooks/git-hooks/`, it sets `core.hooksPath` to that directory itself
+(and `pull`/`checkpoint` keep it active on every later sync), so there is no
+separate step to remember. A session that starts with the hooks checked out
+but not yet active is told to re-run `setup`.
 
 ### GitHub Copilot surface ownership
 
@@ -822,7 +827,7 @@ Configured events:
 
 ### Deterministic Commit And Push Gates (Git Hooks)
 
-`enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath` (set by [install_bootstrap.py](scripts/install_bootstrap.py) and, for fresh devcontainers, by `post-start.sh` before the state pull runs). Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
+`enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath` ([install_bootstrap.py](scripts/install_bootstrap.py) sets it once at install time; `state-sync.sh`'s `setup`/`pull`/fresh `checkpoint` re-activate it on every later sync, including inside `post-start.sh`'s call to `setup`). Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
 
 Two layers, two invariants, one shared contract each:
 
@@ -832,7 +837,7 @@ Two layers, two invariants, one shared contract each:
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
 
 - `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes: git skips the hook entirely, and there is no git hook that fires when hooks are skipped.
-- `.claude/` is gitignored in consumers, so on a fresh clone *before* `.claude/` is checked out, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until the checkout completes). Since AI state moved from a Hugging Face bucket to a nested git repo ([ADR-002](plans/adr-002-git-backed-state-sync.md)), this window shrank: `post-start.sh` runs `state-sync.sh setup` (which checks `.claude/` out from the `ai-state` branch using the same git credentials as the code checkout — no separate auth to configure) and sets `core.hooksPath` immediately after, before the subsequent `state-sync.sh pull`, so the devcontainer path closes the window at checkout time rather than waiting on an authenticated bucket pull.
+- `.claude/` is gitignored in consumers, so on a fresh clone *before* `.claude/` is checked out, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until the checkout completes). Since AI state moved from a Hugging Face bucket to a nested git repo ([ADR-002](plans/adr-002-git-backed-state-sync.md)), this window shrank: `post-start.sh` runs `state-sync.sh setup` (which checks `.claude/` out from the `ai-state` branch using the same git credentials as the code checkout — no separate auth to configure), and `setup` itself sets `core.hooksPath` immediately after, before the subsequent `state-sync.sh pull`, so the devcontainer path closes the window at checkout time rather than waiting on an authenticated bucket pull.
 - Per `githooks(5)`, `commit-msg` also fires for `git merge`, not just `git commit`. A plain merge commit carries no authored content of its own, so on an implementation branch it passes through unledgered — the ceremony re-attaches at the next real commit. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (git behavior, not a bootstrap gap); the commits they create skip the git layer, but the next real commit is still gated. `git commit --amend` does invoke it, and `content_hash` freshness survives a content-preserving amend. The `MERGE_HEAD` passthrough is, like `--no-verify`, a known accepted escape: `git merge --no-commit` followed by manually staging extra changes lands ungated content on an implementation branch, since the hook cannot distinguish a pure merge from a merge plus manual staging.
 - See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) and [plans/plan-post-review-hardening.md](plans/plan-post-review-hardening.md) for the full design rationale.
 

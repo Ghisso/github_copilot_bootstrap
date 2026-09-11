@@ -3214,6 +3214,19 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             "state-sync.sh must use the exact rebase pull invocation",
             errors,
         )
+        check(
+            "configure_outer_hooks_path" in state_sync_text
+            and 'git -C "$REPO_ROOT" config core.hooksPath "$hooks_path"'
+            in state_sync_text,
+            "state-sync.sh must configure the outer repository's core.hooksPath",
+            errors,
+        )
+        check(
+            "session_logs/hooks-errors.log" in state_sync_text
+            and "untrack_error_log" in state_sync_text,
+            "state-sync.sh must gitignore and untrack the local-only error log",
+            errors,
+        )
 
     # Run generated Stop wrappers instead of relying on text searches: Codex
     # needs one JSON response, while Claude must leave stdout empty.
@@ -3772,6 +3785,60 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             f"empty payload must not write hooks-errors.log: {hook_root}",
             errors,
         )
+
+        # The generated state-sync.sh must never track the local-only error
+        # log, even when one already exists on disk before the very first
+        # commit (e.g. carried over from an earlier hook run). Runs against a
+        # throwaway copy so this never mutates the checked-in dist tree.
+        with tempfile.TemporaryDirectory() as error_log_root:
+            error_log_repo = Path(error_log_root)
+            scripts_copy = error_log_repo / ".claude" / "hooks" / "scripts"
+            shutil.copytree(hook_root, scripts_copy)
+            stray_log = error_log_repo / ".claude" / "session_logs" / "hooks-errors.log"
+            stray_log.parent.mkdir(parents=True)
+            stray_log.write_text("pre-existing local diagnostic\n", encoding="utf-8")
+            setup_result = subprocess.run(
+                ["bash", str(scripts_copy / "state-sync.sh"), "setup"],
+                cwd=error_log_repo,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={**os.environ, "AI_STATE_LOCAL_ONLY": "1"},
+            )
+            check(
+                setup_result.returncode == 0,
+                f"generated state-sync.sh setup must succeed: {hook_root}: "
+                f"{setup_result.stderr}",
+                errors,
+            )
+            tracked = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(error_log_repo / ".claude"),
+                    "ls-files",
+                    "session_logs/hooks-errors.log",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            check(
+                tracked.stdout == "",
+                f"generated state-sync.sh must never track hooks-errors.log: {hook_root}",
+                errors,
+            )
+            # `warn` appends to this same file (for example the no-remote
+            # warning in local-only mode), so the original line must survive
+            # as a prefix rather than as the whole content.
+            check(
+                stray_log.exists()
+                and stray_log.read_text(encoding="utf-8").startswith(
+                    "pre-existing local diagnostic\n"
+                ),
+                f"generated state-sync.sh must never delete the local error log: {hook_root}",
+                errors,
+            )
 
         # R-HOOKS-03: the two safety-critical guards must survive without `uv`.
         no_uv = path_without_uv()
@@ -8480,17 +8547,17 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "post-start must not invoke project uv for AI state sync",
             errors,
         )
-        # R-SYNC-05: setup's checkout populates .claude/hooks/git-hooks/, so
-        # core.hooksPath is configured immediately after it and before pull -
-        # no window where a fresh container is ungated once setup completes.
+        # R-SYNC-05: setup's checkout populates .claude/hooks/git-hooks/ and
+        # state-sync.sh's configure_outer_hooks_path sets core.hooksPath on
+        # every restore, so post-start no longer carries its own copy - one
+        # owner, and no window where a fresh container is ungated.
         setup_index = post_start_text.find('"$STATE_SYNC" setup')
-        hooks_path_index = post_start_text.find(
-            'git -C "$REPO_ROOT" config core.hooksPath'
-        )
         pull_index = post_start_text.find('"$STATE_SYNC" pull')
         check(setup_index != -1, "post-start must run state-sync.sh setup", errors)
         check(
-            hooks_path_index != -1, "post-start must configure core.hooksPath", errors
+            "config core.hooksPath" not in post_start_text,
+            "post-start must not set core.hooksPath itself; state-sync.sh owns it",
+            errors,
         )
         check(pull_index != -1, "post-start must run state-sync.sh pull", errors)
         check(
@@ -8499,9 +8566,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             errors,
         )
         check(
-            -1 not in (setup_index, hooks_path_index, pull_index)
-            and setup_index < hooks_path_index < pull_index,
-            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull",
+            -1 not in (setup_index, pull_index) and setup_index < pull_index,
+            "post-start must run state-sync.sh setup before state-sync.sh pull",
             errors,
         )
 

@@ -34,6 +34,12 @@ CLAUDE_STOP_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts" / "claude-stop.s
 REPORTING_REMINDER_SOURCE = (
     REPO_ROOT / "shared" / "hooks" / "scripts" / "reporting-reminder.sh"
 )
+SESSION_START_STATE_SOURCE = (
+    REPO_ROOT / "shared" / "hooks" / "scripts" / "session-start-state.sh"
+)
+ENFORCE_PR_GATE_SOURCE = (
+    REPO_ROOT / "shared" / "hooks" / "scripts" / "enforce-pr-gate.sh"
+)
 HOOK_SCRIPTS_SOURCE = REPO_ROOT / "shared" / "hooks" / "scripts"
 STOP_CHILD_FIXTURE = """#!/usr/bin/env bash
 set -euo pipefail
@@ -271,8 +277,11 @@ def test_claude_stop_continues_after_child_failure(
     assert "WARN claude-stop: stop-session-log-check.sh failed" in result.stderr
 
 
-def test_online_prompt_pushes_offline_stop_plan_and_diagnostic(tmp_path: Path) -> None:
-    """A later prompt checkpoints Stop's offline diagnostics before retrying push."""
+def test_online_prompt_pushes_offline_stop_plan_and_keeps_diagnostic_local(
+    tmp_path: Path,
+) -> None:
+    """A later prompt pushes Stop's offline plan while the diagnostic itself
+    stays local-only: `hooks-errors.log` is never lost, but never published."""
     root = tmp_path / "workspace"
     root.mkdir()
     hooks_dir = copy_real_lifecycle_hooks(root)
@@ -332,7 +341,8 @@ def test_online_prompt_pushes_offline_stop_plan_and_diagnostic(tmp_path: Path) -
         capture_output=True,
         check=False,
     )
-    assert "fetch from origin/ai-state failed" in remote_errors.stdout
+    assert remote_errors.returncode != 0
+    assert "fetch from origin/ai-state failed" in errors.read_text(encoding="utf-8")
 
 
 def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> None:
@@ -800,3 +810,149 @@ def test_reporting_reminder_warns_and_never_blocks_invalid_inputs(
     assert result.returncode == 0
     assert result.stdout == ""
     assert "WARN reporting-reminder:" in result.stderr
+
+
+HOOKS_PATH_WARNING = (
+    "Git hooks are not active (core.hooksPath unset); "
+    "run bash .devcontainer/state-sync.sh setup"
+)
+PUSH_GATE_SEPARATE_COMMANDS_PREFIX = (
+    "commit and push must be separate Bash commands: the push gate evaluates "
+    "the current HEAD before this command's commit exists; run the commit "
+    "first, then push"
+)
+
+
+def copy_hook_script(root: Path, script_source: Path) -> Path:
+    """Copy one hook script and its shared library into a disposable
+    `.claude/hooks/scripts/` root, mirroring the shipped topology so
+    `repo_root_from_script` (`_lib-frontmatter.sh`) resolves REPO_ROOT to
+    `root` instead of the live checkout."""
+    hooks_dir = root / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    script = hooks_dir / script_source.name
+    shutil.copy(script_source, script)
+    script.chmod(0o755)
+    library = hooks_dir / "_lib-frontmatter.sh"
+    if not library.exists():
+        shutil.copy(HOOK_SCRIPTS_SOURCE / "_lib-frontmatter.sh", library)
+        library.chmod(0o755)
+    return script
+
+
+def session_start_state_repo(tmp_path: Path, slug: str = "phase") -> Path:
+    """Minimum implementation-branch repository for session-start-state.sh:
+    an outer Git repository on `<slug>_implementation` with a big plan."""
+    script = copy_hook_script(tmp_path, SESSION_START_STATE_SOURCE)
+    run_git(["init", "-q"], tmp_path)
+    (tmp_path / "seed.txt").write_text("seed\n", encoding="utf-8")
+    run_git(["add", "seed.txt"], tmp_path)
+    run_git(["commit", "-q", "-m", "seed"], tmp_path)
+    run_git(["checkout", "-q", "-b", f"{slug}_implementation"], tmp_path)
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / f"{slug}.md").write_text(
+        "---\nstatus: in-progress\ncurrent_phase: phase-one\n---\n",
+        encoding="utf-8",
+    )
+    return script
+
+
+def run_session_start_state(
+    script: Path, cwd: Path
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(script)],
+        input="",
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_session_start_state_warns_when_hooks_path_is_not_active(
+    tmp_path: Path,
+) -> None:
+    """A repository with the Git hooks checked out but not activated is told
+    how to activate them."""
+    script = session_start_state_repo(tmp_path)
+    (tmp_path / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+
+    result = run_session_start_state(script, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    message = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert HOOKS_PATH_WARNING in message
+
+
+def test_session_start_state_omits_warning_when_hooks_path_is_active(
+    tmp_path: Path,
+) -> None:
+    """An already-activated hooks path gets no redundant warning."""
+    script = session_start_state_repo(tmp_path)
+    (tmp_path / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+    run_git(["config", "core.hooksPath", ".claude/hooks/git-hooks"], tmp_path)
+
+    result = run_session_start_state(script, tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    message = json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert "Git hooks are not active" not in message
+
+
+def enforce_pr_gate_repo(tmp_path: Path, slug: str = "phase") -> Path:
+    """An implementation-branch repository with no big plan at all, so
+    `assert_push_invariants` fails deterministically with one finding
+    (`missing big-plan file`) regardless of push-gate specifics."""
+    script = copy_hook_script(tmp_path, ENFORCE_PR_GATE_SOURCE)
+    run_git(["init", "-q"], tmp_path)
+    (tmp_path / "seed.txt").write_text("seed\n", encoding="utf-8")
+    run_git(["add", "seed.txt"], tmp_path)
+    run_git(["commit", "-q", "-m", "seed"], tmp_path)
+    run_git(["checkout", "-q", "-b", f"{slug}_implementation"], tmp_path)
+    return script
+
+
+def run_enforce_pr_gate(
+    script: Path, cwd: Path, command: str
+) -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return subprocess.run(
+        ["bash", str(script)],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_enforce_pr_gate_explains_a_chained_commit_and_push_denial(
+    tmp_path: Path,
+) -> None:
+    """A denied `git commit ... && git push` names the ordering rule: the
+    push gate evaluates the pre-commit HEAD, before this command's own commit
+    exists."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git commit -m x && git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert PUSH_GATE_SEPARATE_COMMANDS_PREFIX in result.stdout
+    assert "missing big-plan file" in result.stdout
+
+
+def test_enforce_pr_gate_plain_push_denial_omits_the_chained_commit_hint(
+    tmp_path: Path,
+) -> None:
+    """A plain `git push` denial is not mistaken for the chained-command case."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert PUSH_GATE_SEPARATE_COMMANDS_PREFIX not in result.stdout
+    assert "missing big-plan file" in result.stdout

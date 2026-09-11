@@ -346,7 +346,161 @@ def test_setup_upgrades_existing_nested_gitignore_without_overwriting_user_entri
         "",
         "# Derived local caches; never synced.",
         ".cache/",
+        "",
+        "# Local hook-runtime diagnostics only; never synced "
+        "(session_logs/hooks-bypass.log stays tracked).",
+        "session_logs/hooks-errors.log",
     ]
+
+
+def test_setup_activates_the_outer_git_hooks_path(script: Path, tmp_path: Path) -> None:
+    """A fresh setup activates the outer repository's checked-out Git hooks."""
+    root = tmp_path / "hooks-path-consumer"
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+
+    result = _sync(script, root, None, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert _git(root, "config", "--get", "core.hooksPath").stdout.strip() == (
+        ".claude/hooks/git-hooks"
+    )
+
+
+def test_repeated_setup_does_not_rewrite_a_matching_hooks_path(
+    script: Path, tmp_path: Path
+) -> None:
+    """An already-active hooks path is left alone, without a spurious warning."""
+    root = tmp_path / "hooks-path-repeat"
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+    assert _sync(script, root, None, "setup").returncode == 0
+
+    result = _sync(script, root, None, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert "core.hooksPath was" not in result.stderr
+    assert _git(root, "config", "--get", "core.hooksPath").stdout.strip() == (
+        ".claude/hooks/git-hooks"
+    )
+
+
+def test_setup_overwrites_a_different_pre_existing_hooks_path_with_a_warning(
+    script: Path, tmp_path: Path
+) -> None:
+    """A deliberately different pre-existing value is overwritten, and the
+    warning names the old value so the override stays visible."""
+    root = tmp_path / "hooks-path-override"
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+    assert _git(root, "config", "core.hooksPath", "some/other/hooks").returncode == 0
+
+    result = _sync(script, root, None, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        "core.hooksPath was some/other/hooks; replaced it with "
+        ".claude/hooks/git-hooks" in result.stderr
+    )
+    assert _git(root, "config", "--get", "core.hooksPath").stdout.strip() == (
+        ".claude/hooks/git-hooks"
+    )
+
+
+def test_pull_activates_the_outer_hooks_path_for_a_writer_arriving_from_remote(
+    script: Path, tmp_path: Path
+) -> None:
+    """A writer whose ``.claude/`` arrives entirely from ``origin/ai-state``
+    still gets the outer Git hooks path activated on its first pull."""
+    remote = _bare_remote(tmp_path)
+    publisher = _new_writer(script, tmp_path, remote, "hooks-path-publisher")
+    hooks_dir = publisher / ".claude" / "hooks" / "git-hooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "post-commit").write_text("#!/usr/bin/env bash\nexit 0\n")
+    assert _sync(script, publisher, remote, "push").returncode == 0
+
+    writer = tmp_path / "hooks-path-writer"
+    subprocess.run(["git", "init", "-q", str(writer)], check=True)
+
+    result = _sync(script, writer, remote, "pull")
+
+    assert result.returncode == 0, result.stderr
+    assert (writer / ".claude" / "hooks" / "git-hooks" / "post-commit").exists()
+    assert _git(writer, "config", "--get", "core.hooksPath").stdout.strip() == (
+        ".claude/hooks/git-hooks"
+    )
+
+
+def test_setup_skips_hooks_path_when_outer_root_is_not_a_git_repository(
+    script: Path, tmp_path: Path
+) -> None:
+    """A consumer root with no outer ``.git`` is not a hard failure; the
+    hooks-path step is silently skipped and the rest of setup still succeeds."""
+    root = tmp_path / "not-a-repository"
+    (root / ".claude" / "hooks" / "git-hooks").mkdir(parents=True)
+
+    result = _sync(script, root, None, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert "no state remote configured" in result.stderr
+
+
+def test_checkpoint_untracks_previously_committed_error_log_without_deleting_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """Upgrade removes the local-only error log from history while preserving
+    it on disk; ``session_logs/hooks-bypass.log`` stays a separate, tracked
+    file (unaffected by this)."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "tracked-error-log")
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+    error_log.parent.mkdir(parents=True, exist_ok=True)
+    error_log.write_text("legacy tracked error\n")
+    assert (
+        _git(
+            writer / ".claude", "add", "-f", "session_logs/hooks-errors.log"
+        ).returncode
+        == 0
+    )
+    assert (
+        _git(writer / ".claude", "commit", "-qm", "legacy tracked error log").returncode
+        == 0
+    )
+    assert _git(writer / ".claude", "push", "-q").returncode == 0
+    assert (
+        _remote_show(remote, "session_logs/hooks-errors.log")
+        == "legacy tracked error\n"
+    )
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0, result.stderr
+    assert error_log.read_text() == "legacy tracked error\n"
+    assert (
+        _git(writer / ".claude", "ls-files", "session_logs/hooks-errors.log").stdout
+        == ""
+    )
+    assert _git(writer / ".claude", "status", "--porcelain").stdout == ""
+    assert _sync(script, writer, remote, "publish").returncode == 0
+    assert _remote_show(remote, "session_logs/hooks-errors.log") == ""
+
+
+def test_setup_never_tracks_the_error_log(script: Path, tmp_path: Path) -> None:
+    """A brand-new nested repository never commits the local-only error log."""
+    remote = _bare_remote(tmp_path)
+    writer = tmp_path / "fresh-error-log"
+    error_log = writer / ".claude" / "session_logs" / "hooks-errors.log"
+    error_log.parent.mkdir(parents=True, exist_ok=True)
+    error_log.write_text("local-only\n")
+
+    result = _sync(script, writer, remote, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert error_log.read_text() == "local-only\n"
+    assert (
+        _git(writer / ".claude", "ls-files", "session_logs/hooks-errors.log").stdout
+        == ""
+    )
 
 
 def test_checkpoint_untracks_previously_committed_cache_without_deleting_it(
@@ -1673,27 +1827,31 @@ def _seed_remote(
     assert _sync(script, seeder, remote, "push").returncode == 0
 
 
-def test_setup_merges_remote_error_log_without_creating_a_local_blocker(
+def test_setup_merges_remote_tracked_log_without_creating_a_local_blocker(
     script: Path, tmp_path: Path
 ) -> None:
-    """Fresh setup must not create the error log before an unrelated merge."""
+    """Fresh setup must not create a tracked ``session_logs/*.log`` file
+    before an unrelated merge. Uses ``hooks-bypass.log`` (still a normal
+    tracked, union-merged log) rather than the now local-only error log."""
     remote = _bare_remote(tmp_path)
-    _seed_remote(script, tmp_path, remote, "session_logs/hooks-errors.log", "remote\n")
+    _seed_remote(script, tmp_path, remote, "session_logs/hooks-bypass.log", "remote\n")
     writer = tmp_path / "fresh-setup"
     (writer / ".claude").mkdir(parents=True)
 
     result = _sync(script, writer, remote, "setup")
 
     assert result.returncode == 0
-    assert _local_show(writer, "session_logs/hooks-errors.log") == "remote\n"
+    assert _local_show(writer, "session_logs/hooks-bypass.log") == "remote\n"
     assert _no_active_rebase_or_merge(writer)
     assert "could not be merged automatically" not in result.stderr
 
 
-def test_setup_checkpoints_error_log_when_remote_is_unavailable(
+def test_setup_checkpoints_error_log_locally_when_remote_is_unavailable(
     script: Path, tmp_path: Path
 ) -> None:
-    """Offline setup leaves durable state clean after recording its warning."""
+    """Offline setup leaves durable state clean after recording its warning
+    in the local-only error log (never committed, so read directly rather
+    than through ``git show HEAD:...``)."""
     writer = tmp_path / "offline-setup"
     (writer / ".claude").mkdir(parents=True)
     unavailable_remote = tmp_path / "missing.git"
@@ -1704,8 +1862,13 @@ def test_setup_checkpoints_error_log_when_remote_is_unavailable(
     assert _local_head(writer)
     assert _git(writer / ".claude", "status", "--porcelain").stdout == ""
     assert "fetch from origin/ai-state failed" in result.stderr
-    assert "fetch from origin/ai-state failed" in _local_show(
-        writer, "session_logs/hooks-errors.log"
+    assert (
+        "fetch from origin/ai-state failed"
+        in (writer / ".claude" / "session_logs" / "hooks-errors.log").read_text()
+    )
+    assert (
+        _git(writer / ".claude", "ls-files", "session_logs/hooks-errors.log").stdout
+        == ""
     )
 
 

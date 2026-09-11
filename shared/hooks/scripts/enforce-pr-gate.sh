@@ -49,7 +49,16 @@ fi
 
 if [[ "${#failures[@]}" -gt 0 ]]; then
   reason="$(printf '%s; ' "${failures[@]}")"
-  deny_pretool "${reason%; }"
+  reason="${reason%; }"
+  # A chained `git commit ... && git push` is evaluated here against the
+  # pre-commit HEAD, since this hook runs before the command executes: the
+  # commit that would satisfy the invariants below does not exist yet. Name
+  # that ordering constraint instead of leaving the operator to guess why an
+  # apparently-valid commit-then-push was refused.
+  if is_git_commit_command "$COMMAND"; then
+    reason="commit and push must be separate Bash commands: the push gate evaluates the current HEAD before this command's commit exists; run the commit first, then push; $reason"
+  fi
+  deny_pretool "$reason"
   exit 0
 fi
 
