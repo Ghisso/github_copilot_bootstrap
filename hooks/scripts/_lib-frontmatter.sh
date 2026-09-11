@@ -1633,6 +1633,25 @@ assert_completed_phase_publication_invariants() {
 # Public push entry point. A paused current phase may publish a durable remote
 # checkpoint; a just-completed predecessor may publish before later phases;
 # terminal plans retain the strict final closeout ceremony.
+has_completed_predecessor() {
+  local repo_root="$1"
+  local big_plan="$2"
+  local current_phase="$3"
+  local phase current_listed=0 completed=0 small_plan status
+  while IFS= read -r phase; do
+    [[ -n "$phase" ]] || continue
+    if [[ "$phase" == "$current_phase" ]]; then
+      current_listed=1
+      break
+    fi
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    [[ -f "$small_plan" ]] || continue
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    [[ "$status" == "complete" ]] && completed=1
+  done < <(fm_read_list "$big_plan" "phases")
+  [[ "$current_listed" -eq 1 && "$completed" -eq 1 ]]
+}
+
 assert_push_invariants() {
   local repo_root="$1"
   local branch="$2"
@@ -1656,7 +1675,8 @@ assert_push_invariants() {
     assert_closeout_invariants "$repo_root" "$branch" "$local_sha"
   elif [[ "$current_status" == "paused" ]]; then
     assert_paused_publication_invariants "$repo_root" "$branch" "$local_sha"
-  elif [[ "$big_status" == "in-progress" ]]; then
+  elif [[ "$big_status" == "in-progress" && "$current_status" == "in-progress" ]] \
+    && has_completed_predecessor "$repo_root" "$big_plan" "$current_phase"; then
     assert_completed_phase_publication_invariants "$repo_root" "$branch" "$local_sha"
   else
     assert_closeout_invariants "$repo_root" "$branch" "$local_sha"
