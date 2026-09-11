@@ -1,0 +1,47 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-11T07:34:56Z",
+  "branch": "2026-09-11_outer-repo-auto-push_implementation",
+  "head_sha": "05adbcc410efc5b582b1e9d6bff6ac9cec79a436",
+  "base_ref": "dev",
+  "merge_base_sha": "4381ae6ed23017f017ceceec85632c975c955f5c",
+  "phase": "2026-09-11_phase-B-terminal-publication-recovery",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "0305a5ffaf133585033adc34af696dcb44f6e37e",
+  "changed_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/hooks/scripts/_lib-frontmatter.sh",
+    "shared/policies/workflow.instructions.md",
+    "shared/policies/workspace.instructions.md",
+    "shared/scripts/verify.py",
+    "shared/skills/commit/SKILL.md",
+    "tests/test_hook_gates.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_validate_targets.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
