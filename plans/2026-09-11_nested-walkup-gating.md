@@ -1,13 +1,13 @@
 ---
 name: 2026-09-11_nested-walkup-gating
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: 2026-09-11_nested-walkup-gating_implementation
 started_at: 2026-09-11T08:34:59Z
 phases:
   - 2026-09-11_phase-A-gate-nested-readers
-current_phase: 2026-09-11_phase-A-gate-nested-readers
+current_phase: 
 ---
 
 # Big Plan: Gate nested-state readers on a real nested repository
