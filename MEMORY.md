@@ -895,6 +895,19 @@
 - [LEARN:review] Before ruling that a fix would break a documented state,
   measure whether that state works today. The plain-directory consumer already
   failed every publish gate, so gating the readers cost nothing.
+- [LEARN:quality] `uv run <tool>` with the tool missing from the project
+  environment does not raise `FileNotFoundError`; `uv` exits 2 with
+  `Failed to spawn` on stderr. Detect the missing tool from that exit and
+  message, and test the realistic `(rc, stdout, stderr)` shape rather than a
+  raised exception the wrapper never produces.
+- [LEARN:quality] A receipt check that can newly resolve to `NOT_APPLICABLE`
+  must also be allowed by `validate_mode_applicability`'s per-mode table, or
+  `build_receipt` raises for exactly the case the change exists to serve.
+  Test through `build_receipt`, not only through `aggregate_status`.
+- [LEARN:testing] A repository scan that can be blocked by permissions needs a
+  three-way result (found, absent, inconclusive); collapsing inconclusive into
+  "found" keeps the gate closed but produces a message that points the reader
+  at the wrong cause.
 - [LEARN:quality] Check a persist path's ordering against its own status gate.
   `--persist` wrote the receipt before returning on status, so a diagnostic run
   overwrote a passing receipt with a failing one, which is what turned a

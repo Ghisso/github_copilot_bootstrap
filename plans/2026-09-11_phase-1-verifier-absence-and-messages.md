@@ -3,8 +3,8 @@ name: 2026-09-11_phase-1-verifier-absence-and-messages
 type: small-plan
 parent_plan: 2026-09-11_consumer-ceremony-friction
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_phase-1-verifier-absence-and-messages.md
 ---
 
 # Small Plan: Verifier tells "nothing to measure" from "failed", and names runnable fixes
@@ -72,21 +72,21 @@ docs.
 
 ## Steps
 
-- [ ] Add one small helper in `shared/scripts/verify.py` that answers whether
+- [x] Add one small helper in `shared/scripts/verify.py` that answers whether
   the repository contains any test file, walking from the root and skipping
   `.claude`, `.venv`, and `.git`. A few lines; no configuration.
-- [ ] In `_pytest_measurement`, when `rc == 5`: return
+- [x] In `_pytest_measurement`, when `rc == 5`: return
   `("NOT_APPLICABLE", "pytest collected no tests and the repository has no test files yet")`
   when the helper finds none, else
   `("UNVERIFIED", "pytest collected no tests although test files exist; check testpaths and file naming")`.
   Leave the exit 0 and exit 1 branches unchanged.
-- [ ] Replace the three `did not run` messages so a `FileNotFoundError`
+- [x] Replace the three `did not run` messages so a `FileNotFoundError`
   reads `<tool> is not installed in the project environment; run uv add --dev ruff mypy pytest`.
   Keep the generic text for other errors.
-- [ ] Replace the mypy no-scope summary with
+- [x] Replace the mypy no-scope summary with
   `mypy has no scope: add a src/ directory or set [tool.mypy] files, packages, or modules in pyproject.toml`.
-- [ ] Update the two checkpoint remediation strings to the decided sentence.
-- [ ] Tests in `tests/test_verify.py`: a temp repository with no test files
+- [x] Update the two checkpoint remediation strings to the decided sentence.
+- [x] Tests in `tests/test_verify.py`: a temp repository with no test files
   and pytest exit 5 yields `NOT_APPLICABLE` and the receipt aggregate is
   `PASS`; a repository holding `tests/test_x.py` that pytest still does not
   collect yields `UNVERIFIED`; a missing executable yields the install
@@ -94,7 +94,7 @@ docs.
   messages contain `git -C .claude add -A`. Drive `_pytest_measurement`
   through a fake `_run` where the existing tests already do so. Update
   assertions that match the old message texts.
-- [ ] Documentation. In `README.md`'s consumer install section, add a short
+- [x] Documentation. In `README.md`'s consumer install section, add a short
   "What the gates need from your project" list: ruff, mypy, and pytest as dev
   dependencies; a mypy scope or `src/`; tests, or acceptance that pytest is
   reported as not applicable until the first test exists. In
@@ -103,7 +103,7 @@ docs.
   commit and push gates accept only `PASS`; update the quoted diagnostic
   text where the checkpoint message is shown. Update
   `docs/architecture.md:358` to match.
-- [ ] Regenerate with `uv run python scripts/generate_targets.py --all` and
+- [x] Regenerate with `uv run python scripts/generate_targets.py --all` and
   install locally with
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
 
@@ -155,15 +155,15 @@ the git form named in the new remediation messages.
 
 ## Closeout Checklist
 
-- [ ] All steps implemented and verified
-- [ ] `uv run pytest tests/ -q` passes
-- [ ] mypy, ruff check, and ruff format pass
-- [ ] `validate_targets.py` and `check_runtime.py` pass
-- [ ] Targets regenerated and installed locally
-- [ ] Code, architecture, security, tests, and Ponytail reviews complete
-- [ ] Critical and major findings at zero
-- [ ] Documentation updated
-- [ ] `.claude/MEMORY.md` records the reusable lessons or the no-lessons marker
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested state checkpointed before persisting the closeout receipt
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] All steps implemented and verified
+- [x] `uv run pytest tests/ -q` passes
+- [x] mypy, ruff check, and ruff format pass
+- [x] `validate_targets.py` and `check_runtime.py` pass
+- [x] Targets regenerated and installed locally
+- [x] Code, architecture, security, tests, and Ponytail reviews complete
+- [x] Critical and major findings at zero
+- [x] Documentation updated
+- [x] `.claude/MEMORY.md` records the reusable lessons or the no-lessons marker
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested state checkpointed before persisting the closeout receipt
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)

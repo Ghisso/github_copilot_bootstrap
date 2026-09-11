@@ -83,7 +83,7 @@ profile set.
 
 ## Phases
 
-- [ ] `2026-09-11_phase-1-verifier-absence-and-messages` — pytest with no
+- [x] `2026-09-11_phase-1-verifier-absence-and-messages` — pytest with no
   test files reports `NOT_APPLICABLE`; tool-missing and scope-missing
   messages name the fix; the two checkpoint remediation messages name the
   agent-allowed form; consumer prerequisites documented.
