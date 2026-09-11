@@ -1,13 +1,13 @@
 ---
 name: 2026-09-11_outer-repo-auto-push
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: 2026-09-11_outer-repo-auto-push_implementation
-started_at:
+started_at: 2026-09-11T01:24:27Z
 phases:
   - 2026-09-11_phase-A-outer-repo-auto-push
-current_phase:
+current_phase: 2026-09-11_phase-A-outer-repo-auto-push
 ---
 
 # Big Plan: Outer-repository automatic push

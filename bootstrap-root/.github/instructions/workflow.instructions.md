@@ -1,4 +1,4 @@
-# Workflow: Pre-Flight -> Branch -> Plan When Needed -> Implement -> Verify -> Review -> Closeout -> Commit Adapter
+# Workflow: Pre-Flight -> Branch -> Plan When Needed -> Implement -> Verify -> Review -> Closeout -> Commit -> Push Adapter
 
 This Copilot instruction file is a native discovery adapter. Read and follow the canonical shared instruction at `.claude/instructions/workflow.instructions.md`.
 

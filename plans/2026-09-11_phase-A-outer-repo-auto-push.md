@@ -3,8 +3,8 @@ name: 2026-09-11_phase-A-outer-repo-auto-push
 type: small-plan
 parent_plan: 2026-09-11_outer-repo-auto-push
 phase_index: 1
-status: planned
-closeout_session_log:
+status: in-progress
+closeout_session_log: session_logs/2026-09-11_outer-repo-auto-push.md
 ---
 
 # Small Plan: Outer-repository automatic push

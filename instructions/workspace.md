@@ -155,7 +155,7 @@ Quality gates:
 
 ## Project State
 
-**Project:** github_copilot_bootstrap — reusable multi-target coding-agent workflow bootstrap. Details: `.claude/instructions/project-context.instructions.md`.
+**Project:** github_copilot_bootstrap
 **Stack:** Python 3.12+ with uv; adapt framework guidance to the target repo.
 **Active work:** Check `.claude/plans/` and `.claude/explorations/`.
 

@@ -33,7 +33,7 @@ edits remain with the main agent and create no lifecycle artifacts.
 
 You MUST maintain task tracking throughout the entire workflow:
 
-1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT, and PR-on-request when relevant.
+1. **At start:** Create a phase checklist with the canonical order: PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT, PUSH, and PR-on-request when relevant.
 2. **Loop task:** Include a parameterized task for `IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass`.
 3. **Before each task:** Mark the current task as in-progress.
 4. **After each task:** Mark completed immediately. Do not batch completions.
@@ -88,7 +88,8 @@ log before running `verify.py closeout`: the gate requires that exact
 heading with non-empty content whenever the phase being closed out is the
 big plan's own last declared phase, and rejects the closeout otherwise.
 8. **COMMIT:** On normal completion, commit exactly one completed small plan after all gates pass.
-9. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
+9. **PUSH:** After every successful outer-repository commit, attempt a normal non-force publication. If the branch has an upstream, run `GIT_TERMINAL_PROMPT=0 git push`; otherwise, when `origin` exists, run `GIT_TERMINAL_PROMPT=0 git push -u origin HEAD`. A missing remote, authentication failure, or network failure is a visible warning only: keep the completed commit local and continue. Never push the nested `.claude` AI-state repository here; its existing post-commit state-sync behavior is separate. Do not create a PR or merge automatically.
+10. **PR ON REQUEST:** After the last small plan is complete, open `gh pr create --base dev` only when the user explicitly asks for a PR.
 
 ### Conditional pause and resume
 
