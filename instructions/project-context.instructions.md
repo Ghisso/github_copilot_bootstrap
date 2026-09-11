@@ -73,17 +73,14 @@ consumer workflow: plan -> implement -> verify -> review -> score -> document
 
 ## Current status and verification
 
-The repository was checked on `dev` on 2026-09-08. A fresh generation followed
-by `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
+Onboarding was refreshed on `dev` on 2026-09-11 from clean outer and nested
+worktrees. `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
 scripts/validate_targets.py` passed with `PASS generated target is structurally
-valid`.
-
-`scripts/check_runtime.py` did not pass in that check. The installed
-`.claude/instructions/workspace.md` and `workspace.instructions.md` differ from
-the freshly generated bundle, and `.claude/scripts/__pycache__/` contains a
-runtime file absent from the bundle. Before merge, regenerate and reinstall
-locally with `install_bootstrap.py . --allow-self --local-only`, then rerun the
-runtime check. Do not delete or overwrite consumer-owned state by hand.
+valid`; `scripts/check_runtime.py` also passed. The structural validator checks
+generation, determinism, hooks, adapters, lifecycle contracts, and its
+regression suite. It is not proof that every supported native client routed
+every role at runtime; use the optional `scripts/check_native_clients.py`
+release probe when that evidence is needed.
 
 Before merging bootstrap changes, run:
 
@@ -115,3 +112,8 @@ implementation and documentation are present (notably state-sync and
 post-review hardening). Treat code and generated-target validation as the
 current source of truth, and refresh plan status when the next related change
 touches those plans.
+
+The `onboard` skill's generic consumer-project wording assumes both root
+entrypoints have a Project State slot. This authoring repository instead keeps
+the tracked root `AGENTS.md` as its maintainer guide, without that slot; do not
+add one there. Its generated consumer adapter is validated separately.
