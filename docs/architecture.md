@@ -300,6 +300,18 @@ Lifecycle hook scripts keep that workflow stateful without mutating during valid
 The orchestrator attempts a normal, non-force outer-repository push after each successful commit. It uses the branch upstream when configured, otherwise `origin`. Missing remotes and authentication or network failures are warnings that leave the local commit intact. This automated publication does not affect the nested `.claude` `ai-state` synchronization, PR creation, or merge decisions.
 - `session-start-state.sh` and `stop-session-log-check.sh` provide reminders for stale phase and session-log state.
 
+`verify.py closeout --persist` refuses to write a receipt the terminal push gate
+could never accept: when the big plan's recorded `big_plan_digest` is not
+retrievable from a nested Git revision, it fails closed and names
+`bash .claude/hooks/scripts/state-sync.sh checkpoint`. The closeout ceremony therefore
+checkpoints nested plan state after the plan, log, and memory edits are final
+and before the findings and receipts are persisted. An agent does that with
+a direct nested-repository commit rather than by invoking `state-sync.sh`, which
+the file-protection hook denies through the Bash tool. A consumer whose `.claude`
+is not its own Git repository is exempt, which is decided by looking for
+`.claude/.git` rather than by reading a nested `HEAD` — Git walks up to the
+outer repository from a plain `.claude` directory.
+
 ### Reporting reminders
 
 `reporting-reminder.sh` is a short, warn-never-fail context reminder. Prompt

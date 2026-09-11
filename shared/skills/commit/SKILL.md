@@ -43,6 +43,7 @@ git add src/changed_file.py tests/test_changed.py
 - **Never stage**: `.env`, secrets, credentials
 - Review: `git diff --cached`
 - Stage only after focused/fast checks, review, documentation, final plan/log/LEARN state, and before `record_findings.py`, `verify phase --persist`, and `verify closeout --persist`.
+- Once every plan, log, and memory edit is final and before `record_findings.py`, checkpoint nested plan state. Use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent; `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the editor task and hooks, but the file-protection hook denies any Bash command naming a `.claude/hooks/` path. The closeout receipt binds the big plan's bytes, and the push gate can only re-derive that digest from bytes Git already holds, so a big plan left dirty through the receipt steps yields a completion commit that can never be published. Never checkpoint after the receipts are persisted: that stales them and fails the next commit closed.
 - `dirty` in the findings and receipt gates means unstaged tracked changes. Untracked files do not appear in `git diff`; stage intended files before recording findings.
 
 ## Phase 4: Commit

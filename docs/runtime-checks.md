@@ -347,14 +347,42 @@ plan make the receipt stale. Structural receipt invariants are enforced by the
 schema and verifier; they are not represented as synthetic PASS check IDs.
 
 The relevant nested tracked/dirty state that provenance binds to is not
-informational the way the nested HEAD is: it must persist last, while the
-nested `.claude` repository still holds the closeout run's own uncommitted
-changes. Do not run `state-sync.sh checkpoint`/`publish`/`push` by hand before
-`verify.py closeout --persist` — that commits nested state early and changes
-what the persisted receipt is bound to, so the next commit fails closed with
-`closeout receipt governing control-plane provenance is stale`. Persist the
-phase and closeout receipts, commit the outer repository, and let the native
-`post-commit` hook checkpoint and publish nested state afterward.
+informational the way the nested HEAD is, and its ordering is exact in both
+directions.
+
+Checkpoint nested plan state once every plan, log, and memory edit is
+final and before
+`verify.py phase --persist`/`closeout --persist`. `control_plane_provenance`
+records `big_plan_digest` from the big plan's working-tree bytes, while the two
+predicates that authorize a terminal push
+(`has_only_terminal_big_plan_change`, `has_only_checkpointed_terminal_big_plan_change`)
+can only re-derive that digest from a nested Git revision. A big plan still
+dirty in nested state when the receipt is persisted therefore binds a digest
+that is neither indexed nor committed, and no later state can make it match —
+the completion commit becomes permanently unpublishable. A multi-phase big plan
+hides this, because each intermediate commit checkpoints nested state; a
+single-phase plan does not. `closeout --persist` now fails closed on that
+condition before writing anything, and names the checkpoint command.
+
+`bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
+editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies any Bash command naming a `.claude/hooks/` path; the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
+
+Never checkpoint or publish nested state *after* the receipts are persisted.
+That changes what they are bound to and fails the next commit closed with
+`closeout receipt governing control-plane provenance is stale`. Findings and
+receipt files are not provenance-bound paths, so writing them after the
+checkpoint is expected. Leave nested publication itself to the native
+`post-commit` hook after the outer commit.
+
+Two guards protect the recovery path. `--persist` refuses to replace a passing
+receipt with a failing one, so a diagnostic run cannot destroy the only valid
+evidence. And when a big plan is already `complete`, the refusal message
+recommends `phase --persist --phase <slug>` followed by
+`closeout --persist --phase <slug>`, in that order: the closeout receipt records
+the phase receipt's digest at its own persist time, so refreshing the phase
+receipt alone would leave
+`closeout receipt artifact phase_receipt was tampered with`. That recovery is
+only valid while the working tree still matches the commit being certified.
 
 When control-plane provenance is unavailable because of a root-adapter
 mismatch, the verifier's message names each affected path from the ownership

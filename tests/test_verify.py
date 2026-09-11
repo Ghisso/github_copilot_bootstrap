@@ -3745,3 +3745,515 @@ def test_closeout_artifacts_accepts_documentation_na_unchanged(
         assert isinstance(bound, dict)
         assert bound["path"] == relative
         assert re.fullmatch(r"[0-9a-f]{64}", str(bound["sha256"]))
+
+
+def _write_terminal_precondition_repo(
+    tmp_path: Path,
+    *,
+    slug: str = "sample-plan",
+    phase: str = "phase-one",
+    big_plan_status: str = "in-progress",
+    current_phase: str = "",
+    checkpoint: bool = False,
+    nested_repo: bool = True,
+    plain_nested_directory: bool = False,
+) -> None:
+    """Build a nested-state repo plus an outer ``<slug>_implementation`` repo
+    with one resolvable phase, matching the real closeout precondition shape.
+
+    ``checkpoint`` commits the big plan into nested Git before the outer
+    branch is created; leaving it ``False`` reproduces the measured Phase A
+    defect exactly - the big plan ticked complete during closeout is dirty
+    in nested Git at the moment a closeout receipt would be persisted, with
+    no intervening commit to have absorbed it. ``nested_repo=False`` omits
+    ``.claude`` entirely; ``plain_nested_directory=True`` builds it as a real
+    directory holding plan content but never runs ``git init`` in it, which is
+    the documented ``migrate-from-hf`` consumer shape.
+    """
+    resolved_current_phase = current_phase or phase
+    big_plan_text = (
+        "---\n"
+        f"name: {slug}\n"
+        "type: big-plan\n"
+        f"status: {big_plan_status}\n"
+        f"current_phase: {resolved_current_phase}\n"
+        "phases:\n"
+        f"  - {phase}\n"
+        "---\n\n# Big Plan\n"
+    )
+    small_plan_status = "complete" if big_plan_status == "complete" else "in-progress"
+    small_plan_text = (
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        f"parent_plan: {slug}\n"
+        "phase_index: 1\n"
+        f"status: {small_plan_status}\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n"
+    )
+    if plain_nested_directory:
+        # ".claude" has real content but no ".git" of its own. This is the
+        # shape that must skip the precondition: `git -C <repo>/.claude
+        # rev-parse HEAD` walks up and resolves the *outer* HEAD here, so a
+        # check built on `nested_git_head` truthiness would refuse every
+        # closeout for this consumer.
+        _write_root_adapter_pairs(tmp_path)
+        nested = tmp_path / ".claude"
+        plans = nested / "plans"
+        for directory in (plans, nested / "quality_reports", nested / "session_logs"):
+            directory.mkdir(parents=True, exist_ok=True)
+        (plans / f"{phase}.md").write_text(small_plan_text, encoding="utf-8")
+        (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+        (nested / "session_logs" / f"{phase}-closeout.md").write_bytes(
+            b"**Status:** COMPLETED\n"
+        )
+    elif nested_repo:
+        _write_root_adapter_pairs(tmp_path)
+        nested = tmp_path / ".claude"
+        plans = nested / "plans"
+        reports = nested / "quality_reports"
+        logs = nested / "session_logs"
+        for directory in (plans, reports, logs):
+            directory.mkdir(parents=True, exist_ok=True)
+        (plans / f"{phase}.md").write_text(small_plan_text, encoding="utf-8")
+        (reports / f"verification-phase-{phase}.json").write_bytes(
+            f"phase-receipt-for-{phase}\n".encode()
+        )
+        (reports / f"findings-{phase}.json").write_bytes(
+            json.dumps(
+                {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+            ).encode()
+        )
+        (logs / f"{phase}-closeout.md").write_bytes(b"**Status:** COMPLETED\n")
+        _init_repo(nested)
+        if checkpoint:
+            (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+            _commit_all(nested, "nested state")
+        else:
+            _commit_all(nested, "nested state before the big plan exists")
+            (plans / f"{slug}.md").write_text(big_plan_text, encoding="utf-8")
+    # When nested_repo is False, ".claude" is left entirely absent. The
+    # walk-up hazard that shape sidesteps is covered directly by
+    # plain_nested_directory above.
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _git(["checkout", "-q", "-b", f"{slug}_implementation"], tmp_path)
+    _commit_all(tmp_path, "outer state")
+    # A base "dev" ref lets state_metadata resolve a real merge_base_sha,
+    # which build_receipt requires to be non-empty for phase/closeout mode.
+    _git(["branch", "dev"], tmp_path)
+
+
+def test_unpublishable_closeout_reason_flags_dirty_big_plan(tmp_path: Path) -> None:
+    """A big plan not yet retrievable from nested HEAD is refused, matching
+    the measured Phase A shape exactly: no nested commit absorbed the
+    ticked-complete plan before the closeout receipt was to be persisted."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=False)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    reason = verify.unpublishable_closeout_reason(tmp_path, metadata)
+    assert reason is not None
+    assert "state-sync.sh checkpoint" in reason
+
+
+def test_unpublishable_closeout_reason_allows_checkpointed_big_plan(
+    tmp_path: Path,
+) -> None:
+    """Committing the big plan into nested Git before persisting makes the
+    recorded digest retrievable, so the precondition is satisfied."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=True)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_unpublishable_closeout_reason_skips_without_nested_repository(
+    tmp_path: Path,
+) -> None:
+    """A consumer with no nested state repository keeps working unchanged:
+    the precondition only applies when nested provenance is available."""
+    _write_terminal_precondition_repo(tmp_path, nested_repo=False)
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_unpublishable_closeout_reason_skips_for_plain_nested_directory(
+    tmp_path: Path,
+) -> None:
+    """A consumer whose ``.claude`` holds content but is not its own Git
+    repository must keep working unchanged.
+
+    ``nested_git_head`` cannot detect this: Git walks up from ``.claude`` and
+    resolves the outer repository's HEAD, so a precondition gated on that
+    value being empty would refuse every closeout on this branch and force an
+    unrequested nested-repository migration.
+    """
+    _write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)
+    assert (tmp_path / ".claude").is_dir()
+    assert not (tmp_path / ".claude" / ".git").exists()
+    assert verify.nested_git_head(tmp_path) != ""
+    assert verify.nested_state_repository(tmp_path) is False
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_unpublishable_closeout_reason_allows_repersist_after_terminal_transition(
+    tmp_path: Path,
+) -> None:
+    """A re-persist after the terminal transition needs no special case: once
+    the completed big plan's bytes are checkpointed, the working tree,
+    index, and nested HEAD blob all agree."""
+    _write_terminal_precondition_repo(
+        tmp_path, big_plan_status="complete", current_phase="", checkpoint=True
+    )
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    assert verify.unpublishable_closeout_reason(tmp_path, metadata) is None
+
+
+def test_closeout_persist_refuses_while_big_plan_is_dirty_in_nested_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The full CLI path: closeout --persist must refuse and write nothing
+    while the big plan is dirty in nested state."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    exit_code = verify.main()
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "state-sync.sh checkpoint" in captured.err
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+
+
+def test_closeout_persist_succeeds_once_nested_state_is_checkpointed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The full CLI path: closeout --persist must succeed once nested state
+    is checkpointed, and must actually write the receipt."""
+    _write_terminal_precondition_repo(tmp_path, checkpoint=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    exit_code = verify.main()
+    assert exit_code != 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert receipt_path.is_file()
+
+
+def _write_closeout_ready_repo(tmp_path: Path, *, phase: str = "phase-one") -> None:
+    """Build the smallest fully-provisioned repo where closeout/phase mode
+    can reach the persist block with genuinely valid control-plane
+    provenance (``build_receipt`` rejects a receipt without it,
+    unconditionally): nested Git state plus the root-adapter ownership
+    manifest real metadata capture needs, and one resolvable, complete
+    phase plan with its receipt/log artifacts. Stays on the repo's default
+    branch, deliberately not ``<slug>_implementation``, so the big-plan
+    precondition and terminal predicates never engage - this isolates the
+    persist-guard and recovery-message behavior under test from the
+    separate nested-state precondition covered above."""
+    _write_root_adapter_pairs(tmp_path)
+    nested = tmp_path / ".claude"
+    plans = nested / "plans"
+    reports = nested / "quality_reports"
+    logs = nested / "session_logs"
+    for directory in (plans, reports, logs):
+        directory.mkdir(parents=True, exist_ok=True)
+    (plans / f"{phase}.md").write_text(
+        "---\n"
+        f"name: {phase}\n"
+        "type: small-plan\n"
+        "parent_plan: sample-plan\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        f"closeout_session_log: .claude/session_logs/{phase}-closeout.md\n"
+        "---\n\n# Phase\n",
+        encoding="utf-8",
+    )
+    (reports / f"verification-phase-{phase}.json").write_bytes(
+        f"phase-receipt-for-{phase}\n".encode()
+    )
+    (reports / f"findings-{phase}.json").write_bytes(
+        json.dumps(
+            {"findings": [], "counts": {"critical": 0, "major": 0, "minor": 0}}
+        ).encode()
+    )
+    (logs / f"{phase}-closeout.md").write_bytes(b"**Status:** COMPLETED\n")
+    _init_repo(nested)
+    _commit_all(nested, "nested state")
+    (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial commit")
+    # A base "dev" ref lets state_metadata resolve a real merge_base_sha,
+    # which build_receipt requires to be non-empty for phase/closeout mode.
+    _git(["branch", "dev"], tmp_path)
+
+
+def test_unresolved_phase_reason_recovery_names_both_modes_in_order(
+    tmp_path: Path,
+) -> None:
+    """The complete-big-plan recovery message must name both recommended
+    commands, phase before closeout, since the closeout run heals the
+    binding the phase run invalidates."""
+    branch = "sample-plan_implementation"
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "sample-plan.md").write_text(
+        "---\nstatus: complete\nphases:\n  - phase-two\ncurrent_phase: \n---\n",
+        encoding="utf-8",
+    )
+    (plans / "phase-two.md").write_text(
+        "---\nstatus: complete\n---\n", encoding="utf-8"
+    )
+    reason = verify.unresolved_phase_reason(tmp_path, branch, "", requires_phase=True)
+    assert reason is not None
+    phase_index = reason.find("phase --persist --phase phase-two")
+    closeout_index = reason.find("closeout --persist --phase phase-two")
+    assert phase_index != -1
+    assert closeout_index != -1
+    assert phase_index < closeout_index
+    assert "the working tree" in reason
+
+
+def test_phase_then_closeout_refresh_heals_phase_receipt_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Following the corrected recovery sequence - phase --persist, then
+    closeout --persist - leaves no tampered phase_receipt binding, unlike
+    running phase --persist alone (the old, misleading recommendation)."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "measure_ruff",
+        lambda *a, **k: verify.check("VFY-RUFF-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "measure_mypy",
+        lambda *a, **k: verify.check("VFY-MYPY-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "measure_pytest",
+        lambda *a, **k: verify.check("VFY-PYTEST-001", "PASS", "ok"),
+    )
+    monkeypatch.setattr(
+        verify,
+        "generation_check",
+        lambda *a, **k: verify.check("VFY-GEN-001", "PASS", "ok"),
+    )
+
+    metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    initial_checks = verify.closeout_checks(tmp_path, metadata)
+    initial_artifacts = verify.closeout_artifacts(tmp_path, metadata, "fixture reason")
+    initial_receipt = verify.build_receipt(
+        "closeout", initial_checks, metadata, initial_artifacts
+    )
+    closeout_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    closeout_path.parent.mkdir(parents=True, exist_ok=True)
+    closeout_path.write_text(
+        verify.canonical_json(initial_receipt) + "\n", encoding="utf-8"
+    )
+    original_reference = initial_receipt["artifacts"]["phase_receipt"]  # type: ignore[index]
+
+    # Running phase --persist alone (the old, misleading recommendation)
+    # rewrites the phase receipt file, tampering the existing closeout
+    # receipt's bound phase_receipt hash.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", "phase", "--format", "text", "--persist", "--phase", "phase-one"],
+    )
+    verify.main()
+    tampered_errors, _ = verify.artifact_reference_errors(
+        tmp_path, "phase-one", "phase_receipt", original_reference
+    )
+    assert any("was tampered with" in error for error in tampered_errors)
+
+    # closeout --persist, run second as the corrected recommendation says,
+    # rebinds the closeout receipt to the now-refreshed phase receipt.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+    verify.main()
+    healed_receipt = verify.load_receipt(closeout_path)
+    healed_reference = healed_receipt["artifacts"]["phase_receipt"]  # type: ignore[index]
+    healed_errors, _ = verify.artifact_reference_errors(
+        tmp_path, "phase-one", "phase_receipt", healed_reference
+    )
+    assert healed_errors == []
+
+
+def _phase_check_list(status: str) -> list[dict[str, object]]:
+    """Build one schema-valid phase check list with every applicable check at
+    ``status``, matching phase mode's fixed applicability - only
+    VFY-RECEIPT-001 must stay NOT_APPLICABLE."""
+    return [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.check(check_id, status, "fixture")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def _closeout_check_list(status: str) -> list[dict[str, object]]:
+    """Build one schema-valid closeout check list with every applicable
+    check at ``status`` (PASS or FAIL), matching closeout mode's fixed
+    applicability - VFY-RUFF/MYPY/PYTEST/GEN-001 must stay NOT_APPLICABLE."""
+    return [
+        verify.not_applicable(check_id, "closeout reuses phase evidence")
+        if check_id in {"VFY-RUFF-001", "VFY-MYPY-001", "VFY-PYTEST-001", "VFY-GEN-001"}
+        else verify.check(check_id, status, "fixture")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def test_persist_guard_refuses_overwriting_passing_receipt_with_failing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--persist must never replace a passing receipt with a failing one."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+
+    seed_metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    seed_artifacts = verify.closeout_artifacts(tmp_path, seed_metadata, "seed reason")
+    seed_receipt = verify.build_receipt(
+        "closeout", _closeout_check_list("PASS"), seed_metadata, seed_artifacts
+    )
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (verify.canonical_json(seed_receipt) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("FAIL"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "already passed" in captured.err
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_persist_guard_protects_a_passing_phase_receipt_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The guard is documented as covering every mode, not only closeout."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+
+    seed_metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
+    seed_receipt = verify.build_receipt(
+        "phase", _phase_check_list("PASS"), seed_metadata, {}
+    )
+    receipt_path = verify.receipt_path(tmp_path, "phase", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (verify.canonical_json(seed_receipt) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+
+    monkeypatch.setattr(
+        verify, "phase_checks", lambda *_args: _phase_check_list("FAIL")
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify.py", "phase", "--format", "text", "--persist", "--phase", "phase-one"],
+    )
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    assert "already passed" in capsys.readouterr().err
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_persist_guard_allows_failing_receipt_when_no_prior_passing_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--persist must still persist a failing receipt when no passing
+    receipt exists yet - the guard only protects an existing pass."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("FAIL"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+    exit_code = verify.main()
+
+    assert exit_code != 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert receipt_path.is_file()
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["status"] == "FAIL"

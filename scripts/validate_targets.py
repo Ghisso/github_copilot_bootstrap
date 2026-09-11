@@ -6983,6 +6983,230 @@ def validate_completed_phase_stale_receipt_rejection(errors: list[str]) -> None:
         )
 
 
+def validate_single_phase_big_plan_terminal_publication(errors: list[str]) -> None:
+    """R-TERM-01: a one-phase big plan's completion commit must publish.
+
+    Reproduces the measured Phase B defect directly, with no code-under-test
+    imported ahead of the fix: ``control_plane_provenance`` records
+    ``big_plan_digest`` from the big plan's working-tree bytes, but a
+    single-phase big plan has no intermediate phase commit to checkpoint
+    nested state first, so a closeout receipt persisted while the big plan
+    is still dirty in nested Git binds a digest no terminal predicate can
+    ever later match. The real CLI (the installed ``.claude/scripts/
+    verify.py``, invoked exactly as the documented recovery command does) is
+    used for every closeout persist attempt, so this validator fails the
+    same way whether or not the new precondition exists yet - via a clean
+    ``check()`` failure, never an import error - and only starts passing
+    once the fix actually closes the gap.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        remote = temp_root / "remote.git"
+        subprocess.run(
+            ["git", "init", "--bare", "-b", "dev", str(remote)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        repo = setup_hook_repo(temp_root)
+        install_git_hooks(repo)
+        git(repo, "remote", "add", "origin", str(remote))
+        git(repo, "push", "origin", "dev")
+
+        write_big_plan(
+            repo, status="in-progress", phases=("phase-one",), current_phase="phase-one"
+        )
+        git(repo, "checkout", "-b", "foo_implementation")
+        write_small_plan(repo, status="in-progress", phase="phase-one")
+
+        shared_scripts = str(REPO_ROOT / "shared" / "scripts")
+        if shared_scripts not in sys.path:
+            sys.path.insert(0, shared_scripts)
+        import verify as verification
+
+        # Stage real work and mark the phase complete without ever
+        # committing nested state - the exact measured shape: the big plan
+        # ticked complete during closeout is dirty in nested Git the moment
+        # a closeout receipt would be persisted, with no intervening phase
+        # commit (there is only one phase) to have absorbed it.
+        write(repo / "phase-one-work.txt", "phase-one implementation work\n")
+        git(repo, "add", "phase-one-work.txt")
+        write_small_plan(repo, status="complete", phase="phase-one")
+        write(
+            repo / ".claude" / "session_logs" / "phase-one-closeout.md",
+            "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+            "- [LEARN] none - no new lessons this session\n"
+            "\n## Stale-claims surfaces checked\n\n"
+            "Checked README.md and docs/; no stale claims found.\n",
+        )
+        # A placeholder artifact only - closeout_artifacts binds it by path
+        # and hash, never by schema, and the real phase receipt is written
+        # once nested state is checkpointed below.
+        write(
+            repo / ".claude" / "quality_reports" / "verification-phase-phase-one.json",
+            "placeholder phase receipt before checkpoint\n",
+        )
+        merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
+        report = {
+            "findings": [],
+            "counts": {"critical": 0, "major": 0, "minor": 0},
+            "ponytail_reviewed": True,
+            "ponytail_findings": 0,
+            "profiles_reviewed": ["code", "ponytail"],
+            "branch": "foo_implementation",
+            "phase": "phase-one",
+            "generated_at": "2099-01-01T00:00:00Z",
+            "base_ref": "dev",
+            "merge_base_sha": merge_base,
+            "head_sha": git(repo, "rev-parse", "HEAD").stdout.strip(),
+            "target": str(repo / "phase-one-work.txt"),
+            "dirty": False,
+            "content_hash": verification.content_hash_for(repo, merge_base, ""),
+            "changed_files": ["phase-one-work.txt"],
+        }
+        _write_findings_only(
+            repo / ".claude" / "quality_reports" / "findings-phase-one.json",
+            json.dumps(report, indent=2) + "\n",
+        )
+
+        closeout_script = repo / ".claude" / "scripts" / "verify.py"
+        closeout_path = verification.receipt_path(repo, "closeout", "phase-one")
+
+        def run_closeout_persist() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(closeout_script),
+                    "closeout",
+                    "--format",
+                    "text",
+                    "--persist",
+                    "--phase",
+                    "phase-one",
+                    "--documentation-na",
+                    "fixture change does not alter public behavior",
+                ],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        # 1. Closeout refuses to persist while the big plan is dirty in
+        # nested state, and any pre-existing receipt is byte-unchanged -
+        # there is none yet, so "unchanged" means "still absent".
+        dirty_result = run_closeout_persist()
+        check(
+            dirty_result.returncode == 2
+            and "state-sync.sh checkpoint" in dirty_result.stderr,
+            "closeout --persist must refuse while the big plan is dirty in "
+            f"nested state: exit={dirty_result.returncode} "
+            f"stderr={dirty_result.stderr!r}",
+            errors,
+        )
+        check(
+            not closeout_path.exists(),
+            "a refused closeout persist must leave no receipt behind",
+            errors,
+        )
+
+        # 2. After `state-sync.sh checkpoint`, closeout persists a passing
+        # receipt. The real script is used rather than a hand-rolled `git
+        # add -A && commit`: it also seeds nested's own first-time
+        # `.gitignore` on its first real invocation, and a hand-rolled
+        # commit that skips that step would bundle the .gitignore's later,
+        # incidental creation into the post-commit transition's own commit,
+        # tripping the "only the big/small plan changed" checkpoint
+        # predicate for a reason unrelated to this phase's fix.
+        checkpoint = subprocess.run(
+            [
+                "bash",
+                str(repo / ".claude" / "hooks" / "scripts" / "state-sync.sh"),
+                "checkpoint",
+            ],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            checkpoint.returncode == 0,
+            f"nested checkpoint must succeed: {checkpoint.stdout}{checkpoint.stderr}",
+            errors,
+        )
+        # A real phase receipt, built the same fixture way every other
+        # end-to-end validator in this file builds one, now that nested
+        # state matches what closeout is about to certify.
+        write_fixture_closeout_receipt(repo, phase="phase-one")
+        checkpointed_result = run_closeout_persist()
+        check(
+            checkpointed_result.returncode == 0,
+            "closeout --persist must succeed once nested state is "
+            f"checkpointed: exit={checkpointed_result.returncode} "
+            f"stderr={checkpointed_result.stderr!r}",
+            errors,
+        )
+        check(
+            closeout_path.is_file(),
+            "a successful closeout --persist must write a receipt",
+            errors,
+        )
+        if closeout_path.is_file():
+            persisted = json.loads(read(closeout_path))
+            check(
+                persisted.get("status") == "PASS",
+                f"the checkpointed closeout receipt must pass: {persisted.get('status')}",
+                errors,
+            )
+
+        # 3. The completion commit succeeds and the post-commit transition
+        # runs for a single-phase big plan.
+        completion = git(repo, "commit", "-m", "phase one: complete")
+        check(
+            completion.returncode == 0,
+            f"phase-one completion commit must succeed: {completion.stdout}{completion.stderr}",
+            errors,
+        )
+        check(
+            "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
+            "the post-commit transition must mark a single-phase big plan complete",
+            errors,
+        )
+
+        # 4. The push to the local bare remote succeeds - the assertion
+        # that fails today without this phase's fix.
+        push_result = git(repo, "push", "origin", "foo_implementation")
+        check(
+            push_result.returncode == 0,
+            "a single-phase big plan's terminal commit must push: "
+            f"{push_result.stdout}{push_result.stderr}",
+            errors,
+        )
+
+        # Negative: a receipt whose recorded big_plan_digest matches neither
+        # the nested HEAD blob nor the index is still rejected - the fix is
+        # not a blanket allowance.
+        if closeout_path.is_file():
+            tampered = json.loads(read(closeout_path))
+            tampered["metadata"]["control_plane_provenance"]["big_plan_digest"] = (
+                "0" * 64
+            )
+            closeout_path.write_text(json.dumps(tampered), encoding="utf-8")
+            tampered_push = run_hook(
+                lifecycle_script(repo, "enforce-pr-gate.sh"),
+                {"tool_name": "Bash", "tool_input": {"command": "git push"}},
+                "github-copilot",
+                cwd=repo,
+            )
+            check(
+                '"permissionDecision":"deny"' in tampered_push[1],
+                "a closeout receipt whose big_plan_digest matches neither "
+                "the nested HEAD blob nor the index must still be rejected: "
+                f"{tampered_push[1]}",
+                errors,
+            )
+
+
 def validate_generated_scripts(errors: list[str]) -> None:
     python_scripts = sorted(DIST_ROOT.rglob("*.py"))
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -10793,6 +11017,7 @@ def main() -> int:
         validate_typo_bypass_path_restriction(errors)
         validate_end_to_end_receipt_chain_lifecycle(errors)
         validate_completed_phase_stale_receipt_rejection(errors)
+        validate_single_phase_big_plan_terminal_publication(errors)
         validate_json_report_readers(errors)
         validate_devcontainer_and_installer(errors)
         validate_state_sync(errors)

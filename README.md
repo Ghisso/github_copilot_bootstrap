@@ -245,11 +245,22 @@ runtime, in order:
 1. Run focused/fast verification and complete review.
 2. Update documentation, final small-plan state, `[LEARN]` evidence, and the
    completed session closeout log.
-3. Explicitly stage intended outer files, inspect the staged diff, and persist
+3. Checkpoint nested plan state, so the closeout receipt binds big-plan
+   bytes that Git already holds. From an agent use
+   `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`;
+   `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the
+   editor task and the lifecycle hooks.
+4. Explicitly stage intended outer files, inspect the staged diff, and persist
    the converged findings.
-4. Run `verify phase --persist`, then `verify closeout --persist`.
-5. Run the native commit and pre-push gates. Commit only after those gates
+5. Run `verify phase --persist`, then `verify closeout --persist`.
+6. Run the native commit and pre-push gates. Commit only after those gates
    pass; the orchestrator then attempts the permitted outer-repository push.
+
+Step 3's position is exact. `closeout --persist` refuses, writes nothing, and
+names the remediation when the big plan is not yet retrievable from nested
+Git, because a receipt bound to uncommitted big-plan bytes can never satisfy
+the terminal push gate. Never checkpoint after step 5: that stales the
+receipts and fails the commit closed.
 
 Evidence-only checkpoints do not make current evidence stale. Changes to the
 governing plan or runtime do make it stale and require the affected evidence

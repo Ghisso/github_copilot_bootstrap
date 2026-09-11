@@ -540,13 +540,18 @@ testpaths = ["tests"]
     )
     small_plan.write_text(original_small_plan, encoding="utf-8")
 
+    # A dirty big plan is refused before the receipt is persisted, not merely
+    # reported as a stale receipt, because a receipt bound to uncommitted
+    # big-plan bytes can never satisfy the terminal push gate. That earlier
+    # refusal exits 2; the source and small-plan cases above still fail the
+    # receipt itself and exit 1.
     original_big_plan = big_plan.read_text(encoding="utf-8")
     big_plan.write_text(original_big_plan + "\n# changed\n", encoding="utf-8")
     assert (
         _run_consumer_verifier(
             consumer, "closeout", "--documentation-na", "fixture"
         ).returncode
-        == 1
+        == 2
     )
     big_plan.write_text(original_big_plan, encoding="utf-8")
 
