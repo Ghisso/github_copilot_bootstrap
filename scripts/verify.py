@@ -769,6 +769,36 @@ def is_relevant_nested_path(
     )
 
 
+def nested_state_repository(root: Path) -> bool:
+    """Return whether ``.claude`` is genuinely its own Git repository.
+
+    ``nested_git_head`` cannot answer this: ``git -C .claude rev-parse HEAD``
+    walks *up* the directory tree when ``.claude`` has no ``.git`` of its own,
+    so it resolves to the outer repository's HEAD instead of failing. A
+    consumer whose ``.claude`` is a plain tracked directory - the documented
+    ``migrate-from-hf`` state - must not be treated as having nested state.
+    """
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return False
+    return (nested / ".git").exists()
+
+
+def plan_bytes_matching_digest(
+    root: Path, revision: str, relative: str, recorded_digest: object
+) -> bytes | None:
+    """Return a revision's plan bytes only when they hash to ``recorded_digest``.
+
+    This is the one comparison the terminal publication contract turns on, so
+    both the push predicate and the persist-time precondition derive it here
+    rather than repeating it.
+    """
+    source = nested_revision_file(root, revision, relative)
+    if source is None or hashlib.sha256(source).hexdigest() != recorded_digest:
+        return None
+    return source
+
+
 def nested_git_head(root: Path) -> str:
     """Return the nested AI-state HEAD only when it is available."""
     nested = root / ".claude"
@@ -1280,12 +1310,12 @@ def has_only_checkpointed_terminal_big_plan_change(
     recorded_head = recorded.get("nested_head")
     if not isinstance(recorded_head, str):
         return False
-    source = nested_revision_file(root, recorded_head, relative)
+    source = plan_bytes_matching_digest(
+        root, recorded_head, relative, recorded.get("big_plan_digest")
+    )
     indexed = indexed_nested_file(root, relative)
     plan = root / ".claude" / relative
     if source is None or indexed is None or digest_file(plan) == "":
-        return False
-    if hashlib.sha256(source).hexdigest() != recorded.get("big_plan_digest"):
         return False
     expected = terminal_big_plan_bytes(source, phase)
     if expected is None or indexed != expected or plan.read_bytes() != expected:
@@ -2561,14 +2591,20 @@ def unpublishable_closeout_reason(
     destroy the prior valid receipt. Mirrors
     ``missing_documentation_na_reason``'s persist-time precondition shape.
     Skips when nested provenance is unavailable (no big plan bound to this
-    branch, or ``.claude`` is not a Git repository), matching the existing
-    provenance-unavailable path for a consumer without nested state.
+    branch, or ``.claude`` is not its own Git repository), matching the
+    existing provenance-unavailable path for a consumer without nested state.
+    That check goes through ``nested_state_repository`` rather than
+    ``nested_git_head``, because the latter walks up to the outer repository's
+    HEAD when ``.claude`` has no ``.git``, which would refuse every closeout
+    for a consumer whose ``.claude`` is a plain tracked directory.
     """
     branch = metadata.get("branch")
     if not isinstance(branch, str):
         return None
     big_plan = active_big_plan_path(root, branch)
     if big_plan is None:
+        return None
+    if not nested_state_repository(root):
         return None
     nested_head = nested_git_head(root)
     if not nested_head:
@@ -2577,9 +2613,11 @@ def unpublishable_closeout_reason(
     if not isinstance(provenance, dict):
         return None
     slug = branch.removesuffix("_implementation")
-    source = nested_revision_file(root, nested_head, f"plans/{slug}.md")
-    if source is not None and hashlib.sha256(source).hexdigest() == provenance.get(
-        "big_plan_digest"
+    if (
+        plan_bytes_matching_digest(
+            root, nested_head, f"plans/{slug}.md", provenance.get("big_plan_digest")
+        )
+        is not None
     ):
         return None
     return (
