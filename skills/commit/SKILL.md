@@ -91,7 +91,7 @@ as a durable remote backup; it remains unfinished, keeps the big plan
 PR-ready. The exact completion commit of the phase immediately before a
 now-current `in-progress` phase publishes only when its receipt and findings
 directly certify that one commit, so a later in-progress commit cannot publish
-under that authority. Final closeout requires every phase to be terminal:
+under that authority. For final closeout, every phase must be terminal:
 `complete` or fully evidenced as `cancelled`, with at least one completed phase
 and one commit per completed phase.
 
