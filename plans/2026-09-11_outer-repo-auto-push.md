@@ -1,13 +1,13 @@
 ---
 name: 2026-09-11_outer-repo-auto-push
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: 2026-09-11_outer-repo-auto-push_implementation
 started_at: 2026-09-11T01:24:27Z
 phases:
   - 2026-09-11_phase-A-outer-repo-auto-push
-current_phase: 2026-09-11_phase-A-outer-repo-auto-push
+current_phase: 
 ---
 
 # Big Plan: Outer-repository automatic push
@@ -50,7 +50,7 @@ their existing rules.
 
 ## Phases
 
-- [ ] `2026-09-11_phase-A-outer-repo-auto-push` — add the publication contract,
+- [x] `2026-09-11_phase-A-outer-repo-auto-push` — add the publication contract,
   generated guidance, gate coverage, and documentation.
 
 ## Verification

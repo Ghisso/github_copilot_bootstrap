@@ -843,3 +843,22 @@
   automatically safe. Confirm per site that zero iterations is correct, and
   that a fail-closed backstop actually reaches a code path that denies rather
   than merely raising.
+- [LEARN:review] When two gate functions enforce the same security invariant
+  through copied loops, the duplication is the defect, not a style preference.
+  The two publication paths differed only in their accumulator, so a later fix
+  to one would have silently diverged the paused-checkpoint and completed-phase
+  gates while every test still passed.
+- [LEARN:testing] A direct-parent check needs a merge-commit case before it is
+  load-bearing. Loosening a parent-count guard from `== 2` to `>= 2` left the
+  original linear-history test passing, and the fixture must put the certified
+  commit in the merge's *first* parent position so a naive parent-count fix
+  cannot satisfy it either.
+- [LEARN:quality] Tighten a test assertion to the mechanism the code actually
+  reports, not to the identifier you expect to see. Pinning a tamper denial to
+  the phase name failed because the real message names the tampered artifact;
+  reading the produced message is the fix, not guessing at it.
+- [LEARN:workflow] Guidance that is both generated and hand-maintained drifts
+  in the hand-maintained copy. Generated root guidance carried a corrected
+  bullet while this repository's own root `CLAUDE.md` stayed stale, because
+  only freshly rendered guidance is gated. Shared skills have a drift gate for
+  this class of problem; authoring-repo root guidance has no equivalent.
