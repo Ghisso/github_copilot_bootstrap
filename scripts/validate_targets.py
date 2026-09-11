@@ -17,6 +17,7 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, TypedDict, Unpack
 
 from check_runtime import runtime_drift_errors
@@ -175,6 +176,22 @@ ORCHESTRATOR_PROMPT_REQUIRED_FRAGMENTS = (
     "Reuse or continue an existing role when the follow-up is in the same role and phase and its context remains valid",
     "Do not reuse a coder as reviewer merely to save usage",
 )
+ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS = (
+    "the evidence packet you give `coder` must name existing builders and scoped entry points to inspect first",
+    "approve it yourself rather than granting a generic rebuild allowance",
+    "`reviewer` has no `execute` capability and cannot produce this evidence itself",
+    "full-file reads alone are not equivalent to diff review",
+)
+CODER_PROMPT_REQUIRED_FRAGMENTS = (
+    "treat a full rebuild as a material deviation",
+    "report that gap and the evidence for it to the orchestrator before implementing",
+)
+REVIEWER_PROMPT_REQUIRED_FRAGMENTS = (
+    "the changed paths plus either the scoped diff, a repository artifact containing it",
+    "You have no `execute` capability, so you cannot produce this evidence yourself",
+    "full-file reads alone are not equivalent to diff review",
+    "diff-of-diffs isolating only what changed since the previous round",
+)
 ORCHESTRATOR_LIFECYCLE_REQUIRED = (
     "PRE-FLIGHT, BRANCH, PLAN WHEN NEEDED, IMPLEMENT, VERIFY, REVIEW, CLOSEOUT, COMMIT",
     "IMPLEMENT/VERIFY/REVIEW/CLOSEOUT - repeat until verification and review pass",
@@ -229,6 +246,28 @@ CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_upgrade",
     "ctx_purge",
     "ctx_insight",
+)
+# Recommendation-phrasing scan for CONTEXT_MODE_BLOCKED_TOOLS in prose: broader
+# than the four literal verbs it replaced, tolerant of backtick-wrapped tool
+# names, and negation-aware so an explicit prohibition ("do not use
+# ctx_execute") does not itself count as a violation.
+TOOL_ROUTING_RECOMMENDATION_VERBS = (
+    "use",
+    "call",
+    "run",
+    "recommend",
+    "invoke",
+    "leverage",
+    "try",
+)
+TOOL_ROUTING_NEGATION_PHRASES = (
+    "do not",
+    "does not",
+    "never",
+    "don't",
+    "doesn't",
+    "must not",
+    "avoid",
 )
 REPORTING_REMINDER_MAX_BYTES = 200
 REPORTING_REMINDER_TEXT = (
@@ -591,7 +630,7 @@ def root_guidance_errors(name: str, text: str) -> list[str]:
         "<plan_name>_implementation",
         ".claude/skills/ponytail/SKILL.md",
         "`verify phase` reports PASS",
-        "CLOSEOUT updates required documentation, persists findings",
+        "CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings",
         REPORTING_POLICY_POINTER,
         "Control-plane files include",
         "Keep hook guardrails enabled",
@@ -813,6 +852,11 @@ def planner_supervision_contract_errors(
             errors.append(
                 f"orchestrator prompt is missing planner-supervision contract: {fragment}"
             )
+    for fragment in ORCHESTRATOR_DELEGATION_EVIDENCE_REQUIRED_FRAGMENTS:
+        if fragment not in orchestrator_text:
+            errors.append(
+                f"orchestrator prompt is missing delegation-evidence contract: {fragment}"
+            )
     for fragment in ORCHESTRATOR_LIFECYCLE_REQUIRED:
         if fragment not in orchestrator_prompt:
             errors.append(f"orchestrator prompt is missing lifecycle step: {fragment}")
@@ -822,6 +866,67 @@ def planner_supervision_contract_errors(
                 f"orchestrator prompt contains stale lifecycle step: {fragment}"
             )
     return errors
+
+
+def coder_incremental_intent_contract_errors(coder_prompt: str) -> list[str]:
+    """Return missing full-rebuild-as-material-deviation clauses."""
+    return [
+        f"coder prompt is missing incremental-intent contract: {fragment}"
+        for fragment in CODER_PROMPT_REQUIRED_FRAGMENTS
+        if fragment not in coder_prompt
+    ]
+
+
+TOOL_ROUTING_SENTENCE_SPLIT_PATTERN = re.compile(r"[.;:!?]")
+
+
+def tool_routing_recommendation_errors(
+    text: str, blocked_tools: Sequence[str] = CONTEXT_MODE_BLOCKED_TOOLS
+) -> list[str]:
+    """Return violations where prose appears to recommend a filtered Context
+    Mode tool: a recommendation verb followed, within a short word gap, by a
+    blocked tool name. Backtick formatting is stripped before matching so
+    `recommend \\`ctx_execute\\`` is caught the same as unformatted prose. Text
+    is scanned one sentence at a time (split on `.;:!?`) so an unrelated
+    neighboring sentence can never join the verb and the tool name, and a
+    negation phrase ("do not", "never", ...) anywhere earlier in the same
+    sentence — not just immediately before the verb — exempts a genuine
+    prohibition from counting as a violation."""
+    normalized = text.replace("`", "").lower()
+    verb_pattern = "|".join(
+        re.escape(verb) for verb in TOOL_ROUTING_RECOMMENDATION_VERBS
+    )
+    negation_pattern = re.compile(
+        r"\b(?:"
+        + "|".join(re.escape(n) for n in TOOL_ROUTING_NEGATION_PHRASES)
+        + r")\b"
+    )
+    errors: list[str] = []
+    for tool in blocked_tools:
+        # `[,]?` tolerates punctuation glued directly to the verb (e.g. "use,
+        # ctx_execute") without requiring immediate whitespace.
+        pattern = re.compile(
+            rf"\b(?:{verb_pattern})\b[,]?(?:\s+\S+){{0,3}}\s+{re.escape(tool)}\b"
+        )
+        for sentence in TOOL_ROUTING_SENTENCE_SPLIT_PATTERN.split(normalized):
+            for match in pattern.finditer(sentence):
+                preceding = sentence[: match.start()]
+                if negation_pattern.search(preceding):
+                    continue
+                errors.append(
+                    f"tool-routing instructions must not recommend filtered tool {tool}: "
+                    f"{match.group(0)!r}"
+                )
+    return errors
+
+
+def reviewer_diff_evidence_contract_errors(reviewer_prompt: str) -> list[str]:
+    """Return missing diff-scoped evidence clauses in the reviewer's input contract."""
+    return [
+        f"reviewer prompt is missing diff-evidence contract: {fragment}"
+        for fragment in REVIEWER_PROMPT_REQUIRED_FRAGMENTS
+        if fragment not in reviewer_prompt
+    ]
 
 
 def task_lane_for(**inputs: Unpack[TaskLaneInputs]) -> str:
@@ -1259,14 +1364,13 @@ def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
         "matcher": "Bash",
         "hooks": [
             handler("record-branch-state.sh", target),
-            handler("record-commit-closeout.sh", target),
             handler("context-mode-dispatch.sh", target, "posttooluse"),
             handler("reporting-reminder.sh", "late-report", target),
         ],
     }
     if post_groups != [expected_post]:
         errors.append(
-            f"{target} Bash PostToolUse must exactly retain handlers and append one late reminder"
+            f"{target} Bash PostToolUse must leave commit closeout to native Git and append one late reminder"
         )
     return errors
 
@@ -2080,10 +2184,20 @@ def validate_agents(errors: list[str]) -> None:
         errors.append(str(error))
         return
     planner_prompt = read(REPO_ROOT / "shared" / "agents" / "planner" / "prompt.md")
+    orchestrator_prompt = read(
+        REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"
+    )
     errors.extend(
-        planner_supervision_contract_errors(
-            planner_prompt,
-            read(REPO_ROOT / "shared" / "agents" / "orchestrator" / "prompt.md"),
+        planner_supervision_contract_errors(planner_prompt, orchestrator_prompt)
+    )
+    errors.extend(
+        coder_incremental_intent_contract_errors(
+            read(REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md")
+        )
+    )
+    errors.extend(
+        reviewer_diff_evidence_contract_errors(
+            read(REPO_ROOT / "shared" / "agents" / "reviewer" / "prompt.md")
         )
     )
     for prompt_path in sorted((REPO_ROOT / "shared" / "agents").glob("*/prompt.md")):
@@ -2180,6 +2294,15 @@ def validate_agents(errors: list[str]) -> None:
             check(
                 not missing,
                 f"orchestrator capabilities must cover its prompt-declared actions; missing {sorted(missing)}",
+                errors,
+            )
+        if agent_id == "reviewer":
+            # Settled decision: the reviewer stays read/search only and relies
+            # on the orchestrator for diff-scoped evidence instead of gaining
+            # generic shell access.
+            check(
+                "execute" not in capabilities,
+                "reviewer must not gain execute capability; it relies on orchestrator-supplied diff evidence instead",
                 errors,
             )
 
@@ -3042,8 +3165,15 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
     post_commit = git_hook_root / "post-commit"
     if post_commit.exists():
         post_commit_text = read(post_commit)
+        record_index = post_commit_text.find('"$RECORD_CLOSEOUT"')
+        sync_index = post_commit_text.find('"$STATE_SYNC" push')
         check(
-            '"$STATE_SYNC" push' in post_commit_text,
+            record_index >= 0 and sync_index > record_index,
+            "post-commit git hook must record commit closeout before AI-state push",
+            errors,
+        )
+        check(
+            sync_index >= 0,
             "post-commit git hook must push AI state via state-sync.sh",
             errors,
         )
@@ -3456,6 +3586,17 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "deny",
             "openai-codex",
         ),
+        (
+            # `.agents/hooks.json` is not in protect-files.py's HOOK_CONFIGS,
+            # but the shared `.claude/hooks/scripts/` tree every client
+            # bridges into is protected regardless of which native config
+            # names it, so Google Antigravity's copy is exercised the same
+            # way as the other three clients.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".claude/hooks/scripts/guard.sh",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
         patch = f"*** Begin Patch\n*** Update File: {protected_path}\n@@\n x\n*** End Patch\n"
@@ -3477,6 +3618,7 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         ("github-copilot", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
         ("claude-code", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
         ("openai-codex", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("google-antigravity", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
     ):
         returncode, stdout, stderr = run_hook(
             hook_root / "protect-files.sh",
@@ -3683,6 +3825,12 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "deny",
             "openai-codex",
         ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            "cat > .claude/hooks/scripts/guard.sh",
+            "deny",
+            "google-antigravity",
+        ),
     )
     for script, command, expected_decision, target_id in bash_hook_cases:
         returncode, stdout, stderr = run_hook(
@@ -3700,6 +3848,70 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             f"hook guardrail did not protect Bash hook edit with {expected_decision}: {script}",
             errors,
         )
+
+    # Phase D: the recursive heredoc/process-substitution classifier lives in
+    # one shared script file, but every native client bridges into it with
+    # its own target id, so each generated copy is exercised with the same
+    # positive (must allow) and negative (must deny) corpus. Protected-path
+    # categories and each target's existing hook-file ask/deny behavior are
+    # unchanged by this corpus - the earlier cases in this function already
+    # cover that; these only exercise heredoc/<( )> parsing.
+    heredoc_and_procsub_corpus: tuple[tuple[str, str | None], ...] = (
+        # Positive: safe read-only process substitution and data heredocs.
+        ("diff <(cat .env) <(cat CLAUDE.md)", None),
+        (
+            "cat <<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF",
+            None,
+        ),
+        (
+            "git commit -F - <<'EOF'\n"
+            'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\nEOF',
+            None,
+        ),
+        # Negative controls: a mutator inside process substitution, a shell
+        # heredoc that writes a protected file, an interpreter heredoc using
+        # an opaque write call, and a heredoc redirected to a protected
+        # target. `.env` (not a hook file) is "deny" on every target, so
+        # this corpus stays independent of each target's own ask/deny
+        # hook-file wording, which the hook_cases/bash_hook_cases tables
+        # above already cover.
+        ("diff <(touch .env) <(cat CLAUDE.md)", "deny"),
+        ("bash <<'EOF'\ntouch .env\nEOF", "deny"),
+        ('python3 <<\'PY\'\nopen(".env", "w").write("x")\nPY', "deny"),
+        ("cat <<'EOF' > .env\necho hi\nEOF", "deny"),
+    )
+    for target_id, hook_root in (
+        ("github-copilot", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("claude-code", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("openai-codex", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+        ("google-antigravity", TARGET_ROOT / ".claude" / "hooks" / "scripts"),
+    ):
+        for heredoc_command, heredoc_decision in heredoc_and_procsub_corpus:
+            returncode, stdout, stderr = run_hook(
+                hook_root / "protect-files.sh",
+                {"tool_name": "Bash", "tool_input": {"command": heredoc_command}},
+                target_id,
+            )
+            check(
+                returncode == 0,
+                f"heredoc/process-substitution guardrail failed to run for "
+                f"{heredoc_command!r}: {hook_root}: {stderr}",
+                errors,
+            )
+            if heredoc_decision is None:
+                check(
+                    stdout == "",
+                    f"heredoc/process-substitution guardrail wrongly denied "
+                    f"a safe command {heredoc_command!r}: {hook_root}: {stdout}",
+                    errors,
+                )
+            else:
+                check(
+                    f'"permissionDecision":"{heredoc_decision}"' in stdout,
+                    f"heredoc/process-substitution guardrail did not "
+                    f"{heredoc_decision} {heredoc_command!r}: {hook_root}",
+                    errors,
+                )
 
     validate_lifecycle_hook_guardrails(errors)
     validate_cancelled_phase_gate_cases(errors)
@@ -3971,6 +4183,7 @@ def lifecycle_script(repo: Path, name: str) -> Path:
 def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
+        install_git_hooks(repo, ("post-commit",))
         write_big_plan(repo)
         write_small_plan(repo)
 
@@ -4336,38 +4549,9 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
         )
         git(repo, "add", ".")
         git(repo, "commit", "-m", "phase 1 closeout")
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {"tool_name": "Bash", "tool_input": {"command": "git commit"}},
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0,
-            f"record commit no-subject case failed to run: {stderr}",
-            errors,
-        )
-        check(
-            "status: complete" not in read(repo / ".claude" / "plans" / "foo.md"),
-            "record commit closeout must not complete big plan without commit correlation",
-            errors,
-        )
-        # R-HOOKS-05: a whitespace-variant subject still correlates with HEAD.
-        returncode, stdout, stderr = run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase 1   closeout"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
-        check(
-            returncode == 0, f"record commit closeout failed to run: {stderr}", errors
-        )
         check(
             "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
-            "record commit closeout must complete final big plan via normalized subject match",
+            "post-commit must complete the final big plan from Git HEAD",
             errors,
         )
 
@@ -4894,6 +5078,7 @@ def validate_cancelled_phase_gate_cases(errors: list[str]) -> None:
     """Exercise the cancellation-specific lifecycle gate contract."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
+        install_git_hooks(repo, ("post-commit",))
         git(repo, "checkout", "-b", "foo_implementation")
         write(repo / "phase-work.txt", "certified work\n")
         git(repo, "add", "phase-work.txt")
@@ -5325,18 +5510,10 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
         )
 
         def run_closeout() -> None:
-            returncode, _, stderr = run_hook(
-                lifecycle_script(repo, "record-commit-closeout.sh"),
-                {
-                    "tool_name": "Bash",
-                    "tool_input": {"command": 'git commit -m "phase work"'},
-                },
-                "github-copilot",
-                cwd=repo,
-            )
+            result = git(repo, "commit", "--allow-empty", "-m", "phase work")
             check(
-                returncode == 0,
-                f"cancelled closeout fixture failed: {stderr}",
+                result.returncode == 0,
+                f"cancelled closeout fixture failed: {result.stderr}",
                 errors,
             )
 
@@ -5427,6 +5604,7 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             phases=tail_phases,
             current_phase="phase-one",
         )
+        write_small_plan(repo, status="complete", phase="phase-one")
         write_small_plan(repo, status="cancelled", phase="phase-two")
         run_closeout()
         big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
@@ -5441,7 +5619,7 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
             repo,
             status="cancelled",
             phases=tail_phases,
-            current_phase="phase-one",
+            current_phase="",
         )
         run_closeout()
         big_plan_text = read(repo / ".claude" / "plans" / "foo.md")
@@ -5499,10 +5677,15 @@ if [[ "${{#failures[@]}}" -gt 0 ]]; then printf '%s\\n' "${{failures[@]}}"; fi
         )
 
 
-def install_git_hooks(repo: Path) -> None:
+def install_git_hooks(
+    repo: Path, hook_names: tuple[str, ...] = REQUIRED_GIT_HOOKS
+) -> None:
     git_hook_root = repo / ".claude" / "hooks" / "git-hooks"
-    shutil.copytree(TARGET_ROOT / ".claude" / "hooks" / "git-hooks", git_hook_root)
-    for hook in git_hook_root.glob("*"):
+    git_hook_root.mkdir(parents=True)
+    source_root = TARGET_ROOT / ".claude" / "hooks" / "git-hooks"
+    for hook_name in hook_names:
+        hook = git_hook_root / hook_name
+        shutil.copy2(source_root / hook_name, hook)
         hook.chmod(hook.stat().st_mode | 0o111)
     git(repo, "config", "core.hooksPath", ".claude/hooks/git-hooks")
 
@@ -5513,7 +5696,7 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
     evasion paths this deterministic layer exists to close."""
     with tempfile.TemporaryDirectory() as temp_dir:
         repo = setup_hook_repo(Path(temp_dir))
-        install_git_hooks(repo)
+        install_git_hooks(repo, ("commit-msg",))
         write_big_plan(repo)
         git(repo, "checkout", "-b", "foo_implementation")
         run_hook(
@@ -6014,7 +6197,7 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
         )
 
         repo = setup_hook_repo(temp_root)
-        install_git_hooks(repo)
+        install_git_hooks(repo, ("commit-msg", "pre-push"))
         git(repo, "remote", "add", "origin", str(remote))
         initial_push = git(repo, "push", "origin", "dev")
         check(
@@ -6517,19 +6700,10 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             f"through the real commit-msg hook: {completion_one.stdout}{completion_one.stderr}",
             errors,
         )
-        run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase one: complete"'},
-            },
-            "github-copilot",
-            cwd=repo,
-        )
         check(
             "current_phase: phase-two" in read(repo / ".claude" / "plans" / "foo.md"),
             "phase-one completion must advance current_phase to phase-two through "
-            "the real commit-msg + record-commit-closeout PostToolUse wiring",
+            "the real commit-msg + post-commit hook wiring",
             errors,
         )
 
@@ -6544,15 +6718,6 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             "phase-two completion commit must succeed through the real commit-msg "
             f"hook: {completion_two.stdout}{completion_two.stderr}",
             errors,
-        )
-        run_hook(
-            lifecycle_script(repo, "record-commit-closeout.sh"),
-            {
-                "tool_name": "Bash",
-                "tool_input": {"command": 'git commit -m "phase two: complete"'},
-            },
-            "github-copilot",
-            cwd=repo,
         )
         check(
             "status: complete" in read(repo / ".claude" / "plans" / "foo.md"),
@@ -6842,6 +7007,8 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
         "context-status": (
             "planning/in-progress/complete/cancelled",
             "in-progress/paused/complete/cancelled",
+            "never select one as the active small plan",
+            "pending phases",
             "frontmatter",
             "type: big-plan",
             "type: small-plan",
@@ -7269,6 +7436,16 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         "MCP tools",
         errors,
     )
+    check(
+        "agents use only tools their own runtime actually exposes as callable"
+        in tool_routing_text
+        and "does not claim precedence over host-injected system or developer context"
+        in tool_routing_text,
+        "tool-routing instructions must state that agents use only actually "
+        "callable tools and must not claim precedence over host-injected context",
+        errors,
+    )
+    errors.extend(tool_routing_recommendation_errors(tool_routing_text))
 
     validate_support_files(errors)
     validate_generated_hygiene(errors)
@@ -7913,19 +8090,20 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             'git -C "$REPO_ROOT" config core.hooksPath'
         )
         pull_index = post_start_text.find('"$STATE_SYNC" pull')
-        restore_index = post_start_text.find('"$RESTORE_ROOT_ADAPTERS"')
         check(setup_index != -1, "post-start must run state-sync.sh setup", errors)
         check(
             hooks_path_index != -1, "post-start must configure core.hooksPath", errors
         )
         check(pull_index != -1, "post-start must run state-sync.sh pull", errors)
         check(
-            restore_index != -1, "post-start must run restore-root-adapters.sh", errors
+            "RESTORE_ROOT_ADAPTERS" not in post_start_text,
+            "post-start must let state-sync.sh pull own safe root-adapter restoration",
+            errors,
         )
         check(
-            -1 not in (setup_index, hooks_path_index, pull_index, restore_index)
-            and setup_index < hooks_path_index < pull_index < restore_index,
-            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull, then restore-root-adapters.sh, in that order",
+            -1 not in (setup_index, hooks_path_index, pull_index)
+            and setup_index < hooks_path_index < pull_index,
+            "post-start must run: state-sync.sh setup, then set core.hooksPath, then state-sync.sh pull",
             errors,
         )
 
@@ -9085,10 +9263,19 @@ def validate_state_sync(errors: list[str]) -> None:
             "[state-sync] setup must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
             errors,
         )
+        # Remove the file `setup` just restored so the assertion below is
+        # independently probative of `pull`'s own restoration (finish_pull),
+        # rather than passing unchanged even if `pull` never restored anything.
+        (machine_b / "CLAUDE.md").unlink()
         pull_b = run_state_sync(machine_b, "pull", env_b)
         check(
             pull_b.returncode == 0,
             f"[state-sync] machine B setup+pull failed: {pull_b.stderr}",
+            errors,
+        )
+        check(
+            (machine_b / "CLAUDE.md").is_file(),
+            "[state-sync] successful pull must restore root adapters (CLAUDE.md) from bootstrap-root/ on a fresh clone",
             errors,
         )
 

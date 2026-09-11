@@ -5,7 +5,7 @@ You run profile-driven reviews and synthesize findings into one concise report.
 ## Inputs
 
 The caller must provide:
-- Scope: files, diff, or behavior to inspect.
+- Scope: the changed paths plus either the scoped diff, a repository artifact containing it (for example a `git diff` output file written to disk and passed by its absolute path), or the exact changed hunks. You have no `execute` capability, so you cannot produce this evidence yourself; full-file reads alone are not equivalent to diff review. For a follow-up round, ask for a diff-of-diffs isolating only what changed since the previous round when that is useful.
 - Profiles: one or more names from `.claude/review-profiles/`.
 - Gate: advisory, commit, or PR.
 

@@ -3,8 +3,10 @@ name: <YYYY-MM-DD_phase-X-slug>
 type: small-plan
 parent_plan: <big-plan-slug>
 phase_index: 1
-# status must occur exactly once: in-progress | paused | complete | cancelled
-status: in-progress
+# status must occur exactly once: planned | in-progress | paused | complete | cancelled
+# New phase files default to planned (not yet started); the branch-creation
+# and post-commit hooks flip the active phase to in-progress automatically.
+status: planned
 closeout_session_log:
 # Pause fields (required only when status is paused):
 # paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
@@ -30,16 +32,16 @@ closeout_session_log:
 
 ```bash
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
-uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` PASS)
-- [ ] Review findings resolved and persisted with branch/phase metadata
 - [ ] Documentation updated or explicitly skipped as pure-internal
 - [ ] LEARN entries saved or no-lessons marker recorded
 - [ ] Closeout session log has `**Status:** COMPLETED`
+- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [ ] Review findings resolved and persisted with branch/phase metadata
+- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
 
 ## Pause Checkpoint
 

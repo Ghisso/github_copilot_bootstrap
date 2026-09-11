@@ -565,6 +565,20 @@ testpaths = ["tests"]
         consumer, "closeout", "--persist", "--documentation-na", "fixture"
     )
     assert closeout.returncode == 0, closeout.stdout + closeout.stderr
+    nested_closeout = _git(
+        consumer / ".claude",
+        "add",
+        "quality_reports/verification-closeout-phase-one.json",
+    )
+    assert nested_closeout.returncode == 0, nested_closeout.stderr
+    nested_closeout = subprocess.run(
+        ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "closeout"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert nested_closeout.returncode == 0, nested_closeout.stderr
 
     source.write_text('VALUE: str = "post-closeout"\n', encoding="utf-8")
     assert _git(consumer, "add", "src/example_consumer/__init__.py").returncode == 0
@@ -599,14 +613,18 @@ testpaths = ["tests"]
         assert _native_commit(consumer).returncode != 0
         artifact.write_text(original_artifact, encoding="utf-8")
 
+    pre_transition_nested_head = _git(
+        consumer / ".claude", "rev-parse", "HEAD"
+    ).stdout.strip()
+    assert pre_transition_nested_head
     committed = _native_commit(consumer)
     assert committed.returncode == 0, committed.stdout + committed.stderr
-
-    big_plan.write_text(
-        big_plan.read_text(encoding="utf-8")
-        .replace("status: in-progress", "status: complete")
-        .replace("current_phase: phase-one", "current_phase: "),
-        encoding="utf-8",
+    terminal_big_plan = big_plan.read_bytes()
+    assert b"status: complete" in terminal_big_plan
+    assert b"current_phase: \n" in terminal_big_plan
+    assert (
+        _git(consumer / ".claude", "status", "--porcelain").stdout
+        == " M session_logs/hooks-errors.log\n"
     )
     remote = tmp_path / "remote.git"
     assert (
@@ -626,24 +644,38 @@ testpaths = ["tests"]
         encoding="utf-8",
     )
 
+    detached = _git(
+        consumer / ".claude", "checkout", "--detach", pre_transition_nested_head
+    )
+    assert detached.returncode == 0, detached.stderr
+    assert (
+        _git(consumer / ".claude", "rev-parse", "HEAD").stdout.strip()
+        == pre_transition_nested_head
+    )
+    big_plan.write_bytes(terminal_big_plan)
+    assert (
+        _git(consumer / ".claude", "diff", "--name-only", "--", "plans").stdout
+        == "plans/consumer-lifecycle.md\n"
+    )
+    assert (
+        _git(
+            consumer / ".claude", "diff", "--cached", "--name-only", "--", "plans"
+        ).stdout
+        == ""
+    )
+    assert _git(consumer / ".claude", "diff", "--quiet", "--", "plans").returncode == 1
+
     immediate_push = _git(
         consumer, "push", "origin", "consumer-lifecycle_implementation"
     )
     assert immediate_push.returncode == 0, immediate_push.stdout + immediate_push.stderr
-
-    checkpoint = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(consumer / ".claude"),
-            "add",
-            "plans/consumer-lifecycle.md",
-        ],
-        env=_actor_env(),
-        text=True,
-        capture_output=True,
-        check=False,
+    assert (
+        _git(consumer / ".claude", "rev-parse", "HEAD").stdout.strip()
+        == pre_transition_nested_head
     )
+    assert _git(consumer / ".claude", "diff", "--quiet", "--", "plans").returncode == 1
+
+    checkpoint = _git(consumer / ".claude", "add", "plans/consumer-lifecycle.md")
     assert checkpoint.returncode == 0, checkpoint.stderr
     checkpoint = subprocess.run(
         ["git", "-C", str(consumer / ".claude"), "commit", "-qm", "checkpoint"],
@@ -653,6 +685,21 @@ testpaths = ["tests"]
         check=False,
     )
     assert checkpoint.returncode == 0, checkpoint.stderr
+    checkpointed_nested_head = _git(
+        consumer / ".claude", "rev-parse", "HEAD"
+    ).stdout.strip()
+    assert checkpointed_nested_head != pre_transition_nested_head
+    assert _git(consumer / ".claude", "diff", "--quiet", "--", "plans").returncode == 0
+    assert (
+        _git(
+            consumer / ".claude", "diff", "--cached", "--quiet", "--", "plans"
+        ).returncode
+        == 0
+    )
+    assert (
+        _git(consumer / ".claude", "status", "--porcelain").stdout
+        == " M session_logs/hooks-errors.log\n"
+    )
 
     checkpoint_remote = tmp_path / "checkpoint.git"
     assert (
@@ -1000,6 +1047,69 @@ def test_committed_to_local_copilot_migration_refreshes_owned_files(
     assert not (target / ".claude" / "bootstrap-root" / obsolete_relative).exists()
     manifest = (target / ".claude" / "bootstrap-ownership.env").read_text()
     assert "BOOTSTRAP_COMMIT_COPILOT_SURFACE=0\n" in manifest
+
+
+def test_generated_session_pull_restores_ignored_adapter_after_branch_switch(
+    tmp_path: Path,
+) -> None:
+    """An initialized generated consumer restores ignored adapters after an outer switch."""
+    consumer = tmp_path / "consumer"
+    consumer.mkdir()
+    assert _git(consumer, "init", "-q").returncode == 0
+    assert _git(consumer, "config", "user.name", "Installer Test").returncode == 0
+    assert (
+        _git(consumer, "config", "user.email", "installer@example.com").returncode == 0
+    )
+    authored_guidance = consumer / "CLAUDE.md"
+    authored_guidance.write_text("project-authored guidance\n", encoding="utf-8")
+    assert _git(consumer, "add", "CLAUDE.md").returncode == 0
+    assert _git(consumer, "commit", "-qm", "author guidance").returncode == 0
+    default_branch = _git(consumer, "branch", "--show-current").stdout.strip()
+    installed = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(consumer),
+            "--source",
+            str(GENERATED),
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert installed.returncode == 0, installed.stdout + installed.stderr
+    agent_relative = Path(".github/agents/orchestrator.agent.md")
+    agent = consumer / agent_relative
+    expected = (GENERATED / agent_relative).read_bytes()
+    assert agent.read_bytes() == expected
+
+    assert _git(consumer, "checkout", "-qb", "alternate").returncode == 0
+    (consumer / "branch-switch.txt").write_text("alternate\n", encoding="utf-8")
+    assert _git(consumer, "add", "branch-switch.txt").returncode == 0
+    assert _git(consumer, "commit", "-qm", "alternate").returncode == 0
+    assert _git(consumer, "checkout", "-q", default_branch).returncode == 0
+    agent.unlink()
+    assert _git(consumer, "checkout", "-q", "alternate").returncode == 0
+
+    pulled = subprocess.run(
+        ["bash", ".claude/hooks/scripts/state-sync.sh", "pull"],
+        cwd=consumer,
+        env={**_actor_env(), "AI_STATE_LOCAL_ONLY": "1"},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert pulled.returncode == 0, pulled.stderr
+    assert agent.read_bytes() == expected
+    assert (
+        authored_guidance.read_text(encoding="utf-8") == "project-authored guidance\n"
+    )
+    assert _git(consumer / ".claude", "rev-parse", "--verify", "HEAD").returncode == 0
+    assert _git(consumer / ".claude", "status", "--porcelain").stdout == ""
 
 
 def test_installer_preserves_consumer_memory_bytes_on_refresh_and_migration(

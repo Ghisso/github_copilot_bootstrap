@@ -21,7 +21,7 @@ from typing import Any, Sequence
 # repository root, matching verify.py's own `Path.cwd()` convention.
 REPO_ROOT = Path.cwd()
 BIG_PLAN_STATUSES = {"planning", "in-progress", "complete", "cancelled"}
-SMALL_PLAN_STATUSES = {"in-progress", "paused", "complete", "cancelled"}
+SMALL_PLAN_STATUSES = {"planned", "in-progress", "paused", "complete", "cancelled"}
 CANCELLED_FIELDS = ("cancelled_at", "cancelled_reason", "cancelled_evidence")
 PAUSED_FIELDS = ("paused_at", "paused_reason", "pause_session_log")
 CANCELLED_AT_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -37,7 +37,7 @@ CANCELLED_STATUS_PATTERN = re.compile(
 )
 PAUSED_STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*[ \t]+PAUSED\b", re.MULTILINE)
 BODY_PHASE_ITEM_PATTERN = re.compile(
-    r"^- (?:\[[ xX]\] )?`(?P<phase>[^`]+)`(?:[ \t]+(?:—|--|:|-).*)?$"
+    r"^- (?:\[[ xX]\] )?`(?P<phase>[^`]+)`(?:[ \t]+(?:—|--|:|-|\().*)?$"
 )
 BODY_PHASE_HEADING_PATTERN = re.compile(
     r"^## (?:Phase|Phases|Phase Order)[ \t]*\n(?P<body>.*?)(?=^## |\Z)",

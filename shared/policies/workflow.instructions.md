@@ -58,6 +58,20 @@ unaffected scope.
 - Open a PR to `dev` only after every small plan in the big plan is complete or cancelled and only when the user explicitly asks for a PR.
 - The user performs merge/squash decisions manually in GitHub. After merge, return to `dev` and pull before starting new work.
 
+### Declaring future phases
+
+`planned` is a small-plan-only status for a phase that has not started. New
+small-plan files default to `planned` and need only the ordinary identity
+fields; they carry no pause, cancellation, or closeout evidence. Branch
+creation activates the first phase, and a completed-phase commit activates the
+next non-cancelled phase, by flipping exactly that one phase from `planned` to
+`in-progress`; every other declared phase is left untouched. An unexpected
+next-phase status (`paused`, `complete`, invalid, duplicate, missing, or
+unreadable) is never overwritten; the transition warns and leaves the phase
+machine at its current phase instead. `planned` is unfinished and blocks the
+same push/PR and completion gates as `in-progress`. Plans already installed
+with a future phase marked `in-progress` remain valid.
+
 ### Pausing a phase for a checkpoint
 
 `paused` is a small-plan-only, non-terminal status. Enter it only after an
@@ -119,11 +133,11 @@ For each small plan:
 
 1. **PLAN:** If no implementation-ready plan exists, delegate to `planner` and save the concrete small plan under `.claude/plans/`. Otherwise use the approved existing plan directly. Before each new phase, perform the material-impact check above; use one planner only for affected future work.
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
-3. **VERIFY:** The orchestrator runs `uv run python .claude/scripts/verify.py phase --format json --persist`. Route a deterministic failure to the coder with its receipt and changed scope; do not spend another model merely to repeat deterministic checks.
+3. **VERIFY:** Run focused and fast checks during implementation. Route a deterministic failure to the coder with its changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
-5. **CLOSEOUT:** In this fixed order: (a) delegate documentation applicability/update; (b) give every surviving MINOR finding an explicit `disposition` (e.g. `"accepted"`) and non-empty `reason`, then persist converged review findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (c) run `learn` or record `[LEARN] none - no new lessons this session`; (d) update the `COMPLETED` session log; then (e) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation precedes binding reports so findings remain fresh. The reviewer does not persist findings itself, and the coder cannot create final verification receipts.
-6. **FIX LOOP:** If verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
-7. **COMMIT:** On normal completion, commit the completed small plan atomically.
+5. **CLOSEOUT:** Use this fixed order: (a) update documentation, the final small-plan state, LEARN evidence, and the `COMPLETED` session log; (b) explicitly stage only intended outer-repository files and inspect `git diff --cached`; (c) give every surviving MINOR finding an explicit `disposition` (for example `"accepted"`) and non-empty `reason`, then persist converged findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (d) run `uv run python .claude/scripts/verify.py phase --format json --persist`; then (e) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation and final state precede findings so findings bind to the final code and docs. The reviewer does not persist findings itself, and the coder cannot create final verification receipts. Do not manually commit or checkpoint the nested `.claude` AI-state repository (`state-sync.sh checkpoint`/`publish`/`push`) during CLOSEOUT: leave those changes uncommitted while (c)-(e) run, then commit the outer repository. The native `post-commit` hook checkpoints and publishes nested state automatically right after. Committing nested state first changes what the receipt's `control_plane_provenance` binds to and makes the next commit fail closed with `closeout receipt governing control-plane provenance is stale`.
+6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
+7. **COMMIT:** On normal completion, commit the explicitly staged completed small plan atomically.
 
 **Conditional checkpoint branch:** When the user explicitly requests a pause,
 write the PAUSED session log and required pause frontmatter, then checkpoint

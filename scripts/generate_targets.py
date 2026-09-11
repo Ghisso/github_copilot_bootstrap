@@ -1068,7 +1068,6 @@ def render_claude_settings(path: Path) -> None:
                     "matcher": "Bash",
                     "hooks": [
                         cmd("record-branch-state.sh", "claude-code"),
-                        cmd("record-commit-closeout.sh", "claude-code"),
                         cmd("context-mode-dispatch.sh", "claude-code", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "claude-code"),
                     ],
@@ -1157,7 +1156,6 @@ def render_codex_hooks(path: Path) -> None:
                     "matcher": "Bash",
                     "hooks": [
                         cmd("record-branch-state.sh", "openai-codex"),
-                        cmd("record-commit-closeout.sh", "openai-codex"),
                         cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "openai-codex"),
                     ],
@@ -1287,7 +1285,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Read the authoritative Task Lanes decision table in `.claude/instructions/workflow.instructions.md` before acting; it is the sole normative classifier.
 - Read-only/reporting stays with the main agent and produces evidence only. Diagnose stays read-only until a fix is requested.
 - Only an explicit, one-file, low-risk edit with no high-risk impact and no requested commit or PR is lightweight; it stays with the main agent and needs focused verification, not lifecycle artifacts.
-- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> verify phase -> reviewer -> closeout`; an approved implementation-ready plan normally skips planner. All commit/PR work is standard or higher.
+- Standard implementation and control-plane/high-risk work use `orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout`; an approved implementation-ready plan normally skips planner. All commit/PR work is standard or higher.
 - Control-plane/high-risk includes control-plane, security, dependency/lockfile, migration, multi-file, user-data, generators, and scripts. It always uses a full plan and the required high-risk review profiles.
 - Audited typo commit bypasses are recovery exceptions, never lane classification.
 
@@ -1297,7 +1295,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
-- Run `verify phase`, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings, records learning and the completed session log, then runs `verify closeout`.
+- Run focused and fast checks during implementation, then profile-driven review until clean. CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings, then runs `verify phase` and `verify closeout`.
 - Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
 

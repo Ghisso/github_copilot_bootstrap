@@ -607,6 +607,127 @@ def test_rejects_unambiguous_phase_inventory_bullets_that_drift(
     assert any("body phase inventory" in error for error in validation_errors(plan))
 
 
+@pytest.mark.parametrize(
+    "suffix",
+    (
+        "",
+        " — descriptive suffix",
+        " -- descriptive suffix",
+        " : descriptive suffix",
+        " - descriptive suffix",
+        " (parenthetical note)",
+        " (owner: coder, status: pending)",
+        " — a note that itself mentions `an-unrelated-slug` in passing",
+    ),
+    ids=(
+        "no-annotation",
+        "em-dash",
+        "double-hyphen",
+        "colon",
+        "hyphen",
+        "parenthetical",
+        "parenthetical-with-colons",
+        "delimited-prose-with-an-embedded-backtick",
+    ),
+)
+def test_accepts_body_phase_annotations_that_still_match_frontmatter(
+    tmp_path: Path, suffix: str
+) -> None:
+    """Every supported trailing annotation still extracts only the matching slug.
+
+    A second backtick pair inside delimited prose (the last case) can never be
+    mistaken for an additional phase: the pattern's single capture group only
+    ever extracts the slug immediately after the opening ``- ``/``- [ ] ``, so
+    trailing prose - however it is punctuated - cannot smuggle a second entry
+    into the extracted phase list.
+    """
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + f"\n## Phases\n\n- [ ] `2026-08-11_phase-C-example`{suffix}\n",
+        encoding="utf-8",
+    )
+
+    assert validation_errors(plan) == []
+
+
+@pytest.mark.parametrize(
+    "item",
+    (
+        "- [ ] `2026-08-11_phase-C-example`: no whitespace before the delimiter",
+        "- [ ] `2026-08-11_phase-C-example`(no whitespace before the parenthetical)",
+        "- [ ] `2026-08-11_phase-C-example`glued-trailing-text",
+        "- [ ] `2026-08-11_phase-C-example`  ",
+        "- [ ] `2026-08-11_phase-C-example` plain prose with no leading delimiter",
+    ),
+    ids=(
+        "no-boundary-before-colon",
+        "no-boundary-before-parenthetical",
+        "no-boundary-glued-text",
+        "whitespace-only-annotation",
+        "no-delimiter-before-prose",
+    ),
+)
+def test_rejects_phase_annotations_with_no_safe_delimiter_boundary(
+    tmp_path: Path, item: str
+) -> None:
+    """An annotation that skips the required delimiter is rejected outright.
+
+    ``no-delimiter-before-prose`` matters most: a narrative bullet elsewhere in
+    a plan (for example a ``Key gate:`` list entry like
+    "``- `PreToolUse` denies unsafe operations...``") must never be mistaken
+    for a phase-inventory item just because it starts with a backtick-quoted
+    word - only a recognized delimiter right after the closing backtick opens
+    the door to trailing prose.
+    """
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + f"\n## Phases\n\n{item}\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory is malformed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_unclosed_backtick_in_a_phase_annotation(tmp_path: Path) -> None:
+    """An unclosed backtick can never be parsed as a safe delimiter boundary."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        big_plan(
+            "in-progress",
+            "started_at: 2026-08-30T00:00:00Z\n"
+            "current_phase: 2026-08-11_phase-C-example\n",
+        ),
+    )
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        + "\n## Phases\n\n- [ ] `2026-08-11_phase-C-example\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "body phase inventory is malformed" in error
+        for error in validation_errors(plan)
+    )
+
+
 def test_ignores_narrative_phase_subheadings_and_plain_bullets(tmp_path: Path) -> None:
     """Narrative checklist text is not an inventory without a code-form slug."""
     plan = write_plan(
@@ -637,6 +758,7 @@ def test_rejects_near_miss_statuses(tmp_path: Path, status: str) -> None:
 @pytest.mark.parametrize(
     ("status", "extra"),
     [
+        ("planned", ""),
         ("in-progress", ""),
         ("complete", "closeout_session_log: .claude/session_logs/closeout.md"),
     ],
@@ -644,6 +766,9 @@ def test_rejects_near_miss_statuses(tmp_path: Path, status: str) -> None:
 def test_preserves_existing_small_plan_statuses(
     tmp_path: Path, status: str, extra: str
 ) -> None:
+    """A `planned` plan needs only the ordinary identity fields: no pause,
+    cancellation, or closeout evidence, unlike `paused`/`cancelled`/`complete`.
+    """
     plan = write_plan(tmp_path / "small.md", small_plan(status, extra))
 
     assert validation_errors(plan) == []

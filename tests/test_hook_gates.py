@@ -196,6 +196,112 @@ printf '%s\\n' "${{failures[@]}}"
     assert "missing plan-frontmatter validator" in result.stdout
 
 
+def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> None:
+    """Phase B2 (2026-09-11_phase-B2-hook-empty-array-safety): each of the
+    seven Confirmed Reachable Instances, plus the ``expected`` site in
+    ``reporting-reminder.sh`` found while widening the regression scanner to
+    the ``[*]``/indices shapes, must use the repository's
+    ``${arr[@]+"${arr[@]}"}`` guard, not a bare ``${arr[@]}``/``${arr[*]}``/
+    ``${!arr[@]}`` form. Bash 3.2 (the declared consumer orchestration
+    baseline) aborts on every one of those bare forms with 'unbound
+    variable' under `set -u` when the array is empty. This host's newer
+    Bash cannot reproduce that abort, so the fix is pinned at the source
+    level instead of behaviorally."""
+    frontmatter_text = (SCRIPT_SRC / "_lib-frontmatter.sh").read_text(encoding="utf-8")
+    git_protection_text = (SCRIPT_SRC / "git-protection.sh").read_text(encoding="utf-8")
+    reporting_reminder_text = (SCRIPT_SRC / "reporting-reminder.sh").read_text(
+        encoding="utf-8"
+    )
+    expectations = (
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "all_phases",
+            'for other_phase in ${all_phases[@]+"${all_phases[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "paths",
+            'for path in ${paths[@]+"${paths[@]}"}; do',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "_TOKENS",
+            'tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})',
+            3,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens",
+            '_git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1',
+            1,
+        ),
+        (
+            git_protection_text,
+            "git-protection.sh",
+            "tokens",
+            'if reason="$(_git_danger_from_tokens ${tokens[@]+"${tokens[@]}"})"; then',
+            1,
+        ),
+        (
+            reporting_reminder_text,
+            "reporting-reminder.sh",
+            "expected",
+            'for index in ${expected[@]+"${!expected[@]}"}; do',
+            1,
+        ),
+    )
+    for text, filename, variable, snippet, expected_count in expectations:
+        assert text.count(snippet) == expected_count, (
+            f"{filename}: expected {expected_count} guarded expansion(s) of "
+            f"{variable!r} via {snippet!r}; source drifted from the Phase B2 fix"
+        )
+
+
+def test_assert_commit_invariants_reports_missing_current_phase_without_aborting(
+    tmp_path: Path,
+) -> None:
+    """An empty ``current_phase`` must surface as its own gate failure, and
+    the cancellation sweep immediately below it must run zero iterations
+    over the still-empty ``all_phases`` rather than partially executing. On
+    Bash 3.2 an unguarded ``"${all_phases[@]}"`` there aborts with an
+    unbound-variable error before this message is ever printed; this host's
+    newer Bash cannot reproduce that abort, so this test pins the intended
+    message and confirms the sibling sweep never runs (no cancellation-
+    evidence failure for the sibling plan below, even though it is
+    cancelled and missing its evidence fields)."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True)
+    (plans / "example.md").write_text(
+        "---\nname: example\nstatus: in-progress\ncurrent_phase:\n---\n\n# Example\n",
+        encoding="utf-8",
+    )
+    # A sibling plan that looks cancelled-and-incomplete: if the sweep ever
+    # ran despite the empty current_phase, assert_cancellation_evidence
+    # would append failures for it.
+    (plans / "sibling.md").write_text(
+        "---\nname: sibling\nstatus: cancelled\n---\n\n# Sibling\n",
+        encoding="utf-8",
+    )
+    expression = f"""
+assert_plan_frontmatter() {{ :; }}
+assert_completed_receipt() {{ :; }}
+failures=()
+assert_commit_invariants {shlex.quote(str(tmp_path))} example_implementation
+printf '%s\\n' "${{failures[@]}}"
+"""
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    failures = result.stdout.splitlines()
+    assert "big plan has no current_phase" in failures
+    assert not any("evidence" in failure for failure in failures), failures
+
+
 def _write_cancelled_plan(
     root: Path,
     *,
@@ -1308,6 +1414,702 @@ def test_protect_files_denies_ambiguous_protected_reference_without_infra_failur
     assert '"permissionDecision":"deny"' in process.stdout
     assert "could not determine whether the command may" in process.stdout
     assert "exited with status" not in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # `diff`/`cat` never write through their own arguments (READ_ONLY);
+        # reading a protected-looking path through a nested, read-only
+        # process substitution must not become a mutation denial merely
+        # because the classifier cannot yet model <( ).
+        "diff <(cat .env) <(cat CLAUDE.md)",
+        "diff <(cat credentials-prod.json) <(echo ok)",
+    ),
+)
+def test_protect_files_allows_read_only_process_substitution(command: str) -> None:
+    """Regression test for the reported false positive: a read-only process
+    substitution must be allowed, not denied merely because its inner
+    command happens to reference a protected-looking path for reading."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_data_heredoc_with_unmatched_apostrophe() -> None:
+    """A heredoc body is prose/data, not shell syntax: an unmatched
+    apostrophe or shell metacharacters inside it must not corrupt outer
+    tokenization."""
+    command = "cat <<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_git_commit_file_dash_heredoc_reproduction() -> None:
+    """Firsthand reproduction: `git commit -F - <<'EOF' ... EOF` was denied
+    with "protect-files.sh exited with status 2" because the commit
+    message's `${arr[@]}` and `"${arr[@]}"` broke outer shell tokenization,
+    even though the body is pure data fed to git's own -F - stdin convention
+    and can never become a filesystem write target."""
+    command = (
+        "git commit -F - <<'EOF'\n"
+        'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\n'
+        "EOF"
+    )
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_read_only_command_heredoc_with_harmless_data() -> None:
+    """A READ_ONLY command's heredoc is stdin data, exactly like its own
+    command-line arguments already are; harmless prose must not be denied."""
+    command = "wc -l <<'EOF'\njust some ordinary text\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_denies_read_only_command_heredoc_mentioning_protected_path() -> (
+    None
+):
+    """CRITICAL security-review fix: a READ_ONLY consumer's heredoc body is
+    never fully skipped - only its own command-line arguments are known
+    never to write. sed's own script sub-language supports `w file` and `e`
+    without `-i` (see the dedicated sed test below), so every READ_ONLY
+    command's heredoc gets the same conservative literal-scan floor an
+    unmodeled command's own arguments already get."""
+    command = "wc -l <<'EOF'\nreferences .env in prose\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+
+
+def test_protect_files_denies_sed_heredoc_write_command() -> None:
+    """CRITICAL security-review fix: sed is READ_ONLY for its own arguments,
+    but its own scripting language can write an arbitrary file via `w file`/
+    `s///w file`, or execute a shell command via `e`, without ever using
+    `-i`. The dedicated sed/perl `-i` branch does not fire here, so the
+    heredoc-body literal-scan floor is what must catch this."""
+    command = "sed -n -f - CLAUDE.md <<'EOF'\ns/.*/&/w .env\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_denies_unquoted_heredoc_command_substitution() -> None:
+    """CRITICAL security-review fix: an *unquoted* heredoc delimiter's body
+    is expanded by the shell - including $( ) command substitution - before
+    any consuming command ever runs, so `cat <<EOF` with `$(touch .env)` in
+    the body must deny even though `cat` never interprets its own stdin."""
+    command = "cat <<EOF\n$(touch .env)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cat <<EOF\n'literal $(touch .env) more'\nEOF",
+        'cat <<EOF\n"literal $(touch .env) more"\nEOF',
+    ),
+)
+def test_protect_files_denies_quote_wrapped_command_substitution_in_unquoted_heredoc(
+    command: str,
+) -> None:
+    """A heredoc body is not re-tokenized with normal shell quoting rules:
+    only a backslash escaping $, a backtick, or itself is special, so a
+    single or double quote around $( ) is plain literal text and does not
+    suppress it (verified empirically in a real bash). Wrapping the exploit
+    in quotes must not smuggle it past the scanner."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_allows_backslash_escaped_dollar_in_unquoted_heredoc() -> None:
+    """A backslash immediately before `$` suppresses command-substitution
+    expansion even in an unquoted heredoc, so this must not be recursively
+    classified as executable code - it is still denied by the always-on
+    literal-scan floor for the literal ".env" text, but only with the
+    softer "could not determine" wording, not the confirmed one a genuinely
+    executed mutator would produce."""
+    command = "cat <<EOF\nescaped: \\$(touch .env)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+    assert "Protected file blocked by policy" not in process.stdout
+
+
+def test_protect_files_resolves_tracked_variable_inside_unquoted_heredoc_command_substitution() -> (
+    None
+):
+    """The $( ) inside an unquoted heredoc runs in a subshell of the
+    *current* shell (like a process substitution), so it inherits already-
+    tracked variables. The body text itself never contains the literal
+    ".env" substring - only the recursive classification proves this."""
+    command = "TARGET=.env\ncat <<EOF\n$(touch $TARGET)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "TARGET=.env bash <<'EOF'\ntouch $TARGET\nEOF",
+        "env TARGET=.env bash <<'EOF'\ntouch $TARGET\nEOF",
+    ),
+)
+def test_protect_files_resolves_prefix_assignment_inside_quoted_bare_shell_heredoc(
+    command: str,
+) -> None:
+    """CRITICAL security-review fix: a *quoted* heredoc delimiter's body
+    passes through to the child `bash` process literally; the child's own
+    environment does contain this command's own prefix assignment (`VAR=v
+    cmd` and `env VAR=value cmd` both export it to the child), so `touch
+    $TARGET` must resolve and deny. Verified in real bash first (throwaway
+    temp dir, harmless marker file): both forms write the marker."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_allows_prefix_assignment_inside_unquoted_bare_shell_heredoc() -> (
+    None
+):
+    """Must-not-regress control: with an *unquoted* delimiter, the *parent*
+    shell expands the body before the child ever runs, using the parent's
+    own scope - and a prefix assignment is not part of that scope (it is
+    exported only to the child about to exec). Real bash expands `$TARGET`
+    to empty here and `touch` errors with no write (verified empirically).
+    "Fixing" this to resolve would be a new false positive, not a fix."""
+    command = "TARGET=.env bash <<EOF\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_resolves_persistent_assignment_inside_unquoted_bare_shell_heredoc() -> (
+    None
+):
+    """MAJOR test-gap fix: the fourth quoted/prefix combination. A bare
+    assignment on its own, separate segment (`TARGET=.env` then `bash ...`
+    later) *is* already in `outer_variables`, because it was recorded
+    before this segment ever ran; with an *unquoted* delimiter the parent
+    shell expands the body using exactly that scope before the child runs
+    (verified empirically: `touch` succeeds and writes the marker here,
+    unlike the quoted-delimiter sibling test above). This is the one case
+    that actually distinguishes "outer_variables correctly threads
+    cross-segment scope" from "outer_variables is empty and broken exactly
+    like the old unconditional {}" - every sibling test in this batch
+    expects "stays unresolved", so a regression back to always-empty would
+    pass them all untouched."""
+    command = "TARGET=.env\nbash <<EOF\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_does_not_resolve_persistent_assignment_inside_quoted_bare_shell_heredoc() -> (
+    None
+):
+    """Must-not-regress control: a bare assignment on its own, separate
+    segment (`TARGET=.env` then `bash ...` later) is never exported to a
+    child process - only a same-command prefix assignment is. Real bash
+    leaves `$TARGET` empty in the child too here (verified empirically:
+    `touch` errors with "missing file operand", no write), distinguishing
+    this from the prefix-assignment case above."""
+    command = "TARGET=.env\nbash <<'EOF'\ntouch $TARGET\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_process_substitution_still_resolves_persistent_assignment() -> (
+    None
+):
+    """Control: the process-substitution path is untouched by this fix and
+    must keep resolving a persistent, separate-segment assignment exactly
+    as before - a subshell fork inherits the parent's entire variable
+    scope, exported or not."""
+    command = "TARGET=.env\ndiff <(touch $TARGET) <(echo x)"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # env -u NAME takes a separate value token; the old loop skipped
+        # only the flag, leaving the value token ("VAR") to be misread as
+        # the command name, so `bash` and its heredoc were never reached.
+        # Indirect construction (TARGET=env, then ".$TARGET") means the
+        # literal ".env" text never appears anywhere - only correct
+        # resolution can catch this, not the generic literal-scan floor.
+        "env -u VAR TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+        # env -C dir (chdir) - another separate-value flag.
+        "env -C /tmp TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+        # env -S "" (split-string) - another separate-value flag.
+        'env -S "" TARGET=env bash <<\'EOF\'\ntouch ".$TARGET"\nEOF',
+        # sudo shares the same wrapper-skip loop and has its own
+        # separate-value flags (-u USER, -g GROUP).
+        "sudo -u nobody TARGET=env bash <<'EOF'\ntouch \".$TARGET\"\nEOF",
+    ),
+)
+def test_protect_files_resolves_prefix_assignment_past_wrapper_value_flag(
+    command: str,
+) -> None:
+    """CRITICAL security-review fix: command_name()'s sudo/env/command
+    wrapper-flag loop now skips a value-taking flag's separate value token
+    too, so the real command and its own prefix assignment are still found
+    and resolved. Verified in real bash first (throwaway temp dir, harmless
+    marker file): `env -u SOME_VAR TARGET=marker bash <<'EOF'` does write
+    the marker."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_allows_legitimate_env_value_flag_with_harmless_body() -> None:
+    """Must-not-regress control: `env -u FOO` followed by a genuinely
+    harmless heredoc body must not become a new false positive merely
+    because the wrapper now understands -u takes a value."""
+    command = "env -u FOO bash <<'EOF'\necho hello\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_fails_closed_for_unrecognized_wrapper_flag() -> None:
+    """CRITICAL security-review fix, backstop 2: a future/unmodeled env
+    flag must not be silently assumed to take no value (that assumption is
+    exactly how -u's value was mistaken for the command name before this
+    fix) - the segment becomes ambiguous instead, and the conservative
+    fallback still examines the heredoc body directly rather than treating
+    it as invisible."""
+    command = "env --future-flag=value bash <<'EOF'\ntouch .env\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_allows_quoted_heredoc_command_substitution_syntax_as_data() -> (
+    None
+):
+    """A *quoted* heredoc delimiter suppresses shell expansion entirely, so
+    `$(...)`-shaped text in the body is inert prose, not a command
+    substitution - the quoted/unquoted distinction the CRITICAL fix relies
+    on. (The commit-message reproduction test above already proves the
+    apostrophe/brace case; this proves the $( ) case specifically stays
+    inert when quoted, with body text that has no protected-looking literal
+    for the always-on scan floor to catch instead.)"""
+    command = "cat <<'EOF'\n$(some_command some_argument)\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+def test_protect_files_allows_heredoc_nested_inside_process_substitution() -> None:
+    """Nesting must compose: a heredoc inside a process substitution, both
+    read-only, must be allowed."""
+    command = "diff <(cat <<'A'\nfoo\nA\n) <(cat <<'B'\nbar\nB\n)"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff <(touch .env) <(cat CLAUDE.md)",
+        "diff <(cat <(touch .env)) <(echo x)",
+        "tee >(cat > .env)",
+        # CRITICAL security-review fix: a *mutating heredoc* nested inside
+        # <( ) / >( ), not merely a mutating plain command - the recursive
+        # call for the process substitution's inner text must still be able
+        # to resolve a heredoc placeholder the outer extraction pass lifted
+        # out first.
+        "diff <(bash <<'A'\ntouch .env\nA\n) <(cat <<'B'\nbar\nB\n)",
+        "tee >(bash <<'A'\ntouch .env\nA\n)",
+        # A process substitution nested inside a bare shell heredoc's own
+        # body, itself containing another nested heredoc.
+        "bash <<'EOF'\ndiff <(bash <<'X'\ntouch .env\nX\n) <(cat CLAUDE.md)\nEOF",
+    ),
+)
+def test_protect_files_confirms_mutation_inside_process_substitution(
+    command: str,
+) -> None:
+    """Negative control: a real mutator inside <( ) or >( ), including a
+    nested substitution and a mutating heredoc nested inside one, must still
+    be a *confirmed* denial - not merely the softer "could not determine"
+    uncertain wording a naive token leak could produce by accident, and
+    never a silent allow from an unresolved, orphaned heredoc placeholder."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+    assert "could not determine" not in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "echo $((1 << 2))",
+        "echo $((\n1 << 2\n))",
+    ),
+)
+def test_protect_files_allows_arithmetic_left_shift(command: str) -> None:
+    """MAJOR security-review fix: `<<` inside `$(( ))`/`(( ))` is bash's
+    arithmetic left-shift operator, not a heredoc redirect. The paren-blind
+    scanner used to find `<<` there, misread the next token as a heredoc
+    delimiter word, and failed closed with no body/no terminator - a false
+    fail for a common idiom, on both a single line and split across lines."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "bash <<'EOF'\ntouch .env\nEOF",
+        "bash <<'EOF'\ntouch .claude/hooks/scripts/new.sh\nEOF",
+    ),
+)
+def test_protect_files_confirms_shell_heredoc_protected_write(command: str) -> None:
+    """Negative control: a bare shell interpreter executes its heredoc body
+    as real code, so a protected-file mutation or hook-file edit inside it
+    must still be denied."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3 <<\'PY\'\nopen(".env", "w").write("x")\nPY',
+        'python3 <<\'PY\'\nPath(".env").write_text("x")\nPY',
+    ),
+)
+def test_protect_files_denies_interpreter_heredoc_protected_write(
+    command: str,
+) -> None:
+    """Negative control: an interpreter heredoc that opaquely writes a
+    protected file must be denied, the same as the equivalent `-c` form
+    already is."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_confirms_heredoc_redirected_to_protected_target() -> None:
+    """Negative control: the heredoc's own outer redirect target is still
+    classified regardless of the body content."""
+    command = "cat <<'EOF' > .claude/hooks/scripts/new.sh\necho hi\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/new.sh" in process.stdout
+
+
+def test_protect_files_denies_unknown_consumer_heredoc_with_protected_evidence() -> (
+    None
+):
+    """An unmodeled command's heredoc stays conservative: a protected-looking
+    literal in the body is still enough for a reasoned (not infra-failed)
+    denial."""
+    command = "some-unsupported-command <<'EOF'\nplease touch .env for me\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "could not determine whether the command may" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "cat <<'EOF'\nhello",
+        "printf x <<\n",
+    ),
+)
+def test_protect_files_fails_closed_for_malformed_heredoc(command: str) -> None:
+    """A heredoc with no delimiter word, or whose body never reaches its
+    terminator line, is genuinely malformed shell syntax - the
+    infrastructure fail-closed path (exit 2), distinguishable from an
+    ordinary reasoned policy denial such as the one asserted in
+    ``test_protect_files_denies_ambiguous_protected_reference_without_infra_failure``."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 2
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "hook could not evaluate the request safely, denying" in process.stdout
+
+
+def test_protect_files_fails_closed_for_unbalanced_process_substitution() -> None:
+    """An unbalanced <( construct is genuinely malformed shell syntax - the
+    infrastructure fail-closed path, not an ordinary reasoned denial."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": "diff <(cat README.md"}}
+    )
+    assert process.returncode == 2
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "hook could not evaluate the request safely, denying" in process.stdout
+
+
+# CRITICAL security-review fix: `<`, `<<`, `<(`, and `>(` are shell
+# metacharacters that terminate the preceding word even with no leading
+# space (`bash<<'EOF'` and `cat<(...)` are both valid, executing bash), but
+# the entire corpus above always wrote a leading space before these
+# operators - the same convention the round-1 review itself used, which is
+# exactly why nobody exercised the glued form. Every test below repeats an
+# existing corpus command with that space removed, sweeping allow and deny
+# cases across every distinct mechanism: command-name gluing for both `<<`
+# and `<(`/`>(` (which defeats classification entirely, not merely one
+# protected-path category), the exact/suffix/prefix protected-path
+# categories, the outer redirect target, the READ_ONLY/sed/unquoted
+# command-substitution/unknown-consumer heredoc floors, mutation nested
+# inside a glued process substitution, and the hook-file and interpreter
+# heredoc paths.
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff<(cat .env)<(cat CLAUDE.md)",
+        "cat<<'EOF'\nFix: don't break ${arr[@]} or \"${arr[@]}\" handling\nEOF",
+        (
+            "git commit -F -<<'EOF'\n"
+            'Fix: don\'t break ${arr[@]} or "${arr[@]}" handling\nEOF'
+        ),
+        "cat<<'EOF'\n$(some_command some_argument)\nEOF",
+        "diff<(cat<<'A'\nfoo\nA\n)<(cat<<'B'\nbar\nB\n)",
+    ),
+)
+def test_protect_files_allows_glued_operator_safe_commands(command: str) -> None:
+    """Sweep: every safe positive case above must stay allowed when written
+    with no space before <<, <(, or >( - including full-glue nesting."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert process.stdout == "", f"unexpected stdout: {process.stdout!r}"
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        # Command-name gluing (minimum required coverage): defeats
+        # classification entirely, for both operator families.
+        "bash<<'EOF'\ntouch .env\nEOF",
+        "cat<(touch .env)",
+    ),
+)
+def test_protect_files_denies_glued_command_name_mutation(command: str) -> None:
+    """Sweep: command-name gluing must not silently defeat classification -
+    a real mutator must still be a *confirmed* denial."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_reason_fragment"),
+    (
+        # Exact-match category (minimum required coverage).
+        ("touch .env<<EOF\nx\nEOF", "Protected file blocked by policy: .env"),
+        # Suffix-matched category (minimum required coverage).
+        (
+            "touch service.pem<<EOF\nx\nEOF",
+            "Protected file blocked by policy: service.pem",
+        ),
+        # Prefix-matched controls (minimum required coverage): `startswith`
+        # only inspects leading characters, so these were never at risk from
+        # trailing glued garbage - confirm that stays true, with a clean
+        # (non-garbled) path in the reason now that gluing is fixed.
+        (
+            "touch .env.local<<EOF\nx\nEOF",
+            "Protected file blocked by policy: .env.local",
+        ),
+        (
+            "touch .claude/hooks/scripts/new.sh<<EOF\nx\nEOF",
+            "Editing hook files is blocked because PreToolUse cannot request "
+            "approval: .claude/hooks/scripts/new.sh",
+        ),
+        # Redirect-target gluing: `cat > .env<<'EOF'` is valid bash where
+        # ".env" is `>`'s target and `<<'EOF'` is a separate stdin redirect.
+        ("cat > .env<<'EOF'\nx\nEOF", "Protected file blocked by policy: .env"),
+    ),
+)
+def test_protect_files_denies_glued_operand_by_protected_category(
+    command: str, expected_reason_fragment: str
+) -> None:
+    """Sweep: every protected-path category still resolves to a clean,
+    exact operand/redirect-target once the trailing garbage from a glued
+    placeholder is gone, not merely "still denied for the wrong reason"."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert expected_reason_fragment in process.stdout
+    assert "HEREDOC" not in process.stdout, (
+        "a leftover placeholder fragment in the reason means gluing is "
+        f"still corrupting the operand: {process.stdout!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "wc -l<<'EOF'\nreferences .env in prose\nEOF",
+        "sed -n -f - CLAUDE.md<<'EOF'\ns/.*/&/w .env\nEOF",
+        "cat<<EOF\n$(touch .env)\nEOF",
+        "TARGET=.env\ncat<<EOF\n$(touch $TARGET)\nEOF",
+        "some-unsupported-command<<'EOF'\nplease touch .env for me\nEOF",
+    ),
+)
+def test_protect_files_denies_glued_heredoc_floor_cases(command: str) -> None:
+    """Sweep: the READ_ONLY literal-scan floor, sed's own write sub-language,
+    unquoted command-substitution execution (plain and variable-resolved),
+    and the unknown-consumer conservative floor must all still fire when
+    the heredoc operator has no leading space."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        "diff<(touch .env) <(cat CLAUDE.md)",
+        "diff <(bash<<'A'\ntouch .env\nA\n)<(cat <<'B'\nbar\nB\n)",
+    ),
+)
+def test_protect_files_confirms_glued_mutation_inside_process_substitution(
+    command: str,
+) -> None:
+    """Sweep: a mutator inside a glued process substitution, including a
+    glued mutating heredoc nested inside one, must still be a *confirmed*
+    denial."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
+
+
+def test_protect_files_confirms_glued_shell_heredoc_hookfile_write() -> None:
+    """Sweep: the hook-file branch (a different emit() bucket than a plain
+    protected file) must still fire for a glued bare-shell heredoc."""
+    command = "bash<<'EOF'\ntouch .claude/hooks/scripts/new.sh\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert ".claude/hooks/scripts/new.sh" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        'python3<<\'PY\'\nopen(".env", "w").write("x")\nPY',
+        'python3<<\'PY\'\nPath(".env").write_text("x")\nPY',
+    ),
+)
+def test_protect_files_denies_glued_interpreter_heredoc_protected_write(
+    command: str,
+) -> None:
+    """Sweep: an interpreter heredoc's opaque-write floor must still fire
+    when the interpreter name has no space before <<."""
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+
+
+def test_protect_files_confirms_glued_heredoc_redirected_to_protected_target() -> None:
+    """Sweep: the outer redirect target is still classified when the
+    heredoc operator is glued to the preceding command name."""
+    command = "cat<<'EOF' > .env\necho hi\nEOF"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert process.returncode == 0, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "Protected file blocked by policy: .env" in process.stdout
 
 
 def test_protect_files_fails_closed_for_malformed_command_and_without_uv() -> None:

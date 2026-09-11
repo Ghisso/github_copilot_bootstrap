@@ -120,7 +120,31 @@ OPTION_VALUES = {
     "perl": {"-e", "-E", "-f", "-M", "-m"},
     "sed": {"-e", "-f", "--expression", "--file"},
 }
+# command_name()'s sudo/env/command wrapper-flag skip: flags that consume a
+# separate value token (or an attached `--long=value`/`-short=value`) versus
+# flags that take no value at all. Not the full flag set of any of these
+# tools - only what is needed to keep the wrapper-skip loop from ever
+# mistaking a value token, or an unrecognized flag, for the command name.
+WRAPPER_VALUE_FLAGS: dict[str, set[str]] = {
+    "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string", "-P"},
+    "sudo": {"-u", "--user", "-g", "--group"},
+    "command": set(),
+}
+WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
+    "env": {"-i", "--ignore-environment", "-0", "--null"},
+    "sudo": set(),
+    "command": {"-p", "-v", "-V"},
+}
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
+PROCESS_SUB_PREFIX = "__PROTECT_FILES_PROCSUB_"
+HEREDOC_PREFIX = "__PROTECT_FILES_HEREDOC_"
+HEREDOC_WORD = re.compile(
+    r"[ \t]*(?:'([A-Za-z0-9_]+)'|\"([A-Za-z0-9_]+)\"|([A-Za-z0-9_]+))"
+)
+# Shell interpreters whose *bare* heredoc body (no inline -c script and no
+# script-file argument) is the script they actually execute, so it is
+# recursively classified rather than merely scanned as literal text.
+SHELL_INTERPRETERS = {"bash", "sh", "zsh"}
 
 
 class AmbiguousCommand(ValueError):
@@ -132,11 +156,17 @@ class AmbiguousCommand(ValueError):
     """
 
 
-class UnparseableCommand(AmbiguousCommand):
-    """The shell text itself could not be tokenized (e.g. an unterminated quote).
+class UnparseableCommand(ValueError):
+    """The shell text itself could not be tokenized (e.g. an unterminated
+    quote, an unbalanced process substitution, or a heredoc with no
+    delimiter word or no terminator line).
 
-    Unlike AmbiguousCommand, this is genuinely malformed input, not valid
-    syntax our lightweight parser fails to model, so it stays fail-closed.
+    Deliberately a sibling of AmbiguousCommand, not a subclass: recursive
+    classification of a process substitution or a bare shell heredoc runs
+    inside an `except AmbiguousCommand` fallback (see `classify_command`), so
+    genuinely malformed nested syntax must keep propagating to the top-level
+    fail-closed exit instead of being caught there and downgraded to a soft,
+    resource-scoped denial.
     """
 
 
@@ -310,6 +340,266 @@ def protect_quoted_globs(command: str) -> str:
     )
 
 
+def _matching_paren(text: str, open_index: int) -> int:
+    """Return the index just past the ')' matching text[open_index] == '(',
+    honoring nested parens and quotes. Returns -1 when never closed."""
+    depth = 0
+    index = open_index
+    quote: str | None = None
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if quote:
+            if char == quote and text[index - 1] != "\\":
+                quote = None
+            index += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            index += 1
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    return -1
+
+
+def extract_process_substitutions(command: str) -> tuple[str, dict[str, str]]:
+    """Replace every <( ) / >( ) construct with an inert placeholder so outer
+    tokenization sees a plain word, returning the substituted text and a
+    placeholder -> inner-command mapping for recursive classification.
+
+    The placeholder is padded with a space on both sides regardless of what
+    was originally adjacent. `<` and `>` are shell metacharacters that do
+    not require surrounding whitespace (`cat<(...)` is valid bash - it word-
+    glues, exactly like `$( )`, so the process substitution still forks and
+    executes even though the resulting word is unlikely to be a real
+    command), but `shlex` has no such rule: with no separator it would merge
+    the placeholder into an adjacent word, and the substitution's own
+    placeholder token - the only thing `segment_targets` can look up in
+    `process_subs` - would vanish. The single extra space is always safe:
+    `whitespace_split=True` collapses any run of whitespace, so it can never
+    change how an already-separated case tokenizes.
+
+    A construct inside a quoted string is left untouched (quoting suppresses
+    process substitution in real shells too). An unbalanced construct is
+    genuinely malformed shell syntax, not merely unmodeled, so it fails
+    closed rather than being silently dropped.
+    """
+    pieces: list[str] = []
+    inner_by_placeholder: dict[str, str] = {}
+    index = 0
+    length = len(command)
+    quote: str | None = None
+    count = 0
+    while index < length:
+        char = command[index]
+        if quote:
+            pieces.append(char)
+            if char == quote and command[index - 1] != "\\":
+                quote = None
+            index += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            pieces.append(char)
+            index += 1
+            continue
+        if char in ("<", ">") and command[index + 1 : index + 2] == "(":
+            end = _matching_paren(command, index + 1)
+            if end == -1:
+                raise UnparseableCommand("unbalanced process substitution")
+            placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, count)
+            count += 1
+            inner_by_placeholder[placeholder] = command[index + 2 : end - 1]
+            pieces.append(" " + placeholder + " ")
+            index = end
+            continue
+        pieces.append(char)
+        index += 1
+    return "".join(pieces), inner_by_placeholder
+
+
+def _find_unquoted_heredoc(text: str) -> int | None:
+    """Return the index of the first <<[-] operator outside any quoting or
+    arithmetic span, or None if there is none. A <<< here-string is a
+    different construct and is left untouched for the outer tokenizer.
+
+    `<<` is also bash's arithmetic left-shift operator inside `$(( ))`/
+    `(( ))`. Two adjacent, unquoted parens open such a span (bash parses
+    `((` this way regardless of a leading `$`); while depth is open, `<<`
+    is arithmetic, not a heredoc redirect, even though a *single*-paren
+    construct like `$( )` or `( )` can legitimately contain a real heredoc.
+    """
+    quote: str | None = None
+    index = 0
+    length = len(text)
+    arithmetic_depth = 0
+    while index < length:
+        char = text[index]
+        if quote:
+            if char == quote and text[index - 1] != "\\":
+                quote = None
+            index += 1
+            continue
+        if char in ("'", '"'):
+            quote = char
+            index += 1
+            continue
+        if char == "(" and text[index + 1 : index + 2] == "(":
+            arithmetic_depth += 1
+            index += 2
+            continue
+        if char == ")" and arithmetic_depth > 0:
+            if text[index + 1 : index + 2] == ")":
+                arithmetic_depth -= 1
+                index += 2
+            else:
+                index += 1
+            continue
+        if arithmetic_depth > 0:
+            index += 1
+            continue
+        if char == "<" and text[index + 1 : index + 2] == "<":
+            if text[index + 2 : index + 3] == "<":
+                index += 3
+                continue
+            return index
+        index += 1
+    return None
+
+
+def extract_heredocs(
+    command: str, start_count: int = 0
+) -> tuple[str, dict[str, tuple[str, bool]]]:
+    """Remove every here-document body from the text the outer tokenizer will
+    see, replacing the whole `<<WORD ... body ... WORD` construct (including
+    the optional `<<-` and a bare/'quoted'/"quoted" delimiter word) with an
+    inert placeholder. Prose punctuation and apostrophes inside a heredoc
+    body can then never corrupt outer shell tokenization.
+
+    Each placeholder maps to `(body_text, quoted)`. `quoted` is True only
+    when the delimiter word itself was quoted (`<<'WORD'`/`<<"WORD"`): real
+    bash then skips parameter/command-substitution expansion of the body.
+    An unquoted delimiter's body is expanded by the shell itself before the
+    consuming command ever runs, so it is never inert data regardless of
+    what reads it.
+
+    `start_count` numbers placeholders starting above any the caller has
+    already allocated (e.g. a shared mapping accumulated across recursive
+    calls), so nested extractions can never collide on the same name.
+
+    The placeholder is padded with a space on both sides regardless of what
+    was originally adjacent. `<<` is a shell metacharacter that terminates
+    the preceding word even with no space (`bash<<'EOF'` is valid bash,
+    equivalent to `bash <<'EOF'`), but `shlex` has no such rule: with no
+    separator it would merge the placeholder into an adjacent word, and
+    neither `command_name` nor the redirect-target/operand lookups that key
+    off an exact placeholder token would ever see it as its own token again.
+    The single extra space is always safe: `whitespace_split=True` collapses
+    any run of whitespace, so it can never change how an already-separated
+    case tokenizes.
+
+    A missing delimiter word or a body that never reaches its terminator
+    line is genuinely malformed shell syntax and fails closed rather than
+    being silently ignored.
+    """
+    bodies: dict[str, tuple[str, bool]] = {}
+    result = command
+    count = start_count
+    while True:
+        operator_index = _find_unquoted_heredoc(result)
+        if operator_index is None:
+            return result, bodies
+        strip_tabs = result[operator_index + 2 : operator_index + 3] == "-"
+        word_start = operator_index + (3 if strip_tabs else 2)
+        word_match = HEREDOC_WORD.match(result, word_start)
+        if not word_match:
+            raise UnparseableCommand("heredoc redirect has no delimiter word")
+        delimiter = next(group for group in word_match.groups() if group)
+        quoted = word_match.group(1) is not None or word_match.group(2) is not None
+        rest_of_line_start = word_match.end()
+        newline_index = result.find("\n", rest_of_line_start)
+        if newline_index == -1:
+            raise UnparseableCommand("heredoc %r has no body" % delimiter)
+        rest_of_line = result[rest_of_line_start:newline_index]
+        body_start = newline_index + 1
+        terminator = re.compile(
+            r"^%s%s$" % (r"\t*" if strip_tabs else "", re.escape(delimiter)),
+            re.MULTILINE,
+        )
+        terminator_match = terminator.search(result, body_start)
+        if not terminator_match:
+            raise UnparseableCommand(
+                "heredoc delimiter %r is never terminated" % delimiter
+            )
+        body_text = result[body_start : terminator_match.start()]
+        if strip_tabs:
+            body_text = "\n".join(line.lstrip("\t") for line in body_text.split("\n"))
+        after_terminator = result[terminator_match.end() :]
+        if after_terminator.startswith("\n"):
+            after_terminator = after_terminator[1:]
+        placeholder = "%s%d__" % (HEREDOC_PREFIX, count)
+        count += 1
+        bodies[placeholder] = (body_text, quoted)
+        result = (
+            result[:operator_index]
+            + " "
+            + placeholder
+            + " "
+            + rest_of_line
+            + "\n"
+            + after_terminator
+        )
+
+
+def heredoc_command_substitutions(body: str) -> list[str]:
+    """Return each $( ) / `...` inner command found in an *unquoted*
+    heredoc's body.
+
+    Real bash performs parameter, command-substitution, and arithmetic
+    expansion on an unquoted heredoc's body before the consuming command
+    ever sees it, so `$(touch .env)` inside `cat <<EOF` executes regardless
+    of `cat` being read-only. Unlike an ordinary shell word, the body is not
+    re-tokenized with normal quoting rules first: a heredoc body only
+    recognizes a backslash escaping a dollar sign, a backtick, or itself - a
+    single or double quote is plain literal text here (verified empirically
+    in a real bash), so wrapping the construct in quotes does not suppress
+    it. Once a genuine `$(` is found, `_matching_paren` still tracks quoting
+    *inside* it, because that inner text is itself a normal command line. An
+    unbalanced construct here is genuinely malformed and fails closed,
+    matching process substitution.
+    """
+    inner_commands: list[str] = []
+    index = 0
+    length = len(body)
+    while index < length:
+        char = body[index]
+        if char == "\\":
+            index += 2
+            continue
+        if char == "$" and body[index + 1 : index + 2] == "(":
+            end = _matching_paren(body, index + 1)
+            if end == -1:
+                raise UnparseableCommand("unbalanced command substitution")
+            inner_commands.append(body[index + 2 : end - 1])
+            index = end
+            continue
+        if char == "`":
+            end = body.find("`", index + 1)
+            if end == -1:
+                raise UnparseableCommand("unterminated command substitution")
+            inner_commands.append(body[index + 1 : end])
+            index = end + 1
+            continue
+        index += 1
+    return inner_commands
+
+
 def split_segments(command: str) -> list[list[str]]:
     command = command.replace("\\\n", "")
     command = protect_quoted_globs(command)
@@ -378,14 +668,29 @@ def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
 
 def command_name(
     tokens: list[str], variables: dict[str, str]
-) -> tuple[str, int] | None:
-    """Return (command, args-start-index) and record leading assignments.
+) -> tuple[str, int, dict[str, str]] | None:
+    """Return (command, args-start-index, prefix_assignments).
 
     Records any leading `NAME=value` tokens (including ones after a
-    sudo/env/command wrapper) into `variables` as a side effect. Returns None
-    for a segment consisting entirely of assignments (`FOO=bar`): that is
-    valid Bash with no command to classify, not an ambiguity.
+    sudo/env/command wrapper) into the persistent `variables` dict as a side
+    effect, exactly as before. `prefix_assignments` is a *separate*, fresh
+    dict holding only the NAME=value tokens recorded by this one call - a
+    prefix on this command's own invocation (`VAR=v cmd`) or an `env
+    VAR=value cmd` wrapper - not any assignment tracked earlier on a
+    different, already-processed segment.
+
+    Real bash exports a prefix assignment into only the one command it
+    precedes; a persistent bare assignment on its own segment (`VAR=v`, then
+    `cmd` later) is not exported to a child process at all. Callers that
+    need "what this invocation's own environment would contain" (a heredoc
+    consumed by a bare child shell/interpreter) must use
+    `prefix_assignments`, not `variables`, or they conflate the two.
+
+    Returns None for a segment consisting entirely of assignments
+    (`FOO=bar`): that is valid Bash with no command to classify, not an
+    ambiguity.
     """
+    prefix_assignments: dict[str, str] = {}
     index = 0
     while (
         index < len(tokens)
@@ -393,23 +698,46 @@ def command_name(
         and not tokens[index].startswith("-")
     ):
         record_assignment(tokens[index], variables)
+        record_assignment(tokens[index], prefix_assignments)
         index += 1
     if index == len(tokens):
         return None
     while index < len(tokens) and tokens[index] in {"sudo", "env", "command"}:
+        wrapper = tokens[index]
+        value_flags = WRAPPER_VALUE_FLAGS[wrapper]
+        no_value_flags = WRAPPER_NO_VALUE_FLAGS[wrapper]
         index += 1
         while index < len(tokens) and tokens[index].startswith("-"):
-            index += 1
+            flag, _, attached_value = tokens[index].partition("=")
+            if flag in value_flags:
+                if attached_value:
+                    index += 1
+                    continue
+                if index + 1 == len(tokens):
+                    raise AmbiguousCommand(f"{wrapper} {flag} has no value")
+                index += 2
+                continue
+            if tokens[index] in no_value_flags:
+                index += 1
+                continue
+            # An unrecognized flag might take a value we do not know about
+            # (this is exactly how -u's value was mistaken for the command
+            # name before this fix): assuming "no value" is not safe, so
+            # this segment is ambiguous rather than silently guessed.
+            raise AmbiguousCommand(
+                f"{wrapper} has an unrecognized option {tokens[index]!r}"
+            )
         if (
             index < len(tokens)
             and "=" in tokens[index]
             and not tokens[index].startswith("-")
         ):
             record_assignment(tokens[index], variables)
+            record_assignment(tokens[index], prefix_assignments)
             index += 1
     if index == len(tokens):
         raise AmbiguousCommand("shell wrapper has no command")
-    return tokens[index], index + 1
+    return tokens[index], index + 1, prefix_assignments
 
 
 def operands(tokens: list[str], value_options: set[str]) -> list[str]:
@@ -543,6 +871,125 @@ def git_output_target(args: list[str]) -> str | None:
     return None
 
 
+def git_reads_message_from_stdin(args: list[str]) -> bool:
+    """True when git's own -F/--file option reads message text from standard
+    input (git's documented "-" convention, e.g. `commit -F -`, `tag -F -`,
+    `notes add -F -`). Content read this way is stored as a message in the
+    git object database, never written to the working tree, so heredoc data
+    feeding it is not a filesystem write operand regardless of its literal
+    contents. Not "-F -" specific to any one subcommand: the convention is
+    git's own, so it applies uniformly wherever git accepts it."""
+    for index, token in enumerate(args):
+        if token in ("-F", "--file"):
+            return index + 1 < len(args) and args[index + 1] == "-"
+        if token.startswith("--file="):
+            return token.partition("=")[2] == "-"
+    return False
+
+
+def _heredoc_is_bare_shell(
+    args: list[str], heredocs: dict[str, tuple[str, bool]]
+) -> bool:
+    """True when a shell interpreter has no inline -c script and no
+    script-file argument, so its heredoc body is the script it actually
+    executes rather than stdin data for a script this classifier cannot
+    see."""
+    for token in args:
+        if token in heredocs:
+            continue
+        if token == "-c":
+            return False
+        if not token.startswith("-"):
+            return False
+    return True
+
+
+def heredoc_targets(
+    command: str,
+    args: list[str],
+    body: str,
+    quoted: bool,
+    heredocs: dict[str, tuple[str, bool]],
+    repo_root: str,
+    outer_variables: dict[str, str],
+    prefix_assignments: dict[str, str],
+    working_directories: list[str],
+    confirmed: list[str],
+    uncertain: list[str],
+) -> None:
+    """Classify one heredoc body by what its consuming command does with its
+    own standard input.
+
+    An *unquoted* delimiter's body is expanded by the *parent* shell itself,
+    using the parent's own variable scope, before any consuming command
+    runs - so an embedded $( )/`...` always executes, and a bare shell
+    interpreter's whole body is real code the parent already resolved
+    variables in. `outer_variables` models that parent scope: it is a
+    snapshot of the persistently tracked variables taken *before* this
+    command's own leading assignments were recorded, because a prefix
+    assignment (`VAR=v cmd`) is exported only into the child process about
+    to run `cmd` - it is never visible to the parent's own word expansion
+    (verified empirically: `TARGET=x bash <<EOF\\ntouch $TARGET\\nEOF`
+    writes nothing; `$TARGET` expands empty and `touch` errors). A
+    persistent bare assignment from an earlier, separate segment *is*
+    already in `outer_variables`, because it was recorded into the shared
+    dict before this segment ever ran.
+
+    A *quoted* delimiter's body passes through to the child process
+    literally, unexpanded by the parent, so only a bare shell interpreter's
+    own recursive classification needs variables at all, and only the ones
+    that command's own environment would actually contain:
+    `prefix_assignments` (this invocation's own `VAR=v cmd` or `env
+    VAR=value cmd`), never `outer_variables` - a child process does not
+    inherit the parent's non-exported shell variables (verified
+    empirically: `TARGET=x` on its own segment, then `bash <<'EOF'\\ntouch
+    $TARGET\\nEOF`, writes nothing; `touch` receives an empty operand and
+    errors, matching a real, unexported bash variable).
+
+    git's own -F - stdin convention is a genuine exception to all of this:
+    its content is stored as an object-database message, never a
+    working-tree file, so nothing further is scanned. Everything else - a
+    READ_ONLY command (sed's own script language supports `w file` and `e`
+    without needing -i), an interpreter heredoc, a shell fed an explicit
+    script file, or a wholly unmodeled command - gets the same conservative
+    literal/opaque-write fallback an unmodeled command's own arguments
+    already get, rather than being skipped outright.
+    """
+    if not quoted:
+        for inner in heredoc_command_substitutions(body):
+            classify_command(
+                inner,
+                repo_root,
+                dict(outer_variables),
+                list(working_directories),
+                confirmed,
+                uncertain,
+                heredocs,
+            )
+    if command == "git" and git_reads_message_from_stdin(args):
+        return
+    if command in SHELL_INTERPRETERS and _heredoc_is_bare_shell(args, heredocs):
+        # A bare `bash <<EOF ... EOF` starts a new interpreter process: it
+        # only inherits the working directory (a process attribute), plus -
+        # for a quoted delimiter only - this command's own prefix-exported
+        # environment.
+        heredoc_variables = (
+            dict(prefix_assignments) if quoted else dict(outer_variables)
+        )
+        classify_command(
+            body,
+            repo_root,
+            heredoc_variables,
+            list(working_directories),
+            confirmed,
+            uncertain,
+            heredocs,
+        )
+        return
+    uncertain.extend(protected_path_literals(body))
+    uncertain.extend(opaque_write_paths(body))
+
+
 def segment_targets(
     tokens: list[str],
     variables: dict[str, str],
@@ -550,6 +997,8 @@ def segment_targets(
     uncertain: list[str],
     repo_root: str,
     working_directories: list[str],
+    heredocs: dict[str, tuple[str, bool]],
+    process_subs: dict[str, str],
 ) -> None:
     """Classify one segment's mutation targets into `confirmed` or `uncertain`.
 
@@ -558,6 +1007,13 @@ def segment_targets(
     literals seen only because the command itself is not provably safe; it is
     a softer, still-denied signal, not a confirmed mutation.
     """
+    # A snapshot of the persistent scope taken *before* this segment's own
+    # leading assignments are recorded below - the "parent shell" scope a
+    # heredoc's own unquoted-delimiter expansion or bare-shell-consumer
+    # recursion needs, which must not include this command's own prefix
+    # assignment (see heredoc_targets).
+    outer_variables = dict(variables)
+
     # command_name() records this segment's leading NAME=value assignments as
     # a side effect, so it must run on the raw tokens before substitute():
     # otherwise a same-segment `TARGET=.env rm "$TARGET"` would substitute
@@ -578,10 +1034,45 @@ def segment_targets(
             )
         index += 1
 
+    # A process substitution always runs, regardless of which command (or
+    # none) receives its /dev/fd path, so it is recursively classified
+    # unconditionally - never merely because the outer command looks unsafe.
+    for token in tokens:
+        inner = process_subs.get(token)
+        if inner is not None:
+            classify_command(
+                inner,
+                repo_root,
+                dict(variables),
+                list(working_directories),
+                confirmed,
+                uncertain,
+                heredocs,
+            )
+
     if command_info is None:
         return
-    command, start = command_info
+    command, start, prefix_assignments = command_info
     args = tokens[start:]
+
+    for token in args:
+        entry = heredocs.get(token)
+        if entry is not None:
+            body, quoted = entry
+            heredoc_targets(
+                command,
+                args,
+                body,
+                quoted,
+                heredocs,
+                repo_root,
+                outer_variables,
+                prefix_assignments,
+                working_directories,
+                confirmed,
+                uncertain,
+            )
+
     if command == "cd":
         candidates = operands(args, set())
         if len(candidates) != 1:
@@ -722,19 +1213,41 @@ def segment_targets(
         uncertain.extend(opaque_write_paths(" ".join(args)))
 
 
-def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
-    """Return (confirmed_targets, uncertain_targets) for a whole command line.
+def classify_command(
+    command: str,
+    repo_root: str,
+    variables: dict[str, str],
+    working_directories: list[str],
+    confirmed: list[str],
+    uncertain: list[str],
+    heredocs: dict[str, tuple[str, bool]],
+) -> None:
+    """Classify one shell command line, appending its mutation targets into
+    `confirmed`/`uncertain`. The sole recursion point for process
+    substitutions and bare shell heredocs, so nesting composes: each level
+    extracts its own heredocs and process substitutions before tokenizing.
+
+    `heredocs` is one mapping shared (by reference, never copied) across the
+    whole recursive call tree for a single top-level command, with new
+    placeholders numbered above whatever it already holds. A heredoc found
+    while scanning an outer level can end up embedded, as an inert
+    placeholder, inside a process substitution or a bare shell heredoc body
+    that only a *recursive* call ever tokenizes; without a shared mapping
+    that recursive call could never resolve it back to its real body, and
+    the mutation inside would go unclassified.
 
     A segment the classifier cannot fully model (AmbiguousCommand) does not
     abort the scan: it falls back to a conservative literal scan of that
     segment, so an ambiguity elsewhere in the command cannot hide a real
     mutation, while an ambiguity with no protected-resource evidence at all
-    resolves to "nothing found" instead of an internal-error status.
+    resolves to "nothing found" instead of an internal-error status. A
+    genuinely malformed construct (UnparseableCommand) is deliberately not
+    caught here: it propagates to the top-level fail-closed exit even when
+    raised deep inside a recursive call.
     """
-    confirmed: list[str] = []
-    uncertain: list[str] = []
-    variables: dict[str, str] = {}
-    working_directories = [repo_root]
+    command, found_heredocs = extract_heredocs(command, start_count=len(heredocs))
+    heredocs.update(found_heredocs)
+    command, process_subs = extract_process_substitutions(command)
     for segment in split_segments(command):
         try:
             segment_targets(
@@ -744,12 +1257,49 @@ def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
                 uncertain,
                 repo_root,
                 working_directories,
+                heredocs,
+                process_subs,
             )
         except AmbiguousCommand:
             resolved = substitute(segment, variables)
             uncertain.extend(token for token in resolved if protected(token, repo_root))
             uncertain.extend(protected_path_literals(" ".join(resolved)))
             uncertain.extend(opaque_write_paths(" ".join(resolved)))
+            # An ambiguous segment (e.g. an unrecognized wrapper flag) is
+            # raised before segment_targets ever reaches its own heredoc/
+            # process-substitution dispatch, so a placeholder here would
+            # otherwise be invisible to this fallback scan - the literal
+            # text above is only the *outer* tokens, never a heredoc body
+            # or a process substitution's inner command. A process
+            # substitution still executes regardless of the ambiguity, so
+            # it is classified the same as the unconditional case; a
+            # heredoc's real consumer is unknown here, so its body gets the
+            # same conservative floor an unmodeled command's own arguments
+            # already get.
+            for token in resolved:
+                inner = process_subs.get(token)
+                if inner is not None:
+                    classify_command(
+                        inner,
+                        repo_root,
+                        dict(variables),
+                        list(working_directories),
+                        confirmed,
+                        uncertain,
+                        heredocs,
+                    )
+                entry = heredocs.get(token)
+                if entry is not None:
+                    body, _quoted = entry
+                    uncertain.extend(protected_path_literals(body))
+                    uncertain.extend(opaque_write_paths(body))
+
+
+def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
+    """Return (confirmed_targets, uncertain_targets) for a whole command line."""
+    confirmed: list[str] = []
+    uncertain: list[str] = []
+    classify_command(command, repo_root, {}, [repo_root], confirmed, uncertain, {})
     return confirmed, uncertain
 
 

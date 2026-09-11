@@ -49,8 +49,17 @@ Required small-plan fields:
 - `status`
 - `closeout_session_log` once complete
 
-Small-plan status vocabulary is `in-progress`, `paused`, `complete`, or
-`cancelled`. The same exactly-once `status` rule applies to small plans.
+Small-plan status vocabulary is `planned`, `in-progress`, `paused`, `complete`,
+or `cancelled`. The same exactly-once `status` rule applies to small plans.
+
+`planned` marks a future phase that has not started yet. A newly authored
+small plan defaults to `planned` and requires only the ordinary identity
+fields above; it has no pause, cancellation, or closeout evidence. Branch
+creation and completed-phase advancement flip exactly the phase that becomes
+active from `planned` to `in-progress`; every other `planned` phase is left
+untouched. `planned` is unfinished: it blocks the same push/PR and completion
+gates as `in-progress`. Small plans already installed with a future phase
+marked `in-progress` remain valid; only new templates default to `planned`.
 
 `paused` is non-terminal and may be used only after the user explicitly asks
 to stop or checkpoint and resume later. A paused phase requires:
