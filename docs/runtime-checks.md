@@ -384,6 +384,17 @@ receipt alone would leave
 `closeout receipt artifact phase_receipt was tampered with`. That recovery is
 only valid while the working tree still matches the commit being certified.
 
+When `.claude` is present but is not its own Git repository, every mode except
+`gate` exits 2 before building a receipt and prints one message:
+
+```text
+.claude is not its own Git repository, so nested AI-state provenance is unavailable and no verification receipt can be built; run `bash .claude/hooks/scripts/state-sync.sh checkpoint` to initialize it, then re-run
+```
+
+The nested-state readers report absence in that state rather than
+letting Git walk up to the outer repository, so no receipt can record the
+outer `HEAD`, outer file bytes, or outer dirty paths as nested provenance.
+
 When control-plane provenance is unavailable because of a root-adapter
 mismatch, the verifier's message names each affected path from the ownership
 manifest, a `side` (`live`, `mirror`, `pair`, or `manifest`), and a `category`

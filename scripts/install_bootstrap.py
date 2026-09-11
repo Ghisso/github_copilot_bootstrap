@@ -107,6 +107,11 @@ def nested_git(target: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 def require_nested_head(target: Path, action: str) -> None:
     """Abort when a fail-open state-sync call did not create durable state."""
+    if not (target / ".claude" / ".git").exists():
+        raise SystemExit(
+            f"{action} did not create a nested AI-state repository: "
+            f"{target / '.claude'} has no .git"
+        )
     head = nested_git(target, "rev-parse", "--verify", "HEAD")
     if head.returncode != 0:
         raise SystemExit(
