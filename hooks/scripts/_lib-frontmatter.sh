@@ -1387,20 +1387,7 @@ assert_closeout_invariants() {
     failures+=("implementation branch must have at least one commit per completed small plan before PR/push")
   fi
 
-  local started_at bypass_ack
-  started_at="$(fm_read "$big_plan" "started_at" || true)"
-  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
-  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
-    local line timestamp
-    while IFS= read -r line; do
-      timestamp="${line%%,*}"
-      [[ "$line" == *"branch=$branch"* ]] || continue
-      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
-        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before opening a PR")
-        break
-      fi
-    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
-  fi
+  assert_bypass_acknowledgement "$repo_root" "$branch" "$big_plan"
 
   # The terminal completed phase gets strict current-state freshness; every
   # earlier completed phase in the big plan's declared order is additionally
@@ -1413,6 +1400,29 @@ assert_closeout_invariants() {
       require_ponytail="true"
     fi
     assert_completed_receipt "$repo_root" "$branch" "$last_completed_phase" "$local_sha" "ancestor" "true" "$require_ponytail" "true"
+  fi
+}
+
+# A bypass is branch-wide history, not only a terminal PR concern. Terminal
+# and completed-phase publication both require the plan's explicit
+# acknowledgement before a bypassed completion can reach a remote.
+assert_bypass_acknowledgement() {
+  local repo_root="$1"
+  local branch="$2"
+  local big_plan="$3"
+  local started_at bypass_ack
+  started_at="$(fm_read "$big_plan" "started_at" || true)"
+  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
+  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
+    local line timestamp
+    while IFS= read -r line; do
+      timestamp="${line%%,*}"
+      [[ "$line" == *"branch=$branch"* ]] || continue
+      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
+        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before publication")
+        break
+      fi
+    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
   fi
 }
 
@@ -1610,6 +1620,8 @@ assert_completed_phase_publication_invariants() {
     failures+=("completed-phase push needs a completed phase before current_phase")
     return
   fi
+
+  assert_bypass_acknowledgement "$repo_root" "$branch" "$big_plan"
 
   local require_ponytail="false"
   if diff_requires_ponytail "$repo_root" "$local_sha"; then

@@ -1636,7 +1636,7 @@ def gate_receipt_errors(
         errors.append("closeout receipt merge_base_sha is stale")
     if metadata.get("path_discovery_ok") is not True:
         errors.append("closeout receipt path discovery was not verified")
-    if enforce_final_state:
+    if enforce_final_state or head_relation == "certified":
         expected_tree = (
             git_output(["write-tree"], root)
             if head_relation == "exact"
@@ -1644,6 +1644,7 @@ def gate_receipt_errors(
         )
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append("closeout receipt final tracked state is stale")
+    if enforce_final_state:
         root_fingerprint, adapter_diagnostics = bootstrap_root_fingerprint_diagnostics(
             root
         )
@@ -1742,7 +1743,9 @@ def gate_receipt_errors(
                 root=root,
                 require_major=require_major,
                 require_ponytail=require_ponytail,
-                verify_current_content=enforce_final_state,
+                verify_current_content=(
+                    enforce_final_state or head_relation == "certified"
+                ),
             )
         )
     log_path = loaded.get("closeout_log")
@@ -1855,7 +1858,9 @@ def report_errors(
         errors.append(f"{label} changed_files must be a list of strings")
     if verify_current_content:
         current_hash = content_hash_for(
-            root, expected_base, head if head_relation == "ancestor" else ""
+            root,
+            expected_base,
+            head if head_relation in {"ancestor", "certified"} else "",
         )
         if not current_hash or report.get("content_hash") != current_hash:
             errors.append(f"{label} content_hash is stale")

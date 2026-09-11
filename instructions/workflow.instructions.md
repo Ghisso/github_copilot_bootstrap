@@ -164,7 +164,7 @@ Commit-gate bypasses are allowed only for commit subjects beginning with:
   through to the full ceremony gate like any other commit, so a substantive
   runtime/code change cannot hide under a typo subject.
 
-Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. A PR is blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
+Every successful bypass commit is logged to `.claude/session_logs/hooks-bypass.log`. Publication and PR creation are blocked until bypasses since the big plan's `started_at` timestamp are acknowledged with `bypass_acknowledged: true` in the big-plan frontmatter.
 
 Environment-variable bypasses are not supported.
 
