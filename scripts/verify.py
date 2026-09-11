@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import fnmatch
 import hashlib
 import importlib.util
 import json
@@ -2249,6 +2250,12 @@ def _ruff_measurement(
             *config_args,
         ]
         rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return (
+            "UNVERIFIED",
+            "Ruff is not installed in the project environment; "
+            "run uv add --dev ruff mypy pytest",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff did not run: {error}"
     if rc not in {0, 1}:
@@ -2285,6 +2292,12 @@ def _ruff_format_measurement(
     try:
         args = ["uv", "run", "ruff", "format", "--check", *targets, *config_args]
         rc, stdout, stderr = _run(args, cwd=cwd)
+    except FileNotFoundError:
+        return (
+            "UNVERIFIED",
+            "Ruff is not installed in the project environment; "
+            "run uv add --dev ruff mypy pytest",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"Ruff format did not run: {error}"
     if rc not in {0, 1}:
@@ -2323,6 +2336,12 @@ def _mypy_measurement(targets: list[str] | None, cwd: str = ".") -> tuple[str, s
             ],
             cwd=cwd,
         )
+    except FileNotFoundError:
+        return (
+            "UNVERIFIED",
+            "mypy is not installed in the project environment; "
+            "run uv add --dev ruff mypy pytest",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"mypy did not run: {error}"
     output = stdout + stderr
@@ -2352,6 +2371,18 @@ def _pytest_result_summary(output: str) -> str:
     return ""
 
 
+def repository_has_test_files(root: Path) -> bool:
+    """Return whether the repository has any pytest-discoverable test file."""
+    for current_dir, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in {".claude", ".venv", ".git"}]
+        if any(
+            fnmatch.fnmatch(name, "test_*.py") or fnmatch.fnmatch(name, "*_test.py")
+            for name in files
+        ):
+            return True
+    return False
+
+
 def _pytest_measurement(
     cwd: str = ".", targets: list[str] | None = None
 ) -> tuple[str, str]:
@@ -2368,6 +2399,12 @@ def _pytest_measurement(
             ],
             cwd=cwd,
         )
+    except FileNotFoundError:
+        return (
+            "UNVERIFIED",
+            "pytest is not installed in the project environment; "
+            "run uv add --dev ruff mypy pytest",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return "UNVERIFIED", f"pytest did not run: {error}"
     summary = _pytest_result_summary(stdout)
@@ -2382,6 +2419,17 @@ def _pytest_measurement(
             f"pytest reported test failures ({summary})"
             if summary
             else "pytest reported test failures",
+        )
+    if rc == 5:
+        if repository_has_test_files(Path(cwd)):
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests although test files exist; "
+                "check testpaths and file naming",
+            )
+        return (
+            "NOT_APPLICABLE",
+            "pytest collected no tests and the repository has no test files yet",
         )
     return (
         "UNVERIFIED",
@@ -2421,6 +2469,8 @@ def measure_mypy(root: Path, targets: list[str] | None) -> dict[str, object]:
 def measure_pytest(root: Path, targets: list[str] | None = None) -> dict[str, object]:
     """Adapt the strict pytest measurement into a receipt check."""
     status, detail = _pytest_measurement(cwd=str(root), targets=targets)
+    if status == "NOT_APPLICABLE":
+        return not_applicable("VFY-PYTEST-001", detail)
     return check("VFY-PYTEST-001", status, detail)
 
 
@@ -2624,9 +2674,10 @@ def unpublishable_closeout_reason(
     return (
         "closeout receipt would be unpublishable: the big plan's recorded "
         "digest is not yet retrievable from nested Git, so the terminal "
-        "push gate could never accept it; run `bash "
-        ".claude/hooks/scripts/state-sync.sh checkpoint` then re-run "
-        "closeout"
+        "push gate could never accept it; run git -C .claude add -A && "
+        'git -C .claude commit -m "checkpoint: <reason>" (or, from a '
+        "terminal or editor task, bash .claude/hooks/scripts/state-sync.sh "
+        "checkpoint)"
     )
 
 
@@ -2749,7 +2800,8 @@ def phase_checks(
             else check(
                 "VFY-MYPY-001",
                 "UNVERIFIED",
-                "Mypy has no configured scope or conventional src root",
+                "mypy has no scope: add a src/ directory or set [tool.mypy] "
+                "files, packages, or modules in pyproject.toml",
             )
         )
         pytest = measure_pytest(root, [])
@@ -3097,8 +3149,9 @@ def main() -> int:
         print(
             ".claude is not its own Git repository, so nested AI-state "
             "provenance is unavailable and no verification receipt can be "
-            "built; run `bash .claude/hooks/scripts/state-sync.sh "
-            "checkpoint` to initialize it, then re-run",
+            "built; run git -C .claude add -A && git -C .claude commit -m "
+            '"checkpoint: <reason>" (or, from a terminal or editor task, '
+            "bash .claude/hooks/scripts/state-sync.sh checkpoint)",
             file=sys.stderr,
         )
         return 2

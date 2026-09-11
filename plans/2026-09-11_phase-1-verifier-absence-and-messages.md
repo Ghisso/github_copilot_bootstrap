@@ -3,7 +3,7 @@ name: 2026-09-11_phase-1-verifier-absence-and-messages
 type: small-plan
 parent_plan: 2026-09-11_consumer-ceremony-friction
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
