@@ -2417,14 +2417,13 @@ _TEST_DISCOVERY_SKIP_DIRS = frozenset(
 )
 
 
-def repository_has_test_files(root: Path) -> bool:
+def repository_has_test_files(root: Path) -> bool | None:
     """Return whether the repository has any pytest-discoverable test file.
 
-    Also returns True when the walk hits a permission (or other OS) error on
-    a subtree, treating that subtree as inconclusive rather than absent: an
-    unreadable directory could hold the only tests, and reporting absence in
-    that case would fail open into NOT_APPLICABLE instead of the honest
-    UNVERIFIED.
+    Returns None when the walk hit a permission (or other OS) error on a
+    subtree and found no test file elsewhere: an unreadable directory could
+    hold the only tests, so absence cannot be claimed and the caller must
+    stay UNVERIFIED rather than fail open into NOT_APPLICABLE.
     """
     walk_errors: list[OSError] = []
     for current_dir, dirs, files in os.walk(root, onerror=walk_errors.append):
@@ -2434,7 +2433,7 @@ def repository_has_test_files(root: Path) -> bool:
             for name in files
         ):
             return True
-    return bool(walk_errors)
+    return None if walk_errors else False
 
 
 def _pytest_measurement(
@@ -2474,11 +2473,18 @@ def _pytest_measurement(
             else "pytest reported test failures",
         )
     if rc == 5:
-        if repository_has_test_files(Path(cwd)):
+        has_tests = repository_has_test_files(Path(cwd))
+        if has_tests:
             return (
                 "UNVERIFIED",
                 "pytest collected no tests although test files exist; "
                 "check testpaths and file naming",
+            )
+        if has_tests is None:
+            return (
+                "UNVERIFIED",
+                "pytest collected no tests and part of the repository could "
+                "not be read while looking for test files; check permissions",
             )
         return (
             "NOT_APPLICABLE",
