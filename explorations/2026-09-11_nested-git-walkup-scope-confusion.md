@@ -2,7 +2,16 @@
 
 **Date:** 2026-09-11
 **Author:** prior agent session (Claude Opus 5), during big plan `2026-09-11_outer-repo-auto-push`
-**Status:** OPEN — not fixed. Wants independent confirmation and a severity ruling.
+**Status:** RESOLVED on 2026-09-11 by big plan
+`.claude/plans/2026-09-11_nested-walkup-gating.md`. The independent ruling
+confirmed findings 1 through 4, built the fail-open path (both terminal
+predicates and `terminal_control_plane_provenance_matches` returned `True` from
+an outer top-level `plans/` mirror, including with a nested later-phase plan not
+cancelled on disk), and measured that the plain-directory state already refused
+every publish in the normal flow. All five readers are now gated on
+`nested_state_repository`, `verify.py` exits 2 with a plain message in that
+state, and the installer's `require_nested_head` checks for `.claude/.git`
+first. See `.claude/session_logs/2026-09-11_phase-A-gate-nested-readers.md`.
 **Code state:** branch `dev` at merge commit `2258f18` (PR #35), which contains `f92fe22`.
 `origin/main` does not contain it.
 **Authoring source under review:** `shared/scripts/verify.py`. Generated mirrors

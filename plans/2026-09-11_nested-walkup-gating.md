@@ -76,7 +76,7 @@ diagnostic only makes that failure legible and names the remediation.
 
 ## Phases
 
-- [ ] `2026-09-11_phase-A-gate-nested-readers` — gate the five readers, add the
+- [x] `2026-09-11_phase-A-gate-nested-readers` — gate the five readers, add the
   diagnostic, fix the installer check, add regression tests, regenerate
   targets, and run the final documentation, memory, and LEARN audit.
 

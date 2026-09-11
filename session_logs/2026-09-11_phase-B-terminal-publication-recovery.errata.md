@@ -41,6 +41,23 @@ identified and not ruled out.
 ## Where this is now tracked
 
 `.claude/explorations/2026-09-11_nested-git-walkup-scope-confusion.md` holds the
-full brief, the reproductions, the severity reasoning, and the open questions. It
-is awaiting independent confirmation and is the accurate record. This issue is
-open and unfixed.
+full brief, the reproductions, the severity reasoning, and the open questions.
+
+## Resolution (2026-09-11)
+
+The independent ruling confirmed every finding above and refuted the
+"no current gate is affected" conclusion by measurement: with an outer
+top-level `plans/` directory mirroring the nested plan bytes at receipt time,
+`has_only_terminal_big_plan_change`,
+`has_only_checkpointed_terminal_big_plan_change`, and
+`terminal_control_plane_provenance_matches` all returned `True`, including
+while a nested later-phase plan on disk was not cancelled. A genuine nested
+repository refused the same state. The ruling also measured that the
+plain-directory consumer already failed every publish in the normal flow, so
+gating the readers could not break a working path.
+
+Fixed by big plan `.claude/plans/2026-09-11_nested-walkup-gating.md`: all five
+readers are gated on `nested_state_repository`, `verify.py` exits 2 with a plain
+message in that state, and the installer's `require_nested_head` checks for
+`.claude/.git` before asking Git. See
+`.claude/session_logs/2026-09-11_phase-A-gate-nested-readers.md`.

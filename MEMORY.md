@@ -882,6 +882,19 @@
   it reports protection that is not being verified. The first escape-hatch test
   omitted `.claude` entirely, with a comment explaining it was avoiding the
   walk-up behavior — which was the very defect. Build the real shape.
+- [LEARN:review] `git -C <dir>` is never a repository test, and it is not only
+  `rev-parse` that walks up: `git show :path` resolves the path from the
+  repository root, and `git status --porcelain` reports repository-root paths,
+  so a plain `.claude` inside an outer repository returns outer file bytes and
+  outer dirty paths spelled exactly like nested ones. When one reader in a
+  family is found walking up, gate the whole family on the `.git` entry.
+- [LEARN:testing] A fail-open reproduction must include the state the gate is
+  meant to refuse, then a control run on the supported shape must refuse it.
+  The walk-up predicates accepted an un-cancelled nested later-phase plan from
+  an outer `plans/` mirror; the genuine nested repository refused it.
+- [LEARN:review] Before ruling that a fix would break a documented state,
+  measure whether that state works today. The plain-directory consumer already
+  failed every publish gate, so gating the readers cost nothing.
 - [LEARN:quality] Check a persist path's ordering against its own status gate.
   `--persist` wrote the receipt before returning on status, so a diagnostic run
   overwrote a passing receipt with a failing one, which is what turned a

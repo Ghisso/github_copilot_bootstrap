@@ -3,8 +3,8 @@ name: 2026-09-11_phase-A-gate-nested-readers
 type: small-plan
 parent_plan: 2026-09-11_nested-walkup-gating
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_phase-A-gate-nested-readers.md
 ---
 
 # Small Plan: Gate the nested-state readers
@@ -85,7 +85,7 @@ were run from throwaway temporary repositories.
 
 ## Steps
 
-- [ ] Gate the readers. In `shared/scripts/verify.py`, make `nested_git_head`
+- [x] Gate the readers. In `shared/scripts/verify.py`, make `nested_git_head`
   and `nested_tracked_state_fingerprint` return `""`, and
   `indexed_nested_file`, `nested_revision_file`, and
   `relevant_nested_status_changes` return `None`, when
@@ -93,17 +93,17 @@ were run from throwaway temporary repositories.
   `is_dir`/`is_symlink` guard with the predicate call, since the predicate
   already performs those checks. Update the `nested_git_head` docstring to say
   it never walks up. Keep every other line of these functions unchanged.
-- [ ] Add the plain diagnostic. In `main()` of `shared/scripts/verify.py`,
+- [x] Add the plain diagnostic. In `main()` of `shared/scripts/verify.py`,
   after the `gate` branch returns and before `state_metadata` runs, when
   `nested_state_repository(root)` is false print one message to stderr and
   return 2. Name the cause (`.claude` is not its own Git repository, so nested
   provenance is unavailable and no receipt can be built) and the remediation
   (`bash .claude/hooks/scripts/state-sync.sh checkpoint`, then re-run). Reuse
   the wording shape of `unpublishable_closeout_reason`.
-- [ ] Fix the installer check. In `require_nested_head` of
+- [x] Fix the installer check. In `require_nested_head` of
   `scripts/install_bootstrap.py`, raise the same `SystemExit` when
   `target / ".claude" / ".git"` does not exist, before running `rev-parse`.
-- [ ] Add regression tests to `tests/test_verify.py`, reusing
+- [x] Add regression tests to `tests/test_verify.py`, reusing
   `_write_terminal_precondition_repo(tmp_path, plain_nested_directory=True)`
   for the plain-directory shape. Cover: each of the five readers reports
   absence for that shape while an outer file of the same relative path exists;
@@ -118,18 +118,18 @@ were run from throwaway temporary repositories.
   plain `.claude` directory inside an outer repository. Before the fix, the
   outer-mirror test and the reader tests must fail; treat a green run before
   the fix as a harness bug.
-- [ ] Check the harnesses. Run `uv run pytest tests/ -q` and
+- [x] Check the harnesses. Run `uv run pytest tests/ -q` and
   `uv run python scripts/validate_targets.py`. Any existing fixture that
   produced valid receipts only because `.claude` was a plain directory inside
   the outer repository will now fail; convert each to a real nested repository
   with `git init`, since the walk-up was masking the shape under test. Do not
   relax the new guards to keep such a fixture green.
-- [ ] Regenerate the target adapters and install locally with
+- [x] Regenerate the target adapters and install locally with
   `uv run python scripts/generate_targets.py --all` then
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
   Never hand-edit generated files; the hook gate reads
   `.claude/scripts/verify.py`, so an unregenerated tree tests the old code.
-- [ ] Perform the final documentation, memory, and LEARN audit. This phase is
+- [x] Perform the final documentation, memory, and LEARN audit. This phase is
   the only entry in the big plan's `phases:` list. Mark the exploration
   `.claude/explorations/2026-09-11_nested-git-walkup-scope-confusion.md` as
   resolved with a pointer to this plan. Write
@@ -210,17 +210,17 @@ Phase-specific proof:
 
 ## Closeout Checklist
 
-- [ ] All steps implemented and verified
-- [ ] `uv run pytest tests/ -q` passes
-- [ ] `uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases` passes
-- [ ] `uv run ruff check shared scripts tests` and `ruff format --check` pass
-- [ ] `uv run python scripts/validate_targets.py` passes
-- [ ] `uv run python scripts/check_runtime.py` passes
-- [ ] Targets regenerated and installed locally
-- [ ] Code, architecture, security, tests, and Ponytail reviews complete
-- [ ] Critical and major findings at zero
-- [ ] `docs/` updated
-- [ ] `.claude/MEMORY.md` records the reusable lessons
-- [ ] Closeout session log complete, including `## Stale-claims surfaces checked`
-- [ ] Nested state checkpointed before persisting the closeout receipt
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] All steps implemented and verified
+- [x] `uv run pytest tests/ -q` passes
+- [x] `uv run mypy shared scripts tests --ignore-missing-imports --explicit-package-bases` passes
+- [x] `uv run ruff check shared scripts tests` and `ruff format --check` pass
+- [x] `uv run python scripts/validate_targets.py` passes
+- [x] `uv run python scripts/check_runtime.py` passes
+- [x] Targets regenerated and installed locally
+- [x] Code, architecture, security, tests, and Ponytail reviews complete
+- [x] Critical and major findings at zero
+- [x] `docs/` updated
+- [x] `.claude/MEMORY.md` records the reusable lessons
+- [x] Closeout session log complete, including `## Stale-claims surfaces checked`
+- [x] Nested state checkpointed before persisting the closeout receipt
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
