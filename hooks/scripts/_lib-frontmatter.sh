@@ -1429,6 +1429,65 @@ assert_bypass_acknowledgement() {
 # Validate the narrow remote-backup path for a current paused phase. This does
 # not inspect final closeout reports: the checkpoint remains unfinished and PR
 # creation always calls assert_closeout_invariants directly.
+# Validate every phase declared before current_phase, which both publication
+# paths gate on identically: each must be complete or carry full cancellation
+# evidence. Reports what those phases certify through
+# PRIOR_PHASES_COMPLETED_COUNT and PRIOR_PHASES_LAST_COMPLETED, appends to the
+# caller's failures array, and returns non-zero when the caller must stop.
+# Keep this Bash 3.2-compatible: collect the existing frontmatter list with
+# `while read` rather than mapfile/readarray.
+assert_prior_phases_terminal() {
+  local repo_root="$1"
+  local big_plan="$2"
+  local current_phase="$3"
+  local push_label="$4"
+  PRIOR_PHASES_COMPLETED_COUNT=0
+  PRIOR_PHASES_LAST_COMPLETED=""
+
+  local -a phases=()
+  local phase
+  while IFS= read -r phase; do
+    [[ -n "$phase" ]] && phases+=("$phase")
+  done < <(fm_read_list "$big_plan" "phases")
+  if [[ "${#phases[@]}" -eq 0 ]]; then
+    failures+=("$big_plan has no phases list")
+    return 1
+  fi
+
+  local current_listed=0 before_current=1 small_plan status
+  for phase in "${phases[@]}"; do
+    if [[ "$phase" == "$current_phase" ]]; then
+      current_listed=1
+      before_current=0
+      continue
+    fi
+    [[ "$before_current" -eq 1 ]] || continue
+
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    if [[ ! -f "$small_plan" ]]; then
+      failures+=("missing small-plan file: .claude/plans/$phase.md")
+      continue
+    fi
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$status" == "complete" ]]; then
+      PRIOR_PHASES_COMPLETED_COUNT=$((PRIOR_PHASES_COMPLETED_COUNT + 1))
+      PRIOR_PHASES_LAST_COMPLETED="$phase"
+    elif [[ "$status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$small_plan" "$phase"
+    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before $push_label")
+    else
+      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
+    fi
+  done
+
+  if [[ "$current_listed" -ne 1 ]]; then
+    failures+=("big plan current_phase must be listed in phases")
+    return 1
+  fi
+  return 0
+}
+
 assert_paused_publication_invariants() {
   local repo_root="$1"
   local branch="$2"
@@ -1457,49 +1516,12 @@ assert_paused_publication_invariants() {
     return
   fi
 
-  # Keep this Bash 3.2-compatible: collect the existing frontmatter list with
-  # `while read` rather than mapfile/readarray.
-  local -a phases=()
-  local phase
-  while IFS= read -r phase; do
-    [[ -n "$phase" ]] && phases+=("$phase")
-  done < <(fm_read_list "$big_plan" "phases")
-  if [[ "${#phases[@]}" -eq 0 ]]; then
-    failures+=("$big_plan has no phases list")
+  if ! assert_prior_phases_terminal "$repo_root" "$big_plan" "$current_phase" \
+    "paused checkpoint push"; then
     return
   fi
-
-  local current_listed=0 prior_completed_count=0 before_current=1
+  local prior_completed_count="$PRIOR_PHASES_COMPLETED_COUNT"
   local small_plan status
-  for phase in "${phases[@]}"; do
-    if [[ "$phase" == "$current_phase" ]]; then
-      current_listed=1
-      before_current=0
-      continue
-    fi
-    [[ "$before_current" -eq 1 ]] || continue
-
-    small_plan="$repo_root/.claude/plans/$phase.md"
-    if [[ ! -f "$small_plan" ]]; then
-      failures+=("missing small-plan file: .claude/plans/$phase.md")
-      continue
-    fi
-    status="$(fm_read_unique_status "$small_plan" || true)"
-    if [[ "$status" == "complete" ]]; then
-      prior_completed_count=$((prior_completed_count + 1))
-    elif [[ "$status" == "cancelled" ]]; then
-      assert_cancellation_evidence "$small_plan" "$phase"
-    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
-      failures+=("$small_plan must contain exactly one status field before paused checkpoint push")
-    else
-      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
-    fi
-  done
-
-  if [[ "$current_listed" -ne 1 ]]; then
-    failures+=("big plan current_phase must be listed in phases")
-    return
-  fi
 
   small_plan="$repo_root/.claude/plans/$current_phase.md"
   if [[ ! -f "$small_plan" ]]; then
@@ -1564,47 +1586,12 @@ assert_completed_phase_publication_invariants() {
     return
   fi
 
-  local -a phases=()
-  local phase
-  while IFS= read -r phase; do
-    [[ -n "$phase" ]] && phases+=("$phase")
-  done < <(fm_read_list "$big_plan" "phases")
-  if [[ "${#phases[@]}" -eq 0 ]]; then
-    failures+=("$big_plan has no phases list")
+  if ! assert_prior_phases_terminal "$repo_root" "$big_plan" "$current_phase" \
+    "completed-phase push"; then
     return
   fi
-
-  local current_listed=0 before_current=1 completed_phase=""
+  local completed_phase="$PRIOR_PHASES_LAST_COMPLETED"
   local small_plan status
-  for phase in "${phases[@]}"; do
-    if [[ "$phase" == "$current_phase" ]]; then
-      current_listed=1
-      before_current=0
-      continue
-    fi
-    [[ "$before_current" -eq 1 ]] || continue
-
-    small_plan="$repo_root/.claude/plans/$phase.md"
-    if [[ ! -f "$small_plan" ]]; then
-      failures+=("missing small-plan file: .claude/plans/$phase.md")
-      continue
-    fi
-    status="$(fm_read_unique_status "$small_plan" || true)"
-    if [[ "$status" == "complete" ]]; then
-      completed_phase="$phase"
-    elif [[ "$status" == "cancelled" ]]; then
-      assert_cancellation_evidence "$small_plan" "$phase"
-    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
-      failures+=("$small_plan must contain exactly one status field before completed-phase push")
-    else
-      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
-    fi
-  done
-
-  if [[ "$current_listed" -ne 1 ]]; then
-    failures+=("big plan current_phase must be listed in phases")
-    return
-  fi
   small_plan="$repo_root/.claude/plans/$current_phase.md"
   if [[ ! -f "$small_plan" ]]; then
     failures+=("missing small-plan file: .claude/plans/$current_phase.md")

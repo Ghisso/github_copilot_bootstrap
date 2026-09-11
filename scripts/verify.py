@@ -1778,7 +1778,10 @@ def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
     resolved_child = git_output(
         ["rev-parse", "--verify", "--quiet", f"{child}^{{commit}}"], root
     )
-    if not resolved_child:
+    resolved_parent = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}"], root
+    )
+    if not resolved_child or not resolved_parent:
         return False
     try:
         parents = run_process(
@@ -1789,7 +1792,11 @@ def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
     if parents.returncode != 0:
         return False
     parts = parents.stdout.split()
-    return len(parts) == 2 and parts[0] == resolved_child and parts[1] == parent
+    return (
+        len(parts) == 2
+        and parts[0] == resolved_child
+        and parts[1] == resolved_parent
+    )
 
 
 def report_errors(
