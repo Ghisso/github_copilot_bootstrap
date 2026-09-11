@@ -6,11 +6,8 @@ originating_branch: dev
 implementation_branch: 2026-09-11_consumer-ceremony-friction_implementation
 started_at:
 phases:
-  - 2026-09-11_phase-A-verify-absence-vs-failure
-  - 2026-09-11_phase-B-hooks-path-from-state-sync
-  - 2026-09-11_phase-C-agent-facing-gate-messages
-  - 2026-09-11_phase-D-prompt-time-local-checkpoint
-  - 2026-09-11_phase-E-hook-log-hygiene
+  - 2026-09-11_phase-1-verifier-absence-and-messages
+  - 2026-09-11_phase-2-hooks-path-log-and-gate-hint
 current_phase:
 ---
 
@@ -22,9 +19,8 @@ A read-only audit of the generated consumer runtime (`dist/multi-agent`) on
 2026-09-11 found two conditions under which a consumer can never complete a
 commit through the agent, plus several recurring costs. Evidence was gathered
 by reading the gate code, running the PreToolUse guards against sample
-commands, and timing hook overhead. Details are in the session that produced
-this plan; the measured facts each phase depends on are restated in that
-phase's small plan.
+commands, and timing hook overhead. The measured facts each phase depends on
+are restated in that phase's small plan.
 
 The two blockers:
 
@@ -39,11 +35,8 @@ The two blockers:
   folder-open task) never sets it, so commit-msg, post-commit, and pre-push
   never run, phases never advance, and the next push is refused with no hint.
 
-The recurring costs:
+The recurring costs in scope:
 
-- Every user prompt runs `state-sync.sh push`, which performs `ls-remote`,
-  `fetch`, and `push` before the prompt is processed (about 1.5 s online, up
-  to the 60 s hook timeout offline). Stop and SessionEnd publish as well.
 - The verifier's remediation messages tell the agent to run
   `bash .claude/hooks/scripts/state-sync.sh checkpoint`, which the guard
   denies for the agent; `git -C .claude add -A && git -C .claude commit` is
@@ -53,6 +46,10 @@ The recurring costs:
 - `session_logs/hooks-errors.log` is tracked in `ai-state` with no cap. In this
   repository it holds 3513 lines, about 3200 written by the authoring test
   suite, which runs hook scripts with `REPO_ROOT` pointed at the live checkout.
+
+Out of scope by decision: the prompt-time `state-sync.sh push` stays as it
+is. Publication before every prompt is preferred over a local-only
+checkpoint.
 
 The previous friction plan (`consumer-lifecycle-friction-hardening`) fixed
 commit-driven phase advancement, root-adapter recovery diagnostics, empty-array
@@ -68,42 +65,33 @@ above were in its scope.
   session that starts without it is told so.
 - Gate and verifier messages name commands the agent is allowed to run, and
   the chained commit-and-push refusal explains itself.
-- Prompt submission does no network work; publication happens at Stop,
-  SessionEnd, and post-commit, as it already does.
 - The hook error log stops growing in `ai-state` history, and the test suite
   cannot write into the live log.
 
 ## Design Overview
 
 ```mermaid
-flowchart TD
-    A[Phase A: verifier distinguishes absence from failure] --> C[Phase C: messages name allowed commands]
-    B[Phase B: state-sync setup and pull set core.hooksPath] --> C
-    C --> D[Phase D: prompt hook becomes local checkpoint]
-    D --> E[Phase E: untrack error log; isolate tests]
+flowchart LR
+    P1["Phase 1: verify.py — absence vs failure, agent-runnable messages, prerequisites doc"] --> P2["Phase 2: hook scripts — hooksPath on restore, push-gate hint, untracked error log, test isolation, final audit"]
 ```
 
-Each phase is one commit and independently valuable. Phase D is a policy
-change the user may cancel without affecting the others. Every phase touches
-control-plane files (hook scripts, generators, the verifier, or tests), so
-each carries the full review profile set.
+Two phases, split by file family. Phase 1 touches only the canonical verifier,
+its tests, and docs. Phase 2 touches the hook scripts, the devcontainer
+script, the validator, the hook tests, the commit skill, and docs, and carries
+the plan-wide final audit. Both are control-plane and carry the full review
+profile set.
 
 ## Phases
 
-- [ ] `2026-09-11_phase-A-verify-absence-vs-failure` — pytest with no test
-  files reports `NOT_APPLICABLE`; tool-missing and scope-missing messages name
-  the fix; consumer prerequisites documented.
-- [ ] `2026-09-11_phase-B-hooks-path-from-state-sync` — `state-sync.sh`
-  configures `core.hooksPath` whenever it restores the checkout;
-  session-start warns when it is missing.
-- [ ] `2026-09-11_phase-C-agent-facing-gate-messages` — verifier messages
-  name the agent-allowed checkpoint form; the push gate explains the chained
-  commit-and-push refusal; the commit skill documents it.
-- [ ] `2026-09-11_phase-D-prompt-time-local-checkpoint` — UserPromptSubmit
-  runs `checkpoint` instead of `push` for Claude and Codex.
-- [ ] `2026-09-11_phase-E-hook-log-hygiene` — untrack
-  `session_logs/hooks-errors.log` from `ai-state`; make hook tests write only
-  under `tmp_path`; add a leak guard.
+- [ ] `2026-09-11_phase-1-verifier-absence-and-messages` — pytest with no
+  test files reports `NOT_APPLICABLE`; tool-missing and scope-missing
+  messages name the fix; the two checkpoint remediation messages name the
+  agent-allowed form; consumer prerequisites documented.
+- [ ] `2026-09-11_phase-2-hooks-path-log-and-gate-hint` — `state-sync.sh`
+  sets `core.hooksPath` whenever it restores the checkout and untracks the
+  error log; session start warns when hooks are inactive; the push gate
+  explains the chained commit-and-push refusal; hook tests write only under
+  `tmp_path` with a leak guard; final audit.
 
 ## Verification
 
@@ -128,6 +116,3 @@ unchanged, and record the audited surfaces and each one's outcome under a
 `## Stale-claims surfaces checked` heading in that phase's closeout session
 log. `verify.py`'s closeout gate requires that exact heading, non-empty,
 whenever the phase it is closing out is this list's last entry.
-
-If Phase D is cancelled, Phase E remains the final phase and carries the
-audit.
