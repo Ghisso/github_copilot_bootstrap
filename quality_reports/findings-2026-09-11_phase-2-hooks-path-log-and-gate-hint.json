@@ -1,0 +1,45 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-11T13:25:27Z",
+  "branch": "2026-09-11_consumer-ceremony-friction_implementation",
+  "head_sha": "8b062b7936cf275af89582048975479b8129979c",
+  "base_ref": "dev",
+  "merge_base_sha": "326026fd31cc30c3001ab49ef22c98e696dcfaba",
+  "phase": "2026-09-11_phase-2-hooks-path-log-and-gate-hint",
+  "target": "shared",
+  "dirty": false,
+  "content_hash": "1930ec865de45614d3530a764fa4739ebcb06ecc",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/runtime-checks.md",
+    "docs/smoke-tests.md",
+    "scripts/validate_targets.py",
+    "shared/devcontainer/post-start.sh",
+    "shared/hooks/scripts/enforce-pr-gate.sh",
+    "shared/hooks/scripts/session-start-state.sh",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/scripts/verify.py",
+    "shared/skills/commit/SKILL.md",
+    "tests/conftest.py",
+    "tests/test_hook_gates.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_lifecycle_hooks.py",
+    "tests/test_state_sync.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
