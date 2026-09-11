@@ -87,7 +87,7 @@ profile set.
   test files reports `NOT_APPLICABLE`; tool-missing and scope-missing
   messages name the fix; the two checkpoint remediation messages name the
   agent-allowed form; consumer prerequisites documented.
-- [ ] `2026-09-11_phase-2-hooks-path-log-and-gate-hint` — `state-sync.sh`
+- [x] `2026-09-11_phase-2-hooks-path-log-and-gate-hint` — `state-sync.sh`
   sets `core.hooksPath` whenever it restores the checkout and untracks the
   error log; session start warns when hooks are inactive; the push gate
   explains the chained commit-and-push refusal; hook tests write only under

@@ -3,8 +3,8 @@ name: 2026-09-11_phase-2-hooks-path-log-and-gate-hint
 type: small-plan
 parent_plan: 2026-09-11_consumer-ceremony-friction
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-11_phase-2-hooks-path-log-and-gate-hint.md
 ---
 
 # Small Plan: Hook scripts activate Git hooks, keep the error log local, and explain the push refusal
@@ -103,19 +103,19 @@ Push gate:
 
 ## Steps
 
-- [ ] `shared/hooks/scripts/state-sync.sh`: add `configure_outer_hooks_path()`
+- [x] `shared/hooks/scripts/state-sync.sh`: add `configure_outer_hooks_path()`
   and call it at the end of `restore_root_adapters()`; extend
   `write_nested_gitignore()` and add the error-log untrack step where
   `untrack_nested_cache` runs.
-- [ ] `shared/devcontainer/post-start.sh`: remove the `core.hooksPath` block
+- [x] `shared/devcontainer/post-start.sh`: remove the `core.hooksPath` block
   and update the comment above `setup`.
-- [ ] `shared/hooks/scripts/session-start-state.sh`: append the warning
+- [x] `shared/hooks/scripts/session-start-state.sh`: append the warning
   sentence under the stated condition.
-- [ ] `shared/hooks/scripts/enforce-pr-gate.sh`: add the prefixed reason under
+- [x] `shared/hooks/scripts/enforce-pr-gate.sh`: add the prefixed reason under
   the stated condition.
-- [ ] `shared/skills/commit/SKILL.md` Phase 5 and `docs/runtime-checks.md`
+- [x] `shared/skills/commit/SKILL.md` Phase 5 and `docs/runtime-checks.md`
   push-gate description: one sentence each on the separate-commands rule.
-- [ ] Tests, `tests/test_state_sync.py`: a fresh `setup` on an outer Git
+- [x] Tests, `tests/test_state_sync.py`: a fresh `setup` on an outer Git
   repository containing `.claude/hooks/git-hooks` sets `core.hooksPath`; a
   repeated `setup` does not rewrite it; `pull` sets it on a writer whose
   checkout arrived from the remote; an outer directory that is not a Git
@@ -124,29 +124,29 @@ Push gate:
   and the next `status --porcelain` is clean; a fresh setup never tracks it.
   Update the existing tests around `:1681-1752` that seed the remote with
   that file and assert on its tracked content.
-- [ ] Tests, `tests/test_hook_gates.py`: a payload `git commit -m x && git push`
+- [x] Tests, `tests/test_hook_gates.py`: a payload `git commit -m x && git push`
   on an implementation branch yields a denial containing
   `separate Bash commands`; a plain `git push` denial does not. Route every
   live-checkout `REPO_ROOT` to `tmp_path`. In the file that already covers
   `session-start-state.sh`, assert the hooks warning appears when the path is
   unset and is absent when set.
-- [ ] `tests/conftest.py`: add the leak guard fixture. Run the full suite and
+- [x] `tests/conftest.py`: add the leak guard fixture. Run the full suite and
   confirm the live log's line count is unchanged before and after.
-- [ ] `scripts/validate_targets.py`: assert both generated `state-sync.sh`
+- [x] `scripts/validate_targets.py`: assert both generated `state-sync.sh`
   copies contain the `core.hooksPath` configuration and the error-log
   gitignore seed, and that generated `post-start.sh` no longer sets the hooks
   path.
-- [ ] Documentation: `README.md` "Changing dev machines" states that `setup`
+- [x] Documentation: `README.md` "Changing dev machines" states that `setup`
   also activates the Git hooks; `docs/runtime-checks.md` hooks section and
   `docs/architecture.md` state-sync `setup` bullet mention it; the state-sync
   section notes the error log is local-only and why.
-- [ ] Final-phase audit. Sweep `README.md`, `docs/`, root guidance, shared
+- [x] Final-phase audit. Sweep `README.md`, `docs/`, root guidance, shared
   policies, agent prompts, and skills for claims invalidated by Phases 1 and
   2 (prerequisites, `UNVERIFIED` semantics, hooks-path ownership, remediation
   commands, tracked error log, chained push). Record each surface and outcome
   under `## Stale-claims surfaces checked` in this phase's closeout session
   log. Record reusable lessons in `.claude/MEMORY.md`.
-- [ ] Regenerate and install locally.
+- [x] Regenerate and install locally.
 
 ## Review Profiles
 
@@ -201,15 +201,15 @@ explanation.
 
 ## Closeout Checklist
 
-- [ ] All steps implemented and verified
-- [ ] `uv run pytest tests/ -q` passes
-- [ ] mypy, ruff check, and ruff format pass
-- [ ] `validate_targets.py` and `check_runtime.py` pass
-- [ ] Targets regenerated and installed locally
-- [ ] Code, architecture, security, tests, and Ponytail reviews complete
-- [ ] Critical and major findings at zero
-- [ ] Documentation updated
-- [ ] `.claude/MEMORY.md` records the reusable lessons
-- [ ] Closeout session log complete, including `## Stale-claims surfaces checked`
-- [ ] Nested state checkpointed before persisting the closeout receipt
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] All steps implemented and verified
+- [x] `uv run pytest tests/ -q` passes
+- [x] mypy, ruff check, and ruff format pass
+- [x] `validate_targets.py` and `check_runtime.py` pass
+- [x] Targets regenerated and installed locally
+- [x] Code, architecture, security, tests, and Ponytail reviews complete
+- [x] Critical and major findings at zero
+- [x] Documentation updated
+- [x] `.claude/MEMORY.md` records the reusable lessons
+- [x] Closeout session log complete, including `## Stale-claims surfaces checked`
+- [x] Nested state checkpointed before persisting the closeout receipt
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)

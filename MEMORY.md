@@ -908,6 +908,24 @@
   three-way result (found, absent, inconclusive); collapsing inconclusive into
   "found" keeps the gate closed but produces a message that points the reader
   at the wrong cause.
+- [LEARN:testing] Hook scripts derive `REPO_ROOT` from their own path, so
+  tests that run them in place from `shared/hooks/scripts` log into the live
+  `.claude/session_logs/hooks-errors.log`. Symlinking the scripts directory
+  under `tmp_path` keeps bash's logical `$0` under `tmp_path` (the scripts use
+  `pwd`, never `pwd -P`), isolating them without copying. Guard the live log
+  with a session fixture that also fails on absent-at-start, present-at-end.
+- [LEARN:quality] Do not assert byte-identical content on a file the script
+  under test also writes; `warn` appends to `hooks-errors.log`, so the
+  validator's equality check failed on correct behaviour. Assert a prefix or a
+  tracked-state property instead.
+- [LEARN:review] Two validator functions asserting one invariant with
+  different literals drift: a bare-word `core.hooksPath` check matched the very
+  comment that explained the removal. One owner per invariant, and match the
+  invocation, not the word.
+- [LEARN:workflow] When a coder attributes the only validator failure to
+  "stale generated copies", regenerate and rerun before believing it. Twice in
+  one phase the regenerated tree still failed for real reasons the report had
+  folded into that explanation.
 - [LEARN:quality] Check a persist path's ordering against its own status gate.
   `--persist` wrote the receipt before returning on status, so a diagnostic run
   overwrote a passing receipt with a failing one, which is what turned a
