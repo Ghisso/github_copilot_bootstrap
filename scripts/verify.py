@@ -2546,6 +2546,51 @@ def missing_documentation_na_reason(
     )
 
 
+def unpublishable_closeout_reason(
+    root: Path, metadata: dict[str, object]
+) -> str | None:
+    """Diagnose a closeout receipt the terminal push gate could never accept.
+
+    ``control_plane_provenance`` records ``big_plan_digest`` from the big
+    plan's working-tree bytes. The terminal push predicates
+    (``has_only_terminal_big_plan_change``,
+    ``has_only_checkpointed_terminal_big_plan_change``) can only ever accept
+    that digest if it is retrievable from a nested Git revision, so a
+    receipt persisted while the big plan is dirty in nested state binds a
+    digest no later state can ever match - persisting it anyway would only
+    destroy the prior valid receipt. Mirrors
+    ``missing_documentation_na_reason``'s persist-time precondition shape.
+    Skips when nested provenance is unavailable (no big plan bound to this
+    branch, or ``.claude`` is not a Git repository), matching the existing
+    provenance-unavailable path for a consumer without nested state.
+    """
+    branch = metadata.get("branch")
+    if not isinstance(branch, str):
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None:
+        return None
+    nested_head = nested_git_head(root)
+    if not nested_head:
+        return None
+    provenance = metadata.get("control_plane_provenance")
+    if not isinstance(provenance, dict):
+        return None
+    slug = branch.removesuffix("_implementation")
+    source = nested_revision_file(root, nested_head, f"plans/{slug}.md")
+    if source is not None and hashlib.sha256(source).hexdigest() == provenance.get(
+        "big_plan_digest"
+    ):
+        return None
+    return (
+        "closeout receipt would be unpublishable: the big plan's recorded "
+        "digest is not yet retrievable from nested Git, so the terminal "
+        "push gate could never accept it; run `bash "
+        ".claude/hooks/scripts/state-sync.sh checkpoint` then re-run "
+        "closeout"
+    )
+
+
 def closeout_artifacts(
     root: Path, metadata: dict[str, object], documentation_na: str = ""
 ) -> dict[str, object]:
@@ -2926,9 +2971,15 @@ def unresolved_phase_reason(
                     last_completed = candidate
             if last_completed:
                 return (
-                    "no active phase: the big plan is complete; optional receipt "
-                    "refresh: uv run python .claude/scripts/verify.py phase "
-                    f"--format json --persist --phase {last_completed}"
+                    "no active phase: the big plan is complete; if the "
+                    "working tree still matches the commit being certified, "
+                    "recover the receipt chain by running, in order: uv run "
+                    "python .claude/scripts/verify.py phase --persist "
+                    f"--phase {last_completed}; then uv run python "
+                    ".claude/scripts/verify.py closeout --persist --phase "
+                    f"{last_completed} (the second call rebinds the "
+                    "closeout receipt's phase_receipt hash, which the "
+                    "first call invalidates)"
                 )
             return (
                 "active phase metadata is malformed: the complete big plan has no "
@@ -3029,6 +3080,10 @@ def main() -> int:
         if doc_na_reason is not None:
             print(doc_na_reason, file=sys.stderr)
             return 2
+        unpublishable_reason = unpublishable_closeout_reason(root, metadata)
+        if unpublishable_reason is not None:
+            print(unpublishable_reason, file=sys.stderr)
+            return 2
     artifacts = (
         closeout_artifacts(root, metadata, args.documentation_na)
         if args.mode == "closeout"
@@ -3044,6 +3099,20 @@ def main() -> int:
             print("receipt persistence needs phase metadata", file=sys.stderr)
             return 2
         path = receipt_path(root, args.mode, phase)
+        if path.is_file() and receipt["status"] != "PASS":
+            try:
+                previous = load_receipt(path)
+            except ValueError:
+                previous = None
+            if previous is not None and previous.get("status") == "PASS":
+                print(
+                    f"refusing to persist {args.mode} receipt: the existing "
+                    f"receipt at {path} already passed and this run did "
+                    f"not ({receipt['status']}); the prior passing receipt "
+                    "was left unchanged",
+                    file=sys.stderr,
+                )
+                return 2
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     if args.format == "json":
