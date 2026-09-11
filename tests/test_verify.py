@@ -1646,6 +1646,94 @@ def test_pytest_infrastructure_exit_is_unverified(
     assert verify.measure_pytest(REPO_ROOT)["status"] == "UNVERIFIED"
 
 
+def test_repository_has_test_files_detects_pytest_naming_patterns(
+    tmp_path: Path,
+) -> None:
+    """Both accepted pytest test-module naming patterns are detected."""
+    assert verify.repository_has_test_files(tmp_path) is False
+    (tmp_path / "test_alpha.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is True
+    (tmp_path / "test_alpha.py").unlink()
+    nested = tmp_path / "pkg"
+    nested.mkdir()
+    (nested / "alpha_test.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is True
+
+
+def test_repository_has_test_files_skips_claude_venv_and_git(tmp_path: Path) -> None:
+    """AI-state, virtualenv, and Git internals never count as project tests."""
+    for skipped in (".claude", ".venv", ".git"):
+        directory = tmp_path / skipped
+        directory.mkdir()
+        (directory / "test_hidden.py").write_text("", encoding="utf-8")
+    assert verify.repository_has_test_files(tmp_path) is False
+
+
+def test_repository_has_test_files_is_inconclusive_on_a_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unreadable subtree could hold the only tests, so the walk must be
+    treated as inconclusive (None, keeping pytest UNVERIFIED rather than
+    NOT_APPLICABLE) and say so, instead of silently reporting absence or
+    claiming test files exist."""
+    if os.geteuid() == 0:
+        pytest.skip("root bypasses directory permissions")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    (locked / "test_hidden.py").write_text("", encoding="utf-8")
+    locked.chmod(0o000)
+    try:
+        assert verify.repository_has_test_files(tmp_path) is None
+        monkeypatch.setattr(
+            verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran", "")
+        )
+        status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    finally:
+        locked.chmod(0o755)
+    assert status == "UNVERIFIED"
+    assert "could not be read" in detail
+    assert "although test files exist" not in detail
+
+
+def test_pytest_exit_5_without_test_files_is_not_applicable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A brand-new project with no test files yet can still reach a clean
+    receipt: pytest's exit 5 ("no tests collected") is an honest absence,
+    not a tool failure."""
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran in 0.01s", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    assert status == "NOT_APPLICABLE"
+    assert "no test files" in detail
+
+    pytest_check = verify.measure_pytest(tmp_path)
+    assert pytest_check["status"] == "NOT_APPLICABLE"
+    assert pytest_check["applicable"] is False
+    assert verify.aggregate_status([pytest_check]) == "NOT_APPLICABLE"
+    passing_check = verify.check("VFY-RUFF-001", "PASS", "ruff completed")
+    assert verify.aggregate_status([pytest_check, passing_check]) == "PASS"
+
+
+def test_pytest_exit_5_with_uncollected_test_files_is_unverified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Existing test files pytest still fails to collect are a configuration
+    problem, so they must keep blocking rather than reading as an absence."""
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_x.py").write_text(
+        "def test_x() -> None:\n    assert True\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        verify, "_run", lambda *_args, **_kwargs: (5, "no tests ran in 0.01s", "")
+    )
+    status, detail = verify._pytest_measurement(cwd=str(tmp_path))
+    assert status == "UNVERIFIED"
+    assert "testpaths" in detail
+
+
 @pytest.mark.parametrize(
     ("stdout", "expected"),
     (
@@ -2802,6 +2890,43 @@ def test_phase_receipt_rejects_required_check_marked_not_applicable() -> None:
         verify.validate_receipt(receipt)
 
 
+def _phase_checks_with_pytest_not_applicable(
+    *, ruff_not_applicable: bool = False
+) -> list[dict[str, object]]:
+    """Build a phase check list with a genuinely test-less pytest result."""
+    return [
+        verify.not_applicable(check_id, "phase does not consume evidence")
+        if check_id == "VFY-RECEIPT-001"
+        else verify.not_applicable(
+            check_id,
+            "pytest collected no tests and the repository has no test files yet",
+        )
+        if check_id == "VFY-PYTEST-001"
+        else verify.not_applicable(check_id, "test-induced")
+        if ruff_not_applicable and check_id == "VFY-RUFF-001"
+        else verify.check(check_id, "PASS", "measured")
+        for check_id in verify.CHECK_IDS
+    ]
+
+
+def test_phase_receipt_permits_pytest_not_applicable_for_a_test_less_repository() -> (
+    None
+):
+    """A test-less consumer's honest pytest NOT_APPLICABLE must not turn
+    building a phase receipt into an uncaught ValueError."""
+    checks = _phase_checks_with_pytest_not_applicable()
+    receipt = verify.build_receipt("phase", checks, _metadata())  # must not raise
+    assert receipt["status"] == "PASS"
+
+
+def test_phase_receipt_still_rejects_other_checks_marked_not_applicable() -> None:
+    """The pytest carve-out is exact: a NOT_APPLICABLE VFY-RUFF-001 in phase
+    mode still raises, even alongside a genuinely inapplicable pytest check."""
+    checks = _phase_checks_with_pytest_not_applicable(ruff_not_applicable=True)
+    with pytest.raises(ValueError, match="invalid applicability"):
+        verify.build_receipt("phase", checks, _metadata())
+
+
 def test_missing_git_binding_is_not_fresh_evidence() -> None:
     """Freshness cannot pass when Git did not supply a head/base binding."""
     metadata = _metadata()
@@ -3038,6 +3163,97 @@ def test_measurement_does_not_report_failed_measurement_clean(
     monkeypatch.setattr(verify, "_run", lambda *_args, **_kwargs: result)
     measured_status, _detail = runner("shared")  # type: ignore[operator]
     assert measured_status == status
+
+
+def _spawn_failure(tool: str) -> tuple[int, str, str]:
+    """Return the real `uv run <tool>` result when `uv` is present but
+    `tool` is not: a non-zero exit with a "Failed to spawn" stderr, never
+    a raised exception."""
+    return (
+        2,
+        "",
+        f"error: Failed to spawn: `{tool}`\n"
+        "  Caused by: No such file or directory (os error 2)",
+    )
+
+
+@pytest.mark.parametrize(
+    ("runner", "kwargs", "tool_name", "fake_run"),
+    (
+        (
+            verify._ruff_measurement,
+            {},
+            "Ruff",
+            lambda *_a, **_k: _spawn_failure("ruff"),
+        ),
+        (
+            verify._ruff_format_measurement,
+            {},
+            "Ruff",
+            lambda *_a, **_k: _spawn_failure("ruff"),
+        ),
+        (
+            verify._mypy_measurement,
+            {},
+            "mypy",
+            lambda *_a, **_k: _spawn_failure("mypy"),
+        ),
+        (
+            verify._pytest_measurement,
+            {"cwd": "."},
+            "pytest",
+            lambda *_a, **_k: _spawn_failure("pytest"),
+        ),
+        (
+            verify._mypy_measurement,
+            {},
+            "mypy",
+            lambda *_a, **_k: (_ for _ in ()).throw(FileNotFoundError("uv")),
+        ),
+    ),
+    ids=(
+        "ruff-check-spawn-failure",
+        "ruff-format-spawn-failure",
+        "mypy-spawn-failure",
+        "pytest-spawn-failure",
+        "uv-itself-missing",
+    ),
+)
+def test_missing_executable_names_the_dev_dependency_fix(
+    monkeypatch: pytest.MonkeyPatch,
+    runner: object,
+    kwargs: dict[str, str],
+    tool_name: str,
+    fake_run: object,
+) -> None:
+    """Both the real failure mode - `uv run <tool>` failing to spawn an
+    uninstalled `tool` while `uv` itself is present - and `uv` itself being
+    absent (`FileNotFoundError`) get an install fix, not a raw, unhelpful
+    exit code or OSError string."""
+    monkeypatch.setattr(verify, "_run", fake_run)
+    if kwargs:
+        status, detail = runner(**kwargs)  # type: ignore[operator]
+    else:
+        status, detail = runner(["shared"])  # type: ignore[operator]
+    assert status == "UNVERIFIED"
+    assert "uv add --dev ruff mypy pytest" in detail
+    assert f"{tool_name} is not installed in the project environment" in detail
+
+
+def test_generic_os_error_keeps_the_raw_error_text_not_the_install_fix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An OSError that is not a missing executable stays diagnosable as the
+    real underlying error, instead of being mistaken for an absent tool."""
+
+    def fail(*_args: object, **_kwargs: object) -> tuple[int, str, str]:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(verify, "_run", fail)
+    status, detail = verify._mypy_measurement(["shared"])
+    assert status == "UNVERIFIED"
+    assert "disk full" in detail
+    assert "uv add --dev" not in detail
 
 
 def test_consumer_ruff_scope_extends_exclusions_without_replacing_config(
@@ -3286,13 +3502,15 @@ def test_consumer_phase_checks_exclude_bootstrap_runtime_and_fail_closed(
     assert ruff_calls == [(["."], [".claude"])]
     assert mypy_calls == []
     assert pytest_calls == [[]]
-    assert next(
-        item for item in checks if item["id"] == "VFY-MYPY-001"
-    ) == verify.check(
+    mypy_result = next(item for item in checks if item["id"] == "VFY-MYPY-001")
+    assert mypy_result == verify.check(
         "VFY-MYPY-001",
         "UNVERIFIED",
-        "Mypy has no configured scope or conventional src root",
+        "mypy has no scope: add a src/ directory or set [tool.mypy] "
+        "files, packages, or modules in pyproject.toml",
     )
+    assert "src/" in mypy_result["summary"]
+    assert "[tool.mypy]" in mypy_result["summary"]
 
 
 def test_bootstrap_phase_checks_keep_explicit_authoring_targets(
@@ -3958,6 +4176,7 @@ def test_unpublishable_closeout_reason_flags_dirty_big_plan(tmp_path: Path) -> N
     metadata = verify.state_metadata(tmp_path, "dev", "phase-one")
     reason = verify.unpublishable_closeout_reason(tmp_path, metadata)
     assert reason is not None
+    assert "git -C .claude add -A" in reason
     assert "state-sync.sh checkpoint" in reason
 
 
@@ -4060,6 +4279,8 @@ def test_main_reports_missing_nested_repository_plainly(tmp_path: Path) -> None:
     )
     assert result.returncode == 2
     assert "not its own Git repository" in result.stderr
+    assert "git -C .claude add -A" in result.stderr
+    assert "state-sync.sh checkpoint" in result.stderr
     assert "Traceback" not in result.stderr
 
 
@@ -4101,6 +4322,7 @@ def test_closeout_persist_refuses_while_big_plan_is_dirty_in_nested_state(
     exit_code = verify.main()
     assert exit_code == 2
     captured = capsys.readouterr()
+    assert "git -C .claude add -A" in captured.err
     assert "state-sync.sh checkpoint" in captured.err
     receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
     assert not receipt_path.exists()

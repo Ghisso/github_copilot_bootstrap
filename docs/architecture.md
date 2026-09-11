@@ -359,6 +359,14 @@ required Mypy scope cannot be established, the result is `UNVERIFIED` rather
 than an invented target. This keeps bootstrap runtime files out of consumer
 application checks.
 
+Any `UNVERIFIED` check makes the whole receipt `UNVERIFIED`, and the commit
+and push gates accept only a `PASS` receipt status; `NOT_APPLICABLE` does not
+block them. A repository with no test files yet reports its pytest check as
+`NOT_APPLICABLE` instead of `UNVERIFIED`, so a brand-new consumer can still
+reach a passing receipt. Once test files exist, pytest not collecting them
+stays `UNVERIFIED`, and a missing Ruff, mypy, or pytest executable is
+`UNVERIFIED` naming the `uv add --dev ruff mypy pytest` fix.
+
 Every phase and closeout receipt binds the measured outer repository state:
 base ref, branch, phase, `head_sha`, merge-base SHA, path discovery, relevant
 paths, and content/tracked-state hashes. It also records

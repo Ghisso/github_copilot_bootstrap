@@ -388,7 +388,7 @@ When `.claude` is present but is not its own Git repository, every mode except
 `gate` exits 2 before building a receipt and prints one message:
 
 ```text
-.claude is not its own Git repository, so nested AI-state provenance is unavailable and no verification receipt can be built; run `bash .claude/hooks/scripts/state-sync.sh checkpoint` to initialize it, then re-run
+.claude is not its own Git repository, so nested AI-state provenance is unavailable and no verification receipt can be built; run git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>" (or, from a terminal or editor task, bash .claude/hooks/scripts/state-sync.sh checkpoint)
 ```
 
 The nested-state readers report absence in that state rather than
@@ -444,6 +444,18 @@ The verifier derives consumer scopes from native project configuration and
 layout. It excludes `.claude` from consumer Ruff coverage, honors configured
 Mypy `files`, `packages`, or `modules`, and falls back only to a conventional
 `src` root. If required Mypy scope cannot be proven, it reports `UNVERIFIED`.
+Any `UNVERIFIED` check makes the whole receipt `UNVERIFIED`
+(`aggregate_status`), and the commit and push gates accept only `PASS` — a
+`NOT_APPLICABLE` check does not block them. A repository with no
+`test_*.py`/`*_test.py` files anywhere outside version-control, virtual
+environment, dependency, build, and cache directories (`.git`, `.claude`,
+`.venv`, `venv`, `node_modules`, `.tox`, `build`, `dist`, `site-packages`,
+`__pycache__`) reports its pytest check as `NOT_APPLICABLE` rather than
+`UNVERIFIED`; once test files exist, pytest must actually collect and run
+them, or the check stays `UNVERIFIED`. If part of the tree could not be read
+while looking for test files, the check also stays `UNVERIFIED` and says so.
+A missing Ruff, mypy, or pytest executable also reports
+`UNVERIFIED`, naming `uv add --dev ruff mypy pytest` as the fix.
 The bootstrap authoring repository retains its explicit `shared`, `scripts`,
 and `tests` scope. The commit/push/PR gates themselves are Bash 3.2 plus
 Python 3 standard-library JSON parsing; they have no `uv` dependency and

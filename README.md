@@ -93,6 +93,23 @@ git add .devcontainer .gitignore
 git commit -m "chore: add AI devcontainer bootstrap"
 ```
 
+### What the gates need from your project
+
+The deterministic verifier (`shared/scripts/verify.py`, installed as
+`.claude/scripts/verify.py`) measures your own project's Ruff, mypy, and
+pytest. A consumer repo needs:
+
+- `ruff`, `mypy`, and `pytest` as dev dependencies (`uv add --dev ruff mypy
+  pytest`). A missing executable reports `UNVERIFIED` with that same fix
+  rather than a raw error.
+- A mypy scope: a `src/` directory, or a `[tool.mypy]` entry in
+  `pyproject.toml` with `files`, `packages`, or `modules`. Without one, mypy
+  stays `UNVERIFIED` instead of guessing a scope.
+- Tests, eventually. A brand-new project with no `test_*.py`/`*_test.py`
+  files yet still gets a `PASS` receipt, with pytest reported as not
+  applicable; once test files exist, pytest must collect and run them or the
+  check stays `UNVERIFIED`.
+
 If you are already inside this bootstrap repo and only need to set the target path:
 
 ```bash
