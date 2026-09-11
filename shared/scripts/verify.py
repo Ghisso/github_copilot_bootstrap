@@ -769,6 +769,36 @@ def is_relevant_nested_path(
     )
 
 
+def nested_state_repository(root: Path) -> bool:
+    """Return whether ``.claude`` is genuinely its own Git repository.
+
+    ``nested_git_head`` cannot answer this: ``git -C .claude rev-parse HEAD``
+    walks *up* the directory tree when ``.claude`` has no ``.git`` of its own,
+    so it resolves to the outer repository's HEAD instead of failing. A
+    consumer whose ``.claude`` is a plain tracked directory - the documented
+    ``migrate-from-hf`` state - must not be treated as having nested state.
+    """
+    nested = root / ".claude"
+    if not nested.is_dir() or nested.is_symlink():
+        return False
+    return (nested / ".git").exists()
+
+
+def plan_bytes_matching_digest(
+    root: Path, revision: str, relative: str, recorded_digest: object
+) -> bytes | None:
+    """Return a revision's plan bytes only when they hash to ``recorded_digest``.
+
+    This is the one comparison the terminal publication contract turns on, so
+    both the push predicate and the persist-time precondition derive it here
+    rather than repeating it.
+    """
+    source = nested_revision_file(root, revision, relative)
+    if source is None or hashlib.sha256(source).hexdigest() != recorded_digest:
+        return None
+    return source
+
+
 def nested_git_head(root: Path) -> str:
     """Return the nested AI-state HEAD only when it is available."""
     nested = root / ".claude"
@@ -1280,12 +1310,12 @@ def has_only_checkpointed_terminal_big_plan_change(
     recorded_head = recorded.get("nested_head")
     if not isinstance(recorded_head, str):
         return False
-    source = nested_revision_file(root, recorded_head, relative)
+    source = plan_bytes_matching_digest(
+        root, recorded_head, relative, recorded.get("big_plan_digest")
+    )
     indexed = indexed_nested_file(root, relative)
     plan = root / ".claude" / relative
     if source is None or indexed is None or digest_file(plan) == "":
-        return False
-    if hashlib.sha256(source).hexdigest() != recorded.get("big_plan_digest"):
         return False
     expected = terminal_big_plan_bytes(source, phase)
     if expected is None or indexed != expected or plan.read_bytes() != expected:
@@ -1625,12 +1655,18 @@ def gate_receipt_errors(
         errors.append("closeout receipt head_sha is stale")
     elif head_relation == "ancestor" and not git_is_ancestor(root, receipt_head, head):
         errors.append("closeout receipt head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, receipt_head, head
+    ):
+        errors.append(
+            "closeout receipt head_sha does not directly certify the pushed commit"
+        )
     expected_base = git_output(["merge-base", "dev", head], root)
     if not expected_base or metadata.get("merge_base_sha") != expected_base:
         errors.append("closeout receipt merge_base_sha is stale")
     if metadata.get("path_discovery_ok") is not True:
         errors.append("closeout receipt path discovery was not verified")
-    if enforce_final_state:
+    if enforce_final_state or head_relation == "certified":
         expected_tree = (
             git_output(["write-tree"], root)
             if head_relation == "exact"
@@ -1638,6 +1674,7 @@ def gate_receipt_errors(
         )
         if not expected_tree or metadata.get("tree_sha") != expected_tree:
             errors.append("closeout receipt final tracked state is stale")
+    if enforce_final_state:
         root_fingerprint, adapter_diagnostics = bootstrap_root_fingerprint_diagnostics(
             root
         )
@@ -1736,7 +1773,9 @@ def gate_receipt_errors(
                 root=root,
                 require_major=require_major,
                 require_ponytail=require_ponytail,
-                verify_current_content=enforce_final_state,
+                verify_current_content=(
+                    enforce_final_state or head_relation == "certified"
+                ),
             )
         )
     log_path = loaded.get("closeout_log")
@@ -1762,6 +1801,30 @@ def git_is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
         )
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
+    """Return whether ``child`` is a non-merge commit directly after ``parent``."""
+    resolved_child = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{child}^{{commit}}"], root
+    )
+    resolved_parent = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}"], root
+    )
+    if not resolved_child or not resolved_parent:
+        return False
+    try:
+        parents = run_process(
+            ["git", "rev-list", "--parents", "-n", "1", resolved_child], root
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if parents.returncode != 0:
+        return False
+    parts = parents.stdout.split()
+    return (
+        len(parts) == 2 and parts[0] == resolved_child and parts[1] == resolved_parent
+    )
 
 
 def report_errors(
@@ -1803,6 +1866,10 @@ def report_errors(
         errors.append(f"{label} head_sha is stale")
     elif head_relation == "ancestor" and not git_is_ancestor(root, report_head, head):
         errors.append(f"{label} head_sha is not an ancestor of the pushed ref")
+    elif head_relation == "certified" and not git_is_direct_child(
+        root, report_head, head
+    ):
+        errors.append(f"{label} head_sha does not directly certify the pushed commit")
     if report.get("merge_base_sha") != expected_base:
         errors.append(f"{label} merge_base_sha is stale")
     if report.get("dirty") is not False:
@@ -1826,7 +1893,9 @@ def report_errors(
         errors.append(f"{label} changed_files must be a list of strings")
     if verify_current_content:
         current_hash = content_hash_for(
-            root, expected_base, head if head_relation == "ancestor" else ""
+            root,
+            expected_base,
+            head if head_relation in {"ancestor", "certified"} else "",
         )
         if not current_hash or report.get("content_hash") != current_hash:
             errors.append(f"{label} content_hash is stale")
@@ -2507,6 +2576,59 @@ def missing_documentation_na_reason(
     )
 
 
+def unpublishable_closeout_reason(
+    root: Path, metadata: dict[str, object]
+) -> str | None:
+    """Diagnose a closeout receipt the terminal push gate could never accept.
+
+    ``control_plane_provenance`` records ``big_plan_digest`` from the big
+    plan's working-tree bytes. The terminal push predicates
+    (``has_only_terminal_big_plan_change``,
+    ``has_only_checkpointed_terminal_big_plan_change``) can only ever accept
+    that digest if it is retrievable from a nested Git revision, so a
+    receipt persisted while the big plan is dirty in nested state binds a
+    digest no later state can ever match - persisting it anyway would only
+    destroy the prior valid receipt. Mirrors
+    ``missing_documentation_na_reason``'s persist-time precondition shape.
+    Skips when nested provenance is unavailable (no big plan bound to this
+    branch, or ``.claude`` is not its own Git repository), matching the
+    existing provenance-unavailable path for a consumer without nested state.
+    That check goes through ``nested_state_repository`` rather than
+    ``nested_git_head``, because the latter walks up to the outer repository's
+    HEAD when ``.claude`` has no ``.git``, which would refuse every closeout
+    for a consumer whose ``.claude`` is a plain tracked directory.
+    """
+    branch = metadata.get("branch")
+    if not isinstance(branch, str):
+        return None
+    big_plan = active_big_plan_path(root, branch)
+    if big_plan is None:
+        return None
+    if not nested_state_repository(root):
+        return None
+    nested_head = nested_git_head(root)
+    if not nested_head:
+        return None
+    provenance = metadata.get("control_plane_provenance")
+    if not isinstance(provenance, dict):
+        return None
+    slug = branch.removesuffix("_implementation")
+    if (
+        plan_bytes_matching_digest(
+            root, nested_head, f"plans/{slug}.md", provenance.get("big_plan_digest")
+        )
+        is not None
+    ):
+        return None
+    return (
+        "closeout receipt would be unpublishable: the big plan's recorded "
+        "digest is not yet retrievable from nested Git, so the terminal "
+        "push gate could never accept it; run `bash "
+        ".claude/hooks/scripts/state-sync.sh checkpoint` then re-run "
+        "closeout"
+    )
+
+
 def closeout_artifacts(
     root: Path, metadata: dict[str, object], documentation_na: str = ""
 ) -> dict[str, object]:
@@ -2887,9 +3009,15 @@ def unresolved_phase_reason(
                     last_completed = candidate
             if last_completed:
                 return (
-                    "no active phase: the big plan is complete; optional receipt "
-                    "refresh: uv run python .claude/scripts/verify.py phase "
-                    f"--format json --persist --phase {last_completed}"
+                    "no active phase: the big plan is complete; if the "
+                    "working tree still matches the commit being certified, "
+                    "recover the receipt chain by running, in order: uv run "
+                    "python .claude/scripts/verify.py phase --persist "
+                    f"--phase {last_completed}; then uv run python "
+                    ".claude/scripts/verify.py closeout --persist --phase "
+                    f"{last_completed} (the second call rebinds the "
+                    "closeout receipt's phase_receipt hash, which the "
+                    "first call invalidates)"
                 )
             return (
                 "active phase metadata is malformed: the complete big plan has no "
@@ -2933,7 +3061,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--branch", default="")
     parser.add_argument("--head", default="")
     parser.add_argument(
-        "--head-relation", choices=("exact", "ancestor"), default="exact"
+        "--head-relation", choices=("exact", "ancestor", "certified"), default="exact"
     )
     parser.add_argument("--require-major", action="store_true")
     parser.add_argument("--require-ponytail", action="store_true")
@@ -2990,6 +3118,10 @@ def main() -> int:
         if doc_na_reason is not None:
             print(doc_na_reason, file=sys.stderr)
             return 2
+        unpublishable_reason = unpublishable_closeout_reason(root, metadata)
+        if unpublishable_reason is not None:
+            print(unpublishable_reason, file=sys.stderr)
+            return 2
     artifacts = (
         closeout_artifacts(root, metadata, args.documentation_na)
         if args.mode == "closeout"
@@ -3005,6 +3137,20 @@ def main() -> int:
             print("receipt persistence needs phase metadata", file=sys.stderr)
             return 2
         path = receipt_path(root, args.mode, phase)
+        if path.is_file() and receipt["status"] != "PASS":
+            try:
+                previous = load_receipt(path)
+            except ValueError:
+                previous = None
+            if previous is not None and previous.get("status") == "PASS":
+                print(
+                    f"refusing to persist {args.mode} receipt: the existing "
+                    f"receipt at {path} already passed and this run did "
+                    f"not ({receipt['status']}); the prior passing receipt "
+                    "was left unchanged",
+                    file=sys.stderr,
+                )
+                return 2
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(canonical_json(receipt) + "\n", encoding="utf-8")
     if args.format == "json":

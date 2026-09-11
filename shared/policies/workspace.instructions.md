@@ -45,7 +45,7 @@ Always consult the relevant files under `.claude/instructions/`:
 
 | File | Covers |
 |---|---|
-| `workflow.instructions.md` | Pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit loop |
+| `workflow.instructions.md` | Pre-flight -> branch -> plan when needed -> implement -> verify -> review -> closeout -> commit -> push loop |
 | `quality-and-testing.instructions.md` | Verification commands and gates |
 | `tool-routing.instructions.md` | Direct reads, `rg`, Semble, and context-mode routing |
 | `code-standards.instructions.md` | Python architecture and style rules |
@@ -57,7 +57,7 @@ Always consult the relevant files under `.claude/instructions/`:
 ## Workflow
 
 ```text
-PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH
 ```
 
 Classify work with the single authoritative **Task Lanes** table in

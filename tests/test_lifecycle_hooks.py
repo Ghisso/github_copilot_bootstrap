@@ -20,6 +20,7 @@ from generate_targets import (  # noqa: E402
     render_antigravity_hooks,
     render_claude_settings,
     render_codex_hooks,
+    render_root_guidance,
 )
 from validate_targets import (  # noqa: E402
     antigravity_hook_errors,
@@ -45,6 +46,20 @@ if [[ "${FAIL_STEP:-}" == "$(basename "$0")" ]]; then
   exit 17
 fi
 """
+
+
+def test_rendered_root_guidance_defaults_only_outer_commits_to_push() -> None:
+    """Consumer guidance separates outer publication from nested AI-state sync."""
+    guidance = render_root_guidance("openai-codex")
+
+    assert "CLOSEOUT -> COMMIT -> PUSH" in guidance
+    assert "GIT_TERMINAL_PROMPT=0" in guidance
+    assert "branch upstream when configured, otherwise `origin`" in guidance
+    assert "missing remote or authentication/network failure is a warning" in guidance
+    assert (
+        "does not apply to nested `.claude` AI-state sync, PR creation, or merges"
+        in guidance
+    )
 
 
 def copy_stop_wrapper(tmp_path: Path, source: Path) -> tuple[Path, Path]:

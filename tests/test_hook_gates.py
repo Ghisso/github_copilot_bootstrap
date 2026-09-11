@@ -73,6 +73,118 @@ def _git_targets_nested_claude(command: str, subcommand: str) -> int:
     return int(result.stdout.strip())
 
 
+def test_certified_receipt_relation_accepts_only_the_direct_completion_commit(
+    tmp_path: Path,
+) -> None:
+    """Completed-phase publication cannot authorize a later WIP commit."""
+    for args in (
+        ("git", "init", "-q", "-b", "dev"),
+        ("git", "config", "user.email", "agent@example.com"),
+        ("git", "config", "user.name", "Agent"),
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True)
+    (tmp_path / "work.txt").write_text("base\n", encoding="utf-8")
+    subprocess.run(("git", "add", "work.txt"), cwd=tmp_path, check=True)
+    subprocess.run(("git", "commit", "-qm", "base"), cwd=tmp_path, check=True)
+    receipt_head = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+    (tmp_path / "work.txt").write_text("completed\n", encoding="utf-8")
+    subprocess.run(("git", "commit", "-am", "complete"), cwd=tmp_path, check=True)
+    completion = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+    verifier = runpy.run_path(str(REPO_ROOT / "shared" / "scripts" / "verify.py"))
+    is_direct_child = verifier["git_is_direct_child"]
+    assert is_direct_child(tmp_path, receipt_head, completion)
+    assert is_direct_child(tmp_path, receipt_head, "HEAD")
+    (tmp_path / "work.txt").write_text("unreviewed\n", encoding="utf-8")
+    subprocess.run(("git", "commit", "-am", "wip"), cwd=tmp_path, check=True)
+    later_commit = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+    assert not is_direct_child(tmp_path, receipt_head, later_commit)
+
+
+def test_certified_receipt_relation_rejects_a_merge_and_accepts_short_shas(
+    tmp_path: Path,
+) -> None:
+    """A merge commit never certifies; an abbreviated SHA still resolves.
+
+    The whole contract of ``git_is_direct_child`` is that exactly one
+    non-merge child qualifies, so loosening the parent count would admit a
+    merge that carries unreviewed work in from a second parent.
+    """
+    for args in (
+        ("git", "init", "-q", "-b", "dev"),
+        ("git", "config", "user.email", "agent@example.com"),
+        ("git", "config", "user.name", "Agent"),
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True)
+
+    def run(*args: str) -> str:
+        return subprocess.run(
+            args,
+            cwd=tmp_path,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+
+    (tmp_path / "work.txt").write_text("base\n", encoding="utf-8")
+    run("git", "add", "work.txt")
+    run("git", "commit", "-qm", "base")
+    receipt_head = run("git", "rev-parse", "HEAD")
+
+    (tmp_path / "work.txt").write_text("completed\n", encoding="utf-8")
+    run("git", "commit", "-qam", "complete")
+    completion = run("git", "rev-parse", "HEAD")
+
+    verifier = runpy.run_path(str(REPO_ROOT / "shared" / "scripts" / "verify.py"))
+    is_direct_child = verifier["git_is_direct_child"]
+
+    # An abbreviated receipt SHA and an abbreviated pushed SHA both resolve to
+    # the same canonical commits, so neither form may deny a valid push.
+    short_receipt = run("git", "rev-parse", "--short", receipt_head)
+    short_completion = run("git", "rev-parse", "--short", completion)
+    assert short_receipt != receipt_head
+    assert is_direct_child(tmp_path, short_receipt, completion)
+    assert is_direct_child(tmp_path, receipt_head, short_completion)
+    assert is_direct_child(tmp_path, short_receipt, short_completion)
+
+    # A merge whose first parent is the certified commit still has two
+    # parents, so it brings in work the receipt never certified.
+    run("git", "checkout", "-q", "-b", "side", receipt_head)
+    (tmp_path / "side.txt").write_text("uncertified\n", encoding="utf-8")
+    run("git", "add", "side.txt")
+    run("git", "commit", "-qm", "side work")
+    run("git", "checkout", "-q", "dev")
+    run("git", "merge", "-q", "--no-ff", "-m", "merge side", "side")
+    merge_commit = run("git", "rev-parse", "HEAD")
+    assert (
+        len(run("git", "rev-list", "--parents", "-n", "1", merge_commit).split()) == 3
+    )
+    assert not is_direct_child(tmp_path, completion, merge_commit)
+    assert not is_direct_child(tmp_path, completion, "HEAD")
+
+    # An unknown parent revision cannot resolve, so it cannot certify either.
+    assert not is_direct_child(tmp_path, "does-not-exist", completion)
+
+
 def _assert_plan_frontmatter_failures(tmp_path: Path) -> list[str]:
     """Invoke the shipped ``assert_plan_frontmatter`` gate against a fixture
     repo root, returning its accumulated failures (empty when valid)."""

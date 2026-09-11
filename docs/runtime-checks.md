@@ -347,14 +347,42 @@ plan make the receipt stale. Structural receipt invariants are enforced by the
 schema and verifier; they are not represented as synthetic PASS check IDs.
 
 The relevant nested tracked/dirty state that provenance binds to is not
-informational the way the nested HEAD is: it must persist last, while the
-nested `.claude` repository still holds the closeout run's own uncommitted
-changes. Do not run `state-sync.sh checkpoint`/`publish`/`push` by hand before
-`verify.py closeout --persist` — that commits nested state early and changes
-what the persisted receipt is bound to, so the next commit fails closed with
-`closeout receipt governing control-plane provenance is stale`. Persist the
-phase and closeout receipts, commit the outer repository, and let the native
-`post-commit` hook checkpoint and publish nested state afterward.
+informational the way the nested HEAD is, and its ordering is exact in both
+directions.
+
+Checkpoint nested plan state once every plan, log, and memory edit is
+final and before
+`verify.py phase --persist`/`closeout --persist`. `control_plane_provenance`
+records `big_plan_digest` from the big plan's working-tree bytes, while the two
+predicates that authorize a terminal push
+(`has_only_terminal_big_plan_change`, `has_only_checkpointed_terminal_big_plan_change`)
+can only re-derive that digest from a nested Git revision. A big plan still
+dirty in nested state when the receipt is persisted therefore binds a digest
+that is neither indexed nor committed, and no later state can make it match —
+the completion commit becomes permanently unpublishable. A multi-phase big plan
+hides this, because each intermediate commit checkpoints nested state; a
+single-phase plan does not. `closeout --persist` now fails closed on that
+condition before writing anything, and names the checkpoint command.
+
+`bash .claude/hooks/scripts/state-sync.sh checkpoint` is the canonical operation, used by the
+editor task and the lifecycle hooks. An agent working through its Bash tool must use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` instead, because the file-protection hook denies any Bash command naming a `.claude/hooks/` path; the nested-repository commit is explicitly exempt from the commit gate. Both forms put the plan bytes in nested Git, which is all the receipt needs, provided the nested repository is already initialized with its `.gitignore` - otherwise only the script's own seeding is correct.
+
+Never checkpoint or publish nested state *after* the receipts are persisted.
+That changes what they are bound to and fails the next commit closed with
+`closeout receipt governing control-plane provenance is stale`. Findings and
+receipt files are not provenance-bound paths, so writing them after the
+checkpoint is expected. Leave nested publication itself to the native
+`post-commit` hook after the outer commit.
+
+Two guards protect the recovery path. `--persist` refuses to replace a passing
+receipt with a failing one, so a diagnostic run cannot destroy the only valid
+evidence. And when a big plan is already `complete`, the refusal message
+recommends `phase --persist --phase <slug>` followed by
+`closeout --persist --phase <slug>`, in that order: the closeout receipt records
+the phase receipt's digest at its own persist time, so refreshing the phase
+receipt alone would leave
+`closeout receipt artifact phase_receipt was tampered with`. That recovery is
+only valid while the working tree still matches the commit being certified.
 
 When control-plane provenance is unavailable because of a root-adapter
 mismatch, the verifier's message names each affected path from the ownership
@@ -491,8 +519,8 @@ Two workflow invariants are each enforced twice, from a single shared contract p
 - **Commit invariant** — the plan/findings/closeout/LEARN ceremony, via `assert_commit_invariants` in `_lib-frontmatter.sh`:
   - **`PreToolUse` (`enforce-commit-gate.sh`)** gates the AI agent's own Bash tool calls. It can `ask`/`deny` before a turn is wasted and denies an agent commit on any branch that isn't `<plan_name>_implementation`. It exempts commits that target the nested `ai-state` repo (`git -C .claude commit`, `--git-dir=.claude/.git`, `--work-tree .claude`) — `state-sync.sh` commits there constantly and has no ceremony of its own to satisfy — but only when the *matching commit invocation itself* carries the nested-repo flag, not merely because some other `git` call earlier or later in the same compound command happens to touch `.claude/`.
   - **`commit-msg` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every commit that reaches git itself — human, IDE, script, or alias (`git ci`) — on one code path, with no command string to classify and no timeout to fail open on. It only runs the ceremony checks on `<plan_name>_implementation` branches — `dev`/`main` commits pass through untouched.
-- **Push invariant** — the big-plan/phase-completeness/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
-  - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
+- **Push invariant** — the completed-phase/final-closeout/commit-count/bypass-acknowledgment ceremony, via `assert_push_invariants` in `_lib-frontmatter.sh`:
+  - **`PreToolUse` (`enforce-pr-gate.sh`)** gates the agent's own `git push` and `gh pr create` Bash calls, and is the only layer that checks `gh pr create --base dev` (a `pre-push` hook has no PR-creation concept to gate). It permits a paused checkpoint or the exact phase-completion commit directly certified by the predecessor phase's receipt after `post-commit` advances `current_phase`; it rejects later in-progress work. It exempts nested `ai-state` pushes the same way, and with the same per-invocation scoping, as the commit gate above.
   - **`pre-push` (a real git hook, generated under `.claude/hooks/git-hooks/`)** gates every push that reaches git itself, reading ref lines from stdin (`<local-ref> <local-sha> <remote-ref> <remote-sha>`). It derives the branch and the commit-count check from the *pushed* ref/sha, not from whatever is checked out, so a push of `foo_implementation` from elsewhere is still gated. It skips branch deletions (all-zero local sha) and only runs the ceremony checks on `<plan_name>_implementation` refs — `dev`/`main` pushes pass through untouched.
 
 **Historical receipt-chain validation** — the push/PR gate does not check only
@@ -515,6 +543,8 @@ list first. It then re-verifies every
 artifact hash against the current file bytes. Only the terminal completed
 phase receives current-tree/current-runtime freshness checks; every earlier
 phase gets this ancestor/tree/artifact-hash chain instead.
+
+The orchestrator attempts one non-force outer-repository push after every successful commit, using the configured upstream or `origin`. It sets `GIT_TERMINAL_PROMPT=0`; missing remote configuration and authentication or network failures warn and preserve the local commit. Nested `ai-state` publication remains the post-commit hook's separate best-effort responsibility. PRs and merges are still user-requested.
 
 **Closed session logs are immutable.** Because a closeout log's bytes are
 hashed into its phase's receipt, editing a log after its phase closes breaks

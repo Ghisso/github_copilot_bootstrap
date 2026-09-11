@@ -26,7 +26,7 @@ Main goals:
 
 I use a strict execution loop:
 
-PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT
+PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH
 
 Core principles:
 
@@ -38,6 +38,7 @@ Core principles:
 - Verify every change with tests, typing, and linting.
 - Use the unified reviewer to challenge implementation quality.
 - Use the native Git `post-commit` boundary to advance a completed phase before AI-state synchronization; commit-message transport does not affect that transition.
+- After each successful outer-repository commit, have the orchestrator attempt one normal non-force push. A missing remote or authentication/network failure is a warning that preserves the local commit. PRs and merges remain user-requested.
 - Close out in one order: focused/fast checks, review, final docs/plan/log/LEARN state, explicit staging, findings, persisted phase evidence, persisted closeout evidence, then commit.
 - Ship only after a passing `verify phase`/`verify closeout` receipt, a matching findings report with zero CRITICAL findings, documentation updates, learning capture, and closeout logs. Ponytail findings use the same ordinary severity gates as other profiles.
 - Preserve lessons learned in memory and session logs.
@@ -244,11 +245,22 @@ runtime, in order:
 1. Run focused/fast verification and complete review.
 2. Update documentation, final small-plan state, `[LEARN]` evidence, and the
    completed session closeout log.
-3. Explicitly stage intended outer files, inspect the staged diff, and persist
+3. Checkpoint nested plan state, so the closeout receipt binds big-plan
+   bytes that Git already holds. From an agent use
+   `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`;
+   `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the
+   editor task and the lifecycle hooks.
+4. Explicitly stage intended outer files, inspect the staged diff, and persist
    the converged findings.
-4. Run `verify phase --persist`, then `verify closeout --persist`.
-5. Run the native commit and pre-push gates. Commit and push only after those
-   gates pass.
+5. Run `verify phase --persist`, then `verify closeout --persist`.
+6. Run the native commit and pre-push gates. Commit only after those gates
+   pass; the orchestrator then attempts the permitted outer-repository push.
+
+Step 3's position is exact. `closeout --persist` refuses, writes nothing, and
+names the remediation when the big plan is not yet retrievable from nested
+Git, because a receipt bound to uncommitted big-plan bytes can never satisfy
+the terminal push gate. Never checkpoint after step 5: that stales the
+receipts and fails the commit closed.
 
 Evidence-only checkpoints do not make current evidence stale. Changes to the
 governing plan or runtime do make it stale and require the affected evidence
@@ -798,7 +810,7 @@ Configured events:
 Two layers, two invariants, one shared contract each:
 
 - **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh). A `complete` phase keeps the existing closeout, findings, LEARN, and documentation gates. A current small plan with valid explicit pause evidence may take the separate checkpoint path: it records durable incomplete work without final findings/LEARN/DOCUMENT/COMPLETED closeout and does not advance the phase. `in-progress` and `cancelled` phases still cannot certify commits; cancellation semantics are unchanged.
-- **Push invariant** — `pre-push` (git hook) calls the public `assert_push_invariants`, which allows a valid paused current phase to publish its checkpoint as a durable remote backup. Its `dev..local_sha` count includes every prior completed phase plus the checkpoint commit, and future pre-created phases do not block that backup. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `enforce-pr-gate.sh` sends `git push` through that public path but sends `gh pr create --base dev` directly through strict `assert_closeout_invariants`. PR/final closeout still requires every phase to be complete or carry the full cancellation evidence contract, at least one completed phase, completed-phase commit counts, bypass acknowledgement, and final findings/Ponytail gates.
+- **Push invariant** — `pre-push` (git hook) calls the public `assert_push_invariants`. It permits a valid paused checkpoint and the exact completion commit of the phase immediately before the now-current in-progress phase; the latter must be directly certified by its receipt and findings, so later in-progress work cannot publish early. Its `dev..local_sha` count includes every prior completed phase plus the permitted commit, and future pre-created phases do not block that publication. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `enforce-pr-gate.sh` sends `git push` through that public path but sends `gh pr create --base dev` directly through strict `assert_closeout_invariants`. PR/final closeout still requires every phase to be complete or carry the full cancellation evidence contract, at least one completed phase, completed-phase commit counts, bypass acknowledgement, and final findings/Ponytail gates.
 
 Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
 
@@ -925,7 +937,7 @@ This bootstrap is intentionally opinionated, because consistency beats improvisa
 
 If you customize it, prioritize:
 
-- preserving the PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
+- preserving the PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH workflow, with Ponytail applied during coder implementation and conditionally during REVIEW
 - keeping verification commands accurate for your stack
 - maintaining clear ownership between instructions, skills, and hooks
 - treating terse-mode and compression as opt-in guardrailed tools, not blanket rewrites of source-of-truth customization files

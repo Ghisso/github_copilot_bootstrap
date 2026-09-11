@@ -147,7 +147,7 @@ TARGET_PATH_REPLACEMENTS = {
 
 ROOT_GUIDANCE_WORKFLOW = (
     "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
-    "CLOSEOUT -> COMMIT"
+    "CLOSEOUT -> COMMIT -> PUSH"
 )
 CODEX_AGENT_INSTRUCTIONS_DELIMITER = "--- Canonical shared role instructions ---"
 CODEX_ROLE_SUPPLEMENT_DELIMITER = "--- Codex role supplement: {agent_id} ---"
@@ -1297,7 +1297,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Run focused and fast checks during implementation, then profile-driven review until clean. CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings, then runs `verify phase` and `verify closeout`.
 - Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
-- Do not open a PR, push, or merge unless the workflow permits it and the user requested the external action. The user owns merge decisions.
+- After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
 
 ## Exact Commands
 

@@ -1387,20 +1387,7 @@ assert_closeout_invariants() {
     failures+=("implementation branch must have at least one commit per completed small plan before PR/push")
   fi
 
-  local started_at bypass_ack
-  started_at="$(fm_read "$big_plan" "started_at" || true)"
-  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
-  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
-    local line timestamp
-    while IFS= read -r line; do
-      timestamp="${line%%,*}"
-      [[ "$line" == *"branch=$branch"* ]] || continue
-      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
-        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before opening a PR")
-        break
-      fi
-    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
-  fi
+  assert_bypass_acknowledgement "$repo_root" "$branch" "$big_plan"
 
   # The terminal completed phase gets strict current-state freshness; every
   # earlier completed phase in the big plan's declared order is additionally
@@ -1416,9 +1403,91 @@ assert_closeout_invariants() {
   fi
 }
 
+# A bypass is branch-wide history, not only a terminal PR concern. Terminal
+# and completed-phase publication both require the plan's explicit
+# acknowledgement before a bypassed completion can reach a remote.
+assert_bypass_acknowledgement() {
+  local repo_root="$1"
+  local branch="$2"
+  local big_plan="$3"
+  local started_at bypass_ack
+  started_at="$(fm_read "$big_plan" "started_at" || true)"
+  bypass_ack="$(fm_read "$big_plan" "bypass_acknowledged" || true)"
+  if [[ -f "$repo_root/.claude/session_logs/hooks-bypass.log" && "$bypass_ack" != "true" ]]; then
+    local line timestamp
+    while IFS= read -r line; do
+      timestamp="${line%%,*}"
+      [[ "$line" == *"branch=$branch"* ]] || continue
+      if [[ -z "$started_at" || "$timestamp" > "$started_at" ]]; then
+        failures+=("this branch has logged commit-gate bypasses; add bypass_acknowledged: true to the big plan before publication")
+        break
+      fi
+    done < "$repo_root/.claude/session_logs/hooks-bypass.log"
+  fi
+}
+
 # Validate the narrow remote-backup path for a current paused phase. This does
 # not inspect final closeout reports: the checkpoint remains unfinished and PR
 # creation always calls assert_closeout_invariants directly.
+# Validate every phase declared before current_phase, which both publication
+# paths gate on identically: each must be complete or carry full cancellation
+# evidence. Reports what those phases certify through
+# PRIOR_PHASES_COMPLETED_COUNT and PRIOR_PHASES_LAST_COMPLETED, appends to the
+# caller's failures array, and returns non-zero when the caller must stop.
+# Keep this Bash 3.2-compatible: collect the existing frontmatter list with
+# `while read` rather than mapfile/readarray.
+assert_prior_phases_terminal() {
+  local repo_root="$1"
+  local big_plan="$2"
+  local current_phase="$3"
+  local push_label="$4"
+  PRIOR_PHASES_COMPLETED_COUNT=0
+  PRIOR_PHASES_LAST_COMPLETED=""
+
+  local -a phases=()
+  local phase
+  while IFS= read -r phase; do
+    [[ -n "$phase" ]] && phases+=("$phase")
+  done < <(fm_read_list "$big_plan" "phases")
+  if [[ "${#phases[@]}" -eq 0 ]]; then
+    failures+=("$big_plan has no phases list")
+    return 1
+  fi
+
+  local current_listed=0 before_current=1 small_plan status
+  for phase in "${phases[@]}"; do
+    if [[ "$phase" == "$current_phase" ]]; then
+      current_listed=1
+      before_current=0
+      continue
+    fi
+    [[ "$before_current" -eq 1 ]] || continue
+
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    if [[ ! -f "$small_plan" ]]; then
+      failures+=("missing small-plan file: .claude/plans/$phase.md")
+      continue
+    fi
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    if [[ "$status" == "complete" ]]; then
+      PRIOR_PHASES_COMPLETED_COUNT=$((PRIOR_PHASES_COMPLETED_COUNT + 1))
+      PRIOR_PHASES_LAST_COMPLETED="$phase"
+    elif [[ "$status" == "cancelled" ]]; then
+      assert_cancellation_evidence "$small_plan" "$phase"
+    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+      failures+=("$small_plan must contain exactly one status field before $push_label")
+    else
+      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
+    fi
+  done
+
+  if [[ "$current_listed" -ne 1 ]]; then
+    failures+=("big plan current_phase must be listed in phases")
+    return 1
+  fi
+  return 0
+}
+
 assert_paused_publication_invariants() {
   local repo_root="$1"
   local branch="$2"
@@ -1447,49 +1516,12 @@ assert_paused_publication_invariants() {
     return
   fi
 
-  # Keep this Bash 3.2-compatible: collect the existing frontmatter list with
-  # `while read` rather than mapfile/readarray.
-  local -a phases=()
-  local phase
-  while IFS= read -r phase; do
-    [[ -n "$phase" ]] && phases+=("$phase")
-  done < <(fm_read_list "$big_plan" "phases")
-  if [[ "${#phases[@]}" -eq 0 ]]; then
-    failures+=("$big_plan has no phases list")
+  if ! assert_prior_phases_terminal "$repo_root" "$big_plan" "$current_phase" \
+    "paused checkpoint push"; then
     return
   fi
-
-  local current_listed=0 prior_completed_count=0 before_current=1
+  local prior_completed_count="$PRIOR_PHASES_COMPLETED_COUNT"
   local small_plan status
-  for phase in "${phases[@]}"; do
-    if [[ "$phase" == "$current_phase" ]]; then
-      current_listed=1
-      before_current=0
-      continue
-    fi
-    [[ "$before_current" -eq 1 ]] || continue
-
-    small_plan="$repo_root/.claude/plans/$phase.md"
-    if [[ ! -f "$small_plan" ]]; then
-      failures+=("missing small-plan file: .claude/plans/$phase.md")
-      continue
-    fi
-    status="$(fm_read_unique_status "$small_plan" || true)"
-    if [[ "$status" == "complete" ]]; then
-      prior_completed_count=$((prior_completed_count + 1))
-    elif [[ "$status" == "cancelled" ]]; then
-      assert_cancellation_evidence "$small_plan" "$phase"
-    elif [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
-      failures+=("$small_plan must contain exactly one status field before paused checkpoint push")
-    else
-      failures+=("all phases before current_phase must be complete or evidenced cancelled; $phase is ${status:-missing-status}")
-    fi
-  done
-
-  if [[ "$current_listed" -ne 1 ]]; then
-    failures+=("big plan current_phase must be listed in phases")
-    return
-  fi
 
   small_plan="$repo_root/.claude/plans/$current_phase.md"
   if [[ ! -f "$small_plan" ]]; then
@@ -1518,17 +1550,105 @@ assert_paused_publication_invariants() {
   fi
 }
 
+# Validate publication immediately after a normal phase-completion commit.
+# post-commit has already advanced current_phase to the next active phase, so
+# this accepts only the most recently completed predecessor and proves the
+# pushed SHA is the single completion commit its pre-commit receipt certifies.
+# It intentionally does not require current working-tree state to match that
+# receipt: the post-commit phase advance is uncommitted outer-repository
+# bookkeeping. Receipt artifacts and the historical chain remain immutable.
+assert_completed_phase_publication_invariants() {
+  local repo_root="$1"
+  local branch="$2"
+  local local_sha="$3"
+  local slug="${branch%_implementation}"
+  local big_plan="$repo_root/.claude/plans/$slug.md"
+  if [[ ! -f "$big_plan" ]]; then
+    failures+=("missing big-plan file: .claude/plans/$slug.md")
+    return
+  fi
+
+  local big_status current_phase
+  big_status="$(fm_read_unique_status "$big_plan" || true)"
+  if [[ "$big_status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    failures+=("$big_plan must contain exactly one status field before completed-phase push")
+    return
+  elif [[ "$big_status" != "in-progress" ]]; then
+    failures+=("$big_plan must have status: in-progress before completed-phase push")
+    return
+  fi
+  current_phase="$(fm_read "$big_plan" "current_phase" || true)"
+  if [[ -z "$current_phase" ]]; then
+    failures+=("big plan has no current_phase")
+    return
+  elif ! is_plan_slug "$current_phase"; then
+    failures+=("big plan current_phase must be a safe small-plan slug")
+    return
+  fi
+
+  if ! assert_prior_phases_terminal "$repo_root" "$big_plan" "$current_phase" \
+    "completed-phase push"; then
+    return
+  fi
+  local completed_phase="$PRIOR_PHASES_LAST_COMPLETED"
+  local small_plan status
+  small_plan="$repo_root/.claude/plans/$current_phase.md"
+  if [[ ! -f "$small_plan" ]]; then
+    failures+=("missing small-plan file: .claude/plans/$current_phase.md")
+    return
+  fi
+  status="$(fm_read_unique_status "$small_plan" || true)"
+  if [[ "$status" == "$DUPLICATE_STATUS_VALUE" ]]; then
+    failures+=("$small_plan must contain exactly one status field before completed-phase push")
+  elif [[ "$status" != "in-progress" ]]; then
+    failures+=("$small_plan must have status: in-progress after a completed-phase push")
+  fi
+  if [[ -z "$completed_phase" ]]; then
+    failures+=("completed-phase push needs a completed phase before current_phase")
+    return
+  fi
+
+  assert_bypass_acknowledgement "$repo_root" "$branch" "$big_plan"
+
+  local require_ponytail="false"
+  if diff_requires_ponytail "$repo_root" "$local_sha"; then
+    require_ponytail="true"
+  fi
+  assert_completed_receipt "$repo_root" "$branch" "$completed_phase" "$local_sha" "certified" "true" "$require_ponytail" "false"
+}
+
 # Public push entry point. A paused current phase may publish a durable remote
-# checkpoint; all other states retain the strict final closeout ceremony.
+# checkpoint; a just-completed predecessor may publish before later phases;
+# terminal plans retain the strict final closeout ceremony.
+has_completed_predecessor() {
+  local repo_root="$1"
+  local big_plan="$2"
+  local current_phase="$3"
+  local phase current_listed=0 completed=0 small_plan status
+  while IFS= read -r phase; do
+    [[ -n "$phase" ]] || continue
+    if [[ "$phase" == "$current_phase" ]]; then
+      current_listed=1
+      break
+    fi
+    small_plan="$repo_root/.claude/plans/$phase.md"
+    [[ -f "$small_plan" ]] || continue
+    status="$(fm_read_unique_status "$small_plan" || true)"
+    [[ "$status" == "complete" ]] && completed=1
+  done < <(fm_read_list "$big_plan" "phases")
+  [[ "$current_listed" -eq 1 && "$completed" -eq 1 ]]
+}
+
 assert_push_invariants() {
   local repo_root="$1"
   local branch="$2"
   local local_sha="$3"
   local slug="${branch%_implementation}"
   local big_plan="$repo_root/.claude/plans/$slug.md"
-  local current_phase="" small_plan="" current_status=""
+  local big_status="" current_phase="" small_plan="" current_status=""
 
   if [[ -f "$big_plan" ]]; then
+    big_status="$(fm_read_unique_status "$big_plan" || true)"
     current_phase="$(fm_read "$big_plan" "current_phase" || true)"
     if [[ -n "$current_phase" ]] && is_plan_slug "$current_phase"; then
       small_plan="$repo_root/.claude/plans/$current_phase.md"
@@ -1538,8 +1658,13 @@ assert_push_invariants() {
     fi
   fi
 
-  if [[ "$current_status" == "paused" ]]; then
+  if [[ "$big_status" == "complete" ]]; then
+    assert_closeout_invariants "$repo_root" "$branch" "$local_sha"
+  elif [[ "$current_status" == "paused" ]]; then
     assert_paused_publication_invariants "$repo_root" "$branch" "$local_sha"
+  elif [[ "$big_status" == "in-progress" && "$current_status" == "in-progress" ]] \
+    && has_completed_predecessor "$repo_root" "$big_plan" "$current_phase"; then
+    assert_completed_phase_publication_invariants "$repo_root" "$branch" "$local_sha"
   else
     assert_closeout_invariants "$repo_root" "$branch" "$local_sha"
   fi

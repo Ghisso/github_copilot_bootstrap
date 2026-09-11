@@ -474,9 +474,9 @@ def test_root_guidance_rejects_duplicate_sections_and_stale_lifecycle_order() ->
     guidance = render_root_guidance("claude-code")
     mutated = guidance.replace("## Map\n", "## Map\n\n## Map\n", 1).replace(
         "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
-        "CLOSEOUT -> COMMIT",
+        "CLOSEOUT -> COMMIT -> PUSH",
         "PRE-FLIGHT -> PLAN WHEN NEEDED -> BRANCH -> IMPLEMENT -> VERIFY -> REVIEW -> "
-        "CLOSEOUT -> COMMIT",
+        "CLOSEOUT -> COMMIT -> PUSH",
         1,
     )
 
