@@ -1772,16 +1772,21 @@ def git_is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
 
 def git_is_direct_child(root: Path, parent: str, child: str) -> bool:
     """Return whether ``child`` is a non-merge commit directly after ``parent``."""
+    resolved_child = git_output(
+        ["rev-parse", "--verify", "--quiet", f"{child}^{{commit}}"], root
+    )
+    if not resolved_child:
+        return False
     try:
         parents = run_process(
-            ["git", "rev-list", "--parents", "-n", "1", child], root
+            ["git", "rev-list", "--parents", "-n", "1", resolved_child], root
         )
     except (OSError, subprocess.SubprocessError):
         return False
     if parents.returncode != 0:
         return False
     parts = parents.stdout.split()
-    return len(parts) == 2 and parts[0] == child and parts[1] == parent
+    return len(parts) == 2 and parts[0] == resolved_child and parts[1] == parent
 
 
 def report_errors(
