@@ -60,8 +60,10 @@ def test_html_special_chars_escaped_in_output(self, visualizer, tmp_path) -> Non
 
     # DO: Decode the actual vis.js "title" payload and check the boundary
     # being relied on. vis.js renders `title` via innerHTML — the real XSS
-    # sink — so pyvis HTML-escapes it before JSON-encoding it; json.loads()
-    # of the embedded string is what the DOM receives, and it must equal the
+    # sink — so the calling application must HTML-escape it before handing it
+    # to pyvis. pyvis escapes neither `title` nor `label`; Jinja2's `tojson`
+    # JavaScript-source-escapes the already-escaped string for its script
+    # context. json.loads() is what the DOM receives, and it must equal the
     # escaped form, never the raw text. (`label` is canvas-rendered, not an
     # HTML sink, so it is JSON-escaped only, with no HTML-escaping needed.)
     match = re.search(r'"title":\s*(".*?")', content)
@@ -101,8 +103,9 @@ nodes = new vis.DataSet([{
 }]);
 ```
 
-The raw `<script>` never appears — it's either HTML-escaped by your code, then
-JSON-escaped by pyvis, or canvas-rendered by vis.js (labels).
+The raw `<script>` never appears — it is either HTML-escaped by your code and
+then JavaScript-source-escaped by Jinja2's `tojson`, or canvas-rendered by
+vis.js (labels).
 
 ## Anti-Patterns
 

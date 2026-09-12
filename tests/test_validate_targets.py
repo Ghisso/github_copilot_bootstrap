@@ -2615,8 +2615,51 @@ def test_skill_name_errors_rejects_missing_or_mismatched_name(
     assert any(expected_fragment in error for error in errors)
 
 
-def test_skill_name_errors_accepts_matching_name() -> None:
-    assert skill_name_errors(Path("shared/skills/foo/SKILL.md"), "name: foo\n") == []
+@pytest.mark.parametrize(
+    "scalar",
+    ("foo", '"foo"', "'foo'", "foo  # explanatory note"),
+    ids=("bare", "double-quoted", "single-quoted", "trailing-comment"),
+)
+def test_skill_name_errors_accepts_normalized_matching_name(scalar: str) -> None:
+    """R-SKILL-02: matching YAML scalar forms name the skill directory."""
+    assert (
+        skill_name_errors(Path("shared/skills/foo/SKILL.md"), f"name: {scalar}\n") == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("visibility", "scalar"),
+    (
+        ("public", "public"),
+        ("public", '"public"'),
+        ("public", "'public'"),
+        ("background", "background"),
+        ("background", '"background"'),
+        ("background", "'background'"),
+    ),
+    ids=(
+        "public-bare",
+        "public-double-quoted",
+        "public-single-quoted",
+        "background-bare",
+        "background-double-quoted",
+        "background-single-quoted",
+    ),
+)
+def test_shared_skill_integrity_errors_accepts_normalized_visibility(
+    tmp_path: Path, visibility: str, scalar: str
+) -> None:
+    """R-SKILL-02: recognized visibility values accept YAML scalar quoting."""
+    skill_dir = tmp_path / "skills" / "example"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: example\n"
+        f"visibility: {scalar}\n"
+        f"description: {visibility} visibility.\n---\n",
+        encoding="utf-8",
+    )
+
+    assert shared_skill_integrity_errors(skill_dir.parent) == []
 
 
 def test_shared_skill_integrity_errors_rejects_a_skill_directory_with_no_root_skill_md(
@@ -2673,6 +2716,8 @@ def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
         ("pyproject.toml", False, False),  # bare filename: no repo-file claim
         ("shared/skills/**/SKILL.md", False, False),  # glob placeholder
         ("tests/test_[feature].py", False, False),  # bracket placeholder
+        ("shared/skills/<your-skill>/SKILL.md", False, False),  # placeholder
+        ("scripts/validate_skills.py", False, True),  # concrete missing path
         (
             ".claude/instructions/project-context.instructions.md",
             False,
@@ -2689,6 +2734,8 @@ def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
         "bare-filename-skipped",
         "glob-placeholder-skipped",
         "bracket-placeholder-skipped",
+        "angle-placeholder-skipped",
+        "concrete-missing-rejected",
         "known-exception-skipped",
     ),
 )
@@ -2761,8 +2808,7 @@ def test_ponytail_provenance_checks_tolerate_a_whitespace_only_rewrap(
     """Bonus normalization (see report): the two Ponytail provenance checks
     used to match literal-newline substrings, so an unchanged re-wrap of the
     same prose used to fail the gate - this exact brittleness cost a cycle in
-    Phase B (see shared/third_party/ponytail/UPSTREAM.md's own note). They
-    must now survive a re-wrap that does not change the words."""
+    Phase B. They must now survive a re-wrap that does not change the words."""
     target_root = tmp_path / "multi-agent"
     shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
     upstream_path = target_root / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
@@ -2862,6 +2908,23 @@ def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
     assert "72 lines against upstream" in normalized
     assert "38 lines against upstream" in normalized
     assert "limited to formatting, the bootstrap's required" not in normalized
+
+
+def test_pyvis_xss_skill_assigns_html_escaping_to_the_application() -> None:
+    """Textual assertion only: the skill must not claim pyvis escapes HTML."""
+    text = (
+        REPO_ROOT / "shared" / "skills" / "pyvis-xss-testing" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    normalized = " ".join(
+        line.lstrip().removeprefix("# ").strip() for line in text.splitlines()
+    ).lower()
+
+    assert (
+        "the calling application must html-escape it before handing it to pyvis"
+        in normalized
+    )
+    assert "pyvis escapes neither `title` nor `label`" in normalized
+    assert "so pyvis html-escapes it before json-encoding it" not in normalized
 
 
 def test_data_analysis_skill_is_still_present_and_public() -> None:

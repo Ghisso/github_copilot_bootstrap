@@ -74,11 +74,16 @@ enforces only high-confidence, deterministic facts about
 `shared/skills/*/SKILL.md` (the canonical authoring sources) and fails the
 run when any is violated:
 
-- frontmatter is well-formed YAML in the flat schema every skill already
-  uses (matched `---` delimiters, no tab characters, no duplicate top-level
-  keys);
-- frontmatter `name` matches the skill's directory name;
-- `visibility` is a recognized value (`public` or `background`);
+- frontmatter follows the gate's limited flat grammar: matched `---`
+  delimiters; top-level `key: value` lines (with indented block-scalar
+  continuations); no duplicate top-level keys; and no tab characters. The
+  tab prohibition is a house rule, not a YAML requirement;
+- frontmatter `name` matches the skill's directory name after normalizing its
+  scalar value; matching single or double quotes and a trailing `#` comment
+  do not change the result;
+- `visibility` is a recognized normalized scalar value (`public` or
+  `background`), so its matching quote style and trailing `#` comment do not
+  change the result;
 - public and background skills alike have a non-empty `description`;
 - no two skills share an identical `description` (a duplicate breaks
   description-match loading of background skills);
@@ -89,9 +94,9 @@ run when any is violated:
   to a real file. A bare illustrative filename with no such prefix (for
   example `pyproject.toml` in an example command) makes no repository-file
   claim and is intentionally not checked, nor is a glob/placeholder pattern
-  (`**`, `[skill-name]`). A small named-exception set covers paths that are
-  legitimately consumer- or onboarding-populated rather than generated (for
-  example `.claude/instructions/project-context.instructions.md`);
+  (`**`, `[skill-name]`, `<skill-name>`). A small named-exception set covers
+  paths that are legitimately consumer- or onboarding-populated rather than
+  generated (for example `.claude/instructions/project-context.instructions.md`);
 - generated targets stay synchronized with canonical sources. `validate_determinism`
   already proves this for the whole tree (a fresh `generate_targets.py --all`
   run must byte-match the current `dist/`), so the skill-integrity block does
