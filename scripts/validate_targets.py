@@ -7618,8 +7618,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         provenance = read(ponytail_upstream)
         # Normalize whitespace before matching: the prose re-flows across
         # `---` regenerations, and a literal-newline substring check would
-        # fail on an unchanged re-wrap (this cost a cycle in Phase B; see
-        # shared/third_party/ponytail/UPSTREAM.md's own note on this).
+        # fail on an unchanged re-wrap (this cost a cycle in Phase B).
         normalized_provenance = normalized_text(provenance)
         check(
             "v4.8.4" in provenance,
@@ -7955,10 +7954,18 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     return ""
 
 
+def normalize_frontmatter_scalar(value: str) -> str:
+    """Return a flat-frontmatter scalar without YAML-style decoration."""
+    scalar = re.sub(r"\s+#.*$", "", value).strip()
+    if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in ('"', "'"):
+        scalar = scalar[1:-1]
+    return scalar.strip()
+
+
 def extract_frontmatter_name(frontmatter: str) -> str:
     for line in frontmatter.splitlines():
         if line.startswith("name:"):
-            return line[len("name:") :].strip()
+            return normalize_frontmatter_scalar(line[len("name:") :])
     return ""
 
 
@@ -8032,11 +8039,11 @@ def skill_local_reference_errors(skill_path: Path, raw_text: str) -> list[str]:
     to a real file. Bare illustrative filenames without such a prefix (for
     example `pyproject.toml` in an example command) make no repository-file
     claim and are intentionally not checked, nor are glob/placeholder
-    patterns (`**`, `[name]`)."""
+    patterns (`**`, `[name]`, `<name>`)."""
     errors: list[str] = []
     for match in SKILL_LOCAL_REFERENCE_PATTERN.finditer(raw_text):
         reference = match.group(1)
-        if any(char in reference for char in ("*", "[", "]")):
+        if any(char in reference for char in ("*", "[", "]", "<", ">")):
             continue
         if reference in _SKILL_REFERENCE_EXCEPTIONS:
             continue
@@ -8174,9 +8181,16 @@ def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
         errors.extend(skill_frontmatter_yaml_errors(skill_path, raw_text))
         errors.extend(skill_name_errors(skill_path, frontmatter))
         errors.extend(skill_local_reference_errors(skill_path, raw_text))
+        visibility = next(
+            (
+                normalize_frontmatter_scalar(line[len("visibility:") :])
+                for line in frontmatter.splitlines()
+                if line.startswith("visibility:")
+            ),
+            "",
+        )
         check(
-            "\nvisibility: public" in f"\n{frontmatter}"
-            or "\nvisibility: background" in f"\n{frontmatter}",
+            visibility in {"public", "background"},
             f"skill missing visibility metadata: {skill_path}",
             errors,
         )
