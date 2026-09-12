@@ -41,7 +41,10 @@ def _builder_with_df(df: pd.DataFrame, config: MyConfig) -> nx.DiGraph:
     return builder.build_from_dataframe(df)
 ```
 
-If no suitable public method exists, add one:
+Prefer asserting observable public behavior or using an existing seam over
+widening the production API just because a test lacks access. Add a new
+public seam only when it is independently a useful application abstraction —
+not merely to satisfy this test:
 
 ```python
 class MyBuilder:
@@ -59,7 +62,10 @@ class MyBuilder:
 ```
 
 **Rule:** A test helper should call the narrowest PUBLIC method that covers the
-functionality being tested. If none exists, add one.
+functionality being tested. If none exists, prefer asserting observable public
+behavior or reusing an existing seam; add a new public method only when it is
+independently a useful application abstraction, not merely to satisfy this
+test.
 
 ## Verification
 
