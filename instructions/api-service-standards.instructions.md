@@ -11,7 +11,9 @@ applicability:
 ```python
 @bentoml.service(
     traffic={"timeout": 120, "max_concurrency": 50},
-    http={"cors": {"enabled": True, "access_control_allow_origins": ["*"]}},
+    # Origins come from configuration. A wildcard is a local-development
+    # convenience only; never ship ["*"] as a production default.
+    http={"cors": {"enabled": True, "access_control_allow_origins": ALLOWED_ORIGINS}},
     workers=1,
 )
 class MyService:
@@ -39,7 +41,9 @@ class MyService:
 3. **Async-first**: Use `async` for I/O-bound endpoints
 4. **Error handling**: Catch exceptions, log, return structured errors
 5. **Health check**: Endpoint to verify service is alive
-6. **CORS configuration**: Enable in service decorator
+6. **CORS configuration**: Enable in the service decorator and read the allowed
+   origins from configuration. Restrict them to the origins that actually need
+   access; a wildcard is for local development only, never a production default.
 7. **Environment-driven config**: Use `os.getenv()` for all configuration
 
 ## Pydantic Models

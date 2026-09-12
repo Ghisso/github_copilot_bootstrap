@@ -25,6 +25,7 @@ docs/drawio/diagram_name.png
 ## Included References
 
 - `references/layout-guidelines.md` for spacing, padding, and alignment rules
+- `references/xml-recipes.md` for font, export, and coordinate XML examples
 - `references/aws-icons.md` for optional cloud-icon guidance
 - `scripts/export-drawio.sh` for local export or fallback instructions
 
