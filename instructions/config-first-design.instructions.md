@@ -10,6 +10,11 @@ applicability:
 
 **Create config dataclass BEFORE implementing the feature.**
 
+This rule holds for every project. The ConfigStore registration below applies
+when the repository already uses Hydra. In a repository that does not, write
+the same dataclass as a plain dataclass and wire it the way that repository
+already loads configuration; do not add `hydra-core` to satisfy this policy.
+
 ## Pure ConfigStore (No YAML Files)
 
 All config variants live as Python dataclass instances registered with ConfigStore.

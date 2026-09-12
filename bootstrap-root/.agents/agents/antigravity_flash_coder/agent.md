@@ -59,7 +59,8 @@ Choose retrieval tools per `.claude/instructions/tool-routing.instructions.md`: 
 - Python 3.12+ type hints (`X | None`, built-in generics)
 - Google-style docstrings where needed
 - `%` formatting for logging
-- Config-first design: dataclass + ConfigStore before feature wiring
+- Config-first design: config dataclass before feature wiring, registered with
+  Hydra's ConfigStore when the repository already uses Hydra, plain otherwise
 - Small focused functions and explicit error handling
 
 ## Communication Style

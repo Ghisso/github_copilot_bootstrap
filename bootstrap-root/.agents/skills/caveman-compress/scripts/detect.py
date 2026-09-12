@@ -174,6 +174,10 @@ def protected_reason(filepath: Path) -> str | None:
         return "Skill files must keep exact frontmatter and trigger phrases."
     if "/shared/skills/" in normalized and normalized.endswith("/SKILL.md"):
         return "Skill files must keep exact frontmatter and trigger phrases."
+    if "/references/" in normalized and (
+        "/shared/skills/" in normalized or "/.claude/skills/" in normalized
+    ):
+        return "Skill reference files carry normative skill content verbatim."
     if "/shared/agents/" in normalized and normalized.endswith((".md", ".yaml")):
         return "Agent files must keep exact instructions and output contracts."
     if "/shared/review-profiles/" in normalized and normalized.endswith(".md"):
