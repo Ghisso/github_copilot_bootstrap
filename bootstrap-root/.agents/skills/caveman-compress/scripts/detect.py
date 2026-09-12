@@ -172,6 +172,8 @@ def protected_reason(filepath: Path) -> str | None:
         return "Instruction files are source-of-truth and must keep exact structure."
     if "/.claude/skills/" in normalized and normalized.endswith("/SKILL.md"):
         return "Skill files must keep exact frontmatter and trigger phrases."
+    if "/shared/skills/" in normalized and normalized.endswith("/SKILL.md"):
+        return "Skill files must keep exact frontmatter and trigger phrases."
     if "/shared/agents/" in normalized and normalized.endswith((".md", ".yaml")):
         return "Agent files must keep exact instructions and output contracts."
     if "/shared/review-profiles/" in normalized and normalized.endswith(".md"):
