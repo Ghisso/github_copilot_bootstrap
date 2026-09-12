@@ -1,5 +1,5 @@
 ---
-description: "Config-first design using pure ConfigStore (no YAML files)"
+description: "Config-first design; pure ConfigStore (no YAML files) in Hydra projects"
 applicability:
   - src/configs/**/*.py
 ---
@@ -16,6 +16,11 @@ the same dataclass as a plain dataclass and wire it the way that repository
 already loads configuration; do not add `hydra-core` to satisfy this policy.
 
 ## Pure ConfigStore (No YAML Files)
+
+Everything from here to the end of this file is the Hydra pattern, and applies
+only when the repository already uses Hydra. In a repository that does not, the
+Core Rule above is the whole policy: write the config dataclass first, then wire
+it the way that repository already loads configuration.
 
 All config variants live as Python dataclass instances registered with ConfigStore.
 
@@ -113,7 +118,9 @@ def main(cfg: TrainingConfig) -> None:
 
 ## Anti-Patterns
 
-- **YAML config files** — all variants in Python dataclasses only
+- **YAML config files** — in a Hydra project, all variants in Python
+  dataclasses only; elsewhere, follow the configuration pattern the repository
+  already uses (matching `code-standards.instructions.md`)
 - **Ad-hoc dicts** — use typed dataclasses
 - **Accessing `cfg["x"]["y"]`** — use `cfg.x.y` attribute access
 - **Missing `__post_init__`** — always validate in post-init

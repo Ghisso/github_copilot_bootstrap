@@ -85,12 +85,17 @@ description: |
 
 ## Phase 5: Update .claude/MEMORY.md
 ```markdown
-[LEARN:category] Brief description -> see .claude/skills/[name]/SKILL.md
+[LEARN:category] Brief description -> see <shared/skills or .claude/skills>/[name]/SKILL.md
 ```
 
 ## Output
+
+Report the path actually written, which depends on the repository type in
+Phase 3: `shared/skills/` in the bootstrap authoring repository,
+`.claude/skills/` in an installed consumer project.
+
 ```
-Skill created: .claude/skills/[name]/SKILL.md
+Skill created: <shared/skills or .claude/skills>/[name]/SKILL.md
   Trigger: [when to use]
   Problem: [what it solves]
   .claude/MEMORY.md: Updated
