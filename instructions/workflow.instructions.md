@@ -248,7 +248,7 @@ Entries` evidence requirement next to it.
 4. Document open questions.
 
 **Starting a new session:**
-1. Read `.claude/instructions/workspace.md` plus the current plan in `.claude/plans/` or exploration in `.claude/explorations/`.
+1. Read `.claude/instructions/workspace.instructions.md` plus the current plan in `.claude/plans/` or exploration in `.claude/explorations/`.
 2. If the current small plan is `paused`, read its `pause_session_log`, then set that same plan to `in-progress` while preserving its pause metadata; do not create another small plan.
 3. Check `git log --oneline -10`, `git status`, and `git diff`.
 4. State the recorded resume point, understood task, and next step.

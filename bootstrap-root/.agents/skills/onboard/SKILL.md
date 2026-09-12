@@ -2,12 +2,13 @@
 name: onboard
 visibility: public
 description: |
-  Build or refresh this session's understanding of the project: read
-  README/docs, cross-check claims against the real code with direct reads,
-  exact search, and Semble, then persist the findings so future agents don't have to
-  redo the discovery. Use when asked to "get oriented", "understand this
-  project", "refresh project context", or after README/docs/architecture
-  changed significantly.
+  Build or refresh this session's understanding of the project: read the
+  README, index docs/ and retrieve targeted content from it, cross-check
+  claims against the real code with direct reads, exact search, and Semble,
+  then persist the findings so future agents don't have to redo the
+  discovery. Use when asked to "get oriented", "understand this project",
+  "refresh project context", or after README/docs/architecture changed
+  significantly.
 ---
 
 # onboard — Project Understanding + Persistence
@@ -26,12 +27,18 @@ session hooks).
 
 ## Steps
 
-### 1. Read the narrative docs
+### 1. Build a small project index, then retrieve on demand
 
 - `README.md`
-- Everything under `docs/` (design/proposal docs, deploy docs, architecture notes)
 - `.claude/instructions/project-context.instructions.md` if it already
   exists — treat it as prior findings to refresh, not to redo from zero.
+- List `docs/` (e.g. `ls docs/` or `rg --files docs/`) to index what exists
+  by filename, rather than reading every file unconditionally. Open only
+  the docs needed to confirm a specific README claim, fill a gap the
+  existing `project-context.instructions.md` flags, or answer the current
+  task's open question.
+- For a large or unfamiliar `docs/` tree, prefer `mcp__semble__search` or a
+  targeted `rg` query over a sequential full read.
 
 ### 2. Cross-check against the real code
 
@@ -88,19 +95,32 @@ In `.claude/MEMORY.md` under `## Domain-Specific`, add or update a single
 
 ### 5. Fill the Project State slot
 
-`CLAUDE.md`, `AGENTS.md`, and `.claude/instructions/workspace.md` /
-`workspace.instructions.md` each carry a `## Project State` section with
-a `**Project:** [TODO: project name and one-liner description]` fill-in
-slot. That slot — and only that slot — is safe to hand-edit even though
-the surrounding file is generated; it's a designated per-project
-customization point, not shared prose. Fill it with the one-liner plus a
-pointer to `project-context.instructions.md`.
+`CLAUDE.md`, `AGENTS.md`, and the generated
+`.claude/instructions/workspace.instructions.md` (its `workspace.md` alias
+carries the same content) each carry a `## Project State` section with a
+`**Project:** [TODO: project name and one-liner description]` fill-in slot.
+That slot — and only that slot — is a designated per-project customization
+point, not shared prose. Fill it with the one-liner plus a pointer to
+`project-context.instructions.md`.
 
-Remember: the root `CLAUDE.md`/`AGENTS.md` copies are gitignored, so that
-edit is a local convenience only. The durable copies are
-`.claude/instructions/workspace.md` and `workspace.instructions.md`
-inside the tracked `.claude/` nested repo — that's what future agents
-actually inherit.
+Where to make that edit depends on which repository this is:
+
+- **This is the bootstrap authoring repository itself** (a `shared/policies/`
+  directory exists): the slot's canonical source is
+  `shared/policies/workspace.instructions.md`. Edit it there and regenerate
+  with `uv run python scripts/generate_targets.py --all` — hand-editing the
+  generated `.claude/instructions/workspace.md` /
+  `workspace.instructions.md` directly is silently overwritten by the next
+  regeneration.
+- **This is an installed consumer project** (no `shared/policies/` present):
+  the delivered `.claude/instructions/workspace.instructions.md` /
+  `workspace.md` copies are the only copies this project has, so filling
+  the slot there is the correct, durable action.
+
+Remember: the root `CLAUDE.md`/`AGENTS.md` copies are gitignored, so editing
+them directly is a local convenience only, not the durable record. Any
+recurring project fact beyond this one-line slot belongs in
+`project-context.instructions.md`, not in the generated workspace file.
 
 ### 6. Verify persistence
 

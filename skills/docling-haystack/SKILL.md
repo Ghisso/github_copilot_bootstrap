@@ -4,7 +4,7 @@ visibility: background
 description: |
   Integrate Docling with Haystack for PDF ingestion. Triggers:
   - TypeError when passing pipeline_options= directly to DoclingConverter
-  - OCR performance issues (60s/PDF vs 2-5s without OCR)
+  - OCR performance issues (observed roughly 60s/PDF vs 2-5s without OCR; hardware- and document-dependent)
   - Configuring Docling's DocumentConverter format options from Haystack
 user-invocable: false
 ---
@@ -15,6 +15,14 @@ Passing `pipeline_options=` directly to Haystack's `DoclingConverter` raises
 a `TypeError` — that parameter does not exist on the Haystack wrapper. The
 `pipeline_options` must be wrapped in a `PdfFormatOption` and passed via
 a `DocumentConverter` instance.
+
+This wrapper's accepted constructor arguments are version-sensitive and no
+tested `docling`/`haystack_integrations` version is recorded for this skill.
+Before relying on the exact signature below, check the installed API:
+
+```bash
+uv run python -c "import inspect; from haystack_integrations.components.converters.docling import DoclingConverter; print(inspect.signature(DoclingConverter.__init__))"
+```
 
 ```python
 # WRONG — TypeError: DoclingConverter.__init__() got unexpected kwarg
@@ -49,10 +57,17 @@ def _build_converter(do_ocr: bool) -> DoclingConverter:
 
 ## OCR Performance Guide
 
-| Mode | Time per PDF | When to use |
+OCR is substantially slower than text-layer extraction. **Observation, not a
+benchmark:** one run against typical multi-page scanned PDFs with EasyOCR on
+CPU measured roughly 2-5s per PDF with `do_ocr=False` versus roughly 60s per
+PDF with `do_ocr=True`. Actual timing depends on document length, page
+resolution, OCR backend, and hardware — measure on your own corpus rather
+than relying on these numbers.
+
+| Mode | Relative cost | When to use |
 |------|-------------|-------------|
-| `do_ocr=False` | ~2-5s | Digital-native PDFs (text layer present) |
-| `do_ocr=True` | ~60s | Scanned/image-based PDFs |
+| `do_ocr=False` | No OCR pass — fast | Digital-native PDFs (text layer present) |
+| `do_ocr=True` | Full OCR pass — much slower | Scanned/image-based PDFs |
 
 Check whether PDFs have a text layer before deciding:
 
@@ -96,6 +111,6 @@ pipeline.run({"converter": {"sources": ["doc1.pdf", "doc2.pdf"]}})
 ## Anti-Patterns
 
 - **`DoclingConverter(pipeline_options=...)`** — TypeError, parameter doesn't exist
-- **Always using OCR** — 30× slower for digital PDFs; check for text layer first
+- **Always using OCR** — much slower for digital PDFs (see OCR Performance Guide); check for text layer first
 - **Forgetting `do_table_structure=True`**  — tables become unstructured text
 - **Hardcoding language in EasyOcrOptions** — parameterize via config

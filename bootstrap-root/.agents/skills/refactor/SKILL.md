@@ -2,9 +2,10 @@
 name: refactor
 visibility: public
 description: |
-  Safe refactoring with test verification at every step. Establishes baseline,
-  applies one change at a time, verifies after each, then runs full
-  verification. Use when asked to refactor, clean up, or restructure code.
+  Safe refactoring with focused verification at every step. Establishes
+  baseline, applies one change at a time, verifies the affected scope after
+  each, then runs full verification at the end. Use when asked to refactor,
+  clean up, or restructure code.
 argument-hint: "[target file or description]"
 ---
 
@@ -31,14 +32,19 @@ Prioritize: highest-impact, lowest-risk first.
 
 ## Phase 3: Apply Changes (One at a Time)
 
-For EACH logical change:
+For EACH logical change, verify only the affected scope — reserve the full
+suite and full coverage run for Phase 4, since re-running them after every
+single edit is unnecessary overhead during a multi-step refactor:
+
 1. Make the change
-2. Run tests immediately: `uv run pytest tests/ -q`
-3. Run type check: `uv run mypy src/ --ignore-missing-imports` (`mypy shared
-   scripts tests` in this bootstrap's own authoring repository — `verify.py
-   fast` does not run mypy)
-4. If tests fail → **revert and investigate**
-5. If tests pass → continue to next change
+2. Run focused tests for the affected module/file:
+   `uv run pytest tests/test_<affected>.py -q` (or
+   `uv run python .claude/scripts/verify.py fast --format text`, which
+   selects the repository's real scope)
+3. Run type check on the affected files:
+   `uv run mypy <affected files> --ignore-missing-imports`
+4. If focused verification fails → **revert and investigate**
+5. If it passes → continue to next change
 
 ## Phase 4: Full Verification
 ```bash
@@ -49,9 +55,12 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 ## Rules
 
 - **One logical change at a time** — never batch unrelated refactors
-- **Tests must pass after every change** — revert if they don't
+- **Focused verification must pass after every change** — revert if it
+  doesn't; the full suite and coverage run are Phase 4's job, not every
+  step's
 - **No behavior changes** — refactoring preserves external behavior
-- **Coverage must not decrease** — add tests if gaps revealed
+- **Coverage must not decrease** — add tests if gaps revealed (checked at
+  Phase 4, the final floor)
 
 ## Report
 ```
