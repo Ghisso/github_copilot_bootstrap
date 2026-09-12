@@ -32,11 +32,6 @@ imported skill, not a profile or lifecycle ceremony. Local policies take
 precedence over imported generic workflow wording without modifying the
 imported skill files further.
 
-The exact line wrapping of the paragraph above is load-bearing:
-`scripts/validate_targets.py` matches it as literal substrings that span line
-breaks, so re-flowing it fails the target validator even when the wording is
-unchanged. Re-wrap only together with that check.
-
 ## Local allowlist hashes
 
 - `shared/skills/ponytail/SKILL.md`: `sha256:9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3`

@@ -1,13 +1,13 @@
 ---
 name: 2026-09-12_validator-grammar-and-xss-claim
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: 2026-09-12_validator-grammar-and-xss-claim_implementation
-started_at:
+started_at: 2026-09-12T12:52:51Z
 phases:
   - 2026-09-12_phase-A-validator-grammar-and-xss-claim
-current_phase:
+current_phase: 2026-09-12_phase-A-validator-grammar-and-xss-claim
 ---
 # Big Plan: 2026-09-12_validator-grammar-and-xss-claim
 

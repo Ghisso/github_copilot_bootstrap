@@ -3,7 +3,7 @@ name: 2026-09-12_phase-A-validator-grammar-and-xss-claim
 type: small-plan
 parent_plan: 2026-09-12_validator-grammar-and-xss-claim
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-12_phase-A-validator-grammar-and-xss-claim

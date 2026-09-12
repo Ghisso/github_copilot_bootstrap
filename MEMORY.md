@@ -53,12 +53,11 @@
   named as "the required shape" — so the wildcard gained canonical authority
   instead of losing it. When a change relocates responsibility to another
   document, re-read that document as part of the same change.
-- [LEARN:verification] `scripts/validate_targets.py` pins several prose
-  contracts as literal substrings that span line breaks, so re-flowing a
-  paragraph fails the gate even when the wording is unchanged (hit in
-  `shared/third_party/ponytail/UPSTREAM.md`, which now says so in-line).
-  Treat validator-pinned prose as wrap-sensitive, and prefer normalizing
-  whitespace in the checker over re-wrapping the source.
+- [LEARN:verification] `scripts/validate_targets.py` normalizes whitespace
+  before matching the Ponytail provenance prose contracts, so an unchanged
+  re-wrap of `shared/third_party/ponytail/UPSTREAM.md` does not fail those
+  checks. Keep the cited words intact when changing pinned provenance, and
+  update the checker when a contract changes.
 - [LEARN:workflow] Parallel coders in one working tree are safe only when
   their file sets are disjoint AND none of them runs generation, the
   validators, or the full suite. Those write shared state (`dist/`,
