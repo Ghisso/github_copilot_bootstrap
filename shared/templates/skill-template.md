@@ -1,5 +1,10 @@
 ---
+# `name` must match this skill's directory name exactly.
 name: descriptive-kebab-case-name
+# Required under `shared/skills/`: public | background.
+visibility: public
+# Required and must be unique; two skills sharing a description break
+# description-match loading.
 description: |
   [CRITICAL: Include specific triggers in the description]
   - What the skill does

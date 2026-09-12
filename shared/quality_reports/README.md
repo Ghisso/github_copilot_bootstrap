@@ -11,9 +11,17 @@ Use `.claude/templates/quality-report.md` and `.claude/templates/requirements-sp
 
 ## Naming Convention
 
-`YYYY-MM-DD_[type]_[scope].md`
+Review findings and verification receipts are written by tooling, not by hand:
 
-Types: `code-review`, `security-review`, `verification`, `merge`
+- `findings-<phase>.json` — persisted by the orchestrator via
+  `record_findings.py` after review converges. The reviewer returns findings
+  to the orchestrator and does not write this file itself.
+- `verification-phase-<phase>.json` and `verification-closeout-<phase>.json` —
+  receipts written by `verify.py ... --persist`.
+
+Hand-authored markdown reports remain only for the subdirectories above:
+`YYYY-MM-DD_[branch].md` under `merges/` and `YYYY-MM-DD_[feature].md` under
+`specs/`.
 
 ## Report Template
 

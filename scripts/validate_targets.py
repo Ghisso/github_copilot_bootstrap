@@ -7616,20 +7616,25 @@ def validate_skills_and_paths(errors: list[str]) -> None:
     )
     if ponytail_upstream.exists():
         provenance = read(ponytail_upstream)
+        # Normalize whitespace before matching: the prose re-flows across
+        # `---` regenerations, and a literal-newline substring check would
+        # fail on an unchanged re-wrap (this cost a cycle in Phase B; see
+        # shared/third_party/ponytail/UPSTREAM.md's own note on this).
+        normalized_provenance = normalized_text(provenance)
         check(
             "v4.8.4" in provenance,
             "Ponytail provenance must pin release v4.8.4",
             errors,
         )
         check(
-            "canonical\nworkflow and review-routing policies decide lifecycle placement"
-            in provenance,
+            "canonical workflow and review-routing policies decide lifecycle placement"
+            in normalized_provenance,
             "Ponytail provenance must preserve canonical workflow authority",
             errors,
         )
         check(
-            "conditional `ponytail` review profile runs" in provenance
-            and "`ponytail-review` remains an\nimported skill" in provenance,
+            "conditional `ponytail` review profile runs" in normalized_provenance
+            and "`ponytail-review` remains an imported skill" in normalized_provenance,
             "Ponytail provenance must distinguish the review profile from the imported skill",
             errors,
         )
@@ -7950,6 +7955,107 @@ def extract_frontmatter_description(frontmatter: str) -> str:
     return ""
 
 
+def extract_frontmatter_name(frontmatter: str) -> str:
+    for line in frontmatter.splitlines():
+        if line.startswith("name:"):
+            return line[len("name:") :].strip()
+    return ""
+
+
+def skill_frontmatter_yaml_errors(skill_path: Path, raw_text: str) -> list[str]:
+    """Hard rule (R-SKILL-01): SKILL.md frontmatter must be well-formed YAML in
+    the flat `key: value` (or `key: |` block-scalar) schema every shared skill
+    already uses - matched `---` delimiters, no tabs, no duplicate top-level
+    keys. This is a structural check, not a full YAML parser, mirroring the
+    same minimal schema `generate_targets.parse_policy` enforces for policy
+    frontmatter."""
+    parts = raw_text.split("---\n", 2)
+    if not raw_text.startswith("---\n") or len(parts) != 3:
+        return [
+            f"{skill_path}: SKILL_FRONTMATTER_INVALID - frontmatter must start "
+            "with '---' and close with a second '---' delimiter"
+        ]
+    frontmatter = parts[1]
+    errors: list[str] = []
+    if "\t" in frontmatter:
+        errors.append(
+            f"{skill_path}: SKILL_FRONTMATTER_INVALID - frontmatter must not "
+            "contain tab characters"
+        )
+    seen_keys: set[str] = set()
+    for line in frontmatter.splitlines():
+        if not line or line[0] in (" ", "\t"):
+            continue  # blank line, or block-scalar/list continuation
+        if ":" not in line:
+            errors.append(
+                f"{skill_path}: SKILL_FRONTMATTER_INVALID - not a 'key: value' "
+                f"line: {line!r}"
+            )
+            continue
+        key = line.split(":", 1)[0].strip()
+        if key in seen_keys:
+            errors.append(
+                f"{skill_path}: SKILL_FRONTMATTER_INVALID - duplicate "
+                f"frontmatter key: {key}"
+            )
+        seen_keys.add(key)
+    return errors
+
+
+def skill_name_errors(skill_path: Path, frontmatter: str) -> list[str]:
+    """Hard rule (R-SKILL-02): frontmatter `name` must match the directory."""
+    name = extract_frontmatter_name(frontmatter)
+    if not name:
+        return [f"{skill_path}: SKILL_NAME_MISSING - frontmatter must set 'name'"]
+    if name != skill_path.parent.name:
+        return [
+            f"{skill_path}: SKILL_NAME_MISMATCH - frontmatter name '{name}' must "
+            f"match directory name '{skill_path.parent.name}'"
+        ]
+    return []
+
+
+SKILL_LOCAL_REFERENCE_PATTERN = re.compile(r"`([^`\n]+\.(?:py|sh|md|json|ya?ml|toml))`")
+_SKILL_TARGET_ROOT_PREFIXES = (".claude/", ".github/", ".codex/", ".agents/")
+_SKILL_REPO_ROOT_PREFIXES = ("shared/", "scripts/", "docs/", "tests/")
+# Consumer/onboarding-populated runtime paths that are legitimately absent
+# from the generated dist template (never templated by generate_targets.py;
+# see CLAUDE.md's "Put repository-specific facts in ..." instruction).
+_SKILL_REFERENCE_EXCEPTIONS = frozenset(
+    {".claude/instructions/project-context.instructions.md"}
+)
+
+
+def skill_local_reference_errors(skill_path: Path, raw_text: str) -> list[str]:
+    """Hard rule (R-SKILL-03): a backtick-quoted path that names a known
+    repository root (or a same-directory `references/...` path) must resolve
+    to a real file. Bare illustrative filenames without such a prefix (for
+    example `pyproject.toml` in an example command) make no repository-file
+    claim and are intentionally not checked, nor are glob/placeholder
+    patterns (`**`, `[name]`)."""
+    errors: list[str] = []
+    for match in SKILL_LOCAL_REFERENCE_PATTERN.finditer(raw_text):
+        reference = match.group(1)
+        if any(char in reference for char in ("*", "[", "]")):
+            continue
+        if reference in _SKILL_REFERENCE_EXCEPTIONS:
+            continue
+        if reference.startswith(_SKILL_TARGET_ROOT_PREFIXES):
+            resolved = TARGET_ROOT / reference
+        elif reference.startswith(_SKILL_REPO_ROOT_PREFIXES):
+            resolved = REPO_ROOT / reference
+        elif reference.startswith("references/"):
+            resolved = skill_path.parent / reference
+        else:
+            continue
+        if not resolved.exists():
+            errors.append(
+                f"{skill_path}: SKILL_BROKEN_REFERENCE - '{reference}' does not "
+                f"resolve to {resolved}"
+            )
+    return errors
+
+
 def readme_agent_contract_errors(
     readme_text: str, canonical_agents: list[tuple[dict[str, Any], Path]]
 ) -> list[str]:
@@ -8042,6 +8148,56 @@ def readme_agent_contract_errors(
     return errors
 
 
+def shared_skill_integrity_errors(skill_library_root: Path) -> list[str]:
+    """Hard, deterministic skill-library invariants for
+    `skill_library_root` (normally `REPO_ROOT / "shared" / "skills"`): valid
+    YAML frontmatter shape, `name` matching the directory, visibility +
+    non-empty, non-duplicate description (duplicate descriptions break
+    description-match loading of background skills), a required root
+    `SKILL.md` per directory, and local relative references that name a
+    repository path. See "Skill Library Validation Contract" in
+    docs/architecture.md for the hard/advisory split this function enforces;
+    `deep-audit` owns the semantic judgments this function deliberately
+    leaves out. Kept as a single pure helper so it stays independently
+    testable while `validate_docs_parity` remains the one gate that calls it."""
+    errors: list[str] = []
+    for skill_dir in sorted(p for p in skill_library_root.iterdir() if p.is_dir()):
+        check(
+            (skill_dir / "SKILL.md").is_file(),
+            f"{skill_dir}: SKILL_MISSING_ROOT - skill directory has no root SKILL.md",
+            errors,
+        )
+    descriptions: dict[str, Path] = {}
+    for skill_path in sorted(skill_library_root.glob("*/SKILL.md")):
+        raw_text = read(skill_path)
+        frontmatter = extract_frontmatter(raw_text)
+        errors.extend(skill_frontmatter_yaml_errors(skill_path, raw_text))
+        errors.extend(skill_name_errors(skill_path, frontmatter))
+        errors.extend(skill_local_reference_errors(skill_path, raw_text))
+        check(
+            "\nvisibility: public" in f"\n{frontmatter}"
+            or "\nvisibility: background" in f"\n{frontmatter}",
+            f"skill missing visibility metadata: {skill_path}",
+            errors,
+        )
+        description = extract_frontmatter_description(frontmatter).strip()
+        check(
+            bool(description),
+            f"skill missing non-empty description: {skill_path}",
+            errors,
+        )
+        if not description:
+            continue
+        duplicate = descriptions.get(description)
+        if duplicate is not None:
+            errors.append(
+                f"duplicate skill description breaks description-match loading: {duplicate} and {skill_path}"
+            )
+        else:
+            descriptions[description] = skill_path
+    return errors
+
+
 def validate_docs_parity(errors: list[str]) -> None:
     """R-VALID-02: mechanical drift-policing for authoring docs, mirroring
     upstream's check-surface-sync.py / check-skill-integrity.py after they
@@ -8128,33 +8284,9 @@ def validate_docs_parity(errors: list[str]) -> None:
             errors,
         )
 
-    # 3. Skill frontmatter integrity: visibility + non-empty, non-duplicate
-    # description (duplicate descriptions break description-match loading of
-    # background skills).
-    descriptions: dict[str, Path] = {}
-    for skill_path in sorted((REPO_ROOT / "shared" / "skills").glob("*/SKILL.md")):
-        frontmatter = extract_frontmatter(read(skill_path))
-        check(
-            "\nvisibility: public" in f"\n{frontmatter}"
-            or "\nvisibility: background" in f"\n{frontmatter}",
-            f"skill missing visibility metadata: {skill_path}",
-            errors,
-        )
-        description = extract_frontmatter_description(frontmatter).strip()
-        check(
-            bool(description),
-            f"skill missing non-empty description: {skill_path}",
-            errors,
-        )
-        if not description:
-            continue
-        duplicate = descriptions.get(description)
-        if duplicate is not None:
-            errors.append(
-                f"duplicate skill description breaks description-match loading: {duplicate} and {skill_path}"
-            )
-        else:
-            descriptions[description] = skill_path
+    # 3. Skill frontmatter integrity, extracted into a pure, independently
+    # testable helper (see its docstring for the full hard-rule contract).
+    errors.extend(shared_skill_integrity_errors(REPO_ROOT / "shared" / "skills"))
 
 
 SECURITY_REQUIRED_HEADINGS = (

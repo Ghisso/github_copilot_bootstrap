@@ -48,8 +48,8 @@ file attached because of a `src/**/*.py` or a `tests/**/*.py` match.
 
 ## Anti-Patterns (prohibited)
 
-- **`import argparse`** — forbidden in `src/` and `gradio_app/`; use Hydra ConfigStore CLI overrides for all production entrypoints. Test harnesses (`tests/`) are the only allowed exception.
-- **YAML config files** — all config variants as Python dataclasses only (pure ConfigStore)
+- **`import argparse`** — in a project that uses Hydra, forbidden in `src/` and `gradio_app/`; use Hydra ConfigStore CLI overrides for production entrypoints, with test harnesses (`tests/`) the only exception. A project that does not use Hydra (a plain library or CLI tool) uses its own established argument parsing; do not add `hydra-core` to gain this rule.
+- **YAML config files** — in a Hydra project, all config variants are Python dataclasses only (pure ConfigStore); elsewhere, follow the configuration pattern the repository already uses.
 - **Ad-hoc `os.getenv()` arg parsing** — use Hydra config fields with env-var defaults only at system boundaries (service.py / BentoML)
 
 ---

@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Never write a __pycache__ into the canonical shared/skills/ source tree:
@@ -52,8 +54,8 @@ def test_generated_claude_skill_copy_stays_protected(tmp_path: Path) -> None:
 def test_non_skill_markdown_under_shared_skills_stays_compressible(
     tmp_path: Path,
 ) -> None:
-    """Only `SKILL.md` itself is protected; sibling prose docs (e.g. a
-    skill's README or reference notes) remain compressible, matching the
+    """Only `SKILL.md` and `references/` content are protected; other sibling
+    prose docs such as a skill's README remain compressible, matching the
     existing `.claude/skills` suffix-scoped pattern."""
     skill_dir = tmp_path / "shared" / "skills" / "example-skill"
     skill_dir.mkdir(parents=True)
@@ -61,3 +63,18 @@ def test_non_skill_markdown_under_shared_skills_stays_compressible(
     readme.write_text("Some notes about this skill.\n", encoding="utf-8")
 
     assert detect.should_compress(readme) is True
+
+
+@pytest.mark.parametrize("root", ["shared/skills", ".claude/skills"])
+def test_skill_reference_files_are_protected(tmp_path: Path, root: str) -> None:
+    """Progressive disclosure moved normative skill content out of skill roots
+    and into `references/` files, so those carry the same verbatim content the
+    root used to and must not be compressed."""
+    references_dir = tmp_path / root / "example-skill" / "references"
+    references_dir.mkdir(parents=True)
+    reference = references_dir / "xml-recipes.md"
+    reference.write_text(
+        "Exact XML recipes that must stay verbatim.\n", encoding="utf-8"
+    )
+
+    assert detect.should_compress(reference) is False

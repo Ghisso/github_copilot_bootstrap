@@ -40,6 +40,7 @@ from generate_targets import (  # noqa: E402
 )
 from validate_targets import (  # noqa: E402
     CODEX_CODER_ESCALATION,
+    compare_dirs,
     CODEX_ESCALATION_CHAIN,
     CODEX_AGENT_MODEL_INTENTS,
     CODEX_ROLE_MODEL_INTENTS,
@@ -78,6 +79,10 @@ from validate_targets import (  # noqa: E402
     reporting_policy_errors,
     reporting_prompt_errors,
     scope_matches,
+    shared_skill_integrity_errors,
+    skill_frontmatter_yaml_errors,
+    skill_local_reference_errors,
+    skill_name_errors,
     task_lane_contract_errors,
     task_lane_for,
     TaskLaneInputs,
@@ -2536,3 +2541,334 @@ def test_codex_agents_embed_transformed_shared_prompts_and_reject_legacy_reads()
         )
 
         assert instructions.startswith(codex_agent_metadata_header(agent))
+
+
+# --- Phase C: skill-library validation contract -----------------------------
+#
+# The tests below cover two different things and are labeled accordingly:
+# (1) the validator's own new hard rules (pure-function unit tests using the
+#     established tmp_path + monkeypatch fixture pattern already used above
+#     for TARGET_ROOT-scoped tests), and (2) the Phase A/B content
+#     corrections, which are prose facts re-verified by targeted textual or
+#     structural assertions - not runtime behavior - except where an existing
+#     executable helper already provides real execution coverage (noted
+#     below).
+
+
+def test_shared_skill_integrity_errors_accepts_the_real_skill_library() -> None:
+    """The extended skill-integrity gate accepts the current, already-clean
+    canonical skill tree (dist must be generated first, matching the
+    documented Verify order)."""
+    assert shared_skill_integrity_errors(REPO_ROOT / "shared" / "skills") == []
+
+
+@pytest.mark.parametrize(
+    "raw_text",
+    (
+        "no frontmatter at all\n",
+        "---\nname: broken\ndescription: missing closing delimiter\n",
+        "---\nname: broken\n\tdescription: tab-indented key\n---\n",
+        "---\nname: broken\nname: duplicated\ndescription: x\n---\n",
+    ),
+    ids=("missing-delimiters", "unclosed-delimiter", "tab-character", "duplicate-key"),
+)
+def test_skill_frontmatter_yaml_errors_rejects_malformed_frontmatter(
+    raw_text: str,
+) -> None:
+    """R-SKILL-01: malformed frontmatter is a hard, actionable failure."""
+    errors = skill_frontmatter_yaml_errors(
+        Path("shared/skills/broken/SKILL.md"), raw_text
+    )
+    assert errors
+    assert all("SKILL_FRONTMATTER_INVALID" in error for error in errors)
+    assert all("shared/skills/broken/SKILL.md" in error for error in errors)
+
+
+def test_skill_frontmatter_yaml_errors_accepts_well_formed_frontmatter() -> None:
+    raw_text = "---\nname: ok\nvisibility: public\ndescription: |\n  Multi-line.\n  Body.\n---\n\nBody\n"
+    assert (
+        skill_frontmatter_yaml_errors(Path("shared/skills/ok/SKILL.md"), raw_text) == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("frontmatter", "skill_path", "expected_fragment"),
+    (
+        (
+            "visibility: public\n",
+            Path("shared/skills/foo/SKILL.md"),
+            "SKILL_NAME_MISSING",
+        ),
+        (
+            "name: wrong-name\nvisibility: public\n",
+            Path("shared/skills/foo/SKILL.md"),
+            "SKILL_NAME_MISMATCH",
+        ),
+    ),
+    ids=("missing-name", "mismatched-name"),
+)
+def test_skill_name_errors_rejects_missing_or_mismatched_name(
+    frontmatter: str, skill_path: Path, expected_fragment: str
+) -> None:
+    """R-SKILL-02: frontmatter `name` must match the skill's directory."""
+    errors = skill_name_errors(skill_path, frontmatter)
+    assert any(expected_fragment in error for error in errors)
+
+
+def test_skill_name_errors_accepts_matching_name() -> None:
+    assert skill_name_errors(Path("shared/skills/foo/SKILL.md"), "name: foo\n") == []
+
+
+def test_shared_skill_integrity_errors_rejects_a_skill_directory_with_no_root_skill_md(
+    tmp_path: Path,
+) -> None:
+    """R-SKILL-04: every shared/skills/* directory must have a root SKILL.md."""
+    skill_library_root = tmp_path / "skills"
+    good = skill_library_root / "good-skill"
+    good.mkdir(parents=True)
+    (good / "SKILL.md").write_text(
+        "---\nname: good-skill\nvisibility: public\ndescription: A skill.\n---\n\nBody\n",
+        encoding="utf-8",
+    )
+    empty = skill_library_root / "empty-skill"
+    empty.mkdir()
+
+    errors = shared_skill_integrity_errors(skill_library_root)
+
+    assert any(
+        "SKILL_MISSING_ROOT" in error and "empty-skill" in error for error in errors
+    )
+    assert not any("good-skill" in error for error in errors)
+
+
+def test_shared_skill_integrity_errors_rejects_duplicate_descriptions(
+    tmp_path: Path,
+) -> None:
+    """Duplicate descriptions break description-match loading of background
+    skills, so a second skill reusing one is a hard failure."""
+    skill_library_root = tmp_path / "skills"
+    for name in ("skill-one", "skill-two"):
+        skill_dir = skill_library_root / name
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            f"---\nname: {name}\nvisibility: background\n"
+            "description: Exactly the same description.\n---\n\nBody\n",
+            encoding="utf-8",
+        )
+
+    errors = shared_skill_integrity_errors(skill_library_root)
+
+    assert any("duplicate skill description" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("reference", "make_target_exist", "expect_error"),
+    (
+        ("shared/scripts/real.py", True, False),
+        ("shared/scripts/missing.py", False, True),
+        (".claude/instructions/real.instructions.md", True, False),
+        (".claude/instructions/missing.instructions.md", False, True),
+        ("references/real.md", True, False),
+        ("references/missing.md", False, True),
+        ("pyproject.toml", False, False),  # bare filename: no repo-file claim
+        ("shared/skills/**/SKILL.md", False, False),  # glob placeholder
+        ("tests/test_[feature].py", False, False),  # bracket placeholder
+        (
+            ".claude/instructions/project-context.instructions.md",
+            False,
+            False,
+        ),  # named exception: consumer/onboarding-populated, not generated
+    ),
+    ids=(
+        "repo-root-existing",
+        "repo-root-missing",
+        "target-root-existing",
+        "target-root-missing",
+        "skill-relative-existing",
+        "skill-relative-missing",
+        "bare-filename-skipped",
+        "glob-placeholder-skipped",
+        "bracket-placeholder-skipped",
+        "known-exception-skipped",
+    ),
+)
+def test_skill_local_reference_errors_resolves_known_roots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reference: str,
+    make_target_exist: bool,
+    expect_error: bool,
+) -> None:
+    """R-SKILL-03: a backtick-quoted path naming a known repository root must
+    resolve; bare illustrative filenames and glob/placeholder patterns make
+    no repository-file claim and are not checked; a small named-exception set
+    covers legitimately consumer-populated runtime paths."""
+    fake_repo_root = tmp_path / "repo"
+    fake_target_root = tmp_path / "dist" / "multi-agent"
+    skill_path = fake_repo_root / "shared" / "skills" / "example" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True)
+    (fake_repo_root / "shared" / "scripts").mkdir(parents=True)
+    (fake_target_root / ".claude" / "instructions").mkdir(parents=True)
+
+    if make_target_exist:
+        if reference.startswith(".claude/"):
+            (fake_target_root / reference).write_text("x", encoding="utf-8")
+        elif reference.startswith("references/"):
+            (skill_path.parent / "references").mkdir()
+            (skill_path.parent / reference).write_text("x", encoding="utf-8")
+        else:
+            (fake_repo_root / reference).write_text("x", encoding="utf-8")
+
+    monkeypatch.setattr(target_validator, "REPO_ROOT", fake_repo_root)
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", fake_target_root)
+
+    raw_text = f"Reference: `{reference}`\n"
+    errors = skill_local_reference_errors(skill_path, raw_text)
+
+    if expect_error:
+        assert any("SKILL_BROKEN_REFERENCE" in error for error in errors)
+    else:
+        assert errors == []
+
+
+def test_compare_dirs_flags_a_stale_generated_skill_copy(tmp_path: Path) -> None:
+    """Canonical-versus-generated synchronization expectation: if a generated
+    copy diverges from a fresh regeneration, `compare_dirs` (the mechanism
+    `validate_determinism` uses tree-wide) must reject it rather than pass
+    silently."""
+    fresh = tmp_path / "fresh"
+    stale = tmp_path / "stale"
+    (fresh / ".claude" / "skills" / "example").mkdir(parents=True)
+    (stale / ".claude" / "skills" / "example").mkdir(parents=True)
+    (fresh / ".claude" / "skills" / "example" / "SKILL.md").write_text(
+        "---\nname: example\nvisibility: public\ndescription: current.\n---\n",
+        encoding="utf-8",
+    )
+    (stale / ".claude" / "skills" / "example" / "SKILL.md").write_text(
+        "---\nname: example\nvisibility: public\ndescription: stale copy.\n---\n",
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    compare_dirs(stale, fresh, errors)
+
+    assert any("rerun scripts/generate_targets.py --all" in error for error in errors)
+
+
+def test_ponytail_provenance_checks_tolerate_a_whitespace_only_rewrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bonus normalization (see report): the two Ponytail provenance checks
+    used to match literal-newline substrings, so an unchanged re-wrap of the
+    same prose used to fail the gate - this exact brittleness cost a cycle in
+    Phase B (see shared/third_party/ponytail/UPSTREAM.md's own note). They
+    must now survive a re-wrap that does not change the words."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    upstream_path = target_root / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"
+    original = upstream_path.read_text(encoding="utf-8")
+    old_wrap = (
+        "The fork retains Ponytail's behavior and safety boundaries. The canonical\n"
+        "workflow and review-routing policies decide lifecycle placement and whether the\n"
+        "conditional `ponytail` review profile runs. `ponytail-review` remains an\n"
+        "imported skill, not a profile or lifecycle ceremony."
+    )
+    assert old_wrap in original  # sanity: matches the real current wrap
+    new_wrap = (
+        "The fork retains Ponytail's behavior and\n"
+        "safety boundaries. The canonical workflow and review-routing policies\n"
+        "decide lifecycle placement and whether the conditional `ponytail` review\n"
+        "profile runs. `ponytail-review` remains an imported\n"
+        "skill, not a profile or lifecycle ceremony."
+    )
+    rewrapped = original.replace(old_wrap, new_wrap, 1)
+    assert rewrapped != original
+    upstream_path.write_text(rewrapped, encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_skills_and_paths(errors)
+
+    assert not any("preserve canonical workflow authority" in error for error in errors)
+    assert not any("distinguish the review profile" in error for error in errors)
+
+
+def test_pandas_nan_bool_coercion_documents_the_corrected_isinstance_claim() -> None:
+    """Phase A correction: `isinstance(np.bool_(True), bool)` must be
+    documented as `False` (np.bool_ subclasses np.generic, not Python bool),
+    not the original wrong claim that it returns `True`.
+
+    Textual assertion only: numpy is not installed in this repository's test
+    environment, so this cannot be a runtime `isinstance` check without
+    adding a dependency (itself a control-plane change). See the plan's
+    explicit note accepting this limitation.
+    """
+    text = (
+        REPO_ROOT / "shared" / "skills" / "pandas-nan-bool-coercion" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "isinstance(np.bool_(True), bool)  # False" in text
+    assert "isinstance(np.bool_(True), bool)  # True" not in text
+
+
+def test_run_tests_e2e_step_propagates_failure_instead_of_masking_it() -> None:
+    """Phase A correction: a failing example command under `examples/run_*.py`
+    must surface as a failure, never be reported as though no scripts existed.
+
+    Structural/textual assertion on the embedded shell snippet, not an
+    execution test: `run-tests/SKILL.md` is prose with an illustrative code
+    fence, and this repository only executes a skill's shell logic where a
+    real standalone helper script exists (as it does for
+    `caveman-compress/scripts/detect.py`, covered by
+    tests/test_caveman_compress_detect.py).
+    """
+    text = (REPO_ROOT / "shared" / "skills" / "run-tests" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "status=0" in text
+    assert "status=1" in text
+    assert '"E2E scripts FAILED"' in text
+    assert re.search(r"exit 1\b", text)
+    # The "no scripts" message must stay distinct from the failure message -
+    # a real failure must never be reported as an absent script.
+    assert "No E2E scripts" in text
+    assert '"No E2E scripts FAILED"' not in text
+
+
+def test_code_review_skill_keeps_a_surviving_minor_advisory() -> None:
+    """Phase A correction: canonical policy makes a surviving MINOR finding
+    advisory with an explicit disposition and reason, not something that
+    must be fixed like CRITICAL/MAJOR."""
+    text = (REPO_ROOT / "shared" / "skills" / "code-review" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    normalized = " ".join(text.split()).lower()
+    assert (
+        "a surviving minor is advisory but needs an explicit disposition and a "
+        "non-empty reason" in normalized
+    )
+    assert (
+        "fix findings by severity: critical, then major, then minor" not in normalized
+    )
+
+
+def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
+    """Phase B correction: UPSTREAM.md must describe the real, large
+    divergence (dropped sections, line-count deltas) rather than claiming
+    the change is limited to formatting and frontmatter."""
+    text = (
+        REPO_ROOT / "shared" / "third_party" / "ponytail" / "UPSTREAM.md"
+    ).read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+    assert "72 lines against upstream" in normalized
+    assert "38 lines against upstream" in normalized
+    assert "limited to formatting, the bootstrap's required" not in normalized
+
+
+def test_data_analysis_skill_is_still_present_and_public() -> None:
+    """Non-goal guard: data-analysis must not have been removed; it is a
+    public, task-triggered skill whose standing context cost is only its
+    description block."""
+    skill_path = REPO_ROOT / "shared" / "skills" / "data-analysis" / "SKILL.md"
+    assert skill_path.is_file()
+    frontmatter = skill_path.read_text(encoding="utf-8")
+    assert "\nvisibility: public" in f"\n{frontmatter}"
