@@ -1,15 +1,15 @@
 ---
 name: 2026-09-12_skill-library-hardening
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: 2026-09-12_skill-library-hardening_implementation
-started_at:
+started_at: 2026-09-12T08:32:57Z
 phases:
   - 2026-09-12_phase-A-skill-correctness-and-lifecycle
   - 2026-09-12_phase-B-skill-routing-and-provenance
   - 2026-09-12_phase-C-skill-regression-prevention
-current_phase:
+current_phase: 2026-09-12_phase-A-skill-correctness-and-lifecycle
 ---
 # Big Plan: 2026-09-12_skill-library-hardening
 
