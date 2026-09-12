@@ -1,7 +1,7 @@
 ---
 name: 2026-09-12_skill-library-hardening
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: 2026-09-12_skill-library-hardening_implementation
 started_at: 2026-09-12T08:32:57Z
@@ -9,7 +9,7 @@ phases:
   - 2026-09-12_phase-A-skill-correctness-and-lifecycle
   - 2026-09-12_phase-B-skill-routing-and-provenance
   - 2026-09-12_phase-C-skill-regression-prevention
-current_phase: 2026-09-12_phase-C-skill-regression-prevention
+current_phase:
 ---
 # Big Plan: 2026-09-12_skill-library-hardening
 
@@ -190,7 +190,7 @@ instead, which is what makes a future real bump tractable.
 
 - [x] `2026-09-12_phase-A-skill-correctness-and-lifecycle` — correct the verified factual, security, and lifecycle defects, and close the protected-path gap.
 - [x] `2026-09-12_phase-B-skill-routing-and-provenance` — fix provenance accuracy, stale authoring paths, rigid architecture assumptions, routing breadth, and reference-heavy skill roots.
-- [ ] `2026-09-12_phase-C-skill-regression-prevention` — extend the existing validation gate, add regression tests, and complete the final documentation and stale-claims audit.
+- [x] `2026-09-12_phase-C-skill-regression-prevention` — extend the existing validation gate, add regression tests, and complete the final documentation and stale-claims audit.
 
 ## Verification
 

@@ -64,6 +64,21 @@
   validators, or the full suite. Those write shared state (`dist/`,
   `.claude/`, `.agents/`) and race. Split the editing, centralize the
   verification.
+- [LEARN:review] Scoping a policy means scoping the whole file. Qualifying only
+  the opening rule of `config-first-design.instructions.md` left ~130 lines of
+  unconditional Hydra mandates below it, so the file contradicted both its own
+  preamble and the sibling bullet in `code-standards.instructions.md`. When a
+  rule becomes conditional, walk every section, sample, anti-pattern, and
+  checklist item in that file before calling it done.
+- [LEARN:architecture] Progressive disclosure changes what protection rules
+  cover. Moving normative content out of a skill root into `references/`
+  silently removed it from `caveman-compress`'s protected set, which matched
+  `SKILL.md` only. When content moves, re-check every rule that matched its old
+  location.
+- [LEARN:review] Across two consecutive phases the orchestrator's own
+  remediation introduced the next finding (an undefined `ALLOWED_ORIGINS` name,
+  then a half-scoped policy). Route orchestrator fixes back through review
+  instead of treating them as self-verifying.
 - [LEARN:workflow] An implementation branch named `<slug>_implementation`
   requires a matching `.claude/plans/<slug>.md` big plan; a governing design
   under top-level `plans/` doesn't satisfy the commit lifecycle gate.

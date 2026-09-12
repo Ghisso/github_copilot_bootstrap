@@ -3,8 +3,8 @@ name: 2026-09-12_phase-C-skill-regression-prevention
 type: small-plan
 parent_plan: 2026-09-12_skill-library-hardening
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-12_phase-C-skill-regression-prevention.md
 ---
 # Small Plan: 2026-09-12_phase-C-skill-regression-prevention
 
@@ -31,7 +31,7 @@ documentation, memory, LEARN, and stale-claims audit.
 
 ## Steps
 
-- [ ] **Define the validation contract before implementing it.**
+- [x] **Define the validation contract before implementing it.**
   - Add a short authoritative description to the most appropriate existing
     policy or documentation surface. Do not create a second workflow policy.
   - The contract must distinguish three categories:
@@ -59,7 +59,7 @@ documentation, memory, LEARN, and stale-claims audit.
     guidance* references, and must not match generator code, generated
     outputs, test fixtures, or historical records.
 
-- [ ] **Extend the existing validator rather than creating a new one.**
+- [x] **Extend the existing validator rather than creating a new one.**
   - Modify `scripts/validate_targets.py`, extending the skill-integrity block
     at lines 8131-8158 and following the surrounding `check(...)` and `errors`
     patterns already in that file.
@@ -78,7 +78,7 @@ documentation, memory, LEARN, and stale-claims audit.
     review profiles: `code`, `architecture`, `security`, `tests`, and
     `ponytail`.
 
-- [ ] **Add regression tests for the validator and the corrected defects.**
+- [x] **Add regression tests for the validator and the corrected defects.**
   - Add focused tests under the existing `tests/` organization, following the
     established fixture patterns.
   - Cover the validator's own behavior:
@@ -110,7 +110,7 @@ documentation, memory, LEARN, and stale-claims audit.
   - Do not build a generic code-fence execution engine unless existing
     repository patterns make that clearly simpler than targeted tests.
 
-- [ ] **Extend `deep-audit` with advisory hygiene checks.**
+- [x] **Extend `deep-audit` with advisory hygiene checks.**
   - Modify `shared/skills/deep-audit/SKILL.md`.
   - Make audit and report the default behavior; do not silently fix
     repository content unless implementation was requested.
@@ -127,7 +127,7 @@ documentation, memory, LEARN, and stale-claims audit.
   - Keep these checks advisory unless an objective equivalent is already
     enforced in `validate_targets.py`.
 
-- [ ] **Run a cross-model regression review.**
+- [x] **Run a cross-model regression review.**
   - Review representative public descriptions and root skill bodies as they
     are exposed to Codex, Claude, Gemini/Antigravity, and GitHub Copilot.
   - Confirm no correctness rule depends on one model's autonomous judgment or
@@ -136,7 +136,7 @@ documentation, memory, LEARN, and stale-claims audit.
     secondary specialist references use progressive disclosure.
   - Treat Astra compatibility as useful but non-normative.
 
-- [ ] **Complete the final documentation, memory, LEARN, and stale-claims audit.**
+- [x] **Complete the final documentation, memory, LEARN, and stale-claims audit.**
   - This is the final phase in the big plan, so inspect every live-advice
     surface required by the current `plan-decomposition` contract:
     - root guidance;
@@ -189,20 +189,20 @@ stale-claims audit is recorded.
 
 ## Closeout Checklist
 
-- [ ] Extended `validate_targets.py` passes on the canonical skill tree
-- [ ] No second skill-validation gate was introduced
-- [ ] Regression tests cover the hard rules and the corrected defects
-- [ ] Each test asserts only what it can actually prove, with prose checks labeled as such
-- [ ] Generated targets validate and runtime checks pass
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Closeout session log contains non-empty `## Stale-claims surfaces checked`
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] No subjective heuristic was promoted to a hard gate without evidence
+- [x] Extended `validate_targets.py` passes on the canonical skill tree
+- [x] No second skill-validation gate was introduced
+- [x] Regression tests cover the hard rules and the corrected defects
+- [x] Each test asserts only what it can actually prove, with prose checks labeled as such
+- [x] Generated targets validate and runtime checks pass
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Closeout session log contains non-empty `## Stale-claims surfaces checked`
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] No subjective heuristic was promoted to a hard gate without evidence
 
 ## Pause Checkpoint
 
