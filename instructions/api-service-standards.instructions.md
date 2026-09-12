@@ -9,10 +9,14 @@ applicability:
 ## BentoML Service Pattern
 
 ```python
+# Origins come from configuration — never hardcode a wildcard. A comma-
+# separated ALLOWED_ORIGINS env var; empty means no cross-origin access,
+# which is the safe default until a real production list is configured.
+ALLOWED_ORIGINS = [o for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o]
+
+
 @bentoml.service(
     traffic={"timeout": 120, "max_concurrency": 50},
-    # Origins come from configuration. A wildcard is a local-development
-    # convenience only; never ship ["*"] as a production default.
     http={"cors": {"enabled": True, "access_control_allow_origins": ALLOWED_ORIGINS}},
     workers=1,
 )
