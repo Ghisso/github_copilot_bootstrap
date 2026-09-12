@@ -3,7 +3,7 @@ name: 2026-09-12_phase-B-skill-routing-and-provenance
 type: small-plan
 parent_plan: 2026-09-12_skill-library-hardening
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-12_phase-B-skill-routing-and-provenance

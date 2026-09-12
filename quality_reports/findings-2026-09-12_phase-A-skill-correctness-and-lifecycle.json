@@ -1,0 +1,39 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-12T09:15:53Z",
+  "branch": "2026-09-12_skill-library-hardening_implementation",
+  "head_sha": "ff47e775cbbfb8d8780235beaabd1457b335f5f2",
+  "base_ref": "dev",
+  "merge_base_sha": "ff47e775cbbfb8d8780235beaabd1457b335f5f2",
+  "phase": "2026-09-12_phase-A-skill-correctness-and-lifecycle",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "e2f3e79be716f7bc3564ed87a5191caef1eb4f8b",
+  "changed_files": [
+    "shared/skills/caveman-compress/SKILL.md",
+    "shared/skills/caveman-compress/scripts/detect.py",
+    "shared/skills/code-review/SKILL.md",
+    "shared/skills/haystack-conditional-router/SKILL.md",
+    "shared/skills/pandas-nan-bool-coercion/SKILL.md",
+    "shared/skills/pyvis-xss-testing/SKILL.md",
+    "shared/skills/run-tests/SKILL.md",
+    "shared/skills/test-helper-public-api/SKILL.md",
+    "shared/skills/text-to-sql-safety/SKILL.md",
+    "shared/templates/plan-small.md",
+    "tests/test_caveman_compress_detect.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
