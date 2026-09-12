@@ -3,7 +3,7 @@ name: 2026-09-12_phase-C-skill-regression-prevention
 type: small-plan
 parent_plan: 2026-09-12_skill-library-hardening
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-12_phase-C-skill-regression-prevention
