@@ -46,6 +46,24 @@
   Ponytail behavior through `shared/policies/` and the review-routing table,
   which already own lifecycle placement, rather than editing the vendored
   files.
+- [LEARN:review] Removing an unsafe default from a skill is incomplete while
+  that skill still points at a policy which keeps it. The `bentoml-service`
+  CORS fix moved the `["*"]` wildcard out of the skill but left it in
+  `shared/policies/api-service-standards.instructions.md`, which the same edit
+  named as "the required shape" — so the wildcard gained canonical authority
+  instead of losing it. When a change relocates responsibility to another
+  document, re-read that document as part of the same change.
+- [LEARN:verification] `scripts/validate_targets.py` pins several prose
+  contracts as literal substrings that span line breaks, so re-flowing a
+  paragraph fails the gate even when the wording is unchanged (hit in
+  `shared/third_party/ponytail/UPSTREAM.md`, which now says so in-line).
+  Treat validator-pinned prose as wrap-sensitive, and prefer normalizing
+  whitespace in the checker over re-wrapping the source.
+- [LEARN:workflow] Parallel coders in one working tree are safe only when
+  their file sets are disjoint AND none of them runs generation, the
+  validators, or the full suite. Those write shared state (`dist/`,
+  `.claude/`, `.agents/`) and race. Split the editing, centralize the
+  verification.
 - [LEARN:workflow] An implementation branch named `<slug>_implementation`
   requires a matching `.claude/plans/<slug>.md` big plan; a governing design
   under top-level `plans/` doesn't satisfy the commit lifecycle gate.

@@ -3,8 +3,8 @@ name: 2026-09-12_phase-B-skill-routing-and-provenance
 type: small-plan
 parent_plan: 2026-09-12_skill-library-hardening
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-12_phase-B-skill-routing-and-provenance.md
 ---
 # Small Plan: 2026-09-12_phase-B-skill-routing-and-provenance
 
@@ -29,7 +29,7 @@ copy.
 
 ## Steps
 
-- [ ] **Correct the Ponytail provenance record (evidence row 10).**
+- [x] **Correct the Ponytail provenance record (evidence row 10).**
   - Modify `shared/third_party/ponytail/UPSTREAM.md`.
   - The file currently states that local changes are "limited to formatting,
     the bootstrap's required `visibility` frontmatter, and references to this
@@ -54,7 +54,7 @@ copy.
     `shared/skills/ponytail/SKILL.md:51-52`. See the big plan's
     `## Decision: do not bump Ponytail to v4.9.0`.
 
-- [ ] **Fix canonical-versus-generated path confusion (evidence row 11).**
+- [x] **Fix canonical-versus-generated path confusion (evidence row 11).**
   - `.claude/instructions/workspace.md` is not obsolete. It is emitted on
     every generation run by `scripts/generate_targets.py`, and it is required
     by `scripts/validate_targets.py` and `scripts/install_bootstrap.py`. Do
@@ -81,7 +81,7 @@ copy.
     under `shared/policies/`, never the generated copy under
     `.claude/instructions/`.
 
-- [ ] **Remove rigid project-architecture and ceremony assumptions (evidence row 12).**
+- [x] **Remove rigid project-architecture and ceremony assumptions (evidence row 12).**
   - Modify `shared/skills/create-feature/SKILL.md`.
     - Inspect the repository's actual architecture before selecting a
       Hydra-based config-first pattern.
@@ -118,7 +118,7 @@ copy.
     knowledge; make configuration, runtime, and deployment choices conditional
     on the actual project and the installed versions.
 
-- [ ] **Narrow genuinely over-broad public descriptions.**
+- [x] **Narrow genuinely over-broad public descriptions.**
   - A public skill's description is always in context; its body loads on
     demand. The cost being managed here is the description block, so weigh
     each change against that, not against the skill's line count.
@@ -138,7 +138,7 @@ copy.
   - Record borderline semantic routing cases for the Phase C advisory
     `deep-audit` checks rather than inventing brittle hard lint.
 
-- [ ] **Apply progressive disclosure only where reference material dominates.**
+- [x] **Apply progressive disclosure only where reference material dominates.**
   - Consider these roots, and refactor one only when doing so measurably
     reduces irrelevant injected context without hiding required behavior:
     - `shared/skills/draw-io/SKILL.md`
@@ -152,7 +152,7 @@ copy.
   - Do not split a skill based on line count alone.
   - Update local links and regenerate target content accordingly.
 
-- [ ] **Tighten learned and specialist skills where claims are project-specific or version-sensitive.**
+- [x] **Tighten learned and specialist skills where claims are project-specific or version-sensitive.**
   - Review and modify as needed:
     - `shared/skills/csv-driven-integration-tests/SKILL.md`
     - `shared/skills/context-manager-testing/SKILL.md`
@@ -175,7 +175,7 @@ copy.
   - Keep compatibility and migration guidance bounded, so temporary aliases
     and dual writes carry a stated removal condition.
 
-- [ ] **Simplify interaction-heavy and generic skills.**
+- [x] **Simplify interaction-heavy and generic skills.**
   - Modify `shared/skills/concept-to-image/SKILL.md`,
     `shared/skills/html-presentation/SKILL.md`, and
     `shared/skills/literature-review/SKILL.md` so they do not force
@@ -196,7 +196,7 @@ copy.
     narrow it only if a concrete routing or dependency problem is found, and
     record that problem if so.
 
-- [ ] **Tighten remaining policy duplication without unnecessary rewrites.**
+- [x] **Tighten remaining policy duplication without unnecessary rewrites.**
   - Review and make small changes only where a concrete conflict with
     canonical policy exists:
     - `shared/skills/add-dependency/SKILL.md`
@@ -212,7 +212,7 @@ copy.
     third-party content in `scripts/validate_targets.py`; do not edit it.
   - Do not churn stable skills for stylistic consistency.
 
-- [ ] **Regenerate and validate.**
+- [x] **Regenerate and validate.**
   - Run `uv run python scripts/generate_targets.py --all` after the canonical
     source edits, then run the validators against the regenerated tree.
   - Confirm the vendored Ponytail and `humanize` file hashes are unchanged.
@@ -247,16 +247,16 @@ Verification must specifically demonstrate:
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] No generated target was hand-edited instead of its canonical `shared/**` source
-- [ ] Vendored Ponytail and `humanize` files unchanged and pinned hashes still match
-- [ ] Borderline routing cases recorded for the Phase C advisory checks
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] No generated target was hand-edited instead of its canonical `shared/**` source
+- [x] Vendored Ponytail and `humanize` files unchanged and pinned hashes still match
+- [x] Borderline routing cases recorded for the Phase C advisory checks
 
 ## Pause Checkpoint
 
