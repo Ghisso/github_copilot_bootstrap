@@ -3,8 +3,8 @@ name: 2026-09-12_phase-A-skill-correctness-and-lifecycle
 type: small-plan
 parent_plan: 2026-09-12_skill-library-hardening
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-12_phase-A-skill-correctness-and-lifecycle.md
 ---
 # Small Plan: 2026-09-12_phase-A-skill-correctness-and-lifecycle
 
@@ -32,7 +32,7 @@ by `scripts/generate_targets.py --all`; never hand-edit a generated copy.
 
 ## Steps
 
-- [ ] **Fix the verified factual and security defects (evidence rows 1-4).**
+- [x] **Fix the verified factual and security defects (evidence rows 1-4).**
   - Modify `shared/skills/pandas-nan-bool-coercion/SKILL.md` (row 1).
     - Correct line 28: `isinstance(np.bool_(True), bool)` returns `False`.
       `np.bool_` subclasses `np.generic`, not Python `bool`.
@@ -74,7 +74,7 @@ by `scripts/generate_targets.py --all`; never hand-edit a generated copy.
   - Verify with focused content checks and
     `uv run python .claude/scripts/verify.py fast --format text`.
 
-- [ ] **Resolve the lifecycle conflicts (evidence rows 5-8).**
+- [x] **Resolve the lifecycle conflicts (evidence rows 5-8).**
   - Modify `shared/skills/run-tests/SKILL.md` (row 5).
     - Line 40 currently reads
       `uv run python examples/run_*.py 2>/dev/null || echo "No E2E scripts"`,
@@ -112,7 +112,7 @@ by `scripts/generate_targets.py --all`; never hand-edit a generated copy.
   - Verify with focused tests covering failure propagation and severity
     semantics.
 
-- [ ] **Close the protected-path gap (evidence row 9).**
+- [x] **Close the protected-path gap (evidence row 9).**
   - Modify `shared/skills/caveman-compress/scripts/detect.py`.
     - Lines 171-177 protect `/shared/policies/`,
       `/.claude/skills/**/SKILL.md`, `/shared/agents/`, and
@@ -132,7 +132,7 @@ by `scripts/generate_targets.py --all`; never hand-edit a generated copy.
   - Verify with a focused test asserting that a `shared/skills/**/SKILL.md`
     path is refused by the detector.
 
-- [ ] **Bring the small-plan template up to the current closeout contract.**
+- [x] **Bring the small-plan template up to the current closeout contract.**
   - Modify `shared/templates/plan-small.md`.
   - Do not remove a numeric-score lifecycle: it is already gone. All three
     copies are clean, and it was removed in commit `2af3df7`. Verify this
@@ -152,7 +152,7 @@ by `scripts/generate_targets.py --all`; never hand-edit a generated copy.
   - Review `shared/templates/plan-big.md` against the same contract and change
     it only if a concrete conflict is found.
 
-- [ ] **Regenerate and validate.**
+- [x] **Regenerate and validate.**
   - Run `uv run python scripts/generate_targets.py --all` after the canonical
     source edits. Never patch a generated copy directly.
   - Run the validators after generation, so they inspect a current tree.
@@ -192,15 +192,15 @@ Verification must specifically demonstrate:
 
 ## Closeout Checklist
 
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] No generated target was hand-edited instead of its canonical `shared/**` source
-- [ ] Vendored Ponytail files unchanged and their pinned hashes still match
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] No generated target was hand-edited instead of its canonical `shared/**` source
+- [x] Vendored Ponytail files unchanged and their pinned hashes still match
 
 ## Pause Checkpoint
 

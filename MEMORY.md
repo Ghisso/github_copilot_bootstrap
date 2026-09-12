@@ -19,6 +19,33 @@
 
 ## Workflow
 
+- [LEARN:verification] In this authoring repository, `check_runtime.py`
+  reporting `stale runtime path` right after a `shared/**` edit is expected
+  state, not a defect. The repository installs its own bootstrap, so runtime
+  copies under `.agents/`, `.claude/`, and `.claude/bootstrap-root/` lag until
+  `generate_targets.py --all` is followed by
+  `install_bootstrap.py . --allow-self --local-only`. Those paths are
+  gitignored and outer-untracked, so the staleness never reaches the outer
+  commit. The refresh commits nested AI state, which makes it orchestrator
+  CLOSEOUT work rather than something a coder should run mid-implementation.
+- [LEARN:verification] Read a gate's exit status from the command itself,
+  never through a pipe. `cmd | tail; echo $?` reports `tail`'s status and
+  turned a real `check_runtime.py` exit 1 into an apparent pass. Use
+  `cmd > file; echo $?` or `${PIPESTATUS[0]}` whenever a pass/fail decision
+  depends on the status.
+- [LEARN:review] An audit finding is a hypothesis until re-verified against
+  the working tree. Three findings in the 2026-09-12 skill audit were stale or
+  wrong, and one of them (narrowing the vendored `ponytail` descriptions)
+  would have changed a hash-pinned file and failed
+  `validate_targets.py:7641-7660` in every phase that ran it. Re-check each
+  cited line before planning work around it.
+- [LEARN:architecture] `shared/skills/ponytail/SKILL.md` and
+  `ponytail-review/SKILL.md` are hash-pinned vendored MIT files, and the local
+  copies are a heavy fork, not a formatting-only import: 72 lines against
+  upstream's 120 with three sections dropped, and 38 against 57. Adjust
+  Ponytail behavior through `shared/policies/` and the review-routing table,
+  which already own lifecycle placement, rather than editing the vendored
+  files.
 - [LEARN:workflow] An implementation branch named `<slug>_implementation`
   requires a matching `.claude/plans/<slug>.md` big plan; a governing design
   under top-level `plans/` doesn't satisfy the commit lifecycle gate.
