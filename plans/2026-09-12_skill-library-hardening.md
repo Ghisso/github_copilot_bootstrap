@@ -9,7 +9,7 @@ phases:
   - 2026-09-12_phase-A-skill-correctness-and-lifecycle
   - 2026-09-12_phase-B-skill-routing-and-provenance
   - 2026-09-12_phase-C-skill-regression-prevention
-current_phase: 
+current_phase:
 ---
 # Big Plan: 2026-09-12_skill-library-hardening
 
