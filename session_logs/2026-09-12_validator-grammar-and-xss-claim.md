@@ -51,9 +51,8 @@ review passes returned no surviving findings.
 
 ## [LEARN] Entries
 
-- Added `[LEARN:validation]` guidance to `.claude/MEMORY.md`: normalize each
-  supported flat-frontmatter scalar form before comparison and prove the
-  regression against raw-text matching.
+- [LEARN:validation] Normalize each supported flat-frontmatter scalar form
+  before comparison and prove the regression against raw-text matching.
 
 ## Stale-claims surfaces checked
 
