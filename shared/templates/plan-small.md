@@ -36,10 +36,16 @@ uv run python .claude/scripts/verify.py fast --format json               # durin
 
 ## Closeout Checklist
 
+Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
+(Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
+rather than restating it.
+
 - [ ] Documentation updated or explicitly skipped as pure-internal
 - [ ] LEARN entries saved or no-lessons marker recorded
 - [ ] Closeout session log has `**Status:** COMPLETED`
+- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
 - [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
 - [ ] Review findings resolved and persisted with branch/phase metadata
 - [ ] Verification passed (`verify phase` then `verify closeout` PASS)
 

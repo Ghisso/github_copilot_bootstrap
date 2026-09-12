@@ -81,7 +81,11 @@ Examine all available evidence before forming hypotheses:
 
 Generate ranked hypotheses — never start fixing without a hypothesis:
 
-1. **List 3-5 hypotheses** ranked by likelihood. Each hypothesis must include:
+1. **List as many hypotheses as the evidence actually supports.** Often one
+   is enough for a simple, well-understood bug; intermittent, multi-symptom,
+   or no-stacktrace bugs usually need more. Don't pad the list to hit a
+   quota, and don't stop at one if the evidence genuinely fits several
+   causes. Each hypothesis must include:
    - A concrete claim about what is wrong
    - What evidence supports it
    - What evidence would confirm it (a test you can run)
@@ -171,6 +175,9 @@ After finding the root cause:
 
 ### Hypotheses
 
+Add or drop rows to match how many hypotheses the evidence actually
+supports — the three rows below are an example, not a required count.
+
 | # | Hypothesis | Likelihood | Confirming Test | Refuting Test |
 |---|------------|------------|-----------------|---------------|
 | H1 | {Specific claim} | High | {What to check} | {What would disprove} |
@@ -213,8 +220,8 @@ After finding the root cause:
 | Mode | Scope | Depth | When to Use |
 |---|---|---|---|
 | `quick` | Single error | H1 test + fix | Clear stacktrace, obvious cause |
-| `standard` | Full investigation | 3 hypotheses + bisection plan | Default for non-obvious bugs |
-| `deep` | Systemic analysis | 5+ hypotheses + instrumentation + reproduction | Intermittent bugs, no stacktrace, production issues |
+| `standard` | Full investigation | Hypotheses scaled to the evidence + bisection plan | Default for non-obvious bugs |
+| `deep` | Systemic analysis | Broader hypothesis set + instrumentation + reproduction | Intermittent bugs, no stacktrace, production issues |
 
 ## Calibration Rules
 

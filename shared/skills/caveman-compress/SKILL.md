@@ -44,6 +44,8 @@ Do not use this skill on source-of-truth customization files.
 - `.github/copilot-instructions.md`
 - `shared/policies/**`
 - `.claude/skills/**/SKILL.md`
+- `shared/skills/**/SKILL.md`
+- `shared/skills/**/references/**` and `.claude/skills/**/references/**`
 - `shared/agents/**`
 - `shared/review-profiles/**`
 - `*.original.md`
