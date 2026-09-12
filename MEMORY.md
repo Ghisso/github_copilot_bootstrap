@@ -19,6 +19,10 @@
 
 ## Workflow
 
+- [LEARN:validation] A hand-parsed flat frontmatter contract must normalize
+  supported scalar spelling before comparing values. Pair each accepted form
+  (bare, quoted, and comment-suffixed where promised) with a regression that
+  fails against raw-text matching, rather than validating only current files.
 - [LEARN:verification] In this authoring repository, `check_runtime.py`
   reporting `stale runtime path` right after a `shared/**` edit is expected
   state, not a defect. The repository installs its own bootstrap, so runtime
