@@ -31,21 +31,27 @@ Systematic discovery, extraction, and synthesis of academic research on a define
 
 ### Phase 1: Scope Definition
 
-Before searching, establish the review boundaries:
+Before searching, establish the review boundaries. Fill each of these in
+directly from the user's request and reasonable defaults instead of opening
+a confirmation round:
 
-1. **Research question** — What specific question does the review answer? Vague topics produce vague reviews. "What techniques exist for X" is weaker than "How do methods for X compare on metric Y across domains Z?"
+1. **Research question** — What specific question does the review answer? Vague topics produce vague reviews. "What techniques exist for X" is weaker than "How do methods for X compare on metric Y across domains Z?" If the request is genuinely vague here, sharpen it yourself and state the sharpened question in the output rather than asking first.
 2. **Inclusion criteria** — Define what counts:
-   - Date range (e.g., 2020–present)
-   - Publication type (peer-reviewed, preprints, both)
-   - Domains/categories (e.g., cs.CL, cs.AI)
+   - Date range (default: no lower bound unless recency is implied; note it if narrowed)
+   - Publication type (default: peer-reviewed and preprints both)
+   - Domains/categories (default: inferred from the topic)
    - Minimum relevance threshold
 3. **Exclusion criteria** — Define what does not count:
    - Tangentially related work
    - Non-primary sources (blog posts, tutorials) unless explicitly included
    - Duplicate or superseded versions
-4. **Expected output** — What form should the review take? Narrative synthesis, tabular comparison, gap analysis, annotated bibliography, or related-work section?
+4. **Expected output** — What form should the review take? Default to a narrative synthesis unless the request implies otherwise (e.g. "comparison table" implies tabular).
 
-Present the scope to the user for confirmation before proceeding.
+State the assumed scope at the top of the output so the user can correct it.
+Ask first only when the topic is ambiguous between genuinely different
+research questions (e.g. "X" could mean two unrelated fields) and guessing
+wrong would waste the whole search — not for routine parameters already
+covered by the defaults above.
 
 ### Phase 2: Search & Discovery
 

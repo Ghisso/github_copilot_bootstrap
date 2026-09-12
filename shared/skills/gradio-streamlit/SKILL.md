@@ -7,6 +7,24 @@ description: |
   Covers: Gradio lazy-loading pattern, Streamlit session state, async wrapping.
 ---
 
+## Before applying any pattern below
+
+Check what this project actually has installed before copying a snippet —
+the patterns below are illustrative, not a fixed API contract:
+
+```bash
+uv run python -c "import gradio; print(gradio.__version__)" 2>/dev/null
+uv run python -c "import streamlit; print(streamlit.__version__)" 2>/dev/null
+grep -n "^gradio\|^streamlit" pyproject.toml
+```
+
+API surface changes across major versions (for example, `st.cache_resource`
+only exists from Streamlit 1.18+; older code uses
+`st.cache(allow_output_mutation=True)`). Verify the installed version's
+actual API rather than assuming these snippets match it exactly. If the
+project already has a UI entrypoint, follow its existing lazy-init and state
+pattern instead of introducing a second convention.
+
 ## Decision Framework
 
 | Factor | Gradio | Streamlit |
@@ -119,7 +137,10 @@ if __name__ == "__main__":
 
 ## Env Var Wiring
 
-Both frameworks should read config from environment variables, not hardcoded values:
+Both frameworks should read config from environment variables, not hardcoded
+values. `TOP_K`/`RETRIEVER_MODE` below are illustrative example names from
+this skill's example domain — use this project's actual config variable
+names:
 
 ```python
 import os

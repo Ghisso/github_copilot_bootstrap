@@ -5,7 +5,7 @@ description: |
   Extract non-obvious discoveries into reusable skills that persist across
   sessions. Use when debugging took significant effort, found misleading errors,
   discovered undocumented behavior, or built a repeatable multi-step workflow.
-  Trigger: "I learned something", "save this as a skill", "document this".
+  Trigger: "I learned something", "save this as a skill".
 argument-hint: "[skill-name]"
 ---
 
