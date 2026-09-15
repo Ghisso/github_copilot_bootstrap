@@ -11,7 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # printing the invocation-time cwd on its own line below A's own output
 # whenever A (git rev-parse) already succeeded, corrupting REPO_ROOT with an
 # embedded newline and a bogus trailing path.
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)"
+# The `|| true` is required: under `set -e` a bare assignment inherits the
+# command substitution's status, so a git failure (exit 128 outside a repo)
+# would kill the script before the fallback below could run.
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -z "$REPO_ROOT" ]]; then
   REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
