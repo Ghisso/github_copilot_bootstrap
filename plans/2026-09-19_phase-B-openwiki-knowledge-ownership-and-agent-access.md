@@ -3,8 +3,8 @@ name: 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-B-knowledge-ownership.md
 ---
 # Small Plan: 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
 
@@ -23,7 +23,7 @@ human-authored policy remain authoritative.
 
 ### Step B1 — Define the canonical knowledge-ownership contract
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `shared/policies/workflow.instructions.md`
   - modify `shared/policies/workspace.instructions.md`
@@ -65,7 +65,7 @@ human-authored policy remain authoritative.
 
 ### Step B2 — Add a narrow OpenWiki skill
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - create `shared/skills/openwiki/SKILL.md`
   - modify skill validation/routing tests if required
@@ -105,7 +105,7 @@ human-authored policy remain authoritative.
 
 ### Step B3 — Add provider-neutral root guidance
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify authoring `AGENTS.md`
   - modify authoring `CLAUDE.md`
@@ -135,7 +135,7 @@ human-authored policy remain authoritative.
 
 ### Step B4 — High-risk + documentation review and closeout
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Target files:** scoped Phase B diff
 - **Required Skills:** none beyond reviewer-owned profile guidance
 - **Review Profiles:**
@@ -173,16 +173,16 @@ receipts.
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Knowledge-ownership wording is consistent across policy, skill, and root guidance
-- [ ] No model-backed OpenWiki execution was added to deterministic verification or hooks
+- [x] Documentation updated — `README.md`, `docs/architecture.md`, both root adapters, and the new skill
+- [x] LEARN entries saved or no-lessons marker recorded — three entries
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason — none survived; the `verify.py` message MINOR is pre-existing and out of this diff's scope, recorded as a follow-up
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Knowledge-ownership wording is consistent across policy, skill, and root guidance — one MAJOR drift found and fixed, then confirmed
+- [x] No model-backed OpenWiki execution was added to deterministic verification or hooks
 
 ## Pause Checkpoint
 

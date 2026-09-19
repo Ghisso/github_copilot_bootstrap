@@ -193,7 +193,7 @@ A fact that can be re-derived from current source/tests should normally not be c
 ## Phases
 
 - [x] `2026-09-19_phase-A-openwiki-runtime-and-safety-boundary` — pin the dependency and its optional validators, persist user config, add the target-neutral runner, protect bootstrap-owned surfaces, ignore resumable run state, and cover the failure/restore contract with deterministic tests.
-- [ ] `2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access` — encode the knowledge-ownership contract in canonical policy, add the narrow OpenWiki skill with the rebaseline rule, and add provider-neutral root guidance.
+- [x] `2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access` — encode the knowledge-ownership contract in canonical policy, add the narrow OpenWiki skill with the rebaseline rule, and add provider-neutral root guidance.
 - [ ] `2026-09-19_phase-C-openwiki-lifecycle-integration` — teach planner, orchestrator, documenter, learn, and onboard behavior how OpenWiki-enabled big plans end with a small knowledge-refresh phase, without touching disabled repositories.
 - [ ] `2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout` — transition phase: enable OpenWiki for the bootstrap repository, run the real generation/update path, migrate only proven duplicate descriptive knowledge, and complete the repository-wide stale-claims audit.
 - [ ] `2026-09-19_phase-E-openwiki-child-process-sandbox` — replace Phase A's detect-and-refuse symlink containment with operating-system-enforced isolation of the OpenWiki child process, so a write outside `openwiki/**` becomes impossible rather than merely reported.
