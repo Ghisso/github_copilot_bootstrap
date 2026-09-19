@@ -220,6 +220,11 @@ def _prepare_adapter(root: Path, relative_path: Path) -> FileSnapshot:
     return FileSnapshot(None, sentinel_fd=file_descriptor)
 
 
+def _race_error(relative_path: Path) -> RuntimeError:
+    """Build the standard error for a path that no longer matches its snapshot."""
+    return RuntimeError(f"protected path changed outside this refresh: {relative_path}")
+
+
 def _restore(
     root: Path, relative_path: Path, original: FileSnapshot
 ) -> DisplacedContent | None:
@@ -261,9 +266,7 @@ def _restore_absent(
             current_state.st_dev,
             current_state.st_ino,
         ) != (sentinel_state.st_dev, sentinel_state.st_ino):
-            raise RuntimeError(
-                f"protected path changed outside this refresh: {relative_path}"
-            )
+            raise _race_error(relative_path)
         displaced = None
         if sentinel_state.st_size:
             contents = os.pread(original.sentinel_fd, sentinel_state.st_size, 0)
@@ -289,9 +292,7 @@ def _restore_present(
     try:
         read_fd = os.open(name, os.O_RDONLY | no_follow, dir_fd=directory_fd)
     except OSError as error:
-        raise RuntimeError(
-            f"protected path changed outside this refresh: {relative_path}"
-        ) from error
+        raise _race_error(relative_path) from error
     try:
         state = os.fstat(read_fd)
         if (
@@ -302,9 +303,7 @@ def _restore_present(
             )
             != original.identity
         ):
-            raise RuntimeError(
-                f"protected path changed outside this refresh: {relative_path}"
-            )
+            raise _race_error(relative_path)
         current = os.pread(read_fd, state.st_size, 0)
     finally:
         os.close(read_fd)
@@ -320,15 +319,11 @@ def _restore_present(
     try:
         write_fd = os.open(name, os.O_WRONLY | no_follow, dir_fd=directory_fd)
     except OSError as error:
-        raise RuntimeError(
-            f"protected path changed outside this refresh: {relative_path}"
-        ) from error
+        raise _race_error(relative_path) from error
     try:
         write_state = os.fstat(write_fd)
         if (write_state.st_dev, write_state.st_ino) != original.identity:
-            raise RuntimeError(
-                f"protected path changed outside this refresh: {relative_path}"
-            )
+            raise _race_error(relative_path)
         os.ftruncate(write_fd, 0)
         os.write(write_fd, original.contents)
     finally:
