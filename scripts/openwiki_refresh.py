@@ -14,6 +14,21 @@ runner takes prevents a second runner invocation from running concurrently,
 but it does not prevent a concurrent human edit, which restoration can only
 detect and report, never silently merge.
 
+Nested-repository control-plane fingerprinting: an ignored control-plane path
+that is itself a Git repository (for example an installed ``.claude``) is
+fingerprinted file-by-file, because Git does not recurse into it. Its own
+``.git`` is walked too, but not uniformly. ``hooks/*`` (Git executes these
+directly) and ``config`` (``core.hooksPath``, ``core.fsmonitor``, and
+``include.path`` can each redirect to or run arbitrary commands), plus
+``info/``, are fingerprinted like any other file. High-churn storage that
+moves on every ordinary commit -- ``objects/``, ``refs/``, ``logs/``,
+``index``, ``HEAD``, ``ORIG_HEAD``, ``FETCH_HEAD``, ``MERGE_HEAD``,
+``packed-refs``, and ``COMMIT_EDITMSG`` -- is deliberately excluded. This
+includes ``refs/``: a ref moves on every commit, including this bootstrap's
+own state-sync commits inside ``.claude``, and moving one is not itself a
+code-execution vector, so fingerprinting it would only produce false
+failures on ordinary activity.
+
 Residual limit: this phase detects and fails closed on a write that escapes
 ``openwiki/`` through a symlink inside the repository working tree, but a
 write that lands outside the repository entirely, such as the user's home
@@ -50,6 +65,27 @@ IGNORED_CONTROL_PLANE_PATHS = (
     "AGENTS.md",
     "CLAUDE.md",
     ".context-mode-provenance.secret*",
+)
+# High-churn entries directly under a nested repository's own ``.git`` that
+# change on every ordinary commit and carry no code-execution meaning on
+# their own. Excluded by name (not by allowlisting the rest) so a future Git
+# version's new files are fingerprinted by default instead of silently
+# skipped. ``COMMIT_EDITMSG`` is included here even though it holds text, not
+# an object or a ref: it is rewritten on every commit (verified empirically),
+# so treating it as execution-relevant would fail a refresh on ordinary
+# nested-repository activity, such as this bootstrap's own state-sync commits
+# inside ``.claude``.
+_NESTED_GIT_CHURN_DIRECTORIES = frozenset({"objects", "refs", "logs"})
+_NESTED_GIT_CHURN_FILES = frozenset(
+    {
+        "index",
+        "HEAD",
+        "ORIG_HEAD",
+        "FETCH_HEAD",
+        "MERGE_HEAD",
+        "packed-refs",
+        "COMMIT_EDITMSG",
+    }
 )
 
 
@@ -139,16 +175,32 @@ def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
     Git does not recurse into a nested repository (for example an installed
     ``.claude``); ``git ls-files --others --ignored`` reports the directory
     itself as one entry instead of every file inside it, which would let a
-    mutation anywhere inside it pass undetected. Nested ``.git`` metadata is
-    excluded from the walk: its own object/index churn is expected noise, not
-    evidence of a mutated tracked file.
+    mutation anywhere inside it pass undetected. A nested repository's own
+    ``.git`` is walked too, but not uniformly: Git executes ``hooks/*``
+    directly, and ``config`` can redirect execution on its own (a relocated
+    ``core.hooksPath``, a ``core.fsmonitor`` command, or an ``include.path``
+    pulling in further config), so those are fingerprinted like any other
+    file. The high-churn storage that moves on every ordinary commit --
+    ``objects/``, ``refs/``, ``logs/``, and pointer files such as ``HEAD`` and
+    ``index`` (see ``_NESTED_GIT_CHURN_DIRECTORIES``/``_NESTED_GIT_CHURN_FILES``)
+    -- is still excluded. Excluding ``refs/`` is deliberate, not an oversight:
+    refs move on every commit, including this bootstrap's own state-sync
+    commits inside ``.claude``, and moving a ref is not itself a
+    code-execution vector, so fingerprinting it would only produce false
+    failures on ordinary activity.
     """
     paths: set[str] = set()
     for directory, directories, files in os.walk(
         root / relative_directory, followlinks=False
     ):
-        directories[:] = [name for name in directories if name != ".git"]
         current = Path(directory)
+        if current.name == ".git":
+            directories[:] = [
+                name
+                for name in directories
+                if name not in _NESTED_GIT_CHURN_DIRECTORIES
+            ]
+            files = [name for name in files if name not in _NESTED_GIT_CHURN_FILES]
         for name in files:
             paths.add((current / name).relative_to(root).as_posix())
         for name in directories:
