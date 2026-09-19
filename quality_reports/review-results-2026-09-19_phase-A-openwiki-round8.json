@@ -1,0 +1,9 @@
+[
+  {
+    "severity": "MAJOR",
+    "title": "No regression test locks in the .cache exclusion's narrow boundaries (immediate-child-only, real-directory-only, exact-name-only); a symlinked .cache, a deeper .cache, a file literally named .cache, or a near-miss name like .cache-extra could silently start being excluded (or regress) with nothing to catch it",
+    "file": "tests/test_openwiki_refresh.py",
+    "line": 492,
+    "profile": "tests"
+  }
+]
