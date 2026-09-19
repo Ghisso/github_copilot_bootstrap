@@ -10,6 +10,7 @@ phases:
   - 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
   - 2026-09-19_phase-C-openwiki-lifecycle-integration
   - 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
+  - 2026-09-19_phase-E-openwiki-child-process-sandbox
 current_phase: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
@@ -195,6 +196,7 @@ A fact that can be re-derived from current source/tests should normally not be c
 - [ ] `2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access` — encode the knowledge-ownership contract in canonical policy, add the narrow OpenWiki skill with the rebaseline rule, and add provider-neutral root guidance.
 - [ ] `2026-09-19_phase-C-openwiki-lifecycle-integration` — teach planner, orchestrator, documenter, learn, and onboard behavior how OpenWiki-enabled big plans end with a small knowledge-refresh phase, without touching disabled repositories.
 - [ ] `2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout` — transition phase: enable OpenWiki for the bootstrap repository, run the real generation/update path, migrate only proven duplicate descriptive knowledge, and complete the repository-wide stale-claims audit.
+- [ ] `2026-09-19_phase-E-openwiki-child-process-sandbox` — replace Phase A's detect-and-refuse symlink containment with operating-system-enforced isolation of the OpenWiki child process, so a write outside `openwiki/**` becomes impossible rather than merely reported.
 
 ## Step Summary
 
@@ -204,6 +206,8 @@ A fact that can be re-derived from current source/tests should normally not be c
 | B | coder + documenter | `shared/policies/workflow.instructions.md`, `shared/policies/workspace.instructions.md`, `shared/MEMORY.md`, `docs/architecture.md`, `README.md`, new `shared/skills/openwiki/SKILL.md`, authoring `AGENTS.md` / `CLAUDE.md` | `create-feature`, `ponytail` (full), `code-style`, `testing-patterns`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | focused policy/skill/root tests; generated-target validation; `verify.py fast`; receipts |
 | C | coder + documenter | planner/orchestrator/documenter prompts, `plan-decomposition`, `documentation`, `learn`, `onboard` skills, `shared/templates/plan-big.md`, `shared/policies/workflow.instructions.md` | `ponytail` (full), `code-style`, `testing-patterns`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | focused plan-generation/lifecycle tests; generated-target validation; `verify.py fast`; receipts |
 | D | coder + documenter | new `openwiki/INSTRUCTIONS.md`, new `.openwikiignore`, generated `openwiki/**`, `README.md`, `docs/**`, `shared/MEMORY.md`, stale live-advice surfaces | `openwiki`, `documentation`, `humanize`, `learn`, `deep-audit`, `ponytail` (full) for any code fix | `code`, `architecture`, `security`, `tests`, `ponytail` when code changes, `documentation` | real OpenWiki acceptance runs plus deterministic repository checks; final stale-claims audit; receipts |
+
+| E | coder | `shared/scripts/openwiki_refresh.py`, `shared/devcontainer/Dockerfile`, `scripts/validate_targets.py`, runner tests | `ponytail` (full), `code-style`, `testing-patterns` | `code`, `architecture`, `security`, `tests`, `ponytail` | deterministic sandbox-escape tests; `verify.py fast`; receipts |
 
 Skill names above refer to `shared/skills/<name>/SKILL.md`.
 
@@ -221,6 +225,7 @@ Skill names above refer to `shared/skills/<name>/SKILL.md`.
 | Every big plan gains ceremony | MEDIUM | Add the final knowledge phase only in repositories that have enabled OpenWiki and only for multi-phase big plans that change documentable outer-repository behavior. Disabled repos retain the existing lifecycle. |
 | OpenWiki generation consumes unnecessary model budget | MEDIUM | Use deterministic fakes for automated tests. Dogfood only the minimum real runs needed to prove initial generation and post-migration update. Do not run generation inside broad test matrices. |
 | Concurrent OpenWiki runs corrupt/churn state | MEDIUM | Lifecycle requires one serial runner per checkout. If this cannot be guaranteed operationally, add a small atomic lock in the runner before enabling consumer rollout. |
+| OpenWiki escapes `openwiki/**` through a symlink it creates while running | HIGH | Phase A checks before and after the run and fails closed, naming every path that moved, and restores the root adapters from pre-run bytes regardless. Nothing is committed on a failed refresh. Residual gap: a write landing outside the repository entirely is not detected. Phase E closes that gap with operating-system-enforced isolation of the child process. |
 | Generated docs become a second hidden control plane | HIGH | Root guidance treats OpenWiki as optional just-in-time context. Source/tests/policies remain authority and the runner is not allowed to mutate bootstrap control-plane files. |
 
 ## Verification

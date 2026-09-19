@@ -1,6 +1,6 @@
 # OpenWiki Phase A: Runtime and Safety Boundary
 
-**Status:** PAUSED
+**Status:** IN PROGRESS
 **Plan:** `.claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md`
 
 ## Goal
@@ -50,6 +50,27 @@ Implement the approved Phase A runtime, wrapper, installation, ignore, and deter
 - Re-run focused tests, generation, validation, runtime consistency, and fast verification.
 - Re-run the full five-profile review until no CRITICAL or MAJOR finding remains.
 - Complete normal Phase A closeout, findings persistence, phase/closeout receipts, commit, and push.
+
+## Resume (2026-09-19)
+
+Resumed on the same implementation branch. Plan restored to `in-progress`; no new phase created.
+
+### Scope decision taken on resume
+
+Round 3 CRITICAL finding 3 (the OpenWiki symlink walk is check-then-use) has no in-process fix:
+Python cannot supervise another program's file writes. The user chose **detect and refuse now,
+prevent later**:
+
+- Phase A re-walks `openwiki/` after the child exits and fails closed, naming every symlink and
+  every path that moved. The root adapters are restored from pre-run bytes regardless. Nothing
+  is committed on a failed refresh.
+- Operating-system-enforced isolation of the child process is recorded as a new
+  `2026-09-19_phase-E-openwiki-child-process-sandbox`, added to the big plan's phase list,
+  step summary, and risk table.
+- Accepted residual limit, documented in the runner docstring: a write landing outside the
+  repository entirely is not detected until Phase E.
+
+### Original resume point (from the pause)
 
 ## Resume Point
 
