@@ -14,29 +14,87 @@ runner takes prevents a second runner invocation from running concurrently,
 but it does not prevent a concurrent human edit, which restoration can only
 detect and report, never silently merge.
 
-Nested-repository control-plane fingerprinting: an ignored control-plane path
-that is itself a Git repository (for example an installed ``.claude``) is
-fingerprinted file-by-file, because Git does not recurse into it. Inside its
-own ``.git``, only the execution-relevant surface is checked: everything
-under ``hooks/`` (Git executes these directly), the ``config`` file
+Control-plane enumeration: every ``CONTROL_PLANE_PATHS`` entry is resolved
+directly against the filesystem (``_control_plane_paths``), not derived from
+``git ls-files --others --ignored``. Git's own directory walker silently
+omits anything inside a directory literally named ``.git``, valid or not,
+for *any* ignored path, not only ones that are themselves nested
+repositories; a payload written into, for example, ``.agents/.git/x`` was
+therefore reachable by nothing in this module at all, since ``git ls-files``
+never reported it in the first place. Enumerating from disk also naturally
+picks up tracked control-plane files (for example ``.github/workflows/*.yml``),
+which the git-ignored-only enumeration never saw; that is deliberate double
+coverage with the separate outer ``git status`` comparison, not an
+oversight, and matching paths are deduplicated before they reach
+``out_of_scope_paths``. A directory literally named ``.cache`` immediately
+under a control-plane path (for example ``.claude/.cache``) is the one
+exception: it is excluded entirely (see ``_walk_control_plane_directory``).
+That exclusion is narrow and does not generalize -- a future churning
+directory needs the same explicit, one-off judgement, not an automatic
+exemption; see the residual limits below for why that judgement does not
+extend to the rest of a control-plane path's working tree.
+
+Nested-repository control-plane fingerprinting: a control-plane path that is
+itself a Git repository (for example an installed ``.claude``) is
+fingerprinted file-by-file, because Git does not recurse into it. A directory
+literally named ``.git`` is trusted as a real Git directory only after it is
+validated -- see ``_is_real_git_directory`` -- because a directory anyone can
+create with that name is not otherwise evidence of anything; an unvalidated
+one is walked in full, like any other content. Inside a validated Git
+directory, only the execution-relevant surface is checked: everything under
+``hooks/`` (Git executes these directly); ``config`` and ``config.worktree``
 (``core.hooksPath``, ``core.fsmonitor``, and ``include.path`` can each
-redirect to or run arbitrary commands), ``info/attributes`` (it binds paths
-to ``filter.*``/``diff.*.textconv`` handlers whose commands come from
-``config``, so it is part of that same execution path), and the same two,
-``config`` and ``hooks/``, under any ``modules/*/`` subdirectory, since
-submodule git directories live there and carry their own hooks and config.
-Everything else under a nested ``.git`` -- ``objects/``, ``refs/``, ``logs/``,
-``info/refs``, ``index``, ``HEAD``, ``packed-refs``, ``COMMIT_EDITMSG``, and
-whatever a future Git version adds -- is not fingerprinted, so it cannot
-produce a false failure. This is a considered trade, not an oversight: an
-earlier denylist of known-churn names missed ``COMMIT_EDITMSG``, and after
-that was fixed, missed ``git gc``'s ``info/refs``, in successive reviews,
-because the set of files Git writes on ordinary maintenance is open-ended and
-grows with every release -- a check that fails closed on routine ``git gc``
-gets bypassed rather than trusted. The allowlist's cost is symmetric: a
-code-execution vector a future Git version adds outside this listed set will
-not be detected until the set is revisited, which should happen whenever the
-pinned Git version changes.
+redirect to or run arbitrary commands, and ``config.worktree`` carries the
+same settings once ``extensions.worktreeConfig`` is enabled); ``worktrees/*/
+config.worktree`` (the per-worktree counterpart); and ``info/attributes`` (it
+binds paths to ``filter.*``/``diff.*.textconv`` handlers whose commands come
+from ``config``, so it is part of that same execution path). The same
+surface is checked again, recursively, for every submodule Git directory
+under ``modules/`` at any depth (``modules/<a>/modules/<b>/...`` is an
+ordinary configuration, not an adversarial one); a symlinked directory is not
+followed while recursing, so a symlink cycle cannot make that recursion run
+away. Everything else under a Git directory -- ``objects/``, ``refs/``,
+``logs/``, ``info/refs``, ``index``, ``HEAD``, ``packed-refs``,
+``COMMIT_EDITMSG``, and whatever a future Git version adds -- is not
+fingerprinted, so it cannot produce a false failure. This is a considered
+trade, not an oversight: an earlier denylist of known-churn names missed
+``COMMIT_EDITMSG``, and after that was fixed, missed ``git gc``'s
+``info/refs``, in successive reviews, because the set of files Git writes on
+ordinary maintenance is open-ended and grows with every release -- a check
+that fails closed on routine ``git gc`` gets bypassed rather than trusted.
+
+Residual limits of nested-repository fingerprinting, stated without
+softening: a code-execution vector a future Git version adds outside the
+listed allowlist will not be detected until the allowlist is revisited,
+which should happen whenever the pinned Git version changes. A file inside a
+*validated* Git directory that is not on the allowlist is still not
+fingerprinted, which can hide arbitrary content from this check -- but that
+content is inert data, not a code-execution vector, because every
+code-execution vector Git itself defines is in the allowlist. A nested
+repository whose ``.git`` is a file containing a ``gitdir:`` pointer to a
+location outside the tracked tree -- what ``git init --separate-git-dir``
+produces -- escapes this mechanism entirely: the pointer file itself is
+fingerprinted like any other file, but the real Git directory it points to
+is not walked at all.
+
+Residual limit: a control-plane path that is itself a live workspace for a
+concurrent agent session -- most notably this bootstrap's own ``.claude``,
+which ``state-sync.sh`` commits into on every prompt, among other agent
+activity -- is fingerprinted in full, deliberately. Excluding files such as
+``MEMORY.md``, plans, or session logs to avoid that churn would reopen
+exactly the gap this mechanism exists to close: mutations there are supposed
+to "pass undetected" no more than any other control-plane mutation. The
+operational consequence is real and is stated here rather than left to be
+discovered: this runner must be invoked as a discrete step, not while another
+agent session is actively writing to ``.claude`` in the same checkout. If
+that overlap happens, the run fails closed and names files OpenWiki never
+touched; nothing is damaged and nothing is committed, but the run must be
+repeated once the checkout is quiet. The ``flock`` this runner takes does not
+help here: it serializes this runner's own invocations against each other,
+not against an unrelated agent session's writes. There is no reliable way to
+tell a bootstrap write from an OpenWiki write from the outside, so this
+runner does not try to guess; an honest limit is preferable to a heuristic
+that would sometimes be wrong.
 
 Residual limit: this phase detects and fails closed on a write that escapes
 ``openwiki/`` through a symlink inside the repository working tree, but a
@@ -64,7 +122,7 @@ from pathlib import Path
 PROTECTED_ADAPTERS = (Path("AGENTS.md"), Path("CLAUDE.md"))
 PROTECTED_WORKFLOW = Path(".github/workflows/openwiki-update.yml")
 OPENWIKI_ARGUMENTS = ("openwiki", "code", "--update", "--print")
-IGNORED_CONTROL_PLANE_PATHS = (
+CONTROL_PLANE_PATHS = (
     ".claude",
     ".agents",
     ".codex",
@@ -169,61 +227,119 @@ def _walk_files_and_symlinks(directory: Path) -> list[Path]:
     return found
 
 
-def _nested_git_allowed_paths(git_root: Path) -> list[Path]:
-    """List the execution-relevant paths under one nested repository's ``.git``.
+def _is_real_git_directory(candidate: Path) -> bool:
+    """Return whether ``candidate`` has the minimal markers of a real Git directory.
 
-    Matched by path relative to ``git_root``, not by bare name, so a rule can
-    target one file several levels deep (``info/attributes``) without
-    touching its high-churn sibling at the same depth (``info/refs``).
-    Everything not explicitly listed here -- ``objects/``, ``refs/``,
-    ``logs/``, ``info/refs``, pointer files, ``packed-refs``,
-    ``COMMIT_EDITMSG`` -- is data, not walked, and cannot produce a false
-    failure. See the module docstring for why this is an allowlist rather
-    than a denylist of known churn, and for the trade that comes with it.
+    A directory literally named ``.git`` is not itself evidence of anything;
+    anyone able to write into a control-plane path can ``mkdir`` one to keep
+    this walk's execution-vector allowlist from ever reaching content placed
+    inside it. Requiring ``HEAD`` (a regular file), ``objects`` (a
+    directory), and ``refs`` (a directory) -- present in every Git directory
+    Git itself creates -- turns a decoy into ordinary content that gets the
+    same full walk as anything else, instead of a narrower one.
+    """
+    return (
+        (candidate / "HEAD").is_file()
+        and (candidate / "objects").is_dir()
+        and (candidate / "refs").is_dir()
+    )
+
+
+def _git_directory_allowed_paths(git_directory: Path) -> list[Path]:
+    """List the execution-relevant paths directly inside one Git directory.
+
+    Applied both to a nested repository's own Git directory and, recursively,
+    to every submodule Git directory under its ``modules/`` -- a submodule
+    Git directory is a Git directory in its own right, with the same
+    hooks/config/worktree surface. Matched by path relative to
+    ``git_directory``, not by bare name, so a rule can target one file
+    several levels deep (``info/attributes``) without touching its
+    high-churn sibling at the same depth (``info/refs``). See the module
+    docstring for why this is an allowlist rather than a denylist of known
+    churn, and for the trade that comes with it.
     """
     allowed: list[Path] = []
-    hooks = git_root / "hooks"
+    hooks = git_directory / "hooks"
     if hooks.is_dir():
         allowed.extend(_walk_files_and_symlinks(hooks))
-    config = git_root / "config"
-    if config.exists() or config.is_symlink():
-        allowed.append(config)
-    attributes = git_root / "info" / "attributes"
+    for name in ("config", "config.worktree"):
+        candidate = git_directory / name
+        if candidate.exists() or candidate.is_symlink():
+            allowed.append(candidate)
+    attributes = git_directory / "info" / "attributes"
     if attributes.exists() or attributes.is_symlink():
         allowed.append(attributes)
-    submodules = git_root / "modules"
-    if submodules.is_dir():
-        for entry in submodules.iterdir():
+    worktrees = git_directory / "worktrees"
+    if worktrees.is_dir():
+        for entry in worktrees.iterdir():
             if entry.is_symlink() or not entry.is_dir():
                 continue
-            submodule_config = entry / "config"
-            if submodule_config.exists() or submodule_config.is_symlink():
-                allowed.append(submodule_config)
-            submodule_hooks = entry / "hooks"
-            if submodule_hooks.is_dir():
-                allowed.extend(_walk_files_and_symlinks(submodule_hooks))
+            worktree_config = entry / "config.worktree"
+            if worktree_config.exists() or worktree_config.is_symlink():
+                allowed.append(worktree_config)
     return allowed
 
 
-def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
-    """List files and symlinks under an ignored nested-repository directory.
+def _submodule_git_directories(modules_directory: Path) -> list[Path]:
+    """List every submodule Git directory under ``modules_directory``, at any depth.
 
-    Git does not recurse into a nested repository (for example an installed
-    ``.claude``); ``git ls-files --others --ignored`` reports the directory
-    itself as one entry instead of every file inside it, which would let a
-    mutation anywhere inside it pass undetected. A nested repository's own
-    ``.git`` is walked too, but only for the execution-relevant surface
-    ``_nested_git_allowed_paths`` names; everything else under ``.git`` is
-    not fingerprinted, so a code-execution vector a future Git version adds
-    outside that surface will not be detected until it is revisited (see the
-    module docstring for the full trade-off).
+    A submodule's own ``modules/`` (``modules/<a>/modules/<b>/...``) is an
+    ordinary configuration, not an adversarial one, so this recurses without
+    a depth limit. A symlinked directory is skipped rather than followed, so
+    a symlink cycle cannot make the recursion run away.
     """
+    directories: list[Path] = []
+    if modules_directory.is_symlink() or not modules_directory.is_dir():
+        return directories
+    for entry in modules_directory.iterdir():
+        if entry.is_symlink() or not entry.is_dir():
+            continue
+        directories.append(entry)
+        directories.extend(_submodule_git_directories(entry / "modules"))
+    return directories
+
+
+def _nested_git_allowed_paths(git_root: Path) -> list[Path]:
+    """List the execution-relevant paths under one nested repository's ``.git``.
+
+    Everything not covered by ``_git_directory_allowed_paths`` -- ``objects/``,
+    ``refs/``, ``logs/``, ``info/refs``, pointer files, ``packed-refs``,
+    ``COMMIT_EDITMSG`` -- is data, not walked, and cannot produce a false
+    failure.
+    """
+    allowed = list(_git_directory_allowed_paths(git_root))
+    for submodule_git_directory in _submodule_git_directories(git_root / "modules"):
+        allowed.extend(_git_directory_allowed_paths(submodule_git_directory))
+    return allowed
+
+
+def _walk_control_plane_directory(root: Path, relative_directory: str) -> set[str]:
+    """List files and symlinks under one control-plane directory, fully.
+
+    A directory literally named ``.git`` is walked too, but narrowed to the
+    execution-relevant surface ``_nested_git_allowed_paths`` names only after
+    ``_is_real_git_directory`` validates it; an unvalidated ``.git``-named
+    directory is walked in full, the same as any other content, so a decoy
+    cannot hide anything. See the module docstring for the full trade-off,
+    including what a validated Git directory can still hide.
+
+    A directory literally named ``.cache`` immediately under
+    ``relative_directory`` itself (not one found deeper in the tree) is
+    excluded entirely, provided it really is a directory and not a symlink
+    standing in for one. This is disposable cache this bootstrap owns, not
+    an open-ended external surface, and it holds no code-execution vector --
+    a narrow, deliberate exception, not a precedent for excluding churn in
+    general. See the module docstring for the reasoning and its limits.
+    """
+    top = root / relative_directory
     paths: set[str] = set()
-    for directory, directories, files in os.walk(
-        root / relative_directory, followlinks=False
-    ):
+    for directory, directories, files in os.walk(top, followlinks=False):
         current = Path(directory)
-        if current.name == ".git":
+        if current == top:
+            cache = current / ".cache"
+            if cache.is_dir() and not cache.is_symlink():
+                directories[:] = [name for name in directories if name != ".cache"]
+        if current.name == ".git" and _is_real_git_directory(current):
             for candidate in _nested_git_allowed_paths(current):
                 paths.add(candidate.relative_to(root).as_posix())
             directories[:] = []  # Do not also generically walk .git's data.
@@ -237,28 +353,35 @@ def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
     return paths
 
 
-def _ignored_control_plane_paths(root: Path) -> set[str]:
-    """Return ignored control-plane files without reading their contents."""
-    result = _git(
-        root,
-        "ls-files",
-        "--others",
-        "--ignored",
-        "--exclude-standard",
-        "-z",
-        "--",
-        *IGNORED_CONTROL_PLANE_PATHS,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("could not read ignored control-plane paths")
+def _control_plane_paths(root: Path) -> set[str]:
+    """Return every control-plane path on disk, without reading file contents.
+
+    Enumerated directly from the filesystem for each ``CONTROL_PLANE_PATHS``
+    pattern, rather than derived from ``git ls-files --others --ignored``:
+    Git's own directory walker silently omits anything inside a directory
+    literally named ``.git``, valid or not, for *any* ignored path, not only
+    ones that are themselves nested repositories. A payload written into,
+    for example, ``.agents/.git/x`` was therefore reachable by nothing in
+    this module at all -- ``git ls-files`` never reported it, so
+    ``_walk_control_plane_directory``'s validation was never reached.
+
+    Enumerating from disk also naturally includes tracked control-plane
+    files (for example ``.github/workflows/*.yml``), which the prior
+    ignored-only enumeration never saw. That is deliberate double coverage
+    with the separate outer ``git status`` comparison, not an oversight:
+    both fail closed on the same mutation, and paths are deduplicated
+    before they reach ``out_of_scope_paths``.
+    """
     paths: set[str] = set()
-    for entry in result.stdout.split("\0"):
-        if not entry:
-            continue
-        if entry.endswith("/"):
-            paths.update(_walk_ignored_directory(root, entry))
-        else:
-            paths.add(entry)
+    for pattern in CONTROL_PLANE_PATHS:
+        for match in root.glob(pattern):
+            relative = match.relative_to(root).as_posix()
+            if match.is_symlink():
+                paths.add(relative)
+            elif match.is_dir():
+                paths.update(_walk_control_plane_directory(root, relative))
+            elif match.is_file():
+                paths.add(relative)
     return paths
 
 
@@ -490,10 +613,8 @@ def _dirty_state(root: Path, entries: dict[str, str]) -> dict[str, tuple[str, ..
     }
 
 
-def _ignored_control_plane_state(
-    root: Path, paths: set[str]
-) -> dict[str, tuple[str, ...]]:
-    """Fingerprint ignored control-plane files without emitting their contents."""
+def _control_plane_state(root: Path, paths: set[str]) -> dict[str, tuple[str, ...]]:
+    """Fingerprint control-plane files without emitting their contents."""
     return {path: _fingerprint(root, path) for path in paths}
 
 
@@ -636,9 +757,9 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             before_entries = _status_entries(root)
             before_paths = set(before_entries)
             existing_dirty_state = _dirty_state(root, before_entries)
-            before_ignored_paths = _ignored_control_plane_paths(root)
-            before_ignored_state = _ignored_control_plane_state(
-                root, before_ignored_paths
+            before_control_plane_paths = _control_plane_paths(root)
+            before_control_plane_state = _control_plane_state(
+                root, before_control_plane_paths
             )
             for path in PROTECTED_ADAPTERS:
                 adapters[path] = _prepare_adapter(root, path)
@@ -697,34 +818,36 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 **_restoration_evidence(restoration_errors, restoration_displaced),
             )
         try:
-            after_ignored_paths = _ignored_control_plane_paths(root)
-            after_ignored_state = _ignored_control_plane_state(
-                root, after_ignored_paths
+            after_control_plane_paths = _control_plane_paths(root)
+            after_control_plane_state = _control_plane_state(
+                root, after_control_plane_paths
             )
         except (OSError, RuntimeError) as error:
             return 1, _result(
                 "failed",
                 repository_root=str(root),
-                error=f"could not compare ignored control-plane paths: {error}",
+                error=f"could not compare control-plane paths: {error}",
                 openwiki_returncode=child_returncode,
                 **_restoration_evidence(restoration_errors, restoration_displaced),
             )
         after_paths = set(after_entries)
         new_paths = sorted(after_paths - before_paths)
         out_of_scope = [path for path in new_paths if not path.startswith("openwiki/")]
-        changed_ignored_paths = sorted(
+        changed_control_plane_paths = sorted(
             path
-            for path, state in before_ignored_state.items()
-            if after_ignored_state.get(path) != state
+            for path, state in before_control_plane_state.items()
+            if after_control_plane_state.get(path) != state
         )
-        new_ignored_paths = sorted(after_ignored_paths - before_ignored_paths)
-        ignored_out_of_scope = sorted(
+        new_control_plane_paths = sorted(
+            after_control_plane_paths - before_control_plane_paths
+        )
+        control_plane_out_of_scope = sorted(
             path
-            for path in {*changed_ignored_paths, *new_ignored_paths}
+            for path in {*changed_control_plane_paths, *new_control_plane_paths}
             if not path.startswith("openwiki/")
         )
         out_of_scope.extend(
-            path for path in ignored_out_of_scope if path not in out_of_scope
+            path for path in control_plane_out_of_scope if path not in out_of_scope
         )
         try:
             tree_violations, tree_symlinks = _openwiki_tree_violations(root)
@@ -766,7 +889,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             "openwiki_version": openwiki_version,
             "pre_existing_dirty_paths": sorted(before_paths),
             "modified_pre_existing_paths": modified_pre_existing_paths,
-            "ignored_control_plane_paths": ignored_out_of_scope,
+            "control_plane_paths": control_plane_out_of_scope,
             "new_paths": new_paths,
             "out_of_scope_paths": sorted(out_of_scope),
             "workflow_unchanged": workflow_unchanged,
