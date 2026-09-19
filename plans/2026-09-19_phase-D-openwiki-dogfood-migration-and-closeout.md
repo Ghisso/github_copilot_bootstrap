@@ -3,7 +3,7 @@ name: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 4
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout

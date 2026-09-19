@@ -11,7 +11,7 @@ phases:
   - 2026-09-19_phase-C-openwiki-lifecycle-integration
   - 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
   - 2026-09-19_phase-E-openwiki-child-process-sandbox
-current_phase: 2026-09-19_phase-C-openwiki-lifecycle-integration
+current_phase: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
