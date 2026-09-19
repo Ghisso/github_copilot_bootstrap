@@ -2,7 +2,7 @@
 name: 2026-09-19_phase-K-knowledge-refresh
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
-phase_index: 12
+phase_index: 13
 status: planned
 closeout_session_log:
 ---

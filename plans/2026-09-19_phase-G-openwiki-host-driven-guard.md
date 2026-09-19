@@ -2,7 +2,7 @@
 name: 2026-09-19_phase-G-openwiki-host-driven-guard
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
-phase_index: 8
+phase_index: 9
 status: planned
 closeout_session_log:
 ---
