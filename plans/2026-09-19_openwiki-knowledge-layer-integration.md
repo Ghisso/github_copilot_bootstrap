@@ -11,7 +11,13 @@ phases:
   - 2026-09-19_phase-C-openwiki-lifecycle-integration
   - 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
   - 2026-09-19_phase-E-openwiki-child-process-sandbox
-current_phase: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
+  - 2026-09-19_phase-F-openwiki-hook-mechanics-spike
+  - 2026-09-19_phase-G-openwiki-host-driven-guard
+  - 2026-09-19_phase-H-openwiki-skill-rename-and-host-rules
+  - 2026-09-19_phase-I-openwiki-enable-and-first-generation
+  - 2026-09-19_phase-J-openwiki-docs-memory-migration
+  - 2026-09-19_phase-K-knowledge-refresh
+current_phase: 2026-09-19_phase-F-openwiki-hook-mechanics-spike
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
@@ -62,8 +68,11 @@ for future OpenWiki-enabled big plans.
 - Pin and expose a compatible OpenWiki CLI, with its optional Mermaid validators, in the
   bootstrap devcontainer, and persist the user's OpenWiki configuration across rebuilds without
   the bootstrap owning any provider credential.
-- Add one bootstrap-owned, target-neutral OpenWiki runner that works from Codex, Claude,
-  GitHub Copilot, and Antigravity without host-specific OpenWiki integrations.
+- Drive OpenWiki host-driven from Claude Code and Codex, using OpenWiki's own supported host
+  integrations and the coding session's own model, with no provider credential anywhere in the
+  bootstrap. Copilot and Antigravity read `openwiki/**` but cannot refresh it. (Amended
+  2026-09-19: the original goal assumed a bootstrap-owned subprocess runner, which cannot work
+  against OpenWiki 0.5.2 — see `.claude/session_logs/2026-09-19_openwiki-phase-D-E-cancellation.md`.)
 - Preserve bootstrap ownership of `AGENTS.md`, `CLAUDE.md`, workflow files, and other
   control-plane surfaces even though upstream writes its own managed snippets.
 - Never run OpenWiki from deterministic verification, hooks, post-commit automation, or
@@ -91,7 +100,10 @@ for future OpenWiki-enabled big plans.
 - Do not delete `MEMORY.md`.
 - Do not delete `docs/` wholesale.
 - Do not make generated OpenWiki pages normative source of truth.
-- Do not install OpenWiki's host-specific integrations as a bootstrap requirement.
+- Do not install OpenWiki's host integrations automatically. They are the supported enablement
+  step for host-driven mode and are installed once per checkout by a deliberate human-initiated
+  action, never by the bootstrap installer, generator, hooks, `verify.py`, state-sync, or CI, and
+  never with `--force`.
 - Do not add an OpenWiki scheduled GitHub Actions workflow or auto-merge path.
 - Do not store provider credentials, OAuth state, or OpenWiki private configuration in the
   repository, and do not forward individual provider API keys through the devcontainer.
@@ -195,8 +207,14 @@ A fact that can be re-derived from current source/tests should normally not be c
 - [x] `2026-09-19_phase-A-openwiki-runtime-and-safety-boundary` — pin the dependency and its optional validators, persist user config, add the target-neutral runner, protect bootstrap-owned surfaces, ignore resumable run state, and cover the failure/restore contract with deterministic tests.
 - [x] `2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access` — encode the knowledge-ownership contract in canonical policy, add the narrow OpenWiki skill with the rebaseline rule, and add provider-neutral root guidance.
 - [x] `2026-09-19_phase-C-openwiki-lifecycle-integration` — teach planner, orchestrator, documenter, learn, and onboard behavior how OpenWiki-enabled big plans end with a small knowledge-refresh phase, without touching disabled repositories.
-- [ ] `2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout` — transition phase: enable OpenWiki for the bootstrap repository, run the real generation/update path, migrate only proven duplicate descriptive knowledge, and complete the repository-wide stale-claims audit.
-- [ ] `2026-09-19_phase-E-openwiki-child-process-sandbox` — replace Phase A's detect-and-refuse symlink containment with operating-system-enforced isolation of the OpenWiki child process, so a write outside `openwiki/**` becomes impossible rather than merely reported.
+- [ ] `2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout` — cancelled: written against the native-CLI runner model; replaced by F–K (see `.claude/session_logs/2026-09-19_openwiki-phase-D-E-cancellation.md`).
+- [ ] `2026-09-19_phase-E-openwiki-child-process-sandbox` — cancelled: host-driven mode spawns no bootstrap child process; prevention moved to the guard hook and verify backstop in G.
+- [ ] `2026-09-19_phase-F-openwiki-hook-mechanics-spike` — evidence-only spike in a scratch repository with a throwaway MCP server: observe whether `PreToolUse`/`PostToolUse` fire for MCP tools on Claude Code and Codex, the tool name, whether a deny is honored, and the payload shape; record GO / GO-with-adaptations / RE-PLAN for G.
+- [ ] `2026-09-19_phase-G-openwiki-host-driven-guard` — built only against F's evidence: replace the subprocess runner with a PreToolUse/PostToolUse guard on `openwiki_begin`, add the `VFY-OPENWIKI-001` backstop, fix the devcontainer smoke line, add a real-binary MCP handshake test, retire `openwiki_refresh.py`, and make OpenWiki-installed skill bundles third-party-owned.
+- [ ] `2026-09-19_phase-H-openwiki-skill-rename-and-host-rules` — rename the bootstrap skill to `knowledge-refresh`, rewrite it for host-driven operation with the precise host-integration rule, and sweep every reference.
+- [ ] `2026-09-19_phase-I-openwiki-enable-and-first-generation` — enable OpenWiki here, install the Claude Code and Codex integrations, re-probe the guard against the real server, run one host-driven generation, commit, and stop for inspection.
+- [ ] `2026-09-19_phase-J-openwiki-docs-memory-migration` — after explicit confirmation, migrate only proven duplicate descriptive docs and MEMORY content; no refresh.
+- [ ] `2026-09-19_phase-K-knowledge-refresh` — the small knowledge-refresh shape: one update, diff inspection, repository-wide stale-claims/MEMORY/LEARN audit, closeout.
 
 ## Step Summary
 
@@ -205,9 +223,14 @@ A fact that can be re-derived from current source/tests should normally not be c
 | A | coder | `shared/devcontainer/Dockerfile`, `shared/devcontainer/devcontainer.json`, new `shared/scripts/openwiki_refresh.py`, `scripts/generate_targets.py`, `scripts/install_bootstrap.py`, `scripts/validate_targets.py`, runner tests, devcontainer docs | `create-feature`, `add-dependency`, `ponytail` (full), `code-style`, `testing-patterns` | `code`, `architecture`, `security`, `tests`, `ponytail` | focused runner/generator/installer tests; `verify.py fast`; canonical phase/closeout receipts |
 | B | coder + documenter | `shared/policies/workflow.instructions.md`, `shared/policies/workspace.instructions.md`, `shared/MEMORY.md`, `docs/architecture.md`, `README.md`, new `shared/skills/openwiki/SKILL.md`, authoring `AGENTS.md` / `CLAUDE.md` | `create-feature`, `ponytail` (full), `code-style`, `testing-patterns`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | focused policy/skill/root tests; generated-target validation; `verify.py fast`; receipts |
 | C | coder + documenter | planner/orchestrator/documenter prompts, `plan-decomposition`, `documentation`, `learn`, `onboard` skills, `shared/templates/plan-big.md`, `shared/policies/workflow.instructions.md` | `ponytail` (full), `code-style`, `testing-patterns`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | focused plan-generation/lifecycle tests; generated-target validation; `verify.py fast`; receipts |
-| D | coder + documenter | new `openwiki/INSTRUCTIONS.md`, new `.openwikiignore`, generated `openwiki/**`, `README.md`, `docs/**`, `shared/MEMORY.md`, stale live-advice surfaces | `openwiki`, `documentation`, `humanize`, `learn`, `deep-audit`, `ponytail` (full) for any code fix | `code`, `architecture`, `security`, `tests`, `ponytail` when code changes, `documentation` | real OpenWiki acceptance runs plus deterministic repository checks; final stale-claims audit; receipts |
-
-| E | coder | `shared/scripts/openwiki_refresh.py`, `shared/devcontainer/Dockerfile`, `scripts/validate_targets.py`, runner tests | `ponytail` (full), `code-style`, `testing-patterns` | `code`, `architecture`, `security`, `tests`, `ponytail` | deterministic sandbox-escape tests; `verify.py fast`; receipts |
+| D | cancelled — see Phases | — | — | — | — |
+| E | cancelled — see Phases | — | — | — | — |
+| F | coder (user runs the host sessions) | scratch repository outside this checkout (`spike_mcp_server.py`, `spike_hook.py`, scratch `.mcp.json`, `.claude/settings.json`, `.codex/config.toml`, `.codex/hooks.json`); new `docs/2026-09-19-openwiki-hook-mechanics-spike.md`; raw logs under `.claude/explorations/2026-09-19_openwiki-hook-mechanics-spike/` | `integration-gate-spike`, `documentation`, `humanize` | `architecture`, `security`, `tests`, `documentation` | scripted server round trip; observed per-host U1–U7 table; decision line; `verify.py fast`; receipts |
+| G | coder + documenter | new `shared/hooks/scripts/openwiki-guard.py`/`.sh`, `scripts/generate_targets.py`, `scripts/validate_targets.py`, `scripts/runtime_ownership.py`, `scripts/check_runtime.py`, `scripts/install_bootstrap.py`, `shared/scripts/verify.py`, `shared/devcontainer/Dockerfile`, delete `shared/scripts/openwiki_refresh.py` + `tests/test_openwiki_refresh.py`, new guard/verify/smoke tests, runner mentions in policies, prompts, root guidance, docs | `create-feature`, `ponytail` (full), `code-style`, `testing-patterns`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | focused hook/verify/smoke tests; generate/validate/check_runtime; `verify.py fast`; receipts |
+| H | coder + documenter | `shared/skills/openwiki/` → `shared/skills/knowledge-refresh/`, root guidance, `render_root_guidance`, workflow/workspace policies, orchestrator/documenter prompts, `docs/architecture.md`, `README.md` | `ponytail` (full), `code-style`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation` | skill validators; generated-target validation; `check_runtime`; receipts |
+| I | coder | new `openwiki/INSTRUCTIONS.md`, new `.openwikiignore`, `.mcp.json`, `.codex/config.toml` (via `openwiki integrations install`), installed OpenWiki skills, generated `openwiki/**` | `knowledge-refresh`, OpenWiki `openwiki`, `integration-gate-spike`, `documentation`, `humanize` | `code`, `architecture`, `security`, `tests`, `documentation` | guard re-probe; one host-driven update; adapters byte-stable; `check_runtime`; receipts |
+| J | documenter + coder | `README.md`, selected live `docs/**`, `shared/MEMORY.md`, `openwiki/INSTRUCTIONS.md` | `documentation`, `humanize`, `deep-audit`, `learn`, `ponytail` (full) if code | `documentation`, `architecture`, `security`; `code`, `tests`, `ponytail` if code | link integrity; `verify.py fast`; receipts |
+| K | coder + documenter | generated `openwiki/**`, stale live-advice surfaces, `shared/MEMORY.md` | `knowledge-refresh`, OpenWiki `openwiki`, `documentation`, `humanize`, `learn`, `deep-audit` | `code`, `architecture`, `security`, `tests`, `documentation` | one host-driven update; diff inspection; `## Stale-claims surfaces checked`; receipts |
 
 Skill names above refer to `shared/skills/<name>/SKILL.md`.
 
@@ -215,17 +238,23 @@ Skill names above refer to `shared/skills/<name>/SKILL.md`.
 
 | Risk | Level | Mitigation / fallback |
 | --- | --- | --- |
-| OpenWiki writes root `AGENTS.md` / `CLAUDE.md` on every run and offers no opt-out | HIGH | The runner restores exact pre-run bytes in `finally`, verifies the result, and rejects any unexpected out-of-scope mutation. Keep root adapters out of OpenWiki evidence via `.openwikiignore` in the dogfood repo. If upstream adds a stable opt-out before implementation, use it and retain restore assertions as defense-in-depth. |
 | Upstream CLI behavior changes after installation (0.4.x to 0.5.2 shipped within weeks) | HIGH | Pin `openwiki@0.5.2`, `mermaid@11.16.0`, `jsdom@29.1.1`. Do not float `latest`. Upgrade only through a reviewed dependency change with runner acceptance tests. |
-| Model/provider auth makes closeout nondeterministic | MEDIUM | OpenWiki remains opt-in. Do not call it from `verify.py`, hooks, installer, or CI. The explicit final knowledge phase reports actionable auth/provider failures and can be retried without bypassing the phase. |
-| Devcontainer rebuild loses OpenWiki credentials | MEDIUM | Bind-mount the host `~/.openwiki` directory. Document that the host directory must exist before the first build, because Docker creates a missing bind source as root-owned. Do not forward provider keys through `containerEnv`. |
+| Host-driven runs consume the coding session's own model budget | MEDIUM | No provider credentials are involved, so there is no auth failure mode in closeout. Keep the generation phases bounded, never call OpenWiki from automated tests, and shape deterministic test payloads like the Phase F observations. |
+| Devcontainer rebuild loses the OpenWiki configuration directory | LOW | The `~/.openwiki` bind mount is retained for run state and connector config, but host-driven mode needs no provider credential there, so a lost directory no longer blocks a refresh. |
 | Resumable `openwiki/.run.json` is committed by mistake | MEDIUM | Add it to the installer-managed `.gitignore` block and assert it in the target validator. Resume still works because the file stays on disk. |
 | Generated wiki duplicates or contradicts normative docs | HIGH | Keep authority matrix explicit. Review generated content against source. Never delete normative docs because OpenWiki generated similar prose. |
 | Incremental detection silently degrades after squash merge or history rewrite | MEDIUM | Document the rebaseline rule in the OpenWiki skill and in planning policy. Do not change the merge policy for OpenWiki. |
 | Every big plan gains ceremony | MEDIUM | Add the final knowledge phase only in repositories that have enabled OpenWiki and only for multi-phase big plans that change documentable outer-repository behavior. Disabled repos retain the existing lifecycle. |
 | OpenWiki generation consumes unnecessary model budget | MEDIUM | Use deterministic fakes for automated tests. Dogfood only the minimum real runs needed to prove initial generation and post-migration update. Do not run generation inside broad test matrices. |
 | Concurrent OpenWiki runs corrupt/churn state | MEDIUM | Lifecycle requires one serial runner per checkout. If this cannot be guaranteed operationally, add a small atomic lock in the runner before enabling consumer rollout. |
-| OpenWiki escapes `openwiki/**` through a symlink it creates while running | HIGH | Phase A checks before and after the run and fails closed, naming every path that moved, and restores the root adapters from pre-run bytes regardless. Nothing is committed on a failed refresh. Residual gap: a write landing outside the repository entirely is not detected. Phase E closes that gap with operating-system-enforced isolation of the child process. |
+| Host hook semantics for MCP tools are documented but had never been observed; the guard design depends on them | HIGH | Phase F observes them on both hosts with a throwaway MCP server before any guard code exists; per-host outcomes O1–O5 map to defined changes in G; if the exit condition triggers on Claude Code (or `PreToolUse` fires on neither host), G is re-planned, not built. |
+| `openwiki_begin` rewrites root `AGENTS.md` / `CLAUDE.md` with no opt-out (the only out-of-`openwiki/**` write on the host path) | HIGH | `openwiki-guard` PreToolUse snapshots and PostToolUse restores byte-for-byte on the hosts F confirmed; `VFY-OPENWIKI-001` refuses a commit carrying the managed block; `openwiki-guard.sh post </dev/null` is the manual recovery. |
+| The agent calls `openwiki_begin` with `mode: init`, creating a scheduled workflow and replacing the wiki | HIGH | The guard denies `init` where F confirmed denies are honored; the skill forbids it everywhere; `post` restores the workflow path's pre-state; `VFY-OPENWIKI-001` flags an untracked `openwiki-update.yml`. |
+| Devcontainer image build fails at `openwiki --version` (Phase A defect) | HIGH | Phase G replaces the smoke line with a pin check that works non-interactively, updates the validator, and adds a real-binary MCP handshake test. |
+| Skill-name collision: OpenWiki installs `openwiki` where the bootstrap skill lives, on both hosts | MEDIUM | Phase H renames the bootstrap skill to `knowledge-refresh`; OpenWiki owns `openwiki`; never `--force` (it leaves a backup dir inside the skills tree). |
+| Bootstrap refresh or `check_runtime.py` removes or flags OpenWiki's installed skill bundle | MEDIUM | Phase G makes `skills/openwiki` under `.claude/` and `.agents/` third-party-owned: preserved by the installer, exempt from drift. |
+| `update`-mode first generation on an empty wiki is inferred from code, not executed | MEDIUM | Phase I is the proof; if `openwiki_begin` refuses, stop and re-plan; never fall back to `init`. |
+| Model budget is now the coding session's own | MEDIUM | Keep I and K runs bounded; automated tests never call OpenWiki; deterministic tests use payloads shaped like F's observations. |
 | Generated docs become a second hidden control plane | HIGH | Root guidance treats OpenWiki as optional just-in-time context. Source/tests/policies remain authority and the runner is not allowed to mutate bootstrap control-plane files. |
 
 ## Verification
@@ -286,7 +315,7 @@ whenever the phase it is closing out is this list's last entry.
 | --- | --- | --- | --- |
 | Why add a wrapper instead of waiting for an upstream opt-out for agent files? | HIGH | Wait for upstream and make no integration now. | CHANGE: isolate upstream behavior behind one wrapper so the bootstrap can ship safely now and later delete the workaround when upstream exposes a stable policy. |
 | Why not reuse `restore-root-adapters.sh` instead of a new snapshot? | MEDIUM | Call the existing hook script after each run. | ACCEPT the snapshot: the hook restores the canonical mirrored adapters, while the wrapper must preserve the exact pre-run working-tree bytes, including legitimate uncommitted edits, and must work before any mirror exists. This is not duplicated functionality. |
-| Why not use OpenWiki's native host integrations? | MEDIUM | Install each supported host integration and add separate behavior for unsupported targets. | ACCEPT: keep one CLI path. Host-specific installation would undermine the bootstrap's cross-target contract and still does not cover all targets. |
+| Why not use OpenWiki's native host integrations? | MEDIUM | Install each supported host integration and add separate behavior for unsupported targets. | REVERSED 2026-09-19: the original ACCEPT rested on a wrong model of the tool. Host-driven mode is the only path that needs no provider credential and uses the session's own model, which is what the user wants; it is also the only mode where the integration exists. Claude Code and Codex are supported; Copilot and Antigravity read the generated wiki without refreshing it. |
 | Why keep `MEMORY.md` if OpenWiki is intended as memory? | HIGH | Replace it entirely with generated wiki. | ACCEPT: keep a smaller MEMORY surface because rationale, operational lessons, user/project decisions, and AI-state are not reliably derivable from outer-repository source. |
 | Why append a final knowledge phase instead of invoking OpenWiki in `verify.py`? | HIGH | Treat docs freshness as a deterministic verification check. | ACCEPT: model/network work is not deterministic verification. A separate phase preserves lifecycle evidence and retry semantics. |
 | Why forward no provider keys through the devcontainer? | MEDIUM | Add `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and similar to `containerEnv` like `HF_TOKEN`. | CHANGE to bind mount only: OpenWiki supports many providers including OAuth and cloud credentials; forwarding keys makes the bootstrap own a provider matrix it should not own. |

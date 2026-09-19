@@ -3,8 +3,11 @@ name: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 4
-status: in-progress
+status: cancelled
 closeout_session_log:
+cancelled_at: 2026-09-19T13:36:20Z
+cancelled_reason: Replaced by phases F to K after verifying OpenWiki 0.5.2 host-driven mode; the subprocess-runner model this phase assumed does not apply
+cancelled_evidence: .claude/session_logs/2026-09-19_openwiki-phase-D-E-cancellation.md
 ---
 # Small Plan: 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
 

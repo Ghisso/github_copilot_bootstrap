@@ -3,8 +3,11 @@ name: 2026-09-19_phase-E-openwiki-child-process-sandbox
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 5
-status: planned
+status: cancelled
 closeout_session_log:
+cancelled_at: 2026-09-19T13:36:20Z
+cancelled_reason: Obsolete because host-driven mode spawns no bootstrap child process to sandbox; prevention moved to the openwiki-guard hook and the verify backstop in Phase G
+cancelled_evidence: .claude/session_logs/2026-09-19_openwiki-phase-D-E-cancellation.md
 ---
 # Small Plan: 2026-09-19_phase-E-openwiki-child-process-sandbox
 
