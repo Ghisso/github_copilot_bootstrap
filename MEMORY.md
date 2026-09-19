@@ -1040,3 +1040,20 @@
   precedent rather than taste. Six of seven locations stayed consistent for free
   this way; the only drift was in the two root files deliberately exempted from
   linking because of the root-guidance size budget.
+- [LEARN:review] A wrapper, its tests, and its fakes can be perfectly consistent
+  with each other and still wrong about the program being wrapped. Nine review
+  rounds hardened the OpenWiki runner whose very first real command,
+  `openwiki --version`, exits 1 with `Unknown option`. The same defect made the
+  devcontainer image unbuildable, because the Dockerfile `RUN` chain ends on that
+  command, and `validate_targets.py` asserted the broken string. Before a wrapper
+  is considered done, run the real thing once.
+- [LEARN:workflow] A plan step phrased "run this check when an environment is
+  available" will be skipped, and the skip will be recorded and accepted at
+  closeout. If a check is load-bearing it must block the phase; if it does not
+  block, do not write it as a requirement. Phase A's real-CLI smoke check was
+  written as required and treated as optional.
+- [LEARN:quality] State a tool's limitations only from something you ran. Claiming
+  OpenWiki could not use the host agent's own model session, and asking the user to
+  choose a provider on that basis, was contradicted by the project's own README
+  feature list. Check before asserting, and especially before asking someone to
+  decide on the assertion.
