@@ -1,0 +1,9 @@
+[
+  {
+    "severity": "MAJOR",
+    "title": "Churn-exclusion set for nested-repository fingerprinting omits .git/info/refs, which git gc reliably creates outside the excluded set, causing a false fail-closed failure on legitimate maintenance activity during the runner's execution window",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 79,
+    "profile": "security"
+  }
+]
