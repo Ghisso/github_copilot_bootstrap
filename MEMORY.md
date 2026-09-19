@@ -1019,3 +1019,24 @@
   regardless of any `is_symlink()` check, so the check under test never runs.
   Make both the before and after states real, so only the intended predicate can
   tell them apart.
+- [LEARN:quality] Editing a live root adapter desynchronizes
+  `.claude/bootstrap-root/<name>`, the mirror `verify.py` diffs the live adapter
+  against, and `verify.py` then fails with `ValueError: receipt metadata
+  control-plane provenance is invalid`, naming neither the file nor the remedy.
+  Resync with `install_bootstrap.py . --allow-self --local-only`. Needed before
+  `verify.py`, not only before `check_runtime.py`. Known follow-up (MINOR, `code`):
+  `bootstrap_root_fingerprint_diagnostics()` already yields a precise
+  `{"path", "side", "category"}` diagnostic and the closeout path uses it, but the
+  generic receipt-shape validator cannot reach it by construction. Fix by having
+  receipt generation refuse to write an empty `root_fingerprint` with the good
+  message, rather than deferring to the later, worse one.
+- [LEARN:review] When one sentence must appear in two files, copy it; never retype
+  it. Retyping one root-guidance line produced three drifts at once, including a
+  path pointing at `shared/skills/`, which is authoring source no skill-loading
+  runtime reads. A near-restatement is more dangerous than an obvious duplicate
+  because it reads as deliberate.
+- [LEARN:workflow] Give a contract that must appear in many places one canonical
+  home and have every other location link to it, choosing the home by existing
+  precedent rather than taste. Six of seven locations stayed consistent for free
+  this way; the only drift was in the two root files deliberately exempted from
+  linking because of the root-guidance size budget.

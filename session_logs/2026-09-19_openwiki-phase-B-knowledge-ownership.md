@@ -1,6 +1,6 @@
 # OpenWiki Phase B: Knowledge Ownership and Agent Access
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** `.claude/plans/2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access.md`
 
 ## Goal
@@ -76,7 +76,10 @@ that every other reference uses and that skill loading actually reads; and the r
 "never commit OpenWiki's own root snippet" clause omitted. The generated consumer artifact was
 correct throughout, so only the hand-authored contributor-facing file was affected.
 
-Fixed. Confirmation pass pending.
+Fixed, and confirmed by a scoped confirmation pass: gate result PASS, empty findings. The
+confirmation independently re-hashed the generated artifact (`86089f8e823b54445e8b2c63b427
+1802cfda3dfc5d6fadff90555a258084ed4e`, 9398 bytes, 120 lines, unchanged) and verified the
+`.claude/bootstrap-root/AGENTS.md` mirror is back in sync.
 
 Everything else passed on independent verification: the ranking is strictly linear with no
 circular authority; the skill's serial-execution reason matches the runner's module docstring
@@ -107,6 +110,14 @@ Codex's root guidance is served by the `multi-agent` output, which does carry th
 no target misses it and this phase is unaffected. Confirmed independently by the reviewer.
 Worth cleaning up in its own change.
 
-## Remaining Work
+## Follow-Up: verify.py error message (pre-existing, out of scope)
 
-- Confirmation review pass, then closeout: findings, receipts, commit, push.
+Traced by the reviewer to a real, narrow inconsistency rather than a vague complaint.
+`bootstrap_root_fingerprint_diagnostics()` (`verify.py:620`) already computes a precise
+`{"path", "side", "category"}` diagnostic, and the closeout-enforcement path uses it to produce
+an actionable message. The generic receipt-shape validator (`verify.py:220-273`) only re-checks
+already-serialized field shapes and has no access to live adapter diagnostics by construction,
+so it degrades to a bare `ValueError`. Classified MINOR, `code` profile, pre-existing:
+`shared/scripts/verify.py` is not in Phase B's diff. Suggested fix is to refuse to write a
+receipt with an empty `root_fingerprint` at generation time, where the good message is
+available, instead of deferring to the later, worse one. Recorded in `.claude/MEMORY.md`.
