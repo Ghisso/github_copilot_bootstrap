@@ -1,0 +1,30 @@
+[
+  {
+    "severity": "CRITICAL",
+    "title": "_walk_ignored_directory treats any '.git'-named directory as an execution-vector allowlist target with no git-repo validation, hiding arbitrary non-allowlisted payloads (not just Git churn) placed under it -- exploitable by the untrusted OpenWiki subprocess with no special preconditions",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 226,
+    "profile": "security"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "_nested_git_allowed_paths only covers one level of submodule nesting; modules/<a>/modules/<b>/config and hooks/ (a submodule of a submodule) are never matched, contradicting the docstring's general 'any modules/*/ subdirectory' claim",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 194,
+    "profile": "security"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "No regression test proves detection of a payload hidden inside a '.git'-named directory (real or decoy) or inside a submodule-of-a-submodule, so both structural gaps above are unprotected against reintroduction",
+    "file": "tests/test_openwiki_refresh.py",
+    "line": 919,
+    "profile": "tests"
+  },
+  {
+    "severity": "MINOR",
+    "title": "Docstrings overstate residual-limit disclosure: excluded '.git' content is framed as inert Git-authored 'data', without disclosing it also hides arbitrary non-Git-authored files, and without disclosing that a nested repo's .git as a gitdir: pointer to a location outside the tracked tree (e.g. --separate-git-dir) escapes the mechanism entirely",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 28,
+    "profile": "security"
+  }
+]
