@@ -13,7 +13,7 @@ Inspired and adapted from:
 ## What This Repo Is
 
 This is not an app.
-It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are consumer-neutral entrypoints and must not be hand-edited.
+It is a source-of-truth plus generated bootstrap. Bootstrap maintainers edit `shared/`; `dist/multi-agent/` is the generated installable output. In an installed project, `.claude/` is the canonical runtime basis, while generated root files such as `CLAUDE.md` and `AGENTS.md` are consumer-neutral entrypoints and must not be hand-edited. An optional, opt-in OpenWiki knowledge layer can generate descriptive `openwiki/` wiki pages for a repository, but it is derived context, never authority over source, tests, or human-authored policy — see [the knowledge-ownership contract](docs/architecture.md#openwiki-knowledge-layer).
 
 Main goals:
 

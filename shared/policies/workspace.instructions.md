@@ -39,6 +39,27 @@ Always use `uv` — never invoke `python`, `pip`, or `python -m` directly.
 - Keep hook guardrails enabled.
 - Capture reusable lessons in `.claude/MEMORY.md`.
 
+## Knowledge Ownership
+
+This is the single authoritative knowledge-ownership contract. Every other
+policy, skill, doc, and root adapter in this project links to this section
+instead of restating it. Central rule: **OpenWiki is derived context, not
+authority.**
+
+| Layer | What it is | Authority |
+|---|---|---|
+| Source and tests | The actual code, configuration, and test suite | Authoritative for current behavior. Nothing else in this table overrides it. |
+| Human-authored policy and decisions | `shared/policies/*.instructions.md`, security requirements, ADRs, operator runbooks, explicit project decisions | Authoritative for process, security, and explicit choices. |
+| `.claude/MEMORY.md` | Curated cross-session learning | Authoritative only for what current repository evidence cannot reliably re-derive: rationale, operational caveats, and confirmed environmental behavior. Do not duplicate source-derived architecture, module, API, or test facts here merely to help a future agent — re-derive them from source instead. |
+| `openwiki/INSTRUCTIONS.md` | A human-authored repository brief | Human-authored, and it doubles as the deterministic marker that OpenWiki is enabled for this repository. |
+| Generated `openwiki/**` pages | OpenWiki's own generated wiki content | Derived descriptive knowledge only. Never hand-edited, and never outranks any layer above it. |
+
+If a generated wiki page and the source disagree, the source is right and
+the page is stale: refresh it or ignore it, never change the source to match
+it. Plans, explorations, session logs, findings, and receipts are historical
+and lifecycle evidence, not competing authority for current behavior, and
+OpenWiki never replaces them.
+
 ## Instructions
 
 Always consult the relevant files under `.claude/instructions/`:

@@ -159,6 +159,28 @@ This division complements, rather than replaces, project instructions:
 only non-sensitive local scratch. The [security model](../SECURITY.md) defines the related
 trust and credential boundaries.
 
+## OpenWiki Knowledge Layer
+
+OpenWiki is an optional, opt-in knowledge layer: repository-descriptive wiki
+pages generated under `openwiki/**`. It is enabled only when a maintainer has
+written `openwiki/INSTRUCTIONS.md`, a human-authored repository brief that
+doubles as the deterministic enablement marker the runner checks.
+
+Refresh always runs through the bootstrap-owned
+`shared/scripts/openwiki_refresh.py` (installed as
+`.claude/scripts/openwiki_refresh.py`; see the `.claude/skills/openwiki/`
+skill for usage), never a raw `openwiki` call. The runner snapshots and
+restores the root adapters and any OpenWiki workflow file around the refresh,
+fails closed on a write outside `openwiki/**`, and never commits — see the
+runner's own module docstring for its documented residual limits, most
+notably that it cannot tell a concurrent agent-session write to `.claude`
+from an OpenWiki write, and fails closed naming files OpenWiki never touched
+when the two overlap.
+
+See `workspace.instructions.md`'s Knowledge Ownership section for the
+authority contract: OpenWiki is derived context, never authority over
+source, tests, or human-authored policy.
+
 ## Ponytail Integration
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
