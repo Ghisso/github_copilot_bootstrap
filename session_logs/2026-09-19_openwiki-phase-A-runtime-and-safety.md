@@ -120,6 +120,28 @@ case, not the symlink case as reported. The delivered tests are correct; the
 narrative about them was not. Recorded because the evidence trail should match
 what was actually observed.
 
+## [LEARN] Entries
+
+- [LEARN:quality] `git ls-files --others --ignored --exclude-standard` silently
+  omits everything inside any directory literally named `.git`, whether or not it
+  is a real repository, and emits no boundary entry for it. Verified on git
+  2.43.0. Enumerate from disk when the question is "what exists", not "what does
+  git consider ignored".
+- [LEARN:review] Do not build a detection rule from a denylist of what an
+  external tool writes. Two consecutive rounds missed an entry (`COMMIT_EDITMSG`,
+  then `info/refs` from `git gc`) because Git's written-file set is open-ended and
+  grows per release. Allowlist the surface you own and document the narrower claim.
+- [LEARN:quality] A check that fails on ordinary activity gets ignored, which is a
+  worse security outcome than a narrower check that never cries wolf. Measure
+  churn against the real directory before shipping a fingerprint comparison.
+- [LEARN:review] When narrowing behaviour on a name, validate that the thing named
+  is what it claims to be. Narrowing at any directory called `.git` without
+  checking it was a Git directory let a decoy hide an arbitrary tree. The
+  narrowing rule and its validation are one change, not two.
+- [LEARN:quality] A fixture pointing a symlink at a non-existent path can make a
+  test pass for the wrong reason: `Path.is_dir()` is false on a dangling link
+  regardless of any `is_symlink()` check, so the check under test never runs.
+
 ## Documentation Decision
 
 No documentation change this session, recorded as a decision rather than a skip.

@@ -22,14 +22,14 @@
       "reason": "The ordering of the stages inside _run() -- acquire lock, snapshot protected files, launch the child, restore, then compare -- is itself the safety property this runner provides. Extracting helpers would move that ordering from a single readable sequence into call-site convention, where a later edit could reorder it without an obvious tell. The reviewer that raised it stated the same counter-argument and did not assert the finding should block. Revisit only if the function grows a second responsibility rather than more steps of the same one."
     }
   ],
-  "generated_at": "2026-09-19T10:54:36Z",
+  "generated_at": "2026-09-19T10:59:32Z",
   "branch": "2026-09-19_openwiki-knowledge-layer-integration_implementation",
   "head_sha": "cdb95d4f6215c10ba66ebaf38306ad48d33b4682",
   "base_ref": "dev",
   "merge_base_sha": "efefb2c9000d49cc8d791c88303169dbfc83e10c",
   "phase": "2026-09-19_phase-A-openwiki-runtime-and-safety-boundary",
   "target": ".",
-  "dirty": true,
+  "dirty": false,
   "content_hash": "fdfa7a7c26f84a8cd2377174a19f229d1306a0ff",
   "changed_files": [
     ".gitignore",
