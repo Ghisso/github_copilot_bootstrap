@@ -1,0 +1,1398 @@
+diff --git a/.gitignore b/.gitignore
+index 89f5a55..c065f77 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -35,4 +35,5 @@ AGENTS.md
+ CLAUDE.md
+ .uv-cache/
+ .context-mode-provenance.secret*
++openwiki/.run.json
+ # END multi-agent bootstrap generated/private AI content
+diff --git a/README.md b/README.md
+index 9eeef88..a947ceb 100644
+--- a/README.md
++++ b/README.md
+@@ -327,7 +327,7 @@ files in `shared/` instead.
+ 
+ Generated layout:
+ 
+-- `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22 + `context-mode` pre-installed; the container mounts `~/.cache/huggingface` from the host so credentials and cached models are available without re-authenticating (still used by projects themselves — HF sync for AI state moved to git, see [ADR-002](plans/adr-002-git-backed-state-sync.md))
++- `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22.22.0, `context-mode`, and OpenWiki 0.5.2 are pre-installed. The container mounts `~/.cache/huggingface` and `~/.openwiki` from the host. Create the host `~/.openwiki` directory before the first container build, or Docker can create it as `root` and prevent the `vscode` user from writing its OpenWiki configuration. The OpenWiki mount supplies its own provider configuration; no provider key is forwarded by the devcontainer. The Hugging Face cache remains for projects themselves — HF sync moved to git (see [ADR-002](plans/adr-002-git-backed-state-sync.md)).
+ - `.claude/`: installed canonical runtime basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
+ - `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
+ - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
+@@ -430,7 +430,7 @@ Interpretation:
+ - Skills: reusable workflows in [shared/skills/](shared/skills/)
+ - Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
+ - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
+-- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, and `context-mode` are pre-installed; handles GID/UID conflicts in NVIDIA base images and mounts the host HF cache for seamless auth; `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
++- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22.22.0 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, `context-mode`, and OpenWiki 0.5.2 are pre-installed. It mounts the host HF cache and `~/.openwiki`; create `~/.openwiki` before the first build so Docker does not create a root-owned directory that the `vscode` user cannot update. The OpenWiki mount carries user-managed provider configuration, with no provider key in `containerEnv`. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
+ - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
+ - Templates, prompts, memory, plans, session logs, quality reports, and deterministic verification receipts rendered into the shared `.claude/` basis
+ 
+diff --git a/docs/architecture.md b/docs/architecture.md
+index d76418e..e8d2d1d 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -8,7 +8,7 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
+ - `shared/skills/`: reusable skills with `visibility: public|background` metadata.
+ - `shared/third_party/ponytail/`: pinned Ponytail provenance and MIT license; portable skills live in `shared/skills/ponytail*`.
+ - `shared/hooks/`: hook config and guardrail scripts.
+-- `shared/devcontainer/`: GPU devcontainer bootloader. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container — used by the projects themselves, not by AI state sync (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)). `post-start.sh` bootstraps AI state via `state-sync.sh`, which restores root adapters by calling `restore-root-adapters.sh` internally; both scripts are also rendered here (see "Git-Backed State Sync" below).
++- `shared/devcontainer/`: GPU devcontainer bootloader. The `Dockerfile` uses a two-stage build: Node.js 22.22.0 binaries are copied from `node:22.22.0-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for Context Mode and OpenWiki). `bubblewrap`, `context-mode`, and OpenWiki 0.5.2 (with pinned Mermaid and jsdom peer dependencies) are installed so hook events and optional OpenWiki refreshes work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` and `~/.openwiki` from the host; create `~/.openwiki` before the first build, because Docker otherwise creates a root-owned bind source that the `vscode` user cannot update. The OpenWiki mount supplies user-managed provider configuration without forwarding provider keys through `containerEnv`. The Hugging Face cache is used by projects themselves, not by AI state sync (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)). `post-start.sh` bootstraps AI state via `state-sync.sh`, which restores root adapters by calling `restore-root-adapters.sh` internally; both scripts are also rendered here (see "Git-Backed State Sync" below).
+ - `shared/mcp/servers.json`: shared MCP definitions for Semble, Context7, and Context Mode. Context Mode routes through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`, which starts a public-stdio filter (`context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool, including any unknown one, before it reaches upstream. Guarded `ctx_index` accepts content, a contained regular file, or a contained real directory; directory-policy knobs remain fixed at the pinned upstream defaults. The `1.0.169` pin is enforced on both routes rather than only over MCP: hook mode verifies a direct `context-mode` executable against its owning package manifest before running it, and refuses any binary whose version is wrong or undeterminable, falling back to pinned `npx` when available. The dispatcher owns exactly one cache location, `.claude/.cache/context-mode`; a `CONTEXT_MODE_DIR` override is honoured only at or beneath that subtree, and any other value is refused while the bootstrap keeps its project-local cache boundary.
+ - `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `state-sync.sh pull` silently when the workspace opens) and a manual push task for non-AI sessions.
+ - `shared/agents/`: canonical custom-agent metadata and neutral prompts.
+diff --git a/scripts/generate_targets.py b/scripts/generate_targets.py
+index d85092a..74a81cf 100644
+--- a/scripts/generate_targets.py
++++ b/scripts/generate_targets.py
+@@ -294,6 +294,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
+         support_root / "scripts" / "verify.py",
+         "claude-code",
+     )
++    copy_text_transformed(
++        REPO_ROOT / "shared" / "scripts" / "openwiki_refresh.py",
++        support_root / "scripts" / "openwiki_refresh.py",
++        "claude-code",
++    )
+     # Ownership is a target-neutral authority shared by the installer and
+     # generated verifier.  Transforming provider paths here would corrupt its
+     # canonical root-adapter inventory (for example `.github/hooks`).
+diff --git a/scripts/install_bootstrap.py b/scripts/install_bootstrap.py
+index 1800052..e4a8dd6 100644
+--- a/scripts/install_bootstrap.py
++++ b/scripts/install_bootstrap.py
+@@ -622,6 +622,7 @@ def ignore_block(
+     lines = [
+         IGNORE_BLOCK_START,
+         *active_ignore_patterns(commit_copilot_surface),
++        "openwiki/.run.json",
+         IGNORE_BLOCK_END,
+     ]
+     return "\n".join(lines) + "\n"
+diff --git a/scripts/validate_targets.py b/scripts/validate_targets.py
+index 37c0388..42fa95a 100644
+--- a/scripts/validate_targets.py
++++ b/scripts/validate_targets.py
+@@ -238,6 +238,10 @@ REQUIRED_HOOK_SCRIPTS = (
+ # and closed; a new upstream tool needs a later approved plan before it can
+ # join CONTEXT_MODE_ALLOWED_TOOLS.
+ CONTEXT_MODE_PINNED_VERSION = "1.0.169"
++OPENWIKI_PINNED_VERSION = "0.5.2"
++MERMAID_PINNED_VERSION = "11.16.0"
++JSDOM_PINNED_VERSION = "29.1.1"
++OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
+ CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
+ CONTEXT_MODE_BLOCKED_TOOLS = (
+     "ctx_execute",
+@@ -8583,6 +8587,20 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
+             "devcontainer must forward HUGGING_FACE_HUB_TOKEN",
+             errors,
+         )
++        openwiki_mount = (
++            "source=${localEnv:HOME}/.openwiki,"
++            "target=/home/vscode/.openwiki,type=bind,consistency=cached"
++        )
++        check(
++            openwiki_mount in data.get("mounts", []),
++            "devcontainer must bind-mount the host OpenWiki configuration directory",
++            errors,
++        )
++        check(
++            not any("OPENWIKI" in key and "KEY" in key for key in container_env),
++            "devcontainer must not forward OpenWiki provider keys",
++            errors,
++        )
+         check(
+             container_env.get("UV_PROJECT_ENVIRONMENT") == "/home/vscode/.venv",
+             "devcontainer must not reuse a host-mounted project .venv",
+@@ -8614,6 +8632,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
+ 
+     if (devcontainer_root / "Dockerfile").exists():
+         dockerfile = read(devcontainer_root / "Dockerfile")
++        check(
++            f"FROM {OPENWIKI_NODE_IMAGE} AS nodejs" in dockerfile,
++            "devcontainer Dockerfile must pin a Node image that satisfies OpenWiki's engine",
++            errors,
++        )
+         check(
+             "cuda-dl-base" in dockerfile,
+             "devcontainer Dockerfile must use the GPU base image",
+@@ -8634,6 +8657,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
+             "devcontainer Dockerfile must verify context-mode CLI execution",
+             errors,
+         )
++        for package, version in (
++            ("openwiki", OPENWIKI_PINNED_VERSION),
++            ("mermaid", MERMAID_PINNED_VERSION),
++            ("jsdom", JSDOM_PINNED_VERSION),
++        ):
++            check(
++                f"{package}@{version}" in dockerfile,
++                f"devcontainer Dockerfile must install {package} pinned to {version}",
++                errors,
++            )
++        check(
++            "command -v openwiki" in dockerfile and "openwiki --version" in dockerfile,
++            "devcontainer Dockerfile must verify the OpenWiki CLI is on PATH",
++            errors,
++        )
+         check(
+             "huggingface_hub" in dockerfile,
+             "devcontainer Dockerfile must install Hugging Face tooling",
+@@ -8789,6 +8827,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
+             ".claude/skills/ponytail-review/SKILL.md",
+             ".claude/third_party/ponytail/LICENSE",
+             ".claude/third_party/ponytail/UPSTREAM.md",
++            ".claude/scripts/openwiki_refresh.py",
+         ):
+             check(
+                 (temp_repo / relative_path).exists(),
+@@ -8801,6 +8840,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
+             "installed Ponytail provenance must retain the pinned release",
+             errors,
+         )
++        check(
++            "openwiki/.run.json" in read(temp_repo / ".gitignore"),
++            "installer must ignore resumable OpenWiki run state",
++            errors,
++        )
+ 
+         # R-SYNC-05: the installer creates the nested .claude/ AI-state repo
+         # and makes its own bootstrap: install commit (distinct from the Stop
+diff --git a/shared/devcontainer/Dockerfile b/shared/devcontainer/Dockerfile
+index 24179d7..60a3a45 100644
+--- a/shared/devcontainer/Dockerfile
++++ b/shared/devcontainer/Dockerfile
+@@ -1,4 +1,4 @@
+-FROM node:22-bookworm-slim AS nodejs
++FROM node:22.22.0-bookworm-slim AS nodejs
+ 
+ FROM nvcr.io/nvidia/cuda-dl-base:26.03-cuda13.2-devel-ubuntu24.04
+ 
+@@ -28,8 +28,13 @@ RUN apt-get update \
+     && rm -rf /var/lib/apt/lists/*
+ 
+ RUN npm install -g context-mode@1.0.169 \
++        openwiki@0.5.2 \
++        mermaid@11.16.0 \
++        jsdom@29.1.1 \
+     && command -v context-mode \
+-    && context-mode --help >/dev/null
++    && context-mode --help >/dev/null \
++    && command -v openwiki \
++    && openwiki --version
+ 
+ RUN set -eux; \
+     if id -u "${USERNAME}" >/dev/null 2>&1; then \
+diff --git a/shared/devcontainer/devcontainer.json b/shared/devcontainer/devcontainer.json
+index a3a705d..2dfa644 100644
+--- a/shared/devcontainer/devcontainer.json
++++ b/shared/devcontainer/devcontainer.json
+@@ -12,7 +12,8 @@
+     "--security-opt=seccomp=unconfined"
+   ],
+   "mounts": [
+-    "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached"
++    "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached",
++    "source=${localEnv:HOME}/.openwiki,target=/home/vscode/.openwiki,type=bind,consistency=cached"
+   ],
+   "containerEnv": {
+     "HF_XET_HIGH_PERFORMANCE": "1",
+diff --git a/tests/test_install_bootstrap.py b/tests/test_install_bootstrap.py
+index 9250b37..3214ad9 100644
+--- a/tests/test_install_bootstrap.py
++++ b/tests/test_install_bootstrap.py
+@@ -1349,6 +1349,27 @@ def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> N
+     assert ".context-mode-provenance.secret" in gitignore
+ 
+ 
++def test_gitignore_refresh_adds_openwiki_recovery_state(tmp_path: Path) -> None:
++    """An existing generated block gains new private recovery files in place."""
++    target = tmp_path / "consumer"
++    target.mkdir()
++    (target / ".gitignore").write_text(
++        "keep-this\n"
++        "# BEGIN multi-agent bootstrap generated/private AI content\n"
++        ".claude/\n"
++        "# END multi-agent bootstrap generated/private AI content\n"
++        "keep-that\n",
++        encoding="utf-8",
++    )
++
++    merge_gitignore(target, dry_run=False)
++
++    gitignore = (target / ".gitignore").read_text(encoding="utf-8")
++    assert "keep-this\n" in gitignore
++    assert "keep-that\n" in gitignore
++    assert gitignore.count("openwiki/.run.json") == 1
++
++
+ def test_agents_directory_is_a_refreshable_root_adapter(tmp_path: Path) -> None:
+     """A generated `.agents` directory is mirrored and ignored as one adapter."""
+     source = tmp_path / "generated"
+
+diff --git a/shared/scripts/openwiki_refresh.py b/shared/scripts/openwiki_refresh.py
+new file mode 100644
+index 0000000..9a9965f
+--- /dev/null
++++ b/shared/scripts/openwiki_refresh.py
+@@ -0,0 +1,530 @@
++#!/usr/bin/env python3
++"""Run one guarded, user-configured OpenWiki refresh.
++
++``restore-root-adapters.sh`` restores canonical mirrored adapters from nested
++state. This runner instead preserves the exact working-tree bytes that existed
++before OpenWiki ran, including legitimate uncommitted edits, and works before
++any mirror exists. They therefore protect different boundaries.
++"""
++
++from __future__ import annotations
++
++import argparse
++from dataclasses import dataclass
++import fcntl
++import hashlib
++import json
++import os
++import re
++import shutil
++import stat
++import subprocess
++import sys
++from pathlib import Path
++
++
++PROTECTED_ADAPTERS = (Path("AGENTS.md"), Path("CLAUDE.md"))
++PROTECTED_WORKFLOW = Path(".github/workflows/openwiki-update.yml")
++OPENWIKI_ARGUMENTS = ("openwiki", "code", "--update", "--print")
++IGNORED_CONTROL_PLANE_PATHS = (
++    ".claude",
++    ".agents",
++    ".codex",
++    ".github",
++    ".vscode",
++    ".mcp.json",
++    "AGENTS.md",
++    "CLAUDE.md",
++)
++
++
++@dataclass(frozen=True)
++class FileSnapshot:
++    """One protected file's bytes and, for runner-created sentinels, identity."""
++
++    contents: bytes | None
++    sentinel_identity: tuple[int, int] | None = None
++
++
++def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
++    """Run one local Git query without forwarding command output."""
++    return subprocess.run(
++        ["git", "-C", str(root), *arguments],
++        text=True,
++        capture_output=True,
++        check=False,
++    )
++
++
++def _repository_root(start: Path) -> Path | None:
++    """Return the outermost repository root that contains ``start``."""
++    root: Path | None = None
++    for candidate in (start.resolve(), *start.resolve().parents):
++        result = _git(candidate, "rev-parse", "--show-toplevel")
++        if result.returncode == 0:
++            root = Path(result.stdout.strip())
++    return root
++
++
++def _git_directory(root: Path) -> Path:
++    """Return the repository-local Git directory for the execution lock."""
++    result = _git(root, "rev-parse", "--git-dir")
++    if result.returncode != 0:
++        raise RuntimeError("could not determine the Git directory")
++    path = Path(result.stdout.strip())
++    return path if path.is_absolute() else root / path
++
++
++def _status_entries(root: Path) -> dict[str, str]:
++    """Return NUL-delimited porcelain entries keyed by every affected path."""
++    result = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
++    if result.returncode != 0:
++        raise RuntimeError("could not read Git working-tree status")
++
++    records = result.stdout.split("\0")
++    entries: dict[str, str] = {}
++    index = 0
++    while index < len(records):
++        record = records[index]
++        index += 1
++        if not record:
++            continue
++        if len(record) < 4 or record[2] != " ":
++            raise RuntimeError("Git returned malformed working-tree status")
++        entries[record[3:]] = record[:2]
++        if record[:1] in {"R", "C"} or record[1:2] in {"R", "C"}:
++            if index >= len(records) or not records[index]:
++                raise RuntimeError("Git returned malformed rename status")
++            entries[records[index]] = record[:2]
++            index += 1
++    return entries
++
++
++def _ignored_control_plane_paths(root: Path) -> set[str]:
++    """Return ignored control-plane files without reading their contents."""
++    result = _git(
++        root,
++        "ls-files",
++        "--others",
++        "--ignored",
++        "--exclude-standard",
++        "-z",
++        "--",
++        *IGNORED_CONTROL_PLANE_PATHS,
++    )
++    if result.returncode != 0:
++        raise RuntimeError("could not read ignored control-plane paths")
++    return {path for path in result.stdout.split("\0") if path}
++
++
++def _snapshot(root: Path, relative_path: Path) -> FileSnapshot:
++    """Capture raw bytes while refusing symlinks and non-regular files."""
++    path = root / relative_path
++    try:
++        file_descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
++    except FileNotFoundError:
++        return FileSnapshot(None)
++    except OSError as error:
++        raise RuntimeError(
++            f"protected path is not a regular file: {relative_path}"
++        ) from error
++    with os.fdopen(file_descriptor, "rb") as file:
++        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):
++            raise RuntimeError(f"protected path is not a regular file: {relative_path}")
++        return FileSnapshot(file.read())
++
++
++def _prepare_adapter(root: Path, relative_path: Path) -> FileSnapshot:
++    """Snapshot one adapter, reserving its absent path with a runner sentinel."""
++    snapshot = _snapshot(root, relative_path)
++    if snapshot.contents is not None:
++        return snapshot
++    path = root / relative_path
++    try:
++        file_descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++    except FileExistsError:
++        return _snapshot(root, relative_path)
++    state = os.fstat(file_descriptor)
++    with os.fdopen(file_descriptor, "wb"):
++        pass
++    return FileSnapshot(None, (state.st_dev, state.st_ino))
++
++
++def _restore(root: Path, relative_path: Path, original: FileSnapshot) -> None:
++    """Restore a protected adapter without touching unrelated repository paths."""
++    path = root / relative_path
++    if original.contents is None:
++        if not path.exists() and not path.is_symlink():
++            return
++        if path.is_symlink() or not path.is_file():
++            raise RuntimeError(
++                f"protected path changed outside this refresh: {relative_path}"
++            )
++        state = path.stat(follow_symlinks=False)
++        if original.sentinel_identity != (state.st_dev, state.st_ino):
++            raise RuntimeError(
++                f"protected path changed outside this refresh: {relative_path}"
++            )
++        if original.sentinel_identity is not None:
++            path.unlink()
++        return
++    if path.is_symlink() or path.is_file():
++        path.unlink()
++    elif path.exists():
++        raise RuntimeError(
++            f"OpenWiki replaced protected file with directory: {relative_path}"
++        )
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_bytes(original.contents)
++
++
++def _enabled_error(root: Path) -> str | None:
++    """Reject a symlinked OpenWiki tree before a child process can follow it."""
++    openwiki_root = root / "openwiki"
++    marker = openwiki_root / "INSTRUCTIONS.md"
++    if not openwiki_root.exists() and not openwiki_root.is_symlink():
++        return "not_enabled"
++    if openwiki_root.is_symlink() or not openwiki_root.is_dir():
++        return "openwiki must be a real directory, not a symlink"
++    if not marker.exists() and not marker.is_symlink():
++        return "not_enabled"
++    if marker.is_symlink() or not marker.is_file():
++        return "openwiki/INSTRUCTIONS.md must be a regular file"
++    for directory, directories, files in os.walk(openwiki_root, followlinks=False):
++        tree_root = Path(directory)
++        for name in (*directories, *files):
++            if (tree_root / name).is_symlink():
++                return "openwiki must not contain symlinks"
++    return None
++
++
++def _fingerprint(root: Path, relative_path: str) -> tuple[str, ...]:
++    """Capture one dirty path's observable state without modifying it."""
++    path = root / relative_path
++    try:
++        state = path.lstat()
++    except FileNotFoundError:
++        return ("absent",)
++    if stat.S_ISLNK(state.st_mode):
++        return ("symlink", os.readlink(path))
++    if not stat.S_ISREG(state.st_mode):
++        return ("other", str(state.st_mode), str(state.st_dev), str(state.st_ino))
++    digest = hashlib.sha256()
++    with path.open("rb") as file:
++        for chunk in iter(lambda: file.read(1024 * 1024), b""):
++            digest.update(chunk)
++    return ("regular", str(state.st_mode), digest.hexdigest())
++
++
++def _dirty_state(root: Path, entries: dict[str, str]) -> dict[str, tuple[str, ...]]:
++    """Capture existing out-of-scope changes so OpenWiki cannot silently alter them."""
++    return {
++        path: (status, *_fingerprint(root, path))
++        for path, status in entries.items()
++        if not path.startswith("openwiki/")
++    }
++
++
++def _ignored_control_plane_state(
++    root: Path, paths: set[str]
++) -> dict[str, tuple[str, ...]]:
++    """Fingerprint ignored control-plane files without emitting their contents."""
++    return {path: _fingerprint(root, path) for path in paths}
++
++
++def _remove_prepared_sentinels(
++    root: Path, adapters: dict[Path, FileSnapshot]
++) -> list[str]:
++    """Remove only sentinels created by this runner before a launch failure."""
++    errors: list[str] = []
++    for path, snapshot in adapters.items():
++        if snapshot.sentinel_identity is None:
++            continue
++        try:
++            _restore(root, path, snapshot)
++        except (OSError, RuntimeError) as error:
++            errors.append(f"{path}: {error}")
++    return errors
++
++
++def _version(command: str) -> str | None:
++    """Return a compact CLI version without exposing arbitrary command output."""
++    if shutil.which(command) is None:
++        return None
++    try:
++        result = subprocess.run(
++            [command, "--version"],
++            text=True,
++            capture_output=True,
++            check=False,
++        )
++    except OSError:
++        return None
++    if result.returncode != 0:
++        return None
++    match = re.search(r"\b[vV]?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\b", result.stdout)
++    return match.group(0) if match else None
++
++
++def _result(status: str, **details: object) -> dict[str, object]:
++    """Build output that is useful for logs but excludes child output and env data."""
++    return {"status": status, **details}
++
++
++def _run(root: Path) -> tuple[int, dict[str, object]]:
++    """Run OpenWiki once, restoring protected files even after a child failure."""
++    enabled_error = _enabled_error(root)
++    if enabled_error == "not_enabled":
++        return 0, _result("not_enabled", repository_root=str(root))
++    if enabled_error is not None:
++        return 1, _result(
++            "preflight_failed", repository_root=str(root), error=enabled_error
++        )
++
++    node_version = _version("node")
++    openwiki_version = _version("openwiki")
++    if node_version is None or openwiki_version is None:
++        missing = [
++            command
++            for command, version in (
++                ("node", node_version),
++                ("openwiki", openwiki_version),
++            )
++            if version is None
++        ]
++        return 1, _result(
++            "preflight_failed",
++            repository_root=str(root),
++            error=f"required command unavailable: {', '.join(missing)}",
++        )
++
++    try:
++        lock_path = _git_directory(root) / "openwiki-refresh.lock"
++    except RuntimeError as error:
++        return 1, _result(
++            "preflight_failed", repository_root=str(root), error=str(error)
++        )
++
++    try:
++        lock_path.parent.mkdir(parents=True, exist_ok=True)
++        lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
++    except OSError as error:
++        return 1, _result(
++            "preflight_failed",
++            repository_root=str(root),
++            error=f"could not acquire refresh lock: {error}",
++        )
++    try:
++        adapters: dict[Path, FileSnapshot] = {}
++        try:
++            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
++        except BlockingIOError:
++            return 1, _result(
++                "busy",
++                repository_root=str(root),
++                error="another OpenWiki refresh is running",
++            )
++        except OSError as error:
++            return 1, _result(
++                "preflight_failed",
++                repository_root=str(root),
++                error=f"could not acquire refresh lock: {error}",
++            )
++
++        enabled_error = _enabled_error(root)
++        if enabled_error is not None:
++            status = (
++                "not_enabled" if enabled_error == "not_enabled" else "preflight_failed"
++            )
++            return (0 if status == "not_enabled" else 1), _result(
++                status,
++                repository_root=str(root),
++                **({} if status == "not_enabled" else {"error": enabled_error}),
++            )
++        try:
++            before_entries = _status_entries(root)
++            before_paths = set(before_entries)
++            existing_dirty_state = _dirty_state(root, before_entries)
++            before_ignored_paths = _ignored_control_plane_paths(root)
++            before_ignored_state = _ignored_control_plane_state(
++                root, before_ignored_paths
++            )
++            for path in PROTECTED_ADAPTERS:
++                adapters[path] = _prepare_adapter(root, path)
++            workflow = _snapshot(root, PROTECTED_WORKFLOW)
++        except (OSError, RuntimeError) as error:
++            sentinel_errors = _remove_prepared_sentinels(root, adapters)
++            details: dict[str, object] = {
++                "repository_root": str(root),
++                "error": str(error),
++            }
++            if sentinel_errors:
++                details["restoration_errors"] = sentinel_errors
++            return 1, _result("preflight_failed", **details)
++
++        child_environment = os.environ.copy()
++        child_environment.setdefault("OPENWIKI_TELEMETRY_DISABLED", "1")
++        child_returncode: int | None = None
++        try:
++            try:
++                child = subprocess.run(
++                    list(OPENWIKI_ARGUMENTS),
++                    cwd=root,
++                    env=child_environment,
++                    stdout=subprocess.DEVNULL,
++                    stderr=subprocess.DEVNULL,
++                    check=False,
++                )
++                child_returncode = child.returncode
++            except OSError:
++                child_returncode = None
++        finally:
++            restoration_errors: list[str] = []
++            for path, original in adapters.items():
++                try:
++                    _restore(root, path, original)
++                except (OSError, RuntimeError) as error:
++                    restoration_errors.append(f"{path}: {error}")
++
++        try:
++            workflow_unchanged = _snapshot(root, PROTECTED_WORKFLOW) == workflow
++        except RuntimeError:
++            workflow_unchanged = False
++        try:
++            after_entries = _status_entries(root)
++        except RuntimeError as error:
++            return 1, _result(
++                "failed",
++                repository_root=str(root),
++                error=str(error),
++                openwiki_returncode=child_returncode,
++            )
++        try:
++            after_ignored_paths = _ignored_control_plane_paths(root)
++            after_ignored_state = _ignored_control_plane_state(
++                root, after_ignored_paths
++            )
++        except (OSError, RuntimeError) as error:
++            return 1, _result(
++                "failed",
++                repository_root=str(root),
++                error=f"could not compare ignored control-plane paths: {error}",
++                openwiki_returncode=child_returncode,
++            )
++        after_paths = set(after_entries)
++        new_paths = sorted(after_paths - before_paths)
++        out_of_scope = [path for path in new_paths if not path.startswith("openwiki/")]
++        changed_ignored_paths = sorted(
++            path
++            for path, state in before_ignored_state.items()
++            if after_ignored_state.get(path) != state
++        )
++        new_ignored_paths = sorted(after_ignored_paths - before_ignored_paths)
++        ignored_out_of_scope = sorted(
++            path
++            for path in {*changed_ignored_paths, *new_ignored_paths}
++            if not path.startswith("openwiki/")
++        )
++        out_of_scope.extend(
++            path for path in ignored_out_of_scope if path not in out_of_scope
++        )
++        try:
++            after_dirty_state = _dirty_state(
++                root,
++                {path: after_entries.get(path, "") for path in existing_dirty_state},
++            )
++        except OSError as error:
++            return 1, _result(
++                "failed",
++                repository_root=str(root),
++                error=f"could not compare pre-existing changes: {error}",
++                openwiki_returncode=child_returncode,
++            )
++        modified_pre_existing_paths = sorted(
++            path
++            for path, before_state in existing_dirty_state.items()
++            if after_dirty_state.get(path) != before_state
++        )
++        if not workflow_unchanged and PROTECTED_WORKFLOW.as_posix() not in out_of_scope:
++            out_of_scope.append(PROTECTED_WORKFLOW.as_posix())
++
++        details: dict[str, object] = {
++            "repository_root": str(root),
++            "node_version": node_version,
++            "openwiki_version": openwiki_version,
++            "pre_existing_dirty_paths": sorted(before_paths),
++            "modified_pre_existing_paths": modified_pre_existing_paths,
++            "ignored_control_plane_paths": ignored_out_of_scope,
++            "new_paths": new_paths,
++            "out_of_scope_paths": sorted(out_of_scope),
++            "workflow_unchanged": workflow_unchanged,
++            "openwiki_returncode": child_returncode,
++        }
++        if restoration_errors:
++            error = "protected-file restoration failed"
++            if child_returncode not in (None, 0):
++                error = "OpenWiki exited non-zero; protected-file restoration failed"
++            return 1, _result(
++                "failed", error=error, restoration_errors=restoration_errors, **details
++            )
++        if child_returncode is None:
++            return 1, _result(
++                "failed", error="OpenWiki could not be started", **details
++            )
++        if child_returncode != 0:
++            return 1, _result("failed", error="OpenWiki exited non-zero", **details)
++        if modified_pre_existing_paths:
++            return 1, _result(
++                "failed",
++                error="modified pre-existing out-of-scope changes",
++                **details,
++            )
++        if out_of_scope:
++            return 1, _result("failed", error="new out-of-scope changes", **details)
++        return 0, _result("success", **details)
++    finally:
++        os.close(lock_fd)
++
++
++def parse_args() -> argparse.Namespace:
++    """Parse the runner's deliberately small public interface."""
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument(
++        "--require-enabled",
++        action="store_true",
++        help="fail instead of returning not_enabled when OpenWiki is not configured",
++    )
++    return parser.parse_args()
++
++
++def main() -> int:
++    """Run the refresh and emit concise text plus one JSON result object."""
++    args = parse_args()
++    root = _repository_root(Path.cwd())
++    if root is None:
++        result = _result(
++            "preflight_failed", error="run this command inside a Git repository"
++        )
++        print("openwiki-refresh: preflight failed", file=sys.stderr)
++        print(json.dumps(result, sort_keys=True))
++        return 1
++
++    marker = root / "openwiki" / "INSTRUCTIONS.md"
++    if not marker.is_file() and args.require_enabled:
++        result = _result(
++            "not_enabled",
++            repository_root=str(root),
++            error="OpenWiki is not enabled; create openwiki/INSTRUCTIONS.md first",
++        )
++        print("openwiki-refresh: OpenWiki is not enabled", file=sys.stderr)
++        print(json.dumps(result, sort_keys=True))
++        return 1
++
++    returncode, result = _run(root)
++    print(f"openwiki-refresh: {result['status']}", file=sys.stderr)
++    print(json.dumps(result, sort_keys=True))
++    return returncode
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+
+diff --git a/tests/test_openwiki_refresh.py b/tests/test_openwiki_refresh.py
+new file mode 100644
+index 0000000..ac8c551
+--- /dev/null
++++ b/tests/test_openwiki_refresh.py
+@@ -0,0 +1,619 @@
++"""Deterministic boundary tests for the bootstrap-owned OpenWiki runner."""
++
++from __future__ import annotations
++
++import fcntl
++import importlib.util
++import json
++import os
++import subprocess
++import sys
++import time
++from pathlib import Path
++
++import pytest
++
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++RUNNER = REPO_ROOT / "shared" / "scripts" / "openwiki_refresh.py"
++RUNNER_SPEC = importlib.util.spec_from_file_location("openwiki_refresh_test", RUNNER)
++assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None
++RUNNER_MODULE = importlib.util.module_from_spec(RUNNER_SPEC)
++sys.modules[RUNNER_SPEC.name] = RUNNER_MODULE
++RUNNER_SPEC.loader.exec_module(RUNNER_MODULE)
++
++
++def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
++    return subprocess.run(
++        ["git", "-C", str(root), *arguments],
++        text=True,
++        capture_output=True,
++        check=False,
++    )
++
++
++def _repository(
++    tmp_path: Path, *, enabled: bool = True, ignored_control_plane: bool = False
++) -> Path:
++    root = tmp_path / "consumer"
++    root.mkdir()
++    assert _git(root, "init", "-q").returncode == 0
++    ignore_patterns = ["openwiki/.run.json"]
++    if ignored_control_plane:
++        ignore_patterns.append(".claude/")
++    (root / ".gitignore").write_text(
++        "\n".join(ignore_patterns) + "\n", encoding="utf-8"
++    )
++    (root / "tracked.txt").write_text("base\n", encoding="utf-8")
++    if enabled:
++        marker = root / "openwiki" / "INSTRUCTIONS.md"
++        marker.parent.mkdir()
++        marker.write_text("enabled\n", encoding="utf-8")
++    assert _git(root, "add", ".").returncode == 0
++    assert (
++        _git(
++            root,
++            "-c",
++            "user.name=OpenWiki Test",
++            "-c",
++            "user.email=openwiki-test@example.com",
++            "commit",
++            "-qm",
++            "base",
++        ).returncode
++        == 0
++    )
++    return root
++
++
++@pytest.fixture
++def fake_cli(tmp_path: Path) -> Path:
++    """Create fake Node and OpenWiki executables with no network behavior."""
++    bin_dir = tmp_path / "bin"
++    bin_dir.mkdir()
++    node = bin_dir / "node"
++    node.write_text("#!/bin/sh\nprintf 'v22.22.0\\n'\n", encoding="utf-8")
++    openwiki = bin_dir / "openwiki"
++    openwiki.write_text(
++        """#!/usr/bin/env python3
++import json
++import os
++import sys
++import time
++from pathlib import Path
++
++if sys.argv[1:] == ["--version"]:
++    print("0.5.2")
++    raise SystemExit(0)
++
++trace = os.environ.get("OPENWIKI_TEST_TRACE")
++if trace:
++    Path(trace).write_text(json.dumps({
++        "argv": sys.argv[1:],
++        "telemetry": os.environ.get("OPENWIKI_TELEMETRY_DISABLED"),
++        "secret": os.environ.get("OPENWIKI_TEST_PROVIDER_SECRET"),
++    }), encoding="utf-8")
++
++root = Path.cwd()
++mode = os.environ.get("OPENWIKI_TEST_MODE", "success")
++if mode in {"success", "fail"}:
++    state = root / "openwiki" / ".run.json"
++    state.write_text("resume state\\n", encoding="utf-8")
++    (root / "openwiki" / "generated.md").write_text("generated\\n", encoding="utf-8")
++if mode in {"adapters", "fail"}:
++    (root / "AGENTS.md").write_bytes(b"upstream agents\\n")
++    (root / "CLAUDE.md").write_bytes(b"upstream claude\\n")
++if mode == "create-adapter":
++    (root / "AGENTS.md").write_bytes(b"upstream created\\n")
++if mode == "workflow-existing":
++    workflow = root / ".github" / "workflows" / "openwiki-update.yml"
++    workflow.parent.mkdir(parents=True, exist_ok=True)
++    workflow.write_bytes(b"upstream workflow\\n")
++if mode == "workflow-new":
++    workflow = root / ".github" / "workflows" / "openwiki-update.yml"
++    workflow.parent.mkdir(parents=True, exist_ok=True)
++    workflow.write_bytes(b"new workflow\\n")
++if mode == "workflow-fail":
++    workflow = root / ".github" / "workflows" / "openwiki-update.yml"
++    workflow.parent.mkdir(parents=True, exist_ok=True)
++    workflow.write_bytes(b"failed workflow\\n")
++if mode == "out-of-scope":
++    (root / "unexpected.txt").write_text("unexpected\\n", encoding="utf-8")
++if mode == "ignored-new":
++    ignored = root / ".claude" / "generated-by-openwiki.txt"
++    ignored.parent.mkdir(parents=True, exist_ok=True)
++    ignored.write_text("unexpected\\n", encoding="utf-8")
++if mode == "ignored-existing":
++    (root / ".claude" / "existing.txt").write_text("after!\\n", encoding="utf-8")
++if mode == "dirty-existing":
++    (root / "local.txt").write_text("upstream changed\\n", encoding="utf-8")
++if mode == "dirty-delete":
++    (root / "local.txt").unlink()
++if mode == "dirty-clean":
++    (root / "tracked.txt").write_text("base\\n", encoding="utf-8")
++if mode == "wait-for-replacement":
++    Path(os.environ["OPENWIKI_TEST_READY"]).write_text("ready\\n", encoding="utf-8")
++    release = Path(os.environ["OPENWIKI_TEST_RELEASE"])
++    for _ in range(300):
++        if release.exists():
++            break
++        time.sleep(0.01)
++if mode in {"fail", "workflow-fail"}:
++    raise SystemExit(7)
++""",
++        encoding="utf-8",
++    )
++    node.chmod(0o755)
++    openwiki.chmod(0o755)
++    return bin_dir
++
++
++def _run(
++    root: Path,
++    fake_cli: Path,
++    *,
++    require_enabled: bool = False,
++    mode: str = "success",
++    cwd: Path | None = None,
++    **environment: str,
++) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
++    env = {
++        **os.environ,
++        "PATH": f"{fake_cli}{os.pathsep}{os.environ['PATH']}",
++        "OPENWIKI_TEST_MODE": mode,
++        **environment,
++    }
++    command = [sys.executable, str(RUNNER)]
++    if require_enabled:
++        command.append("--require-enabled")
++    result = subprocess.run(
++        command,
++        cwd=cwd or root,
++        env=env,
++        text=True,
++        capture_output=True,
++        check=False,
++    )
++    return result, json.loads(result.stdout)
++
++
++def test_disabled_repository_is_a_true_noop(tmp_path: Path, fake_cli: Path) -> None:
++    root = _repository(tmp_path, enabled=False)
++
++    result, payload = _run(root, fake_cli)
++
++    assert result.returncode == 0
++    assert payload == {"repository_root": str(root), "status": "not_enabled"}
++    assert _git(root, "status", "--porcelain").stdout == ""
++
++
++def test_require_enabled_fails_when_marker_is_absent(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path, enabled=False)
++
++    result, payload = _run(root, fake_cli, require_enabled=True)
++
++    assert result.returncode != 0
++    assert payload["status"] == "not_enabled"
++    assert "create openwiki/INSTRUCTIONS.md" in str(payload["error"])
++
++
++def test_successful_update_only_changes_openwiki_content(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++
++    result, payload = _run(root, fake_cli)
++
++    assert result.returncode == 0, result.stderr
++    assert payload["status"] == "success"
++    assert payload["new_paths"] == ["openwiki/generated.md"]
++    assert payload["out_of_scope_paths"] == []
++    assert (root / "openwiki/.run.json").read_text() == "resume state\n"
++
++
++def test_existing_adapters_are_restored_byte_for_byte(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    agents = root / "AGENTS.md"
++    claude = root / "CLAUDE.md"
++    agents.write_bytes(b"local agents\x00edit\n")
++    claude.write_bytes(b"local claude\x00edit\n")
++
++    result, payload = _run(root, fake_cli, mode="adapters")
++
++    assert result.returncode == 0, result.stderr
++    assert payload["status"] == "success"
++    assert agents.read_bytes() == b"local agents\x00edit\n"
++    assert claude.read_bytes() == b"local claude\x00edit\n"
++    assert set(payload["pre_existing_dirty_paths"]) == {"AGENTS.md", "CLAUDE.md"}
++
++
++def test_created_root_adapter_is_removed_when_previously_absent(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++
++    result, payload = _run(root, fake_cli, mode="create-adapter")
++
++    assert result.returncode == 0, result.stderr
++    assert payload["status"] == "success"
++    assert not (root / "AGENTS.md").exists()
++
++
++def test_existing_workflow_remains_byte_identical(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    workflow = root / ".github/workflows/openwiki-update.yml"
++    workflow.parent.mkdir(parents=True)
++    workflow.write_bytes(b"local workflow\n")
++
++    result, payload = _run(root, fake_cli)
++
++    assert result.returncode == 0, result.stderr
++    assert payload["workflow_unchanged"] is True
++    assert workflow.read_bytes() == b"local workflow\n"
++
++
++def test_existing_workflow_mutation_is_detected(tmp_path: Path, fake_cli: Path) -> None:
++    root = _repository(tmp_path)
++    workflow = root / ".github/workflows/openwiki-update.yml"
++    workflow.parent.mkdir(parents=True)
++    workflow.write_bytes(b"local workflow\n")
++
++    result, payload = _run(root, fake_cli, mode="workflow-existing")
++
++    assert result.returncode != 0
++    assert payload["workflow_unchanged"] is False
++    assert ".github/workflows/openwiki-update.yml" in payload["out_of_scope_paths"]
++    assert workflow.read_bytes() == b"upstream workflow\n"
++
++
++def test_failed_update_reports_workflow_mutation(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    workflow = root / ".github/workflows/openwiki-update.yml"
++    workflow.parent.mkdir(parents=True)
++    workflow.write_bytes(b"local workflow\n")
++
++    result, payload = _run(root, fake_cli, mode="workflow-fail")
++
++    assert result.returncode != 0
++    assert payload["openwiki_returncode"] == 7
++    assert payload["workflow_unchanged"] is False
++    assert ".github/workflows/openwiki-update.yml" in payload["out_of_scope_paths"]
++    assert workflow.read_bytes() == b"failed workflow\n"
++
++
++def test_new_workflow_is_detected_as_out_of_scope(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++
++    result, payload = _run(root, fake_cli, mode="workflow-new")
++
++    assert result.returncode != 0
++    assert ".github/workflows/openwiki-update.yml" in payload["out_of_scope_paths"]
++
++
++def test_failed_update_restores_adapters_and_keeps_recovery_state(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    agents = root / "AGENTS.md"
++    agents.write_bytes(b"local agents\n")
++
++    result, payload = _run(root, fake_cli, mode="fail")
++
++    assert result.returncode != 0
++    assert payload["openwiki_returncode"] == 7
++    assert agents.read_bytes() == b"local agents\n"
++    assert not (root / "CLAUDE.md").exists()
++    assert (root / "openwiki/.run.json").read_text() == "resume state\n"
++    assert (root / "openwiki/generated.md").exists()
++
++
++def test_new_out_of_scope_mutation_fails_without_reverting_user_changes(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    pre_existing = root / "local.txt"
++    pre_existing.write_text("keep me\n", encoding="utf-8")
++
++    result, payload = _run(root, fake_cli, mode="out-of-scope")
++
++    assert result.returncode != 0
++    assert payload["out_of_scope_paths"] == ["unexpected.txt"]
++    assert payload["pre_existing_dirty_paths"] == ["local.txt"]
++    assert pre_existing.read_text() == "keep me\n"
++    assert (root / "unexpected.txt").read_text() == "unexpected\n"
++
++
++def test_new_ignored_control_plane_path_is_reported(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path, ignored_control_plane=True)
++
++    result, payload = _run(root, fake_cli, mode="ignored-new")
++
++    assert result.returncode != 0
++    assert payload["ignored_control_plane_paths"] == [
++        ".claude/generated-by-openwiki.txt"
++    ]
++
++
++def test_changed_ignored_control_plane_path_is_reported(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path, ignored_control_plane=True)
++    ignored = root / ".claude" / "existing.txt"
++    ignored.parent.mkdir()
++    ignored.write_text("before\n", encoding="utf-8")
++
++    result, payload = _run(root, fake_cli, mode="ignored-existing")
++
++    assert result.returncode != 0
++    assert payload["ignored_control_plane_paths"] == [".claude/existing.txt"]
++    assert ignored.read_text() == "after!\n"  # Same size as the pre-run bytes.
++
++
++def test_mutation_of_existing_dirty_path_is_reported(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    dirty_path = root / "local.txt"
++    dirty_path.write_text("local edit\n", encoding="utf-8")
++
++    result, payload = _run(root, fake_cli, mode="dirty-existing")
++
++    assert result.returncode != 0
++    assert payload["modified_pre_existing_paths"] == ["local.txt"]
++    assert dirty_path.read_text() == "upstream changed\n"
++
++
++@pytest.mark.parametrize(
++    ("path", "mode"),
++    (("local.txt", "dirty-delete"), ("tracked.txt", "dirty-clean")),
++)
++def test_deleting_or_cleaning_an_existing_dirty_path_is_reported(
++    tmp_path: Path, fake_cli: Path, path: str, mode: str
++) -> None:
++    root = _repository(tmp_path)
++    dirty_path = root / path
++    dirty_path.write_text("local edit\n", encoding="utf-8")
++
++    result, payload = _run(root, fake_cli, mode=mode)
++
++    assert result.returncode != 0
++    assert payload["modified_pre_existing_paths"] == [path]
++
++
++@pytest.mark.parametrize("symlink_target", ("directory", "marker"))
++def test_symlinked_openwiki_configuration_is_rejected_before_launch(
++    tmp_path: Path, fake_cli: Path, symlink_target: str
++) -> None:
++    root = _repository(tmp_path)
++    marker = root / "openwiki" / "INSTRUCTIONS.md"
++    external = tmp_path / "external-openwiki"
++    external.mkdir()
++    (external / "INSTRUCTIONS.md").write_text("enabled\n", encoding="utf-8")
++    if symlink_target == "directory":
++        marker.unlink()
++        (root / "openwiki").rmdir()
++        (root / "openwiki").symlink_to(external, target_is_directory=True)
++    else:
++        marker.unlink()
++        marker.symlink_to(external / "INSTRUCTIONS.md")
++
++    result, payload = _run(root, fake_cli, OPENWIKI_TEST_TRACE=str(tmp_path / "trace"))
++
++    assert result.returncode != 0
++    assert payload["status"] == "preflight_failed"
++    assert not (tmp_path / "trace").exists()
++
++
++@pytest.mark.parametrize("relative", ("page.md", "pages/child.md", ".run.json"))
++def test_symlink_anywhere_in_openwiki_tree_is_rejected_before_launch(
++    tmp_path: Path, fake_cli: Path, relative: str
++) -> None:
++    root = _repository(tmp_path)
++    link = root / "openwiki" / relative
++    link.parent.mkdir(parents=True, exist_ok=True)
++    target = tmp_path / "outside-openwiki"
++    target.write_text("outside\n", encoding="utf-8")
++    link.symlink_to(target)
++
++    result, payload = _run(root, fake_cli, OPENWIKI_TEST_TRACE=str(tmp_path / "trace"))
++
++    assert result.returncode != 0
++    assert payload["status"] == "preflight_failed"
++    assert not (tmp_path / "trace").exists()
++
++
++def test_failed_preparation_removes_only_runner_sentinels(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    (root / "CLAUDE.md").mkdir()
++    trace = tmp_path / "trace"
++
++    result, payload = _run(root, fake_cli, OPENWIKI_TEST_TRACE=str(trace))
++
++    assert result.returncode != 0
++    assert payload["status"] == "preflight_failed"
++    assert not (root / "AGENTS.md").exists()
++    assert not trace.exists()
++
++
++def test_failed_workflow_snapshot_removes_runner_sentinels(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    workflow = root / ".github" / "workflows" / "openwiki-update.yml"
++    workflow.mkdir(parents=True)
++
++    result, payload = _run(root, fake_cli)
++
++    assert result.returncode != 0
++    assert payload["status"] == "preflight_failed"
++    assert not (root / "AGENTS.md").exists()
++    assert not (root / "CLAUDE.md").exists()
++
++
++def test_sentinel_identity_uses_open_file_descriptor(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    root = _repository(tmp_path)
++
++    def unexpected_stat(*_args: object, **_kwargs: object) -> None:
++        raise AssertionError("sentinel identity must come from os.fstat")
++
++    monkeypatch.setattr(Path, "stat", unexpected_stat)
++    snapshot = RUNNER_MODULE._prepare_adapter(root, Path("AGENTS.md"))
++
++    assert snapshot.contents is None
++    assert snapshot.sentinel_identity is not None
++
++
++def test_lock_open_failure_is_structured(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    root = _repository(tmp_path)
++    original_open = RUNNER_MODULE.os.open
++
++    def fail_lock(path: object, *args: object, **kwargs: object) -> int:
++        if str(path).endswith("openwiki-refresh.lock"):
++            raise PermissionError("lock denied")
++        return original_open(path, *args, **kwargs)
++
++    monkeypatch.setattr(RUNNER_MODULE, "_version", lambda _command: "0.5.2")
++    monkeypatch.setattr(RUNNER_MODULE.os, "open", fail_lock)
++
++    returncode, payload = RUNNER_MODULE._run(root)
++
++    assert returncode != 0
++    assert payload["status"] == "preflight_failed"
++    assert "could not acquire refresh lock" in str(payload["error"])
++
++
++def test_nested_claude_cwd_resolves_to_outer_repository(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    nested = root / ".claude" / "scripts"
++    nested.mkdir(parents=True)
++    assert _git(root / ".claude", "init", "-q").returncode == 0
++
++    result, payload = _run(root, fake_cli, cwd=nested)
++
++    assert result.returncode == 0, result.stderr
++    assert payload["repository_root"] == str(root)
++
++
++def test_argv_telemetry_default_and_secret_redaction(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    trace = tmp_path / "trace.json"
++
++    result, payload = _run(
++        root,
++        fake_cli,
++        OPENWIKI_TEST_TRACE=str(trace),
++        OPENWIKI_TEST_PROVIDER_SECRET="provider-secret-value",
++    )
++
++    assert result.returncode == 0
++    assert json.loads(trace.read_text()) == {
++        "argv": ["code", "--update", "--print"],
++        "telemetry": "1",
++        "secret": "provider-secret-value",
++    }
++    assert "provider-secret-value" not in result.stdout
++    assert "provider-secret-value" not in result.stderr
++    assert "provider-secret-value" not in json.dumps(payload)
++
++
++def test_telemetry_explicit_user_value_is_preserved(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    trace = tmp_path / "trace.json"
++
++    result, _payload = _run(
++        root,
++        fake_cli,
++        OPENWIKI_TEST_TRACE=str(trace),
++        OPENWIKI_TELEMETRY_DISABLED="0",
++    )
++
++    assert result.returncode == 0
++    assert json.loads(trace.read_text())["telemetry"] == "0"
++
++
++def test_concurrent_refresh_is_rejected_before_openwiki_starts(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    external = tmp_path / "outside"
++    external.write_text("outside\n", encoding="utf-8")
++    (root / "AGENTS.md").symlink_to(external)
++    lock_path = root / ".git" / "openwiki-refresh.lock"
++    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
++    try:
++        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
++        result, payload = _run(root, fake_cli)
++    finally:
++        os.close(lock_fd)
++
++    assert result.returncode != 0
++    assert payload["status"] == "busy"
++    assert not (root / "openwiki/generated.md").exists()
++
++
++def test_concurrent_protected_file_replacement_is_not_deleted(
++    tmp_path: Path, fake_cli: Path
++) -> None:
++    root = _repository(tmp_path)
++    ready = tmp_path / "ready"
++    release = tmp_path / "release"
++    env = {
++        **os.environ,
++        "PATH": f"{fake_cli}{os.pathsep}{os.environ['PATH']}",
++        "OPENWIKI_TEST_MODE": "wait-for-replacement",
++        "OPENWIKI_TEST_READY": str(ready),
++        "OPENWIKI_TEST_RELEASE": str(release),
++    }
++    process = subprocess.Popen(
++        [sys.executable, str(RUNNER)],
++        cwd=root,
++        env=env,
++        text=True,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++    )
++    for _ in range(300):
++        if ready.exists():
++            break
++        time.sleep(0.01)
++    assert ready.exists()
++    for name, contents in (
++        ("AGENTS.md", b"external agents\n"),
++        ("CLAUDE.md", b"external claude\n"),
++    ):
++        replacement = root / f"{name}.replacement"
++        replacement.write_bytes(contents)
++        replacement.replace(root / name)
++    release.touch()
++    stdout, stderr = process.communicate(timeout=5)
++    payload = json.loads(stdout)
++
++    assert process.returncode != 0, stderr
++    assert payload["error"] == "protected-file restoration failed"
++    assert len(payload["restoration_errors"]) == 2
++    assert (root / "AGENTS.md").read_bytes() == b"external agents\n"
++    assert (root / "CLAUDE.md").read_bytes() == b"external claude\n"
+
