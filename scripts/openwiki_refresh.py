@@ -5,6 +5,20 @@
 state. This runner instead preserves the exact working-tree bytes that existed
 before OpenWiki ran, including legitimate uncommitted edits, and works before
 any mirror exists. They therefore protect different boundaries.
+
+OpenWiki rewrites a managed block in the root ``AGENTS.md``/``CLAUDE.md``
+adapters on every ``code`` run with no opt-out, so restoration overwriting
+them is the expected normal path here, not a failure. Editing the root
+adapters by hand while a refresh runs is unsupported: the ``flock`` this
+runner takes prevents a second runner invocation from running concurrently,
+but it does not prevent a concurrent human edit, which restoration can only
+detect and report, never silently merge.
+
+Residual limit: this phase detects and fails closed on a write that escapes
+``openwiki/`` through a symlink inside the repository working tree, but a
+write that lands outside the repository entirely, such as the user's home
+directory, is not detected. Process-level sandboxing (for example a mount or
+user namespace) is tracked as a follow-up phase, not implemented here.
 """
 
 from __future__ import annotations
@@ -35,15 +49,34 @@ IGNORED_CONTROL_PLANE_PATHS = (
     ".mcp.json",
     "AGENTS.md",
     "CLAUDE.md",
+    ".context-mode-provenance.secret*",
 )
 
 
 @dataclass(frozen=True)
 class FileSnapshot:
-    """One protected file's bytes and, for runner-created sentinels, identity."""
+    """One protected file's pre-run bytes, or an absent-path runner sentinel.
+
+    ``identity`` is the pre-run file's ``(st_dev, st_ino)`` when it was
+    present, used at restore time to detect a same-content-different-inode
+    replacement race. ``sentinel_fd`` is the still-open descriptor of a
+    sentinel this runner created for an absent path; restoration authenticates
+    through this descriptor, an unforgeable handle on that inode, rather than
+    a path lookup, which would be racy.
+    """
 
     contents: bytes | None
-    sentinel_identity: tuple[int, int] | None = None
+    identity: tuple[int, int] | None = None
+    sentinel_fd: int | None = None
+
+
+@dataclass(frozen=True)
+class DisplacedContent:
+    """Evidence that restoration overwrote or removed non-empty content."""
+
+    path: str
+    sha256: str
+    length: int
 
 
 def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -100,6 +133,31 @@ def _status_entries(root: Path) -> dict[str, str]:
     return entries
 
 
+def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
+    """List files and symlinks under an ignored nested-repository directory.
+
+    Git does not recurse into a nested repository (for example an installed
+    ``.claude``); ``git ls-files --others --ignored`` reports the directory
+    itself as one entry instead of every file inside it, which would let a
+    mutation anywhere inside it pass undetected. Nested ``.git`` metadata is
+    excluded from the walk: its own object/index churn is expected noise, not
+    evidence of a mutated tracked file.
+    """
+    paths: set[str] = set()
+    for directory, directories, files in os.walk(
+        root / relative_directory, followlinks=False
+    ):
+        directories[:] = [name for name in directories if name != ".git"]
+        current = Path(directory)
+        for name in files:
+            paths.add((current / name).relative_to(root).as_posix())
+        for name in directories:
+            candidate = current / name
+            if candidate.is_symlink():
+                paths.add(candidate.relative_to(root).as_posix())
+    return paths
+
+
 def _ignored_control_plane_paths(root: Path) -> set[str]:
     """Return ignored control-plane files without reading their contents."""
     result = _git(
@@ -114,11 +172,19 @@ def _ignored_control_plane_paths(root: Path) -> set[str]:
     )
     if result.returncode != 0:
         raise RuntimeError("could not read ignored control-plane paths")
-    return {path for path in result.stdout.split("\0") if path}
+    paths: set[str] = set()
+    for entry in result.stdout.split("\0"):
+        if not entry:
+            continue
+        if entry.endswith("/"):
+            paths.update(_walk_ignored_directory(root, entry))
+        else:
+            paths.add(entry)
+    return paths
 
 
 def _snapshot(root: Path, relative_path: Path) -> FileSnapshot:
-    """Capture raw bytes while refusing symlinks and non-regular files."""
+    """Capture raw bytes and inode identity while refusing symlinks."""
     path = root / relative_path
     try:
         file_descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
@@ -129,53 +195,157 @@ def _snapshot(root: Path, relative_path: Path) -> FileSnapshot:
             f"protected path is not a regular file: {relative_path}"
         ) from error
     with os.fdopen(file_descriptor, "rb") as file:
-        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):
+        state = os.fstat(file.fileno())
+        if not stat.S_ISREG(state.st_mode):
             raise RuntimeError(f"protected path is not a regular file: {relative_path}")
-        return FileSnapshot(file.read())
+        return FileSnapshot(file.read(), (state.st_dev, state.st_ino))
 
 
 def _prepare_adapter(root: Path, relative_path: Path) -> FileSnapshot:
-    """Snapshot one adapter, reserving its absent path with a runner sentinel."""
+    """Snapshot one adapter, reserving an absent path with a runner sentinel.
+
+    The sentinel's descriptor is kept open, read-write, for the whole run so
+    restoration can authenticate the exact inode it created through
+    ``fstat`` instead of a racy path-based identity check, and can read back
+    any bytes written into it before removal, as displaced-content evidence.
+    """
     snapshot = _snapshot(root, relative_path)
     if snapshot.contents is not None:
         return snapshot
     path = root / relative_path
     try:
-        file_descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        file_descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         return _snapshot(root, relative_path)
-    state = os.fstat(file_descriptor)
-    with os.fdopen(file_descriptor, "wb"):
-        pass
-    return FileSnapshot(None, (state.st_dev, state.st_ino))
+    return FileSnapshot(None, sentinel_fd=file_descriptor)
 
 
-def _restore(root: Path, relative_path: Path, original: FileSnapshot) -> None:
-    """Restore a protected adapter without touching unrelated repository paths."""
-    path = root / relative_path
-    if original.contents is None:
-        if not path.exists() and not path.is_symlink():
-            return
-        if path.is_symlink() or not path.is_file():
+def _restore(
+    root: Path, relative_path: Path, original: FileSnapshot
+) -> DisplacedContent | None:
+    """Restore one protected adapter without displacing a concurrent edit blindly.
+
+    A file present before the run is restored in place, on the same inode, so
+    a concurrent reader or writer is not silently detached; it is never
+    unlinked and recreated. A sentinel this runner created is removed only
+    through the descriptor it kept open for the whole run and then unlinked
+    relative to an open directory descriptor, avoiding a second, re-resolved
+    path lookup. A path or identity that no longer matches what was
+    snapshotted is left untouched and reported as a restoration error instead
+    of being guessed at.
+    """
+    name = str(relative_path)
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        if original.contents is None:
+            return _restore_absent(name, relative_path, original, directory_fd)
+        return _restore_present(name, relative_path, original, directory_fd, no_follow)
+    finally:
+        os.close(directory_fd)
+
+
+def _restore_absent(
+    name: str, relative_path: Path, original: FileSnapshot, directory_fd: int
+) -> DisplacedContent | None:
+    """Remove a sentinel this runner created, authenticated by its open fd."""
+    if original.sentinel_fd is None:
+        return None
+    try:
+        sentinel_state = os.fstat(original.sentinel_fd)
+        try:
+            current_state = os.lstat(name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            return None
+        if not stat.S_ISREG(current_state.st_mode) or (
+            current_state.st_dev,
+            current_state.st_ino,
+        ) != (sentinel_state.st_dev, sentinel_state.st_ino):
             raise RuntimeError(
                 f"protected path changed outside this refresh: {relative_path}"
             )
-        state = path.stat(follow_symlinks=False)
-        if original.sentinel_identity != (state.st_dev, state.st_ino):
-            raise RuntimeError(
-                f"protected path changed outside this refresh: {relative_path}"
-            )
-        if original.sentinel_identity is not None:
-            path.unlink()
-        return
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.exists():
+        displaced = None
+        if sentinel_state.st_size:
+            contents = os.pread(original.sentinel_fd, sentinel_state.st_size, 0)
+            if contents:
+                displaced = DisplacedContent(
+                    name, hashlib.sha256(contents).hexdigest(), len(contents)
+                )
+        os.unlink(name, dir_fd=directory_fd)
+        return displaced
+    finally:
+        os.close(original.sentinel_fd)
+
+
+def _restore_present(
+    name: str,
+    relative_path: Path,
+    original: FileSnapshot,
+    directory_fd: int,
+    no_follow: int,
+) -> DisplacedContent | None:
+    """Restore a pre-run file in place, on the same inode, or report a race."""
+    assert original.contents is not None  # caller-enforced: only called when present
+    try:
+        read_fd = os.open(name, os.O_RDONLY | no_follow, dir_fd=directory_fd)
+    except OSError as error:
         raise RuntimeError(
-            f"OpenWiki replaced protected file with directory: {relative_path}"
-        )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(original.contents)
+            f"protected path changed outside this refresh: {relative_path}"
+        ) from error
+    try:
+        state = os.fstat(read_fd)
+        if (
+            not stat.S_ISREG(state.st_mode)
+            or (
+                state.st_dev,
+                state.st_ino,
+            )
+            != original.identity
+        ):
+            raise RuntimeError(
+                f"protected path changed outside this refresh: {relative_path}"
+            )
+        current = os.pread(read_fd, state.st_size, 0)
+    finally:
+        os.close(read_fd)
+
+    if current == original.contents:
+        return None  # Nothing changed; leave the inode untouched.
+
+    displaced = (
+        DisplacedContent(name, hashlib.sha256(current).hexdigest(), len(current))
+        if current
+        else None
+    )
+    try:
+        write_fd = os.open(name, os.O_WRONLY | no_follow, dir_fd=directory_fd)
+    except OSError as error:
+        raise RuntimeError(
+            f"protected path changed outside this refresh: {relative_path}"
+        ) from error
+    try:
+        write_state = os.fstat(write_fd)
+        if (write_state.st_dev, write_state.st_ino) != original.identity:
+            raise RuntimeError(
+                f"protected path changed outside this refresh: {relative_path}"
+            )
+        os.ftruncate(write_fd, 0)
+        os.write(write_fd, original.contents)
+    finally:
+        os.close(write_fd)
+    return displaced
+
+
+def _symlinks_under(directory: Path) -> list[Path]:
+    """List every symlink under ``directory``, without following any of them."""
+    found: list[Path] = []
+    for current, directories, files in os.walk(directory, followlinks=False):
+        tree_root = Path(current)
+        for name in (*directories, *files):
+            candidate = tree_root / name
+            if candidate.is_symlink():
+                found.append(candidate)
+    return found
 
 
 def _enabled_error(root: Path) -> str | None:
@@ -190,12 +360,33 @@ def _enabled_error(root: Path) -> str | None:
         return "not_enabled"
     if marker.is_symlink() or not marker.is_file():
         return "openwiki/INSTRUCTIONS.md must be a regular file"
-    for directory, directories, files in os.walk(openwiki_root, followlinks=False):
-        tree_root = Path(directory)
-        for name in (*directories, *files):
-            if (tree_root / name).is_symlink():
-                return "openwiki must not contain symlinks"
+    if _symlinks_under(openwiki_root):
+        return "openwiki must not contain symlinks"
     return None
+
+
+def _openwiki_tree_violations(root: Path) -> tuple[list[str], dict[str, str]]:
+    """Re-walk ``openwiki/`` after the child exits to catch a check-then-use swap.
+
+    The pre-launch check in ``_enabled_error`` can still be raced: a symlink
+    created while the child runs, or by the child itself, would otherwise let
+    a write land outside ``openwiki/`` even though the earlier walk saw a
+    real directory. Returns out-of-scope paths to fold into the existing
+    fail-closed reporting, plus symlink targets kept only for diagnostics.
+    """
+    openwiki_root = root / "openwiki"
+    marker = openwiki_root / "INSTRUCTIONS.md"
+    if openwiki_root.is_symlink() or not openwiki_root.is_dir():
+        return ["openwiki"], {}
+    violations: list[str] = []
+    if marker.is_symlink() or not marker.is_file():
+        violations.append("openwiki/INSTRUCTIONS.md")
+    symlinks = {
+        path.relative_to(root).as_posix(): os.readlink(path)
+        for path in _symlinks_under(openwiki_root)
+    }
+    violations.extend(path for path in symlinks if path not in violations)
+    return violations, symlinks
 
 
 def _fingerprint(root: Path, relative_path: str) -> tuple[str, ...]:
@@ -234,20 +425,24 @@ def _ignored_control_plane_state(
 
 def _remove_prepared_sentinels(
     root: Path, adapters: dict[Path, FileSnapshot]
-) -> list[str]:
+) -> tuple[list[str], list[DisplacedContent]]:
     """Remove only sentinels created by this runner before a launch failure."""
     errors: list[str] = []
+    displaced: list[DisplacedContent] = []
     for path, snapshot in adapters.items():
-        if snapshot.sentinel_identity is None:
+        if snapshot.sentinel_fd is None:
             continue
         try:
-            _restore(root, path, snapshot)
+            result = _restore(root, path, snapshot)
         except (OSError, RuntimeError) as error:
             errors.append(f"{path}: {error}")
-    return errors
+            continue
+        if result is not None:
+            displaced.append(result)
+    return errors, displaced
 
 
-def _version(command: str) -> str | None:
+def _version(command: str, *, env: dict[str, str] | None = None) -> str | None:
     """Return a compact CLI version without exposing arbitrary command output."""
     if shutil.which(command) is None:
         return None
@@ -256,6 +451,7 @@ def _version(command: str) -> str | None:
             [command, "--version"],
             text=True,
             capture_output=True,
+            env=env,
             check=False,
         )
     except OSError:
@@ -271,6 +467,21 @@ def _result(status: str, **details: object) -> dict[str, object]:
     return {"status": status, **details}
 
 
+def _restoration_evidence(
+    restoration_errors: list[str], restoration_displaced: list[DisplacedContent]
+) -> dict[str, object]:
+    """Return restoration evidence fields to merge into any post-child result."""
+    evidence: dict[str, object] = {}
+    if restoration_errors:
+        evidence["restoration_errors"] = restoration_errors
+    if restoration_displaced:
+        evidence["restoration_displaced_content"] = [
+            {"path": item.path, "sha256": item.sha256, "length": item.length}
+            for item in restoration_displaced
+        ]
+    return evidence
+
+
 def _run(root: Path) -> tuple[int, dict[str, object]]:
     """Run OpenWiki once, restoring protected files even after a child failure."""
     enabled_error = _enabled_error(root)
@@ -279,23 +490,6 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
     if enabled_error is not None:
         return 1, _result(
             "preflight_failed", repository_root=str(root), error=enabled_error
-        )
-
-    node_version = _version("node")
-    openwiki_version = _version("openwiki")
-    if node_version is None or openwiki_version is None:
-        missing = [
-            command
-            for command, version in (
-                ("node", node_version),
-                ("openwiki", openwiki_version),
-            )
-            if version is None
-        ]
-        return 1, _result(
-            "preflight_failed",
-            repository_root=str(root),
-            error=f"required command unavailable: {', '.join(missing)}",
         )
 
     try:
@@ -331,6 +525,29 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 error=f"could not acquire refresh lock: {error}",
             )
 
+        # The lock is held: only now is it safe to spawn OpenWiki, including
+        # for a version probe, and only with the same privacy-default
+        # environment every other OpenWiki subprocess in this module uses.
+        child_environment = os.environ.copy()
+        child_environment.setdefault("OPENWIKI_TELEMETRY_DISABLED", "1")
+
+        node_version = _version("node", env=child_environment)
+        openwiki_version = _version("openwiki", env=child_environment)
+        if node_version is None or openwiki_version is None:
+            missing = [
+                command
+                for command, version in (
+                    ("node", node_version),
+                    ("openwiki", openwiki_version),
+                )
+                if version is None
+            ]
+            return 1, _result(
+                "preflight_failed",
+                repository_root=str(root),
+                error=f"required command unavailable: {', '.join(missing)}",
+            )
+
         enabled_error = _enabled_error(root)
         if enabled_error is not None:
             status = (
@@ -353,17 +570,16 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 adapters[path] = _prepare_adapter(root, path)
             workflow = _snapshot(root, PROTECTED_WORKFLOW)
         except (OSError, RuntimeError) as error:
-            sentinel_errors = _remove_prepared_sentinels(root, adapters)
+            sentinel_errors, sentinel_displaced = _remove_prepared_sentinels(
+                root, adapters
+            )
             details: dict[str, object] = {
                 "repository_root": str(root),
                 "error": str(error),
+                **_restoration_evidence(sentinel_errors, sentinel_displaced),
             }
-            if sentinel_errors:
-                details["restoration_errors"] = sentinel_errors
             return 1, _result("preflight_failed", **details)
 
-        child_environment = os.environ.copy()
-        child_environment.setdefault("OPENWIKI_TELEMETRY_DISABLED", "1")
         child_returncode: int | None = None
         try:
             try:
@@ -380,14 +596,20 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 child_returncode = None
         finally:
             restoration_errors: list[str] = []
+            restoration_displaced: list[DisplacedContent] = []
             for path, original in adapters.items():
                 try:
-                    _restore(root, path, original)
+                    displaced = _restore(root, path, original)
                 except (OSError, RuntimeError) as error:
                     restoration_errors.append(f"{path}: {error}")
+                    continue
+                if displaced is not None:
+                    restoration_displaced.append(displaced)
 
         try:
-            workflow_unchanged = _snapshot(root, PROTECTED_WORKFLOW) == workflow
+            workflow_unchanged = (
+                _snapshot(root, PROTECTED_WORKFLOW).contents == workflow.contents
+            )
         except RuntimeError:
             workflow_unchanged = False
         try:
@@ -398,6 +620,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 repository_root=str(root),
                 error=str(error),
                 openwiki_returncode=child_returncode,
+                **_restoration_evidence(restoration_errors, restoration_displaced),
             )
         try:
             after_ignored_paths = _ignored_control_plane_paths(root)
@@ -410,6 +633,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 repository_root=str(root),
                 error=f"could not compare ignored control-plane paths: {error}",
                 openwiki_returncode=child_returncode,
+                **_restoration_evidence(restoration_errors, restoration_displaced),
             )
         after_paths = set(after_entries)
         new_paths = sorted(after_paths - before_paths)
@@ -429,6 +653,19 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             path for path in ignored_out_of_scope if path not in out_of_scope
         )
         try:
+            tree_violations, tree_symlinks = _openwiki_tree_violations(root)
+        except OSError as error:
+            return 1, _result(
+                "failed",
+                repository_root=str(root),
+                error=f"could not verify the OpenWiki write boundary: {error}",
+                openwiki_returncode=child_returncode,
+                **_restoration_evidence(restoration_errors, restoration_displaced),
+            )
+        out_of_scope.extend(
+            path for path in tree_violations if path not in out_of_scope
+        )
+        try:
             after_dirty_state = _dirty_state(
                 root,
                 {path: after_entries.get(path, "") for path in existing_dirty_state},
@@ -439,6 +676,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 repository_root=str(root),
                 error=f"could not compare pre-existing changes: {error}",
                 openwiki_returncode=child_returncode,
+                **_restoration_evidence(restoration_errors, restoration_displaced),
             )
         modified_pre_existing_paths = sorted(
             path
@@ -448,7 +686,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
         if not workflow_unchanged and PROTECTED_WORKFLOW.as_posix() not in out_of_scope:
             out_of_scope.append(PROTECTED_WORKFLOW.as_posix())
 
-        details: dict[str, object] = {
+        details = {
             "repository_root": str(root),
             "node_version": node_version,
             "openwiki_version": openwiki_version,
@@ -459,14 +697,17 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             "out_of_scope_paths": sorted(out_of_scope),
             "workflow_unchanged": workflow_unchanged,
             "openwiki_returncode": child_returncode,
+            **_restoration_evidence(restoration_errors, restoration_displaced),
         }
+        if tree_symlinks:
+            details["openwiki_tree_symlinks"] = tree_symlinks
         if restoration_errors:
-            error = "protected-file restoration failed"
+            failure_reason = "protected-file restoration failed"
             if child_returncode not in (None, 0):
-                error = "OpenWiki exited non-zero; protected-file restoration failed"
-            return 1, _result(
-                "failed", error=error, restoration_errors=restoration_errors, **details
-            )
+                failure_reason = (
+                    "OpenWiki exited non-zero; protected-file restoration failed"
+                )
+            return 1, _result("failed", error=failure_reason, **details)
         if child_returncode is None:
             return 1, _result(
                 "failed", error="OpenWiki could not be started", **details
