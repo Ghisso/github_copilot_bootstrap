@@ -26,6 +26,16 @@ from pathlib import Path
 PROTECTED_ADAPTERS = (Path("AGENTS.md"), Path("CLAUDE.md"))
 PROTECTED_WORKFLOW = Path(".github/workflows/openwiki-update.yml")
 OPENWIKI_ARGUMENTS = ("openwiki", "code", "--update", "--print")
+IGNORED_CONTROL_PLANE_PATHS = (
+    ".claude",
+    ".agents",
+    ".codex",
+    ".github",
+    ".vscode",
+    ".mcp.json",
+    "AGENTS.md",
+    "CLAUDE.md",
+)
 
 
 @dataclass(frozen=True)
@@ -47,11 +57,13 @@ def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
 
 
 def _repository_root(start: Path) -> Path | None:
-    """Return the outer repository root when ``start`` is inside one."""
-    result = _git(start, "rev-parse", "--show-toplevel")
-    if result.returncode != 0:
-        return None
-    return Path(result.stdout.strip())
+    """Return the outermost repository root that contains ``start``."""
+    root: Path | None = None
+    for candidate in (start.resolve(), *start.resolve().parents):
+        result = _git(candidate, "rev-parse", "--show-toplevel")
+        if result.returncode == 0:
+            root = Path(result.stdout.strip())
+    return root
 
 
 def _git_directory(root: Path) -> Path:
@@ -88,6 +100,23 @@ def _status_entries(root: Path) -> dict[str, str]:
     return entries
 
 
+def _ignored_control_plane_paths(root: Path) -> set[str]:
+    """Return ignored control-plane files without reading their contents."""
+    result = _git(
+        root,
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "-z",
+        "--",
+        *IGNORED_CONTROL_PLANE_PATHS,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("could not read ignored control-plane paths")
+    return {path for path in result.stdout.split("\0") if path}
+
+
 def _snapshot(root: Path, relative_path: Path) -> FileSnapshot:
     """Capture raw bytes while refusing symlinks and non-regular files."""
     path = root / relative_path
@@ -115,9 +144,9 @@ def _prepare_adapter(root: Path, relative_path: Path) -> FileSnapshot:
         file_descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         return _snapshot(root, relative_path)
+    state = os.fstat(file_descriptor)
     with os.fdopen(file_descriptor, "wb"):
         pass
-    state = path.stat(follow_symlinks=False)
     return FileSnapshot(None, (state.st_dev, state.st_ino))
 
 
@@ -161,6 +190,11 @@ def _enabled_error(root: Path) -> str | None:
         return "not_enabled"
     if marker.is_symlink() or not marker.is_file():
         return "openwiki/INSTRUCTIONS.md must be a regular file"
+    for directory, directories, files in os.walk(openwiki_root, followlinks=False):
+        tree_root = Path(directory)
+        for name in (*directories, *files):
+            if (tree_root / name).is_symlink():
+                return "openwiki must not contain symlinks"
     return None
 
 
@@ -189,6 +223,28 @@ def _dirty_state(root: Path, entries: dict[str, str]) -> dict[str, tuple[str, ..
         for path, status in entries.items()
         if not path.startswith("openwiki/")
     }
+
+
+def _ignored_control_plane_state(
+    root: Path, paths: set[str]
+) -> dict[str, tuple[str, ...]]:
+    """Fingerprint ignored control-plane files without emitting their contents."""
+    return {path: _fingerprint(root, path) for path in paths}
+
+
+def _remove_prepared_sentinels(
+    root: Path, adapters: dict[Path, FileSnapshot]
+) -> list[str]:
+    """Remove only sentinels created by this runner before a launch failure."""
+    errors: list[str] = []
+    for path, snapshot in adapters.items():
+        if snapshot.sentinel_identity is None:
+            continue
+        try:
+            _restore(root, path, snapshot)
+        except (OSError, RuntimeError) as error:
+            errors.append(f"{path}: {error}")
+    return errors
 
 
 def _version(command: str) -> str | None:
@@ -249,9 +305,17 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             "preflight_failed", repository_root=str(root), error=str(error)
         )
 
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError as error:
+        return 1, _result(
+            "preflight_failed",
+            repository_root=str(root),
+            error=f"could not acquire refresh lock: {error}",
+        )
+    try:
+        adapters: dict[Path, FileSnapshot] = {}
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -259,6 +323,12 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 "busy",
                 repository_root=str(root),
                 error="another OpenWiki refresh is running",
+            )
+        except OSError as error:
+            return 1, _result(
+                "preflight_failed",
+                repository_root=str(root),
+                error=f"could not acquire refresh lock: {error}",
             )
 
         enabled_error = _enabled_error(root)
@@ -275,14 +345,22 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             before_entries = _status_entries(root)
             before_paths = set(before_entries)
             existing_dirty_state = _dirty_state(root, before_entries)
-            adapters = {
-                path: _prepare_adapter(root, path) for path in PROTECTED_ADAPTERS
-            }
+            before_ignored_paths = _ignored_control_plane_paths(root)
+            before_ignored_state = _ignored_control_plane_state(
+                root, before_ignored_paths
+            )
+            for path in PROTECTED_ADAPTERS:
+                adapters[path] = _prepare_adapter(root, path)
             workflow = _snapshot(root, PROTECTED_WORKFLOW)
         except (OSError, RuntimeError) as error:
-            return 1, _result(
-                "preflight_failed", repository_root=str(root), error=str(error)
-            )
+            sentinel_errors = _remove_prepared_sentinels(root, adapters)
+            details: dict[str, object] = {
+                "repository_root": str(root),
+                "error": str(error),
+            }
+            if sentinel_errors:
+                details["restoration_errors"] = sentinel_errors
+            return 1, _result("preflight_failed", **details)
 
         child_environment = os.environ.copy()
         child_environment.setdefault("OPENWIKI_TELEMETRY_DISABLED", "1")
@@ -321,9 +399,35 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 error=str(error),
                 openwiki_returncode=child_returncode,
             )
+        try:
+            after_ignored_paths = _ignored_control_plane_paths(root)
+            after_ignored_state = _ignored_control_plane_state(
+                root, after_ignored_paths
+            )
+        except (OSError, RuntimeError) as error:
+            return 1, _result(
+                "failed",
+                repository_root=str(root),
+                error=f"could not compare ignored control-plane paths: {error}",
+                openwiki_returncode=child_returncode,
+            )
         after_paths = set(after_entries)
         new_paths = sorted(after_paths - before_paths)
         out_of_scope = [path for path in new_paths if not path.startswith("openwiki/")]
+        changed_ignored_paths = sorted(
+            path
+            for path, state in before_ignored_state.items()
+            if after_ignored_state.get(path) != state
+        )
+        new_ignored_paths = sorted(after_ignored_paths - before_ignored_paths)
+        ignored_out_of_scope = sorted(
+            path
+            for path in {*changed_ignored_paths, *new_ignored_paths}
+            if not path.startswith("openwiki/")
+        )
+        out_of_scope.extend(
+            path for path in ignored_out_of_scope if path not in out_of_scope
+        )
         try:
             after_dirty_state = _dirty_state(
                 root,
@@ -350,6 +454,7 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             "openwiki_version": openwiki_version,
             "pre_existing_dirty_paths": sorted(before_paths),
             "modified_pre_existing_paths": modified_pre_existing_paths,
+            "ignored_control_plane_paths": ignored_out_of_scope,
             "new_paths": new_paths,
             "out_of_scope_paths": sorted(out_of_scope),
             "workflow_unchanged": workflow_unchanged,
