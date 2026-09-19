@@ -93,7 +93,7 @@ decisions remain, use a focused PRD-style interview before drafting.
 **Phase 4 — Plan Draft**
 - Write the full phased plan with owner, files, required skills, and verification per step.
 - Include risks, fallback paths, and done criteria.
-- Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`.
+- Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`, including its required `-knowledge-refresh` slug suffix for the appended phase.
 
 **Phase 5 — Devil's Advocate (conditional)**
 - Run if: 3+ phases, new module, or architecture decision.

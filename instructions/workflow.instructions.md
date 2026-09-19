@@ -192,7 +192,13 @@ append one dedicated final small plan, after every phase already listed,
 only when all of these hold: `openwiki/INSTRUCTIONS.md` exists; the plan has
 more than one phase; the plan changes documentable outer-repository
 behavior (not read-only/reporting, and not AI-state-only work); and the
-plan's own purpose is not itself a knowledge/OpenWiki refresh.
+plan's own purpose is not itself a knowledge/OpenWiki refresh. Name the
+appended phase's slug so it ends with `-knowledge-refresh` (for example
+`2026-09-19_phase-D-knowledge-refresh`, not `...-phase-D-openwiki-sync` or
+any other conventionally reasonable but differently worded slug) — this
+exact suffix is what the termination rule below and
+`scripts/validate_plan_frontmatter.py` both key on; a phase named anything
+else is invisible to both and the recursion guard silently does nothing.
 
 **Termination.** This rule runs only while drafting or revising a plan's
 `phases:` list, and only ever appends to the end of that list. Recognize an

@@ -3,8 +3,8 @@ name: 2026-09-19_phase-C-openwiki-lifecycle-integration
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-C-lifecycle-integration.md
 ---
 # Small Plan: 2026-09-19_phase-C-openwiki-lifecycle-integration
 
@@ -25,7 +25,7 @@ commit.
 
 ### Step C1 — Teach planning to append the final knowledge-refresh phase
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `shared/agents/planner/prompt.md`
   - modify `shared/skills/plan-decomposition/SKILL.md`
@@ -64,7 +64,7 @@ commit.
 
 ### Step C2 — Integrate the lifecycle without turning OpenWiki into a gate script
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `shared/agents/orchestrator/prompt.md`
   - modify `shared/policies/workflow.instructions.md`
@@ -97,7 +97,7 @@ commit.
 
 ### Step C3 — Narrow documenter, learning, and onboarding responsibilities
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `shared/agents/documenter/prompt.md`
   - modify `shared/skills/documentation/SKILL.md`
@@ -136,7 +136,7 @@ commit.
 
 ### Step C4 — High-risk + documentation review and closeout
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Target files:** scoped Phase C diff
 - **Required Skills:** none beyond reviewer-owned profile guidance
 - **Review Profiles:**
@@ -175,17 +175,17 @@ receipts.
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Disabled repositories retain the existing planning and closeout behavior
-- [ ] Knowledge-refresh phase wording is consistent across planner, orchestrator, templates, and skills
-- [ ] No model-backed OpenWiki execution was added to deterministic verification or hooks
+- [x] Documentation updated — `docs/runtime-checks.md` gained a row for the new plan gate
+- [x] LEARN entries saved or no-lessons marker recorded — three entries
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason — none survived; both findings were fixed
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Disabled repositories retain the existing planning and closeout behavior — scoped to C1 and C2; C3 applies everywhere by design, recorded in the session log
+- [x] Knowledge-refresh phase wording is consistent across planner, orchestrator, templates, and skills — one MAJOR naming gap found and fixed, then confirmed
+- [x] No model-backed OpenWiki execution was added to deterministic verification or hooks
 
 ## Pause Checkpoint
 

@@ -1,6 +1,6 @@
 # OpenWiki Phase C: Lifecycle Integration
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** `.claude/plans/2026-09-19_phase-C-openwiki-lifecycle-integration.md`
 
 ## Goal
@@ -143,6 +143,35 @@ A planner-output harness would be valuable well beyond OpenWiki. It is its own p
   knowledge-refresh trigger conditions are judgements about prose; a gate enforcing only the
   observable two would have failed legitimately exempt plans.
 
-## Remaining Work
+## Documentation
 
-- Confirmation review pass, then closeout: findings, receipts, commit, push.
+`docs/runtime-checks.md` gained one row for the new plan gate, covering both error strings with
+their own recovery: remove the duplicate `-knowledge-refresh` phase, or move the remaining one
+to the end of `phases:`. This was found during closeout, not during implementation. The gate
+table exists so someone hitting a gate can recover without reading validator source, and adding
+a check without documenting its recovery would have reproduced the exact complaint recorded
+earlier in this session against `verify.py`'s provenance error.
+
+Checked for other staleness and found none: the pre-existing stale-claims-audit row is still
+accurate, because the knowledge-refresh phase satisfies that requirement rather than changing it.
+
+## Correction: why `plan-big.md` needs no suffix pointer
+
+The first reason given was wrong and is corrected here so it does not mislead a later editor.
+It is **not** that the template is read at a different moment than the naming decision — a
+planner reads the template in one pass, and the template's own pre-existing Completion Evidence
+section sits after the phases list in file order while plainly being meant to shape it.
+
+The omission is fine because it is redundant with two sources that are unambiguously at the
+decision moment: `planner/prompt.md`'s Plan Draft step and `plan-decomposition`'s per-phase
+naming step, both of which now name the suffix explicitly. If either is deleted, the gap
+reopens. The template link alone was never what closed it.
+
+## Confirmation Pass
+
+Gate result PASS. Both findings resolved and independently verified. The three locations now
+naming the suffix were checked against each other and the canonical section: all use the
+identical literal string, none restates the trigger conditions, shape, or failure semantics.
+The reviewer noted this is a materially different pattern from Phase B's drift, where a synonym
+was substituted for an equivalent concept; here one literal token is quoted verbatim in three
+places with no synonym anywhere.
