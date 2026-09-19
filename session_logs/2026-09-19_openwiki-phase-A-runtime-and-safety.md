@@ -1,6 +1,6 @@
 # OpenWiki Phase A: Runtime and Safety Boundary
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** `.claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md`
 
 ## Goal
@@ -68,7 +68,82 @@ assert the finding should block.
 - Added the bootstrap-owned runner, generator/installer wiring, ignore entry, validator coverage, and deterministic fake-command tests.
 - Completed two review-driven fix loops for lock ordering, dirty-path fingerprints, symlink checks, sentinel restoration, nested-root resolution, ignored-path checks, and structured failures.
 
-## Remaining Work
+## Resumed-Session Rounds
+
+Nine fix rounds and six review rounds ran after the pause. Every round is on
+record in `.claude/quality_reports/review-results-2026-09-19_phase-A-openwiki-round*.json`.
+
+| Round | Result | What it found |
+| --- | --- | --- |
+| 3 (pre-pause) | FAIL | 3 CRITICAL, 4 MAJOR |
+| 4 | FAIL | Nested `.git` excluded wholesale, hiding `hooks/` and `config` |
+| 5 | FAIL | The churn denylist missed `info/refs`, which `git gc` creates |
+| 6 | FAIL | Decoy `.git` bypass; submodule nesting stopped at one level |
+| 7 (coder-found) | — | `git ls-files` never reaches inside any `.git`-named directory, so round 6's fix was unreachable for non-repository control-plane paths |
+| 8 | FAIL | No test pinned the `.cache` exclusion's boundaries |
+| final | PASS | Empty findings |
+
+Two defects were found by the reviewer running live experiments rather than
+reading code. Two were found by the coder checking its own work, including a
+test that passed for the wrong reason because a dangling symlink makes
+`Path.is_dir()` false regardless of the check under test.
+
+### Decisions taken during the resumed session
+
+- **Detect now, sandbox later.** User decision. Phase A fails closed on a symlink
+  escape inside the working tree; operating-system-enforced isolation of the
+  child process became `2026-09-19_phase-E-openwiki-child-process-sandbox`.
+- **Allowlist, not denylist, inside a nested `.git`.** Reversal of orchestrator
+  guidance after rounds 4 and 5 each missed an entry. The set of files Git writes
+  is open-ended and grows per release, so a denylist produces false failures on
+  ordinary maintenance, and a check that fails on routine work gets ignored.
+  The allowlist covers the execution vectors: `hooks/`, `config`,
+  `config.worktree`, `info/attributes`, `worktrees/*/config.worktree`, and the
+  same set under submodules at any depth.
+- **Enumerate from disk, not through `git ls-files`.** Verified on git 2.43.0:
+  `git ls-files --others --ignored --exclude-standard` omits everything inside
+  any directory named `.git`, real repository or not, with no boundary entry.
+  The result field was renamed `ignored_control_plane_paths` to
+  `control_plane_paths`, since tracked files are now in scope.
+- **`.claude/.cache/` excluded; `MEMORY.md`, plans, and logs are not.** One
+  unrelated tool call changed two files under `.cache/`. Excluding the protected
+  surface instead would have reopened the round-3 CRITICAL, so concurrent agent
+  activity is documented as a residual limit rather than silenced.
+- **Accepted MINOR:** `_run()` length. The stage ordering is the safety property;
+  extracting helpers would move it into call-site convention.
+
+### Accuracy note
+
+The final review found the coder's account of which code mutation causes which
+test failure was imprecise: a substring-match mutation fails only the near-miss
+case, not the symlink case as reported. The delivered tests are correct; the
+narrative about them was not. Recorded because the evidence trail should match
+what was actually observed.
+
+## Documentation Decision
+
+No documentation change this session, recorded as a decision rather than a skip.
+The user-facing surface — devcontainer prerequisite, pinned versions, the
+`~/.openwiki` mount — is already in `README.md` and `docs/architecture.md` from
+the checkpoint commit. This session changed internal runner logic only. The
+operational constraints live in the module docstring; Phase B adds the skill that
+documents how to run the runner.
+
+## Residual Limits Carried Forward
+
+Stated in the runner's module docstring and repeated here so they are not lost:
+
+1. A write landing outside the repository entirely is not detected. Phase E.
+2. A file inside a *validated* git directory but off the allowlist is not
+   fingerprinted. It can hide inert data, not a code-execution vector.
+3. A nested repository whose `.git` is a `gitdir:` pointer outside the tracked
+   tree escapes the mechanism; the pointer file itself is fingerprinted.
+4. `.claude/.cache/` is excluded by deliberate exception.
+5. Concurrent agent-session writes to `.claude` cause a fail-closed failure
+   naming unrelated files. Re-run when the checkout is quiet. The `flock`
+   serialises runner against runner, not runner against an agent session.
+
+## Original Remaining Work (from the pause, now complete)
 
 - Resolve every finding in the saved round 3 review result.
 - Re-run focused tests, generation, validation, runtime consistency, and fast verification.

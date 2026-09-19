@@ -3,10 +3,10 @@ name: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 1
-status: in-progress
+status: complete
 resumed_at: 2026-09-19T16:55:00Z
 prior_pause_session_log: .claude/session_logs/2026-09-19_openwiki-phase-A-runtime-and-safety.md
-closeout_session_log:
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-A-runtime-and-safety.md
 ---
 # Small Plan: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
 
@@ -27,7 +27,7 @@ resumable state that must stay on disk after a failure but must never enter Git.
 
 ### Step A1 — Pin the runtime dependency and persist user configuration
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `shared/devcontainer/Dockerfile`
   - modify `shared/devcontainer/devcontainer.json`
@@ -75,7 +75,7 @@ resumable state that must stay on disk after a failure but must never enter Git.
 
 ### Step A2 — Add the bootstrap-owned OpenWiki runner
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - create `shared/scripts/openwiki_refresh.py`
   - create focused runner tests under `tests/test_openwiki_refresh.py`
@@ -150,7 +150,7 @@ resumable state that must stay on disk after a failure but must never enter Git.
 
 ### Step A3 — Install the runner and ignore resumable run state
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - modify `scripts/generate_targets.py`
   - modify `scripts/install_bootstrap.py` (`ignore_block`)
@@ -186,7 +186,7 @@ resumable state that must stay on disk after a failure but must never enter Git.
 
 ### Step A4 — Cover destructive and failure cases deterministically
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - extend `tests/test_openwiki_refresh.py`
 - **Required Skills:**
@@ -219,7 +219,7 @@ resumable state that must stay on disk after a failure but must never enter Git.
 
 ### Step A5 — High-risk review and phase closeout
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Target files:** scoped Phase A diff
 - **Required Skills:** none beyond reviewer-owned profile guidance
 - **Review Profiles:**
@@ -262,17 +262,17 @@ Normal completion then follows the fixed closeout sequence and requires canonica
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, CLOSEOUT); the order below mirrors it rather than restating it.
 
-- [ ] Documentation updated (devcontainer prerequisite) or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] No real provider/model request was needed to prove Phase A correctness
-- [ ] Root-adapter and workflow restoration tests cover both success and failure paths
-- [ ] `openwiki/.run.json` is in the installer-managed ignore block and asserted by the validator
+- [x] Documentation updated (devcontainer prerequisite) or explicitly skipped as pure-internal — README.md and docs/architecture.md carry the devcontainer prerequisite and pins from the checkpoint commit; this session changed internal runner logic only, so no public interface moved
+- [x] LEARN entries saved or no-lessons marker recorded — five entries in `.claude/MEMORY.md`
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason — one surviving MINOR (`_run()` length), accepted with reason
+- [x] Review findings resolved and persisted with branch/phase metadata — 0 critical, 0 major, 1 minor
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] No real provider/model request was needed to prove Phase A correctness
+- [x] Root-adapter and workflow restoration tests cover both success and failure paths
+- [x] `openwiki/.run.json` is in the installer-managed ignore block and asserted by the validator
 
 ## Pause Checkpoint
 
