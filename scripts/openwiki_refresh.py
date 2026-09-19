@@ -16,18 +16,27 @@ detect and report, never silently merge.
 
 Nested-repository control-plane fingerprinting: an ignored control-plane path
 that is itself a Git repository (for example an installed ``.claude``) is
-fingerprinted file-by-file, because Git does not recurse into it. Its own
-``.git`` is walked too, but not uniformly. ``hooks/*`` (Git executes these
-directly) and ``config`` (``core.hooksPath``, ``core.fsmonitor``, and
-``include.path`` can each redirect to or run arbitrary commands), plus
-``info/``, are fingerprinted like any other file. High-churn storage that
-moves on every ordinary commit -- ``objects/``, ``refs/``, ``logs/``,
-``index``, ``HEAD``, ``ORIG_HEAD``, ``FETCH_HEAD``, ``MERGE_HEAD``,
-``packed-refs``, and ``COMMIT_EDITMSG`` -- is deliberately excluded. This
-includes ``refs/``: a ref moves on every commit, including this bootstrap's
-own state-sync commits inside ``.claude``, and moving one is not itself a
-code-execution vector, so fingerprinting it would only produce false
-failures on ordinary activity.
+fingerprinted file-by-file, because Git does not recurse into it. Inside its
+own ``.git``, only the execution-relevant surface is checked: everything
+under ``hooks/`` (Git executes these directly), the ``config`` file
+(``core.hooksPath``, ``core.fsmonitor``, and ``include.path`` can each
+redirect to or run arbitrary commands), ``info/attributes`` (it binds paths
+to ``filter.*``/``diff.*.textconv`` handlers whose commands come from
+``config``, so it is part of that same execution path), and the same two,
+``config`` and ``hooks/``, under any ``modules/*/`` subdirectory, since
+submodule git directories live there and carry their own hooks and config.
+Everything else under a nested ``.git`` -- ``objects/``, ``refs/``, ``logs/``,
+``info/refs``, ``index``, ``HEAD``, ``packed-refs``, ``COMMIT_EDITMSG``, and
+whatever a future Git version adds -- is not fingerprinted, so it cannot
+produce a false failure. This is a considered trade, not an oversight: an
+earlier denylist of known-churn names missed ``COMMIT_EDITMSG``, and after
+that was fixed, missed ``git gc``'s ``info/refs``, in successive reviews,
+because the set of files Git writes on ordinary maintenance is open-ended and
+grows with every release -- a check that fails closed on routine ``git gc``
+gets bypassed rather than trusted. The allowlist's cost is symmetric: a
+code-execution vector a future Git version adds outside this listed set will
+not be detected until the set is revisited, which should happen whenever the
+pinned Git version changes.
 
 Residual limit: this phase detects and fails closed on a write that escapes
 ``openwiki/`` through a symlink inside the repository working tree, but a
@@ -65,27 +74,6 @@ IGNORED_CONTROL_PLANE_PATHS = (
     "AGENTS.md",
     "CLAUDE.md",
     ".context-mode-provenance.secret*",
-)
-# High-churn entries directly under a nested repository's own ``.git`` that
-# change on every ordinary commit and carry no code-execution meaning on
-# their own. Excluded by name (not by allowlisting the rest) so a future Git
-# version's new files are fingerprinted by default instead of silently
-# skipped. ``COMMIT_EDITMSG`` is included here even though it holds text, not
-# an object or a ref: it is rewritten on every commit (verified empirically),
-# so treating it as execution-relevant would fail a refresh on ordinary
-# nested-repository activity, such as this bootstrap's own state-sync commits
-# inside ``.claude``.
-_NESTED_GIT_CHURN_DIRECTORIES = frozenset({"objects", "refs", "logs"})
-_NESTED_GIT_CHURN_FILES = frozenset(
-    {
-        "index",
-        "HEAD",
-        "ORIG_HEAD",
-        "FETCH_HEAD",
-        "MERGE_HEAD",
-        "packed-refs",
-        "COMMIT_EDITMSG",
-    }
 )
 
 
@@ -169,6 +157,54 @@ def _status_entries(root: Path) -> dict[str, str]:
     return entries
 
 
+def _walk_files_and_symlinks(directory: Path) -> list[Path]:
+    """List every regular file and every symlink (file or directory) below ``directory``."""
+    found: list[Path] = []
+    for current_directory, directories, files in os.walk(directory, followlinks=False):
+        current = Path(current_directory)
+        found.extend(current / name for name in files)
+        found.extend(
+            current / name for name in directories if (current / name).is_symlink()
+        )
+    return found
+
+
+def _nested_git_allowed_paths(git_root: Path) -> list[Path]:
+    """List the execution-relevant paths under one nested repository's ``.git``.
+
+    Matched by path relative to ``git_root``, not by bare name, so a rule can
+    target one file several levels deep (``info/attributes``) without
+    touching its high-churn sibling at the same depth (``info/refs``).
+    Everything not explicitly listed here -- ``objects/``, ``refs/``,
+    ``logs/``, ``info/refs``, pointer files, ``packed-refs``,
+    ``COMMIT_EDITMSG`` -- is data, not walked, and cannot produce a false
+    failure. See the module docstring for why this is an allowlist rather
+    than a denylist of known churn, and for the trade that comes with it.
+    """
+    allowed: list[Path] = []
+    hooks = git_root / "hooks"
+    if hooks.is_dir():
+        allowed.extend(_walk_files_and_symlinks(hooks))
+    config = git_root / "config"
+    if config.exists() or config.is_symlink():
+        allowed.append(config)
+    attributes = git_root / "info" / "attributes"
+    if attributes.exists() or attributes.is_symlink():
+        allowed.append(attributes)
+    submodules = git_root / "modules"
+    if submodules.is_dir():
+        for entry in submodules.iterdir():
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            submodule_config = entry / "config"
+            if submodule_config.exists() or submodule_config.is_symlink():
+                allowed.append(submodule_config)
+            submodule_hooks = entry / "hooks"
+            if submodule_hooks.is_dir():
+                allowed.extend(_walk_files_and_symlinks(submodule_hooks))
+    return allowed
+
+
 def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
     """List files and symlinks under an ignored nested-repository directory.
 
@@ -176,18 +212,11 @@ def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
     ``.claude``); ``git ls-files --others --ignored`` reports the directory
     itself as one entry instead of every file inside it, which would let a
     mutation anywhere inside it pass undetected. A nested repository's own
-    ``.git`` is walked too, but not uniformly: Git executes ``hooks/*``
-    directly, and ``config`` can redirect execution on its own (a relocated
-    ``core.hooksPath``, a ``core.fsmonitor`` command, or an ``include.path``
-    pulling in further config), so those are fingerprinted like any other
-    file. The high-churn storage that moves on every ordinary commit --
-    ``objects/``, ``refs/``, ``logs/``, and pointer files such as ``HEAD`` and
-    ``index`` (see ``_NESTED_GIT_CHURN_DIRECTORIES``/``_NESTED_GIT_CHURN_FILES``)
-    -- is still excluded. Excluding ``refs/`` is deliberate, not an oversight:
-    refs move on every commit, including this bootstrap's own state-sync
-    commits inside ``.claude``, and moving a ref is not itself a
-    code-execution vector, so fingerprinting it would only produce false
-    failures on ordinary activity.
+    ``.git`` is walked too, but only for the execution-relevant surface
+    ``_nested_git_allowed_paths`` names; everything else under ``.git`` is
+    not fingerprinted, so a code-execution vector a future Git version adds
+    outside that surface will not be detected until it is revisited (see the
+    module docstring for the full trade-off).
     """
     paths: set[str] = set()
     for directory, directories, files in os.walk(
@@ -195,12 +224,10 @@ def _walk_ignored_directory(root: Path, relative_directory: str) -> set[str]:
     ):
         current = Path(directory)
         if current.name == ".git":
-            directories[:] = [
-                name
-                for name in directories
-                if name not in _NESTED_GIT_CHURN_DIRECTORIES
-            ]
-            files = [name for name in files if name not in _NESTED_GIT_CHURN_FILES]
+            for candidate in _nested_git_allowed_paths(current):
+                paths.add(candidate.relative_to(root).as_posix())
+            directories[:] = []  # Do not also generically walk .git's data.
+            continue
         for name in files:
             paths.add((current / name).relative_to(root).as_posix())
         for name in directories:
