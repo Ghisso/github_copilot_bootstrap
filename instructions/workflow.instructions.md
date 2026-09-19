@@ -170,6 +170,17 @@ Environment-variable bypasses are not supported.
 
 ---
 
+## OpenWiki Refresh
+
+OpenWiki refresh runs only as one serial, explicit, model-backed lifecycle
+action, through `.claude/scripts/openwiki_refresh.py` (see
+`.claude/skills/openwiki/SKILL.md`). It is never added to a hook,
+`verify.py`, the installer, state-sync, post-commit, or a scheduled CI job.
+See `workspace.instructions.md`'s Knowledge Ownership section for why the
+result carries no authority: OpenWiki is derived context, not authority.
+
+---
+
 ## Reporting
 
 Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing
