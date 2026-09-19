@@ -22,27 +22,59 @@ location, instead of the *target* the command acts on.
    inside `environ`), and refused any Bash command whose text mentioned `.claude/settings.json`,
    `.codex/config.toml` or `.codex/hooks.json` regardless of which directory those files were in.
 
-This phase scopes both guards to their actual targets. It changes no guard's verdict for any
-command that acts on this repository. Phase F's `[LEARN:quality]` entry is the reason this is
-worth a phase: both the coder and the orchestrator worked around the classifier by switching from
-Bash to `Write`/`Edit`/`Read`, and a guard that people route around by changing tools has stopped
-being a guard.
+3. Found by inspection while fixing the first two: `enforce-pr-gate.sh` and
+   `enforce-branch-state.sh` both work out which repository they govern from where the hook script
+   itself is installed (`:8` and `:9`), so a `git push` or a `git checkout -b` aimed at another
+   repository is judged against this repository's current branch, working tree and plan files.
+
+This phase scopes three gates to their actual targets — the commit gate, the push gate, and the
+branch-creation gate — and scopes the protected-file classifier's control-plane rules to this
+repository. It changes no gate's verdict for any command that acts on this repository. Phase F's
+`[LEARN:quality]` entry is the reason this is worth a phase: both the coder and the orchestrator
+worked around the classifier by switching from Bash to `Write`/`Edit`/`Read`, and a guard that
+people route around by changing tools has stopped being a guard.
 
 This is control-plane work under the repository's own classification in `CLAUDE.md`: it edits
 `shared/hooks/scripts/`. It therefore requires a full plan and the `code`, `architecture`,
-`security`, `tests` and `ponytail` review profiles. Defect 2 deliberately makes a security
-classifier less conservative in one narrow direction, so the `security` profile is pointed at
-exactly that narrowing in Step F3.6.
+`security`, `tests` and `ponytail` review profiles. Every fix here makes a guard stand down for a
+target it was never meant to govern, which is the point. One of them needs a closer security
+reading than the rest: the classifier scoping in Step F3.4 decides whether to stand down by
+resolving a path and testing whether it falls inside this repository, rather than by reading an
+explicit redirect the operator typed. Path resolution can be argued with; an explicit `-C` cannot.
+Step F3.8 points the `security` profile at that difference.
 
-Two contained fixes to existing code. No rewrite of `protect-files.py` (1397 lines of established
-reasoning about heredocs, variable substitution and quoting) and no new hook script.
+Four contained fixes to existing code. No rewrite of `protect-files.py` (1397 lines of established
+reasoning about heredocs, variable substitution and quoting), no new hook script, and no change to
+`record-branch-state.sh`, the `PostToolUse` handler that writes plan state after a branch is
+created: it already declines to write unless this repository's own `HEAD` matches the branch name
+it parsed (`:21-25`), so a branch created elsewhere cannot reach the plan-state write.
 
-**Deliberately out of scope, recorded so it is not rediscovered.** `enforce-pr-gate.sh:8,23,30`
-and `enforce-branch-state.sh:9,41,47` derive `REPO_ROOT` the same way and carry the same class of
-defect for `git push`, `gh pr create` and `git checkout -b`. This phase does not wire them.
-`git_targets_other_repository` takes a subcommand argument precisely so a follow-up can, without
-further library work. Whether to do that follow-up is a separate decision, not a gap in this
-phase.
+**Three design decisions, resolved here rather than left to the implementer.**
+
+*The shared helper keeps one subcommand per call.* `git_targets_other_repository`, added in
+Step F3.1, takes a command string and a single git subcommand and answers whether every invocation
+of that subcommand in the command provably acts on a different repository. Step F3.2 calls it with
+`commit` and Step F3.5 calls it with `push`.
+
+*Branch creation gets its own predicate instead.* It does not fit the shared helper, because it
+spans two subcommands with different flag grammars — `git checkout -b` and `git switch -c` — and
+calling the helper once per subcommand gives the wrong answer: the helper requires at least one
+invocation of the named subcommand to exist, so the conjunction of two calls is false whenever only
+one of the two shapes appears. Step F3.6 therefore builds a dedicated predicate on the same
+underlying resolver, mirroring how the library already gives branch creation a dedicated parser
+rather than routing it through a generic subcommand walker.
+
+*Pull-request creation is deliberately not scoped, and keeps gating every time.* Unlike `git`,
+the `gh` command line has no directory redirect: it works out its target from an `owner/repo` pair
+passed to `-R`, falling back to the current directory's remote. Scoping it would mean normalising
+and comparing remote URLs — `https://` and `git@host:` forms, optional `.git` suffixes,
+case-insensitive owner names — inside the control plane, and a comparison that wrongly reported
+"different repository" would let a real pull request skip this repository's closeout ceremony.
+That is the worst failure available in this phase, and nothing observed in Phase F asks for it. So
+`gh pr create` is checked from this checkout whatever repository it names. Step F3.5 still changes
+that file, for a reason that stands on its own: the hook's existing exemption for the nested
+state-sync repository currently exits the whole hook, which lets a pull request slip past
+unchecked.
 
 ## Steps
 
