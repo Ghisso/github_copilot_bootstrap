@@ -545,6 +545,98 @@ def test_accepts_cancelled_big_plan_without_started_at_or_current_phase(
     assert validation_errors(plan) == []
 
 
+def test_accepts_a_single_trailing_knowledge_refresh_phase(tmp_path: Path) -> None:
+    """A dedicated final knowledge-refresh phase is a normal, valid shape."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-example
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_rejects_two_knowledge_refresh_phases(tmp_path: Path) -> None:
+    """Recursion never occurs: the rule cannot append a second copy of itself."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_non_trailing_knowledge_refresh_phase(tmp_path: Path) -> None:
+    """The knowledge-refresh phase must be last, never mid-plan."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+""",
+    )
+
+    assert any(
+        "the knowledge-refresh phase must be the last phase in phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "phases",
+    (
+        [123, "2026-01-01_phase-A-knowledge-refresh"],
+        ["2026-01-01_phase-A-knowledge-refresh", 123],
+    ),
+    ids=("non_string_first", "non_string_last"),
+)
+def test_knowledge_refresh_check_skips_non_string_phase_entries_safely(
+    tmp_path: Path, phases: list[object]
+) -> None:
+    """The defensive non-string guard must skip safely, not crash or misfire."""
+    path = tmp_path / "big.md"
+    path.write_text("---\nname: example\n---\n\n# Plan\n", encoding="utf-8")
+    data: dict[str, object] = {
+        "name": "example",
+        "type": "big-plan",
+        "status": "planning",
+        "originating_branch": "dev",
+        "implementation_branch": "example_implementation",
+        "phases": phases,
+    }
+    errors: list[str] = []
+
+    validator.validate_big_plan(path, data, errors)
+
+    assert not any("knowledge-refresh" in error for error in errors)
+
+
 def test_rejects_big_plan_body_phase_inventory_drift(tmp_path: Path) -> None:
     """The readable phase list cannot silently diverge from frontmatter."""
     plan = write_plan(

@@ -39,6 +39,14 @@ session hooks).
   task's open question.
 - For a large or unfamiliar `docs/` tree, prefer `mcp__semble__search` or a
   targeted `rg` query over a sequential full read.
+- If `openwiki/INSTRUCTIONS.md` exists, treat OpenWiki's own entry/index page
+  as optional just-in-time orientation — read it to get oriented, not every
+  generated page at startup. It is derived, descriptive knowledge, never
+  authority; see `.claude/instructions/workspace.instructions.md`'s
+  Knowledge Ownership section. Verify any material implementation claim it
+  makes against source and tests before editing, the same as any other doc
+  claim in step 2. A repository without that marker uses this skill's
+  existing targeted-retrieval steps unchanged.
 
 ### 2. Cross-check against the real code
 

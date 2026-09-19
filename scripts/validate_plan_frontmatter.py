@@ -43,6 +43,12 @@ BODY_PHASE_HEADING_PATTERN = re.compile(
     r"^## (?:Phase|Phases|Phase Order)[ \t]*\n(?P<body>.*?)(?=^## |\Z)",
     re.MULTILINE | re.DOTALL,
 )
+# See the canonical Knowledge-Refresh Final Phase rule in
+# shared/policies/workflow.instructions.md. This suffix is how a big plan's
+# own dedicated final knowledge-refresh phase is recognized; enforcing at
+# most one, and only as the last phase, is what makes the rule's termination
+# condition deterministic rather than a convention the planner could forget.
+KNOWLEDGE_REFRESH_PHASE_SUFFIX = "-knowledge-refresh"
 
 
 def parse_frontmatter(path: Path) -> dict[str, Any]:
@@ -230,6 +236,24 @@ def validate_pause(path: Path, data: dict[str, Any], errors: list[str]) -> None:
         errors.append(f"{path}: pause_session_log must contain **Status:** PAUSED")
 
 
+def validate_knowledge_refresh_phase_position(
+    path: Path, phases: list[str], errors: list[str]
+) -> None:
+    """A knowledge-refresh phase must be unique and last, so it cannot recur."""
+    refresh_phases = [
+        phase for phase in phases if phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX)
+    ]
+    if len(refresh_phases) > 1:
+        errors.append(
+            f"{path}: at most one knowledge-refresh phase is allowed, "
+            f"found {len(refresh_phases)}"
+        )
+    elif refresh_phases and phases[-1] != refresh_phases[0]:
+        errors.append(
+            f"{path}: the knowledge-refresh phase must be the last phase in phases"
+        )
+
+
 def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> None:
     require_fields(
         path,
@@ -256,6 +280,8 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
     if not isinstance(data.get("phases"), list) or not data.get("phases"):
         errors.append(f"{path}: phases must be a non-empty list")
         return
+    if all(isinstance(phase, str) for phase in data["phases"]):
+        validate_knowledge_refresh_phase_position(path, data["phases"], errors)
     body = path.read_text(encoding="utf-8").split("---\n", 2)
     if len(body) != 3:
         return
