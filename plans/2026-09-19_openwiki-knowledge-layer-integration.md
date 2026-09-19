@@ -18,7 +18,7 @@ phases:
   - 2026-09-19_phase-I-openwiki-enable-and-first-generation
   - 2026-09-19_phase-J-openwiki-docs-memory-migration
   - 2026-09-19_phase-K-knowledge-refresh
-current_phase: 2026-09-19_phase-F-openwiki-hook-mechanics-spike
+current_phase: 2026-09-19_phase-F2-verification-evidence-guardrails
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
@@ -210,7 +210,7 @@ A fact that can be re-derived from current source/tests should normally not be c
 - [x] `2026-09-19_phase-C-openwiki-lifecycle-integration` — teach planner, orchestrator, documenter, learn, and onboard behavior how OpenWiki-enabled big plans end with a small knowledge-refresh phase, without touching disabled repositories.
 - [ ] `2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout` — cancelled: written against the native-CLI runner model; replaced by F–K (see `.claude/session_logs/2026-09-19_openwiki-phase-D-E-cancellation.md`).
 - [ ] `2026-09-19_phase-E-openwiki-child-process-sandbox` — cancelled: host-driven mode spawns no bootstrap child process; prevention moved to the guard hook and verify backstop in G.
-- [ ] `2026-09-19_phase-F-openwiki-hook-mechanics-spike` — evidence-only spike in a scratch repository with a throwaway MCP server: observe whether `PreToolUse`/`PostToolUse` fire for MCP tools on Claude Code and Codex, the tool name, whether a deny is honored, and the payload shape; record GO / GO-with-adaptations / RE-PLAN for G.
+- [x] `2026-09-19_phase-F-openwiki-hook-mechanics-spike` — evidence-only spike in a scratch repository with a throwaway MCP server: observe whether `PreToolUse`/`PostToolUse` fire for MCP tools on Claude Code and Codex, the tool name, whether a deny is honored, and the payload shape; record GO / GO-with-adaptations / RE-PLAN for G.
 - [ ] `2026-09-19_phase-F2-verification-evidence-guardrails` — process guardrails so the Phase A failure class cannot recur: mandated required/optional verification lists in small plans, closeout accounting of every listed item (completing phase only, no new check ID), a plan-time lint refusing hedged checks, the spike skill routed to third-party binaries/CLIs/MCP servers, and a `tests` review question on direct exercise of external dependencies.
 - [ ] `2026-09-19_phase-G-openwiki-host-driven-guard` — built only against F's evidence: replace the subprocess runner with a PreToolUse/PostToolUse guard on `openwiki_begin`, add the `VFY-OPENWIKI-001` backstop, fix the devcontainer smoke line, add a real-binary MCP handshake test, retire `openwiki_refresh.py`, and make OpenWiki-installed skill bundles third-party-owned.
 - [ ] `2026-09-19_phase-H-openwiki-skill-rename-and-host-rules` — rename the bootstrap skill to `knowledge-refresh`, rewrite it for host-driven operation with the precise host-integration rule, and sweep every reference.

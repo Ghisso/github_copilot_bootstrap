@@ -1057,3 +1057,24 @@
   choose a provider on that basis, was contradicted by the project's own README
   feature list. Check before asserting, and especially before asking someone to
   decide on the assertion.
+- [LEARN:review] "Something fires afterwards" is not the same observation as
+  "`PostToolUse` fires afterwards". On an MCP tool returning `isError: true`,
+  Claude Code fires `PostToolUseFailure` and Codex fires nothing at all; a
+  restore hook written against the plan's original wording would have missed
+  both. When a plan names a specific event, verify that event, not its
+  category.
+- [LEARN:workflow] Before planning a phase that probes a third-party host,
+  check whether that host can be driven unattended. Claude Code has
+  `claude -p --output-format json` and produced a complete machine record.
+  Codex has no equivalent: project trust and MCP call approval both block
+  `codex exec`, and the flags that lift them are ones an agent should not
+  reach for. Half that phase ran at human speed for this reason alone.
+- [LEARN:review] Evidence pasted by a human into the session is not archived
+  evidence. A line quoted from the user's terminal read exactly like the
+  machine-captured values around it. Capture it as a file and label how it was
+  obtained, or do not quote it.
+- [LEARN:quality] A guard that people routinely route around by switching
+  tools has stopped being a guard. `protect-files.sh` matches command text
+  rather than command targets, so it blocks a Bash command that merely names a
+  protected-looking path in `/tmp`, and every such block gets resolved by using
+  `Write`/`Edit`/`Read` instead. That teaches tool-switching past guards.
