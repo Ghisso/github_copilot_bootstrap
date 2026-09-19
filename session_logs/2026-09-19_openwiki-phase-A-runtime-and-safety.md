@@ -1,6 +1,6 @@
 # OpenWiki Phase A: Runtime and Safety Boundary
 
-**Status:** IN PROGRESS
+**Status:** PAUSED
 **Plan:** `.claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md`
 
 ## Goal
@@ -23,11 +23,34 @@ Implement the approved Phase A runtime, wrapper, installation, ignore, and deter
 
 ## Verification
 
-Not run yet.
+- Focused runner and installer tests: 31 passed.
+- `scripts/generate_targets.py --all`: passed.
+- `scripts/validate_targets.py`: passed.
+- `scripts/check_runtime.py`: passed after local-only self-install.
+- `.claude/scripts/verify.py fast --format json`: PASS.
+- `git diff --check`: passed.
+- Devcontainer Node/OpenWiki smoke build: not run because no build environment was used.
 
-## Open Questions and Next Steps
+## Review
 
-- Implement all Phase A steps.
-- Run focused and fast verification.
-- Complete high-risk review and closeout.
+- Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`.
+- Round 3 result: 3 CRITICAL and 4 MAJOR findings remain.
+- Exact results: `.claude/quality_reports/review-results-2026-09-19_phase-A-openwiki-round3.json`.
+- Ponytail result: no separate simplification finding survived.
 
+## Completed Work
+
+- Added the pinned OpenWiki runtime, optional Mermaid validators, and host config mount.
+- Added the bootstrap-owned runner, generator/installer wiring, ignore entry, validator coverage, and deterministic fake-command tests.
+- Completed two review-driven fix loops for lock ordering, dirty-path fingerprints, symlink checks, sentinel restoration, nested-root resolution, ignored-path checks, and structured failures.
+
+## Remaining Work
+
+- Resolve every finding in the saved round 3 review result.
+- Re-run focused tests, generation, validation, runtime consistency, and fast verification.
+- Re-run the full five-profile review until no CRITICAL or MAJOR finding remains.
+- Complete normal Phase A closeout, findings persistence, phase/closeout receipts, commit, and push.
+
+## Resume Point
+
+Resume Phase A on the same implementation branch. Restore this plan to `in-progress`, then return the saved round 3 findings to the existing coder context if available. Start with the three CRITICAL runner findings before the four MAJOR findings. Do not create a new phase or treat the current verification as final after code changes.

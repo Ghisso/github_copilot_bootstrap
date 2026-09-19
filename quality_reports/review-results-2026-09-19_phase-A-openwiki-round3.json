@@ -1,0 +1,51 @@
+[
+  {
+    "severity": "CRITICAL",
+    "title": "Ignored nested .claude repositories collapse to one directory fingerprint, so mutations to MEMORY, plans, or logs pass undetected; recursively fingerprint worktree entries while excluding nested .git metadata and test the installed nested-repository layout",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 103,
+    "profile": "security"
+  },
+  {
+    "severity": "CRITICAL",
+    "title": "Adapter restoration can delete concurrent consumer edits: present files are unconditionally replaced, same-inode sentinel edits are removed, and identity-check-to-unlink remains racy; make restoration conflict-safe for both present and absent adapters and test present-file, in-place, and replacement races",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 153,
+    "profile": "security"
+  },
+  {
+    "severity": "CRITICAL",
+    "title": "The OpenWiki symlink walk is check-then-use, so a descendant can be replaced with a symlink before or during the child and escape the openwiki write boundary; use race-safe filesystem isolation or an equivalent containment mechanism and add a barrier-based traversal test",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 193,
+    "profile": "security"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "The ignored control-plane allowlist omits .context-mode-provenance.secret*, making creation or mutation of the bootstrap anti-forgery secret invisible; cover installed root control-plane patterns and add a regression test",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 29,
+    "profile": "security"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "openwiki --version runs before the flock and without the telemetry-default environment, so a busy invocation still starts a concurrent OpenWiki process outside the privacy default; acquire the lock first and apply the same environment to every OpenWiki subprocess",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 284,
+    "profile": "code"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "Post-run status or fingerprint errors return before restoration_errors are attached, hiding failed protected-file recovery; merge cleanup failures into every post-child failure result and test combined comparison/restoration failures",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 393,
+    "profile": "code"
+  },
+  {
+    "severity": "MAJOR",
+    "title": "The credential validator only rejects names containing both OPENWIKI and KEY, so real provider variables such as OPENAI_API_KEY and ANTHROPIC_API_KEY pass; validate containerEnv against an explicit allowed-key set",
+    "file": "scripts/validate_targets.py",
+    "line": 8600,
+    "profile": "security"
+  }
+]
