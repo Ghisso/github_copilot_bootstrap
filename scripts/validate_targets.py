@@ -242,6 +242,19 @@ OPENWIKI_PINNED_VERSION = "0.5.2"
 MERMAID_PINNED_VERSION = "11.16.0"
 JSDOM_PINNED_VERSION = "29.1.1"
 OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
+# Exact, closed allowlist of legitimate devcontainer containerEnv keys. Any
+# other key -- most importantly a provider credential such as OPENAI_API_KEY
+# or ANTHROPIC_API_KEY -- must fail validation instead of silently passing.
+ALLOWED_DEVCONTAINER_ENV_KEYS = frozenset(
+    {
+        "HF_XET_HIGH_PERFORMANCE",
+        "UV_CACHE_DIR",
+        "UV_LINK_MODE",
+        "UV_PROJECT_ENVIRONMENT",
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+    }
+)
 CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
 CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_execute",
@@ -8596,9 +8609,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "devcontainer must bind-mount the host OpenWiki configuration directory",
             errors,
         )
+        unexpected_env_keys = sorted(set(container_env) - ALLOWED_DEVCONTAINER_ENV_KEYS)
         check(
-            not any("OPENWIKI" in key and "KEY" in key for key in container_env),
-            "devcontainer must not forward OpenWiki provider keys",
+            set(container_env) <= ALLOWED_DEVCONTAINER_ENV_KEYS,
+            "devcontainer containerEnv must not forward an unexpected key "
+            f"(no provider credential such as an API key is allowed): {', '.join(unexpected_env_keys)}",
             errors,
         )
         check(
