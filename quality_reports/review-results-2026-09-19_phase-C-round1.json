@@ -1,0 +1,16 @@
+[
+  {
+    "severity": "MAJOR",
+    "title": "The `-knowledge-refresh` suffix is documented only as a recognition rule for an existing phase, never as a naming mandate for a newly-created one, so the deterministic recursion-guard silently does not apply to a plausible, convention-conformant phase name that omits the exact suffix",
+    "file": "shared/policies/workflow.instructions.md",
+    "line": 190,
+    "profile": "architecture"
+  },
+  {
+    "severity": "MINOR",
+    "title": "No test exercises a non-string phase list entry mixed with a `-knowledge-refresh`-suffixed entry, leaving the new check's `all(isinstance(phase, str) ...)` guard-and-skip path unverified",
+    "file": "tests/test_validate_plan_frontmatter.py",
+    "line": 548,
+    "profile": "tests"
+  }
+]
