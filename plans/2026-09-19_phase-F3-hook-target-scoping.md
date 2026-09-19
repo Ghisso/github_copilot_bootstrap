@@ -37,6 +37,13 @@ exactly that narrowing in Step F3.6.
 Two contained fixes to existing code. No rewrite of `protect-files.py` (1397 lines of established
 reasoning about heredocs, variable substitution and quoting) and no new hook script.
 
+**Deliberately out of scope, recorded so it is not rediscovered.** `enforce-pr-gate.sh:8,23,30`
+and `enforce-branch-state.sh:9,41,47` derive `REPO_ROOT` the same way and carry the same class of
+defect for `git push`, `gh pr create` and `git checkout -b`. This phase does not wire them.
+`git_targets_other_repository` takes a subcommand argument precisely so a follow-up can, without
+further library work. Whether to do that follow-up is a separate decision, not a gap in this
+phase.
+
 ## Steps
 
 ### Step F3.1 — Promote the target-repository resolver into the shared hook library
