@@ -3,7 +3,7 @@ name: 2026-09-19_phase-C-openwiki-lifecycle-integration
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-19_phase-C-openwiki-lifecycle-integration
