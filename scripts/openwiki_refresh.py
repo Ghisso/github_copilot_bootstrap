@@ -10,11 +10,14 @@ any mirror exists. They therefore protect different boundaries.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import fcntl
+import hashlib
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +26,14 @@ from pathlib import Path
 PROTECTED_ADAPTERS = (Path("AGENTS.md"), Path("CLAUDE.md"))
 PROTECTED_WORKFLOW = Path(".github/workflows/openwiki-update.yml")
 OPENWIKI_ARGUMENTS = ("openwiki", "code", "--update", "--print")
+
+
+@dataclass(frozen=True)
+class FileSnapshot:
+    """One protected file's bytes and, for runner-created sentinels, identity."""
+
+    contents: bytes | None
+    sentinel_identity: tuple[int, int] | None = None
 
 
 def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -52,14 +63,14 @@ def _git_directory(root: Path) -> Path:
     return path if path.is_absolute() else root / path
 
 
-def _status_paths(root: Path) -> set[str]:
-    """Return all paths represented by Git's NUL-delimited porcelain output."""
+def _status_entries(root: Path) -> dict[str, str]:
+    """Return NUL-delimited porcelain entries keyed by every affected path."""
     result = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
     if result.returncode != 0:
         raise RuntimeError("could not read Git working-tree status")
 
     records = result.stdout.split("\0")
-    paths: set[str] = set()
+    entries: dict[str, str] = {}
     index = 0
     while index < len(records):
         record = records[index]
@@ -68,33 +79,65 @@ def _status_paths(root: Path) -> set[str]:
             continue
         if len(record) < 4 or record[2] != " ":
             raise RuntimeError("Git returned malformed working-tree status")
-        paths.add(record[3:])
+        entries[record[3:]] = record[:2]
         if record[:1] in {"R", "C"} or record[1:2] in {"R", "C"}:
             if index >= len(records) or not records[index]:
                 raise RuntimeError("Git returned malformed rename status")
-            paths.add(records[index])
+            entries[records[index]] = record[:2]
             index += 1
-    return paths
+    return entries
 
 
-def _snapshot(root: Path, relative_path: Path) -> bytes | None:
-    """Capture raw bytes, with ``None`` preserving the absence distinction."""
+def _snapshot(root: Path, relative_path: Path) -> FileSnapshot:
+    """Capture raw bytes while refusing symlinks and non-regular files."""
     path = root / relative_path
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise RuntimeError(f"protected path is not a regular file: {relative_path}")
-    return path.read_bytes() if path.exists() else None
+    try:
+        file_descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except FileNotFoundError:
+        return FileSnapshot(None)
+    except OSError as error:
+        raise RuntimeError(
+            f"protected path is not a regular file: {relative_path}"
+        ) from error
+    with os.fdopen(file_descriptor, "rb") as file:
+        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):
+            raise RuntimeError(f"protected path is not a regular file: {relative_path}")
+        return FileSnapshot(file.read())
 
 
-def _restore(root: Path, relative_path: Path, original: bytes | None) -> None:
+def _prepare_adapter(root: Path, relative_path: Path) -> FileSnapshot:
+    """Snapshot one adapter, reserving its absent path with a runner sentinel."""
+    snapshot = _snapshot(root, relative_path)
+    if snapshot.contents is not None:
+        return snapshot
+    path = root / relative_path
+    try:
+        file_descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return _snapshot(root, relative_path)
+    with os.fdopen(file_descriptor, "wb"):
+        pass
+    state = path.stat(follow_symlinks=False)
+    return FileSnapshot(None, (state.st_dev, state.st_ino))
+
+
+def _restore(root: Path, relative_path: Path, original: FileSnapshot) -> None:
     """Restore a protected adapter without touching unrelated repository paths."""
     path = root / relative_path
-    if original is None:
-        if path.is_symlink() or path.is_file():
-            path.unlink()
-        elif path.exists():
+    if original.contents is None:
+        if not path.exists() and not path.is_symlink():
+            return
+        if path.is_symlink() or not path.is_file():
             raise RuntimeError(
-                f"OpenWiki replaced protected file with directory: {relative_path}"
+                f"protected path changed outside this refresh: {relative_path}"
             )
+        state = path.stat(follow_symlinks=False)
+        if original.sentinel_identity != (state.st_dev, state.st_ino):
+            raise RuntimeError(
+                f"protected path changed outside this refresh: {relative_path}"
+            )
+        if original.sentinel_identity is not None:
+            path.unlink()
         return
     if path.is_symlink() or path.is_file():
         path.unlink()
@@ -103,7 +146,49 @@ def _restore(root: Path, relative_path: Path, original: bytes | None) -> None:
             f"OpenWiki replaced protected file with directory: {relative_path}"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(original)
+    path.write_bytes(original.contents)
+
+
+def _enabled_error(root: Path) -> str | None:
+    """Reject a symlinked OpenWiki tree before a child process can follow it."""
+    openwiki_root = root / "openwiki"
+    marker = openwiki_root / "INSTRUCTIONS.md"
+    if not openwiki_root.exists() and not openwiki_root.is_symlink():
+        return "not_enabled"
+    if openwiki_root.is_symlink() or not openwiki_root.is_dir():
+        return "openwiki must be a real directory, not a symlink"
+    if not marker.exists() and not marker.is_symlink():
+        return "not_enabled"
+    if marker.is_symlink() or not marker.is_file():
+        return "openwiki/INSTRUCTIONS.md must be a regular file"
+    return None
+
+
+def _fingerprint(root: Path, relative_path: str) -> tuple[str, ...]:
+    """Capture one dirty path's observable state without modifying it."""
+    path = root / relative_path
+    try:
+        state = path.lstat()
+    except FileNotFoundError:
+        return ("absent",)
+    if stat.S_ISLNK(state.st_mode):
+        return ("symlink", os.readlink(path))
+    if not stat.S_ISREG(state.st_mode):
+        return ("other", str(state.st_mode), str(state.st_dev), str(state.st_ino))
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return ("regular", str(state.st_mode), digest.hexdigest())
+
+
+def _dirty_state(root: Path, entries: dict[str, str]) -> dict[str, tuple[str, ...]]:
+    """Capture existing out-of-scope changes so OpenWiki cannot silently alter them."""
+    return {
+        path: (status, *_fingerprint(root, path))
+        for path, status in entries.items()
+        if not path.startswith("openwiki/")
+    }
 
 
 def _version(command: str) -> str | None:
@@ -132,9 +217,13 @@ def _result(status: str, **details: object) -> dict[str, object]:
 
 def _run(root: Path) -> tuple[int, dict[str, object]]:
     """Run OpenWiki once, restoring protected files even after a child failure."""
-    marker = root / "openwiki" / "INSTRUCTIONS.md"
-    if not marker.is_file():
+    enabled_error = _enabled_error(root)
+    if enabled_error == "not_enabled":
         return 0, _result("not_enabled", repository_root=str(root))
+    if enabled_error is not None:
+        return 1, _result(
+            "preflight_failed", repository_root=str(root), error=enabled_error
+        )
 
     node_version = _version("node")
     openwiki_version = _version("openwiki")
@@ -154,9 +243,6 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
         )
 
     try:
-        before_paths = _status_paths(root)
-        adapters = {path: _snapshot(root, path) for path in PROTECTED_ADAPTERS}
-        workflow = _snapshot(root, PROTECTED_WORKFLOW)
         lock_path = _git_directory(root) / "openwiki-refresh.lock"
     except RuntimeError as error:
         return 1, _result(
@@ -175,10 +261,32 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 error="another OpenWiki refresh is running",
             )
 
+        enabled_error = _enabled_error(root)
+        if enabled_error is not None:
+            status = (
+                "not_enabled" if enabled_error == "not_enabled" else "preflight_failed"
+            )
+            return (0 if status == "not_enabled" else 1), _result(
+                status,
+                repository_root=str(root),
+                **({} if status == "not_enabled" else {"error": enabled_error}),
+            )
+        try:
+            before_entries = _status_entries(root)
+            before_paths = set(before_entries)
+            existing_dirty_state = _dirty_state(root, before_entries)
+            adapters = {
+                path: _prepare_adapter(root, path) for path in PROTECTED_ADAPTERS
+            }
+            workflow = _snapshot(root, PROTECTED_WORKFLOW)
+        except (OSError, RuntimeError) as error:
+            return 1, _result(
+                "preflight_failed", repository_root=str(root), error=str(error)
+            )
+
         child_environment = os.environ.copy()
         child_environment.setdefault("OPENWIKI_TELEMETRY_DISABLED", "1")
         child_returncode: int | None = None
-        cleanup_error: str | None = None
         try:
             try:
                 child = subprocess.run(
@@ -193,19 +301,19 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             except OSError:
                 child_returncode = None
         finally:
-            try:
-                for path, original in adapters.items():
+            restoration_errors: list[str] = []
+            for path, original in adapters.items():
+                try:
                     _restore(root, path, original)
-            except RuntimeError as error:
-                cleanup_error = str(error)
+                except (OSError, RuntimeError) as error:
+                    restoration_errors.append(f"{path}: {error}")
 
         try:
             workflow_unchanged = _snapshot(root, PROTECTED_WORKFLOW) == workflow
-        except RuntimeError as error:
+        except RuntimeError:
             workflow_unchanged = False
-            cleanup_error = cleanup_error or str(error)
         try:
-            after_paths = _status_paths(root)
+            after_entries = _status_entries(root)
         except RuntimeError as error:
             return 1, _result(
                 "failed",
@@ -213,8 +321,26 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
                 error=str(error),
                 openwiki_returncode=child_returncode,
             )
+        after_paths = set(after_entries)
         new_paths = sorted(after_paths - before_paths)
         out_of_scope = [path for path in new_paths if not path.startswith("openwiki/")]
+        try:
+            after_dirty_state = _dirty_state(
+                root,
+                {path: after_entries.get(path, "") for path in existing_dirty_state},
+            )
+        except OSError as error:
+            return 1, _result(
+                "failed",
+                repository_root=str(root),
+                error=f"could not compare pre-existing changes: {error}",
+                openwiki_returncode=child_returncode,
+            )
+        modified_pre_existing_paths = sorted(
+            path
+            for path, before_state in existing_dirty_state.items()
+            if after_dirty_state.get(path) != before_state
+        )
         if not workflow_unchanged and PROTECTED_WORKFLOW.as_posix() not in out_of_scope:
             out_of_scope.append(PROTECTED_WORKFLOW.as_posix())
 
@@ -223,19 +349,31 @@ def _run(root: Path) -> tuple[int, dict[str, object]]:
             "node_version": node_version,
             "openwiki_version": openwiki_version,
             "pre_existing_dirty_paths": sorted(before_paths),
+            "modified_pre_existing_paths": modified_pre_existing_paths,
             "new_paths": new_paths,
             "out_of_scope_paths": sorted(out_of_scope),
             "workflow_unchanged": workflow_unchanged,
             "openwiki_returncode": child_returncode,
         }
-        if cleanup_error is not None:
-            return 1, _result("failed", error=cleanup_error, **details)
+        if restoration_errors:
+            error = "protected-file restoration failed"
+            if child_returncode not in (None, 0):
+                error = "OpenWiki exited non-zero; protected-file restoration failed"
+            return 1, _result(
+                "failed", error=error, restoration_errors=restoration_errors, **details
+            )
         if child_returncode is None:
             return 1, _result(
                 "failed", error="OpenWiki could not be started", **details
             )
         if child_returncode != 0:
             return 1, _result("failed", error="OpenWiki exited non-zero", **details)
+        if modified_pre_existing_paths:
+            return 1, _result(
+                "failed",
+                error="modified pre-existing out-of-scope changes",
+                **details,
+            )
         if out_of_scope:
             return 1, _result("failed", error="new out-of-scope changes", **details)
         return 0, _result("success", **details)
