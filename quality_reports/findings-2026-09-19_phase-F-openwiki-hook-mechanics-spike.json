@@ -7,6 +7,7 @@
   "profiles_reviewed": [
     "architecture",
     "documentation",
+    "ponytail",
     "security",
     "tests"
   ],
@@ -21,7 +22,7 @@
       "reason": "Archived, throwaway, local-only stdio evidence tooling reachable only through prompts written in this phase; never installed under shared/, scripts/ or tests/, and frozen as historical evidence. A caution paragraph above the inline copy in docs/2026-09-19-openwiki-hook-mechanics-spike.md warns against reuse as a template. Editing frozen evidence code to fix a risk it cannot realise would misrepresent what was actually run."
     }
   ],
-  "generated_at": "2026-09-19T15:09:04Z",
+  "generated_at": "2026-09-19T15:32:04Z",
   "branch": "2026-09-19_openwiki-knowledge-layer-integration_implementation",
   "head_sha": "11b72d29ce1dc3bca82553a246a46689bc74a287",
   "base_ref": "dev",
@@ -60,5 +61,7 @@
     "tests/test_install_bootstrap.py",
     "tests/test_openwiki_refresh.py",
     "tests/test_validate_plan_frontmatter.py"
-  ]
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
 }
