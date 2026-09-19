@@ -993,3 +993,29 @@
   `--persist` wrote the receipt before returning on status, so a diagnostic run
   overwrote a passing receipt with a failing one, which is what turned a
   misleading recovery hint into a destructive one.
+- [LEARN:quality] `git ls-files --others --ignored --exclude-standard` silently
+  omits everything inside any directory literally named `.git`, whether or not
+  it is a real repository, and emits no boundary entry for it. Enumerating a
+  security surface through it left `.agents/.git/payload.sh` reachable by
+  nothing. Verified on git 2.43.0. Enumerate from disk when the question is
+  "what exists", not "what does git consider ignored".
+- [LEARN:review] Do not build a detection rule from a denylist of what an
+  external tool writes. Two consecutive rounds missed an entry (`COMMIT_EDITMSG`,
+  then `info/refs` from `git gc`) because git's written-file set is open-ended
+  and grows per release. Allowlist the surface you own and can enumerate; accept
+  and document the narrower claim.
+- [LEARN:quality] A check that fails on ordinary activity gets ignored, which is
+  a worse security outcome than a narrower check that never cries wolf. Measure
+  churn against the real directory before shipping a fingerprint comparison: one
+  unrelated tool call changed two files under `.claude/.cache/`, which would have
+  made a minutes-long run fail almost every time.
+- [LEARN:review] When narrowing behaviour on a name, validate that the thing
+  named is what it claims to be. Narrowing to an allowlist at any directory
+  called `.git`, with no check that it was a git directory, let a decoy `.git`
+  hide an arbitrary tree. The narrowing rule and its validation are one change,
+  not two.
+- [LEARN:quality] A test whose fixture points a symlink at a non-existent path
+  can pass for the wrong reason: `Path.is_dir()` is false on a dangling link
+  regardless of any `is_symlink()` check, so the check under test never runs.
+  Make both the before and after states real, so only the intended predicate can
+  tell them apart.
