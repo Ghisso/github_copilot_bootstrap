@@ -3,7 +3,7 @@ name: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary

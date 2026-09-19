@@ -1,16 +1,16 @@
 ---
 name: 2026-09-19_openwiki-knowledge-layer-integration
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: 2026-09-19_openwiki-knowledge-layer-integration_implementation
-started_at:
+started_at: 2026-09-19T06:51:50Z
 phases:
   - 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
   - 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
   - 2026-09-19_phase-C-openwiki-lifecycle-integration
   - 2026-09-19_phase-D-openwiki-dogfood-migration-and-closeout
-current_phase:
+current_phase: 2026-09-19_phase-A-openwiki-runtime-and-safety-boundary
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
