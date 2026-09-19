@@ -6,7 +6,7 @@ Use `shared/policies/workspace.instructions.md` for the main workspace guidance.
 
 The source of truth lives in `shared/`; generated installable output lives in `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` before installing). Do not hand-edit generated files.
 
-An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context — never authority over `shared/`, tests, or policy. Refresh only through `shared/skills/openwiki/SKILL.md` and `.claude/scripts/openwiki_refresh.py`; never hand-edit a generated page.
+An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context — never authority over source, tests, or policy. Refresh only through `.claude/skills/openwiki/SKILL.md` and `.claude/scripts/openwiki_refresh.py`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 Semble and context-mode are optional helpers:
 
