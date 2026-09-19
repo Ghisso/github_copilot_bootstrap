@@ -238,6 +238,10 @@ REQUIRED_HOOK_SCRIPTS = (
 # and closed; a new upstream tool needs a later approved plan before it can
 # join CONTEXT_MODE_ALLOWED_TOOLS.
 CONTEXT_MODE_PINNED_VERSION = "1.0.169"
+OPENWIKI_PINNED_VERSION = "0.5.2"
+MERMAID_PINNED_VERSION = "11.16.0"
+JSDOM_PINNED_VERSION = "29.1.1"
+OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
 CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
 CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_execute",
@@ -8583,6 +8587,20 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "devcontainer must forward HUGGING_FACE_HUB_TOKEN",
             errors,
         )
+        openwiki_mount = (
+            "source=${localEnv:HOME}/.openwiki,"
+            "target=/home/vscode/.openwiki,type=bind,consistency=cached"
+        )
+        check(
+            openwiki_mount in data.get("mounts", []),
+            "devcontainer must bind-mount the host OpenWiki configuration directory",
+            errors,
+        )
+        check(
+            not any("OPENWIKI" in key and "KEY" in key for key in container_env),
+            "devcontainer must not forward OpenWiki provider keys",
+            errors,
+        )
         check(
             container_env.get("UV_PROJECT_ENVIRONMENT") == "/home/vscode/.venv",
             "devcontainer must not reuse a host-mounted project .venv",
@@ -8615,6 +8633,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     if (devcontainer_root / "Dockerfile").exists():
         dockerfile = read(devcontainer_root / "Dockerfile")
         check(
+            f"FROM {OPENWIKI_NODE_IMAGE} AS nodejs" in dockerfile,
+            "devcontainer Dockerfile must pin a Node image that satisfies OpenWiki's engine",
+            errors,
+        )
+        check(
             "cuda-dl-base" in dockerfile,
             "devcontainer Dockerfile must use the GPU base image",
             errors,
@@ -8632,6 +8655,21 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(
             "context-mode --help >/dev/null" in dockerfile,
             "devcontainer Dockerfile must verify context-mode CLI execution",
+            errors,
+        )
+        for package, version in (
+            ("openwiki", OPENWIKI_PINNED_VERSION),
+            ("mermaid", MERMAID_PINNED_VERSION),
+            ("jsdom", JSDOM_PINNED_VERSION),
+        ):
+            check(
+                f"{package}@{version}" in dockerfile,
+                f"devcontainer Dockerfile must install {package} pinned to {version}",
+                errors,
+            )
+        check(
+            "command -v openwiki" in dockerfile and "openwiki --version" in dockerfile,
+            "devcontainer Dockerfile must verify the OpenWiki CLI is on PATH",
             errors,
         )
         check(
@@ -8789,6 +8827,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             ".claude/skills/ponytail-review/SKILL.md",
             ".claude/third_party/ponytail/LICENSE",
             ".claude/third_party/ponytail/UPSTREAM.md",
+            ".claude/scripts/openwiki_refresh.py",
         ):
             check(
                 (temp_repo / relative_path).exists(),
@@ -8799,6 +8838,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "v4.8.4"
             in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
             "installed Ponytail provenance must retain the pinned release",
+            errors,
+        )
+        check(
+            "openwiki/.run.json" in read(temp_repo / ".gitignore"),
+            "installer must ignore resumable OpenWiki run state",
             errors,
         )
 

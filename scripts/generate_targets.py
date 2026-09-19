@@ -294,6 +294,11 @@ def render_shared_basis(target_root: Path, target: str) -> None:
         support_root / "scripts" / "verify.py",
         "claude-code",
     )
+    copy_text_transformed(
+        REPO_ROOT / "shared" / "scripts" / "openwiki_refresh.py",
+        support_root / "scripts" / "openwiki_refresh.py",
+        "claude-code",
+    )
     # Ownership is a target-neutral authority shared by the installer and
     # generated verifier.  Transforming provider paths here would corrupt its
     # canonical root-adapter inventory (for example `.github/hooks`).

@@ -622,6 +622,7 @@ def ignore_block(
     lines = [
         IGNORE_BLOCK_START,
         *active_ignore_patterns(commit_copilot_surface),
+        "openwiki/.run.json",
         IGNORE_BLOCK_END,
     ]
     return "\n".join(lines) + "\n"

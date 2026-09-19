@@ -1349,6 +1349,27 @@ def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> N
     assert ".context-mode-provenance.secret" in gitignore
 
 
+def test_gitignore_refresh_adds_openwiki_recovery_state(tmp_path: Path) -> None:
+    """An existing generated block gains new private recovery files in place."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    (target / ".gitignore").write_text(
+        "keep-this\n"
+        "# BEGIN multi-agent bootstrap generated/private AI content\n"
+        ".claude/\n"
+        "# END multi-agent bootstrap generated/private AI content\n"
+        "keep-that\n",
+        encoding="utf-8",
+    )
+
+    merge_gitignore(target, dry_run=False)
+
+    gitignore = (target / ".gitignore").read_text(encoding="utf-8")
+    assert "keep-this\n" in gitignore
+    assert "keep-that\n" in gitignore
+    assert gitignore.count("openwiki/.run.json") == 1
+
+
 def test_agents_directory_is_a_refreshable_root_adapter(tmp_path: Path) -> None:
     """A generated `.agents` directory is mirrored and ignored as one adapter."""
     source = tmp_path / "generated"
