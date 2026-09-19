@@ -115,6 +115,7 @@ How to run tests, linting, and type checking.
 - **Missing Raises section** — always document exceptions the caller must handle
 - **Wall of prose in README** — prefer tables and code blocks
 - **Undocumented env vars** — every env var must appear in `CONFIGURATION.md`
+- **Duplicating OpenWiki-derivable facts** — when OpenWiki is enabled, don't copy descriptive architecture/module facts it already regenerates into a manual doc; see the Knowledge Ownership contract in `.claude/instructions/workspace.instructions.md`
 
 ---
 

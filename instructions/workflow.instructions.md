@@ -181,6 +181,49 @@ result carries no authority: OpenWiki is derived context, not authority.
 
 ---
 
+## Knowledge-Refresh Final Phase
+
+This is the single authoritative definition of the knowledge-refresh final
+phase. The planner prompt, orchestrator prompt, the `plan-decomposition`
+skill, and the big-plan template link here instead of restating it.
+
+**When to add it.** While drafting or revising a big plan's `phases:` list,
+append one dedicated final small plan, after every phase already listed,
+only when all of these hold: `openwiki/INSTRUCTIONS.md` exists; the plan has
+more than one phase; the plan changes documentable outer-repository
+behavior (not read-only/reporting, and not AI-state-only work); and the
+plan's own purpose is not itself a knowledge/OpenWiki refresh.
+
+**Termination.** This rule runs only while drafting or revising a plan's
+`phases:` list, and only ever appends to the end of that list. Recognize an
+existing knowledge-refresh phase by its slug suffix, `-knowledge-refresh`;
+if the phase already at the end of the list carries that suffix, do not
+append another one. The self-referential exclusion above means a plan whose
+own purpose is a knowledge refresh never has one appended to itself, so
+that phase can never produce a second one, whether through a later revision
+of the same plan or as the reason for a follow-up plan.
+`scripts/validate_plan_frontmatter.py` enforces this deterministically: a
+big plan fails validation if more than one phase carries the
+`-knowledge-refresh` suffix, or if one exists but is not the last phase.
+
+**Shape.** Small, and only this: refresh through
+`.claude/skills/openwiki/SKILL.md` and its runner, inspect the generated
+diff, run the standing final-phase documentation/memory/LEARN audit already
+required below — the same `## Stale-claims surfaces checked` requirement;
+this phase is what satisfies it, not a second, competing one — then review,
+verify, and commit like any other phase. It does not carry a larger phase's
+transition scope.
+
+**Failure.** A failed refresh blocks that phase's completion like any other
+failed phase, without fabricating a deterministic verification failure —
+see "OpenWiki Refresh" above for that boundary. A provider or
+authentication failure is reported with the runner's own actionable error
+and retried once fixed; an enabled repository's required refresh is never
+silently skipped. An unreachable recorded base HEAD follows the skill's
+rebaseline rule, never `--init`.
+
+---
+
 ## Reporting
 
 Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing

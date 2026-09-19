@@ -21,6 +21,15 @@ Answer these questions:
 
 **Continue only if YES to at least one.**
 
+Then route the lesson before creating anything: a cross-project reusable
+lesson becomes a skill (Phase 3); a project-specific fact that current
+repository evidence cannot reliably re-derive becomes a `.claude/MEMORY.md`
+entry (Phase 5); a fact already derivable from current source, tests, or an
+enabled OpenWiki refresh gets no redundant entry — see the canonical
+Knowledge Ownership contract in `.claude/instructions/workspace.instructions.md`;
+and a historical execution fact belongs in a session log or plan, never
+MEMORY.
+
 ## Phase 2: Check Existing Skills
 
 Search the authoring source when one exists, otherwise the installed copy.

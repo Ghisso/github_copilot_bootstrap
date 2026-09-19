@@ -48,6 +48,23 @@ structured findings, scores, severity labels, and attributed quotations remain
 exact. Do not use `rewrite` by default. Use it only when the user requests a
 substantial rewrite or targeted edits would make the prose worse or inconsistent.
 
+## Generated vs. Human-Authored Documentation
+
+Before editing, classify the target surface using the canonical ranking in
+`.claude/instructions/workspace.instructions.md`'s Knowledge Ownership
+section: source and tests are ground truth; README, policies, ADRs,
+security docs, and runbooks are human-authored authority; OpenWiki-generated
+`openwiki/**` pages are derived descriptive knowledge.
+
+Never hand-edit a generated OpenWiki page or its `.claims` sidecar — refresh
+through `.claude/skills/openwiki/SKILL.md` instead. Update a manual doc
+(README, policy, ADR, security doc, runbook) only when that surface actually
+owns the changed requirement. In a repository where OpenWiki is enabled,
+descriptive architecture or component detail may live in the generated wiki
+instead of a new manual page when no human-authored contract requires one;
+do not create a duplicate manual page merely because OpenWiki has not been
+refreshed yet.
+
 ## Step 1 — Diff Scan
 
 The orchestrator passes the plan's `originating_branch` (default `dev`) as the diff base. Run these commands with that base (shown with the `dev` default):

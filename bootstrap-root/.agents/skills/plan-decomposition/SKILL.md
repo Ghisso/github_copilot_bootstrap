@@ -118,6 +118,12 @@ the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
 closeout gate requires it, with non-empty content, whenever the phase it is
 closing out is this list's last entry.
 
+In a repository where `openwiki/INSTRUCTIONS.md` exists, that last phase may
+also need to be a dedicated knowledge-refresh phase: see the canonical
+Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+for exactly when and how, including its recursion guard. Do not restate that
+rule here.
+
 ### Step 5: Cross-Phase Consistency
 
 After drafting all files, verify:
