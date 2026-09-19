@@ -170,7 +170,7 @@ instead of growing a fourth copy.
     library deliberately does not evaluate shell semantics: `_shell_tokenize` discards operators
     and never tracks a working directory. `protect-files.py` does model `cd`, but there the model
     *widens* protection, so an error is conservative; here an error would let a real in-repository
-    commit through. `git -C <dir> commit` is the supported way to commit elsewhere, and Step F3.5
+    commit through. `git -C <dir> commit` is the supported way to commit elsewhere, and Step F3.7
     documents it.
 - **Test scenarios:** run `enforce-commit-gate.sh` through a `PreToolUse` Bash payload with
   `_isolated_hook_scripts_dir` (`tests/test_hook_gates.py:38`) so `REPO_ROOT` is a synthetic
@@ -313,25 +313,193 @@ substrings at `:198-207`, which are global by construction. `REPO_ROOT` is alrea
   every denied case passes on both trees; the whole existing `protect_files` corpus passes
   unchanged.
 
-### Step F3.5 — Document the two scope changes
+### Step F3.5 — Scope the push gate, and split the hook's two command shapes apart
+
+`enforce-pr-gate.sh` guards two unrelated command shapes in one pass: pushing with `git push`, and
+opening a pull request with `gh pr create`. Only the push shape is scoped to this repository here.
+The pull-request shape keeps gating every time, for the reason recorded in Scope.
+
+The step still has to change the file's control flow, and that change earns its place on its own.
+The hook opens with an exemption for the nested `.claude` state-sync repository: `:23-25` asks
+whether every `git push` in the command is aimed at that nested repository, and exits the hook when
+they all are, so routine state syncing is not judged against this repository's release ceremony.
+The problem is that it exits the *whole* hook, not just the push half. So
+`git -C .claude push && gh pr create --base dev` opens a pull request with no branch check, no
+`--base dev` check, and no closeout-evidence check: the nested push satisfies the question at
+`:23`, and `:24` returns before any pull-request logic runs. **That hole exists today and closing
+it is the main reason this step touches the file.** Adding a second whole-hook exemption next to it
+would have made the hole bigger; making both exemptions answer per shape closes it.
+
+- [ ] **Owner:** `coder`
+- **Target files:** modify `shared/hooks/scripts/enforce-pr-gate.sh`; extend
+  `tests/test_lifecycle_hooks.py`
+- **Required Skills:**
+  - `shared/skills/ponytail/SKILL.md` in `full` mode
+  - `shared/skills/code-style/SKILL.md`
+  - `shared/skills/testing-patterns/SKILL.md`
+- **Contract — the push half:**
+  - Reuse `git_targets_other_repository` from Step F3.1, called with the subcommand `push`. It
+    reports whether every `git push` invocation in the command carries an explicit `-C`,
+    `--git-dir` or `--work-tree` redirect that resolves to a repository other than this one, and
+    reports false whenever any of them is undeterminable. This step adds nothing to
+    `_lib-frontmatter.sh`; the library work was all done in Step F3.1.
+- **Contract — the pull-request half:**
+  - Unchanged. No predicate, no remote-URL parsing, no new library function. Every command
+    containing a `gh pr create` reaches the existing checks below it.
+- **Contract — the restructured exemption block, replacing `:20-28`:**
+  - Work out once whether each shape is present, using the two existing detectors:
+    `is_gh_pr_create_command`, which reports whether any `gh` invocation in the command is a
+    `pr create`, and `is_git_push_command`, which reports whether the command contains a
+    `git push`.
+  - Write those as `if is_gh_pr_create_command "$COMMAND"; then IS_PR=1; fi`, never as
+    `is_gh_pr_create_command "$COMMAND" && IS_PR=1`. This file runs under `set -euo pipefail`, and
+    the second form makes the whole hook exit when the detector reports false, which would silently
+    disable the gate.
+  - Exit 0 when neither shape is present, exactly as `:26-28` does today.
+  - Skip the gate only when **every shape that is present** provably acts elsewhere. The push shape
+    qualifies when either the nested-repository question at `:23` or the
+    `git_targets_other_repository` question answers yes. The pull-request shape never qualifies. So
+    in practice: a command containing a `gh pr create` always proceeds to the checks below, and a
+    push-only command proceeds unless its pushes all provably target the nested repository or
+    another repository.
+  - The nested-repository exemption keeps its current meaning and its explanatory comment at
+    `:20-22`, and moves inside the push arm so it can no longer excuse a pull request.
+  - Everything below the exemption block is untouched, because the skip returns before all of it:
+    reading the current branch (`:30`), the implementation-branch requirement (`:31-34`), the
+    `--base dev` requirement for pull requests (`:36-41`), the closeout-evidence checks that run
+    for a pull request and the push-invariant checks that run for a push (`:44-48`), and the
+    message explaining that a chained commit-and-push is evaluated against the pre-commit `HEAD`
+    (`:53-60`).
+- **Must not:** invoke `gh`, read any git remote, or parse a remote URL. The hook gains no
+  dependency on the `gh` binary, on its stored authentication, or on the network.
+- **Test scenarios,** in `tests/test_lifecycle_hooks.py`, reusing the existing fixture
+  `enforce_pr_gate_repo` (`:904`), which builds a temporary repository on an implementation branch
+  with no big plan so the invariant checks fail with one predictable finding, and the runner
+  `run_enforce_pr_gate` (`:917`):
+  - `git -C <other-repo> push` exits 0. **The foreign-push case; fails before the change.**
+  - `git push` with no redirect still denies. **The proof the push gate still fires for a push that
+    does target this repository.**
+  - `git -C <other-repo> push && git push` still denies, because one push is undeterminable.
+  - `git -C <path-that-is-not-a-repo> push` still denies.
+  - `cd /tmp/elsewhere && git push` still denies, the same documented `cd` limit as Step F3.2.
+  - `gh pr create --base dev` still denies. **The proof the pull-request gate is unchanged.**
+  - `gh pr create -R other/repo --base dev` still denies. **The proof that naming another
+    repository does not excuse a pull request — this is the decision recorded in Scope, asserted as
+    behavior.**
+  - `git -C .claude push && gh pr create --base dev` still denies, on the pull-request shape.
+    **This is the pre-existing hole; the test fails before the change, and it is the one test here
+    that proves the restructure rather than the scoping.**
+  - `git -C <other-repo> push && gh pr create --base dev` still denies, on the pull-request shape.
+    This is the same hole in its new form, proving the added push exemption did not reopen it.
+  - `git -C .claude push` alone still exits 0, unchanged.
+- **Verification:** `uv run pytest tests/test_lifecycle_hooks.py -k pr_gate -q`
+- **Acceptance criteria:** the foreign-push test fails on the pre-change tree and passes after; the
+  two hole-closing tests fail on the pre-change tree and pass after; the three still-denies proofs
+  (bare push, bare pull request, pull request naming another repository) pass on both trees; no
+  test invokes `gh`; the findings record the hole as a pre-existing defect closed here rather than
+  as new behavior.
+
+### Step F3.6 — Scope the branch-state gate to this repository
+
+`enforce-branch-state.sh` reads `REPO_ROOT` for all three of its substantive checks —
+`CURRENT_BRANCH` at `:41`, `git status --porcelain` at `:47`, and the big-plan lookup at `:53` — so
+a branch created in another repository is judged against this repository's HEAD, working tree and
+plan inventory. All three are meaningless for a foreign target, which is the defect.
+
+- [ ] **Owner:** `coder`
+- **Target files:** modify `shared/hooks/scripts/enforce-branch-state.sh`; modify
+  `shared/hooks/scripts/_lib-frontmatter.sh`; extend `tests/test_hook_gates.py`
+- **Required Skills:**
+  - `shared/skills/ponytail/SKILL.md` in `full` mode
+  - `shared/skills/refactor/SKILL.md`
+  - `shared/skills/code-style/SKILL.md`
+  - `shared/skills/testing-patterns/SKILL.md`
+- **Contract:**
+  - Extract the per-invocation body of `parse_branch_create_command` (`_lib-frontmatter.sh:423-465`)
+    into `_git_invocation_created_branch <tokens...>`, which prints the branch name one invocation
+    would create, or prints nothing. The grammar moves unchanged: the global-flag skip at `:428-437`
+    including `-C`, `--git-dir` and `--work-tree` with their values, the `checkout` arm's `-b`/`-B`,
+    the `switch` arm's `-c`/`-C`/`--create`/`--create=`, and the quote stripping at `:456-459`.
+  - `parse_branch_create_command` keeps its exact signature, its walk, and its observable behavior,
+    and now calls the extracted function. Its two callers — `enforce-branch-state.sh:21` and
+    `record-branch-state.sh:16` — are not edited.
+  - **There are two subcommands, not three.** The parser has no `branch` arm, so `git branch foo`
+    is not gated today. This phase does not add one; widening what the gate catches is a different
+    change from scoping what it already catches.
+  - `branch_create_targets_other_repository <command>` — public. Walks `git` invocations the same
+    way, and for each invocation where `_git_invocation_created_branch` yields a name, resolves
+    that same invocation's tokens through `_git_invocation_top_level`. Returns 0 only when at least
+    one branch-creating invocation exists **and** every one of them resolves to a non-empty top
+    level different from `$REPO_ROOT`. Returns 1 in every other case.
+  - In `enforce-branch-state.sh`, insert the skip between the `command -v git` check (`:26-29`) and
+    the branch-name check (`:31`): `if branch_create_targets_other_repository "$COMMAND"; then exit
+    0; fi`. Placing it after the git-availability check means the resolver never runs without
+    `git`; placing it before `:31` means a foreign repository's own branch naming is not judged
+    against `<plan_name>_implementation`.
+  - **No nested-`.claude` exemption is added, and the plan states why.** `state-sync.sh` contains
+    no `checkout`, no `switch -c` and no `git branch` — it commits and pushes only — so no branch
+    is ever created in the nested `ai-state` repository and such an exemption would be dead code.
+    This is why this hook has no nested exemption today.
+  - **Fail closed.** No explicit redirect, an unresolvable redirect, a bare repository, an
+    unforwarded flag, or a missing value token all keep gating. A `cd` prefix stays gated, for the
+    reason given in Step F3.2.
+  - `record-branch-state.sh` is unchanged: its `CURRENT_BRANCH != BRANCH` bail at `:21-25` already
+    declines to record when the created branch is not this repository's own HEAD, so a foreign
+    branch creation cannot reach the plan-state write at `:34` onward.
+- **Test scenarios,** predicate tests via `_bash_source` (`tests/test_hook_gates.py:75`),
+  end-to-end tests through `_isolated_hook_scripts_dir` (`:38`) as in Step F3.2:
+  - `git -C <other-repo> switch -c anything` exits 0. **Foreign case, fails before the change.**
+  - `git -C <other-repo> checkout -b anything` exits 0.
+  - `git switch -c foo_implementation` with no redirect, from a non-`dev` branch, still denies.
+    **This is the proof the branch gate still fires for a branch created in this repository.**
+  - `git checkout -b not-an-implementation-name` still denies with the naming message.
+  - `git -C <other> switch -c a && git switch -c b_implementation` still denies.
+  - `git -C <path-that-is-not-a-repo> checkout -b x` still denies.
+  - `cd /tmp/elsewhere && git checkout -b x` still denies.
+  - `git branch foo` produces no gate before or after, confirming the unchanged parser coverage.
+  - `parse_branch_create_command` returns byte-identical results to the pre-change function across
+    the existing corpus, asserted directly.
+  - A `PostToolUse` run of `record-branch-state.sh` after a foreign `git -C <other> switch -c
+    <name>` writes no plan state, asserted against the untouched big plan.
+- **Verification:** `uv run pytest tests/test_hook_gates.py -k "branch_create or branch_state" -q`
+  and `uv run pytest tests/test_branch_state.py -q`
+- **Acceptance criteria:** the two foreign cases fail on the pre-change tree and pass after; the
+  in-repository denial proofs pass on both trees; `tests/test_branch_state.py` passes without edits
+  to its assertions, proving the extraction changed no recorder behavior.
+
+### Step F3.7 — Document the target-scoping changes
 
 - [ ] **Owner:** `documenter`
 - **Target files:**
-  - modify `docs/runtime-checks.md`: extend the classifier contract paragraph at `:218-230` with
-    the repository-scoped versus global split and the fail-closed rule; add one paragraph on the
-    commit gate's target scoping, naming `git -C <dir> commit` as the supported way to commit in
-    another repository and recording that a `cd` prefix stays gated
-  - modify `docs/smoke-tests.md`: extend the `protect-files.sh` line at `:203` with the scoping
-    split
-  - modify `docs/architecture.md` at `:464` only where it describes the classifier's reach
+  - modify `docs/runtime-checks.md`: extend the paragraph describing what the protected-file
+    classifier must cover (`:218-230`) with the split between rules that apply only inside this
+    repository and rules that apply to any path anywhere, and with the rule that an unresolvable
+    path stays protected; add one paragraph on target scoping that states plainly which gates now
+    stand down for another repository and which does not — committing, pushing and creating a
+    branch stand down when the command carries an explicit `-C`, `--git-dir` or `--work-tree`
+    pointing at a different repository, so `git -C <dir> commit`, `git -C <dir> push` and
+    `git -C <dir> switch -c` are the supported ways to act on another repository from this
+    checkout; creating a pull request is always checked from this checkout, whatever repository
+    `-R` names; and a `cd` into another directory followed by any of these commands is still
+    checked against this repository, everywhere
+  - modify the "Other gates that newly block a refresh" table in `docs/runtime-checks.md`
+    (`:495-503`): add no row, because nothing newly blocks — add instead the reverse note that
+    three gates now stand down for a provably different target, with the unresolvable-target rule
+    stated once
+  - modify `docs/smoke-tests.md`: extend the `protect-files.sh` line (`:203`) with the same split,
+    and extend the gate lines with the stand-down and its one exception
+  - modify `docs/architecture.md` (`:464`) only where it describes how far the classifier reaches
 - **Required Skills:**
   - `shared/skills/documentation/SKILL.md`
   - `shared/skills/humanize/SKILL.md`
-- **Acceptance criteria:** a reader who hits either guard in another repository finds the reason
-  and the supported command in `docs/runtime-checks.md`; no document claims the classifier
-  protects control-plane names outside this repository.
+- **Acceptance criteria:** a reader who hits any of these gates in another repository finds the
+  reason and the supported command in `docs/runtime-checks.md`; the pull-request exception is
+  stated as a deliberate choice, with its reason, rather than left as an inconsistency; no document
+  describes a repository comparison for `gh`, an accepted `-R` value format, or any remote-URL
+  handling, because none exists; no document claims the classifier protects control-plane names
+  outside this repository; no document claims `git branch foo` is gated.
 
-### Step F3.6 — Review
+### Step F3.8 — Review
 
 - [ ] **Owner:** `reviewer`
 - **Target files:** scoped Phase F3 diff
@@ -342,25 +510,44 @@ substrings at `:198-207`, which are global by construction. `REPO_ROOT` is alrea
   - `tests`
   - `ponytail`
 - **Review focus:**
-  - `security`, pointed at Step F3.4 specifically: the six-row split table is accurate and
-    complete; each repository-scoped alternative's safety argument holds; every unresolvable
-    candidate stays protected; containment cannot be tricked by a relative path, a `..` sequence,
-    a symlink in either direction, or a sibling directory whose name shares a prefix with
-    `REPO_ROOT`; no secret-shaped alternative was narrowed.
-  - `security`, on Step F3.1: the resolver forwards only `-C`, `--git-dir` and `--work-tree`, so a
-    command string cannot inject `-c` configuration or `--exec-path` into the resolver's own `git`
-    call.
-  - `architecture`: the gate reuses `git_targets_nested_claude`'s per-invocation shape rather than
-    a new scheme; the nested exemption still precedes the foreign exemption; no fourth copy of the
-    resolution logic survives.
-  - `code`: `enforce-commit-gate.sh`'s `REPO_ROOT`, bypass, branch and invariant paths are
-    untouched; array expansions satisfy the scanner at `tests/test_hook_gates.py:334`.
-  - `tests`: every allowed-case test demonstrably fails on the pre-change tree; the two
-    still-denies proofs exist (in-repository commit; secret-shaped filename outside the
-    repository); the tests exercise the real `git` binary against real temporary repositories and
-    the real classifier, with no test double standing in for either.
-  - `ponytail`: the promoted resolver is the reuse, not a reinvention; both fixes stay inside
-    existing functions.
+  - `security`, on Step F3.5's restructured hook: confirm that no command containing a
+    `gh pr create` can leave the hook before reaching the branch check, the `--base dev` check and
+    the closeout-evidence checks. That single invariant is what closes the pre-existing hole and
+    what keeps the unscoped pull-request decision real. Confirm also that the file reads no git
+    remote and parses no URL.
+  - `security`, on Step F3.4, the one place in this phase where a guard stands down on the strength
+    of a path this code resolved rather than a redirect the operator typed: the six-row table
+    splitting repository-scoped rules from global ones is accurate and complete; each
+    repository-scoped entry's safety argument holds; a path that cannot be resolved stays
+    protected; the containment test cannot be fooled by a relative path, a `..` sequence, a symlink
+    in either direction, or a sibling directory whose name merely starts with this repository's
+    path; no rule covering credential-shaped filenames was narrowed.
+  - `security`, on the resolver added in Step F3.1 and every predicate built on it in Steps F3.2,
+    F3.5 and F3.6: it forwards only `-C`, `--git-dir` and `--work-tree` to the `git` call it makes
+    to identify the target repository, so a command string cannot smuggle `-c` configuration or an
+    `--exec-path` override into that call.
+  - `architecture`: the three decisions recorded in Scope are the ones implemented — one
+    single-subcommand helper serving `commit` and `push`, one dedicated predicate for branch
+    creation, and no predicate at all for pull requests; the nested-repository exemption still
+    encloses or precedes the different-repository exemption in both hooks that have one; the logic
+    that identifies a target repository exists in exactly one place in the library.
+  - `code`: in `enforce-commit-gate.sh`, the repository root, the bypass path, the branch check and
+    the commit-invariant call are untouched; in `enforce-pr-gate.sh`, everything below the
+    exemption block is untouched; in `enforce-branch-state.sh`, the three reads of the repository
+    root are untouched; no `command && VAR=1` assignment was used under `set -euo pipefail`; array
+    expansions use the guarded idiom the static scanner at `tests/test_hook_gates.py:334` enforces.
+  - `tests`: every case that newly exits 0 demonstrably fails on the pre-change tree; all four
+    still-denies proofs exist — an in-repository commit, an in-repository push, a pull request that
+    names another repository, and an in-repository branch creation — plus the proof that a
+    credential-shaped filename outside this repository is still protected; the two hole-closing
+    tests in Step F3.5 fail before the change; the equivalence of `parse_branch_create_command`
+    before and after Step F3.6's extraction is asserted directly and `tests/test_branch_state.py`
+    passes with no edits to its assertions; the tests drive the real `git` binary against real
+    temporary repositories and the real classifier, with no test double standing in for either, and
+    no test invokes `gh`.
+  - `ponytail`: the resolver promoted in Step F3.1 and the branch parser extracted in Step F3.6 are
+    reuse of existing logic rather than new implementations of it; all four fixes stay inside
+    existing functions and existing hook scripts.
   - this plan's own `## Verification` block and its closeout log satisfy the Verification
     Evidence Contract introduced by Phase F2.
 
@@ -380,13 +567,14 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 ## Optional Verification
 
 - Refresh this repository's own overlay (`uv run python scripts/install_bootstrap.py . --allow-self
-  --local-only`, after the `generate_targets.py --all` above) and reproduce both Phase F commands
-  live in a host session: `git -C <scratch-dir> commit --allow-empty -m spike` and a Bash heredoc
-  containing `os.environ`. This is optional because the required pytest cases above already run
-  both guards end to end against real temporary repositories, and because refreshing the overlay
-  mid-phase mutates `.claude/` outside this phase's diff, which is an orchestrator-owned
-  operational action rather than a check this plan owns. Record the outcome, or record NOT RUN
-  with a reason, in the closeout log.
+  --local-only`, after the `generate_targets.py --all` above) and reproduce the Phase F commands
+  live in a host session: `git -C <scratch-dir> commit --allow-empty -m spike`, a Bash heredoc
+  containing `os.environ`, `git -C <scratch-dir> push` against a scratch remote, and
+  `git -C <scratch-dir> switch -c throwaway`. This item is optional because the required pytest
+  cases above already drive all three gates and the classifier end to end against real temporary
+  repositories, and because refreshing the overlay mid-phase mutates `.claude/` outside this
+  phase's diff, which is an orchestrator-owned operational action rather than a check this plan
+  owns. Record the outcome, or record NOT RUN with a reason, in the closeout log.
 
 ## Closeout Checklist
 
@@ -402,9 +590,13 @@ Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 - [ ] Every surviving MINOR has an explicit disposition and non-empty reason
 - [ ] Review findings resolved and persisted with branch/phase metadata
 - [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Both defects have a regression test that fails on the pre-change tree and passes after, and
-      both still-denies proofs exist: an in-repository commit is still gated, and a secret-shaped
-      filename outside the repository is still protected
+- [ ] All four fixes have a regression test that fails on the pre-change tree and passes after, and
+      every still-denies proof exists: an in-repository commit, an in-repository push, a pull
+      request that names another repository, an in-repository branch creation, and a
+      credential-shaped filename outside this repository
+- [ ] The pull-request arm carries no repository comparison and no remote-URL parsing, and the
+      pre-existing hole that let a nested-repository push excuse an unchecked pull request is
+      recorded in the findings as closed by this phase
 - [ ] The parent plan's `phases:` list carries this phase between F2 and G, and G through K carry
       their renumbered `phase_index` values
 
