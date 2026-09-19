@@ -3,7 +3,7 @@ name: 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 # Small Plan: 2026-09-19_phase-B-openwiki-knowledge-ownership-and-agent-access
