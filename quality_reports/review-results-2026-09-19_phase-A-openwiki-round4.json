@@ -1,0 +1,16 @@
+[
+  {
+    "severity": "MAJOR",
+    "title": "Nested .git internals (hooks/config/refs) inside a protected ignored control-plane directory are excluded from the fingerprint walk, so a mutation there is invisible to fail-closed detection",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 150,
+    "profile": "security"
+  },
+  {
+    "severity": "MINOR",
+    "title": "_run() is a ~240-line multi-phase function; the post-child comparison block is mechanically separable, though linear security-critical control flow is a defensible counter-argument",
+    "file": "shared/scripts/openwiki_refresh.py",
+    "line": 480,
+    "profile": "code"
+  }
+]

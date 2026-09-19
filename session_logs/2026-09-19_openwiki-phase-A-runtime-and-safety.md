@@ -34,9 +34,33 @@ Implement the approved Phase A runtime, wrapper, installation, ignore, and deter
 ## Review
 
 - Profiles: `code`, `architecture`, `security`, `tests`, `ponytail`.
-- Round 3 result: 3 CRITICAL and 4 MAJOR findings remain.
-- Exact results: `.claude/quality_reports/review-results-2026-09-19_phase-A-openwiki-round3.json`.
-- Ponytail result: no separate simplification finding survived.
+- Round 3 result: 3 CRITICAL and 4 MAJOR findings.
+  Exact results: `.claude/quality_reports/review-results-2026-09-19_phase-A-openwiki-round3.json`.
+- Round 4 result: FAIL on 1 new MAJOR, plus 1 MINOR needing disposition.
+  Exact results: `.claude/quality_reports/review-results-2026-09-19_phase-A-openwiki-round4.json`.
+- Ponytail result across both rounds: no simplification finding survived. Round 4 judged the
+  growth from roughly 460 to 766 lines proportionate to the round-3 CRITICAL fixes, with no
+  speculative interface, reinvented standard library, or dead flexibility.
+
+### Round 3 finding disposition (all seven accounted for)
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| 1 | Nested repository collapses to one directory fingerprint | Resolved. `_walk_ignored_directory` expands any entry ending in `/`. Verified empirically that this is the exclusive signal for a non-recursed nested repository. |
+| 2 | Adapter restoration can delete concurrent edits | Resolved. Restoration authenticates through retained file descriptors, never unlinks a present file, and performs no write at all when content already matches. |
+| 3 | Symlink walk is check-then-use | Scope changed by user decision, not re-raised. Phase A detects and fails closed; operating-system-enforced isolation moved to Phase E. Detection verified to match the documented claim. |
+| 4 | Control-plane allowlist omits the provenance secret | Resolved. |
+| 5 | Version probe before the lock and outside the telemetry default | Resolved. Lock acquired first; both probes share the child environment. |
+| 6 | Post-run failures drop restoration errors | Resolved. All nine post-child returns carry restoration evidence. |
+| 7 | Credential validator heuristic too narrow | Resolved. Closed six-key allowlist asserted as a subset relation. |
+
+### Round 4 MINOR disposition
+
+`_run()` is roughly 240 lines covering lock, preflight, snapshot, launch, restore, and compare.
+**Accepted as-is.** Reason: the ordering of those stages is itself the safety property. Splitting
+them into helpers would move that ordering into call-site convention, where a later edit could
+reorder it without an obvious tell. The reviewer raised the same counter-argument and did not
+assert the finding should block.
 
 ## Completed Work
 
