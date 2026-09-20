@@ -55,6 +55,20 @@ let a chained pull request through unchecked.
   tree, so from inside this checkout that command commits this repository's
   files into a borrowed object store. The plan's test scenario listed it as
   foreign; the plan text was corrected and a pinned test added.
+- Steps F3.3, F3.4 done by the classifier coder: every `PROTECTED_PATH_LITERAL`
+  alternative gained the boundary the plan demonstrated a defect for; the
+  three control-plane alternatives capture the whole path token; `protected()`
+  gained one containment helper on resolved path components, applied only to
+  the control-plane clause, with each name form paired to the single path it
+  came from (a symlink inside the repository pointing at a foreign settings
+  file is allowed; a symlink outside pointing inside stays denied). Secret-
+  shaped rules untouched. 42 tests in the new `tests/test_protect_files_scoping.py`,
+  including both Phase F reproductions now allowed.
+- One legacy test (`test_protect_files_blocks_write_through_symlinked_directory`,
+  2026-08-14) encoded the old defect: a hooks-looking path entirely outside any
+  repository was expected to be denied. Decision: keep its intent and anchor
+  it inside an isolated checkout; handed to the git-gate coder, which owns
+  that file.
 
 ## Review findings and dispositions
 
