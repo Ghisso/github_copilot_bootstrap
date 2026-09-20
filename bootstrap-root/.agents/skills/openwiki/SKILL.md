@@ -71,7 +71,8 @@ report it and stop; do not hand-edit the adapter to fix it.
 
 A commit-time check in `verify.py` is the independent backstop: it refuses
 a commit that still carries the managed block in `AGENTS.md`/`CLAUDE.md`,
-an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a
+an untracked or newly staged OpenWiki workflow file (`openwiki-update.yml` under
+the GitHub workflows directory), or a
 tracked `openwiki/.run.json`, even if the hook guard was skipped or its
 restore was missed.
 
