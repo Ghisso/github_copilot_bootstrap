@@ -69,6 +69,11 @@ let a chained pull request through unchecked.
   repository was expected to be denied. Decision: keep its intent and anchor
   it inside an isolated checkout; handed to the git-gate coder, which owns
   that file.
+- Legacy test re-anchored inside an isolated checkout with its deny assertion
+  unchanged. VERIFY round 1 in the correct order (regenerate, self overlay
+  refresh, checks): `validate_targets.py` exit 0, `check_runtime.py` exit 0,
+  plan lint exit 0, `verify.py phase` PASS with 1753 tests, ruff and mypy
+  clean, generated verifier matches source.
 
 ## Review findings and dispositions
 
