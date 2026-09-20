@@ -31,6 +31,12 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   binary into `~/.local/bin`, which is on PATH; `openwiki integrations list
   </dev/null` exits 0. Reversible with `npm uninstall -g openwiki` and removing
   the link.
+- Step G2 done by the verifier coder: `openwiki_managed_state_violations(root)`
+  reads the two adapters and asks git only about the workflow file and
+  `openwiki/.run.json`; `VFY-GEN-001`'s phase check FAILs first on any
+  violation; `gate_receipt_errors` adds one `openwiki-managed-state:` error per
+  violation under `exact` only. 19 new tests on real temporary repositories;
+  one docs row. No check ID or schema change.
 
 ## Review findings and dispositions
 
