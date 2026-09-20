@@ -1103,3 +1103,24 @@
   fixing its list. The `best-effort` phrase looked like a hedge and flagged
   six plans, all design prose about sync behaviour; plural verb forms looked
   optional and caught one more genuine hedge with no new false positives.
+- [LEARN:security] When a containment check compares a candidate path against
+  a root, resolve symlinks on both sides or on neither. `repo_root_from_script`
+  derives the root with a plain `cd && pwd`, so on hosts where the checkout sits
+  behind a symlink (macOS `/tmp`, symlinked homes) the root keeps the link while
+  the candidate is realpath'd, and an in-repository file named by its physical
+  path is judged outside. Accept containment under either form of the root.
+- [LEARN:workflow] A plan can encode a wrong assumption about a tool. `--git-dir`
+  without `--work-tree` makes git treat the current directory as the working
+  tree, so the plan's "foreign" test scenario would have exempted a commit of
+  this repository's own files. When a coder reports a contract deviation with a
+  documented tool fact and a pinned test, accept it and correct the plan text
+  in the same phase rather than forcing the plan.
+- [LEARN:testing] A legacy test that asserts a guard fires on a path entirely
+  outside any repository is a test of the defect, not of the guard. When
+  scoping a guard, re-anchor such tests inside an isolated checkout with the
+  same assertion instead of flipping the expected outcome.
+- [LEARN:workflow] Two coders can share a phase safely when they own disjoint
+  source files and each writes tests to its own test file; record the test-file
+  deviation in the plan. The only cross-file dependency this produced (a legacy
+  test in one coder's file broken by the other's change) was resolved by
+  routing the fix to the owning coder, not by editing across ownership.

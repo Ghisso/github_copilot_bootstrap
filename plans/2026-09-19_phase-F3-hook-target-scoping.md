@@ -3,8 +3,8 @@ name: 2026-09-19_phase-F3-hook-target-scoping
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 8
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-F3-hook-target-scoping.md
 ---
 
 # Small Plan: 2026-09-19_phase-F3-hook-target-scoping
@@ -102,7 +102,7 @@ top level with `git "${options[@]}" rev-parse --show-toplevel` (`:122`) and comp
 physically to `REPO_ROOT`. Promote the third one into the library so the commit gate reuses it
 instead of growing a fourth copy.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/_lib-frontmatter.sh`; modify
   `shared/hooks/scripts/reporting-reminder.sh`; extend `tests/test_hook_gates.py`
 - **Required Skills:**
@@ -160,7 +160,7 @@ instead of growing a fourth copy.
 
 ### Step F3.2 — Scope the commit gate to this repository
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/enforce-commit-gate.sh`; extend
   `tests/test_hook_gates.py`
 - **Required Skills:**
@@ -215,7 +215,7 @@ output is later classified by `protected()`. The `.env` alternative has no bound
 side, so it extracts the `.env` out of `os.environ` and hands `protected()` a candidate whose
 basename is exactly `.env`. Every global alternative has some version of this problem.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/protect-files.py`; extend
   `tests/test_hook_gates.py`
 - **Required Skills:**
@@ -255,7 +255,7 @@ path, so `/tmp/scratch/.claude/settings.json` yields the fragment `.claude/setti
 substrings at `:198-207`, which are global by construction. `REPO_ROOT` is already available:
 `protect-files.sh:36` passes it as `argv[2]` and `main` unpacks it at `:1370`.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/protect-files.py`; extend
   `tests/test_hook_gates.py`
 - **Required Skills:**
@@ -345,7 +345,7 @@ The problem is that it exits the *whole* hook, not just the push half. So
 it is the main reason this step touches the file.** Adding a second whole-hook exemption next to it
 would have made the hole bigger; making both exemptions answer per shape closes it.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/enforce-pr-gate.sh`; extend
   `tests/test_lifecycle_hooks.py`
 - **Required Skills:**
@@ -421,7 +421,7 @@ would have made the hole bigger; making both exemptions answer per shape closes 
 a branch created in another repository is judged against this repository's HEAD, working tree and
 plan inventory. All three are meaningless for a foreign target, which is the defect.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/hooks/scripts/enforce-branch-state.sh`; modify
   `shared/hooks/scripts/_lib-frontmatter.sh`; extend `tests/test_hook_gates.py`
 - **Required Skills:**
@@ -484,7 +484,7 @@ plan inventory. All three are meaningless for a foreign target, which is the def
 
 ### Step F3.7 — Document the target-scoping changes
 
-- [ ] **Owner:** `documenter`
+- [x] **Owner:** `documenter`
 - **Target files:**
   - modify `docs/runtime-checks.md`: extend the paragraph describing what the protected-file
     classifier must cover (`:218-230`) with the split between rules that apply only inside this
@@ -516,7 +516,7 @@ plan inventory. All three are meaningless for a foreign target, which is the def
 
 ### Step F3.8 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Target files:** scoped Phase F3 diff
 - **Review Profiles:**
   - `code`
@@ -597,23 +597,23 @@ uv run python .claude/scripts/verify.py phase --format json --persist
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, CLOSEOUT); the order below mirrors it rather than restating it.
 
-- [ ] Documentation updated (`docs/runtime-checks.md`, `docs/smoke-tests.md`, `docs/architecture.md`)
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section recording
+- [x] Documentation updated (`docs/runtime-checks.md`, `docs/smoke-tests.md`, `docs/architecture.md`)
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section recording
       each of the eight required items above as PASS, plus the one optional item's outcome
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] All four fixes have a regression test that fails on the pre-change tree and passes after, and
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] All four fixes have a regression test that fails on the pre-change tree and passes after, and
       every still-denies proof exists: an in-repository commit, an in-repository push, a pull
       request that names another repository, an in-repository branch creation, and a
       credential-shaped filename outside this repository
-- [ ] The pull-request arm carries no repository comparison and no remote-URL parsing, and the
+- [x] The pull-request arm carries no repository comparison and no remote-URL parsing, and the
       pre-existing hole that let a nested-repository push excuse an unchecked pull request is
       recorded in the findings as closed by this phase
-- [ ] The parent plan's `phases:` list carries this phase between F2 and G, and G through K carry
+- [x] The parent plan's `phases:` list carries this phase between F2 and G, and G through K carry
       their renumbered `phase_index` values
 
 ## Pause Checkpoint

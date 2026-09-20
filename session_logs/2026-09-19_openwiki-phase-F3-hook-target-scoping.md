@@ -101,6 +101,10 @@ Round 1 (fresh reviewer; profiles `code`, `architecture`, `security`, `tests`,
   that `--git-dir` without `--work-tree` does not stand down, matching the
   accepted plan correction.
 
+Round 2 (same reviewer, delta only): the fix re-run against the real module;
+`/repo-evil`, outside-pointing-in denial, and inside-pointing-out allowance all
+preserved; no other unresolved-root comparison exists. PASS with zero findings.
+
 Held up on review: resolver forwards only the three redirect flags and
 composes repeated `-C` in order; every `IS_PR=1` path in the push hook reaches
 the branch, base, and closeout checks; `..` and sibling-name lookalikes; all
@@ -135,8 +139,22 @@ matches `verify.py`'s real ordering requirements.
 
 (pending: runner summary lines pasted at closeout)
 
-- optional 1: (pending)
+- optional 1: PASS — live host session (Claude Code) after the self overlay refresh:
+  `git -C /tmp/claude-1000/f3live/work commit --allow-empty -m spike`,
+  `git -C /tmp/claude-1000/f3live/work push origin HEAD` to a scratch bare remote, and
+  `git -C /tmp/claude-1000/f3live/work switch -c throwaway` all ran; a Python heredoc
+  naming the standard library's environment-variable mapping was allowed. The
+  branch-state recorder correctly wrote nothing for the foreign branch. Two
+  fail-closed refusals were observed on the way and are by design: a `-C` value
+  passed through a shell variable, and `-c user.email=...` options before the
+  subcommand; a redirect to a directory that did not exist yet also stayed gated.
 
 ## Open Questions / Next Steps
 
-(pending)
+- Next phase is `2026-09-19_phase-G-openwiki-host-driven-guard`, built against
+  the Phase F spike evidence with its five adaptations and the Step G2/G4
+  rewrites from Phase F2.
+- Known follow-up carried from Phase F2 (MINOR, `code`): `verify closeout`
+  raises an unhandled traceback when the findings report does not exist yet.
+- `shellcheck` is not installed in this environment; the shell changes were
+  checked with `bash -n` and the real-git test suites only.
