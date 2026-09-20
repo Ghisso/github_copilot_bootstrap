@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-20
 **Plan:** `.claude/plans/2026-09-19_phase-F2-verification-evidence-guardrails.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -146,9 +146,37 @@ stability, all eight message prefixes matching the docs.
 
 ## Verification
 
-(pending: the runner's summary lines are pasted here at closeout; this plan
-has no optional items)
+Summary lines printed by `verify closeout --format text` for the seven required
+items (this plan has no optional items):
+
+```text
+PASS        6.3s  uv run pytest tests/test_validate_plan_frontmatter.py tests/test_verify.py -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       47.7s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      114.3s  uv run python .claude/scripts/verify.py phase --format json --persist
+```
+
+Round 3 review gate: PASS with zero findings; findings report persisted with all
+six profiles and `ponytail_reviewed: true`. `verify phase` PASS (1649 tests).
 
 ## Open Questions / Next Steps
 
-(pending)
+- Next phase is `2026-09-19_phase-F3-hook-target-scoping`. Two more instances
+  of its defect surfaced this session: the file-protection hook blocked a
+  read-only Python one-liner because a dictionary key-listing call matched
+  the private-key filename pattern, and it blocked a heredoc because the
+  standard library's environment-variable mapping name contains the
+  environment-file pattern. Both blocks were resolved by rewording, which is
+  the tool-switching problem Phase F3 exists to remove.
+- Known follow-up (MINOR, `code`, not in this phase's diff): `verify closeout`
+  raises an unhandled traceback from `relative_artifact` when the findings
+  report does not exist yet, instead of naming the missing file and the
+  `record_findings.py` step. Pre-existing behaviour; fold into F3 or a
+  lightweight fix.
+- Under the new contract, a phase's closeout takes as long as its required
+  block. This phase's block runs in about three minutes. Run the self overlay
+  refresh before closeout whenever the block regenerates targets, or
+  `check_runtime.py` fails on stale installed copies.
