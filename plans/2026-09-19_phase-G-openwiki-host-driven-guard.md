@@ -103,18 +103,22 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 - **Verification:** `uv run pytest tests/test_openwiki_guard.py tests/test_hook_gates.py tests/test_validate_targets.py -q --tb=short`;
   `uv run python scripts/generate_targets.py --all && uv run python scripts/validate_targets.py`
 
-### Step G2 — Add the deterministic commit backstop to `verify.py`
+### Step G2 — Fold the deterministic commit backstop into the existing gates
 
 - [ ] **Owner:** `coder`
-- **Target files:** `shared/scripts/verify.py` (new `VFY-OPENWIKI-001` in `phase_checks` and
-  `closeout_checks`), its tests, `docs/runtime-checks.md` (one row)
+- **Target files:** `shared/scripts/verify.py` (extend `VFY-GEN-001` in `phase_checks`; extend
+  `gate_receipt_errors`), its tests, `docs/runtime-checks.md` (one row)
 - **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode,
   `shared/skills/code-style/SKILL.md`, `shared/skills/testing-patterns/SKILL.md`
-- **Behavior:** FAIL when root `AGENTS.md` or `CLAUDE.md` contains `MANAGED_START`; when
+- **Behavior:** this adds no check ID. `VFY-GEN-001`'s `phase` remit additionally FAILs when
+  root `AGENTS.md` or `CLAUDE.md` contains `MANAGED_START`; when
   `.github/workflows/openwiki-update.yml` is untracked or staged as new; or when
-  `openwiki/.run.json` is tracked or staged. PASS otherwise. File reads and
-  `git ls-files`/`git diff --cached --name-only` only; never model-backed. The message names
-  the file and the fix.
+  `openwiki/.run.json` is tracked or staged. File reads and
+  `git ls-files`/`git diff --cached --name-only` only; never model-backed. At commit time,
+  `gate_receipt_errors` raises one closeout-evidence error per violated condition, under the
+  `exact` head relation only, message prefix `openwiki-managed-state:`, naming the file and the
+  fix — the same path Phase C's stale-claims gate already uses. `CHECK_IDS` and
+  `SCHEMA_VERSION` are unchanged, so every earlier phase's receipt still loads.
 - **Verification:** focused verifier tests; `uv run python .claude/scripts/verify.py phase --format json`
 
 ### Step G3 — Retire the subprocess runner
@@ -148,13 +152,15 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
   non-interactively, for example
   `test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.5.2"` and
   `openwiki integrations list </dev/null >/dev/null`; keep `command -v openwiki`; update the
-  validator to assert the working check. The smoke test is `skipif(shutil.which("openwiki") is
-  None)`; in a temporary Git repo it spawns `openwiki mcp --host claude` with `DO_NOT_TRACK=1`,
-  sends `initialize` and `tools/list` over stdio with a timeout, asserts `serverInfo.version ==
-  OPENWIKI_PINNED_VERSION` (imported from `scripts.validate_targets`) and the six tool names,
-  and asserts the temporary repo is unchanged.
+  validator to assert the working check. The smoke test does not use `skipif`: when
+  `shutil.which("openwiki")` is `None` it fails with a message naming the missing binary,
+  because the devcontainer image installs the pinned CLI and this required item must prove the
+  handshake ran, not report a pass it never attempted. In a temporary Git repo it spawns
+  `openwiki mcp --host claude` with `DO_NOT_TRACK=1`, sends `initialize` and `tools/list` over
+  stdio with a timeout, asserts `serverInfo.version == OPENWIKI_PINNED_VERSION` (imported from
+  `scripts.validate_targets`) and the six tool names, and asserts the temporary repo is
+  unchanged.
 - **Verification:** `uv run pytest tests/test_openwiki_cli_smoke.py -q`; `uv run python scripts/validate_targets.py`
-  <!-- ASSUMPTION: the image build itself runs only if a Docker host is available; record which applies. -->
 
 ### Step G5 — Make OpenWiki-installed skill bundles third-party-owned
 
@@ -211,6 +217,13 @@ uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
+
+## Optional Verification
+
+- Build the devcontainer image (`docker build` of `shared/devcontainer/Dockerfile`) to prove
+  the new smoke line in Step G4 passes inside the image. This is optional because it needs a
+  Docker host, which is not available in every execution environment. Record the outcome in the
+  closeout session log as `- optional 1: PASS|FAIL|NOT RUN — <detail>`.
 
 ## Closeout Checklist
 
