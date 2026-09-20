@@ -3,7 +3,7 @@ name: 2026-09-19_phase-F3-hook-target-scoping
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 8
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

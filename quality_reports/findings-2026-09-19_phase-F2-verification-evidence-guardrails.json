@@ -13,14 +13,14 @@
     "tests"
   ],
   "findings": [],
-  "generated_at": "2026-09-20T14:06:58Z",
+  "generated_at": "2026-09-20T14:17:58Z",
   "branch": "2026-09-19_openwiki-knowledge-layer-integration_implementation",
   "head_sha": "2523ac22b506a710946c0f82bd272249d8ec8915",
   "base_ref": "dev",
   "merge_base_sha": "efefb2c9000d49cc8d791c88303169dbfc83e10c",
   "phase": "2026-09-19_phase-F2-verification-evidence-guardrails",
   "target": ".",
-  "dirty": true,
+  "dirty": false,
   "content_hash": "6aebd8f86a0b428de63d419f69dc5cc5228df7c0",
   "changed_files": [
     ".gitignore",

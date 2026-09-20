@@ -19,7 +19,7 @@ phases:
   - 2026-09-19_phase-I-openwiki-enable-and-first-generation
   - 2026-09-19_phase-J-openwiki-docs-memory-migration
   - 2026-09-19_phase-K-knowledge-refresh
-current_phase: 2026-09-19_phase-F2-verification-evidence-guardrails
+current_phase: 2026-09-19_phase-F3-hook-target-scoping
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
