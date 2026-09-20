@@ -28,6 +28,17 @@ if ! command -v git >/dev/null 2>&1; then
   exit 0
 fi
 
+# A branch created in some other repository entirely (git checkout -b/switch
+# -c with an explicit -C, --git-dir or --work-tree redirect) is judged
+# against that repository's own naming, not <plan_name>_implementation.
+# branch_create_targets_other_repository checks each branch-creating
+# invocation individually and fails closed on anything undeterminable, so a
+# compound command mixing a foreign branch creation with one targeting this
+# repository still gates in full.
+if branch_create_targets_other_repository "$COMMAND"; then
+  exit 0
+fi
+
 if ! is_implementation_branch "$BRANCH"; then
   deny_pretool "implementation branch must be named <plan_name>_implementation using only letters, numbers, dot, underscore, and dash"
   exit 0
