@@ -67,6 +67,12 @@ was ever exercised directly.
   refresh: `validate_targets.py` exit 0; `check_runtime.py` exit 0;
   `validate_plan_frontmatter.py` exit 0; `verify.py phase` PASS with 1625
   tests, ruff and mypy clean, generated verifier matches source.
+- Review rounds 1 and 2 (below) each sent fixes back to the script coder.
+  VERIFY round 3, in the correct order (`generate_targets.py --all`, then
+  the self overlay refresh, then the checks): `validate_targets.py` exit 0,
+  `check_runtime.py` exit 0, plan lint exit 0, `verify.py phase` PASS with
+  1649 tests. README step 5 of the closeout walkthrough now says closeout runs
+  the plan's block itself; the canonical text says both fence styles count.
 
 ## Review findings and dispositions
 
