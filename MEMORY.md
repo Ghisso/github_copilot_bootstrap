@@ -1078,3 +1078,28 @@
   rather than command targets, so it blocks a Bash command that merely names a
   protected-looking path in `/tmp`, and every such block gets resolved by using
   `Write`/`Edit`/`Read` instead. That teaches tool-switching past guards.
+- [LEARN:verification] A gate that reads a claim out of a log confirms the
+  claim was written, not that anything ran. When the checked items are shell
+  commands, have the gate run them and record exit code, duration, and output
+  tail in the receipt; the receipt's existing `extensions` object holds that
+  without touching `CHECK_IDS` or `SCHEMA_VERSION`.
+- [LEARN:security] A substring test on shell text is not a guard. `verify.py
+  "closeout"`, `clos""eout`, and `cmd||true` all defeat literal matches while
+  bash runs them identically. Strip quote characters first, then match a
+  word-bounded regex, and apply the identical function at plan time and at
+  run time.
+- [LEARN:testing] When a new commit or push gate lands, every fixture that
+  constructs receipts or plans directly (not through the CLI) must be updated
+  in the same change, or the end-to-end validator fails with downstream
+  freshness errors ("tracked state is stale", "content_hash is stale") that
+  hide the real cause: the first refused commit. Read the first FAIL line of
+  the earliest scenario, not the last.
+- [LEARN:workflow] `check_runtime.py` compares the installed `.claude/`
+  runtime against `dist/`; after `generate_targets.py --all` it fails until
+  `install_bootstrap.py . --allow-self --local-only` refreshes the overlay.
+  Run the overlay refresh before `check_runtime.py` and before any closeout
+  whose required block regenerates targets.
+- [LEARN:quality] Measure a text-pattern lint on the real corpus before
+  fixing its list. The `best-effort` phrase looked like a hedge and flagged
+  six plans, all design prose about sync behaviour; plural verb forms looked
+  optional and caught one more genuine hedge with no new false positives.

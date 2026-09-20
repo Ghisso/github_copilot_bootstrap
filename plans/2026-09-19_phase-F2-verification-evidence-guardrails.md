@@ -3,8 +3,8 @@ name: 2026-09-19_phase-F2-verification-evidence-guardrails
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 7
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-F2-verification-evidence-guardrails.md
 ---
 
 # Small Plan: 2026-09-19_phase-F2-verification-evidence-guardrails
@@ -57,7 +57,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.1 — Write the canonical contract and update every surface that must produce it
 
-- [ ] **Owner:** `documenter` (prose) + `coder` (templates, prompt strings)
+- [x] **Owner:** `documenter` (prose) + `coder` (templates, prompt strings)
 - **Target files:**
   - modify `shared/policies/workflow.instructions.md`: new `## Verification Evidence Contract`
     section beside "Knowledge-Refresh Final Phase" (the single authoritative definition; all
@@ -98,7 +98,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.2 — Plan-time lint in `validate_plan_frontmatter.py`
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `scripts/validate_plan_frontmatter.py`; extend
   `tests/test_validate_plan_frontmatter.py`
 - **Required Skills:**
@@ -130,7 +130,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.3 — `verify closeout` runs the required items and records them in the receipt
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** modify `shared/scripts/verify.py`; extend `tests/test_verify.py`; adjust the
   two fixture helpers in `scripts/validate_targets.py` (`write_small_plan`,
   `write_fixture_closeout_receipt`) so their throwaway plans carry a one-command
@@ -207,7 +207,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.4 — Route the spike skill to third-party binaries, CLIs, and MCP servers
 
-- [ ] **Owner:** `documenter` + `coder`
+- [x] **Owner:** `documenter` + `coder`
 - **Target files:**
   - modify `shared/skills/integration-gate-spike/SKILL.md`: description triggers and Step 1
     unknowns gain "Invocation contract — flags, exit codes, TTY needs, stdio protocol,
@@ -226,7 +226,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.5 — Reviewer question in the `tests` profile
 
-- [ ] **Owner:** `documenter`
+- [x] **Owner:** `documenter`
 - **Target files:** modify `shared/review-profiles/tests.md`
 - **Required Skills:**
   - `shared/skills/documentation/SKILL.md`
@@ -238,7 +238,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.6 — Bring live plans into compliance and document the gates
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - `.claude/plans/2026-09-19_phase-G-openwiki-host-driven-guard.md`: Step G2 redesigned to add
     no check ID (the OpenWiki managed-block condition moves into `VFY-GEN-001`'s remit and the
@@ -261,7 +261,7 @@ Docker host is available", which Step F2.6 removes.
 
 ### Step F2.7 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Target files:** scoped Phase F2 diff
 - **Review Profiles:**
   - `code`
@@ -309,16 +309,16 @@ persists the phase receipt that closeout then reuses, which is the intended orde
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, CLOSEOUT); the order below mirrors it rather than restating it.
 
-- [ ] Documentation updated (`docs/runtime-checks.md` rows and paragraph)
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section pasting the runner's seven PASS summary lines (this plan has no optional items)
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] `CHECK_IDS` and `SCHEMA_VERSION` unchanged; Phase A–C receipts still load
-- [ ] Live plans G–K pass the new lint; Phase G's plan text carries the amended Step G2
+- [x] Documentation updated (`docs/runtime-checks.md` rows and paragraph)
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section pasting the runner's seven PASS summary lines (this plan has no optional items)
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] `CHECK_IDS` and `SCHEMA_VERSION` unchanged; Phase A–C receipts still load
+- [x] Live plans G–K pass the new lint; Phase G's plan text carries the amended Step G2
 
 ## Pause Checkpoint
 
