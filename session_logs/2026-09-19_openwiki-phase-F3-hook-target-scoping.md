@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-20
 **Plan:** `.claude/plans/2026-09-19_phase-F3-hook-target-scoping.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -137,7 +137,22 @@ matches `verify.py`'s real ordering requirements.
 
 ## Verification
 
-(pending: runner summary lines pasted at closeout)
+Summary lines printed by `verify closeout --format text` for the eight required
+items:
+
+```text
+PASS       19.1s  uv run pytest tests/test_hook_gates.py tests/test_lifecycle_hooks.py -q --tb=short
+PASS      120.6s  uv run pytest tests/ -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       57.9s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      121.3s  uv run python .claude/scripts/verify.py phase --format json --persist
+```
+
+Round 2 review gate: PASS with zero findings; findings report persisted with all
+six profiles and `ponytail_reviewed: true`. `verify phase` PASS (1755 tests).
 
 - optional 1: PASS — live host session (Claude Code) after the self overlay refresh:
   `git -C /tmp/claude-1000/f3live/work commit --allow-empty -m spike`,
@@ -156,5 +171,9 @@ matches `verify.py`'s real ordering requirements.
   rewrites from Phase F2.
 - Known follow-up carried from Phase F2 (MINOR, `code`): `verify closeout`
   raises an unhandled traceback when the findings report does not exist yet.
+- The numbered CLOSEOUT sequence written after Phase F2 had the closeout dry run
+  before the findings and phase receipt it depends on; found when this phase's
+  dry run failed, corrected in the policy in this phase's diff (dry run is now
+  the last part of step 4, after staging, findings, and the phase receipt).
 - `shellcheck` is not installed in this environment; the shell changes were
   checked with `bash -n` and the real-git test suites only.
