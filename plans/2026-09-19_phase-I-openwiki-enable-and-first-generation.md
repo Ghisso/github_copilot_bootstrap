@@ -62,7 +62,7 @@ knowledge-refresh phases; the closeout log must say so.
 
 ### Step I3 — Re-probe the guard against the real server
 
-- [ ] **Owner:** `coder` (Claude Code; repeat in Codex when available)
+- [ ] **Owner:** `coder` (Claude Code)
 - **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/knowledge-refresh/SKILL.md`
 - **Probes:** (1) `openwiki_begin` with `mode: "init"` → deny before the tool runs (on hosts
@@ -88,7 +88,8 @@ knowledge-refresh phases; the closeout log must say so.
   present; `openwiki/.run.json` absent after `finish` (or present and ignored if interrupted);
   no secrets or AI-state content in output; representative claims verified against source.
 - **Verification:** `git status`, `git diff --stat`;
-  `uv run python .claude/scripts/verify.py phase --format json` (`VFY-OPENWIKI-001` PASS)
+  `uv run python .claude/scripts/verify.py phase --format json` (the OpenWiki managed-state
+  condition in `VFY-GEN-001` and the commit gate PASS)
 
 ### Step I5 — Review
 
@@ -108,6 +109,12 @@ uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
+
+## Optional Verification
+
+- Repeat Step I3's re-probe in Codex, when a Codex session is available. This must be run
+  interactively by the coder and cannot be scripted, so it is optional. Record the outcome in
+  the closeout session log as `- optional 1: PASS|FAIL|NOT RUN — <detail>`.
 
 ## Closeout Checklist
 
