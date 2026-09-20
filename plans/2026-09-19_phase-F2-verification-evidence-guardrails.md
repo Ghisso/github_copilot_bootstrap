@@ -45,9 +45,13 @@ C's stale-claims gate does. The closeout gate judges only the phase being comple
 plans dated on or after 2026-09-19. Completed and cancelled plans are dated records and are
 never re-judged.
 
-Hedge-pattern measurement over this repository's 107 small plans: a verb-anchored pattern list
-flags 10 plans, 7 of them genuine hedged checks (Phase A's line among them); a bare phrase list
-flags 34, mostly ordinary prose; scoping to verification contexts only halves recall.
+Hedge-pattern measurement over this repository's small plans (110 at implementation time): a
+bare phrase list flags 34, mostly ordinary prose; scoping to verification contexts only halves
+recall. The first verb-anchored list flagged 10 plans, 7 genuine; re-measured on 2026-09-20, the
+three `best-effort` false positives were design prose about sync behaviour and were dropped, and
+plural verb forms were added. The final three patterns flag 5 plans, all genuine hedged checks:
+four completed plans (Phase A's line among them) and the planned Phase G comment "runs only if a
+Docker host is available", which Step F2.6 removes.
 
 ## Steps
 
@@ -127,7 +131,11 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
 ### Step F2.3 — `verify closeout` runs the required items and records them in the receipt
 
 - [ ] **Owner:** `coder`
-- **Target files:** modify `shared/scripts/verify.py`; extend `tests/test_verify.py`
+- **Target files:** modify `shared/scripts/verify.py`; extend `tests/test_verify.py`; adjust the
+  two fixture helpers in `scripts/validate_targets.py` (`write_small_plan`,
+  `write_fixture_closeout_receipt`) so their throwaway plans carry a one-command
+  `## Verification` block and their fixture receipts carry the matching result, because the
+  end-to-end scenarios drive the real commit and push hooks and must satisfy the new contract
 - **Required Skills:**
   - `shared/skills/create-feature/SKILL.md`
   - `shared/skills/ponytail/SKILL.md` in `full` mode
