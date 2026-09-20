@@ -34,6 +34,11 @@ let a chained pull request through unchecked.
   is reused for Step F3.7. Plan deviation recorded: the classifier's tests go
   in a new `tests/test_protect_files_scoping.py` so the two coders never edit
   the same test file.
+- Step F3.7 (docs) done in parallel with the code, written from the plan's
+  step contracts rather than the in-progress code: `docs/runtime-checks.md`
+  (classifier split, gate stand-down paragraph, reverse note under the
+  refresh-gates table), `docs/smoke-tests.md`, `docs/architecture.md`. The
+  pull-request exception is stated as a deliberate choice with its reason.
 
 ## Review findings and dispositions
 
