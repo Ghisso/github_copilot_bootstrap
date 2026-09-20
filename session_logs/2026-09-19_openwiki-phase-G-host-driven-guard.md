@@ -56,6 +56,28 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   the live `.agents` marker. Tests prove the unmarked copy is still overwritten
   and compared, the marked copy is preserved and exempt. 50 installer tests
   pass; `check_runtime.py` PASS on this marker-free checkout.
+- Steps G1, G3, G4 done by the hook coder: `openwiki-guard.py` (stdlib, 3.9)
+  and `openwiki-guard.sh`; Claude Code wiring on `PreToolUse`, `PostToolUse`
+  and `PostToolUseFailure`; Codex wiring on `PreToolUse`, `PostToolUse` and
+  the `Stop` hook (adaptation O2); runner and its test deleted; Dockerfile
+  smoke line replaced with the version pin check and a non-interactive start;
+  real-binary MCP handshake test observed `serverInfo.version 0.5.2` and the
+  six tools. 18 guard tests. Deviations accepted: the guard computes its own
+  root three directories up with a lexical path (the isolated-hook test
+  pattern relies on symlinks); no `deny_pretool` call (same as
+  `protect-files.sh`); a stale snapshot that cannot be healed denies the new
+  call; the `post` success line format is the coder's.
+- VERIFY round 1: the overlay refresh pruned the obsolete installed runner
+  copy; `docs/runtime-checks.md` guardrail list gained `openwiki-guard.sh`;
+  the skill's mention of the forbidden workflow file was reworded so the
+  reference validator does not demand it exist. `validate_targets.py` exit 0,
+  `check_runtime.py` exit 0, plan lint exit 0; `verify.py phase` FAIL on three
+  tests that encode the pre-guard hook wiring (Codex single Stop handler,
+  Claude lifecycle shape, routing-group fixture), handed to the hook coder.
+- Observed: the overlay refresh reported `.claude/.gitignore` as an obsolete
+  generated file and removed it; `state-sync.sh` recreated it with `.cache/`
+  ignored, so the guard's snapshot directory stays out of the nested
+  repository. Pre-existing behaviour, recorded for follow-up.
 
 ## Review findings and dispositions
 
