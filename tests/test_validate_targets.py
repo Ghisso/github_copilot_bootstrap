@@ -22,6 +22,7 @@ import generate_targets as target_generator  # noqa: E402
 
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
+    OPENWIKI_BEGIN_MATCHER,
     load_shared_agents,
     parse_policy,
     render_claude_rule_adapter,
@@ -101,6 +102,10 @@ def test_pretool_routing_rejects_wildcard_safety_and_lifecycle_drift() -> None:
             {"matcher": "Edit|Write", "hooks": [{"command": "protect-files.sh"}]},
             {"matcher": "Bash", "hooks": [{"command": "pretool-bash-guard.sh"}]},
             {"matcher": "*", "hooks": [{"command": "context-mode-dispatch.sh"}]},
+            {
+                "matcher": OPENWIKI_BEGIN_MATCHER,
+                "hooks": [{"command": "openwiki-guard.sh"}],
+            },
         ]
     }
     assert pretool_routing_errors(hooks, "openai-codex") == []

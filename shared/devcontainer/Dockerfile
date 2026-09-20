@@ -34,7 +34,8 @@ RUN npm install -g context-mode@1.0.169 \
     && command -v context-mode \
     && context-mode --help >/dev/null \
     && command -v openwiki \
-    && openwiki --version
+    && test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.5.2" \
+    && openwiki integrations list </dev/null >/dev/null
 
 RUN set -eux; \
     if id -u "${USERNAME}" >/dev/null 2>&1; then \

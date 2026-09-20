@@ -17,6 +17,7 @@ from runtime_ownership import (
     install_mode_from_manifest,
     is_consumer_state_path,
     is_root_adapter_path,
+    is_third_party_skill_dir,
 )
 
 
@@ -123,6 +124,18 @@ def parity_matches(path: Path, authoritative_path: Path, repo_root: Path) -> boo
     return actual == expected
 
 
+def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
+    """Return whether ``relative_path`` (relative to ``surface_root``, e.g.
+    ``.claude`` or ``.agents``) sits inside a marker-claimed third-party
+    skill directory. Checks ``relative_path`` itself and every ancestor so a
+    file nested inside the bundle is covered by its directory's marker."""
+    return any(
+        is_third_party_skill_dir(surface_root / candidate)
+        for candidate in (relative_path, *relative_path.parents)
+        if candidate != Path(".")
+    )
+
+
 def runtime_drift_errors(
     repo_root: Path = REPO_ROOT, target_root: Path | None = None
 ) -> list[str]:
@@ -183,9 +196,13 @@ def runtime_drift_errors(
                 continue
             if claude_relative == Path("antigravity-ownership.env"):
                 continue
-            if not is_consumer_state_path(claude_relative) and (
-                not claude_relative.parts
-                or claude_relative.parts[0] != "bootstrap-root"
+            if (
+                not is_consumer_state_path(claude_relative)
+                and not _third_party_skill_owner(repo_root / ".claude", claude_relative)
+                and (
+                    not claude_relative.parts
+                    or claude_relative.parts[0] != "bootstrap-root"
+                )
             ):
                 expected[target_relative] = authoritative_path
         if not is_root_adapter_path(target_relative):
@@ -194,12 +211,28 @@ def runtime_drift_errors(
             repo_root, target_relative
         ):
             continue
-        if not is_exact_tracked(repo_root, target_relative):
+        # OpenWiki's installer owns `.agents/skills/openwiki` once it writes
+        # its marker there; neither the live path nor its
+        # `.claude/bootstrap-root/.agents` backup mirror is then compared
+        # against freshly generated content. Gated by the live directory's
+        # marker, not the mirror's own copy of it.
+        agents_third_party_skill = target_relative.parts[
+            0
+        ] == ".agents" and _third_party_skill_owner(
+            repo_root / ".agents", target_relative.relative_to(".agents")
+        )
+        if not agents_third_party_skill and not is_exact_tracked(
+            repo_root, target_relative
+        ):
             expected[target_relative] = authoritative_path
-        if any(
-            target_relative == root or root in target_relative.parents
-            for root in active_bootstrap_paths
-        ) and not is_exact_tracked(repo_root, target_relative):
+        if (
+            not agents_third_party_skill
+            and any(
+                target_relative == root or root in target_relative.parents
+                for root in active_bootstrap_paths
+            )
+            and not is_exact_tracked(repo_root, target_relative)
+        ):
             expected[Path(".claude/bootstrap-root") / target_relative] = (
                 authoritative_path
             )
@@ -226,6 +259,7 @@ def runtime_drift_errors(
                 or relative == Path(".gitignore")
                 or (relative.parts and relative.parts[0] == ".cache")
                 or is_consumer_state_path(relative)
+                or _third_party_skill_owner(repo_root / ".claude", relative)
                 or (relative.parts and relative.parts[0] == "bootstrap-root")
                 or (
                     relative == Path("bootstrap-ownership.env")
@@ -247,6 +281,9 @@ def runtime_drift_errors(
             for path in candidates
             if path.relative_to(repo_root).as_posix() not in TRACKED_AUTHORING_PATHS
             if not is_exact_tracked(repo_root, path.relative_to(repo_root))
+            if not _third_party_skill_owner(
+                adapter_path, path.relative_to(adapter_path)
+            )
         )
     bootstrap_root = claude_root / "bootstrap-root"
     if bootstrap_root.is_dir():
@@ -254,6 +291,10 @@ def runtime_drift_errors(
             if not path.is_file():
                 continue
             root_relative = path.relative_to(bootstrap_root)
+            if root_relative.parts[0] == ".agents" and _third_party_skill_owner(
+                repo_root / ".agents", root_relative.relative_to(".agents")
+            ):
+                continue
             is_active = any(
                 root_relative == root or root in root_relative.parents
                 for root in active_bootstrap_paths

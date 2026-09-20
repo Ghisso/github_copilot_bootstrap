@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from generate_targets import (  # noqa: E402
+    OPENWIKI_BEGIN_MATCHER,
     render_antigravity_hooks,
     render_claude_settings,
     render_codex_hooks,
@@ -345,8 +346,15 @@ def test_online_prompt_pushes_offline_stop_plan_and_keeps_diagnostic_local(
     assert "fetch from origin/ai-state failed" in errors.read_text(encoding="utf-8")
 
 
-def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> None:
-    """Generated Codex lifecycle hooks use the planned local/network boundaries."""
+def test_rendered_codex_lifecycle_keeps_stop_local_with_the_openwiki_guard(
+    tmp_path: Path,
+) -> None:
+    """Generated Codex lifecycle hooks use the planned local/network
+    boundaries. `codex-stop.sh` remains the sole session-lifecycle wrapper;
+    the only other `Stop` handler is the payload-free `openwiki-guard.sh
+    post` call (Codex's O2 adaptation - it fires no failure event at all, so
+    the restore instead runs unconditionally at end of turn), and neither
+    handler performs a network publish."""
     hooks_path = tmp_path / "hooks.json"
 
     render_codex_hooks(hooks_path)
@@ -354,9 +362,11 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     hooks = json.loads(hooks_path.read_text(encoding="utf-8"))["hooks"]
     stop = hooks["Stop"]
     assert len(stop) == 1
-    assert len(stop[0]["hooks"]) == 1
+    assert len(stop[0]["hooks"]) == 2
     assert "codex-stop.sh" in stop[0]["hooks"][0]["command"]
-    assert "state-sync.sh" not in stop[0]["hooks"][0]["command"]
+    assert "openwiki-guard.sh" in stop[0]["hooks"][1]["command"]
+    assert stop[0]["hooks"][1]["command"].rstrip().endswith("post")
+    assert "state-sync.sh" not in json.dumps(stop[0]["hooks"])
 
     prompt = hooks["UserPromptSubmit"]
     assert len(prompt) == 1
@@ -368,13 +378,19 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     )
 
     posttool = hooks["PostToolUse"]
-    assert len(posttool) == 1
+    assert len(posttool) == 2
+    bash_group, openwiki_group = posttool
+    assert bash_group["matcher"] == "Bash"
     assert [
         "record-branch-state.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report openai-codex" in handler["command"]
-        for handler in posttool[0]["hooks"]
+        for handler in bash_group["hooks"]
     ] == [True, True, True]
+    assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(openwiki_group["hooks"]) == 1
+    assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]
+    assert openwiki_group["hooks"][0]["command"].rstrip().endswith("post")
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == []
     prompt[0]["hooks"][1]["timeout"] = 99
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == [
@@ -422,7 +438,11 @@ def test_rendered_antigravity_hook_uses_only_proven_pretool_safety(
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     tmp_path: Path,
 ) -> None:
-    """Generated Claude settings keep lifecycle boundaries single and ordered."""
+    """Generated Claude settings keep lifecycle boundaries single and
+    ordered. `Stop` itself stays untouched by the openwiki guard - Claude
+    Code fires a real `PostToolUseFailure` event (unlike Codex), so the
+    guard's restore is wired to `PostToolUse` and `PostToolUseFailure`
+    instead of piggybacking on `Stop`."""
     settings_path = tmp_path / "settings.json"
 
     render_claude_settings(settings_path)
@@ -445,13 +465,26 @@ def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     )
 
     posttool = hooks["PostToolUse"]
-    assert len(posttool) == 1
+    assert len(posttool) == 2
+    bash_group, openwiki_group = posttool
+    assert bash_group["matcher"] == "Bash"
     assert [
         "record-branch-state.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report claude-code" in handler["command"]
-        for handler in posttool[0]["hooks"]
+        for handler in bash_group["hooks"]
     ] == [True, True, True]
+    assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(openwiki_group["hooks"]) == 1
+    assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]
+    assert openwiki_group["hooks"][0]["command"].rstrip().endswith("post")
+
+    posttool_failure = hooks["PostToolUseFailure"]
+    assert len(posttool_failure) == 1
+    assert posttool_failure[0]["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(posttool_failure[0]["hooks"]) == 1
+    assert "openwiki-guard.sh" in posttool_failure[0]["hooks"][0]["command"]
+    assert posttool_failure[0]["hooks"][0]["command"].rstrip().endswith("post")
 
     stop_failure = hooks["StopFailure"]
     assert len(stop_failure) == 1

@@ -164,18 +164,29 @@ trust and credential boundaries.
 OpenWiki is an optional, opt-in knowledge layer: repository-descriptive wiki
 pages generated under `openwiki/**`. It is enabled only when a maintainer has
 written `openwiki/INSTRUCTIONS.md`, a human-authored repository brief that
-doubles as the deterministic enablement marker the runner checks.
+doubles as the deterministic enablement marker the hook guard checks.
 
-Refresh always runs through the bootstrap-owned
-`shared/scripts/openwiki_refresh.py` (installed as
-`.claude/scripts/openwiki_refresh.py`; see the `.claude/skills/openwiki/`
-skill for usage), never a raw `openwiki` call. The runner snapshots and
-restores the root adapters and any OpenWiki workflow file around the refresh,
-fails closed on a write outside `openwiki/**`, and never commits — see the
-runner's own module docstring for its documented residual limits, most
-notably that it cannot tell a concurrent agent-session write to `.claude`
-from an OpenWiki write, and fails closed naming files OpenWiki never touched
-when the two overlap.
+Refresh is host-driven: the coding agent calls OpenWiki's own MCP tools
+directly (see the `.claude/skills/openwiki/` skill for usage) — there is no
+bootstrap-spawned process. OpenWiki's server writes `openwiki/**` and, at
+`openwiki_begin` only, a managed block into root `AGENTS.md` and
+`CLAUDE.md`. A hook guard, `openwiki-guard.sh pre|post`, snapshots both
+adapters and the OpenWiki workflow-file path before `openwiki_begin` and
+restores them byte-for-byte after; `mode: "update"` is the only mode it
+allows, because `init` creates a scheduled workflow and replaces the wiki.
+Automatic restore coverage differs by host: on Claude Code it is wired to
+both `PostToolUse` and `PostToolUseFailure`, so a failed call still
+restores; on Codex it is wired to `PostToolUse` and to the `Stop` hook, with
+no automatic restore when the tool call itself errors, so the skill has the
+agent run `openwiki-guard.sh post` manually right after `openwiki_begin`.
+The guard's own module docstring documents the residual limits inherited
+from the earlier runner design: a write outside this repository is
+invisible to it, it covers only the two adapters and the workflow path, and
+the agent's own writes stay governed by the existing `protect-files` hooks.
+A commit-time check in `verify.py` is an independent backstop: it refuses a
+commit that still carries the managed block, an untracked or newly staged
+OpenWiki workflow file, or a tracked `openwiki/.run.json`, whether or not
+the guard ran.
 
 See `workspace.instructions.md`'s Knowledge Ownership section for the
 authority contract: OpenWiki is derived context, never authority over

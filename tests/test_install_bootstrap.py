@@ -1304,6 +1304,42 @@ def test_local_client_settings_are_consumer_state() -> None:
     assert is_consumer_state_path(".cache/context-mode/sessions/local.db")
 
 
+def test_openwiki_skill_bundle_paths_are_third_party() -> None:
+    """The path shape for OpenWiki's skill bundle is recognized inside every
+    skill-hosting surface (`.claude/skills/openwiki`, `.agents/skills/openwiki`),
+    the same way `is_consumer_state_path` checks a surface-relative path."""
+    from runtime_ownership import is_third_party_skill_path
+
+    assert is_third_party_skill_path("skills/openwiki")
+    assert is_third_party_skill_path("skills/openwiki/SKILL.md")
+    assert not is_third_party_skill_path("skills/ponytail/SKILL.md")
+    assert not is_third_party_skill_path("skills/openwiki-review/SKILL.md")
+
+
+def test_openwiki_skill_dir_requires_both_shape_and_marker(tmp_path: Path) -> None:
+    """A directory shaped like `skills/openwiki` is ordinary bootstrap
+    content until OpenWiki's own installer claims it by writing
+    `.openwiki-install.json` directly inside it; the marker alone, on a
+    directory with the wrong shape, does not count either (R-OPENWIKI-G5)."""
+    from runtime_ownership import is_third_party_skill_dir
+
+    unmarked = tmp_path / "unmarked" / "skills/openwiki"
+    unmarked.mkdir(parents=True)
+    (unmarked / "SKILL.md").write_text("bootstrap-generated\n", encoding="utf-8")
+    assert not is_third_party_skill_dir(unmarked)
+
+    marked = tmp_path / "marked" / "skills/openwiki"
+    marked.mkdir(parents=True)
+    (marked / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+    (marked / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+    assert is_third_party_skill_dir(marked)
+
+    wrong_shape = tmp_path / "wrong-shape" / "skills/ponytail"
+    wrong_shape.mkdir(parents=True)
+    (wrong_shape / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+    assert not is_third_party_skill_dir(wrong_shape)
+
+
 def test_refresh_preserves_local_context_mode_cache_bytes(tmp_path: Path) -> None:
     source = tmp_path / "generated"
     target = tmp_path / "consumer"
@@ -1316,6 +1352,72 @@ def test_refresh_preserves_local_context_mode_cache_bytes(tmp_path: Path) -> Non
     copy_generated_tree(source, target, dry_run=False)
 
     assert cache.read_bytes() == b"local-cache\x00bytes"
+
+
+def test_refresh_preserves_third_party_openwiki_skill_bundle(tmp_path: Path) -> None:
+    """A refresh only preserves `.claude/skills/openwiki` and
+    `.agents/skills/openwiki` once OpenWiki's own installer has claimed
+    each by writing `.openwiki-install.json` directly inside it; without
+    that marker a refresh still overwrites and prunes them like any other
+    generated content (R-OPENWIKI-G5)."""
+    source = tmp_path / "generated"
+    target = tmp_path / "consumer"
+    surfaces = (".claude", ".agents")
+    for surface in surfaces:
+        skill = source / surface / "skills/openwiki/SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("bootstrap-generated v1\n", encoding="utf-8")
+
+    # A genuinely fresh install still seeds the bundle today.
+    copy_generated_tree(source, target, dry_run=False)
+    for surface in surfaces:
+        assert (target / surface / "skills/openwiki/SKILL.md").read_text(
+            encoding="utf-8"
+        ) == "bootstrap-generated v1\n"
+
+    # Without the marker, it is still ordinary generated content: a refresh
+    # with newer generated content overwrites it as today.
+    for surface in surfaces:
+        (source / surface / "skills/openwiki/SKILL.md").write_text(
+            "bootstrap-generated v2\n", encoding="utf-8"
+        )
+    copy_generated_tree(source, target, dry_run=False)
+    for surface in surfaces:
+        assert (target / surface / "skills/openwiki/SKILL.md").read_text(
+            encoding="utf-8"
+        ) == "bootstrap-generated v2\n"
+
+    # OpenWiki's own installer now claims the live copy by writing its
+    # marker alongside SKILL.md.
+    for surface in surfaces:
+        live = target / surface / "skills/openwiki"
+        (live / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+        (live / ".openwiki-install.json").write_text("{}", encoding="utf-8")
+
+    # A refresh with newer generated content must not overwrite it.
+    for surface in surfaces:
+        (source / surface / "skills/openwiki/SKILL.md").write_text(
+            "bootstrap-generated v3\n", encoding="utf-8"
+        )
+    copy_generated_tree(source, target, dry_run=False)
+    for surface in surfaces:
+        assert (target / surface / "skills/openwiki/SKILL.md").read_text(
+            encoding="utf-8"
+        ) == "openwiki-managed\n"
+
+    # A refresh must not prune it even once the bootstrap stops generating it.
+    for surface in surfaces:
+        skill = source / surface / "skills/openwiki/SKILL.md"
+        skill.unlink()
+        skill.parent.rmdir()
+    copy_generated_tree(source, target, dry_run=False)
+    for surface in surfaces:
+        assert (target / surface / "skills/openwiki/SKILL.md").read_text(
+            encoding="utf-8"
+        ) == "openwiki-managed\n"
+        assert (
+            target / surface / "skills/openwiki" / ".openwiki-install.json"
+        ).is_file()
 
 
 def test_fresh_install_gitignore_excludes_provenance_secret(tmp_path: Path) -> None:
@@ -1780,3 +1882,47 @@ def test_runtime_check_accepts_root_owned_agents_manifest(tmp_path: Path) -> Non
         ".claude/bootstrap-ownership.env" in error for error in missing_hook_errors
     )
     assert any(".agents/hooks.json" in error for error in missing_hook_errors)
+
+
+def test_runtime_check_marker_gates_openwiki_skill_bundle_drift(
+    tmp_path: Path,
+) -> None:
+    """Without OpenWiki's install marker, `.claude/skills/openwiki` and
+    `.agents/skills/openwiki` are ordinary generated content and a diverged
+    copy is reported as drift like any other; once the marker exists in the
+    live copy, both surfaces (and the `.claude/bootstrap-root/.agents`
+    backup mirror, gated by the live `.agents` marker) are exempt
+    (R-OPENWIKI-G5)."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+
+    validate_agents_takeover(GENERATED, target)
+    copy_generated_tree(GENERATED, target, dry_run=False)
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        (target / name).write_bytes((REPO_ROOT / name).read_bytes())
+    assert _git(target, "add", "AGENTS.md", "CLAUDE.md").returncode == 0
+    populate_bootstrap_root(target, False, False)
+    assert runtime_drift_errors(target, GENERATED) == []
+
+    # Without OpenWiki's marker, a diverged live copy is still ordinary
+    # generated content: the dogfood check reports it as drift.
+    diverged = b"# hand-edited, no OpenWiki marker\n"
+    (target / ".claude/skills/openwiki/SKILL.md").write_bytes(diverged)
+    (target / ".agents/skills/openwiki/SKILL.md").write_bytes(diverged)
+    (target / ".claude/bootstrap-root/.agents/skills/openwiki/SKILL.md").write_bytes(
+        diverged
+    )
+    unmarked_errors = runtime_drift_errors(target, GENERATED)
+    assert any(".claude/skills/openwiki/SKILL.md" in error for error in unmarked_errors)
+    assert any(".agents/skills/openwiki/SKILL.md" in error for error in unmarked_errors)
+
+    # Once OpenWiki's installer claims the live copies by writing its
+    # marker, both surfaces (and the mirror) are exempt again.
+    (target / ".claude/skills/openwiki/.openwiki-install.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    (target / ".agents/skills/openwiki/.openwiki-install.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    assert runtime_drift_errors(target, GENERATED) == []

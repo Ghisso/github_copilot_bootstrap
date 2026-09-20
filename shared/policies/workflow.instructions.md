@@ -196,12 +196,20 @@ Environment-variable bypasses are not supported.
 
 ## OpenWiki Refresh
 
-OpenWiki refresh runs only as one serial, explicit, model-backed lifecycle
-action, through `.claude/scripts/openwiki_refresh.py` (see
-`.claude/skills/openwiki/SKILL.md`). It is never added to a hook,
-`verify.py`, the installer, state-sync, post-commit, or a scheduled CI job.
-See `workspace.instructions.md`'s Knowledge Ownership section for why the
-result carries no authority: OpenWiki is derived context, not authority.
+OpenWiki runs host-driven, not through a bootstrap-spawned process: the
+coding agent calls OpenWiki's own MCP tools directly (see
+`.claude/skills/openwiki/SKILL.md`), and OpenWiki's server writes
+`openwiki/**` and, at `openwiki_begin` only, a managed block into root
+`AGENTS.md` and `CLAUDE.md`. A hook guard, `openwiki-guard.sh`, snapshots
+both adapters and the OpenWiki workflow-file path before `openwiki_begin`
+and restores them after; restore coverage differs by host, so the skill
+also tells the agent when to run the restore manually. `mode: "update"` is
+the only mode the guard allows; it denies `init`. A commit-time backstop in
+`verify.py` refuses a commit that still carries the managed block, a new
+OpenWiki workflow file, or a tracked `openwiki/.run.json`, independently of
+the hook. See `workspace.instructions.md`'s Knowledge Ownership section for
+why the result carries no authority: OpenWiki is derived context, not
+authority.
 
 ---
 
@@ -237,7 +245,7 @@ big plan fails validation if more than one phase carries the
 `-knowledge-refresh` suffix, or if one exists but is not the last phase.
 
 **Shape.** Small, and only this: refresh through
-`.claude/skills/openwiki/SKILL.md` and its runner, inspect the generated
+`.claude/skills/openwiki/SKILL.md`, inspect the generated
 diff, run the standing final-phase documentation/memory/LEARN audit already
 required below — the same `## Stale-claims surfaces checked` requirement;
 this phase is what satisfies it, not a second, competing one — then review,
@@ -247,7 +255,7 @@ transition scope.
 **Failure.** A failed refresh blocks that phase's completion like any other
 failed phase, without fabricating a deterministic verification failure —
 see "OpenWiki Refresh" above for that boundary. A provider or
-authentication failure is reported with the runner's own actionable error
+authentication failure is reported with OpenWiki's own actionable error
 and retried once fixed; an enabled repository's required refresh is never
 silently skipped. An unreachable recorded base HEAD follows the skill's
 rebaseline rule, never `--init`.

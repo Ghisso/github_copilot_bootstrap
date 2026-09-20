@@ -3147,6 +3147,297 @@ def test_generation_check_requires_generated_verifier(tmp_path: Path) -> None:
     assert verify.generation_check(tmp_path)["status"] == "UNVERIFIED"
 
 
+# --- OpenWiki managed-state backstop (Phase G, Step G2) ---
+
+
+def test_openwiki_managed_state_violations_empty_on_a_clean_tree(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+@pytest.mark.parametrize("adapter", ["AGENTS.md", "CLAUDE.md"])
+def test_openwiki_managed_state_violations_flags_a_live_managed_block(
+    tmp_path: Path, adapter: str
+) -> None:
+    (tmp_path / adapter).write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(v.startswith(f"{adapter} still carries") for v in violations)
+
+
+def test_openwiki_managed_state_violations_flags_an_untracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is untracked")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_flags_a_staged_new_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is staged as a new file")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_a_tracked_unchanged_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_accepts_a_staged_modification_to_a_tracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    """A staged edit to an already-tracked workflow file is not "staged as
+    new" - only a brand-new file staged for the first time is."""
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    workflow.write_text("name: openwiki\non: [push]\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_flags_a_tracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith("openwiki/.run.json is tracked or staged") for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_an_untracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_generation_check_fails_on_a_live_managed_block(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "AGENTS.md" in str(result["summary"])
+
+
+def test_generation_check_fails_on_an_untracked_openwiki_workflow(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert ".github/workflows/openwiki-update.yml" in str(result["summary"])
+
+
+def test_generation_check_fails_on_a_tracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "openwiki/.run.json" in str(result["summary"])
+
+
+def test_gate_flags_a_live_managed_block_under_exact(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any("openwiki-managed-state: AGENTS.md" in error for error in errors)
+
+
+def test_gate_does_not_flag_a_managed_block_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_an_untracked_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is untracked"
+        in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_an_untracked_workflow_file_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_staged_new_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is staged "
+        "as a new file" in error
+        for error in errors
+    )
+
+
+def test_gate_accepts_a_tracked_unchanged_workflow_file(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    _write_gate_phase_plan(tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_tracked_run_json_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: openwiki/.run.json is tracked or staged" in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_a_tracked_run_json_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_accepts_an_untracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
 def test_canonical_serialization_is_stable() -> None:
     """Receipt output has stable object-key ordering for machine consumers."""
     assert verify.canonical_json({"b": 1, "a": 2}) == '{"a":2,"b":1}'

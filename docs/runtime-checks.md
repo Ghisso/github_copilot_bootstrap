@@ -167,6 +167,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 - `run-hook.sh`
 - `protect-files.sh`
+- `openwiki-guard.sh`
 - `pretool-bash-guard.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
@@ -531,6 +532,7 @@ of this changes what a gate checks, only what an operator should expect.
 | Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks approval when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
 | `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
+| OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
 
 The reverse also holds: three gates in this table's family now stand down
 instead of newly blocking. The commit, push, and branch-creation gates skip a

@@ -24,6 +24,7 @@ from runtime_ownership import (
     install_mode_from_manifest,
     is_consumer_state_path,
     is_root_adapter_path,
+    is_third_party_skill_dir,
     restore_manifest,
 )
 
@@ -403,6 +404,18 @@ def validate_agents_takeover(source: Path, target: Path) -> None:
     )
 
 
+def _third_party_skill_owner(surface_root: Path, relative_path: Path) -> bool:
+    """Return whether ``relative_path`` (relative to ``surface_root``, e.g.
+    ``.claude`` or ``.agents``) sits inside a marker-claimed third-party
+    skill directory. Checks ``relative_path`` itself and every ancestor so a
+    file nested inside the bundle is covered by its directory's marker."""
+    return any(
+        is_third_party_skill_dir(surface_root / candidate)
+        for candidate in (relative_path, *relative_path.parents)
+        if candidate != Path(".")
+    )
+
+
 def copy_generated_tree(
     source: Path,
     target: Path,
@@ -458,6 +471,9 @@ def copy_generated_tree(
                     for name in names
                     if not (relative_directory == Path(".") and name == ".git")
                     and not is_consumer_state_path(relative_directory / name)
+                    and not _third_party_skill_owner(
+                        claude_root, relative_directory / name
+                    )
                     and not (
                         relative_directory == Path(".") and name == "bootstrap-root"
                     )
@@ -476,7 +492,10 @@ def copy_generated_tree(
                 owned.update(
                     path.relative_to(target)
                     for path in adapter_path.rglob("*")
-                    if path.is_file() or path.is_symlink()
+                    if (path.is_file() or path.is_symlink())
+                    and not _third_party_skill_owner(
+                        adapter_path, path.relative_to(adapter_path)
+                    )
                 )
         return owned
 
@@ -524,6 +543,21 @@ def copy_generated_tree(
             elif should_preserve(relative_path):
                 ignored.add(name)
                 info(f"preserve tracked authoring adapter {relative_path.as_posix()}")
+            elif (
+                # OpenWiki's own installer owns `.claude/skills/openwiki` and
+                # `.agents/skills/openwiki` once it writes its marker there;
+                # a refresh must not overwrite either once it exists, only
+                # seed it on a genuinely fresh install.
+                relative_path.parts
+                and relative_path.parts[0] in (".claude", ".agents")
+                and _third_party_skill_owner(
+                    target / relative_path.parts[0],
+                    relative_path.relative_to(relative_path.parts[0]),
+                )
+            ):
+                if destination_path.exists() or destination_path.is_symlink():
+                    ignored.add(name)
+                    info(f"preserve third-party skill {relative_path.as_posix()}")
         return ignored
 
     for child in sorted(source.iterdir()):
