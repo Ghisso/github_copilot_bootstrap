@@ -37,6 +37,13 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   violation; `gate_receipt_errors` adds one `openwiki-managed-state:` error per
   violation under `exact` only. 19 new tests on real temporary repositories;
   one docs row. No check ID or schema change.
+- Step G6 prose done by the prose coder across seven files; three stale
+  "the runner" claims beyond the two named sections were also corrected. The
+  skill now states per-host restore coverage and the manual `post` command.
+  The coder saw `verify.py fast` fail with `receipt metadata control-plane
+  provenance is invalid`; expected after editing root `AGENTS.md`/`CLAUDE.md`
+  (their installed mirror under `.claude/bootstrap-root/` is stale until the
+  self overlay refresh at VERIFY), not a defect.
 
 ## Review findings and dispositions
 
