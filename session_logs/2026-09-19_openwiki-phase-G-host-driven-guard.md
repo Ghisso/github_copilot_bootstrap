@@ -87,7 +87,32 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
 
 ## Review findings and dispositions
 
-(pending)
+Round 1 (Phase F3 reviewer reused; profiles `code`, `architecture`,
+`security`, `tests`, `ponytail`, `documentation`): 1 CRITICAL, 1 MAJOR, 0
+MINOR. Gate FAIL. Both reproduced against the real guard script.
+
+- CRITICAL code — a manifest that is valid JSON but lacks its `adapters` or
+  `workflow` keys was treated like an explicit "file was absent" record, so
+  `post` (and `pre`'s heal step) deleted root `AGENTS.md` and `CLAUDE.md` and
+  reported success. On Codex `Stop` runs `post` every turn, so a corrupted
+  cache file would have removed real repository content. Fix: validate the
+  manifest shape first; absence must come only from an explicit
+  `present: false`; a malformed manifest makes `post` exit 2 touching nothing
+  and `pre` deny.
+- MAJOR security — a symlinked adapter was followed: `pre` copied the link
+  target's bytes into the repo-local cache, and `post` flattened the link into
+  a regular file. Fix: a symlinked adapter or workflow path is undeterminable;
+  `pre` denies naming it, `post` refuses it; recorded in the residual limits.
+- Dropped by the reviewer after reproduction: a suspected repeat of the Phase
+  F3 symlinked-root defect; here both sides open the filesystem, so the two
+  spellings reach the same file.
+- Noted, not a finding: the verifier's "staged as new" check for the workflow
+  file accepted any staged change. Tightened to `--diff-filter=A` by the
+  verifier coder as a precision fix.
+
+Held up on review: per-host wiring matches the spike; the real-binary smoke
+test has no skip path; the marker-gated ownership predicate does not confuse
+`skills/openwiki-review`; docs match the code and the spike.
 
 ## [LEARN] Entries
 
