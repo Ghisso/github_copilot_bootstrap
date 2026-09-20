@@ -341,7 +341,15 @@ def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> No
     baseline) aborts on every one of those bare forms with 'unbound
     variable' under `set -u` when the array is empty. This host's newer
     Bash cannot reproduce that abort, so the fix is pinned at the source
-    level instead of behaviorally."""
+    level instead of behaviorally.
+
+    Phase F3 (2026-09-19_phase-F3-hook-target-scoping) added
+    ``_git_invocation_top_level``, ``git_targets_other_repository``,
+    ``_git_invocation_created_branch`` and
+    ``branch_create_targets_other_repository`` (``_lib-frontmatter.sh``),
+    plus a ``git_command_targets_repo_root`` rewrite (``reporting-reminder.sh``)
+    that all walk a possibly-empty tokenized array the same way; every new
+    site is pinned below alongside the Phase B2 originals."""
     frontmatter_text = (SCRIPT_SRC / "_lib-frontmatter.sh").read_text(encoding="utf-8")
     git_protection_text = (SCRIPT_SRC / "git-protection.sh").read_text(encoding="utf-8")
     reporting_reminder_text = (SCRIPT_SRC / "reporting-reminder.sh").read_text(
@@ -367,13 +375,41 @@ def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> No
             "_lib-frontmatter.sh",
             "_TOKENS",
             'tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})',
-            3,
+            5,
         ),
         (
             frontmatter_text,
             "_lib-frontmatter.sh",
             "tokens",
             '_git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (parse_branch_create_command)",
+            'if branch="$(_git_invocation_created_branch ${tokens[@]+"${tokens[@]}"})"; then',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (branch_create_targets_other_repository)",
+            'if _git_invocation_created_branch ${tokens[@]+"${tokens[@]}"} >/dev/null; then',
+            1,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "tokens (git_targets_other_repository / branch_create_targets_other_repository)",
+            'target="$(_git_invocation_top_level ${tokens[@]+"${tokens[@]}"})" || return 1',
+            2,
+        ),
+        (
+            frontmatter_text,
+            "_lib-frontmatter.sh",
+            "forward",
+            'effective="$(git -C "$REPO_ROOT" ${forward[@]+"${forward[@]}"} rev-parse --show-toplevel 2>/dev/null || true)"',
             1,
         ),
         (
@@ -388,6 +424,13 @@ def test_confirmed_reachable_sites_use_the_guarded_array_expansion_idiom() -> No
             "reporting-reminder.sh",
             "expected",
             'for index in ${expected[@]+"${!expected[@]}"}; do',
+            1,
+        ),
+        (
+            reporting_reminder_text,
+            "reporting-reminder.sh",
+            "forward",
+            'target="$(_git_invocation_top_level ${forward[@]+"${forward[@]}"})" || return 1',
             1,
         ),
     )
@@ -926,6 +969,528 @@ def test_git_targets_nested_claude_does_not_exempt_mixed_compound_commands() -> 
     assert _git_targets_nested_claude(both_nested, "commit") == 0
 
 
+def _init_git_repo(path: Path, *, bare: bool = False) -> Path:
+    """Create a minimal real git repository (bare or not) at ``path``. No
+    commit is needed for any of the resolver tests below: ``git rev-parse
+    --show-toplevel`` behaves realistically right after ``git init``."""
+    path.mkdir(parents=True, exist_ok=True)
+    args = (
+        ["git", "init", "-q", "--bare"] if bare else ["git", "init", "-q", "-b", "main"]
+    )
+    subprocess.run([*args, str(path)], check=True, capture_output=True, text=True)
+    return path
+
+
+def _physical_path(path: Path) -> str:
+    return subprocess.run(
+        ["bash", "-c", f"cd {shlex.quote(str(path))} && pwd -P"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout.strip()
+
+
+def _git_invocation_top_level(
+    repo_root: Path, *tokens: str
+) -> subprocess.CompletedProcess[str]:
+    quoted = " ".join(shlex.quote(token) for token in tokens)
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n_git_invocation_top_level {quoted}"
+    )
+    return _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+
+
+def _git_targets_other_repository(
+    command: str, subcommand: str, repo_root: Path
+) -> int:
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n"
+        f"git_targets_other_repository {shlex.quote(command)} {shlex.quote(subcommand)}; "
+        "printf '%s' $?"
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return int(result.stdout.strip())
+
+
+def _branch_create_targets_other_repository(command: str, repo_root: Path) -> int:
+    expression = (
+        f"REPO_ROOT={shlex.quote(str(repo_root))}\n"
+        f"branch_create_targets_other_repository {shlex.quote(command)}; printf '%s' $?"
+    )
+    result = _bash_source(SCRIPT_SRC / "_lib-frontmatter.sh", expression)
+    assert result.returncode == 0, result.stderr
+    return int(result.stdout.strip())
+
+
+def test_git_invocation_top_level_resolves_a_real_repository_to_itself(
+    tmp_path: Path,
+) -> None:
+    """F3.1 Contract: the private resolver prints the physical top level a
+    -C redirect targets."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    target = _init_git_repo(tmp_path / "target")
+
+    result = _git_invocation_top_level(repo_root, "-C", str(target))
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == _physical_path(target)
+
+
+@pytest.mark.parametrize(
+    ("command_template", "expected"),
+    (
+        ("git -C {other} commit -m x", 0),
+        ("git commit -m x", 1),
+        ("git --git-dir {other}/.git --work-tree={other} commit -m x", 0),
+        ("git --work-tree={other} commit -m x", 0),
+        # --git-dir given without --work-tree is a real git footgun, not a
+        # foreign redirect: git defines the CURRENT directory as the work
+        # tree in that case (confirmed against git 2.43), so the invocation
+        # still acts on REPO_ROOT's own working tree and correctly stays
+        # gated. Every existing caller of this resolver already forwards
+        # --git-dir and --work-tree together (tests/test_lifecycle_hooks.py),
+        # never --git-dir alone.
+        ("git --git-dir {other}/.git commit -m x", 1),
+        ("git -C {notrepo} commit -m x", 1),
+        ("git -C {bare} commit -m x", 1),
+        ('git -C "$SOME_VAR" commit -m x', 1),
+        ("git -c foo=bar -C {other} commit -m x", 1),
+        ("git -C {other} commit -m a && git -C {other2} commit -m b", 0),
+        ("git -C {other} commit -m a && git commit -m b", 1),
+        ("git commit -m a && git -C {other} commit -m b", 1),
+    ),
+    ids=(
+        "explicit-C-foreign",
+        "no-redirect-stays-gated",
+        "git-dir-and-work-tree-together-foreign",
+        "work-tree-alone-foreign",
+        "git-dir-alone-stays-gated",
+        "nonexistent-directory-stays-gated",
+        "bare-repository-stays-gated",
+        "unexpanded-variable-stays-gated",
+        "unforwarded-flag-stays-gated",
+        "two-distinct-foreign-repos-foreign",
+        "foreign-then-local-stays-gated",
+        "local-then-foreign-stays-gated",
+    ),
+)
+def test_git_targets_other_repository_scenarios(
+    tmp_path: Path, command_template: str, expected: int
+) -> None:
+    """F3.1 Contract: ``git_targets_other_repository`` fails closed on
+    anything undeterminable and returns 0 only when every matching
+    invocation provably resolves to a different, real repository. The
+    ``explicit-C-foreign`` case is the exact Phase F reproduction."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    other = _init_git_repo(tmp_path / "other")
+    other2 = _init_git_repo(tmp_path / "other2")
+    notrepo = tmp_path / "notrepo"
+    notrepo.mkdir()
+    bare = _init_git_repo(tmp_path / "bare.git", bare=True)
+
+    command = command_template.format(
+        other=other, other2=other2, notrepo=notrepo, bare=bare
+    )
+    assert _git_targets_other_repository(command, "commit", repo_root) == expected
+
+
+@pytest.mark.parametrize(
+    ("command_template", "expected"),
+    (
+        ("git -C {other} switch -c anything", 0),
+        ("git -C {other} checkout -b anything", 0),
+        ("git switch -c foo_implementation", 1),
+        ("git checkout -b not-an-implementation-name", 1),
+        ("git -C {other} switch -c a && git switch -c b_implementation", 1),
+        ("git -C {notrepo} checkout -b x", 1),
+        ("git branch foo", 1),
+    ),
+    ids=(
+        "switch-c-foreign",
+        "checkout-b-foreign",
+        "switch-c-local-stays-gated",
+        "checkout-b-local-stays-gated",
+        "mixed-foreign-and-local-stays-gated",
+        "unresolvable-target-stays-gated",
+        "plain-branch-creates-nothing",
+    ),
+)
+def test_branch_create_targets_other_repository_scenarios(
+    tmp_path: Path, command_template: str, expected: int
+) -> None:
+    """F3.6 Contract: branch creation spans two subcommand shapes with
+    different flag grammars, so this predicate cannot reuse
+    git_targets_other_repository directly; it is tested the same way."""
+    repo_root = _init_git_repo(tmp_path / "repo_root")
+    other = _init_git_repo(tmp_path / "other")
+    notrepo = tmp_path / "notrepo"
+    notrepo.mkdir()
+
+    command = command_template.format(other=other, notrepo=notrepo)
+    assert _branch_create_targets_other_repository(command, repo_root) == expected
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_branch"),
+    (
+        ("git checkout -b foo_implementation", "foo_implementation"),
+        ("git checkout -B foo_implementation", "foo_implementation"),
+        ("git switch -c bar_implementation", "bar_implementation"),
+        ("git switch -C bar_implementation", "bar_implementation"),
+        ("git switch --create bar_implementation", "bar_implementation"),
+        ("git switch --create=bar_implementation", "bar_implementation"),
+        ('git checkout -b "quoted_implementation"', "quoted_implementation"),
+        ("git checkout -b 'quoted_implementation'", "quoted_implementation"),
+        ("git status", ""),
+        ("git branch foo", ""),
+        ("git checkout main", ""),
+        ("git -C /tmp checkout -b elsewhere", "elsewhere"),
+        ("git --git-dir /tmp/.git checkout -b elsewhere", "elsewhere"),
+        ("git --work-tree /tmp checkout -b elsewhere", "elsewhere"),
+        (
+            "git status && git checkout -b second_implementation",
+            "second_implementation",
+        ),
+    ),
+)
+def test_parse_branch_create_command_matches_the_pre_extraction_grammar(
+    command: str, expected_branch: str
+) -> None:
+    """F3.6 Acceptance: extracting ``_git_invocation_created_branch`` must
+    not change ``parse_branch_create_command``'s observable per-invocation
+    grammar (global-flag skip, checkout -b/-B, switch -c/-C/--create(=), and
+    quote stripping)."""
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"parse_branch_create_command {shlex.quote(command)}",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == expected_branch
+
+
+def _commit_gate_repo(tmp_path: Path, branch: str = "main") -> Path:
+    """A synthetic outer checkout on a non-implementation branch, isolated
+    via ``_isolated_hook_scripts_dir``, so the commit ceremony denies
+    deterministically once reached, whatever the scoping exemption decides."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    for args in (
+        ["git", "init", "-q", "-b", branch],
+        ["git", "config", "user.email", "hook@example.com"],
+        ["git", "config", "user.name", "Hook Test"],
+    ):
+        subprocess.run(args, cwd=tmp_path, check=True, capture_output=True, text=True)
+    return scripts_dir / "enforce-commit-gate.sh"
+
+
+def _run_enforce_commit_gate(
+    script: Path, cwd: Path, command: str
+) -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return subprocess.run(
+        ["bash", str(script), "test-target"],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_enforce_commit_gate_scopes_a_foreign_commit(tmp_path: Path) -> None:
+    """The exact Phase F reproduction: this must fail before the change."""
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {other} commit --allow-empty -m spike"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_still_denies_a_commit_targeting_this_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof the gate still fires for a commit that does target this
+    repository."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(script, tmp_path, 'git commit -m "x"')
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "commit gate failed for test-target" in result.stdout
+
+
+def test_enforce_commit_gate_denies_when_a_local_commit_follows_a_foreign_one(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {other} commit -m a && git commit -m b"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_denies_when_a_foreign_commit_follows_a_local_one(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git commit -m b && git -C {other} commit -m a"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_allows_two_distinct_foreign_commits(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    other_a = _init_git_repo(tmp_path / "other-a")
+    other_b = _init_git_repo(tmp_path / "other-b")
+
+    result = _run_enforce_commit_gate(
+        script,
+        tmp_path,
+        f"git -C {other_a} commit -m a && git -C {other_b} commit -m b",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_keeps_the_pre_existing_nested_claude_exemption(
+    tmp_path: Path,
+) -> None:
+    """Unchanged: the nested-.claude exemption is checked before, and
+    independently of, the foreign-repository exemption this phase adds."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(script, tmp_path, "git -C .claude commit -m sync")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_commit_gate_ignores_a_cd_prefix_and_still_denies(
+    tmp_path: Path,
+) -> None:
+    """Documented limit: a `cd` prefix is out of scope and stays gated."""
+    script = _commit_gate_repo(tmp_path)
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, "cd /tmp/elsewhere && git commit -m x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_commit_gate_denies_a_commit_to_an_unresolvable_target(
+    tmp_path: Path,
+) -> None:
+    script = _commit_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = _run_enforce_commit_gate(
+        script, tmp_path, f"git -C {not_a_repo} commit -m x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def _branch_state_gate_repo(tmp_path: Path, current_branch: str = "dev") -> Path:
+    """A synthetic outer checkout for enforce-branch-state.sh, isolated via
+    ``_isolated_hook_scripts_dir``."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    subprocess.run(
+        ["git", "init", "-q", "-b", current_branch],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return scripts_dir / "enforce-branch-state.sh"
+
+
+def _run_enforce_branch_state(
+    script: Path, cwd: Path, command: str
+) -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}})
+    return subprocess.run(
+        ["bash", str(script), "test-target"],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=cwd,
+    )
+
+
+def test_enforce_branch_state_scopes_a_foreign_switch(tmp_path: Path) -> None:
+    """Foreign case; fails before the change."""
+    script = _branch_state_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {other} switch -c anything"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_branch_state_scopes_a_foreign_checkout(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {other} checkout -b anything"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_branch_state_still_denies_a_local_switch(tmp_path: Path) -> None:
+    """The proof the branch gate still fires for a branch created in this
+    repository."""
+    script = _branch_state_gate_repo(tmp_path, current_branch="not-dev")
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "git switch -c foo_implementation"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "must be created from dev" in result.stdout
+
+
+def test_enforce_branch_state_still_denies_a_bad_branch_name(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "git checkout -b not-an-implementation-name"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "implementation branch must be named" in result.stdout
+
+
+def test_enforce_branch_state_denies_when_only_some_creations_are_foreign(
+    tmp_path: Path,
+) -> None:
+    script = _branch_state_gate_repo(tmp_path, current_branch="not-dev")
+    other = _init_git_repo(tmp_path / "other")
+
+    result = _run_enforce_branch_state(
+        script,
+        tmp_path,
+        f"git -C {other} switch -c a && git switch -c b_implementation",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_denies_an_unresolvable_target(tmp_path: Path) -> None:
+    script = _branch_state_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, f"git -C {not_a_repo} checkout -b x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_ignores_a_cd_prefix_and_still_denies(
+    tmp_path: Path,
+) -> None:
+    """Documented limit: a `cd` prefix is out of scope, for the same reason
+    given in the commit gate."""
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(
+        script, tmp_path, "cd /tmp/elsewhere && git checkout -b x"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_branch_state_does_not_gate_plain_branch_creation(
+    tmp_path: Path,
+) -> None:
+    """`git branch foo` creates no checked-out branch; the parser has no
+    `branch` arm today, and this phase does not add one."""
+    script = _branch_state_gate_repo(tmp_path)
+
+    result = _run_enforce_branch_state(script, tmp_path, "git branch foo")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_record_branch_state_writes_nothing_for_a_foreign_branch_creation(
+    tmp_path: Path,
+) -> None:
+    """record-branch-state.sh is unchanged by this phase: its own
+    CURRENT_BRANCH != BRANCH bail already declines to write when the branch
+    created is not this repository's own HEAD, so a foreign branch creation
+    cannot reach the plan-state write, proven here end-to-end."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    subprocess.run(
+        ["git", "init", "-q", "-b", "dev"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    big_plan = plans / "foo.md"
+    original_text = (
+        "---\nname: foo\ntype: big-plan\nstatus: planning\nphases:\n"
+        "  - phase-one\n---\n"
+    )
+    big_plan.write_text(original_text, encoding="utf-8")
+    other = _init_git_repo(tmp_path / "other")
+
+    payload = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_input": {"command": f"git -C {other} switch -c foo_implementation"},
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(scripts_dir / "record-branch-state.sh")],
+        cwd=tmp_path,
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert big_plan.read_text(encoding="utf-8") == original_text
+
+
 def _run_protect_files(
     payload: dict, repo_root: Path | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -1343,16 +1908,23 @@ def test_protect_files_blocks_mutation_through_symlinked_protected_source(
 
 
 def test_protect_files_blocks_write_through_symlinked_directory(tmp_path: Path) -> None:
-    protected_dir = tmp_path / ".claude" / "hooks"
+    """A write through a symlinked directory that resolves onto this
+    repository's own protected hooks path is still denied. Anchored to an
+    isolated checkout (F3.4 scopes the ``.claude/hooks/**``-style control-
+    plane alternatives to REPO_ROOT): both the symlink and its real target
+    must live inside REPO_ROOT for the resolved candidate to land there."""
+    repo_root = tmp_path / "repo"
+    protected_dir = repo_root / ".claude" / "hooks"
     protected_dir.mkdir(parents=True)
-    alias = tmp_path / "ordinary"
+    alias = repo_root / "ordinary"
     alias.symlink_to(protected_dir, target_is_directory=True)
 
     process = _run_protect_files(
         {
             "tool_name": "Bash",
             "tool_input": {"command": f"printf x > {alias / 'new.sh'}"},
-        }
+        },
+        repo_root,
     )
     assert process.returncode == 0, process.stderr
     assert '"permissionDecision":"deny"' in process.stdout

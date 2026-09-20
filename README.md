@@ -274,8 +274,13 @@ runtime, in order:
    records each result in the receipt; one failing command means no receipt
    (see the Verification Evidence Contract in
    `.claude/instructions/workflow.instructions.md`).
-6. Run the native commit and pre-push gates. Commit only after those gates
-   pass; the orchestrator then attempts the permitted outer-repository push.
+6. Run `git commit` in its own command, after the receipts exist. The commit
+   gate hook judges a command's text before it runs, so a chain that ends in
+   `git commit` is denied on the old receipts and nothing in it executes. The
+   orchestrator then attempts the permitted outer-repository push. The
+   step-by-step version of this list, with the reason each step precedes the
+   next, is the CLOSEOUT sequence in
+   `.claude/instructions/workflow.instructions.md`.
 
 Step 3's position is exact. `closeout --persist` refuses, writes nothing, and
 names the remediation when the big plan is not yet retrievable from nested

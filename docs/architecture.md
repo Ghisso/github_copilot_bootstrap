@@ -473,7 +473,13 @@ redirects, `sed -i`/`perl -i`, and mutating commands remain protected. Copy,
 install, and move operations include both source and destination operands in
 the protection check, preventing a protected source file from being copied out
 through a write-bearing command; unknown command syntax with a protected literal
-is denied rather than guessed.
+is denied rather than guessed. How far the classifier reaches differs by rule:
+the hook paths and protected hook configuration files that identify this
+repository's own guardrail setup are scoped to this repository only, decided
+on the candidate's resolved real path, while the credential-shaped rules
+(`.env*`, `uv.lock`, `credentials*`, `.pem`/`.key`) reach any path, in this
+repository or any other. A candidate whose real path cannot be resolved stays
+protected rather than being allowed.
 
 `git-protection.sh` scans a possibly-chained Bash command for destructive git subcommands (`reset --hard`, `push --force`, `checkout --`, `clean -fd`, deleting `main`/`master`). Because `_shell_tokenize` drops shell operators (`;`/`|`/`&`) as mere separators, the flattened token stream for `git clean -f && ls -d /tmp` has no trace of the `&&` — scanning "does -d appear anywhere after clean" would misattribute `ls`'s unrelated `-d` to `git clean`, denying a wholly benign command (and the same shape misattributes an unrelated later `--force` to an earlier `git push`). `git_danger_reason` bounds each invocation's argument scan to `_unquoted_operator_boundary` — the point right before the next unquoted operator — so a later chained command's flags can never bleed into an earlier invocation's danger check, while a real danger later in the same chain (`git status && git reset --hard`) is still caught on its own invocation.
 

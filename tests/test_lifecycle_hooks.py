@@ -956,3 +956,146 @@ def test_enforce_pr_gate_plain_push_denial_omits_the_chained_commit_hint(
     assert '"permissionDecision":"deny"' in result.stdout
     assert PUSH_GATE_SEPARATE_COMMANDS_PREFIX not in result.stdout
     assert "missing big-plan file" in result.stdout
+
+
+def test_enforce_pr_gate_scopes_a_foreign_push(tmp_path: Path) -> None:
+    """F3.5: a `git push` explicitly redirected at another repository is not
+    this repository's release ceremony. Fails before the change."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(script, tmp_path, f"git -C {other_repo} push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_push_targeting_this_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof the push gate still fires for a push that does target this
+    repository."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_denies_when_only_some_pushes_are_foreign(
+    tmp_path: Path,
+) -> None:
+    """One push is undeterminable relative to REPO_ROOT, so the whole
+    command still gates."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, f"git -C {other_repo} push && git push"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_denies_a_push_to_an_unresolvable_target(
+    tmp_path: Path,
+) -> None:
+    script = enforce_pr_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = run_enforce_pr_gate(script, tmp_path, f"git -C {not_a_repo} push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_ignores_a_cd_prefix_and_still_denies(tmp_path: Path) -> None:
+    """Documented limit: the same `cd` limit as the commit gate."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "cd /tmp/elsewhere && git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_pull_request(tmp_path: Path) -> None:
+    """The proof the pull-request gate is unchanged."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "gh pr create --base dev")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_pull_request_naming_another_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof that naming another repository does not excuse a pull
+    request: `gh pr create` has no directory redirect, so it is always
+    checked from this checkout (Scope)."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, "gh pr create -R other/repo --base dev"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_closes_the_nested_push_pull_request_hole(
+    tmp_path: Path,
+) -> None:
+    """The pre-existing hole: before this change, the nested-.claude push
+    exemption exited the whole hook, letting a chained `gh pr create` skip
+    every check below unchecked. This test fails before the change and is
+    the one test here that proves the restructure rather than the scoping."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, "git -C .claude push && gh pr create --base dev"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_closes_the_foreign_push_pull_request_hole(
+    tmp_path: Path,
+) -> None:
+    """The same hole in its new form: a push that provably targets another
+    repository must not excuse a chained pull request either, proving the
+    added push exemption did not reopen the hole F3.5 closes."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(
+        script,
+        tmp_path,
+        f"git -C {other_repo} push && gh pr create --base dev",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_nested_push_alone_still_exits_clean(tmp_path: Path) -> None:
+    """Unchanged: a nested-.claude push with no pull request still stands
+    down entirely."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git -C .claude push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
