@@ -44,6 +44,12 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   provenance is invalid`; expected after editing root `AGENTS.md`/`CLAUDE.md`
   (their installed mirror under `.claude/bootstrap-root/` is stale until the
   self overlay refresh at VERIFY), not a defect.
+- Step G5 first draft preserved `skills/openwiki` on every refresh. The coder
+  reported the conflict: the bootstrap still generates that skill (G6 rewrites
+  it in this phase, Phase H renames it), so this repository's own installed
+  copy would have frozen on the old text. Decision: third-party ownership is
+  gated on OpenWiki's own marker file `.openwiki-install.json`; recorded in
+  the plan's Step G5.
 
 ## Review findings and dispositions
 

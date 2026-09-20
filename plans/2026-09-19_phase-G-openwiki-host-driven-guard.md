@@ -174,6 +174,13 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 - **Behavior:** OpenWiki's installer writes `SKILL.md`, `.openwiki-install.json`, and
   `agents/*.yaml` into those two directories in Phase I; the bootstrap never generates or edits
   them afterwards.
+- **Marker rule (decided 2026-09-21 during implementation):** a directory under
+  `THIRD_PARTY_SKILL_PATHS` is third-party-owned only when it contains
+  `.openwiki-install.json`, the file OpenWiki's installer writes. Without the marker it stays
+  ordinary generated content: refresh overwrites and prunes it, and `check_runtime.py`
+  compares it. Reason: the bootstrap still ships `shared/skills/openwiki/SKILL.md` into that
+  path until Phase H renames it; an unconditional preserve-on-refresh would have kept every
+  installed copy, including this repository's own, on the pre-G6 text.
 - **Verification:** `uv run pytest tests/test_install_bootstrap.py -q` plus runtime-check tests;
   `uv run python scripts/check_runtime.py`
 
