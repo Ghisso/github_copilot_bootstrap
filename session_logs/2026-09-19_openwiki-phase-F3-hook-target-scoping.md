@@ -39,6 +39,22 @@ let a chained pull request through unchecked.
   (classifier split, gate stand-down paragraph, reverse note under the
   refresh-gates table), `docs/smoke-tests.md`, `docs/architecture.md`. The
   pull-request exception is stated as a deliberate choice with its reason.
+- Steps F3.1, F3.2, F3.5, F3.6 done by the git-gate coder: one resolver
+  `_git_invocation_top_level` in the shared library, two predicates on it
+  (`git_targets_other_repository`, `branch_create_targets_other_repository`),
+  `reporting-reminder.sh` reusing it instead of its own copy, and the three
+  gates exempting a provably foreign target. `enforce-pr-gate.sh` restructured
+  into per-shape detection so a nested-state push can no longer excuse a
+  chained `gh pr create`; the two hole-closing tests fail on the old hook and
+  pass on the new one (stash-verified). 62 new tests across
+  `tests/test_hook_gates.py` and `tests/test_lifecycle_hooks.py`;
+  `tests/test_branch_state.py` passes unedited. `shellcheck` is not installed
+  here, so only `bash -n` ran on the shell files.
+- Plan correction accepted: `--git-dir <repo>/.git` **alone** stays gated. Git
+  documents that without `--work-tree` the current directory is the working
+  tree, so from inside this checkout that command commits this repository's
+  files into a borrowed object store. The plan's test scenario listed it as
+  foreign; the plan text was corrected and a pinned test added.
 
 ## Review findings and dispositions
 

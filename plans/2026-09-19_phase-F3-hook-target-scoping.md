@@ -142,8 +142,11 @@ instead of growing a fourth copy.
 - **Test scenarios** (`tests/test_hook_gates.py`, reusing `_bash_source` at `:75` and the
   `_git_targets_nested_claude` probe shape at `:90`): a real temporary git repository created
   under `tmp_path` resolves to itself; `git -C <tmp-repo> commit -m x` returns 0; `git commit -m x`
-  with no redirect returns 1; `--git-dir <tmp-repo>/.git commit` and
-  `--work-tree=<tmp-repo> commit` return 0; `-C <nonexistent>` returns 1; `-C "$SOME_VAR"` returns
+  with no redirect returns 1; `--git-dir <tmp-repo>/.git --work-tree <tmp-repo> commit` and
+  `--work-tree=<tmp-repo> commit` return 0; `--git-dir <tmp-repo>/.git commit` **alone** returns 1
+  (corrected 2026-09-20 during implementation: without `--work-tree`, git treats the current
+  directory as the working tree, so from inside this checkout that command commits this
+  repository's files into a borrowed object store and must stay gated); `-C <nonexistent>` returns 1; `-C "$SOME_VAR"` returns
   1; `-C <tmp-dir-that-is-not-a-repo>` returns 1; `-C .claude` returns 1 (inside this repository,
   and still handled by the nested exemption); a bare repository returns 1; `git -c foo=bar -C
   <tmp-repo> commit` returns 1 because an unforwarded flag makes the invocation undeterminable.
