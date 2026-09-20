@@ -210,6 +210,17 @@ def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
     this repository (its `resolved` form, which is what matched the name
     pattern, does not).
 
+    `source` is tested against **both** `repo_root`'s own literal form and
+    its `os.path.realpath()` form, contained if either succeeds.
+    `repo_root_from_script` (`_lib-frontmatter.sh`) resolves `REPO_ROOT` with
+    a plain `cd && pwd`, which preserves a symlinked path component instead
+    of resolving it (macOS `/tmp` -> `/private/tmp` is the standard case; a
+    symlinked home directory or mount is another). Without this, a `source`
+    reached through the *other* form of the same directory - `resolved`
+    following symlinks down to `repo_root`'s physical path while `repo_root`
+    itself is still the symlinked one, or vice versa - would read as outside
+    a repository it is actually inside.
+
     Containment is decided on resolved path components via
     `os.path.commonpath`, never a string prefix, so a sibling directory
     whose name merely starts with `repo_root` (`/repo-evil` vs `/repo`) is
@@ -233,11 +244,16 @@ def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
     ):
         return True
     try:
-        repo_norm = os.path.normpath(repo_root)
-        common = os.path.commonpath([repo_norm, os.path.normpath(source)])
+        source_norm = os.path.normpath(source)
+        repo_lexical = os.path.normpath(repo_root)
+        repo_real = os.path.realpath(repo_root)
+        lexically_inside = (
+            os.path.commonpath([repo_lexical, source_norm]) == repo_lexical
+        )
+        really_inside = os.path.commonpath([repo_real, source_norm]) == repo_real
     except (OSError, ValueError):
         return True
-    return common == repo_norm
+    return lexically_inside or really_inside
 
 
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
