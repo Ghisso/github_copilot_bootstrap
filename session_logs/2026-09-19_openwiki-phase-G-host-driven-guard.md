@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-21
 **Plan:** `.claude/plans/2026-09-19_phase-G-openwiki-host-driven-guard.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -152,9 +152,25 @@ test has no skip path; the marker-gated ownership predicate does not confuse
 
 ## Verification
 
-(pending: runner summary lines pasted at closeout)
+Summary lines printed by `verify closeout --format text` for the six required
+items:
 
-- optional 1: (pending)
+```text
+PASS       43.5s  uv run pytest tests/test_openwiki_guard.py tests/test_openwiki_cli_smoke.py tests/test_hook_gates.py tests/test_install_bootstrap.py -q --tb=short
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       57.7s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      120.4s  uv run python .claude/scripts/verify.py phase --format json --persist
+```
+
+Round 2 review gate: PASS with zero findings; findings report persisted with all
+six profiles and `ponytail_reviewed: true`. `verify phase` PASS (1755 tests).
+
+- optional 1: PASS — `docker build -f .devcontainer/Dockerfile .devcontainer` on Docker
+  28.3.1 completed with exit 0, so the replaced smoke line (`command -v openwiki`, the
+  0.5.2 version-pin test, and `openwiki integrations list </dev/null`) passes inside the
+  image; the throwaway image was removed afterwards.
 
 ## Open Questions / Next Steps
 
