@@ -76,6 +76,18 @@ that file, for a reason that stands on its own: the hook's existing exemption fo
 state-sync repository currently exits the whole hook, which lets a pull request slip past
 unchecked.
 
+**Carried into this phase (2026-09-20).** Four files edited after Phase F2's completion commit
+ride in this phase's diff and review: `shared/policies/workflow.instructions.md` (new numbered
+`### CLOSEOUT sequence` with two hard rules), `shared/agents/orchestrator/prompt.md` (CLOSEOUT
+step points to it), `shared/skills/commit/SKILL.md` and `README.md` (the commit-gate hook judges a
+command's text before it runs, so `git commit` runs in its own command). They are policy prose
+requested by the user after two closeout ordering mistakes; the `documentation` review profile is
+added to Step F3.8 for them.
+
+**Test-file deviation.** Steps F3.3 and F3.4 put their tests in a new
+`tests/test_protect_files_scoping.py` instead of `tests/test_hook_gates.py`, so the two coders
+working in parallel do not edit the same test file.
+
 ## Steps
 
 ### Step F3.1 — Promote the target-repository resolver into the shared hook library
@@ -509,6 +521,7 @@ plan inventory. All three are meaningless for a foreign target, which is the def
   - `security`
   - `tests`
   - `ponytail`
+  - `documentation` (carried policy prose and Step F3.7)
 - **Review focus:**
   - `security`, on Step F3.5's restructured hook: confirm that no command containing a
     `gh pr create` can leave the hook before reaching the branch check, the `--base dev` check and
