@@ -91,6 +91,21 @@ Round 1 (profiles `code`, `architecture`, `security`, `tests`, `ponytail`,
 - MINOR ponytail — a near-verbatim duplicate closeout-receipt test helper.
   Fix: one optional parameter on the existing helper.
 
+Round 2 (fresh reviewer; profiles `code`, `security`, `tests`, `ponytail`,
+`documentation`): all five round-1 fixes verified against real bash
+execution and the persisted receipt file; 2 new MAJOR (security), same root
+cause. Gate FAIL.
+
+- MAJOR security — `verify.py clos\eout`: bash removes the backslash, the
+  quote-stripping guard does not, so the item passed L4 and the runtime
+  refusal and would launch a real recursive closeout. Fix: one shared
+  `_shell_flatten` (strip quotes, collapse `\X` to `X`) used by both checks.
+- MAJOR security — `|| /bin/true`, `|| tru\e` were not recognised as
+  unfailable. Fix: flatten first, then match a path-qualified `true` or `:`.
+  Ceiling recorded in a `ponytail:` comment: `|| exit 0`, `; true`, and
+  wrapper scripts are not detected; the runner still records the real exit
+  code and the `tests` profile asks whether a check can fail.
+
 Held up on review: ordering of the runner before metadata, no receipt written
 on a failing item, `fast`/`phase` modes unchanged, path confinement, schema
 stability, all eight message prefixes matching the docs.
