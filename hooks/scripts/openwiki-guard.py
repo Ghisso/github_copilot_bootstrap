@@ -19,7 +19,12 @@ repository-local check, this guard fingerprints only the two adapters and
 `WORKFLOW`, and it does not replace `protect-files`, which governs the
 agent's own file-editing tool calls independently of anything OpenWiki does.
 This guard does not run OpenWiki, take locks, or write outside its own
-snapshot directory.
+snapshot directory. It also never reads or writes *through* a symlinked
+adapter or workflow path: following one at snapshot time would copy
+external content into the repo-local manifest, and writing back through one
+at restore time (`os.replace`) would silently flatten it into a plain file.
+Either direction is treated as undeterminable rather than guessed at - `pre`
+denies naming the symlinked path, `post` leaves it alone and exits 2.
 """
 
 from __future__ import annotations
@@ -132,30 +137,101 @@ def _read_payload(raw: str) -> dict:
 # --- manifest ---------------------------------------------------------
 
 
+class _MalformedManifest(Exception):
+    """The snapshot manifest file exists but its shape cannot be trusted.
+
+    A manifest missing `adapters`/`workflow`, or an entry with no explicit
+    boolean `present`, must never be read as "recorded absent" - that
+    reading previously made `_restore_one` delete live, unsnapshotted files.
+    """
+
+
+def _manifest_malformed_reason(repo_root: str, error: Exception) -> str:
+    return (
+        "openwiki-guard: snapshot manifest {!r} is malformed ({}); resolve "
+        "manually before retrying".format(_manifest_path(repo_root), error)
+    )
+
+
+def _valid_manifest_entry(entry: object) -> bool:
+    """True only when `entry` explicitly records presence (and, when
+    present, content) - never inferred from a missing or wrong-typed key."""
+    if not isinstance(entry, dict):
+        return False
+    present = entry.get("present")
+    if not isinstance(present, bool):
+        return False
+    if present and not isinstance(entry.get("content_b64"), str):
+        return False
+    return True
+
+
+def _validate_manifest(manifest: object) -> dict:
+    if not isinstance(manifest, dict) or manifest.get("version") != 1:
+        raise _MalformedManifest("unexpected version or top-level shape")
+    adapters = manifest.get("adapters")
+    if not isinstance(adapters, dict):
+        raise _MalformedManifest("missing adapters")
+    for name in ADAPTERS:
+        if not _valid_manifest_entry(adapters.get(name)):
+            raise _MalformedManifest(f"missing or invalid adapters entry: {name}")
+    if not _valid_manifest_entry(manifest.get("workflow")):
+        raise _MalformedManifest("missing or invalid workflow entry")
+    return manifest
+
+
 def _load_manifest(repo_root: str) -> dict | None:
+    """Returns None only when no manifest file exists. Raises
+    `_MalformedManifest` for anything present but untrustworthy - invalid
+    JSON, or JSON that does not pass `_validate_manifest` - rather than
+    letting a caller treat an unrecognized shape as "nothing to restore"."""
     raw = _read_bytes(_manifest_path(repo_root))
     if raw is None:
         return None
-    return json.loads(raw.decode("utf-8"))
+    try:
+        manifest = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as error:
+        raise _MalformedManifest(str(error)) from error
+    return _validate_manifest(manifest)
 
 
-def _snapshot_entry(repo_root: str, relative_path: str) -> dict:
-    content = _read_bytes(os.path.join(repo_root, relative_path))
+def _snapshot_entry(repo_root: str, relative_path: str) -> dict | None:
+    """None means the path could not be safely fingerprinted: currently,
+    only a symlink, since following it would copy external content into the
+    repo-local manifest and restoring through it later would flatten it."""
+    path = os.path.join(repo_root, relative_path)
+    if os.path.islink(path):
+        return None
+    content = _read_bytes(path)
     if content is None:
         return {"present": False}
     return {"present": True, "content_b64": base64.b64encode(content).decode("ascii")}
 
 
-def _write_manifest(repo_root: str) -> None:
-    manifest = {
-        "version": 1,
-        "adapters": {name: _snapshot_entry(repo_root, name) for name in ADAPTERS},
-        "workflow": _snapshot_entry(repo_root, WORKFLOW),
-    }
+def _write_manifest(repo_root: str) -> list[str]:
+    """Write the manifest atomically and return an empty list on success.
+    Returns the sorted list of guarded paths that could not be snapshotted
+    (currently: symlinks) without writing anything, on failure."""
+    adapter_entries: dict[str, dict] = {}
+    symlinked: list[str] = []
+    for name in ADAPTERS:
+        entry = _snapshot_entry(repo_root, name)
+        if entry is None:
+            symlinked.append(name)
+        else:
+            adapter_entries[name] = entry
+    workflow_entry = _snapshot_entry(repo_root, WORKFLOW)
+    if workflow_entry is None:
+        symlinked.append(WORKFLOW)
+    if symlinked:
+        return sorted(symlinked)
+
+    manifest = {"version": 1, "adapters": adapter_entries, "workflow": workflow_entry}
     _write_bytes_atomic(
         _manifest_path(repo_root),
         json.dumps(manifest, separators=(",", ":")).encode("utf-8"),
     )
+    return []
 
 
 def _delete_manifest(repo_root: str) -> None:
@@ -183,6 +259,13 @@ def _restore_one(
     result: _RestoreResult,
 ) -> None:
     path = os.path.join(repo_root, relative_path)
+    if os.path.islink(path):
+        # Restoring through a symlink (os.replace) would silently flatten
+        # it into a plain file; removing one recorded absent would be safe
+        # on its own, but is refused too so this rule stays one blanket,
+        # easily-audited check instead of a per-branch exception.
+        result.mismatches.append(relative_path)
+        return
     current = _read_bytes(path)
     snapshot_present = bool(snapshot_entry and snapshot_entry.get("present"))
 
@@ -242,6 +325,10 @@ def _marker_strip_fallback(repo_root: str) -> _RestoreResult:
     result = _RestoreResult()
     for name in ADAPTERS:
         path = os.path.join(repo_root, name)
+        if os.path.islink(path):
+            # Same rule as _restore_one: never write through a symlink.
+            result.actions[name] = "unchanged"
+            continue
         current = _read_bytes(path)
         if current is None:
             result.actions[name] = "unchanged"
@@ -304,7 +391,11 @@ def _cmd_pre(payload: dict) -> int:
         )
         return 0
 
-    manifest = _load_manifest(real_repo_root)
+    try:
+        manifest = _load_manifest(real_repo_root)
+    except _MalformedManifest as error:
+        _deny(_manifest_malformed_reason(real_repo_root, error))
+        return 0
     if manifest is not None:
         heal = _restore_from_manifest(real_repo_root, manifest)
         if heal.mismatches:
@@ -315,7 +406,12 @@ def _cmd_pre(payload: dict) -> int:
             )
             return 0
 
-    _write_manifest(real_repo_root)
+    symlinked = _write_manifest(real_repo_root)
+    if symlinked:
+        _deny(
+            "openwiki-guard: refusing a symlinked guarded path: " + ", ".join(symlinked)
+        )
+        return 0
     return 0
 
 
@@ -325,7 +421,11 @@ def _cmd_post(_payload: dict) -> int:
     # finding 3), and a manual `post </dev/null` invocation has no payload
     # at all.
     repo_root = _repo_root()
-    manifest = _load_manifest(repo_root)
+    try:
+        manifest = _load_manifest(repo_root)
+    except _MalformedManifest as error:
+        sys.stderr.write(_manifest_malformed_reason(repo_root, error) + "\n")
+        return 2
     if manifest is None:
         result = _marker_strip_fallback(repo_root)
         print("restored_from: marker-strip; " + _summarize(result))

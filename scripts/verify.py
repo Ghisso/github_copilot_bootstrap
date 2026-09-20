@@ -2980,10 +2980,20 @@ def openwiki_managed_state_violations(root: Path) -> list[str]:
                 "bash .claude/hooks/scripts/openwiki-guard.sh post "
                 "</dev/null to restore it"
             )
-    workflow_staged = bool(
-        git_output(["diff", "--cached", "--name-only", "--", OPENWIKI_WORKFLOW], root)
+    workflow_staged_as_new = bool(
+        git_output(
+            [
+                "diff",
+                "--cached",
+                "--name-only",
+                "--diff-filter=A",
+                "--",
+                OPENWIKI_WORKFLOW,
+            ],
+            root,
+        )
     )
-    if workflow_staged:
+    if workflow_staged_as_new:
         violations.append(
             f"{OPENWIKI_WORKFLOW} is staged as a new file; OpenWiki init "
             "mode is forbidden - delete it"
