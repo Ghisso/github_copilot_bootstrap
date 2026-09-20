@@ -240,7 +240,8 @@ evidence. Every other surface — the plan and session-log templates, the
 ### The required `## Verification` block
 
 A small plan's `## Verification` section holds one or more fenced code
-blocks, each labeled `bash` or `sh`. Every non-comment line inside those
+blocks, each labeled `bash` or `sh` and fenced with either ``` or ~~~. Every
+non-comment line inside those
 blocks is a required item: a shell command that `verify closeout` runs
 itself, from the repository root, and that must exit 0. Never list
 `verify.py closeout` as a required item; it cannot certify itself.

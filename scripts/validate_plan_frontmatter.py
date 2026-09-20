@@ -377,10 +377,39 @@ def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
         return match.group("body") if match is not None else None
 
     def normalize(line: str) -> str:
-        comment = re.search(r"\s#\s", line)
-        if comment is not None:
-            line = line[: comment.start()]
-        return re.sub(r"\s+", " ", line).strip()
+        # Quote-aware scan: a "#" only opens a trailing comment when it is
+        # whitespace-bounded on both sides and outside any open quote span,
+        # so `git commit -m "Fix bug # 123"` is never truncated mid-string.
+        # A backslash only escapes a quote inside a double-quoted span,
+        # matching POSIX shell quoting; single quotes have no escape.
+        quote = ""
+        cut = len(line)
+        index = 0
+        while index < len(line):
+            char = line[index]
+            if quote:
+                if quote == '"' and char == "\\" and index + 1 < len(line):
+                    index += 2
+                    continue
+                if char == quote:
+                    quote = ""
+                index += 1
+                continue
+            if char in "'\"":
+                quote = char
+                index += 1
+                continue
+            if (
+                char == "#"
+                and index > 0
+                and line[index - 1].isspace()
+                and index + 1 < len(line)
+                and line[index + 1].isspace()
+            ):
+                cut = index
+                break
+            index += 1
+        return re.sub(r"\s+", " ", line[:cut]).strip()
 
     required: list[str] = []
     verification_body = section_body("Verification")
@@ -432,6 +461,22 @@ def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
                 optional.append(item)
 
     return required, optional
+
+
+def _names_closeout(item: str) -> bool:
+    """Return whether a normalized item's text names ``verify.py closeout``.
+
+    Strips quote characters first so ``verify.py "closeout"``,
+    ``clos""eout``, or ``--format json closeout`` (mode given after
+    options) cannot hide the nesting from a literal substring match.
+
+    ponytail: this cannot see through a ``$VAR`` shell expansion that only
+    resolves to "closeout" at runtime - bash still executes it, and the
+    resulting recursive ``verify.py closeout`` run fails on the same plan
+    it is trying to close out, which is a loud failure, not a silent pass.
+    """
+    stripped = item.replace("'", "").replace('"', "")
+    return re.search(r"verify\.py\b.*\bcloseout\b", stripped) is not None
 
 
 def _mask_span(text: str, start: int, end: int) -> str:
@@ -492,12 +537,16 @@ def validate_verification_contract(
             "with the required commands"
         )
     for item in required:
-        if "|| true" in item or "|| :" in item:
+        # Quote characters can hide "|| true"/"verify.py closeout" from a
+        # literal substring check (see _names_closeout), so both L3 and L4
+        # scan the same quote-stripped form.
+        quote_stripped_item = item.replace("'", "").replace('"', "")
+        if re.search(r"\|\|\s*(?:true|:)(?![\w-])", quote_stripped_item):
             errors.append(
                 f"{path}:{heading_line}: L3 unfailable-verification: "
                 f'"{item}" can never fail; remove the fallback'
             )
-        if "verify.py closeout" in item:
+        if _names_closeout(item):
             errors.append(
                 f'{path}:{heading_line}: L4 self-listed-closeout: "{item}" '
                 "lists closeout, which runs the block itself; remove it"
