@@ -70,7 +70,30 @@ was ever exercised directly.
 
 ## Review findings and dispositions
 
-(pending)
+Round 1 (profiles `code`, `architecture`, `security`, `tests`, `ponytail`,
+`documentation`): 0 CRITICAL, 4 MAJOR, 1 MINOR. Gate FAIL.
+
+- MAJOR security — the "closeout may not list itself" refusal was a literal
+  substring test; `verify.py "closeout"`, `clos""eout`, or the mode written
+  after options bypassed it, and nothing else guards recursion. Fix: strip
+  quote characters, then match `verify\.py\b.*\bcloseout\b`, identically in
+  the lint and the runner.
+- MAJOR code — the comment cut in `normalize()` stopped at the first ` # `
+  even inside quotes, truncating `git commit -m "Fix bug # 123" # note`.
+  Fix: quote-aware scan for the first `#` outside quotes.
+- MAJOR security — the unfailable-item check needed literal spaces around
+  `||`; `cmd||true` passed plan approval and would always record PASS. Fix:
+  whitespace-tolerant pattern on the quote-stripped item.
+- MAJOR tests — the parser's documented rules and the runner-before-metadata
+  ordering had no direct unit test; the three defects above were exactly the
+  uncovered cases. Fix: direct parser tests and a `main()`-level closeout
+  test on the persisted receipt's `tree_sha`.
+- MINOR ponytail — a near-verbatim duplicate closeout-receipt test helper.
+  Fix: one optional parameter on the existing helper.
+
+Held up on review: ordering of the runner before metadata, no receipt written
+on a failing item, `fast`/`phase` modes unchanged, path confinement, schema
+stability, all eight message prefixes matching the docs.
 
 ## [LEARN] Entries
 
