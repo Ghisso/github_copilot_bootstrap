@@ -77,7 +77,30 @@ let a chained pull request through unchecked.
 
 ## Review findings and dispositions
 
-(pending)
+Round 1 (fresh reviewer; profiles `code`, `architecture`, `security`, `tests`,
+`ponytail`, `documentation`): 1 CRITICAL, 0 MAJOR, 0 MINOR. Gate FAIL.
+
+- CRITICAL security — `_control_plane_in_repo_root` compared the repository
+  root without resolving symlinks against a candidate that was resolved, so
+  when the checkout itself sits behind a symlink (macOS `/tmp` to
+  `/private/tmp`, a symlinked home or mount) an in-repository control-plane
+  file named by its physical path was judged outside and left unprotected.
+  Reproduced by the reviewer against the real module. Fix: containment is
+  true when either the literal or the resolved form of the repository root
+  contains the source; docstring corrected; tests added for both root
+  spellings.
+- Dropped by the reviewer in its second pass: a ponytail candidate about the
+  repeated git-invocation walk, because the same idiom already exists in the
+  nested-repository predicate this phase must not touch.
+- Orchestrator addition after review: `docs/runtime-checks.md` now states
+  that `--git-dir` without `--work-tree` does not stand down, matching the
+  accepted plan correction.
+
+Held up on review: resolver forwards only the three redirect flags and
+composes repeated `-C` in order; every `IS_PR=1` path in the push hook reaches
+the branch, base, and closeout checks; `..` and sibling-name lookalikes; all
+in-repository spellings of the settings file; the CLOSEOUT sequence prose
+matches `verify.py`'s real ordering requirements.
 
 ## [LEARN] Entries
 
