@@ -14,26 +14,36 @@ closeout_session_log:
 Phase A listed a real-CLI smoke check, hedged it ("when a devcontainer build environment is
 available"), never ran it, recorded "not run because no build environment was used", and passed
 closeout. This phase makes that class of failure impossible without judgement: a plan's required
-verification is a mandated, machine-read list; the completing phase's closeout log must account
-for every item with a PASS; conditional phrasing about checks is refused at plan time; optional
-checks have exactly one declared home; the spike skill is routed to third-party binaries, CLIs,
-and MCP servers; and the `tests` review profile asks whether the external dependency was ever
-exercised directly.
+verification is a mandated, machine-read list of shell commands; `verify closeout` **runs every
+one of them itself** and records each exit code and output tail inside the closeout receipt, so a
+required check can neither be skipped nor reported as passed without having run; conditional
+phrasing about checks is refused at plan time; optional checks have exactly one declared home;
+the spike skill is routed to third-party binaries, CLIs, and MCP servers; and the `tests` review
+profile asks whether the external dependency was ever exercised directly.
+
+The user chose the run-it-yourself design over a log-accounting design on 2026-09-20. A gate that
+only reads "PASS" out of the session log confirms the word was written, not that the command
+ran; it would have moved Phase A's failure from "skipped and admitted" to "skipped and written as
+passed". Running the commands removes the agent from the evidence path. The session log still
+accounts for optional items, because those may be interactive procedures a script cannot run.
 
 Measured before design, and it corrects the obvious assumption: Phase A's hedge was **not** in
 the plan's `## Verification` block. It was a step-level `- **Verification:**` sub-bullet, and all
-five commands the block did list genuinely passed. Closeout accounting alone would have passed
+five commands the block did list genuinely passed. Running the block alone would have passed
 Phase A. The hedge lint is what catches it. The two mechanisms are complementary, not redundant,
 and they fire at different times: plan approval, and completion commit.
 
 This is unrelated to OpenWiki and lives on this branch by the user's decision, to avoid a second
-branch and a `verify.py` conflict with Phase G. It changes no check ID: `load_receipt` requires
-exactly `CHECK_IDS` and `historical_chain_errors` reloads every earlier completed phase's
-receipt, so a new ID would invalidate Phases A–C. Both new gates surface through the existing
-closeout-evidence error path, the way Phase C's stale-claims gate does. The closeout gate judges
-only the phase being completed (`verify closeout` run and `gate --head-relation exact`); the
-plan-time lint judges only live plans dated on or after 2026-09-19. Completed and cancelled plans
-are dated records and are never re-judged.
+branch and a `verify.py` conflict with Phase G. It changes no check ID and no schema version:
+`load_receipt` requires exactly `CHECK_IDS` and `historical_chain_errors` reloads every earlier
+completed phase's receipt, so a new ID would invalidate Phases A–C. The run results live under
+the receipt's existing optional `extensions` object (`RECEIPT_EXTENSIONS_FIELD`), which
+`validate_receipt` already accepts as any dictionary, so Phase A–C receipts without it still
+load. Both new gates surface through the existing closeout-evidence error path, the way Phase
+C's stale-claims gate does. The closeout gate judges only the phase being completed
+(`verify closeout` run and `gate --head-relation exact`); the plan-time lint judges only live
+plans dated on or after 2026-09-19. Completed and cancelled plans are dated records and are
+never re-judged.
 
 Hedge-pattern measurement over this repository's 107 small plans: a verb-anchored pattern list
 flags 10 plans, 7 of them genuine hedged checks (Phase A's line among them); a bare phrase list
@@ -50,11 +60,15 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
     other surfaces link here); update "Session Logging" and the CLOSEOUT step of the Canonical
     Orchestrator Loop
   - modify `shared/templates/plan-small.md`: the `## Verification` block comment states that
-    every non-comment line is a required item the closeout log must record as PASS; add an
-    `## Optional Verification` section with a one-line comment stating it is the only place a
-    check may be conditional; update the closeout checklist item
+    every non-comment line is a required shell command that `verify closeout` runs itself from
+    the repository root and that must exit 0; anything a script cannot run (an interactive
+    probe, a host session, a manual inspection) belongs under `## Optional Verification`; add
+    that section with a one-line comment stating it is the only place a check may be
+    conditional or non-executable; update the closeout checklist item
   - modify `shared/templates/session-log.md`: rename `## Verification Results` to
-    `## Verification` and show the mandated line grammar
+    `## Verification`; the section records each optional item's outcome (or NOT RUN with a
+    reason) in the mandated line grammar, and pastes the one-line-per-item summary that
+    `verify closeout --format text` prints for the required items
   - modify `shared/skills/plan-decomposition/SKILL.md` Step 4 "Verification" bullet
   - modify `shared/agents/planner/prompt.md` (Plan Requirements), plus the routing rule from F2.4
   - modify `shared/agents/orchestrator/prompt.md` CLOSEOUT step
@@ -65,12 +79,16 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
   - `shared/skills/humanize/SKILL.md`
   - `shared/skills/ponytail/SKILL.md` in `full` mode
 - **Canonical text must state, imperatively:** the plan block shape and parsing rules (section,
-  fence languages, comment stripping, continuation joining, whitespace collapsing, labels for
-  interactive procedures, `verify.py closeout` never listed); the `## Optional Verification`
-  rule; the log line grammar; the hedge rule with the pattern list reproduced verbatim and the
-  constant name `HEDGED_VERIFICATION_PATTERNS`; the scopes (`VERIFICATION_CONTRACT_SINCE`, live
-  statuses, completing phase only); and which script enforces which rule with which message
-  prefix.
+  fence languages, comment stripping, continuation joining, whitespace collapsing, every item a
+  shell command run from the repository root, `verify.py closeout` never listed); that
+  `verify closeout` runs the required items itself, in order, before it binds the tree, and
+  refuses to persist a receipt when any item fails or times out; the per-item timeout constant
+  `VERIFICATION_ITEM_TIMEOUT_SECONDS` and its value; where the results live
+  (`extensions.verification_items` in the closeout receipt); the `## Optional Verification`
+  rule; the log line grammar for optional items; the hedge rule with the pattern list
+  reproduced verbatim and the constant name `HEDGED_VERIFICATION_PATTERNS`; the scopes
+  (`VERIFICATION_CONTRACT_SINCE`, live statuses, completing phase only); and which script
+  enforces which rule with which message prefix.
 - **Acceptance criteria:** every rule the code enforces is written here first; no other file
   restates it, they link; generated targets carry the template and prompt changes.
 
@@ -106,7 +124,7 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
   fails L2 on its step-bullet sentence; the current G–K plan texts pass after F2.6; the two July
   `in-progress` plans pass unchanged.
 
-### Step F2.3 — Closeout accounting in `verify.py`
+### Step F2.3 — `verify closeout` runs the required items and records them in the receipt
 
 - [ ] **Owner:** `coder`
 - **Target files:** modify `shared/scripts/verify.py`; extend `tests/test_verify.py`
@@ -115,26 +133,69 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
   - `shared/skills/ponytail/SKILL.md` in `full` mode
   - `shared/skills/code-style/SKILL.md`
   - `shared/skills/testing-patterns/SKILL.md`
-- **Contract:**
-  - `plan_verification_items` (mirror, equality-tested); `log_verification_outcomes` maps each
-    normalized item recorded under the log's `## Verification` H2 to `(outcome, detail)`;
-    `verification_accounting_errors(root, phase, log_path)`.
-  - Errors, each naming the log path, the plan path, the item, and the fix: **G1** no
-    `## Verification` section in the log; **G2** no outcome recorded for a required item;
-    **G3** FAIL recorded for a required item; **G4** NOT RUN recorded for a required item;
-    **G5** an optional item unaccounted for, or NOT RUN with an empty reason.
-  - Call sites: `gate_receipt_errors` immediately after the existing `closeout_log_errors` call,
-    guarded by `head_relation == "exact"`; and the `verify closeout` run as a pre-persist error
-    alongside `missing_documentation_na_reason`, so the operator sees it when running
-    `verify closeout` rather than only at `git commit`. Extra recorded items are ignored.
-  - Must not: add to `CHECK_IDS`, change `SCHEMA_VERSION`, change `closeout_log_errors`, or run
-    when `head_relation` is `ancestor` or `certified`.
-- **Test scenarios:** every G1–G5 path; exact match after normalization (trailing comment,
-  continuation lines, whitespace); PASS with trailing detail; optional NOT RUN with and without a
-  reason; `ancestor` relation never produces these errors even with a non-compliant log; a
-  persisted pre-F2 receipt for another phase still loads; the Phase A plan-and-log pair as
-  fixture copies passes as historically written, proving the lint rather than the gate is what
-  catches Phase A.
+- **Contract — the runner (`verify closeout` side):**
+  - `plan_verification_items` (mirror of the lint's copy, equality-tested).
+  - `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600`, separate from `COMMAND_TIMEOUT_SECONDS`
+    because a required item may itself be `verify.py phase`, which already spends up to
+    `COMMAND_TIMEOUT_SECONDS` on one pytest run.
+  - `run_verification_items(root, phase) -> list[dict]` reads the completing phase's plan file
+    through `confined_path` under `.claude/plans/`, extracts the required items, and runs each
+    one in order with `subprocess.run(["bash", "-c", item], cwd=root, capture_output=True,
+    text=True, timeout=VERIFICATION_ITEM_TIMEOUT_SECONDS)`. It never reads items from the
+    command line or the environment. Each result is
+    `{"item": <normalized text>, "status": "PASS" | "FAIL" | "TIMEOUT", "exit_code": int |
+    None, "duration_seconds": float, "output_tail": <last 20 lines, at most 2000 characters>}`.
+    It stops at the first non-PASS item and records the remaining items as
+    `{"status": "NOT RUN", "exit_code": None, ...}`, because a later item may depend on an
+    earlier one (for example `validate_targets.py` after `generate_targets.py --all`).
+  - Nesting refusal: an item whose normalized text contains `verify.py closeout` is recorded as
+    `FAIL` with `output_tail` "closeout may not list itself" and is not executed. This mirrors
+    the lint's L4 for plans that predate the lint or were edited after approval.
+  - **Ordering in `main`.** The runner executes **before** metadata is collected for closeout
+    mode, so any file an item rewrites (generated targets, a persisted phase receipt) is part of
+    the `tree_sha` and `content_hash` the receipt binds. `closeout_checks` then reuses the phase
+    receipt an item may just have persisted, which is the intended freshness path, not a
+    side effect.
+  - Failure path: when any result is not `PASS`, `main` prints one line per item to stderr
+    (`item`, `status`, `exit_code`, first line of `output_tail`) and returns 2 **before**
+    `build_receipt`, alongside the existing `missing_documentation_na_reason` and
+    `unpublishable_closeout_reason` pre-persist refusals. No receipt is written or overwritten.
+  - Success path: the results list is stored at `receipt["extensions"]["verification_items"]`
+    in the closeout receipt. `build_receipt` gains an optional `extensions` argument used only
+    by closeout mode; `validate_receipt` is not changed, because it already accepts the field.
+    In `--format text`, `verify closeout` prints one summary line per item
+    (`PASS  1.3s  <item>`), which the closeout log pastes.
+- **Contract — the gate (`git commit` side):**
+  - `verification_items_errors(root, phase, receipt) -> list[str]` is called from
+    `gate_receipt_errors` immediately after the existing `closeout_log_errors` call, guarded by
+    `head_relation == "exact"`. Errors, each naming the plan path, the receipt path, the item,
+    and the fix: **G1** the receipt has no `extensions.verification_items`; **G2** a required
+    item in the plan has no result in the receipt; **G3** a result whose `status` is not `PASS`;
+    **G4** the optional items are not all accounted for in the closeout log's `## Verification`
+    section (an outcome line, or NOT RUN with a non-empty reason). G2 exists because the plan is
+    a tracked file: under `exact` the tree binding already catches a plan edited after
+    `verify closeout`, but the message names the item rather than reporting a stale tree.
+    Extra results for items no longer in the plan are ignored.
+  - `log_verification_outcomes(text)` is the only session-log parsing that remains, and it is
+    used for optional items only.
+  - Must not: add to `CHECK_IDS`, change `SCHEMA_VERSION`, change `validate_receipt`, change
+    `closeout_log_errors`, or run for `ancestor` or `certified` relations.
+- **Test scenarios (runner):** all items exit 0 and appear in `extensions.verification_items`
+  with `PASS`, positive duration, and a captured tail; an item exiting 3 records `FAIL` with
+  `exit_code: 3`, the following item records `NOT RUN`, `main` returns 2, and no receipt file is
+  written; an item that sleeps past a monkeypatched one-second timeout records `TIMEOUT`; an
+  item containing `verify.py closeout` is refused without executing; an item that writes a
+  tracked file changes the receipt's `tree_sha` relative to a run without it, proving the
+  runner precedes metadata collection; `output_tail` is cut to 20 lines and 2000 characters;
+  a plan with an empty required block yields an empty results list and a passing closeout; an
+  existing passing receipt is left unchanged when the rerun fails (existing refusal path).
+- **Test scenarios (gate):** every G1–G4 path; a plan item added after the receipt was written
+  fails G2 naming the item; optional NOT RUN with and without a reason; `ancestor` relation never
+  produces these errors even with a receipt lacking `extensions`; a persisted pre-F2 closeout
+  receipt for another phase (no `extensions`) still loads and passes `historical_chain_errors`;
+  the two `plan_verification_items` copies are byte-equal; the Phase A plan text as a fixture
+  passes the runner's extraction with its five historically listed commands, proving the lint
+  rather than the runner is what catches Phase A.
 
 ### Step F2.4 — Route the spike skill to third-party binaries, CLIs, and MCP servers
 
@@ -177,9 +238,11 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
     and the smoke item's recorded outcome must show `1 passed`, not `skipped`
   - `.claude/plans/2026-09-19_phase-I-openwiki-enable-and-first-generation.md`: Step I3's Codex
     re-probe declared under `## Optional Verification`
-  - `docs/runtime-checks.md`: two rows in "Other gates that newly block a refresh" (plan-time
-    lint L1–L4, closeout accounting G1–G5), each with the exact message prefix and the recovery,
-    plus one paragraph describing the accounting and its `exact`-only scope
+  - `docs/runtime-checks.md`: three rows in "Other gates that newly block a refresh" (plan-time
+    lint L1–L4; `verify closeout` refusing to persist when a required item fails, times out, or
+    is `NOT RUN`; commit-time gate G1–G4), each with the exact message prefix and the recovery,
+    plus one paragraph describing that closeout runs the plan's required block itself, where the
+    results are stored in the receipt, the per-item timeout, and the gate's `exact`-only scope
   - `docs/architecture.md` only if it describes the closeout gate list
 - **Required Skills:**
   - `shared/skills/documentation/SKILL.md`
@@ -200,8 +263,14 @@ flags 34, mostly ordinary prose; scoping to verification contexts only halves re
   - `ponytail`
   - `documentation`
 - **Review focus:**
-  - no check ID or schema change; Phase A–C receipts still load
-  - the accounting never runs for an `ancestor` or `certified` relation
+  - no check ID or schema change; Phase A–C receipts (which have no `extensions`) still load
+  - the runner reads items only from the tracked plan file under `.claude/plans/` through
+    `confined_path`, never from arguments or the environment, and refuses `verify.py closeout`
+    as an item (`security`)
+  - the runner executes before closeout metadata is collected, so files an item rewrites are
+    inside the bound tree (`architecture`)
+  - a failing or timed-out item returns 2 before `build_receipt`; no receipt is written
+  - the gate never runs for an `ancestor` or `certified` relation
   - the two `plan_verification_items` copies are equality-tested
   - every message names file, line or item, and fix
   - the hedge list in code equals the canonical text
@@ -223,8 +292,9 @@ uv run python .claude/scripts/verify.py fast --format json
 uv run python .claude/scripts/verify.py phase --format json --persist
 ```
 
-This phase's own completion commit is the first real exercise of the new gate: the closeout log
-must record each of the seven items above as PASS, exactly as written.
+This phase's own completion commit is the first real exercise of the new runner: `verify closeout`
+runs the seven items above itself, and its receipt must carry seven `PASS` results. The last item
+persists the phase receipt that closeout then reuses, which is the intended order.
 
 ## Closeout Checklist
 
@@ -233,7 +303,7 @@ Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 
 - [ ] Documentation updated (`docs/runtime-checks.md` rows and paragraph)
 - [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section recording every item above as PASS
+- [ ] Closeout session log has `**Status:** COMPLETED` and a `## Verification` section pasting the runner's seven PASS summary lines (this plan has no optional items)
 - [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
 - [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
 - [ ] Every surviving MINOR has an explicit disposition and non-empty reason
