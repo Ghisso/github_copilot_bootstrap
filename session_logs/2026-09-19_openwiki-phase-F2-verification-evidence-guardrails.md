@@ -54,6 +54,19 @@ was ever exercised directly.
   ("closeout receipt final tracked state is stale", "findings report
   content_hash is stale", historical tree_sha mismatch). Handed to the script
   coder as a deterministic regression.
+- Root cause of the validator failure: the new gates working as designed. The
+  scenario's fixture helpers write undated plans with no `## Verification`
+  block (rejected by L1 through the real commit-msg hook) and build closeout
+  receipts directly, without `extensions.verification_items` (rejected by
+  G1). The stale-tree messages were downstream of the first refused commit.
+  Orchestrator decision: the two fixture helpers in
+  `scripts/validate_targets.py` gain a one-command `true` block and the
+  matching PASS result. 20 FAIL lines across six scenarios went to zero with
+  no other edits.
+- VERIFY round 2 after `generate_targets.py --all` and the self overlay
+  refresh: `validate_targets.py` exit 0; `check_runtime.py` exit 0;
+  `validate_plan_frontmatter.py` exit 0; `verify.py phase` PASS with 1625
+  tests, ruff and mypy clean, generated verifier matches source.
 
 ## Review findings and dispositions
 
