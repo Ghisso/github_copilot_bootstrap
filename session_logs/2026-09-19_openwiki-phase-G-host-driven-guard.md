@@ -117,6 +117,13 @@ MINOR. Gate FAIL. Both reproduced against the real guard script.
   file accepted any staged change. Tightened to `--diff-filter=A` by the
   verifier coder as a precision fix.
 
+Round 2 (same reviewer, delta only): both reproductions re-run against the
+fixed script (malformed manifest → exit 2 touching nothing; symlinked adapter
+→ deny, no manifest written); no path reaches a delete or write without a
+validated explicit `present`; the symlink refusal covers the workflow path; a
+symlinked snapshot directory is consistent by construction; normal restore
+unchanged. PASS with zero findings.
+
 Held up on review: per-host wiring matches the spike; the real-binary smoke
 test has no skip path; the marker-gated ownership predicate does not confuse
 `skills/openwiki-review`; docs match the code and the spike.
@@ -151,4 +158,12 @@ test has no skip path; the marker-gated ownership predicate does not confuse
 
 ## Open Questions / Next Steps
 
-(pending)
+- Next phase is `2026-09-19_phase-H-openwiki-skill-rename-and-host-rules`,
+  which renames the bootstrap skill and frees `skills/openwiki` for OpenWiki's
+  own installer; the marker rule from Step G5 makes that hand-over automatic.
+- Follow-ups carried: `verify closeout` traceback when the findings report is
+  missing (MINOR, from Phase F2); the overlay refresh reporting the nested
+  `.claude/.gitignore` as obsolete and `state-sync.sh` recreating it
+  (pre-existing, harmless, worth one look).
+- `openwiki@0.5.2` is now installed globally on this host for the required
+  handshake test; the devcontainer image carries the same pin.

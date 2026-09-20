@@ -1124,3 +1124,22 @@
   deviation in the plan. The only cross-file dependency this produced (a legacy
   test in one coder's file broken by the other's change) was resolved by
   routing the fix to the owning coder, not by editing across ownership.
+- [LEARN:security] Carried from the retired Phase A runner so nine review
+  rounds survive as design: a guard that fails closed on ordinary activity
+  gets routed around, so allow-list the one surface you own instead;
+  detection at commit time is not prevention, so pair the backstop with a
+  guard at the moment of the write; and never let a child process you did not
+  spawn define your safety boundary. The host-driven guard applies all three:
+  it wraps one MCP tool, snapshots before and restores after, and the
+  verifier refuses the commit if anything slipped through.
+- [LEARN:workflow] Ownership of a directory two parties write must key on a
+  fact only the intended owner produces. Path shape alone froze this
+  repository's own installed skill on stale text; keying on OpenWiki's own
+  `.openwiki-install.json` marker made the hand-over automatic and testable.
+- [LEARN:testing] A validator that treats every backticked repository path as a
+  file that must exist cannot describe a forbidden file. Name such a file
+  without a repository prefix, or the reference check demands its presence.
+- [LEARN:workflow] A required real-binary check needs the binary in the
+  environment that runs closeout, not only in the devcontainer image. Install
+  the pinned version where the phase actually closes out and record that in
+  the log, or the closeout runner fails on the first item.

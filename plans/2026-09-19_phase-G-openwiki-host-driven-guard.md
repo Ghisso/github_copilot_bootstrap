@@ -3,8 +3,8 @@ name: 2026-09-19_phase-G-openwiki-host-driven-guard
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 9
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-G-host-driven-guard.md
 ---
 
 # Small Plan: 2026-09-19_phase-G-openwiki-host-driven-guard
@@ -47,7 +47,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G1 — Add the `openwiki-guard` hook and wire it per the spike evidence
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:**
   - create `shared/hooks/scripts/openwiki-guard.py` (Python 3.9-compatible; stdlib only)
   - create `shared/hooks/scripts/openwiki-guard.sh` (conventions of `protect-files.sh`: stdin
@@ -105,7 +105,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G2 — Fold the deterministic commit backstop into the existing gates
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** `shared/scripts/verify.py` (extend `VFY-GEN-001` in `phase_checks`; extend
   `gate_receipt_errors`), its tests, `docs/runtime-checks.md` (one row)
 - **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode,
@@ -123,7 +123,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G3 — Retire the subprocess runner
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** delete `shared/scripts/openwiki_refresh.py` and
   `tests/test_openwiki_refresh.py`; `scripts/generate_targets.py` (remove the copy at lines
   297-301); `scripts/validate_targets.py` (remove `.claude/scripts/openwiki_refresh.py` near
@@ -141,7 +141,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G4 — Fix the devcontainer smoke line and add the real-binary MCP handshake test
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** `shared/devcontainer/Dockerfile:36-37`, `scripts/validate_targets.py:8685-8689`,
   new `tests/test_openwiki_cli_smoke.py`
 - **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode,
@@ -164,7 +164,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G5 — Make OpenWiki-installed skill bundles third-party-owned
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** `scripts/runtime_ownership.py` (one small constant and predicate, for
   example `THIRD_PARTY_SKILL_PATHS = ("skills/openwiki",)`), `scripts/check_runtime.py`
   (neither `.claude/skills/openwiki/**` nor `.agents/skills/openwiki/**` is obsolete drift or
@@ -186,7 +186,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G6 — Remove every runner mention and describe the host-driven mechanism
 
-- [ ] **Owner:** `coder` for generator strings, `documenter` for prose
+- [x] **Owner:** `coder` for generator strings, `documenter` for prose
 - **Target files:** `shared/policies/workflow.instructions.md` ("OpenWiki Refresh" lines
   173-180; Knowledge-Refresh "Shape" lines 215-216: drop "and its runner");
   `shared/agents/orchestrator/prompt.md:56`; authoring `AGENTS.md:9`, `CLAUDE.md:14`, and
@@ -206,7 +206,7 @@ answers MCP `initialize` with `serverInfo.version` and lists six tools;
 
 ### Step G7 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Review Profiles:** `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`
 - **Review focus:** every guard behavior maps to a line of spike evidence (skill Step 3
   verification); the guard cannot be bypassed by a different `mode` spelling or non-object
@@ -236,17 +236,17 @@ uv run python .claude/scripts/verify.py phase --format json --persist    # befor
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Spike decision was GO or GO-with-adaptations; adaptations applied are named in the session log
-- [ ] Documentation updated (`docs/architecture.md`, `docs/runtime-checks.md`, README bullets)
-- [ ] LEARN entries saved (including the runner's carried-forward security reasoning)
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] No runner reference remains; nested `.claude/scripts/openwiki_refresh.py` removed
-- [ ] No hook, verifier, installer, state-sync, or CI path runs OpenWiki
+- [x] Spike decision was GO or GO-with-adaptations; adaptations applied are named in the session log
+- [x] Documentation updated (`docs/architecture.md`, `docs/runtime-checks.md`, README bullets)
+- [x] LEARN entries saved (including the runner's carried-forward security reasoning)
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] No runner reference remains; nested `.claude/scripts/openwiki_refresh.py` removed
+- [x] No hook, verifier, installer, state-sync, or CI path runs OpenWiki
 
 ## Pause Checkpoint
 
