@@ -135,7 +135,7 @@ For each small plan:
 2. **IMPLEMENT:** Delegate to `coder` (including Gradio/Streamlit UI work). The coder applies `.claude/skills/ponytail/SKILL.md` once in `full` mode, simplifies the changed scope, and re-verifies it; Ponytail is not a standalone lifecycle phase.
 3. **VERIFY:** Run focused and fast checks during implementation. Route a deterministic failure to the coder with its changed scope; do not spend another model merely to repeat deterministic checks.
 4. **REVIEW:** Delegate to `reviewer` with profiles selected from the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules. The reviewer returns surviving findings as JSON; do not persist them yet.
-5. **CLOSEOUT:** Use this fixed order: (a) update documentation, the final small-plan state, LEARN evidence, and the `COMPLETED` session log; (b) checkpoint nested plan state - `bash .claude/hooks/scripts/state-sync.sh checkpoint` for the editor task and hooks, or `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent, since the file-protection hook denies any Bash command naming a `.claude/hooks/` path; (c) explicitly stage only intended outer-repository files and inspect `git diff --cached`; (d) give every surviving MINOR finding an explicit `disposition` (for example `"accepted"`) and non-empty `reason`, then persist converged findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (e) run `uv run python .claude/scripts/verify.py phase --format json --persist`; then (f) run `uv run python .claude/scripts/verify.py closeout --format json --persist`. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation and final state precede findings so findings bind to the final code and docs. The reviewer does not persist findings itself, and the coder cannot create final verification receipts. Step (b) is load-bearing and its position is exact: the closeout receipt binds the big plan's bytes through `control_plane_provenance.big_plan_digest`, and the terminal push gate can only re-derive that digest from bytes Git already holds, so a big plan still dirty in nested state when (e)-(f) run produces a receipt that no later state can ever satisfy. Checkpoint after every plan, log, and memory edit is final, and never after (e)-(f) have run: a `state-sync.sh checkpoint`/`publish`/`push` between the receipts and the outer commit changes what those receipts bind to and makes the commit fail closed with `closeout receipt governing control-plane provenance is stale`. Findings and receipt files are not provenance-bound paths, so writing them after the checkpoint is expected. Leave nested publication itself to the native `post-commit` hook, which checkpoints and publishes right after the outer commit.
+5. **CLOSEOUT:** Use this fixed order: (a) update documentation, the final small-plan state, LEARN evidence, and the `COMPLETED` session log; (b) checkpoint nested plan state - `bash .claude/hooks/scripts/state-sync.sh checkpoint` for the editor task and hooks, or `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent, since the file-protection hook denies any Bash command naming a `.claude/hooks/` path; (c) explicitly stage only intended outer-repository files and inspect `git diff --cached`; (d) give every surviving MINOR finding an explicit `disposition` (for example `"accepted"`) and non-empty `reason`, then persist converged findings with one `--profile <name>` per profile via `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; (e) run `uv run python .claude/scripts/verify.py phase --format json --persist`; then (f) run `uv run python .claude/scripts/verify.py closeout --format json --persist`, which runs the plan's required `## Verification` items itself and refuses to persist a receipt unless every item is `PASS` — see the Verification Evidence Contract above. When documentation is explicitly not applicable, add `--documentation-na "<reason>"`; omission is not proof of N/A. Documentation and final state precede findings so findings bind to the final code and docs. The reviewer does not persist findings itself, and the coder cannot create final verification receipts. Step (b) is load-bearing and its position is exact: the closeout receipt binds the big plan's bytes through `control_plane_provenance.big_plan_digest`, and the terminal push gate can only re-derive that digest from bytes Git already holds, so a big plan still dirty in nested state when (e)-(f) run produces a receipt that no later state can ever satisfy. Checkpoint after every plan, log, and memory edit is final, and never after (e)-(f) have run: a `state-sync.sh checkpoint`/`publish`/`push` between the receipts and the outer commit changes what those receipts bind to and makes the commit fail closed with `closeout receipt governing control-plane provenance is stale`. Findings and receipt files are not provenance-bound paths, so writing them after the checkpoint is expected. Leave nested publication itself to the native `post-commit` hook, which checkpoints and publishes right after the outer commit.
 6. **FIX LOOP:** If focused verification, review, or closeout fails, update task tracking (the runtime's native tracker when available, otherwise the phase checklist as prose), return to IMPLEMENT, and repeat the checks and review before CLOSEOUT. A later code change restarts verification and review. Continue until `verify phase`/`verify closeout` report PASS and the findings report has `counts.critical == 0`. Resolve findings according to the ordinary severity gates: CRITICAL and MAJOR both block the phase-completion commit (not only push/PR), and a surviving MINOR needs an explicit disposition and reason but is otherwise advisory.
 7. **COMMIT:** On normal completion, commit the explicitly staged completed small plan atomically.
 8. **PUSH:** After every successful outer-repository commit, attempt a normal non-force push. Prefer the configured branch upstream with `GIT_TERMINAL_PROMPT=0 git push`; otherwise, when `origin` exists, use `GIT_TERMINAL_PROMPT=0 git push -u origin HEAD`. If no remote exists or authentication/network access fails, warn clearly and keep the local commit; do not retry interactively or fail the completed phase. This outer publication is separate from the nested `.claude` `ai-state` post-commit sync. PR creation and merge remain explicitly user-requested.
@@ -230,6 +230,105 @@ rebaseline rule, never `--init`.
 
 ---
 
+## Verification Evidence Contract
+
+This is the single authoritative definition of a small plan's verification
+evidence. Every other surface — the plan and session-log templates, the
+`plan-decomposition` skill, the planner and orchestrator prompts, and the
+`commit` skill — links to this section instead of restating it.
+
+### The required `## Verification` block
+
+A small plan's `## Verification` section holds one or more fenced code
+blocks, each labeled `bash` or `sh`. Every non-comment line inside those
+blocks is a required item: a shell command that `verify closeout` runs
+itself, from the repository root, and that must exit 0. Never list
+`verify.py closeout` as a required item; it cannot certify itself.
+
+Parse each fenced block with these rules, applied in order:
+
+- Join a line that ends in `\` with the line that follows it, before
+  evaluating either line.
+- Drop a line whose first non-whitespace character is `#`.
+- Cut a trailing ` # comment` from the end of a command line.
+- Collapse repeated whitespace.
+
+### The `## Optional Verification` section
+
+`## Optional Verification` is an H2 section of top-level `- ` bullets. It is
+the only place a check may be conditional or non-executable. Put an
+interactive probe, a host session, or a manual inspection here, never in the
+required block. Each bullet is one optional item, numbered from 1 in the
+order it appears.
+
+### What `verify closeout` does with the required items
+
+`verify closeout` runs the required items itself, in order, before it binds
+the tree. Each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds.
+It stops at the first item that is not `PASS` and refuses to persist a
+receipt when any item failed, timed out, or was never run because an
+earlier item stopped the run. On success, it stores the run results at
+`extensions.verification_items` in the closeout receipt: for every item,
+the item text, its status, exit code, duration, and the last 20 lines of
+output. In `--format text`, it prints one summary line per item, for
+example `PASS      1.3s  <item>`.
+
+### The closeout session log
+
+A completed small plan's session log has a `## Verification` section. Paste
+the summary lines `verify closeout --format text` printed for the required
+items. Then record every optional item's outcome, one line per item, in
+this grammar:
+
+```
+- optional <n>: PASS|FAIL|NOT RUN — <detail>
+```
+
+A `NOT RUN` line needs a non-empty `<detail>` explaining why.
+
+### The hedge rule
+
+Outside a fenced code block and outside `## Optional Verification`, a live
+small plan may not contain text matching `HEDGED_VERIFICATION_PATTERNS`. A
+plan is live when its `status` is `planned`, `in-progress`, or `paused`, and
+its slug date is absent or on or after `VERIFICATION_CONTRACT_SINCE =
+"2026-09-19"`. Hedging a required check — writing that it runs only when
+something is available, or marking it optional in prose instead of moving
+it to `## Optional Verification` — turns a required item into one nobody
+ever runs. A completed or cancelled plan is a dated record; it is never
+re-judged.
+
+`HEDGED_VERIFICATION_PATTERNS`, case-insensitive:
+
+```text
+\b(?:when|if|where|once|whenever|provided|should)\b[^.\n]{0,60}\b(?:available|possible|present|installed|exists|feasible|reachable|configured|set up)\b[^.\n]{0,60}\b(?:runs?|executes?|exercises?|smoke[- ]?(?:tests?|checks?)|checks?|verify|verifies|tests?|probes?|re-probes?|confirms?)\b
+\b(?:runs?|executes?|exercises?|smoke[- ]?(?:tests?|checks?)|checks?|verify|verifies|tests?|probes?|re-probes?|confirms?)\b[^.\n]{0,80}\b(?:when|if|where|once|whenever|provided)\b[^.\n]{0,60}\b(?:available|possible|present|installed|exists|feasible|reachable|practical|configured|set up)\b
+\b(?:as time permits|time permitting|optionally\s+(?:runs?|executes?|verify|verifies|checks?))\b
+```
+
+### Enforcement
+
+Three scripts enforce this contract, at three different times. At plan
+approval, `scripts/validate_plan_frontmatter.py` rejects the plan text
+itself. At phase closeout, `verify.py closeout` refuses to persist a
+receipt whenever a required item is not `PASS`; this refusal has no message
+prefix, because it is `verify.py closeout`'s own ordinary failure path, not
+a named lint or gate rule. At commit, `verify.py gate` blocks the commit,
+and only when the plan and the receipt have an `exact` head relation.
+
+| When | Script | Message prefix | Refuses when |
+|---|---|---|---|
+| Plan approval | `scripts/validate_plan_frontmatter.py` | `L1 verification-block-missing:` | the `## Verification` section has no `bash` or `sh` fenced block |
+| Plan approval | `scripts/validate_plan_frontmatter.py` | `L2 hedged-verification:` | text matches a hedge pattern; the message quotes the matched text |
+| Plan approval | `scripts/validate_plan_frontmatter.py` | `L3 unfailable-verification:` | a required item contains `\|\| true` or `\|\| :`, so it can never fail |
+| Plan approval | `scripts/validate_plan_frontmatter.py` | `L4 self-listed-closeout:` | a required item lists `verify.py closeout` |
+| Commit, `exact` relation only | `verify.py gate` | `G1 verification-results-missing:` | the receipt has no `extensions.verification_items` |
+| Commit, `exact` relation only | `verify.py gate` | `G2 verification-item-unrun:` | a required item in the plan has no result in the receipt |
+| Commit, `exact` relation only | `verify.py gate` | `G3 verification-item-failed:` | a recorded result's `status` is not `PASS` |
+| Commit, `exact` relation only | `verify.py gate` | `G4 optional-verification-unaccounted:` | an optional item has no outcome line in the closeout session log |
+
+---
+
 ## Reporting
 
 Follow `.claude/instructions/agent-reporting.instructions.md` for human-facing
@@ -245,7 +344,7 @@ communication and agent-to-agent status or handoffs.
 - After plan approval (goal, approach, rationale)
 - During work: design decisions, problems solved, verification results, `[LEARN]` entries
 - Before stopping: summary, verification results, open questions, next steps
-- At small-plan closeout: `**Status:** COMPLETED`, `**Plan:** <small-plan path>`, `[LEARN]` entries or explicit no-lessons marker
+- At small-plan closeout: `**Status:** COMPLETED`, `**Plan:** <small-plan path>`, `[LEARN]` entries or explicit no-lessons marker, and a `## Verification` section satisfying the Verification Evidence Contract above
 - At an explicit checkpoint: `**Status:** PAUSED`, `**Plan:** <small-plan path>`, pause reason, completed and remaining work, verification state, incomplete checks, and resume point
 
 **Frequency:** Every 30 responses or at session end, whichever comes first.

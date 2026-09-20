@@ -49,6 +49,47 @@ BODY_PHASE_HEADING_PATTERN = re.compile(
 # most one, and only as the last phase, is what makes the rule's termination
 # condition deterministic rather than a convention the planner could forget.
 KNOWLEDGE_REFRESH_PHASE_SUFFIX = "-knowledge-refresh"
+# See the canonical Verification Evidence Contract rule in
+# shared/policies/workflow.instructions.md. Only a live small plan (never a
+# completed or cancelled one) dated on or after this value is in scope, so a
+# historical plan is never re-judged against a rule it predates.
+VERIFICATION_CONTRACT_SINCE = "2026-09-19"
+LIVE_SMALL_PLAN_STATUSES = {"planned", "in-progress", "paused"}
+# Each pattern looks for a condition word, an availability word, and a
+# check-running verb within a bounded span of the same sentence - not just
+# any two of the three words anywhere in the file. Order matters: 1 and 2
+# cover "when available, run" and "run when available" word orders; 3
+# catches the "as time permits"/"optionally" idiom neither word order
+# expresses. Measured against every plan in this repository before being
+# fixed: a verb-anchored list flags 10 plans (7 genuine hedged checks); a
+# bare phrase list flags 34, mostly ordinary prose.
+HEDGED_VERIFICATION_PATTERNS = (
+    re.compile(
+        r"\b(?:when|if|where|once|whenever|provided|should)\b[^.\n]{0,60}"
+        r"\b(?:available|possible|present|installed|exists|feasible|reachable|"
+        r"configured|set up)\b[^.\n]{0,60}"
+        r"\b(?:runs?|executes?|exercises?|smoke[- ]?(?:tests?|checks?)|checks?|"
+        r"verify|verifies|tests?|probes?|re-probes?|confirms?)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:runs?|executes?|exercises?|smoke[- ]?(?:tests?|checks?)|checks?|"
+        r"verify|verifies|tests?|probes?|re-probes?|confirms?)\b[^.\n]{0,80}"
+        r"\b(?:when|if|where|once|whenever|provided)\b[^.\n]{0,60}"
+        r"\b(?:available|possible|present|installed|exists|feasible|reachable|"
+        r"practical|configured|set up)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:as time permits|time permitting|optionally\s+"
+        r"(?:runs?|executes?|verify|verifies|checks?))\b",
+        re.IGNORECASE,
+    ),
+)
+_FENCE_BLOCK_PATTERN = re.compile(
+    r"^[ \t]*(?P<fence>`{3,}|~{3,})[^\n]*\r?\n.*?^[ \t]*(?P=fence)[ \t]*\r?$",
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def parse_frontmatter(path: Path) -> dict[str, Any]:
@@ -310,7 +351,174 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
             errors.append(f"{path}: body phase inventory must match frontmatter phases")
 
 
-def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> None:
+def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
+    """Extract required and optional verification items from a plan's text.
+
+    Required items are normalized shell commands from every fenced code
+    block opened with ``bash`` or ``sh`` under the ``## Verification``
+    heading. Optional items are the top-level ``- `` bullets under the
+    ``## Optional Verification`` heading, with indented continuation lines
+    joined in; fenced code blocks in that section are ignored. Each H2
+    section runs from its own heading to the next ``^## `` heading or the
+    end of the text; a missing section yields an empty list.
+
+    Mirrored byte-for-byte between ``scripts/validate_plan_frontmatter.py``
+    and ``shared/scripts/verify.py`` (an equality test in both suites
+    guards drift); neither file may import the other, so both copies stay
+    stdlib-only and self-contained.
+    """
+
+    def section_body(heading: str) -> str | None:
+        match = re.search(
+            rf"^## {re.escape(heading)}[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        return match.group("body") if match is not None else None
+
+    def normalize(line: str) -> str:
+        comment = re.search(r"\s#\s", line)
+        if comment is not None:
+            line = line[: comment.start()]
+        return re.sub(r"\s+", " ", line).strip()
+
+    required: list[str] = []
+    verification_body = section_body("Verification")
+    if verification_body is not None:
+        for fence in re.finditer(
+            r"^[ \t]*(?P<mark>`{3,}|~{3,})[ \t]*(?P<lang>\S*)[ \t]*\r?\n"
+            r"(?P<body>.*?)^[ \t]*(?P=mark)[ \t]*\r?$",
+            verification_body,
+            re.MULTILINE | re.DOTALL,
+        ):
+            if fence.group("lang") not in ("bash", "sh"):
+                continue
+            joined: list[str] = []
+            buffer = ""
+            for raw_line in fence.group("body").split("\n"):
+                buffer += raw_line
+                if buffer.endswith("\\"):
+                    buffer = buffer[:-1]
+                    continue
+                joined.append(buffer)
+                buffer = ""
+            if buffer:
+                joined.append(buffer)
+            for line in joined:
+                if line.lstrip()[:1] == "#":
+                    continue
+                item = normalize(line)
+                if item:
+                    required.append(item)
+
+    optional: list[str] = []
+    optional_body = section_body("Optional Verification")
+    if optional_body is not None:
+        stripped: list[str] = []
+        in_fence = False
+        for raw_line in optional_body.split("\n"):
+            if re.match(r"^[ \t]*(?:`{3,}|~{3,})", raw_line):
+                in_fence = not in_fence
+                continue
+            if not in_fence:
+                stripped.append(raw_line)
+        for bullet in re.finditer(
+            r"^- [ \t]*(?P<rest>.*(?:\n[ \t]+\S.*)*)",
+            "\n".join(stripped),
+            re.MULTILINE,
+        ):
+            item = re.sub(r"\s+", " ", bullet.group("rest")).strip()
+            if item:
+                optional.append(item)
+
+    return required, optional
+
+
+def _mask_span(text: str, start: int, end: int) -> str:
+    """Blank a text span with same-length spaces, preserving line numbers."""
+    return text[:start] + re.sub(r"[^\n]", " ", text[start:end]) + text[end:]
+
+
+def _hedge_scan_text(text: str) -> str:
+    """Return plan text with fenced code blocks and the ``## Optional
+    Verification`` body blanked out, so a real command or an intentionally
+    conditional optional check can never itself be mistaken for a hedge.
+    Blanking (not deleting) keeps every remaining line number identical to
+    the source file's, including HTML comments, which stay in scope: a
+    hedge hidden inside one is still a hedge.
+    """
+    masked = text
+    for fence in _FENCE_BLOCK_PATTERN.finditer(text):
+        masked = _mask_span(masked, fence.start(), fence.end())
+    optional_match = re.search(
+        r"^## Optional Verification[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if optional_match is not None:
+        masked = _mask_span(masked, *optional_match.span("body"))
+    return masked
+
+
+def validate_verification_contract(
+    path: Path, data: dict[str, Any], text: str, errors: list[str]
+) -> None:
+    """Enforce the mandatory, machine-run ``## Verification`` block.
+
+    Applies only to a live small plan (``planned``, ``in-progress``, or
+    ``paused``) dated on or after ``VERIFICATION_CONTRACT_SINCE`` (or
+    undated). Never reads Git state and never parses step-level bullets for
+    items - only the plan's own ``## Verification``/``## Optional
+    Verification`` H2 sections, via ``plan_verification_items``.
+    """
+    if str(data.get("type", "")) != "small-plan":
+        return
+    if str(data.get("status", "")) not in LIVE_SMALL_PLAN_STATUSES:
+        return
+    date_match = re.match(r"^(\d{4}-\d{2}-\d{2})_", path.name)
+    if date_match is not None and date_match.group(1) < VERIFICATION_CONTRACT_SINCE:
+        return
+
+    required, _optional = plan_verification_items(text)
+    heading_match = re.search(r"^## Verification[ \t]*\r?\n", text, re.MULTILINE)
+    heading_line = (
+        text.count("\n", 0, heading_match.start()) + 1 if heading_match else 1
+    )
+
+    if not required:
+        errors.append(
+            f"{path}:{heading_line}: L1 verification-block-missing: no "
+            "bash/sh fenced block under ## Verification; add the block "
+            "with the required commands"
+        )
+    for item in required:
+        if "|| true" in item or "|| :" in item:
+            errors.append(
+                f"{path}:{heading_line}: L3 unfailable-verification: "
+                f'"{item}" can never fail; remove the fallback'
+            )
+        if "verify.py closeout" in item:
+            errors.append(
+                f'{path}:{heading_line}: L4 self-listed-closeout: "{item}" '
+                "lists closeout, which runs the block itself; remove it"
+            )
+
+    hedge_text = _hedge_scan_text(text)
+    for pattern in HEDGED_VERIFICATION_PATTERNS:
+        match = pattern.search(hedge_text)
+        if match is not None:
+            line = hedge_text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f'{path}:{line}: L2 hedged-verification: "{match.group(0)}"; '
+                "drop the condition, or move the check under ## Optional "
+                "Verification"
+            )
+            break
+
+
+def validate_small_plan(
+    path: Path, data: dict[str, Any], text: str, errors: list[str]
+) -> None:
     require_fields(
         path, data, ["name", "type", "parent_plan", "phase_index", "status"], errors
     )
@@ -323,6 +531,7 @@ def validate_small_plan(path: Path, data: dict[str, Any], errors: list[str]) -> 
         validate_cancellation(path, data, errors)
     if status == "paused":
         validate_pause(path, data, errors)
+    validate_verification_contract(path, data, text, errors)
 
 
 def validate_plan(path: Path, errors: list[str]) -> None:
@@ -334,7 +543,8 @@ def validate_plan(path: Path, errors: list[str]) -> None:
     if plan_type == "big-plan":
         validate_big_plan(path, data, errors)
     elif plan_type == "small-plan":
-        validate_small_plan(path, data, errors)
+        text = path.read_text(encoding="utf-8")
+        validate_small_plan(path, data, text, errors)
     else:
         errors.append(f"{path}: type must be big-plan or small-plan")
 
