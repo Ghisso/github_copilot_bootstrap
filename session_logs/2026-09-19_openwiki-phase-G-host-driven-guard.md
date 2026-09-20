@@ -84,6 +84,13 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   routing fixture has four groups). VERIFY round 2: `validate_targets.py` exit
   0, `check_runtime.py` exit 0, plan lint exit 0, `verify.py phase` PASS with
   1743 tests.
+- Review round 1 fixes landed: manifest shape validation (absence only from an
+  explicit `present: false`; malformed manifest → `post` exit 2 touching
+  nothing, `pre` deny), symlinked guarded paths refused everywhere including
+  the marker-strip fallback, and the verifier's staged-as-new check narrowed
+  to `--diff-filter=A`. 29 guard tests. VERIFY round 3: `validate_targets.py`
+  exit 0, `check_runtime.py` exit 0, plan lint exit 0, `verify.py phase` PASS
+  with 1755 tests.
 
 ## Review findings and dispositions
 
