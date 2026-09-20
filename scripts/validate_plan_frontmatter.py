@@ -463,11 +463,20 @@ def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
     return required, optional
 
 
+def _shell_flatten(item: str) -> str:
+    """Remove quote characters, then collapse a backslash-escaped character
+    into itself, so a quoted or backslash-broken decoy (``clos\\eout``,
+    ``"closeout"``) cannot hide from a literal pattern match.
+    """
+    text = item.replace("'", "").replace('"', "")
+    return re.sub(r"\\(.)", r"\1", text)
+
+
 def _names_closeout(item: str) -> bool:
     """Return whether a normalized item's text names ``verify.py closeout``.
 
-    Strips quote characters first so ``verify.py "closeout"``,
-    ``clos""eout``, or ``--format json closeout`` (mode given after
+    Uses ``_shell_flatten`` so ``verify.py "closeout"``, ``clos""eout``,
+    ``clos\\eout``, or ``--format json closeout`` (mode given after
     options) cannot hide the nesting from a literal substring match.
 
     ponytail: this cannot see through a ``$VAR`` shell expansion that only
@@ -475,8 +484,7 @@ def _names_closeout(item: str) -> bool:
     resulting recursive ``verify.py closeout`` run fails on the same plan
     it is trying to close out, which is a loud failure, not a silent pass.
     """
-    stripped = item.replace("'", "").replace('"', "")
-    return re.search(r"verify\.py\b.*\bcloseout\b", stripped) is not None
+    return re.search(r"verify\.py\b.*\bcloseout\b", _shell_flatten(item)) is not None
 
 
 def _mask_span(text: str, start: int, end: int) -> str:
@@ -537,11 +545,15 @@ def validate_verification_contract(
             "with the required commands"
         )
     for item in required:
-        # Quote characters can hide "|| true"/"verify.py closeout" from a
-        # literal substring check (see _names_closeout), so both L3 and L4
-        # scan the same quote-stripped form.
-        quote_stripped_item = item.replace("'", "").replace('"', "")
-        if re.search(r"\|\|\s*(?:true|:)(?![\w-])", quote_stripped_item):
+        # Quotes and backslash escapes can hide "|| true"/"verify.py
+        # closeout" from a literal check (see _names_closeout), so both L3
+        # and L4 scan the same flattened form.
+        flat = _shell_flatten(item)
+        # ponytail: `|| exit 0`, `; true`, and a wrapper script under
+        # another name are not detected; the runner still records the real
+        # exit code of whatever ran, and the review `tests` profile asks
+        # whether the check can fail.
+        if re.search(r"\|\|\s*(?:(?:\S*/)?true|:)(?![\w-])", flat):
             errors.append(
                 f"{path}:{heading_line}: L3 unfailable-verification: "
                 f'"{item}" can never fail; remove the fallback'
