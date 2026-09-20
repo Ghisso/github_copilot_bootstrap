@@ -24,9 +24,21 @@ BLOCK_SCALAR_HEADERS = [
 ]
 
 
-def write_plan(path: Path, frontmatter: str) -> Path:
-    """Write a plan with the supplied frontmatter."""
-    path.write_text(f"---\n{frontmatter.strip()}\n---\n\n# Plan\n", encoding="utf-8")
+# A valid, unhedged block by default so tests unrelated to the verification
+# contract are never incidentally caught by it; tests that exercise the
+# contract itself pass their own `body`.
+DEFAULT_VERIFICATION_BODY = (
+    "\n## Verification\n\n```bash\nuv run pytest tests/ -q --tb=short\n```\n"
+)
+
+
+def write_plan(
+    path: Path, frontmatter: str, body: str = DEFAULT_VERIFICATION_BODY
+) -> Path:
+    """Write a plan with the supplied frontmatter and body."""
+    path.write_text(
+        f"---\n{frontmatter.strip()}\n---\n\n# Plan\n{body}", encoding="utf-8"
+    )
     return path
 
 
@@ -1002,3 +1014,258 @@ def test_shipped_probe_shares_the_pause_fields() -> None:
             f"required pause field {field} is not enforced by the shipped "
             "pause-time probe"
         )
+
+
+# --- Verification Evidence Contract (L1-L4) ---
+
+
+def in_scope_plan(
+    tmp_path: Path,
+    body: str,
+    *,
+    status: str = "planned",
+    filename: str = "2026-09-19_phase-test-example.md",
+) -> Path:
+    """Write a live small plan in scope of the verification contract."""
+    return write_plan(tmp_path / filename, small_plan(status), body=body)
+
+
+def test_missing_verification_block_fails_l1(tmp_path: Path) -> None:
+    plan = in_scope_plan(tmp_path, "\n## Verification\n\nno fenced block here.\n")
+
+    assert any(
+        "L1 verification-block-missing" in error for error in validation_errors(plan)
+    )
+
+
+def test_absent_verification_heading_also_fails_l1(tmp_path: Path) -> None:
+    plan = in_scope_plan(tmp_path, "\nNo verification section at all.\n")
+
+    assert any(
+        "L1 verification-block-missing" in error for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "\n### Step A1 -- when a build host is available, run the check\n\n"
+        "## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n- **Owner:** `coder` -- when a build host is available, run the "
+        "check\n\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n- **Acceptance criteria:** when a build host is available, run "
+        "the check\n\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+        "\n<!-- when a build host is available, run the check -->\n\n"
+        "## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n",
+    ],
+    ids=("step-title", "owner-line", "acceptance-bullet", "html-comment"),
+)
+def test_hedged_verification_sentence_fails_l2_wherever_it_appears(
+    tmp_path: Path, body: str
+) -> None:
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L2 hedged-verification" in error
+        and "when a build host is available, run" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_hedged_sentence_inside_fenced_block_does_not_trigger_l2(
+    tmp_path: Path,
+) -> None:
+    body = (
+        "\n## Verification\n\n```bash\n"
+        "# when a build host is available, run the check\n"
+        "uv run pytest tests/ -q\n```\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert not any(
+        "L2 hedged-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_hedged_sentence_under_optional_verification_does_not_trigger_l2(
+    tmp_path: Path,
+) -> None:
+    body = (
+        "\n## Verification\n\n```bash\nuv run pytest tests/ -q\n```\n"
+        "\n## Optional Verification\n\n"
+        "- when a build host is available, run the check\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert not any(
+        "L2 hedged-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_with_true_fallback_fails_l3(tmp_path: Path) -> None:
+    body = "\n## Verification\n\n```bash\nexit 3 || true\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_with_colon_fallback_fails_l3(tmp_path: Path) -> None:
+    body = "\n## Verification\n\n```bash\nexit 3 || :\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+def test_required_item_listing_closeout_fails_l4(tmp_path: Path) -> None:
+    body = (
+        "\n## Verification\n\n```bash\n"
+        "uv run python .claude/scripts/verify.py closeout --format json\n```\n"
+    )
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any("L4 self-listed-closeout" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        'uv run python .claude/scripts/verify.py "closeout" --format json',
+        'uv run python .claude/scripts/verify.py clos""eout --format json',
+        "uv run python .claude/scripts/verify.py --format json closeout",
+        r"uv run python .claude/scripts/verify.py clos\eout --format json",
+    ],
+    ids=(
+        "quoted-closeout",
+        "split-quotes-closeout",
+        "mode-after-options",
+        "backslash-broken-closeout",
+    ),
+)
+def test_disguised_closeout_self_reference_still_fails_l4(
+    tmp_path: Path, item: str
+) -> None:
+    body = f"\n## Verification\n\n```bash\n{item}\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any("L4 self-listed-closeout" in error for error in validation_errors(plan))
+
+
+@pytest.mark.parametrize(
+    "item",
+    [
+        "exit 3||true",
+        "exit 3 ||true",
+        "exit 3||:",
+        "exit 3 || /bin/true",
+        r"exit 3 || tru\e",
+        "exit 3||./true",
+    ],
+    ids=(
+        "no-space-true",
+        "leading-space-true",
+        "no-space-colon",
+        "absolute-path-true",
+        "backslash-broken-true",
+        "relative-path-true",
+    ),
+)
+def test_unspaced_unfailable_fallback_still_fails_l3(tmp_path: Path, item: str) -> None:
+    body = f"\n## Verification\n\n```bash\n{item}\n```\n"
+    plan = in_scope_plan(tmp_path, body)
+
+    assert any(
+        "L3 unfailable-verification" in error for error in validation_errors(plan)
+    )
+
+
+# Loose text carrying signals for every rule: no ## Verification block at
+# all (L1's trigger), a hedge sentence (L2's trigger), and the L3/L4 marker
+# substrings. None of L1-L4 may fire once the plan is out of scope, proving
+# the scope gate is an early return rather than a per-rule exemption.
+_DEFECT_LADEN_BODY = (
+    "\nWhen a build host is available, run the full smoke check before merging.\n"
+    "\nexit 3 || true\n"
+    "\nuv run python .claude/scripts/verify.py closeout --format json\n"
+)
+
+
+def test_complete_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path,
+) -> None:
+    plan = write_plan(
+        tmp_path / "2026-09-19_phase-test-example.md",
+        small_plan(
+            "complete", "closeout_session_log: .claude/session_logs/closeout.md"
+        ),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_cancelled_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(validator, "REPO_ROOT", tmp_path)
+    (tmp_path / "evidence.md").write_text("**Status:** CANCELLED\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "2026-09-19_phase-test-example.md",
+        small_plan("cancelled", cancellation_fields()),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_pre_contract_dated_plan_skips_the_verification_contract_even_with_every_defect(
+    tmp_path: Path,
+) -> None:
+    plan = write_plan(
+        tmp_path / "2026-01-01_phase-test-example.md",
+        small_plan("planned"),
+        body=_DEFECT_LADEN_BODY,
+    )
+
+    assert validation_errors(plan) == []
+
+
+def test_phase_a_fixture_fails_l2_on_its_step_bullet_sentence(tmp_path: Path) -> None:
+    """Phase A's real hedge lived in a step-level bullet, not the
+    ``## Verification`` block; forcing the plan back to a live status must
+    still catch it via the hedge scan.
+    """
+    source = (
+        REPO_ROOT
+        / ".claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md"
+    )
+    text = source.read_text(encoding="utf-8").replace(
+        "status: complete", "status: in-progress", 1
+    )
+    plan = tmp_path / source.name
+    plan.write_text(text, encoding="utf-8")
+
+    errors = validation_errors(plan)
+
+    assert any(
+        f"{plan}:72: L2 hedged-verification" in error and "run one smoke check" in error
+        for error in errors
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "2026-07-18_phase-A-preserve-consumer-memory.md",
+        "2026-07-18_phase-B-configure-codex-gpt-5.6.md",
+    ],
+)
+def test_pre_contract_july_in_progress_plans_pass_unchanged(name: str) -> None:
+    """Both plans predate ``VERIFICATION_CONTRACT_SINCE``, so the new lint
+    must leave their existing ``in-progress`` status alone."""
+    plan = REPO_ROOT / ".claude" / "plans" / name
+
+    assert validation_errors(plan) == []

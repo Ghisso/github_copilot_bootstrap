@@ -310,7 +310,7 @@ def test_assert_plan_frontmatter_accepts_valid_plans(tmp_path: Path) -> None:
         "parent_plan: example\n"
         "phase_index: 1\n"
         "status: in-progress\n"
-        "---\n\n# Phase\n",
+        "---\n\n# Phase\n\n## Verification\n\n```bash\ntrue\n```\n",
         encoding="utf-8",
     )
     assert _assert_plan_frontmatter_failures(tmp_path) == []

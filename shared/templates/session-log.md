@@ -28,12 +28,16 @@ no-new-lessons marker documented in `.claude/session_logs/README.md`
 instead. Delete this paragraph; an untouched template with no bullet line
 here fails closeout.
 
-## Verification Results
+## Verification
 
-```bash
-# pytest output
-# mypy output
-# ruff output
+Paste the required items' `PASS <duration> <item>` summary lines that
+`verify closeout --format text` printed. Then record every optional item's
+outcome, one line per item: `- optional <n>: PASS|FAIL|NOT RUN — <detail>`;
+a `NOT RUN` line needs a non-empty `<detail>`. See the Verification Evidence
+Contract in `shared/policies/workflow.instructions.md` for the full rules.
+
+```text
+# verify closeout --format text summary lines
 # verify.py phase/closeout receipt path
 ```
 

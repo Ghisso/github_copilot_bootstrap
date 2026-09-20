@@ -4080,8 +4080,21 @@ def write_fixture_closeout_receipt(repo: Path, phase: str = "phase-one") -> None
         artifacts = verification.closeout_artifacts(
             repo, metadata, "fixture change does not alter public behavior"
         )
+        # The Verification Evidence Contract (G1) requires a matching result
+        # for the plan's "true" item written by write_small_plan.
+        extensions = {
+            "verification_items": [
+                {
+                    "item": "true",
+                    "status": "PASS",
+                    "exit_code": 0,
+                    "duration_seconds": 0.01,
+                    "output_tail": "",
+                }
+            ]
+        }
         closeout_receipt = verification.build_receipt(
-            "closeout", closeout_checks, metadata, artifacts
+            "closeout", closeout_checks, metadata, artifacts, extensions
         )
         verification.receipt_path(repo, "closeout", phase).write_text(
             verification.canonical_json(closeout_receipt) + "\n", encoding="utf-8"
@@ -4227,6 +4240,7 @@ def write_small_plan(
     if status == "paused":
         pause = "".join(f"{key}: {value}\n" for key, value in pause_values.items())
     duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
+    # The Verification Evidence Contract (L1) requires a real bash/sh block.
     write(
         repo / ".claude" / "plans" / f"{phase}.md",
         f"""---
@@ -4238,6 +4252,12 @@ status: {status}
 {duplicate_status_line}{closeout}{cancellation}{pause}---
 
 # {phase}
+
+## Verification
+
+```bash
+true
+```
 """,
     )
     if (

@@ -269,7 +269,11 @@ runtime, in order:
    editor task and the lifecycle hooks.
 4. Explicitly stage intended outer files, inspect the staged diff, and persist
    the converged findings.
-5. Run `verify phase --persist`, then `verify closeout --persist`.
+5. Run `verify phase --persist`, then `verify closeout --persist`. Closeout
+   first runs every command in the plan's `## Verification` block itself and
+   records each result in the receipt; one failing command means no receipt
+   (see the Verification Evidence Contract in
+   `.claude/instructions/workflow.instructions.md`).
 6. Run the native commit and pre-push gates. Commit only after those gates
    pass; the orchestrator then attempts the permitted outer-repository push.
 

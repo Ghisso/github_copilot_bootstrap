@@ -25,6 +25,7 @@ import re
 import stat
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,6 +64,10 @@ CHECK_IDS = (
     "VFY-RECEIPT-001",
 )
 COMMAND_TIMEOUT_SECONDS = 180
+# Separate from COMMAND_TIMEOUT_SECONDS because a required item may itself be
+# `verify.py phase`, which already spends up to COMMAND_TIMEOUT_SECONDS on
+# one pytest run.
+VERIFICATION_ITEM_TIMEOUT_SECONDS = 600
 PHASE_RECEIPT = Path(".claude/quality_reports/verification-phase-{phase}.json")
 CLOSEOUT_RECEIPT = Path(".claude/quality_reports/verification-closeout-{phase}.json")
 ARTIFACT_KEYS = (
@@ -389,6 +394,234 @@ def confined_path(root: Path, value: str, *, regular: bool = False) -> Path:
     if regular and (not resolved.is_file() or resolved.is_symlink()):
         raise ValueError("path is not a regular file")
     return resolved
+
+
+def plan_verification_items(text: str) -> tuple[list[str], list[str]]:
+    """Extract required and optional verification items from a plan's text.
+
+    Required items are normalized shell commands from every fenced code
+    block opened with ``bash`` or ``sh`` under the ``## Verification``
+    heading. Optional items are the top-level ``- `` bullets under the
+    ``## Optional Verification`` heading, with indented continuation lines
+    joined in; fenced code blocks in that section are ignored. Each H2
+    section runs from its own heading to the next ``^## `` heading or the
+    end of the text; a missing section yields an empty list.
+
+    Mirrored byte-for-byte between ``scripts/validate_plan_frontmatter.py``
+    and ``shared/scripts/verify.py`` (an equality test in both suites
+    guards drift); neither file may import the other, so both copies stay
+    stdlib-only and self-contained.
+    """
+
+    def section_body(heading: str) -> str | None:
+        match = re.search(
+            rf"^## {re.escape(heading)}[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+            text,
+            re.MULTILINE | re.DOTALL,
+        )
+        return match.group("body") if match is not None else None
+
+    def normalize(line: str) -> str:
+        # Quote-aware scan: a "#" only opens a trailing comment when it is
+        # whitespace-bounded on both sides and outside any open quote span,
+        # so `git commit -m "Fix bug # 123"` is never truncated mid-string.
+        # A backslash only escapes a quote inside a double-quoted span,
+        # matching POSIX shell quoting; single quotes have no escape.
+        quote = ""
+        cut = len(line)
+        index = 0
+        while index < len(line):
+            char = line[index]
+            if quote:
+                if quote == '"' and char == "\\" and index + 1 < len(line):
+                    index += 2
+                    continue
+                if char == quote:
+                    quote = ""
+                index += 1
+                continue
+            if char in "'\"":
+                quote = char
+                index += 1
+                continue
+            if (
+                char == "#"
+                and index > 0
+                and line[index - 1].isspace()
+                and index + 1 < len(line)
+                and line[index + 1].isspace()
+            ):
+                cut = index
+                break
+            index += 1
+        return re.sub(r"\s+", " ", line[:cut]).strip()
+
+    required: list[str] = []
+    verification_body = section_body("Verification")
+    if verification_body is not None:
+        for fence in re.finditer(
+            r"^[ \t]*(?P<mark>`{3,}|~{3,})[ \t]*(?P<lang>\S*)[ \t]*\r?\n"
+            r"(?P<body>.*?)^[ \t]*(?P=mark)[ \t]*\r?$",
+            verification_body,
+            re.MULTILINE | re.DOTALL,
+        ):
+            if fence.group("lang") not in ("bash", "sh"):
+                continue
+            joined: list[str] = []
+            buffer = ""
+            for raw_line in fence.group("body").split("\n"):
+                buffer += raw_line
+                if buffer.endswith("\\"):
+                    buffer = buffer[:-1]
+                    continue
+                joined.append(buffer)
+                buffer = ""
+            if buffer:
+                joined.append(buffer)
+            for line in joined:
+                if line.lstrip()[:1] == "#":
+                    continue
+                item = normalize(line)
+                if item:
+                    required.append(item)
+
+    optional: list[str] = []
+    optional_body = section_body("Optional Verification")
+    if optional_body is not None:
+        stripped: list[str] = []
+        in_fence = False
+        for raw_line in optional_body.split("\n"):
+            if re.match(r"^[ \t]*(?:`{3,}|~{3,})", raw_line):
+                in_fence = not in_fence
+                continue
+            if not in_fence:
+                stripped.append(raw_line)
+        for bullet in re.finditer(
+            r"^- [ \t]*(?P<rest>.*(?:\n[ \t]+\S.*)*)",
+            "\n".join(stripped),
+            re.MULTILINE,
+        ):
+            item = re.sub(r"\s+", " ", bullet.group("rest")).strip()
+            if item:
+                optional.append(item)
+
+    return required, optional
+
+
+def _shell_flatten(item: str) -> str:
+    """Remove quote characters, then collapse a backslash-escaped character
+    into itself, so a quoted or backslash-broken decoy (``clos\\eout``,
+    ``"closeout"``) cannot hide from a literal pattern match.
+    """
+    text = item.replace("'", "").replace('"', "")
+    return re.sub(r"\\(.)", r"\1", text)
+
+
+def _names_closeout(item: str) -> bool:
+    """Return whether a normalized item's text names ``verify.py closeout``.
+
+    Uses ``_shell_flatten`` so ``verify.py "closeout"``, ``clos""eout``,
+    ``clos\\eout``, or ``--format json closeout`` (mode given after
+    options) cannot hide the nesting from a literal substring match.
+
+    ponytail: this cannot see through a ``$VAR`` shell expansion that only
+    resolves to "closeout" at runtime - bash still executes it, and the
+    resulting recursive ``verify.py closeout`` run fails on the same plan
+    it is trying to close out, which is a loud failure, not a silent pass.
+    """
+    return re.search(r"verify\.py\b.*\bcloseout\b", _shell_flatten(item)) is not None
+
+
+def _process_text(value: object) -> str:
+    """Coerce a subprocess text/bytes/``None`` stream capture to ``str``."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value if isinstance(value, str) else ""
+
+
+def _output_tail(text: str) -> str:
+    """Return the last 20 lines of process output, capped at 2000 characters."""
+    tail = "\n".join(text.splitlines()[-20:])
+    return tail[-2000:]
+
+
+def run_verification_items(root: Path, phase: str) -> list[dict[str, object]]:
+    """Run a completing phase's required verification items and record each.
+
+    Reads the plan through ``confined_path`` under ``.claude/plans/``,
+    extracts its required items with ``plan_verification_items``, and runs
+    each one in order from the repository root - never from the command
+    line or the environment. Stops at the first non-``PASS`` item, since a
+    later item may depend on an earlier one (for example
+    ``validate_targets.py`` after ``generate_targets.py --all``); the
+    remaining items are recorded ``NOT RUN``. An item naming
+    ``verify.py closeout`` is refused unexecuted - closeout may not list
+    itself.
+    """
+    plan_path = confined_path(root, f".claude/plans/{phase}.md", regular=True)
+    required, _optional = plan_verification_items(plan_path.read_text(encoding="utf-8"))
+    results: list[dict[str, object]] = []
+    blocked = False
+    for item in required:
+        if blocked:
+            results.append(
+                {
+                    "item": item,
+                    "status": "NOT RUN",
+                    "exit_code": None,
+                    "duration_seconds": 0.0,
+                    "output_tail": "",
+                }
+            )
+            continue
+        if _names_closeout(item):
+            results.append(
+                {
+                    "item": item,
+                    "status": "FAIL",
+                    "exit_code": None,
+                    "duration_seconds": 0.0,
+                    "output_tail": "closeout may not list itself",
+                }
+            )
+            blocked = True
+            continue
+        start = time.monotonic()
+        try:
+            completed = subprocess.run(
+                ["bash", "-c", item],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=VERIFICATION_ITEM_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as error:
+            results.append(
+                {
+                    "item": item,
+                    "status": "TIMEOUT",
+                    "exit_code": None,
+                    "duration_seconds": time.monotonic() - start,
+                    "output_tail": _output_tail(
+                        _process_text(error.stdout) + _process_text(error.stderr)
+                    ),
+                }
+            )
+            blocked = True
+            continue
+        status = "PASS" if completed.returncode == 0 else "FAIL"
+        results.append(
+            {
+                "item": item,
+                "status": status,
+                "exit_code": completed.returncode,
+                "duration_seconds": time.monotonic() - start,
+                "output_tail": _output_tail(completed.stdout + completed.stderr),
+            }
+        )
+        if status != "PASS":
+            blocked = True
+    return results
 
 
 def validate_mode_applicability(
@@ -1630,6 +1863,122 @@ def historical_chain_errors(
     return errors
 
 
+def log_verification_outcomes(text: str) -> dict[int, tuple[str, str]]:
+    """Parse each optional item's outcome from a closeout log's own
+    ``## Verification`` section - the only session-log parsing this
+    contract performs. Required items are proven by
+    ``run_verification_items`` running the plan itself, never by trusting
+    what a log claims.
+    """
+    section = re.search(
+        r"^## Verification[ \t]*\r?\n(?P<body>.*?)(?=^## |\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if section is None:
+        return {}
+    outcomes: dict[int, tuple[str, str]] = {}
+    for match in re.finditer(
+        r"^- optional (?P<n>\d+): (?P<status>PASS|FAIL|NOT RUN)"
+        r"(?: — (?P<detail>.+))?[ \t]*$",
+        section.group("body"),
+        re.MULTILINE,
+    ):
+        outcomes[int(match.group("n"))] = (
+            match.group("status"),
+            (match.group("detail") or "").strip(),
+        )
+    return outcomes
+
+
+def verification_items_errors(
+    root: Path, phase: str, receipt: dict[str, object]
+) -> list[str]:
+    """Prove the closeout receipt against what the plan actually required.
+
+    Guarded by the caller to run only for an ``exact`` head relation; never
+    for ``ancestor`` or ``certified``, where a receipt predating this
+    contract (no ``extensions``) must still load and pass.
+    """
+    plan_path = root / ".claude/plans" / f"{phase}.md"
+    receipt_display = receipt_path(root, "closeout", phase)
+    try:
+        plan_text = confined_path(
+            root, plan_path.relative_to(root).as_posix(), regular=True
+        ).read_text(encoding="utf-8")
+    except (ValueError, OSError) as error:
+        return [
+            f"{plan_path}: {receipt_display}: verification plan is unreadable: {error}"
+        ]
+    required, optional = plan_verification_items(plan_text)
+
+    extensions = receipt.get(RECEIPT_EXTENSIONS_FIELD)
+    verification_items = (
+        extensions.get("verification_items") if isinstance(extensions, dict) else None
+    )
+    if not isinstance(verification_items, list):
+        return [
+            f"{plan_path}: {receipt_display}: G1 verification-results-missing: "
+            "the closeout receipt has no extensions.verification_items; rerun "
+            "verify.py closeout so it runs the plan's required items itself"
+        ]
+
+    results_by_item: dict[str, dict[str, object]] = {
+        result["item"]: result
+        for result in verification_items
+        if isinstance(result, dict) and isinstance(result.get("item"), str)
+    }
+
+    errors: list[str] = []
+    for item in required:
+        result = results_by_item.get(item)
+        if result is None:
+            errors.append(
+                f"{plan_path}: {receipt_display}: G2 verification-item-unrun: "
+                f"{item!r} has no result in the receipt; rerun verify.py "
+                "closeout so it runs every required item"
+            )
+            continue
+        if result.get("status") != "PASS":
+            errors.append(
+                f"{plan_path}: {receipt_display}: G3 verification-item-failed: "
+                f"{item!r} recorded {result.get('status')!r}, not PASS; fix "
+                "the command and rerun verify.py closeout"
+            )
+
+    if optional:
+        try:
+            log_text = closeout_log_path(root, phase).read_text(encoding="utf-8")
+        except (ValueError, OSError) as error:
+            errors.append(
+                f"{plan_path}: {receipt_display}: G4 "
+                f"optional-verification-unaccounted: closeout log is "
+                f"unreadable: {error}"
+            )
+            return errors
+        outcomes = log_verification_outcomes(log_text)
+        for index, item in enumerate(optional, start=1):
+            outcome = outcomes.get(index)
+            if outcome is None:
+                errors.append(
+                    f"{plan_path}: {receipt_display}: G4 "
+                    f"optional-verification-unaccounted: optional item "
+                    f"{index} ({item!r}) has no '- optional {index}: PASS|FAIL|"
+                    "NOT RUN' line in the closeout log's ## Verification "
+                    "section; add one"
+                )
+                continue
+            status, detail = outcome
+            if status == "NOT RUN" and not detail:
+                errors.append(
+                    f"{plan_path}: {receipt_display}: G4 "
+                    f"optional-verification-unaccounted: optional item "
+                    f"{index} ({item!r}) is NOT RUN with no reason; add a "
+                    "— detail explaining why"
+                )
+    return errors
+
+
 def gate_receipt_errors(
     root: Path,
     *,
@@ -1794,6 +2143,8 @@ def gate_receipt_errors(
     log_path = loaded.get("closeout_log")
     if isinstance(log_path, Path):
         errors.extend(closeout_log_errors(root, phase, log_path))
+    if head_relation == "exact":
+        errors.extend(verification_items_errors(root, phase, receipt))
     if isinstance(receipt_head, str) and receipt_head:
         errors.extend(
             historical_chain_errors(
@@ -2780,6 +3131,7 @@ def build_receipt(
     checks: list[dict[str, object]],
     metadata: dict[str, object],
     artifacts: dict[str, object] | None = None,
+    extensions: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build and validate one complete receipt."""
     receipt = {
@@ -2791,6 +3143,8 @@ def build_receipt(
     }
     if mode == "closeout":
         receipt["artifacts"] = artifacts if artifacts is not None else {}
+        if extensions is not None:
+            receipt[RECEIPT_EXTENSIONS_FIELD] = extensions
     validate_receipt(receipt)
     return receipt
 
@@ -3214,21 +3568,34 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    adapter_diagnostics: list[dict[str, str]] = []
-    metadata = state_metadata(
-        root, args.base_ref, args.phase, adapter_diagnostics=adapter_diagnostics
-    )
-    branch = metadata.get("branch")
-    phase_value = metadata.get("phase")
+    branch = git_output(["rev-parse", "--abbrev-ref", "HEAD"], root)
+    phase = args.phase or current_phase(root, branch)
     reason = unresolved_phase_reason(
-        root,
-        branch if isinstance(branch, str) else "",
-        phase_value if isinstance(phase_value, str) else "",
-        requires_phase=args.mode != "fast",
+        root, branch, phase, requires_phase=args.mode != "fast"
     )
     if reason is not None:
         print(reason, file=sys.stderr)
         return 2
+    verification_items: list[dict[str, object]] | None = None
+    if args.mode == "closeout":
+        # Runs before metadata is collected below, so any file an item
+        # rewrites (generated targets, a persisted phase receipt) is part
+        # of the tree_sha/content_hash the receipt binds.
+        verification_items = run_verification_items(root, phase)
+        if any(result["status"] != "PASS" for result in verification_items):
+            for result in verification_items:
+                tail = result["output_tail"]
+                first_line = str(tail).splitlines()[0] if tail else ""
+                print(
+                    f"{result['status']} {result['exit_code']} {first_line} "
+                    f"{result['item']}",
+                    file=sys.stderr,
+                )
+            return 2
+    adapter_diagnostics: list[dict[str, str]] = []
+    metadata = state_metadata(
+        root, args.base_ref, phase, adapter_diagnostics=adapter_diagnostics
+    )
     if args.mode == "fast":
         checks = fast_checks(root, metadata)
     elif args.mode == "phase":
@@ -3249,7 +3616,12 @@ def main() -> int:
         if args.mode == "closeout"
         else None
     )
-    receipt = build_receipt(args.mode, checks, metadata, artifacts)
+    extensions: dict[str, object] | None = (
+        {"verification_items": verification_items}
+        if verification_items is not None
+        else None
+    )
+    receipt = build_receipt(args.mode, checks, metadata, artifacts, extensions)
     if args.persist:
         if args.mode == "fast":
             print("fast mode never persists evidence", file=sys.stderr)
@@ -3278,6 +3650,12 @@ def main() -> int:
     if args.format == "json":
         print(canonical_json(receipt))
     else:
+        if verification_items is not None:
+            for result in verification_items:
+                status = result["status"]
+                duration = result["duration_seconds"]
+                if isinstance(status, str) and isinstance(duration, float):
+                    print(f"{status:<8}{duration:>7.1f}s  {result['item']}")
         print(f"{args.mode}: {receipt['status']}")
         for item in checks:
             print(f"{item['id']}: {item['status']} - {item['summary']}")
