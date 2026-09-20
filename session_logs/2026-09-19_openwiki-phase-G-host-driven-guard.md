@@ -50,6 +50,12 @@ Code fires `PreToolUse`, `PostToolUse`, and `PostToolUseFailure`; Codex fires
   copy would have frozen on the old text. Decision: third-party ownership is
   gated on OpenWiki's own marker file `.openwiki-install.json`; recorded in
   the plan's Step G5.
+- Step G5 redone under the marker rule: `is_third_party_skill_dir` requires both
+  the `skills/openwiki` shape and the marker file on disk; refresh preservation
+  and drift exemption apply only then, and the bootstrap-root mirror follows
+  the live `.agents` marker. Tests prove the unmarked copy is still overwritten
+  and compared, the marked copy is preserved and exempt. 50 installer tests
+  pass; `check_runtime.py` PASS on this marker-free checkout.
 
 ## Review findings and dispositions
 
