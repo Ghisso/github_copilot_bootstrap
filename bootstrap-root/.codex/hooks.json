@@ -57,6 +57,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__openwiki__openwiki_begin",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh pre",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -76,6 +86,16 @@
           {
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" reporting-reminder.sh late-report openai-codex",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__openwiki__openwiki_begin",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
             "timeout": 10
           }
         ]
@@ -99,6 +119,11 @@
             "type": "command",
             "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" codex-stop.sh",
             "timeout": 180
+          },
+          {
+            "type": "command",
+            "command": "REPO_ROOT=\"$(git rev-parse --show-toplevel 2>/dev/null || pwd)\"; \"$REPO_ROOT/.claude/hooks/scripts/run-hook.sh\" openwiki-guard.sh post",
+            "timeout": 10
           }
         ]
       }

@@ -94,6 +94,13 @@ CONTROL_PLANE_PREFIXES = (
     ".devcontainer/",
 )
 CONTROL_PLANE_FILES = {"AGENTS.md", "CLAUDE.md", ".mcp.json"}
+# OpenWiki managed-state backstop (Phase G, Step G2): the same marker
+# openwiki-guard.py restores on "post"; a live block here means openwiki_begin
+# ran without the guard cleaning up after it.
+MANAGED_START = "<!-- OPENWIKI:START -->"
+OPENWIKI_ADAPTERS = ("AGENTS.md", "CLAUDE.md")
+OPENWIKI_WORKFLOW = ".github/workflows/openwiki-update.yml"
+OPENWIKI_RUN_JSON = "openwiki/.run.json"
 CONFIG_SUFFIXES = {".cfg", ".ini", ".json", ".toml", ".yaml", ".yml"}
 DEPENDENCY_FILES = {
     "Cargo.lock",
@@ -2145,6 +2152,10 @@ def gate_receipt_errors(
         errors.extend(closeout_log_errors(root, phase, log_path))
     if head_relation == "exact":
         errors.extend(verification_items_errors(root, phase, receipt))
+        errors.extend(
+            f"openwiki-managed-state: {violation}"
+            for violation in openwiki_managed_state_violations(root)
+        )
     if isinstance(receipt_head, str) and receipt_head:
         errors.extend(
             historical_chain_errors(
@@ -2947,8 +2958,59 @@ def consumer_mypy_targets(root: Path) -> list[str] | None:
     return ["src"] if (root / "src").is_dir() else None
 
 
+def openwiki_managed_state_violations(root: Path) -> list[str]:
+    """Return each violated OpenWiki managed-state condition, naming the
+    file and the fix.
+
+    File reads and ``git ls-files``/``git diff --cached --name-only`` only
+    - never model-backed, and never reads inside ``openwiki/`` beyond the
+    ``.run.json`` tracked-or-staged question. Shared by ``generation_check``
+    (``VFY-GEN-001``'s phase remit) and the commit-time gate, so both read
+    the same three conditions the same way.
+    """
+    violations: list[str] = []
+    for adapter in OPENWIKI_ADAPTERS:
+        try:
+            text = (root / adapter).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if MANAGED_START in text:
+            violations.append(
+                f"{adapter} still carries an OpenWiki managed block; run "
+                "bash .claude/hooks/scripts/openwiki-guard.sh post "
+                "</dev/null to restore it"
+            )
+    workflow_staged = bool(
+        git_output(["diff", "--cached", "--name-only", "--", OPENWIKI_WORKFLOW], root)
+    )
+    if workflow_staged:
+        violations.append(
+            f"{OPENWIKI_WORKFLOW} is staged as a new file; OpenWiki init "
+            "mode is forbidden - delete it"
+        )
+    elif (root / OPENWIKI_WORKFLOW).is_file() and not git_output(
+        ["ls-files", "--", OPENWIKI_WORKFLOW], root
+    ):
+        violations.append(
+            f"{OPENWIKI_WORKFLOW} is untracked; OpenWiki init mode is "
+            "forbidden - delete it"
+        )
+    if git_output(["ls-files", "--", OPENWIKI_RUN_JSON], root):
+        violations.append(
+            f"{OPENWIKI_RUN_JSON} is tracked or staged; run git rm "
+            f"--cached {OPENWIKI_RUN_JSON} and keep it ignored"
+        )
+    return violations
+
+
 def generation_check(root: Path) -> dict[str, object]:
-    """Require the generated verifier to match its canonical source."""
+    """Require the generated verifier to match its canonical source, and
+    that no OpenWiki managed state has leaked into the tree (a live
+    managed block, an init-mode workflow file, or a tracked ``.run.json``).
+    """
+    violations = openwiki_managed_state_violations(root)
+    if violations:
+        return check("VFY-GEN-001", "FAIL", "; ".join(violations))
     source = root / "shared/scripts/verify.py"
     generated = root / ".claude/scripts/verify.py"
     if source.is_file():

@@ -3,10 +3,10 @@ name: openwiki
 visibility: public
 description: |
   Initialize, refresh, rebaseline, or review this repository's OpenWiki
-  knowledge layer (the generated openwiki/ wiki) through the bootstrap-owned
-  runner. Use only for that specific generated layer. Do not use for
-  README/docs/ writing, general documentation review, or any other wiki or
-  knowledge-base tool.
+  knowledge layer (the generated openwiki/ wiki) by calling OpenWiki's own
+  MCP tools directly, guarded by this repository's hook. Use only for that
+  specific generated layer. Do not use for README/docs/ writing, general
+  documentation review, or any other wiki or knowledge-base tool.
 ---
 
 # OpenWiki Knowledge Layer
@@ -21,49 +21,59 @@ the refresh safely.
 
 OpenWiki is opt-in. It is enabled only when `openwiki/INSTRUCTIONS.md`
 exists — a human-authored repository brief the maintainer writes once. Its
-presence is also the deterministic marker the runner checks. Do not create
+presence is also the deterministic marker the hook guard checks. Do not create
 that file on a user's behalf unless asked to enable OpenWiki.
 
 ## Running a refresh
 
-Always run the bootstrap-owned runner. Never call `openwiki` directly, and
-never pass `--init`:
+Call OpenWiki's own MCP tools directly — there is no bootstrap runner or
+child process. Start with `openwiki_begin`, always with `mode: "update"`.
+Never pass `mode: "init"`: a hook guard, `openwiki-guard.sh`, denies it
+before the tool runs, because `init` creates a scheduled GitHub Actions
+workflow and replaces the wiki wholesale.
+
+The guard snapshots root `AGENTS.md`, `CLAUDE.md`, and the OpenWiki workflow
+path immediately before `openwiki_begin` runs, and restores them
+byte-for-byte after. Restore coverage differs by host:
+
+- **Claude Code** restores automatically on both a successful call
+  (`PostToolUse`) and a failed one (`PostToolUseFailure`).
+- **Codex** restores automatically only on a successful call
+  (`PostToolUse`) and again at the end of the turn (`Stop`); nothing runs
+  automatically if the tool call itself errors.
+
+Because of that gap, always run the restore yourself right after calling
+`openwiki_begin`, on every host, whether or not the call succeeded:
 
 ```bash
-uv run python .claude/scripts/openwiki_refresh.py
-uv run python .claude/scripts/openwiki_refresh.py --require-enabled
+bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null
 ```
 
-Run it as one serial, explicit, model-backed step — never from a hook,
-`verify.py`, the installer, state-sync, post-commit, or scheduled CI. The
-runner's own `flock` only serializes one refresh invocation against
-another; it does not protect against a concurrent agent session writing to
-`.claude` in the same checkout. Run the refresh when nothing else in the
-checkout is writing to `.claude`, and simply re-run it later if it fails for
-that reason — the failure names files OpenWiki never touched, and nothing
-is damaged or committed.
+This is redundant but harmless when the host already restored automatically,
+and it is the only protection on a Codex tool-call error. Run refreshes
+serially: the guard takes no lock, so avoid starting one while another
+session is writing to the same checkout.
 
 ## Reading the result
 
-The runner prints one JSON result object. `status: "success"` means the
-refresh completed and touched nothing outside `openwiki/**`. Any other
-status means it failed closed and changed nothing outside `openwiki/**`:
+There is no runner JSON result. Read `openwiki_begin`'s own MCP response:
+the host surfaces a denial from `openwiki-guard.sh pre` as an ordinary
+permission-denial message, naming the reason (`mode` was not `update`, the
+resolved `root` is not this repository, or `openwiki/INSTRUCTIONS.md` is
+missing) — the tool never runs and nothing changes. When the call goes
+through, OpenWiki's own response says whether the refresh succeeded or
+failed.
 
-- **`not_enabled`** — no `openwiki/INSTRUCTIONS.md`; nothing to do.
-- **`preflight_failed`** — a precondition (missing `node`/`openwiki`, a
-  symlinked `openwiki/` tree, or a lock/snapshot error) blocked the run
-  before OpenWiki started.
-- **`busy`** — another refresh is already running; wait and retry.
-- **`failed`** — OpenWiki exited non-zero, or a write landed outside
-  `openwiki/**`. `out_of_scope_paths` and `restoration_errors` name exactly
-  what happened.
+Either way, the manual `post` command above tells you what happened: one
+line naming what it restored on success, or a nonzero exit naming an
+adapter it could not reconcile. Treat that nonzero exit as a real failure —
+report it and stop; do not hand-edit the adapter to fix it.
 
-On any failure, retry the refresh; do not clean up first. A failed run
-deliberately leaves `openwiki/.run.json` and partial generated pages on
-disk so the next run can resume incrementally, and the runner never
-commits, so a failed refresh cannot have published anything. Report the
-failure and its named paths to the orchestrator instead of working around
-it.
+A commit-time check in `verify.py` is the independent backstop: it refuses
+a commit that still carries the managed block in `AGENTS.md`/`CLAUDE.md`,
+an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a
+tracked `openwiki/.run.json`, even if the hook guard was skipped or its
+restore was missed.
 
 ## What never changes
 
@@ -72,10 +82,12 @@ it.
 - Never install a host-specific OpenWiki integration as part of an ordinary
   refresh.
 - Never create or modify a scheduled workflow for OpenWiki.
-- Provider selection and authentication live entirely in the user's own
-  `~/.openwiki` (relocatable with `OPENWIKI_CONFIG_DIR`), never in
-  repository state. Telemetry is off by default through the runner; a user
-  who wants it opts in by setting `OPENWIKI_TELEMETRY_DISABLED` themselves.
+- Provider configuration is optional: OpenWiki's MCP tools run using the
+  coding session's own model, not a separately configured provider.
+  Anything you do configure lives entirely in your own `~/.openwiki`
+  (relocatable with `OPENWIKI_CONFIG_DIR`), never in repository state.
+  Nothing in this repository sets `OPENWIKI_TELEMETRY_DISABLED`
+  automatically; set it yourself if you want telemetry off.
 
 ## Merge history and rebaseline
 
@@ -84,13 +96,14 @@ Incremental detection depends on the base commit recorded in
 rewrite can make it unreachable; treat OpenWiki's own fallback in that case
 as degraded incremental assistance, not a failure to fix.
 
-Never use `openwiki --init` to recover. When a clean baseline is genuinely
-required: keep `openwiki/INSTRUCTIONS.md`, remove everything else under
-`openwiki/**`, and run the standard refresh again — the runner performs a
-first generation the same way it performs an incremental one.
+Never call `openwiki_begin` with `mode: "init"` to recover — the guard
+denies it. When a clean baseline is genuinely required: keep
+`openwiki/INSTRUCTIONS.md`, remove everything else under `openwiki/**`, and
+call `openwiki_begin` with `mode: "update"` again; it performs a first
+generation the same way it performs an incremental one.
 
 ## References
 
-- `.claude/scripts/openwiki_refresh.py`
+- `.claude/hooks/scripts/openwiki-guard.sh`
 - `.claude/instructions/workspace.instructions.md`
 - `.claude/instructions/workflow.instructions.md`
