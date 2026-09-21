@@ -136,7 +136,31 @@ Phase J.
 
 ## Review findings and dispositions
 
-(pending)
+One round (profiles `code`, `architecture`, `security`, `tests`,
+`documentation`, `ponytail`; two sequential passes, converged after round
+2): 0 CRITICAL, 0 MAJOR, 0 MINOR. Gate PASS.
+
+- Confirmed: both MCP config files gained exactly OpenWiki's managed entries
+  and nothing else changed; no credential, private config, or AI-state
+  content in `openwiki/**` or `.openwikiignore`; the brief subordinates
+  generated content to source, tests, and policy and marks archived records
+  as historical.
+- Generated pages: three to six concrete claims per page were checked against
+  the cited source (agent roster and delegates, `prompt_base` derivations,
+  skill counts, `run-hook.sh` root resolution, guard wiring, the
+  `git-protection.sh` denial list, `protect-files.py` per-host decisions,
+  renderer order, MCP server definitions, the seven `VFY-*` ids, `gate`
+  flags, the `state-sync.sh` dispatch table, the installer sequence, and the
+  L1 to L4 lint codes); none contradicted the code; terminology is
+  consistent and matches the repository's own vocabulary.
+- Considered and dropped: whether the shape-only `skills/openwiki` match lets
+  a planted marker hide content under another root adapter directory. It is
+  the same rule Phase G established for `check_runtime.py`, needs filesystem
+  write access that already permits more direct tampering, and matches the
+  plan's acceptance bar, so it is not an actionable finding.
+- Held up: the four new tests fail if either exemption is removed or
+  broadened to shape-only; both code changes are the smallest correct fix
+  and reuse the existing `is_third_party_skill_dir` helper.
 
 ## [LEARN] Entries
 

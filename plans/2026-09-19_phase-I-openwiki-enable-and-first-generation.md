@@ -3,8 +3,8 @@ name: 2026-09-19_phase-I-openwiki-enable-and-first-generation
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 11
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-I-enable-and-first-generation.md
 ---
 
 # Small Plan: 2026-09-19_phase-I-openwiki-enable-and-first-generation
@@ -119,7 +119,7 @@ mirror. Phase G exempted these bundles from `check_runtime.py` drift only.
 
 ### Step I5 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Review Profiles:** `code`, `architecture`, `security`, `tests`, `documentation`, `ponytail`
   (Step I2b changes a script)
 - **Review focus:** MCP entries are exactly OpenWiki's managed form; no credential or private
@@ -147,16 +147,16 @@ uv run python .claude/scripts/verify.py phase --format json --persist    # befor
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`, names this a transition phase, and records the tool-call sequence and probe results
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged (`openwiki/**`, `.openwikiignore`, `.mcp.json`, `.codex/config.toml`) and `git diff --cached` reviewed; `openwiki/.run.json` not staged
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Root adapters byte-stable across the run; no scheduled workflow created
-- [ ] **Stop.** Phase J starts only after the user inspects `openwiki/**` and confirms in writing
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`, names this a transition phase, and records the tool-call sequence and probe results
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged (`openwiki/**`, `.openwikiignore`, `.mcp.json`, `.codex/config.toml`) and `git diff --cached` reviewed; `openwiki/.run.json` not staged
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Root adapters byte-stable across the run; no scheduled workflow created
+- [x] **Stop.** Phase J starts only after the user inspects `openwiki/**` and confirms in writing
 
 ## Pause Checkpoint
 

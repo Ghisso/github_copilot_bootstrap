@@ -1157,3 +1157,20 @@
   that path in an acceptance grep over the same file has two incompatible
   requirements. Scope the grep to code, or phrase acceptance as "only
   intentional references" and list them.
+- [LEARN:workflow] An ownership rule added to one checker must reach every
+  reader of the same ownership contract. Phase G exempted OpenWiki's
+  marker-claimed skill bundle from `check_runtime.py` drift only; the
+  installer's `.agents` takeover check and the verifier's bootstrap-root
+  fingerprint broke the first time the bundle existed. When adding an
+  ownership category to `runtime_ownership.py`, grep every consumer of that
+  module and apply the rule in each.
+- [LEARN:planning] A step that calls a project MCP server needs a session
+  boundary in the plan: a running Claude Code session does not discover a
+  server added to `.mcp.json`, and subagent tool lists exclude project MCP
+  servers, so such steps run on the main thread in a session started after
+  the server is configured.
+- [LEARN:tooling] OpenWiki 0.5.2: `mode: "update"` on an empty wiki performs
+  a first generation; the page queue is served alphabetically by path;
+  `openwiki_submit_page` rejects evidence citing `.openwikiignore`-excluded
+  files or generated OpenWiki output (including `openwiki/INSTRUCTIONS.md`),
+  so cite the generator string or README for root-guidance facts.
