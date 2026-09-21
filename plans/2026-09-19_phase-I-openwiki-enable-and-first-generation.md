@@ -62,7 +62,9 @@ knowledge-refresh phases; the closeout log must say so.
 
 ### Step I3 — Re-probe the guard against the real server
 
-- [ ] **Owner:** `coder` (Claude Code)
+- [ ] **Owner:** the orchestrator on the main thread, in a Claude Code session started after
+  Step I2 (the `coder` agent's tool list has no OpenWiki MCP server, and a running session does
+  not discover a server added to `.mcp.json`; the user approves the project server on restart)
 - **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/knowledge-refresh/SKILL.md`
 - **Probes:** (1) `openwiki_begin` with `mode: "init"` → deny before the tool runs (on hosts
@@ -75,7 +77,7 @@ knowledge-refresh phases; the closeout log must say so.
 
 ### Step I4 — Run the first host-driven generation
 
-- [ ] **Owner:** `coder` (Claude Code session)
+- [ ] **Owner:** the orchestrator on the main thread, same session as Step I3 (same reason)
 - **Target files:** generated `openwiki/**` except `openwiki/INSTRUCTIONS.md`; nothing else
 - **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`, then OpenWiki's installed
   `.claude/skills/openwiki/SKILL.md`
