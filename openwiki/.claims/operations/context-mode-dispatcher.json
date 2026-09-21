@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:095c81cc9f432098cefe4d02c763688847c80e6c609ea42bf4b39a7ddb220695",
+  "claims": [
+    {
+      "id": "claim_577776e0370d47099f04fb101b4060e5",
+      "statement": "context-mode-dispatch.sh has two modes: server mode, launched from the MCP configurations, execs context-mode-mcp-filter.mjs under Node in front of the pinned Context Mode; hook mode maps the host name to Context Mode's target (github-copilot to vscode-copilot, openai-codex to codex) and runs context-mode hook <target> <event>.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L330",
+          "version": "repo-lines-v1:sha256:1166c1ae674af69d31198d53818c5e62c6113c7eb4ac7a8fc5bf85af646292ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNGEwYzQ4OTcyYTJlZDk4MGJjYWI5MDcwZGE3MTE3Y2U1N2Y0MDZjMzAyZTMzNWNiYmU1NWU4MjEwMzhlMTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ee848aeb09444f659c02cce859a8a3a5",
+      "statement": "Hook mode fails open (warn and exit 0) when storage is unavailable or when neither a pinned context-mode binary nor npx is available, and never checks for Node; server mode prints an ERROR context-mode-dispatch line and exits non-zero under those same two conditions and additionally when Node or the filter script is missing.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L307",
+          "version": "repo-lines-v1:sha256:2067673403f45411153800159ad7175337109780a2db189228d24c7cb87368a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzYTkwZTU2NTFlZmNkZWMzZmI2MzM3ZWM4NmI2MTIzZjgxMTM5NTg4OGI0OWY4MWIxMDI4YjQxMTcwOGE1MzgifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L309-L318",
+          "version": "repo-lines-v1:sha256:221338df76de15992b148c3aa9fd1575004709966f3f9dbf231b54d9a35ce72f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ZjJmOWIyYzE0YzFkZThhODRlOTU2MGZhZTEwYmQxZWUyOTI4MjVjMmYxYzQwOTJkNmI1ODFmNGYyNWM5NzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0MzVkYmMxOGI5Mjc2NGQyOGI1ZjdhMGY2NzZmNzVmYzgxZGI2MTg5NDA1NmVkMTcxZGYzMjA5Y2NjNmU4OGUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L320-L330",
+          "version": "repo-lines-v1:sha256:97837674bcef934a03a92ca52ea4489652e4367661782764784f329fe2b19613:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3Y2YyOTNiMzVmZjdjNjkyZTk4OTZkYjg0OGFiMTIwOGFmYTBiNzQwY2ZiNGEyMDY4ZWJkZDUxMDY0MGVmMzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNGEwYzQ4OTcyYTJlZDk4MGJjYWI5MDcwZGE3MTE3Y2U1N2Y0MDZjMzAyZTMzNWNiYmU1NWU4MjEwMzhlMTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhODI2M2UzOTEwZTk4YjYzNGY3MjNlYWQ1Y2Y1MTE2M2Y4MTYzOWU4ZTZjMDM1N2YwYjBjOWFmMTYwYzg0ZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2299aa361c764874ad2950a5ed8d1b1a",
+      "statement": "The pinned Context Mode version is 1.0.169; resolve_context_mode uses a direct context-mode executable only when its owning package.json name and version prove that exact pin, because Context Mode 1.0.169 has no working --version flag and doctor is slow and network-bound; otherwise it falls back to npx -y context-mode@1.0.169, pinned by construction.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L11-L11",
+          "version": "repo-lines-v1:sha256:921404203a54914e99cf7a37d0a9d776831fee00f6abed92ff209f3a6db5650a:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTIxNDA0MjAzYTU0OTE0ZTk5Y2Y3YTM3ZDBhOWQ3NzY4MzFmZWUwMGY2YWJlZDkyZmYyMDlmM2E2ZGI1NjUwYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTIxNDA0MjAzYTU0OTE0ZTk5Y2Y3YTM3ZDBhOWQ3NzY4MzFmZWUwMGY2YWJlZDkyZmYyMDlmM2E2ZGI1NjUwYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2Y3MDU2YjQ0MTA5ODZkYTRmMjdkNmFmMWY3OTZhZTgwZTVjNzRmYmQ1MWM2ODFiMmUzMzBmZDhkZTUzMDc2NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTcyY2VlNzJmNTI3N2IxYjg0YzAyNTExMGYxOTlkNjk3MjkzMmZiZWU2MWM1ZjExZjQwMjNlOGU5MjYxMzljNiJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L20-L65",
+          "version": "repo-lines-v1:sha256:cef9ef60ab159574d27140bd996e5e905f6813b1c07f5f14f88afb9124e90ef4:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmNDZmMGJjMzA1NzA5ZTM3MTFlODg4MTg0MzA1NzY2NWVkZWFmMTc5NmUzZmUzOGQyMWRiZWM1OTgyNzExN2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYwMmI5YzI5NzZiZGFiZTRlZDgxMmI5ZDExMzAxMzlkYWVlODNmN2M4MjBjNmY5ODdhZDkwOWZhODZkY2RhMGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkOWJiZWI5NzNhNzk5MDk1OWFkOTM4ZGZlMWRmOGQ0Yjk1Yzc0OTYwZTZiNDYwZjRiNmZkMzA2MGZjNmFlNzUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4d57b495d44f4c90b42df874b8fc1d19",
+      "statement": "context-mode-dispatch.sh --self-check prints PASS context-mode-dispatch lines for required-version, resolved-path, observed-version, launcher, version-contract (pinned-direct-binary or pinned-via-npx), filter, storage-root, storage, and nested-ignore, and check_runtime.py consumes this self-check.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/check_runtime.py#L349-L382",
+          "version": "repo-lines-v1:sha256:8197b6210d1eae2fff1a6f0a34b47c87020f7f2263ba2cfebe390f704c70fa79:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0MDdjNDVmOWQ5YTg5ZTcwZTZjYTNiYmJhNmIwMTRhZDljYjhkN2ZhMDYwNTAyNzUwNWZjMDU1MWMwZjZiZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI1ZTcxZjY1ZDJjNDcyZWY4ZTFhNTA4ZTUyMThlY2YyZTgwNGVlOGMwNGY0ZTEzNDVjMWExN2U1ZmE5ZmQ5NTAifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L230-L287",
+          "version": "repo-lines-v1:sha256:a4c30f2ea38aa739b615097a01fe7f6e403a2ee9efdd8d70e9df00f5621f92f6:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEyZGJmMmFlZmJjNmYwYTVhZWQ1ODg2OGEyODkyNDFjNmM5ZTM3OWRmZTg2ODA4NTQwMjhkNWJmOTU3NTRhYjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNhNTU0MjkyYWIxMGJkYzNiNGYwMDc5ZjY3YjU2MDJkNDllZWM3MmFjMjdiZjgxZmFiZGExNGVjYTUyNTFkZDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM1YTMxNDZiYTc5MTYxODBhNzI1MjY2ZDg5ZjQwYjU5ZmQyYTk2MWUwNmU0Y2M3NGQyNWIwODYwMDRiODIyMjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_15b7fd26d27143ab94015918c18643f7",
+      "statement": "context-mode-mcp-filter.mjs advertises and allows exactly four tools (ctx_index, ctx_search, ctx_stats, ctx_doctor), answers every other tool call locally with a JSON-RPC error and never forwards it, exposes no tools when serverInfo.version does not match the pin, and filters tools/list responses by counted request id so a reused id cannot leak the unfiltered list.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L1-L40",
+          "version": "repo-lines-v1:sha256:6fb14a92cff0f06841babcfa5f9594d0aa40416f6969f2ef47914e4b20b890d9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MWIwNTZhZjc2OGRmYTU2MDk1M2I1MjAzOGI4ZWUzYmQ0YzIxMzI2MThjMzg4NjdjNDgxM2NiMWI5MWNiY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0OTRmYTQ3ODkzZmE1ZWZkODJjMDM3MjUwNGZlY2U4NTBkY2ZiYzg3YmNhMDkzOTkzZjM4NDhjZGEzMjYxY2UifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L130-L140",
+          "version": "repo-lines-v1:sha256:8d1d75c03240d395c5de5e8df97b2e896c2125bd2a7d6a495deceaf760960a9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxZjVkYzZlN2Q0MTQzZGFhNTM3ODk2YzgxMDVmYzBmZmU4NjY3ZmNkNmM2M2I4NjVmM2IxYjNkMmEwOGM4OGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzYTRlNDJjNTEyYjIwODEyOGVkYmQ5MjQwYzgxYmZmNmZlMjlmMjNmY2E3NTZkZmI1NTkwMDg2MjdjNWZmNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA3Mjk2NDI3ZDM4ZTM0MWU1MjU3M2ZlN2YwMTcyZTc2ZDMzZTNkNTU1MWVkMTJiZDRjNmU2Y2ExOWJlYmJmMzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJmZDNiODNkM2ZjZmVjMTMzNWQ5OTI1ZGFmYjkyMThmZTNiZmQ1N2YxODMyZjQ1NjY1NGE1M2Y1ZDExNzJlMGYifQ"
+        },
+        {
+          "resource": "repo://tests/test_context_mode_mcp_filter.py",
+          "version": "repo-file-v1:sha256:f157760013fe630d9cd193fefb6f3d38a67dab5c0b0e10662bd66a05ae81cb2e"
+        }
+      ]
+    },
+    {
+      "id": "claim_4f831498072e4ac8a441f799da04d771",
+      "statement": "Guarded ctx_index accepts only content, path, and source; exactly one of content or path is required; path must exist, be a regular file or directory, not a symbolic link, and resolve inside the repository; directory-policy arguments such as include, exclude, maxDepth, maxFiles, extensions, respectGitignore, and followSymlinks are rejected.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L50-L85",
+          "version": "repo-lines-v1:sha256:165312e0637f6cc8cab6b5e677c4121c743899b7eedcf92a190d67211ee2e644:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0NDFjN2QwZmUxZDBjMzJhOTUwZTQ0NGNlODk0MTU3Yzg4N2ZiZjM2MWU0OGEyOTk1YjcyYWExZGM1MTkzZTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiNDFlOTNmNjkzOWM2OTU3ZWUyMDU1MWE3MGNhYTZjNmY0YjUyN2U1MmQ2ZGQyNDA1NzMyYjc4NDYyZTJiZTAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2c3a193e8e0849f29e0bab8f9d5eb942",
+      "statement": "The bootstrap owns exactly one Context Mode cache location, .claude/.cache/context-mode; select_storage_root honors a CONTEXT_MODE_DIR override only when it resolves at or beneath that directory and otherwise warns, uses the project-local cache, and never creates, stamps, or renames the refused path.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L10-L10",
+          "version": "repo-lines-v1:sha256:ca7f4fb07a0a0118db248736d47b97374eb571861190cc80b664dc7c9d57ad59:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E3ZjRmYjA3YTBhMDExOGRiMjQ4NzM2ZDQ3Yjk3Mzc0ZWI1NzE4NjExOTBjYzgwYjY2NGRjN2M5ZDU3YWQ1OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2E3ZjRmYjA3YTBhMDExOGRiMjQ4NzM2ZDQ3Yjk3Mzc0ZWI1NzE4NjExOTBjYzgwYjY2NGRjN2M5ZDU3YWQ1OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzAwNWQ0MWRhZDEzMWUxZDY1NzhkOTNlZTI2OTllYjExMWRkMjdlOWNmZDBhYzM2NWZjMjI2NDlhYjFjMDQ1ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjk3YjYzMGIxM2I3ZWQyM2JlNDVhM2Y0ZjBlOThlNmEyZmEyMThhYWI2Njk5ODk2ZDYyYmMyY2I4ZWI1MGY0MyJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L92-L131",
+          "version": "repo-lines-v1:sha256:c31d341a7848ea93910b4dad4af32f1b51789789d22164787c95139eae8f5b97:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwZmI3MzE0NDE4M2NkZWIxYjI2Yzk3OTA2NDYyNTNmNTU5NmI4OGJmYWUzYWI2OWVlZmNkYThiYTM1MmVjMWUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc3NDg1NWUyMTgwMTlmMmJhMDY1Yjk1YmQ2YTFhZWVhY2MyMGM4Nzc4NmM4N2QyZmU2MzFlZDhmMjNmODUxM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcxOWJlYTUwNGQ1M2Q4ZGQ5NzRmMjhiZmQ1MGI2MDJiZWNhYzljZTlkMTJiZWUzNTkxN2NjODI4OWY5OTVkM2QifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_cb6379a34b2c4b05a78055db25998702",
+      "statement": "configure_storage trusts an existing cache only when its .bootstrap-provenance marker contains matching repository, context-mode version, filter contract, and secret lines; otherwise it renames the cache to <cache>.untrusted.<UTC timestamp>.<pid>, never deletes it, warns with the quarantine path, and creates a fresh stamped cache.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L175-L209",
+          "version": "repo-lines-v1:sha256:08bf514201227df42a734dccabe012aeba670148ad6198af85114e8a04cfc9a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU0YTc5M2JlODE5ZmViNjhlNGE0Y2UyM2JhMDUzNTE2M2ViZjViNzBlYTFjZGM5NjY3ZDU4YWRhOGJiZGFkOGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhmNTI1MzU5OTllYzkzZDkyMzFjNWY0NjE5NzkyM2MxYjdkZTYyZDJhZmZmYmI4MjQyZTU3MzMwYjVjMmRjNDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI1MDcwOTU2YzY4M2QzMGQ1ZjJlODhmNTE5ODM1NzQwM2Q4ODU5YzhkNzMzMzViNjkwNWNhZmZlODI4MDgzYjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8a98933c09924e4eb78ccedd3eb9189f",
+      "statement": "The provenance secret is a random 32-byte value generated once with openssl rand or /dev/urandom and stored at .context-mode-provenance.secret in the repository root, outside .claude/, where state-sync.sh never adds, commits, or restores anything, so a hostile ai-state remote cannot read or plant it; it is written to a temp sibling and moved into place with mv -n so racing first runs converge on one secret.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L132-L174",
+          "version": "repo-lines-v1:sha256:a4d4db831aea1dba663036689999547ca46e42a1d77d83798cbb299af143a184:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3M2U1Yjc2MmE3OWJjY2ZhYjBkOGRmYjE1YjQ2NjAxYWE1MTMwZGVjYzIzNDdiZjZkNWQ0NDVjMjExYTA3YzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkZjhmZjgyNTgxNjY5YzNiNmRhYWMxOTVhYjQ3MjhjMjY2ZDBlODcwOGMwOGFiMDViM2Y0YmQ2ODE1YTczNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYxOTY2OGFhZjdkNzcwYmZmMjI2MDcwY2Y3YzlhNDIzOWE1MDg2YmFiMjE4NThkYWJiM2M2YWNmYzM0ODYyMTIifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L14-L18",
+          "version": "repo-lines-v1:sha256:c09093577f8a6e42ceb3f24af9b7e56dbfea509c7f30d41881d203371d683022:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2I3NTkyZGQ4ZDA2N2Y3NTJjOGVkZTYwYTA3ZmFiNDc0ZDYxY2U1Y2IyODFkNDBhNzljZTY1MjA5Njc2ODBiMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWQzZTgxMjAzMzc1NmU0YTVjNzE3Njk3Mzc2NDFkZGQ2MTM5ZDA5MTMwM2FlODhjYmQ1M2M1NjQ2ZTY0MDhkYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjk3YjYzMGIxM2I3ZWQyM2JlNDVhM2Y0ZjBlOThlNmEyZmEyMThhYWI2Njk5ODk2ZDYyYmMyY2I4ZWI1MGY0MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzJjNjdhZTlkM2U2Y2E3Njk3MDVhMjdlODA3YjBiY2FkNmRhZWI4YjNmZTliYWFlMjcxNjEyYzE2OTZkYmJmYSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2583404dcae94f85b81946d90703ff00",
+      "statement": "The installer's ignore block and the OpenWiki ignore file both exclude .context-mode-provenance.secret* so the secret never enters the consumer's main history or the generated wiki's evidence.",
+      "evidence": [
+        {
+          "resource": "repo://.openwikiignore",
+          "version": "repo-file-v1:sha256:39d83f20d6318c3fc831742df719e78893a856fb5e1500db9dd9e6f3cbbbde1d"
+        },
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L87-L118",
+          "version": "repo-lines-v1:sha256:b7fa0f3217e54acba05ee19cc1f360445609bdbc674e3c79ca0dba420fb5ad91:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NmU4N2JiMjBhOTNmYTEyMjVkNjBiMGZkMGYyMzMwZTgyNjkzYTljYTMzMDBjYjQwN2ExNjQyMTA5MWQwMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlZmRlYWJjYTMzYTdmY2EyMWRjZjcyNjQyZDc2NTk3YzkwZDgxYmRkMWI5ODliZjQwNjI2NjhkMzQxYWFiNjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4NjRlMDQ2YWJhMWIxNTVlNWUzMGQzM2NiOGYyMGQ0MzczZTQzYWNlZTNlMzZlZThiNjFhNjcyNjNlMGY4NGMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7de4142ca863474eaf7d79f6df54ef78",
+      "statement": "tests/test_context_mode_dispatch.py covers the storage override rules, the exact-pin version contract with npx fallback, the self-check fields, and server-mode failure messages, and tests/test_context_mode_mcp_filter.py covers the exact allowlist, no tools on version mismatch, blocked calls never reaching upstream, guarded ctx_index arguments, and duplicate-id leak cases.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_context_mode_dispatch.py",
+          "version": "repo-file-v1:sha256:aad7b9a11d8e79c083f3c53eea5ac9e29dee5fa9b4d135a042860408533e9e3b"
+        },
+        {
+          "resource": "repo://tests/test_context_mode_mcp_filter.py",
+          "version": "repo-file-v1:sha256:f157760013fe630d9cd193fefb6f3d38a67dab5c0b0e10662bd66a05ae81cb2e"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T06:07:33.954Z"
+  }
+}

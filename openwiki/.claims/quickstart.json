@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:ebc49dcd051b24b8ad9adad78769aab0b00ebda5d261edc923119b1a247edb85",
+  "pageVersion": "sha256:598d2ea41630fd13a2d19dae24b4bc09391cef880674e8573ee08a1b68c697ab",
   "claims": [
     {
-      "id": "claim_c590d72d79154af3a7e07a337207f09a",
+      "id": "claim_170b66d0359a4df39a8029164feadafe",
       "statement": "The generated OpenWiki knowledge layer is derived context, never authority over source, tests, or human-authored policy; the generated root guidance instructs agents to refresh it only through the knowledge-refresh skill and never to hand-edit a generated page or commit OpenWiki's own root snippet.",
       "evidence": [
         {
@@ -17,7 +17,7 @@
       ]
     },
     {
-      "id": "claim_2d3007f16a014351815502c79ebbb72e",
+      "id": "claim_5a899a6b4ac44f63bbbbfd8a33e6c5b1",
       "statement": "The canonical verification entrypoints are generate_targets.py --all, validate_targets.py, check_runtime.py, and verify.py in fast or phase mode, run through uv run from the repository root; verify.py selects the lint, type, and test scope for whichever repository it runs in.",
       "evidence": [
         {
@@ -31,7 +31,7 @@
       ]
     },
     {
-      "id": "claim_c2d96659f86146449e4ef0502c681d6c",
+      "id": "claim_480c0ebe8e8d4d68b511c510f144f8c1",
       "statement": "The lifecycle every change follows is PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH, classified first by the Task Lanes table in the workflow policy.",
       "evidence": [
         {
@@ -47,6 +47,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T03:23:13.016Z"
+    "at": "2026-09-21T05:37:12.382Z"
   }
 }

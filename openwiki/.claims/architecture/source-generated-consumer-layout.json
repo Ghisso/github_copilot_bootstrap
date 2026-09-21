@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:f624e42bb933b30f399b03bcbc01ece5a6739d7aa1bb3c831d2a4025b7113a57",
+  "pageVersion": "sha256:3e95f1329da9f5924075b024eb60dd8d1cfc476ccb86455712dc968a337e8e66",
   "claims": [
     {
-      "id": "claim_ed42ac4bfd7a4be0b02c65a7ea522aa7",
+      "id": "claim_8c95339bcd2a421fb59848cad3c15947",
       "statement": "The repository is a source-of-truth plus generated bootstrap: maintainers edit shared/, dist/multi-agent/ is the generated installable output, and in an installed project .claude/ is the canonical runtime basis while generated root files such as CLAUDE.md and AGENTS.md are adapters that must not be hand-edited.",
       "evidence": [
         {
@@ -12,12 +12,12 @@
         },
         {
           "resource": "repo://docs/architecture.md#L62-L66",
-          "version": "repo-lines-v1:sha256:564aeae8c9ed229f1d5d4771aae60702357818c92838840acd002fa09ca94bc1:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTczZmFlOTVkMmM1ZjFmM2MwNjQzYTEwYzUwZTRkZDVhOGQyNWNiY2ZkN2E2YTA5YWViMWE2MmU0ZGFlZDBjYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWUxMTM2NDA2YmQ4OTI0ZDJkMTBmMGM4NzNkNTUwN2M0YmRmNDVjOTViYmI4OGM1ZjM4MmEyMmMyNzExNGM0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDNiMTExYTU2YmRhMDExZTM1NThkYjU3NzIzOThmNzNmN2Q5YzZlNDVmN2MwNjgyM2RmMzE5Yzg1NTUzMTMyZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWYyN2RlMjFmYjRmYjc4NzIzNDFhM2U1MzcyMDUzZWQ5NGNlZTM1ZjlmMTUyYTI2N2VlYzcwZDdhY2JiNzU3YyJ9"
+          "version": "repo-lines-v1:sha256:8deb7f943bc4a43e0072d490e337945ae0d71670620e7d581970001b9a054aa4:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWJhMDIwYWZlNWQxYWZjM2YzZjkzODc3MTk5NDUwZjdiNWRlNTY4ZGE3Y2Q0N2QwMTk1OGNjMDBiYmZiM2RlMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjRmZjllOTIyYTNmZDAxMmZmOWE0MjAxN2ZjMTU1MzBmMjJjNDkzMDgwNDA1YzFjYzI3YTE4ZTc0MWFmMzlhNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmI0NDc0NmZjNmI2Mjc1ODY1MDdiZTVkMzkyMmQyMDc0NjYyZmVjNGFhNDhmYzFiMDQ1OWZlN2FjMjZlN2NiMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzEyNDFiNzcxZTk4YjllYzIzYjRiYTEzMzQxZTEyOTgwNDk3MWQ1YTU2NGZkZjhhNzgxY2U3Mzc5YThkYTRiNyJ9"
         }
       ]
     },
     {
-      "id": "claim_867cf9c93e2d44aca210ae0e8bf1e60b",
+      "id": "claim_5cc321c3793f46b295a0dc2ec00a13cc",
       "statement": "The authoring repository's root .gitignore excludes dist/ as generated build output and .claude/ because AI state is tracked in the nested .claude repository rather than the outer one.",
       "evidence": [
         {
@@ -27,7 +27,7 @@
       ]
     },
     {
-      "id": "claim_60e1222334d54b9ab2f328b7f250a627",
+      "id": "claim_f9b5f02bc824485682006f1441dbe483",
       "statement": "generate_targets.py has exactly one target, multi-agent; generate resets the output root, calls render_multi_agent, and strips quarantined content, and the CLI accepts --all, --target, and --output.",
       "evidence": [
         {
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "id": "claim_97f28631808a4eb1afd58dcd4c348d2b",
+      "id": "claim_3d85c27a23104134884568b7b16bcc1e",
       "statement": "render_multi_agent renders in a fixed order: devcontainer, the shared .claude basis, root AGENTS.md, the GitHub Copilot surface, the Claude Code surface, the Codex surface, and the Antigravity surface.",
       "evidence": [
         {
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "id": "claim_2199f0ab47ca44d499dc15239b9b6e99",
+      "id": "claim_f35529960e0b49c88fc95532a11e1f1d",
       "statement": "render_shared_basis copies MEMORY.md, templates, verify.py, record_findings.py, and every policy into the .claude basis with provider path rewriting, renders Claude path-scoped rules for conditional policies, writes the bootstrap-ownership.env manifest, and copies runtime_ownership.py and validate_plan_frontmatter.py verbatim because they are target-neutral.",
       "evidence": [
         {
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "id": "claim_402a71a47d7f4da0b57b46c29d367365",
+      "id": "claim_fe41ded221f549b692b52fe4add85a23",
       "statement": "render_github writes .github/copilot-instructions.md, one instruction adapter per policy, the copied hooks.json, .vscode/mcp.json and tasks.json, and one .github/agents/<id>.agent.md per eligible agent; render_claude writes CLAUDE.md, .mcp.json, and .claude/settings.json; render_codex writes .codex/config.toml, .codex/hooks.json, and one .codex/agents/<id>.toml per eligible agent.",
       "evidence": [
         {
@@ -71,7 +71,7 @@
       ]
     },
     {
-      "id": "claim_fc1f22e2bea344cbab106d46bb04d8ad",
+      "id": "claim_ae16fd88a04a49249ca1c21bf8d042da",
       "statement": "transform_target_paths applies a per-provider literal replacement table so canonical text naming .github/copilot-instructions.md and .github/hooks is rewritten to CLAUDE.md and .claude/hooks for Claude Code and to AGENTS.md and .codex/hooks for Codex.",
       "evidence": [
         {
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "id": "claim_d31a8ba6230e4cac9ba7af1c029e1461",
+      "id": "claim_6217b6d89e1c4283bc8f84de1b751a64",
       "statement": "shared/mcp/servers.json defines the shared MCP servers semble (via uvx), context-mode (routed through context-mode-dispatch.sh server), and context7, which the generator renders into .mcp.json, .vscode/mcp.json, .codex/config.toml, and .agents/mcp_config.json.",
       "evidence": [
         {
@@ -99,7 +99,7 @@
       ]
     },
     {
-      "id": "claim_a2c1742ce2524c06934e1751f55a5e0b",
+      "id": "claim_83dd86c150c649749b392023e5bd792a",
       "statement": "validate_targets.py's main runs a fixed sequence of structural gates over dist/ (task-lane contract, agents, MCP and hooks, skills, docs parity, runtime drift, receipt-chain lifecycle, installer, state sync, determinism, and hook-gate regression tests), prints FAIL lines and exits 1 on any error, and otherwise prints 'PASS generated target is structurally valid'.",
       "evidence": [
         {
@@ -109,12 +109,12 @@
       ]
     },
     {
-      "id": "claim_264b83c6bb274ca9846f9bdbb08038bc",
+      "id": "claim_d1bd688c04174e9ab4efd6fd02d261a9",
       "statement": "validate_determinism regenerates the target into a temporary directory with generate_targets.py --all and requires it to match the committed dist/, so any hand edit to generated output fails validation.",
       "evidence": [
         {
           "resource": "repo://docs/architecture.md#L108-L112",
-          "version": "repo-lines-v1:sha256:25db145e6dcf25c7533d96b58854319f6b9fed5084df5f1ab512f79a6ef4befe:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQ0NGQ3ZWRkMmQwMmRlMWQ2MzhiZjY1YjYwYzI3MWQ1Njg3ZDE4NmE3OWVlYzBjNWM2OGY1NmMwYTA5NDM2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTIxMGYxM2YzMTY4NTRmMWI4NTJlMTVjYjY0ZmM2ZDYyODVkMzY1YjYwNjk2N2JhMThjM2ViYzU1OWFmNGIwYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODcwM2QxMDBhZGM0ZjM4MmYzOWU5MDFkMTNhZmJhMmVjYmI5NGZiNGIwNzk0NjA1MjQ0NTEyZGEyNDhlMGJlOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTEzODRmMmE5NDhiNjBmYzM1MzdmYWE1NzJiM2U4ZGVjOTUzNTE5Y2FhOTBmYzgwYzBjZjJjZTNjM2VjNzE2OCJ9"
+          "version": "repo-lines-v1:sha256:d7e42f67b4bd59dd383d5f975c8ff157686b28c55e6ffcfbe9e648e29b158125:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTVjZDM5NmJhYjg4YjIwNWRiNzM4ODA3ZjI3YjgzOWFlMjIxMDJmNjkyMGU1OWVjN2NhNDQ1ZTY2ZWYyZjQ5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdiYTcxYWMzNGYzN2QyODhjZGVmOTM3OTY0MmUyMjMxOWEzMGE1YjkyYjZlMmI3MGU1ZDNhMDMwMTYwZTNjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI1NTA0NmRjM2FhNzg3NmQwOTQxY2Q1YjY2ZGI1NWM3NTc1MTBkNTdhZTBlYzZlODc4Y2I1NzVhYTJhNDNhYiJ9"
         },
         {
           "resource": "repo://scripts/validate_targets.py#L10636-L10660",
@@ -123,17 +123,17 @@
       ]
     },
     {
-      "id": "claim_7bc0a2ae744947c09bdf6b8f6eb33df7",
+      "id": "claim_90fd67f6da954a29a72b9b82d6e8c8eb",
       "statement": "Policies are authored once with target-neutral applicability frontmatter and discovered natively per host: Claude Code loads conditional policies as path-scoped rules under .claude/rules/, Codex gets a nested AGENTS.md only for a policy owning a stable directory (otherwise a skill), and Copilot adapters derive applyTo from the same patterns with scope parity validated against Claude's paths.",
       "evidence": [
         {
           "resource": "repo://docs/architecture.md#L27-L60",
-          "version": "repo-lines-v1:sha256:b57811648d9b092a9900d9a90387011d52d08fa90351935858feb9f44c75924f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMTc1YmNmMDYxMzgzZmFkMzA0MzkxN2NiYWI2OTdmOTEzZWFjNjg3NTFkM2JkOGRhMWQ0ZTM3MDA4ZjcwOGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZjM3OGVkMGVlN2E3MzY5M2JiNGMzOGJhNTZjOTEyOWMxMWIyOGE1Y2U4ODlhMDE2YWU3NWVlZTdmNzMxZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0OGNlNzUyODMyMjlkOWJlNzk0M2UyMzMyNzRhNjI1N2FiOWE0YmI5YTgxMDgxMGVkYjcwMmU2M2JmZTE0YzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmNTgxODJiM2YzYWRhZjlmNjU1M2MwOWMwMWFkMjgyODM3YjcyMTY3Y2VjMDU3NjFhOTQxNWEyMTBkYTQxNzIifQ"
+          "version": "repo-lines-v1:sha256:5826467b2931ed99f55dd80ceab51e01ec64b39582d87366341c3b58045db253:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzZGI0MzJlZGZjOTJkMzRkMTUwMzFiYWYxY2ZiMDlhNmJjZGFhMjc3MTVhYzcwYjIxNTg0NzM0ZGM2YjhlOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMGI2NDNlMGQwNWM4NTI2NTYwYTAxODg1ZDlhYmJmOGNhNTJkMTkzOWQyYTJiZWJlMDg1MjQwZmRkOWY2OTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3NGVkNTU0MDMzNTEzZDBiOTczODkzZjQ1MjcyZWI1MTc0MjgxMzdmN2JkNTU2NGY3YmNjZjZmNWEzOGM2ZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlNGIzYzdkYjUyNjZmODc5NjgzZGEyOGRmYjZkZmNlZWU2NjA1OWQ1YTZlNDExM2U3OTc1MWRlMTc2OWFhN2QifQ"
         }
       ]
     },
     {
-      "id": "claim_9dc79a419d9744bb912efa70bd17c25a",
+      "id": "claim_4eb7ff07929446d38bf05878e7c4fdd3",
       "statement": "This repository self-installs its generated output with scripts/install_bootstrap.py --allow-self to exercise the lifecycle end to end, keeping tracked authoring adapters byte-stable; a normal consumer only receives the generated copy and never shared/.",
       "evidence": [
         {
@@ -145,6 +145,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T03:23:13.016Z"
+    "at": "2026-09-21T05:37:12.382Z"
   }
 }

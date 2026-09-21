@@ -5,7 +5,7 @@ description: A routing map from common tasks in the github_copilot_bootstrap rep
 tags: [quickstart, routing, navigation, authority]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-21T03:23:13.016Z
+    at: 2026-09-21T05:37:12.382Z
 sources:
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
@@ -15,42 +15,43 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-21T03:23:13.016Z" }
+generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
 ---
 
 # Quickstart: where to look for what
 
-This wiki is derived context. Source under `shared/`, `scripts/`, and
-`tests/`, and the policies under `shared/policies/`, outrank every page
-here. When a page and the code disagree, the code is right, and the page
-should be refreshed, never hand-edited.
+Source under `shared/`, `scripts/`, and `tests/`, and the policies under `shared/policies/`, outrank every page in this wiki. When a page and the code disagree, the code is right; the page is refreshed, never hand-edited.
 
-## Orientation in one paragraph
+## The repository in one picture
 
-This repository is a source-of-truth plus generated bootstrap for AI coding
-agents. Maintainers edit `shared/`; `scripts/generate_targets.py --all`
-renders it into `dist/multi-agent/`; `scripts/install_bootstrap.py`
-installs that into a consumer, whose `.claude/` becomes a nested Git
-repository on the `ai-state` branch. Hooks enforce a plan-driven lifecycle
-and `shared/scripts/verify.py` produces the receipts the commit and push
-gates check.
+This diagram shows how content moves from authoring source to a consumer.
+
+```mermaid
+flowchart LR
+    S[shared/] -->|generate_targets.py| D[dist/multi-agent/]
+    D -->|install_bootstrap.py| C[consumer repo]
+    C --> N[nested .claude on ai-state]
+```
+
+This repository is a source-of-truth plus generated bootstrap for AI coding agents, not an application. Hooks enforce a plan-driven lifecycle, and `shared/scripts/verify.py` produces the receipts the commit and push gates check.
 
 ## Route by task
 
-| I want to... | Read | Then look at |
-|---|---|---|
-| understand what lives where and why `dist/` and `.claude/` are ignored | [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md) | `README.md`, `docs/architecture.md`, `scripts/generate_targets.py` |
+| I want to... | Read | Then open |
+| --- | --- | --- |
+| understand what lives where and why `dist/` and `.claude/` are ignored | [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md) | `README.md`, `scripts/generate_targets.py` |
 | classify a request, start a phase, or close one out | [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md) | `shared/policies/workflow.instructions.md`, `shared/templates/plan-small.md` |
-| understand why a commit, push, or PR was denied | [Deterministic verification](/openwiki/operations/deterministic-verification.md) then [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `shared/hooks/scripts/enforce-commit-gate.sh`, `docs/runtime-checks.md` |
+| understand why a commit, push, or PR was denied | [Deterministic verification](/openwiki/operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
 | add or change an agent, a review profile, or a skill | [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
-| add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, `shared/hooks/hooks.json`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
-| install into a consumer, refresh one, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
-| understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `shared/hooks/scripts/restore-root-adapters.sh`, `tests/test_state_sync.py` |
+| add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
+| install into a consumer, refresh one, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py` |
+| understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
+| understand the Context Mode pin, tool filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs` |
 | refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.py` |
 
 ## Commands you will run most
 
-From this repository's root, through `uv run`:
+Run these from the repository root. The verifier selects the right lint, type, and test scope for whichever repository it runs in, so prefer it over restating the scope by hand.
 
 ```
 uv run python scripts/generate_targets.py --all
@@ -60,12 +61,21 @@ uv run python .claude/scripts/verify.py fast --format text
 uv run python .claude/scripts/verify.py phase --format text
 ```
 
-The verifier selects the right lint, type, and test scope for whichever
-repository it runs in, so prefer it over restating the scope by hand.
-
 ## Things that are historical, not current
 
-`.claude/plans/`, `.claude/session_logs/`, dated documents named
-`docs/2026-*`, and the root `plans/` directory record past decisions and
-their evidence. A later phase may have reversed or refined them. Re-derive
-current behavior from `shared/`, `scripts/`, and `tests/`.
+- `.claude/plans/` and `.claude/session_logs/` record this checkout's own plans and sessions.
+- Dated documents named `docs/2026-*` are point-in-time spikes and reviews.
+- The root `plans/` directory holds architecture decision records and past phase plans.
+
+A later phase may have reversed or refined any of them. Re-derive current behavior from `shared/`, `scripts/`, and `tests/`.
+
+## Related pages
+
+- [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
+- [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md)
+- [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md)
+- [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
+- [Deterministic verification: verify.py modes, receipts, and findings](/openwiki/operations/deterministic-verification.md)
+- [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
+- [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
+- [Context Mode dispatcher: version pin, tool filter, and cache security](/openwiki/operations/context-mode-dispatcher.md)

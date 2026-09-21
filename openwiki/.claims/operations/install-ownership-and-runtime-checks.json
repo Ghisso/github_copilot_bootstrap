@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:b1d7b564f467dc5e4e59327786d08446d23af7870421b1b7acd937b1aee6c115",
+  "pageVersion": "sha256:a4ddba601c309f5f6b5bb5556a6c7719f72af1879182eac6858c18af9d74a285",
   "claims": [
     {
-      "id": "claim_8cfa325536394e72814f633a8e2d3092",
-      "statement": "runtime_ownership.py is the shared ownership contract: ROOT_ADAPTER_PATHS (CLAUDE.md, AGENTS.md, .mcp.json, .codex, .agents, .vscode/mcp.json, .vscode/tasks.json) and COPILOT_SURFACE_PATHS are generated in consumers and mirrored into .claude/bootstrap-root for restoration, TRACKED_AUTHORING_PATHS (AGENTS.md, CLAUDE.md) are preserved when tracked, and CONSUMER_STATE_PATHS under .claude are never used as equality targets or overwritten on refresh.",
+      "id": "claim_b1af9741cfc242439d4d2f5655e2f681",
+      "statement": "runtime_ownership.py is the shared ownership contract: ROOT_ADAPTER_PATHS and COPILOT_SURFACE_PATHS are generated in consumers and mirrored into .claude/bootstrap-root for restoration, TRACKED_AUTHORING_PATHS (AGENTS.md, CLAUDE.md) are preserved when tracked, and CONSUMER_STATE_PATHS under .claude are never used as equality targets or overwritten on refresh.",
       "evidence": [
         {
           "resource": "repo://scripts/runtime_ownership.py#L1-L70",
@@ -13,7 +13,7 @@
       ]
     },
     {
-      "id": "claim_0d4f182ae94c423b932efda42dc057a2",
+      "id": "claim_ca1ef0f5f8e34e04b0d4fb13a9784c12",
       "statement": "A skills/openwiki directory under .claude or .agents is ordinary bootstrap-generated content until OpenWiki's installer writes the marker file .openwiki-install.json inside it; is_third_party_skill_dir requires both the path shape and the marker, and only then does the bootstrap stop generating, drift-checking, refreshing, or comparing that directory.",
       "evidence": [
         {
@@ -27,8 +27,8 @@
       ]
     },
     {
-      "id": "claim_90c4e4b5e06a49cab2fbcd3575a82205",
-      "statement": "The state-directory README files under plans, explorations, session_logs, and quality_reports are bootstrap-owned and regenerated on refresh even though their directories are consumer-owned, while every sibling file in those directories is left untouched.",
+      "id": "claim_094bafc538dc42b08c5378f7b0969857",
+      "statement": "The state-directory README files under plans, explorations, session_logs, and quality_reports are bootstrap-owned and regenerated on refresh even though their directories are consumer-owned, while every sibling file is left untouched.",
       "evidence": [
         {
           "resource": "repo://scripts/runtime_ownership.py#L58-L70",
@@ -37,8 +37,8 @@
       ]
     },
     {
-      "id": "claim_4463f7fcf0b845feb447d775662e1520",
-      "statement": "The installer's --commit-copilot-surface mode decides whether the Copilot surface is committed to the outer repository (then not mirrored and not ignored) or kept as a local mirrored overlay; the mode is persisted in .claude/bootstrap-ownership.env and reused on later refreshes unless overridden.",
+      "id": "claim_a9367bde756c4d3986df5206e5963a18",
+      "statement": "The installer's --commit-copilot-surface mode decides whether the Copilot surface is committed to the outer repository or kept as a local mirrored overlay; the mode is persisted in .claude/bootstrap-ownership.env and reused on later refreshes unless overridden.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L1136-L1152",
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "id": "claim_db9a80159f2b4106bca141c2d3cc78ed",
+      "id": "claim_2640e40d15e04a8ab30ad2acd5ae0eb9",
       "statement": "install_bootstrap.py's main runs a fixed sequence: validate roots, validate the .agents takeover, resolve the Copilot mode, migrate pre-Git state, copy the generated tree, substitute project name and Python version, populate .claude/bootstrap-root, update the devcontainer state remote, merge the .gitignore block, chmod runtime scripts, configure core.hooksPath, warn about tracked ignored paths, sync nested state, and report the Codex hook-trust reminder.",
       "evidence": [
         {
@@ -61,8 +61,8 @@
       ]
     },
     {
-      "id": "claim_58c1bbad297e4c1b8e15b07389a86df9",
-      "statement": "validate_install_roots rejects overlapping source and target trees, and --allow-self permits exactly one overlap: the bootstrap repository refreshing its own overlay from its own dist/, with the target required to be the bootstrap repository itself.",
+      "id": "claim_c9588aa779e44c27a279b3f156eb0ef1",
+      "statement": "validate_install_roots rejects overlapping source and target trees, and --allow-self permits exactly one overlap: the bootstrap repository refreshing its own overlay from its own dist/.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L290-L322",
@@ -71,8 +71,22 @@
       ]
     },
     {
-      "id": "claim_f14f31f10a85432994e3f35a9af36e77",
-      "statement": "copy_generated_tree preserves consumer state, tracked authoring adapters, and marker-claimed third-party skill directories (logging preserve consumer state, preserve tracked authoring adapter, and preserve third-party skill), and removes bootstrap-owned files the new generation no longer produces (logging remove obsolete generated file), walking only .claude and the restorable root paths.",
+      "id": "claim_3445db3dbe054ce7910fbd695fa87b1d",
+      "statement": "validate_agents_takeover compares the live .agents tree, the mirror under .claude/bootstrap-root/.agents, and the generated source with marker-claimed third-party bundles pruned by _agents_tree, and refuses with 'Refusing .agents takeover' when the tree cannot be proven generated.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L142-L175",
+          "version": "repo-lines-v1:sha256:37656153cd3d2fae96631348d99ce5a66f5d224306a32934082629f569b86c93:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzODc3YjMwNmVlODIwYjY5Y2Y0YWVkZjRlZmJmZTM0ODUxYjVkOTM0Nzk5ZGI2ZGY4MDcwZjM3NDU4NWEzOWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzYzBmYmIwZjJjZjBlYzYyNDdkZjc5YjBiMjcwYTMxNDdlMzRjNWMxN2NmZjUxODlmZjQ3NzgzZGUyOGIxYzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJjMDE4OGVkOTlmOTNiNjcyM2FkOWNlYTIxYjIxMzRjMDhjYmJmMTVmYmZkODdhMGIzY2ExMWY1ZmJjYjkyYWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNhMjVjNTMxYTI0OWVjMzY5ZTNiMWJkMzlmN2E3MTdlNDEyMTNhMmQzOThlNTRlMmVmZTgwNTZmYWEzM2Y3NWMifQ"
+        },
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L324-L404",
+          "version": "repo-lines-v1:sha256:218c80dbae3c39cf31799c5040c62be5de5430f5717dc12354a3c9f8ff1a338b:eyJzZWxlY3RlZExpbmVDb3VudCI6ODEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiYTE3NjJkMWQwMWYwNTJlMDA0YjU5MDNmOGU4MjljNGY5MTA1YzdhZWUyYzZmN2EwNWM5MTE3NmIwM2YyMjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1ZWZmNTgzMzdhNDBhZTVhNTUxZjI2ZGZjZWIwNjJhMzQ5MjIwZjNiOTA4MWIxY2UxNzA3MjYyYTRlNDZiOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhMGViMzJiY2JmZDUyNzkxNzA0MjU0MGIyMjU3Nzc3NTEzY2FmZjVhODUyNzI2NjEzZDY3N2Y4NWI5YjY3ZDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzZTgyZDQ0ZDY1N2YxOTcyMzQzYjRkMTIwZWUyOTA1ZGViNjVjNWY1YzIyYmQxNDdkZTA3YmI4YTlkMmIyMGQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3364acc27d114398adb3cbbbf226d426",
+      "statement": "copy_generated_tree preserves consumer state, tracked authoring adapters, and marker-claimed third-party skill directories, and removes bootstrap-owned files the new generation no longer produces, walking only .claude and the restorable root paths.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L419-L570",
@@ -81,7 +95,7 @@
       ]
     },
     {
-      "id": "claim_ec82de58abd84c2b8413ab569acce2b1",
+      "id": "claim_9ad0567b5a14441287fbf9c3c9ab9cbf",
       "statement": "populate_bootstrap_root mirrors the root-level adapter files into .claude/bootstrap-root so the Git-backed .claude checkout carries them, skipping the Copilot surface when it is committed to the outer repository.",
       "evidence": [
         {
@@ -91,8 +105,8 @@
       ]
     },
     {
-      "id": "claim_05bd99e2b56241269c9a4b8099ba77eb",
-      "statement": "merge_gitignore writes or refreshes an idempotent block between '# BEGIN multi-agent bootstrap generated/private AI content' and its END marker, updating patterns in place for existing consumers and leaving text outside the markers untouched; the active patterns cover .claude/, .codex/, .agents/, the Copilot surface when not committed, .mcp.json, AGENTS.md, CLAUDE.md, .uv-cache/, and the Context Mode provenance secret.",
+      "id": "claim_cc7b1f30c9b74cdd84ee158c25d8dcdc",
+      "statement": "merge_gitignore writes or refreshes an idempotent block between '# BEGIN multi-agent bootstrap generated/private AI content' and its END marker, updating patterns in place and leaving text outside the markers untouched.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L22-L24",
@@ -105,8 +119,8 @@
       ]
     },
     {
-      "id": "claim_fe5c1836ea4144e2ab3f947c4c3b9b66",
-      "statement": "sync_state_after_install runs state-sync.sh to create the distinct 'bootstrap: install/update <timestamp>' nested commit, separate from the session: commits made by Stop hooks, and migrate_pre_existing_state first commits a pre-Git .claude with real content as 'migrate: import pre-git state'.",
+      "id": "claim_1a2add56aa73499da484b8df3a18e05f",
+      "statement": "sync_state_after_install runs state-sync.sh to create the distinct 'bootstrap: install/update <timestamp>' nested commit, and migrate_pre_existing_state first commits a pre-Git .claude with real content as 'migrate: import pre-git state'.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L1136-L1200",
@@ -119,7 +133,7 @@
       ]
     },
     {
-      "id": "claim_92042faca9594ee5869810240074054f",
+      "id": "claim_03532a56451548fc896200a658d16f96",
       "statement": "update_consumers.py regenerates dist/ unless --skip-regen and runs install_bootstrap.py for each consumer, passing through --dry-run, --local-only, --allow-self, and the Copilot surface flags.",
       "evidence": [
         {
@@ -129,8 +143,8 @@
       ]
     },
     {
-      "id": "claim_f6f32890fede477b9eea5adf68272367",
-      "statement": "check_runtime.py fails on missing required runtime files, invalid plan frontmatter, runtime drift between installed files and their generated source (including installed files absent from the generated target, reported as 'stale runtime path ... absent from generated target'), Context Mode dispatch problems, and unguarded array expansions in hook scripts, and otherwise prints 'PASS generated runtime wiring is present'.",
+      "id": "claim_b30980f8742b4a8cabaccd2608317e73",
+      "statement": "check_runtime.py fails on missing required runtime files, invalid plan frontmatter, runtime drift between installed files and their generated source (including installed files absent from the generated target), Context Mode dispatch problems, and unguarded array expansions in hook scripts, and otherwise prints 'PASS generated runtime wiring is present'.",
       "evidence": [
         {
           "resource": "repo://scripts/check_runtime.py#L139-L311",
@@ -143,7 +157,7 @@
       ]
     },
     {
-      "id": "claim_d6b654921a744cdc97dde810a4ce707c",
+      "id": "claim_d72e13cf81984f6c8eedb50bda93c37b",
       "statement": "Runtime drift checking exempts a marker-claimed third-party skill bundle under .claude or .agents in both the drift and the obsolete directions, and skips consumer state and the bootstrap-root mirror.",
       "evidence": [
         {
@@ -157,8 +171,8 @@
       ]
     },
     {
-      "id": "claim_086684a63371478fb0f55bfc8f371ce5",
-      "statement": "The installer sets git config core.hooksPath to .claude/hooks/git-hooks once at install time and skips with a warning when the target is not a Git repository; state-sync.sh re-activates the same value on later syncs.",
+      "id": "claim_74b8803a59c7475d83cf29a06cfe857b",
+      "statement": "The installer sets core.hooksPath to .claude/hooks/git-hooks once at install time and skips with a warning when the target is not a Git repository; state-sync.sh re-activates the same value on later syncs.",
       "evidence": [
         {
           "resource": "repo://scripts/install_bootstrap.py#L1040-L1060",
@@ -173,6 +187,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T03:23:13.016Z"
+    "at": "2026-09-21T06:07:33.954Z"
   }
 }

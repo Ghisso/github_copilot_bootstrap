@@ -66,6 +66,74 @@ Cover, at minimum:
   self-check (`shared/hooks/scripts/context-mode-dispatch.sh`, README's
   "Optional Retrieval Helpers").
 
+## Page style
+
+Write every page in plain, direct prose. A new maintainer should be able to
+read a page once and act on it.
+
+**Structure**
+
+- Open every page with one sentence naming its authority: source, tests, and
+  the policies under `shared/policies/` outrank the page.
+- Lead with the answer or the mechanism first, then add detail. Do not build
+  up to the point.
+- Define an uncommon term the first time you use it. A short parenthetical
+  is enough.
+- Close every page with a short "Related pages" list linking pages that cover
+  a neighboring topic.
+
+**Sentences and words**
+
+- Write one idea per sentence. Aim for about 20 words per sentence.
+- Keep paragraphs to two or three sentences. Start a new paragraph for a new
+  idea.
+- Use common words. Avoid idioms and invented labels; if the source uses a
+  specific term, use that exact term instead of a paraphrase.
+- Do not use em-dashes, except inside a backtick-quoted exact required string, where the
+  literal character must be reproduced.
+- Do not hard-wrap prose at a fixed column. Let one sentence run as long as
+  it needs to; the renderer wraps it for the reader.
+
+**Lists and tables**
+
+- Use a bulleted list when you state several facts that are parallel, such as
+  a set of guards or a set of log files.
+- Use a numbered list when the order matters, such as steps in a sequence.
+- Keep each list item to one or two sentences.
+- Use a table only for genuinely tabular data, such as a mapping of targets
+  to files. Do not hard-wrap text inside a table cell; keep each cell on one
+  line.
+
+**Diagrams**
+
+- Add one Mermaid diagram, in a fenced ```` ```mermaid ```` block, when the page
+  covers a flow, a lifecycle, an ownership boundary, or a call sequence. Add it
+  only if the diagram is clearer than prose.
+- Write one plain sentence right before the diagram that says what it shows.
+- Keep node labels short, a few words at most. Prefer `flowchart` for a
+  pipeline or a boundary and `sequenceDiagram` for a call sequence between
+  components.
+- Example, at the size a page diagram should be:
+
+  ```mermaid
+  flowchart LR
+      A[Request] --> B[Guard]
+      B --> C[Handler]
+      C --> D[Response]
+  ```
+
+**Code, paths, and enforcement**
+
+- Put every command, exact error message, and path the reader must open in a
+  fenced code block or in backticks.
+- Name a specific file only when the reader needs to go open it. Do not name
+  every file that happens to be involved.
+- When a rule you state is enforced by a hook, a validator, or a test, say so
+  in the same sentence. This lets the reader tell an enforced rule from a
+  written policy. For example: "A new branch must be named
+  `<plan_name>_implementation`, which `enforce-branch-state.sh` checks before
+  allowing the branch to be created."
+
 ## Historical records are not current behavior
 
 Treat the following as evidence of past decisions only, never as a

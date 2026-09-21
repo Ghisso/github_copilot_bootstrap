@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:50386c5b8614a2b88ad294ad3595b4e257e1201ceb120d07a9fed911319e3d60",
+  "pageVersion": "sha256:6fe5a3714161cb9a85b373e0af7c916a730d317366dd9fcfd373ea9b8913d4e1",
   "claims": [
     {
-      "id": "claim_ce4a82fd76d943ecb1faaa8afaad46b9",
-      "statement": "The workflow policy's Task Lanes table is the single normative task-size classifier with four lanes (read-only/reporting, lightweight edit, standard implementation, control-plane/high-risk); time and line-count thresholds are never used, and any work with a requested commit or PR is at least standard implementation.",
+      "id": "claim_f49518af7629414a92868ab695c5bf80",
+      "statement": "The workflow policy's Task Lanes table is the single normative task-size classifier with four lanes; time and line-count thresholds are never used, and any work with a requested commit or PR is at least standard implementation.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L10-L27",
@@ -13,7 +13,7 @@
       ]
     },
     {
-      "id": "claim_fe75ad86fd7e4a10987945a549249b72",
+      "id": "claim_5aa5ac0287dc433f94a7c834489a3766",
       "statement": "Control-plane/high-risk covers any control-plane, security, dependency or lockfile, migration, multi-file, user-data, generator, or script change; it always uses a full plan and review with code, architecture, security, tests, and ponytail profiles.",
       "evidence": [
         {
@@ -23,7 +23,7 @@
       ]
     },
     {
-      "id": "claim_928a691c68304802a2c094aaa5cf2846",
+      "id": "claim_ca97bb078ab24351b707a1a2ad959c8f",
       "statement": "Each big plan creates exactly one implementation branch named <plan_name>_implementation from a clean dev; big plans use type: big-plan and small plans type: small-plan, one commit lands per completed small plan, and a PR to dev is opened only after every phase is complete or cancelled and only when the user asks.",
       "evidence": [
         {
@@ -33,7 +33,7 @@
       ]
     },
     {
-      "id": "claim_6187f2efcd61424da7a4c171e3cf36fc",
+      "id": "claim_124207df8bfc4e30a99d48868c2c9643",
       "statement": "Big-plan statuses are planning, in-progress, complete, and cancelled; small-plan statuses add planned and paused; validate_plan_frontmatter.py enforces these sets, the exact pause and cancellation fields, and that at most one -knowledge-refresh phase exists and only as the last phase.",
       "evidence": [
         {
@@ -51,8 +51,8 @@
       ]
     },
     {
-      "id": "claim_eaa83b4f51184a24ab08d2548c832d32",
-      "statement": "The canonical orchestrator loop is PLAN when needed, IMPLEMENT (coder applies ponytail once in full mode), VERIFY (focused and fast checks), REVIEW (reviewer returns JSON findings without persisting them), CLOSEOUT, a FIX LOOP back to IMPLEMENT on any failure, COMMIT, and one non-force PUSH with GIT_TERMINAL_PROMPT=0 where a missing remote or auth failure is only a warning.",
+      "id": "claim_d9f9ce593cab4eb989ad823fecc2d14e",
+      "statement": "The canonical orchestrator loop is PLAN when needed, IMPLEMENT with ponytail applied once, VERIFY, REVIEW returning JSON findings, CLOSEOUT, a FIX LOOP back to IMPLEMENT, COMMIT, and one non-force PUSH with GIT_TERMINAL_PROMPT=0 where a missing remote or auth failure is only a warning.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L126-L148",
@@ -61,8 +61,8 @@
       ]
     },
     {
-      "id": "claim_54503f1b1de34dfaa91af3ed5406a3db",
-      "statement": "A normal completion commit requires a passing verify phase and closeout receipt plus a matching findings report with counts.critical == 0 and counts.major == 0 and an explicit disposition and reason on every surviving MINOR; CRITICAL and MAJOR block the phase-completion commit itself, and the same contract is re-checked across every completed phase at push or PR time.",
+      "id": "claim_0d648a6764914bd0a9db91ac0519b4ae",
+      "statement": "A normal completion commit requires a passing verify phase and closeout receipt plus a findings report with counts.critical == 0 and counts.major == 0 and a disposition and reason on every surviving MINOR; CRITICAL and MAJOR block the completion commit itself, and the same contract is re-checked across every completed phase at push or PR time.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L141-L150",
@@ -71,8 +71,8 @@
       ]
     },
     {
-      "id": "claim_c5ca56eb6bce4150bb5bceb849a33149",
-      "statement": "The closeout sequence has eight ordered steps (documentation, final AI state, first nested checkpoint, stage plus findings plus phase receipt plus closeout dry run in one command with no git commit, second nested checkpoint, closeout receipt, commit in its own command, push), and two hard rules: never chain git commit with the findings or receipt steps, and never touch nested state between the receipt and the commit.",
+      "id": "claim_69dd9ab7aff8475eb5b8d3adecaa564f",
+      "statement": "The closeout sequence has eight ordered steps and two hard rules the hooks enforce: never chain git commit with the findings or receipt steps, and never touch nested state between the receipt and the commit.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L154-L176",
@@ -81,13 +81,23 @@
       ]
     },
     {
-      "id": "claim_ff221eb2b32f47cda224a0d774af2708",
-      "statement": "planned is a small-plan-only status for a phase that has not started; branch creation activates the first phase and a completed-phase commit activates the next non-cancelled phase by flipping exactly that one phase to in-progress, while an unexpected next-phase status is never overwritten and planned blocks the same push and completion gates as in-progress.",
+      "id": "claim_004f867e835c4640b2cac85b8ca74aea",
+      "statement": "enforce-branch-state.sh denies a misnamed branch, a dirty or non-dev start, or a missing or wrongly typed big plan, and record-branch-state.sh then writes originating_branch, implementation_branch, started_at, and current_phase and activates the first planned phase.",
       "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/enforce-branch-state.sh#L8-L87",
+          "version": "repo-lines-v1:sha256:9eabe477fbcc793f5d2ee1daf51721cf91a5f1099f01bd65660cb44c2048b8cb:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4NjBjODcyY2IxNGU0MmZjMzg3Mzc3ZDI3MGUzYzNiZTFlMDg1YWE4OWFjZTUxM2YyOTllNmI3MmEzYWNhNjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5YzBkNjIzYWM4MzRlMDAxZjZhNGM5NzUxY2E2NmM1ZTFhOTNkNDNlMzMzNDI4NzA4ZTNhMjcxM2Y2OGYxMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        },
         {
           "resource": "repo://shared/hooks/scripts/record-branch-state.sh#L39-L52",
           "version": "repo-lines-v1:sha256:1277b644aaa162c38b3630c8938e20ab3835ea592221ea81e8ab3849a778640f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiOTk1M2UyY2QxNmEwYzc2MTU4ZmRmMjZkYWVlYjU2MzkxYjljZTIxODlhZTlhMGNlMjMwOTVlYjM1ZmU4ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NmE4NGE1NDViMmI4Zjk0ZTM3MzQyNjNlZjVlY2UyNjViNDQzZWUyYmIwOWE0MzdiNjAzYjZlM2Q2Y2I0N2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZTkzZWIwYTc2OWJmZDE4MDQ1ZjEyNzJhZDU3NTZjNGM5MDk3YmE5N2M1ZjE1YWU2Yzg4NTU4Mjk5MDZhNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkZWQxNzkwMDJkZDU5ZWFhODFhODk4NTYzY2M3NTkxYTQwN2NlZTZiZjcxODQ3MjNkODY2NzAwYjdjNDcyZTgifQ"
-        },
+        }
+      ]
+    },
+    {
+      "id": "claim_4894b5d9f7874ce3a078088d7ef46490",
+      "statement": "planned is a small-plan-only status; branch creation activates the first phase and a completed-phase commit activates the next non-cancelled phase by flipping exactly one phase to in-progress, an unexpected next-phase status is never overwritten, and planned blocks the same gates as in-progress.",
+      "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L61-L74",
           "version": "repo-lines-v1:sha256:e36f7165b59dd59607d36563762455bcf0771ba89865f75acb89ce6a0d4a1a7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliNzFmODUyZDUxNDRkYTIxNzA4NTI4MjRhOTExMmI1YzY1YjY3MzdjNmRjZTI4ZDk5OTE4Y2I1ZDUxNGMzY2MiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5ZGUzNGEzMzBlNjllNmQzYzAxNmY4ZjhhOTE2YjNhZWE0MjBlMmM0YzEwMmM2Y2I0MTg5YWI5ZGRiNWQzMmIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM4Yzk3NDc0MGYwZTYwNGM3YzkyMjVhMzEwMDQ3MzA1YWQ3ZGNiZGE0MDczZWZiMWFjMTQ4ZGQ4ODUxY2I3YjEifQ"
@@ -95,8 +105,8 @@
       ]
     },
     {
-      "id": "claim_067af1e3dc154be4a19b9daf95da2500",
-      "statement": "paused is a small-plan-only non-terminal status entered only on an explicit user request, requiring paused_at in exact UTC form, a single-line paused_reason, and a pause_session_log containing **Status:** PAUSED; a checkpoint commit may preserve tracked work without final closeout, does not advance current_phase, and still blocks PR creation.",
+      "id": "claim_35d7c364fc52429e81010e6272c9b9c3",
+      "statement": "paused is small-plan-only and non-terminal, entered only on an explicit user request, requiring paused_at in exact UTC form, a single-line paused_reason, and a pause_session_log containing **Status:** PAUSED; a checkpoint commit does not advance current_phase and still blocks PR creation.",
       "evidence": [
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L225-L279",
@@ -109,8 +119,8 @@
       ]
     },
     {
-      "id": "claim_649762abc3664c4e8668255f217e4289",
-      "statement": "cancelled requires cancelled_at as an exact UTC timestamp, a single-line prose cancelled_reason, and a repository-relative cancelled_evidence artifact containing **Status:** CANCELLED; a cancelled phase needs no commit, findings, or closeout log, a cancelled big plan cannot start a branch, and commit-count checks count completed phases only.",
+      "id": "claim_ae0b37ba57ff4bf48d7f4a0f430be24a",
+      "statement": "cancelled requires cancelled_at, a single-line prose cancelled_reason, and a cancelled_evidence artifact containing **Status:** CANCELLED; a cancelled phase needs no commit, findings, or closeout log, a cancelled big plan cannot start a branch, and commit-count checks count completed phases only.",
       "evidence": [
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L155-L224",
@@ -123,8 +133,8 @@
       ]
     },
     {
-      "id": "claim_9e14af266da443ffbfcf0ec8c98aa548",
-      "statement": "At plan approval validate_plan_frontmatter.py applies the verification-contract lints to live small plans only (status planned, in-progress, or paused, dated on or after 2026-09-19): L1 verification-block-missing, L2 hedged-verification, L3 unfailable-verification, and L4 self-listed-closeout.",
+      "id": "claim_f942fea6520149bca221756e7a2b5aae",
+      "statement": "At plan approval validate_plan_frontmatter.py applies the verification-contract lints to live small plans only: L1 verification-block-missing, L2 hedged-verification, L3 unfailable-verification, and L4 self-listed-closeout.",
       "evidence": [
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L516-L579",
@@ -137,8 +147,8 @@
       ]
     },
     {
-      "id": "claim_fe06081043824d758de1b2d690400f7a",
-      "statement": "Plan-first protocol: check MEMORY.md for LEARN entries, clarify ambiguous work, draft into .claude/plans/ or .claude/explorations/, obtain approval unless the user supplied an approved plan, and before each new phase invoke one planner only when new evidence materially affects remaining work, revising affected future phases only.",
+      "id": "claim_10052977a14e46c4af5a5cb4b741eeee",
+      "statement": "Plan-first protocol: check MEMORY.md for LEARN entries, clarify ambiguous work, draft into .claude/plans/ or .claude/explorations/, obtain approval, and before each new phase invoke one planner only when new evidence materially affects remaining work.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L29-L47",
@@ -149,6 +159,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T03:23:13.016Z"
+    "at": "2026-09-21T05:37:12.382Z"
   }
 }

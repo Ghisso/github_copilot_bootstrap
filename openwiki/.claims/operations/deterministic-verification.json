@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:86e37a041bbcfcba7d30a3b9f84d52547e2cad2d65454f1acb70025f65145d96",
+  "pageVersion": "sha256:63b1dec4f25872cc359160ab62e4321ff9caed9f746d80b2d57b49de57a49a8c",
   "claims": [
     {
-      "id": "claim_10edbc6d6f68435589e7e7cba83f74d4",
-      "statement": "verify.py has three measurement modes plus a gate mode: fast is focused feedback that runs Ruff only on changed Python paths, phase persists reusable evidence, and closeout proves that phase evidence remains fresh before binding the final state; every receipt carries the same seven check ids VFY-RUFF-001, VFY-MYPY-001, VFY-PYTEST-001, VFY-FRESH-001, VFY-FRESH-002, VFY-GEN-001, and VFY-RECEIPT-001.",
+      "id": "claim_0b94d0a2c25644d6912b95fd89cbe5ed",
+      "statement": "verify.py has three measurement modes plus a gate mode: fast runs Ruff only on changed Python paths, phase persists reusable evidence, and closeout proves phase evidence remains fresh before binding the final state; every receipt carries the seven check ids VFY-RUFF-001, VFY-MYPY-001, VFY-PYTEST-001, VFY-FRESH-001, VFY-FRESH-002, VFY-GEN-001, and VFY-RECEIPT-001.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L1-L14",
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "id": "claim_25f366803ac14268a6d48bbc27aab61e",
+      "id": "claim_0208bb648f224affbab165a422fa7b30",
       "statement": "phase mode branches on repository kind: in the bootstrap authoring repository it lints and type-checks shared, scripts, and tests and runs tests/, while in a consumer it lints the repository excluding .claude, type-checks the configured mypy scope or reports VFY-MYPY-001 UNVERIFIED with the fix, and runs pytest.",
       "evidence": [
         {
@@ -31,8 +31,8 @@
       ]
     },
     {
-      "id": "claim_50931ec28d4548b9905d49eb0f57af0a",
-      "statement": "closeout mode does not re-measure: it loads the persisted phase receipt for VFY-RECEIPT-001, passes VFY-FRESH-001 only when base_ref, branch, head_sha, merge_base_sha, and content_hash equal the phase receipt's values, and passes VFY-FRESH-002 only when control-plane provenance still matches, otherwise reporting 'relevant code evidence is stale' or 'governing control-plane provenance is stale'.",
+      "id": "claim_448f2b4691b24ce99fcc58e8fd3c8e18",
+      "statement": "closeout mode loads the persisted phase receipt for VFY-RECEIPT-001, passes VFY-FRESH-001 only when base_ref, branch, head_sha, merge_base_sha, and content_hash equal the phase receipt's values, and passes VFY-FRESH-002 only when control-plane provenance still matches, otherwise reporting 'relevant code evidence is stale' or 'governing control-plane provenance is stale'.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L3379-L3456",
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "id": "claim_e9700d20cba24533b0db35d53e4c0e6f",
+      "id": "claim_ca8e86d75fa946af96ce36a8010099e0",
       "statement": "validate_receipt requires exactly the metadata fields generated_at, base_ref, branch, head_sha, merge_base_sha, tree_sha, phase, content_hash, tracked_state_hash, changed_paths, relevant_paths, path_discovery_ok, and control_plane_provenance, and raises 'receipt metadata control-plane provenance is invalid' when the provenance object is not bound.",
       "evidence": [
         {
@@ -51,8 +51,8 @@
       ]
     },
     {
-      "id": "claim_e28b3aff072d43b1836d25ec72972cd7",
-      "statement": "control_plane_provenance binds the nested repository head, a runtime fingerprint combining the nested .claude runtime paths with the bootstrap-root fingerprint, a tracked-state fingerprint over the active plans, and digests of the active big and small plans; the runtime fingerprint is empty when either component is unavailable.",
+      "id": "claim_6297b4f599914d85b0cfbcd9ba232268",
+      "statement": "control_plane_provenance binds the nested repository head, a runtime fingerprint combining the nested .claude runtime paths with the bootstrap-root fingerprint, a tracked-state fingerprint over the active plans, and digests of the active big and small plans.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L1172-L1210",
@@ -61,8 +61,8 @@
       ]
     },
     {
-      "id": "claim_9a40f862282b47718bc0128f2db9f820",
-      "statement": "The bootstrap-root fingerprint hashes each installer-owned live root adapter listed by the bootstrap-ownership.env manifest against its mirror under .claude/bootstrap-root/, excluding marker-claimed third-party skill bundles on both sides, and yields an empty digest when an adapter is missing, symlinked, or differs from its mirror.",
+      "id": "claim_5ce5a61862804233acf4df0fc3a86014",
+      "statement": "The bootstrap-root fingerprint hashes each installer-owned live root adapter listed by bootstrap-ownership.env against its mirror under .claude/bootstrap-root/, excluding marker-claimed third-party skill bundles on both sides, and yields an empty digest when an adapter is missing, symlinked, or differs from its mirror.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L795-L932",
@@ -71,8 +71,8 @@
       ]
     },
     {
-      "id": "claim_68bf83d43fa3493a8363bd1529abbfa6",
-      "statement": "closeout runs every required item from the plan's fenced Verification blocks itself, in order, before collecting metadata, with a 600-second per-item timeout, stops at the first non-PASS item and exits 2 without a receipt, and stores results at extensions.verification_items with item text, status, exit code, duration, and output tail.",
+      "id": "claim_eaafd4e303a546289484822b57ea8cd1",
+      "statement": "closeout runs every required item from the plan's fenced Verification blocks itself, in order, before collecting metadata, with a 600-second per-item timeout, stops at the first non-PASS item and exits 2 without a receipt, and stores results at extensions.verification_items.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L3660-L3680",
@@ -89,8 +89,8 @@
       ]
     },
     {
-      "id": "claim_d1fcdf72e9b94590b1522bf34a0b4cd3",
-      "statement": "phase and closeout refuse to run when .claude is not its own Git repository, printing instructions to checkpoint nested state, because nested AI-state provenance is otherwise unavailable.",
+      "id": "claim_c2c66c4b706443118a1c570cca8af728",
+      "statement": "phase and closeout refuse to run when .claude is not its own Git repository, printing instructions to checkpoint nested state.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/verify.py#L3645-L3658",
@@ -99,7 +99,7 @@
       ]
     },
     {
-      "id": "claim_7030e324144a4de4b00ace9abd06ee11",
+      "id": "claim_11ec3fb32c3e4a498cdbefb3d9fd5ebd",
       "statement": "openwiki_managed_state_violations checks three conditions with file reads and git queries only (a live OpenWiki managed block in AGENTS.md or CLAUDE.md, an untracked or newly staged openwiki-update.yml workflow, and a tracked or staged openwiki/.run.json), and generation_check fails VFY-GEN-001 on any violation before comparing the generated verifier with its source.",
       "evidence": [
         {
@@ -109,8 +109,8 @@
       ]
     },
     {
-      "id": "claim_e73e2ffecacf42f691a7dc2b4c5fe5a9",
-      "statement": "record_findings.py validates each finding's severity (CRITICAL, MAJOR, MINOR), title, and profile membership in the repeated --profile arguments, writes counts, profiles_reviewed, findings, and Git metadata including dirty (true when tracked changes are unstaged) and content_hash, and adds ponytail_reviewed and ponytail_findings when the ponytail profile ran.",
+      "id": "claim_cabe98975553402cbc35b8cbe106525f",
+      "statement": "record_findings.py validates each finding's severity, title, and profile membership, writes counts, profiles_reviewed, findings, and Git metadata including dirty (true when tracked changes are unstaged) and content_hash, and adds ponytail_reviewed and ponytail_findings when the ponytail profile ran.",
       "evidence": [
         {
           "resource": "repo://shared/scripts/record_findings.py#L1-L30",
@@ -127,7 +127,7 @@
       ]
     },
     {
-      "id": "claim_17a7f8c360ef4cbb91f59e67c86ce6cf",
+      "id": "claim_cae239dd08284f8b8f269fc5af1eefbb",
       "statement": "gate mode validates a passing closeout receipt for the given branch, phase, and head under a head relation of exact (head_sha equals HEAD and tree_sha equals the index write-tree), ancestor (receipt head is an ancestor of the pushed ref), or certified (the pushed commit is the direct child of the receipt head), and requires merge_base_sha to match the current merge base with dev.",
       "evidence": [
         {
@@ -141,7 +141,7 @@
       ]
     },
     {
-      "id": "claim_a0b6748c50754942a08857f3ede21e0e",
+      "id": "claim_fbc0b1b73e2a498c962bc7cd494f6665",
       "statement": "Under the exact head relation the gate enforces the verification-items contract with message prefixes G1 verification-results-missing, G2 verification-item-unrun, G3 verification-item-failed, and G4 optional-verification-unaccounted.",
       "evidence": [
         {
@@ -155,7 +155,21 @@
       ]
     },
     {
-      "id": "claim_8d8fe7afdb8f4bf4bc73bcc3fafac896",
+      "id": "claim_16219a6897bb4fe682f5c8b738d5fd8e",
+      "statement": "A normal completion commit requires counts.critical == 0 and counts.major == 0 in the findings report with a disposition and reason on every surviving MINOR, and a multi-file or otherwise high-risk diff is refused with 'this high-risk diff requires a fresh Ponytail review' unless the report records ponytail_reviewed=true.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L771-L890",
+          "version": "repo-lines-v1:sha256:d74e6be3fe05936b3b48564ccef139e1d888f69d4091bbabf64487064ae3483c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlYjM0ZWU4ZGMyMzQ3MjdhYTE3OTk2MGFiODAzMWRlZjU2MTBjNWIyYzQ4M2Q3ZWFjZDc1N2ExOTRmNWQ0YmQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxNWVmZWJiMTkzNjcwNmJiMmMxMzczYjFkMjU1NzY2NDEyYWY1MWNkMWU0NTI0M2E3NjZhOTZmNjkyZjk1MWUzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkNDMyOTQyMWJkZTU4ZmMxMWZjNTMzZmY4Yzc3OTAyZjI0M2ZjYjQyMDQ2OTg0MDNjY2UxNzQ4MWFhZjFkM2UyIn0"
+        },
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L141-L150",
+          "version": "repo-lines-v1:sha256:aca24d5210aec42ea58ddd4170040a96f4a74553bd85516b77c7ed8c7fbb4d1a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNjgwYzc0ZDk4ZDQ2NGU3NTc0MzkwODBlYWZhZGEzMGZkYzFkZjc5MmNlNGM1YWU3YzZlYjEzMzM4MGY4ZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzZTVlNGJjNGRkMmE1NDQ4ZGIzMWZmMzFlODk2YzcyNzVlY2VmYTVlYTAzOTFjZTEzNmJlYTc0Zjk4ZTg2MWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMGM3OWM4MjgzMjBjYmY0MDIyOTZhZTg5YTQ5ZDNjMDk1M2Q2NjdkNjYzMzg0NGViNTU0NDMwMWFkZGFhZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_584081de0485477d9b544e0d3e5da4a6",
       "statement": "The closeout session log must carry LEARN evidence as explicit [LEARN:category] entries or the exact marker '[LEARN] none - no new lessons this session' outside fenced code blocks; MEMORY.md's modification time is never a substitute, and a closeout whose diff touches no documentation needs an explicit --documentation-na reason.",
       "evidence": [
         {
@@ -173,8 +187,8 @@
       ]
     },
     {
-      "id": "claim_f997f633fd71454294eff8c245380b46",
-      "statement": "historical_chain_errors walks every earlier completed phase of the big plan at push or PR time, requiring each receipt's head_sha to resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches tree_sha, and re-verifying the recorded receipt, findings, and closeout-log artifact hashes; closed session logs are therefore immutable and corrections use a sibling errata file.",
+      "id": "claim_52638dcd6a1b459da6b5d289d5ced54b",
+      "statement": "historical_chain_errors walks every earlier completed phase at push or PR time, requiring each receipt's head_sha to resolve, be an ancestor of the next completed phase's head, and directly certify exactly one commit whose tree matches tree_sha, and re-verifying the recorded receipt, findings, and closeout-log artifact hashes; closed session logs are therefore immutable and corrections use a sibling errata file.",
       "evidence": [
         {
           "resource": "repo://docs/runtime-checks.md#L608-L634",
@@ -189,6 +203,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T03:23:13.016Z"
+    "at": "2026-09-21T05:37:12.382Z"
   }
 }
