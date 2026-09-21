@@ -3,8 +3,8 @@ name: 2026-09-19_phase-K-knowledge-refresh
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 13
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-K-knowledge-refresh.md
 ---
 
 # Small Plan: 2026-09-19_phase-K-knowledge-refresh
@@ -28,7 +28,7 @@ tables look misaligned. OpenWiki does not fix page style; the writing agent does
 OpenWiki validates every fenced `mermaid` block with its pinned `mermaid` and `jsdom`
 peer dependencies and marks a failed parse with an `openwiki: mermaid parse failed` comment.
 
-- [ ] **Owner:** `documenter` (prose), orchestrator approves the wording
+- [x] **Owner:** `documenter` (prose), orchestrator approves the wording
 - **Target files:** `openwiki/INSTRUCTIONS.md` only (human-authored; the one file under
   `openwiki/` that is not generated)
 - **Required Skills:** `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`
@@ -55,7 +55,7 @@ peer dependencies and marks a failed parse with an `openwiki: mermaid parse fail
 
 ### Step K1 — Refresh as a rebaseline
 
-- [ ] **Owner:** the orchestrator on the main thread in a Claude Code session (project MCP
+- [x] **Owner:** the orchestrator on the main thread in a Claude Code session (project MCP
   servers are not in the `coder` agent's tool list; OpenWiki's own skill forbids page subagents)
 - **Target files:** generated `openwiki/**` only
 - **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`, then OpenWiki's installed
@@ -78,7 +78,7 @@ peer dependencies and marks a failed parse with an `openwiki: mermaid parse fail
 
 ### Step K2 — Final stale-claims, MEMORY, and LEARN audit
 
-- [ ] **Owner:** `documenter` + orchestrator closeout
+- [x] **Owner:** `documenter` + orchestrator closeout
 - **Surfaces:** root guidance (`AGENTS.md`, `CLAUDE.md`, `README.md`); live `docs/` except dated
   records; `shared/policies/**`, `shared/skills/**`, `shared/templates/**`, `shared/agents/**`,
   review profiles; state READMEs; `shared/MEMORY.md` and live `.claude/MEMORY.md`;
@@ -98,7 +98,7 @@ peer dependencies and marks a failed parse with an `openwiki: mermaid parse fail
 
 ### Step K3 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Review Profiles:** `code`, `architecture`, `security`, `tests`, `documentation`
 - **Review focus:** generated content subordinate to source/tests/policy; final live advice
   tells one coherent host-driven story; nothing outside `openwiki/**` changed.
@@ -122,15 +122,15 @@ uv run python .claude/scripts/verify.py phase --format json --persist    # befor
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED` and a non-empty `## Stale-claims surfaces checked`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed; `openwiki/.run.json` not staged
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] Root adapters unchanged by the refresh; no scheduled workflow exists
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED` and a non-empty `## Stale-claims surfaces checked`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed; `openwiki/.run.json` not staged
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] Root adapters unchanged by the refresh; no scheduled workflow exists
 
 ## Pause Checkpoint
 

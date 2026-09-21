@@ -122,7 +122,14 @@ Non-documentation observation: `shared/scripts/__pycache__/openwiki_refresh.cpyt
 
 ## Review findings and dispositions
 
-(pending)
+Round 1: 0 CRITICAL, 1 MAJOR, 3 MINOR (see the Work Log). All four were
+fixed rather than dispositioned: the MAJOR and two MINORs through a
+corrective OpenWiki update run, the third MINOR in the human-authored brief.
+Round 2 (same reviewer, delta only): PASS, no surviving findings; the
+revised claim's evidence split was confirmed against the script; Mermaid
+10 of 10 parse; changes remain confined to `openwiki/`. Final: 0 findings
+across `code`, `architecture`, `security`, `tests`, `documentation`,
+`ponytail`.
 
 ## [LEARN] Entries
 
@@ -148,4 +155,14 @@ Non-documentation observation: `shared/scripts/__pycache__/openwiki_refresh.cpyt
 
 ## Open Questions / Next Steps
 
-- (pending)
+- This is the big plan's last phase. After this commit every phase of
+  `2026-09-19_openwiki-knowledge-layer-integration` is complete or
+  cancelled; the user owns the PR to `dev` and the merge.
+- Follow-ups carried: the Codex guard re-probe (optional, interactive);
+  `verify closeout` traceback when the findings report is missing (MINOR,
+  from Phase F2); the overlay refresh removing the nested `.claude/.gitignore`
+  that `state-sync.sh` recreates; a stale `__pycache__` bytecode file of the
+  retired runner (git-ignored, local only).
+- Future knowledge refreshes follow this phase's shape without Step K0 and
+  without the rebaseline: `update`, inspect the diff, audit, review, verify,
+  commit.

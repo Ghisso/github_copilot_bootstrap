@@ -1190,3 +1190,15 @@
   diffs included. Run the `ponytail` profile in the same review round as
   `documentation` whenever more than one file changes, or the first commit
   attempt fails and steps 4 to 7 of closeout must be redone.
+- [LEARN:documentation] OpenWiki fixes structure, claims, and validation;
+  the writing agent fixes page style. A style change goes in the brief's
+  `## Page style` section, and applying it to existing pages needs a
+  rebaseline (keep `openwiki/INSTRUCTIONS.md`, remove the rest, `update`),
+  because an incremental update rewrites only pages whose source changed.
+- [LEARN:documentation] Cite the script or test that implements a wiki fact,
+  not the human doc that describes it; shortening a human doc later
+  invalidates line-range evidence even when the fact is unchanged.
+- [LEARN:workflow] A generated wiki page is fixed through a corrective
+  OpenWiki `update` run scoped to the affected pages, using
+  `openwiki_inspect_page_claims` to get the claim id to revise; source need
+  not have changed for `openwiki_begin` to start a run.
