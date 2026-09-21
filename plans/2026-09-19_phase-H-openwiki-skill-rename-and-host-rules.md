@@ -15,8 +15,10 @@ OpenWiki's host integration installs its own skill, named `openwiki`, at
 `.claude/skills/openwiki` (Claude Code) and `.agents/skills/openwiki` (Codex), and refuses to
 install while an unmanaged skill occupies either path. The bootstrap-generated skill of the same
 name occupies both, and skill names must be unique per host. This phase renames the bootstrap
-skill to `knowledge-refresh`, rewrites it for host-driven operation, and replaces the three
-committed rules that forbade host integrations with the precise rule below.
+skill to `knowledge-refresh`, rewrites it for host-driven operation, and replaces the one
+remaining committed rule that forbade host integrations (`shared/skills/openwiki/SKILL.md:83`,
+"Never install a host-specific OpenWiki integration as part of an ordinary refresh"; Phase G
+already removed the policy and prompt copies) with the precise rule below.
 
 The two skills have different jobs: OpenWiki's `openwiki` skill is the tool-lifecycle and
 authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle policy around it
@@ -59,6 +61,9 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
     repository; supported hosts are Claude Code and Codex — other targets read `openwiki/**`
     but cannot refresh it
   - rebaseline rule unchanged in substance ("first generation in `update` mode")
+  - keep the current "provider configuration is optional" bullet (`~/.openwiki`,
+    `OPENWIKI_CONFIG_DIR`, `OPENWIKI_TELEMETRY_DISABLED`) in condensed form; it is still true
+    in host-driven mode and is the only place the repository records it
 - **Acceptance criteria:** passes the skill validators in `scripts/validate_targets.py`; no
   sentence describes a mechanism that does not exist at this commit.
 - **Verification:** `uv run python scripts/generate_targets.py --all && uv run python scripts/validate_targets.py`
@@ -67,16 +72,23 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
 
 - [ ] **Owner:** `coder` for generator strings, `documenter` for prose
 - **Target files:** authoring `AGENTS.md:9`, `CLAUDE.md:14`, `render_root_guidance` in
-  `scripts/generate_targets.py`; `shared/policies/workflow.instructions.md` (OpenWiki Refresh;
-  Knowledge-Refresh Shape); `shared/policies/workspace.instructions.md` if the skill is named;
+  `scripts/generate_targets.py` (line 1321 at plan time); `shared/policies/workflow.instructions.md`
+  (lines 201 and 248: OpenWiki Refresh; Knowledge-Refresh Shape);
+  `shared/policies/workspace.instructions.md` if the skill is named;
   `shared/agents/orchestrator/prompt.md:56`, `shared/agents/documenter/prompt.md:42`;
-  `docs/architecture.md`; `README.md`; after self-install remove the stale bootstrap copies
-  `.claude/skills/openwiki/` (nested repo) and `.agents/skills/openwiki/` that
-  `check_runtime.py` reports as obsolete, so Phase I's installer finds the paths free
+  `docs/architecture.md:170`; `README.md` if the skill is named; after self-install remove the
+  stale bootstrap copies `.claude/skills/openwiki/` (nested repo) and `.agents/skills/openwiki/`
+  so Phase I's installer finds the paths free. Expectation to confirm, not a fact: because
+  neither copy carries OpenWiki's `.openwiki-install.json` marker, `check_runtime.py` should
+  report them as obsolete bootstrap files once `shared/skills/openwiki/` is gone; if it stays
+  silent, record that in the session log and remove them by hand anyway
 - **Required Skills:** `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`
 - **Acceptance criteria:** `grep -rn 'skills/openwiki' shared scripts docs README.md AGENTS.md CLAUDE.md`
-  returns only lines that intentionally describe OpenWiki's own installed skill; the Codex
-  `[[skills.config]]` set equals the `shared/skills` set (validator-enforced).
+  returns only lines that intentionally describe OpenWiki's own installed skill (the
+  third-party ownership code in `scripts/runtime_ownership.py`, `check_runtime.py`, and
+  `install_bootstrap.py`); the `[[skills.config]]` names in the generated Codex `config.toml`
+  equal the `shared/skills` directory names. No validator enforces that equality today; confirm
+  it by inspection and record the comparison in the session log.
 - **Verification:** `uv run python scripts/validate_targets.py && uv run python scripts/check_runtime.py`
 
 ### Step H3 — Review
@@ -89,12 +101,17 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
 ## Verification
 
 ```bash
+uv run pytest tests/test_validate_targets.py tests/test_lifecycle_hooks.py tests/test_install_bootstrap.py -q --tb=short
 uv run python scripts/generate_targets.py --all
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
+
+## Optional Verification
+
+- None. Every check this phase depends on runs without external services or a Docker host.
 
 ## Closeout Checklist
 

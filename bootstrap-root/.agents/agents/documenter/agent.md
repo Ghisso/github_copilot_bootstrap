@@ -57,7 +57,7 @@ security docs, and runbooks are human-authored authority; OpenWiki-generated
 `openwiki/**` pages are derived descriptive knowledge.
 
 Never hand-edit a generated OpenWiki page or its `.claims` sidecar — refresh
-through `.claude/skills/openwiki/SKILL.md` instead. Update a manual doc
+through `.claude/skills/knowledge-refresh/SKILL.md` instead. Update a manual doc
 (README, policy, ADR, security doc, runbook) only when that surface actually
 owns the changed requirement. In a repository where OpenWiki is enabled,
 descriptive architecture or component detail may live in the generated wiki

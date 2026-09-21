@@ -73,7 +73,7 @@ editing it.
 
 Treat a knowledge-refresh small plan as an explicit IMPLEMENT phase, not a
 hidden closeout hook: its IMPLEMENT step is invoking OpenWiki's MCP tools
-per `.claude/skills/openwiki/SKILL.md`, then reviewing the generated diff,
+per `.claude/skills/knowledge-refresh/SKILL.md`, then reviewing the generated diff,
 before moving to VERIFY -> REVIEW -> CLOSEOUT like any other phase. See the
 canonical Knowledge-Refresh Final Phase rule in
 `.claude/instructions/workflow.instructions.md` for exactly when the planner
