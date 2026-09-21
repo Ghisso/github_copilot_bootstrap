@@ -68,6 +68,30 @@ surface for claims this big plan invalidated, and close the big plan.
   vocabulary. One hit, "hook-event runner" in the operations index
   describing the Context Mode dispatcher, is accurate and unrelated to the
   retired OpenWiki runner. No stale claim.
+- Step K3 review round 1 (`code`, `architecture`, `security`, `tests`,
+  `documentation`, `ponytail`; two passes plus a convergence pass): 0
+  CRITICAL, 1 MAJOR, 3 MINOR. All ten Mermaid blocks parsed with
+  `mermaid@11.16.0` under `jsdom@29.1.1`; every page met the style contract
+  except the items below; three or more claims per page matched source; no
+  secrets or AI-state content; nothing outside `openwiki/` changed.
+  - MAJOR: the Context Mode page said hook mode checks for Node like server
+    mode does; only the server branch (`context-mode-dispatch.sh` lines
+    309 to 318) checks `command -v node`. Fixed through a corrective
+    OpenWiki `update` run (not a hand edit): plan with the two affected
+    pages, `openwiki_inspect_page_claims` to get the claim id, the sentence
+    rewritten, the claim `claim_ee848aeb09444f659c02cce859a8a3a5` revised
+    with evidence split into lines 288 to 307, 309 to 318, and 320 to 330,
+    `openwiki_finish` returned `complete`.
+  - MINOR (two pages): Mermaid node labels longer than "a few words" on the
+    installer and cache-quarantine diagrams. Fixed in the same run: labels
+    shortened, detail moved to a sentence under the diagram.
+  - MINOR: the brief's "Do not use em-dashes" rule had no carve-out for a
+    backtick-quoted exact required string (two pages quote the required
+    `- optional <n>: PASS|FAIL|NOT RUN — <detail>` grammar verbatim). Fixed
+    in the brief, which is human-authored: the rule now excepts a
+    backtick-quoted exact required string.
+  - Dropped by the reviewer: the OpenWiki-owned `index.md` files lack the
+    style elements; they are generated indexes, not authored pages.
 
 ## Stale-claims surfaces checked
 
