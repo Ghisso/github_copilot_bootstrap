@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-21
 **Plan:** `.claude/plans/2026-09-19_phase-H-openwiki-skill-rename-and-host-rules.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -130,7 +130,22 @@ PASS.
 
 ## Verification
 
-(pending: paste `verify closeout --format text` summary lines)
+```text
+PASS       75.5s  uv run pytest tests/test_validate_targets.py tests/test_lifecycle_hooks.py tests/test_install_bootstrap.py -q --tb=short
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       45.9s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      118.2s  uv run python .claude/scripts/verify.py phase --format json --persist
+closeout: PASS
+```
+
+Receipts: `.claude/quality_reports/` phase receipt (`VFY-RUFF-001`,
+`VFY-MYPY-001`, `VFY-PYTEST-001` 1755 passed, `VFY-FRESH-001/002`,
+`VFY-GEN-001` all PASS) and the closeout receipt persisted after this log was
+checkpointed. Findings report:
+`.claude/quality_reports/findings-2026-09-19_phase-H-openwiki-skill-rename-and-host-rules.json`
+(0 findings, six profiles, `ponytail_reviewed=true`).
 
 - optional: none declared in the plan.
 
