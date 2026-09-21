@@ -28,7 +28,7 @@ that. This is a transition phase, not the template for future knowledge-refresh 
 
 ### Step J2 — Audit generated coverage before removing manual knowledge
 
-- [ ] **Owner:** `documenter`
+- [x] **Owner:** `documenter`
 - **Target files (read-only):** `openwiki/**`, `README.md`, live `docs/**`, `shared/MEMORY.md`,
   root/manual policy and ADR surfaces
 - **Required Skills:** `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`,
@@ -44,7 +44,7 @@ that. This is a transition phase, not the template for future knowledge-refresh 
 
 ### Step J3 — Apply the conservative migration
 
-- [ ] **Owner:** `coder` for tracked edits, `documenter` for prose
+- [x] **Owner:** `coder` for tracked edits, `documenter` for prose
 - **Target files:** `README.md`, selected live `docs/**`, `shared/MEMORY.md`,
   `openwiki/INSTRUCTIONS.md` when J2 found gaps, links to removed docs
 - **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode for any code change,

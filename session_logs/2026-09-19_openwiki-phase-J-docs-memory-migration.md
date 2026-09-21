@@ -105,6 +105,32 @@ where the audit finds gaps.
      stays).
   Downgrade suggestions (VS Code Tasks, the Design Decisions closing
   paragraph) are deferred; over-preservation is the conservative direction.
+- Step J3 (same documenter, no code changes): twelve shortening edits plus
+  one brief bullet applied. `README.md` 976 -> 765 lines,
+  `docs/architecture.md` 675 -> 446, `docs/target-mapping.md` 222 -> 93,
+  `openwiki/INSTRUCTIONS.md` +1 bullet (Context Mode dispatcher security
+  model under "Cover, at minimum"). Net 268 insertions, 820 deletions. Every
+  condition sentence preserved: the exact Memory Authority link text in
+  target-mapping; README `## Hooks` heading, design-intent bullets,
+  `--no-verify` note, and the `githooks(5)` merge/rebase/cherry-pick/amend
+  paragraph with the `MERGE_HEAD` passthrough; the Antigravity
+  deny-by-default sentence; the repository-scoped versus path-agnostic
+  protection sentence and the 183-byte / 200-byte sentence; the
+  `~/.openwiki` pre-creation instruction and the `--cap-add=SYS_ADMIN` /
+  `seccomp=unconfined` rationale in README What Is Included.
+- Deviation found by the gate, not the plan: `validate_targets.py`'s
+  `readme_agent_contract_errors` requires README itself to carry the literal
+  `Universal agents:` and `Codex-only agents:` lists and exactly one
+  `| Agent | Claude model | Claude effort | Codex model | Codex effort |`
+  table matching every agent's `model_intent`. The first pass moved the
+  matrix out of README and failed three checks; the documenter restored the
+  lists and table in README's Agent System. The matrix therefore lives in
+  both README and `docs/architecture.md` Custom Agents by necessity. Moving
+  it out of README would need a validator change, a code change outside this
+  documentation-only phase.
+- VERIFY: `validate_targets.py` PASS (link integrity over README, AGENTS.md,
+  docs), `check_runtime.py` PASS, `verify.py fast` PASS, `verify.py phase`
+  PASS (ruff 0, mypy 0, pytest 1759 passed, `VFY-GEN-001` PASS).
 
 ## Review findings and dispositions
 
@@ -112,7 +138,18 @@ where the audit finds gaps.
 
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:documentation] Before shortening a human doc against generated
+  coverage, grep the validators for literal-text contracts on that doc.
+  `validate_targets.py` hard-requires README's agent lists and model table
+  (`readme_agent_contract_errors`) and target-mapping's Memory Authority
+  link; a disposition that ignores those gates fails at verification, not
+  at review.
+- [LEARN:documentation] A disposition review must check what the wiki does
+  not say, not only what it does. Seven sentences (escape hatches, a
+  deny-by-default contract, a scope distinction, two exact constants, one
+  operator setup step) existed only in the human docs; shortening all their
+  copies in one phase would have left them nowhere. Name the surviving home
+  for each before editing.
 
 ## Verification
 
