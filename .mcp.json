@@ -10,6 +10,14 @@
     },
     "context-mode": {
       "command": "context-mode"
+    },
+    "openwiki": {
+      "command": "openwiki",
+      "args": [
+        "mcp",
+        "--host",
+        "claude"
+      ]
     }
   }
 }

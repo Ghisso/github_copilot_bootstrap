@@ -9,3 +9,9 @@ args = ["--from", "semble[mcp]", "semble"]
 [mcp_servers.context-mode]
 command = "bash"
 args = ["-c", "REPO_ROOT=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\"; exec \"$REPO_ROOT/.claude/hooks/scripts/context-mode-dispatch.sh\" server"]
+
+# OPENWIKI:MCP:START
+[mcp_servers.openwiki]
+command = "openwiki"
+args = ["mcp", "--host", "codex"]
+# OPENWIKI:MCP:END

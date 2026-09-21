@@ -159,6 +159,14 @@ def _agents_tree(
                 invalid.append(f"{relative_root}/{relative}")
                 names.remove(name)
                 continue
+            if is_third_party_skill_dir(path):
+                # OpenWiki's own installer owns this bundle once it writes
+                # its marker inside it; neither the takeover comparison nor
+                # the mirror comparison should see it, in either tree being
+                # walked here. A same-named directory without the marker
+                # falls through unchanged and is still ordinary content.
+                names.remove(name)
+                continue
             entries[relative] = None
         for name in sorted(files):
             path = directory_path / name

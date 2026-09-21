@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:ebc49dcd051b24b8ad9adad78769aab0b00ebda5d261edc923119b1a247edb85",
+  "claims": [
+    {
+      "id": "claim_c590d72d79154af3a7e07a337207f09a",
+      "statement": "The generated OpenWiki knowledge layer is derived context, never authority over source, tests, or human-authored policy; the generated root guidance instructs agents to refresh it only through the knowledge-refresh skill and never to hand-edit a generated page or commit OpenWiki's own root snippet.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L13-L16",
+          "version": "repo-lines-v1:sha256:4f5f60c8d0b58e7be373629e9b11bc00f9d7da568340991e6786c65f8a4aec24:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzJkNzg2OGQ4MDZiNzljYTZjNzA5OWJiODdhNmI5NzllMDQxMjJiN2EwOTdmZjViODdiZDg4ZDZhN2Y0NDEwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjODk1NTg2OTNiZDM3NGVkYWJlYjhmYWIzNWFjYTRjMjgwNjM0YzU5YjY0OWQ1MWEzMDRmZjVmYTlkNGI1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODExNTQ3NTI3NzJiNDljMGRlM2EwODBkMWFiZWJmY2I5MzZmYWEzMTFmNDJiOGJiZjUzN2ZhYjNmMjRlNjlmMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzcwOThkMWRkZjBmNWZhYzc5YWQwNmM0NTg5MDAxOTdkODBhZmQ3ZGEzMmNiOGYxMTA2NWExYTRmODIxOGY3NyJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1321-L1321",
+          "version": "repo-lines-v1:sha256:fdacd0c4db65e0cd311f1491f1049be6b0c5e868482b5da602b2d90e0f39587f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZmRhY2QwYzRkYjY1ZTBjZDMxMWYxNDkxZjEwNDliZTZiMGM1ZTg2ODQ4MmI1ZGE2MDJiMmQ5MGUwZjM5NTg3ZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmRhY2QwYzRkYjY1ZTBjZDMxMWYxNDkxZjEwNDliZTZiMGM1ZTg2ODQ4MmI1ZGE2MDJiMmQ5MGUwZjM5NTg3ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODVhNjJhMTMzYjdlNDQ2NTA3ZGRmN2JkMWFkNDE0OTc5OWE2ZTc5NWY3N2U0YWE1YjhlNmFiMDcwNzA1NjljNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmNjNjQ2ZmU0MjIxYTQ1NzhjNmVmM2MzYTM1NTRiMmY5ZjhhZjBmODk5YTVjOGVmYWVkYTc0NTY1NWE3YTZhMCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2d3007f16a014351815502c79ebbb72e",
+      "statement": "The canonical verification entrypoints are generate_targets.py --all, validate_targets.py, check_runtime.py, and verify.py in fast or phase mode, run through uv run from the repository root; verify.py selects the lint, type, and test scope for whichever repository it runs in.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L50-L66",
+          "version": "repo-lines-v1:sha256:45fec4bc05866584a1f53db60bba2dd581298ea2f90cceaff8191f73787b8c56:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5ZDMzYWU0ZTRjMzY2ZWJjNDNhMThhMTRiNDM3M2U4NGE3MzRkNjE5ZTY1ZWI1MmM0NGQxN2M4NGMxYjc5YTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNhZjZlMWEzMjkzYTAwYWM4NWQ1M2ZmY2YyYTQwNjA4NWU3MjYxMTBhYzM0NTk2M2VkODE2OTk0MTIxNzNmODYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZiN2JlYjBkNGJlYmQ1NWU5ZDE1OGJmNDc2ZTQwNGQ5YTk3ZDdiMDM1ZDg4OWU0OTg4MGNjNjkyN2M4MDlhYzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5NWI5MGFjMWM2ZDRhYThjMWEwNzhmMmIwNzZiMzdkZmYwZDYyZDhiNjk2YTNkNzU2ODUwZWIyNDY5ZTZmMjYifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L3281-L3336",
+          "version": "repo-lines-v1:sha256:af94f41808a7a282101875b4f8eccfef23d73437d80675ba226be4ae126701db:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM2NTcwOWNkMTU4NDAzMmJiY2I5ODFjM2Q2Y2YwMjNhYjNhNTM1N2ZlZWJmMjcyZTdmOGRjNjMxNTkzMDc5NzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhiYjc3NTcxNzAxODQ2YzJmNTgxODBlYWUzNDE2YTk1MzAwNzgwZjYzNTQ2ODFkZWI4OGQzZGZhZjY5ODliYzYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c2d96659f86146449e4ef0502c681d6c",
+      "statement": "The lifecycle every change follows is PRE-FLIGHT -> BRANCH -> PLAN when needed -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH, classified first by the Task Lanes table in the workflow policy.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L10-L28",
+          "version": "repo-lines-v1:sha256:9689be7d5727302597eed76b667481dedd9dcd552648c4e273162abbd6d3b737:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmZWVlYjM0MjY5NTIwYjZiMDZjMzg2OWExNmM2ZDYwMTQ3NmNlMWM3ZGIyZDYzN2NhYjA0MDU0NWVmOWFmNGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0OGEyZmQzZWUxNTExNjQxMGU1YzI0NDY0YTM5YWUwZTlkZGZlODdhYzBjMzU2Y2UyMjZmZjU1NmU1ZTkzNDgifQ"
+        },
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L126-L130",
+          "version": "repo-lines-v1:sha256:b105137af1e220f9d2ec5fbb8d287180a6be7a375ee1be472af2e3f0e2b1ca75:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTFhNjA4MzY5ZmQzMWEwMmM4MzdhMGMwZTEyMzRlZjQ3MWQ2NDczYTVmNDdjOTI3OTNmODg2YjUyYjhmNzY5NCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDdjMDZjNTYxZDVjMzI3MzQzNjg1MjY4YTQ2YjMzOTFmMzk5OGVlZTg5MGQyYmU1MWYwZDIxY2M0YTUzYWU2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDAxZjJlYzE3NTkzYzEwNTRlYjQ2MzY3ZDg0NTNlZjI0YTE3M2NlOTZiNzExN2Q5MWY5YTY4ZDQ0ZmVmOGIwMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZmRmYWEyYWZiMjYxOTUxNjg2ZWIwZjkxMTRjYmJjZDE4ZmNjYWMxZWZhZmU2YjhkNjA3OTNjMGYxZGE0M2Q1MCJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T03:23:13.016Z"
+  }
+}

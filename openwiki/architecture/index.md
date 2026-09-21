@@ -1,0 +1,5 @@
+# Files
+
+- [Agent roster, prompts, and the skill library](agents-and-skills.md) - How the bootstrap defines its specialist agents once in shared/agents, renders each agent into GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity adapters, routes review profiles, and validates the shared skill library.
+- [Hook dispatcher and guardrail scripts](hooks-and-guardrails.md) - How target-native hook configuration for GitHub Copilot, Claude Code, Codex, and Antigravity dispatches into the shared guardrail scripts, what each guard denies or records, how guards scope to the repository a command targets, and where hook errors are logged.
+- [Source, generated output, consumer repo, and nested AI state](source-generated-consumer-layout.md) - The four places the bootstrap lives in (authoring shared/, generated dist/multi-agent/, a consumer's outer repository, and the nested .claude ai-state repository), how generate_targets.py renders shared/ into one installable target, and what validate_targets.py proves about the output.

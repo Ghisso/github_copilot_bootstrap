@@ -2295,6 +2295,71 @@ def test_root_adapter_diagnostics_skip_nonreplaceable_live_recovery(
     assert "restore-root-adapters.sh" not in detail
 
 
+def test_bootstrap_root_fingerprint_ignores_marker_claimed_skill_bundle(
+    tmp_path: Path,
+) -> None:
+    """A marker-claimed `.agents/skills/openwiki` bundle never breaks the
+    live/mirror pairing, whether it exists on only one side or with
+    different bytes on each side -- OpenWiki, not the bootstrap installer,
+    owns writes to it once it claims it (Step I2b)."""
+    _write_root_adapter_pairs(tmp_path)
+    # A real generated `.agents` already has a `skills/` directory shared
+    # identically by both sides (the other, ordinary bootstrap-generated
+    # skills); create the same matching shape here so the only difference
+    # introduced below is the bundle itself, not this fixture's own gap.
+    for base in (tmp_path, tmp_path / ".claude" / "bootstrap-root"):
+        other_skill = base / ".agents" / "skills" / "some-skill" / "SKILL.md"
+        other_skill.parent.mkdir(parents=True)
+        other_skill.write_text("shared skill\n", encoding="utf-8")
+    baseline = verify.bootstrap_root_fingerprint(tmp_path)
+    assert baseline != ""
+
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed v1\n", encoding="utf-8")
+    (live_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    assert diagnostics == ()
+    assert fingerprint == baseline
+
+    mirror_bundle = (
+        tmp_path / ".claude" / "bootstrap-root" / ".agents" / "skills" / "openwiki"
+    )
+    mirror_bundle.mkdir(parents=True)
+    (mirror_bundle / "SKILL.md").write_text(
+        "openwiki-managed v2 (drifted)\n", encoding="utf-8"
+    )
+    (mirror_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint_with_drifted_mirror, diagnostics = (
+        verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    )
+    assert diagnostics == ()
+    assert fingerprint_with_drifted_mirror == baseline
+
+
+def test_bootstrap_root_fingerprint_still_flags_unmarked_extra_directory(
+    tmp_path: Path,
+) -> None:
+    """Without OpenWiki's own marker file, an extra `.agents/skills/openwiki`
+    directory is ordinary unrecognized drift, exactly as before this
+    exemption existed."""
+    _write_root_adapter_pairs(tmp_path)
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+
+    assert fingerprint == ""
+    assert {
+        "path": ".agents",
+        "side": "pair",
+        "category": "content-difference",
+    } in diagnostics
+
+
 @pytest.mark.parametrize(
     "replacement",
     (

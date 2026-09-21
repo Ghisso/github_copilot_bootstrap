@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:f624e42bb933b30f399b03bcbc01ece5a6739d7aa1bb3c831d2a4025b7113a57",
+  "claims": [
+    {
+      "id": "claim_ed42ac4bfd7a4be0b02c65a7ea522aa7",
+      "statement": "The repository is a source-of-truth plus generated bootstrap: maintainers edit shared/, dist/multi-agent/ is the generated installable output, and in an installed project .claude/ is the canonical runtime basis while generated root files such as CLAUDE.md and AGENTS.md are adapters that must not be hand-edited.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L13-L16",
+          "version": "repo-lines-v1:sha256:4f5f60c8d0b58e7be373629e9b11bc00f9d7da568340991e6786c65f8a4aec24:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzJkNzg2OGQ4MDZiNzljYTZjNzA5OWJiODdhNmI5NzllMDQxMjJiN2EwOTdmZjViODdiZDg4ZDZhN2Y0NDEwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNjdjODk1NTg2OTNiZDM3NGVkYWJlYjhmYWIzNWFjYTRjMjgwNjM0YzU5YjY0OWQ1MWEzMDRmZjVmYTlkNGI1NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODExNTQ3NTI3NzJiNDljMGRlM2EwODBkMWFiZWJmY2I5MzZmYWEzMTFmNDJiOGJiZjUzN2ZhYjNmMjRlNjlmMSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzcwOThkMWRkZjBmNWZhYzc5YWQwNmM0NTg5MDAxOTdkODBhZmQ3ZGEzMmNiOGYxMTA2NWExYTRmODIxOGY3NyJ9"
+        },
+        {
+          "resource": "repo://docs/architecture.md#L62-L66",
+          "version": "repo-lines-v1:sha256:564aeae8c9ed229f1d5d4771aae60702357818c92838840acd002fa09ca94bc1:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTczZmFlOTVkMmM1ZjFmM2MwNjQzYTEwYzUwZTRkZDVhOGQyNWNiY2ZkN2E2YTA5YWViMWE2MmU0ZGFlZDBjYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYWUxMTM2NDA2YmQ4OTI0ZDJkMTBmMGM4NzNkNTUwN2M0YmRmNDVjOTViYmI4OGM1ZjM4MmEyMmMyNzExNGM0NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDNiMTExYTU2YmRhMDExZTM1NThkYjU3NzIzOThmNzNmN2Q5YzZlNDVmN2MwNjgyM2RmMzE5Yzg1NTUzMTMyZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWYyN2RlMjFmYjRmYjc4NzIzNDFhM2U1MzcyMDUzZWQ5NGNlZTM1ZjlmMTUyYTI2N2VlYzcwZDdhY2JiNzU3YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_867cf9c93e2d44aca210ae0e8bf1e60b",
+      "statement": "The authoring repository's root .gitignore excludes dist/ as generated build output and .claude/ because AI state is tracked in the nested .claude repository rather than the outer one.",
+      "evidence": [
+        {
+          "resource": "repo://.gitignore#L1-L6",
+          "version": "repo-lines-v1:sha256:ac6f1e07a2b981f381714cfa151a85eddf710553d96606360ef36e726c205a13:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGVhYzZjYjQ2NTcxNzE3OTc0NGRlMTIxNDE5YjMwZDkzMGRiYzQyOTkxMGJlNTAyNWY0Yzg3NzdiYTFjN2U1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJlYjE1ZDBmZDgzNWVmNTZhZjExZmYwZmI4NWRjODM2NDU4MTNiN2FkZTc0MTljZmIxMGRkMzBjZmNlZmM1YyJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_60e1222334d54b9ab2f328b7f250a627",
+      "statement": "generate_targets.py has exactly one target, multi-agent; generate resets the output root, calls render_multi_agent, and strips quarantined content, and the CLI accepts --all, --target, and --output.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1739-L1770",
+          "version": "repo-lines-v1:sha256:67c56e21d0ce0ae20bf852a837ed5540bec5a2d0570cf66e48aac708a8c9d566:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmMjYxYmIyZWEzYjAzZDNlMWZkMTA5OGUyOGRkZjcwMGE5ZjgzNzRkZDdlZGNjYzRjMjBmNTcyNmE2NWI0MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5MWQzYjcxNzRmZjRiNDEzYTFiNWM4MTBmZGFhMDI2YTdjODY2MDQ5MjllOTFmOWJlYjYyYzA5OGM1MWQ5YWMifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L24-L24",
+          "version": "repo-lines-v1:sha256:3bf699d7021db394ef11e374fe6fa7e268356bfc4ac1d1a4430b74e0dbb50c04:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JmNjk5ZDcwMjFkYjM5NGVmMTFlMzc0ZmU2ZmE3ZTI2ODM1NmJmYzRhYzFkMWE0NDMwYjc0ZTBkYmI1MGMwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JmNjk5ZDcwMjFkYjM5NGVmMTFlMzc0ZmU2ZmE3ZTI2ODM1NmJmYzRhYzFkMWE0NDMwYjc0ZTBkYmI1MGMwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWIyM2EyMzlmODE1YTg4MzMyYTk1ZjQ4YTM5OGYwNTcyNGZlN2NlNGNkYmRjZWFhMmRiOWMyNGRiOWI3YzQ3OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDI0OGFjNTJhNzcyODNkMjViMTJlZDJlMDI1ZmZlMDMwMGMzMTAyZDdhM2E0NzQ3YmY3N2Y4OTg2OTE3YTRkZSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_97f28631808a4eb1afd58dcd4c348d2b",
+      "statement": "render_multi_agent renders in a fixed order: devcontainer, the shared .claude basis, root AGENTS.md, the GitHub Copilot surface, the Claude Code surface, the Codex surface, and the Antigravity surface.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1729-L1737",
+          "version": "repo-lines-v1:sha256:06e01a53384a6698a3eaaa51dbf07778b4e050932f6d7f74139ce36072037f2c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTJiMmUwZGM2MTVkM2FlM2FmYThmMjM0YTM3YmFkZDI1ZDhjMDA0MjliOWIzMGE2MDdkNzY1NjQ3MDI2ZjVmMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjNkZjJhY2YwNmU4YzNmMDNjNzEzNWM2ZThhYzVhOWNhNTQzMmFiZTA2YTc0YWNhMGZkZDlhNTNhMDA4Zjk4NyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDI1YTc4NjUyOTA1YjA3OWIwYjVlY2JjYmM4NzVhOWE2ZTc1ZDk1NTQxMTViMmE0NGMxYjI5Yzg1NTdkNTM2OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_2199f0ab47ca44d499dc15239b9b6e99",
+      "statement": "render_shared_basis copies MEMORY.md, templates, verify.py, record_findings.py, and every policy into the .claude basis with provider path rewriting, renders Claude path-scoped rules for conditional policies, writes the bootstrap-ownership.env manifest, and copies runtime_ownership.py and validate_plan_frontmatter.py verbatim because they are target-neutral.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L280-L340",
+          "version": "repo-lines-v1:sha256:ef9c2c9a20c39f352e142374ab2f965e224f4a433c72511f858e46de0c9be1d2:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkZDkyN2JiMDU2Y2MxZjRkMDVjMGYyNzI0ZGMyZDMyMzJlOWVkOGJhYTQwMzY1YWE5OWUxN2RhMWNhNjJkNTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjZjc1NzI4YWNiYWNiODY0NDllNmQwMmI2YmRhMTkxMGRjMzYxY2Y3Y2U2ZjFlMmRmZmMxZjkzZGFjNGE3MTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUxZWVhNWQ3ZmU5ZGQ3NGY5NTkwYTA0MmE4ODk2Njg5MWRhOWExYTZlMGUwZWZiNGExNDZjOTQyZjlhMGJkY2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZWU2MGMxMDUzYzk0MmQ0NzZhNWQ5YWVlZGIxYmExZDczMTg1ZmU3NWYwNmE3NTM4MTliYWIyN2IwODFiNjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_402a71a47d7f4da0b57b46c29d367365",
+      "statement": "render_github writes .github/copilot-instructions.md, one instruction adapter per policy, the copied hooks.json, .vscode/mcp.json and tasks.json, and one .github/agents/<id>.agent.md per eligible agent; render_claude writes CLAUDE.md, .mcp.json, and .claude/settings.json; render_codex writes .codex/config.toml, .codex/hooks.json, and one .codex/agents/<id>.toml per eligible agent.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1645-L1689",
+          "version": "repo-lines-v1:sha256:87e545e18df4880d73b265f4ea185ce9279a09967e81d9cd912743f16f93b0c2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYjZiZmNmM2M1OWZkZTEwMTkzMDI1MzEyYmM0OWI3NTA1NmYzMjZjMWE2ODhjMTRhZDVkMDc2YjU0ODlhZWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk0ZDEzZWM3NDJjYThhZDI0ZGE4NTI3MWNiMjUwNzFhZjg2OWM1NTQ4OTBhNWM5NzAxMmJlZTc5MGNiMzM0NzciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU3ODQ5MTQ2ODcwZDQ5Njc4YzcwNzM1MzE0OTUyMzNmMzAzNTExYWYyNjBmYTcxNzAzMWUzMDgzNjIwYmI2MmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fc1f22e2bea344cbab106d46bb04d8ad",
+      "statement": "transform_target_paths applies a per-provider literal replacement table so canonical text naming .github/copilot-instructions.md and .github/hooks is rewritten to CLAUDE.md and .claude/hooks for Claude Code and to AGENTS.md and .codex/hooks for Codex.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L127-L149",
+          "version": "repo-lines-v1:sha256:6a22be7f9a41e612e7acca4b5f0aa743deae4bea89afb7810a780f543d6447da:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2M2IxMzM1ZTRmYWFjNTkwNTA4MjYwNzExNzJlNDNlYmRhOWQxNDRhZGI3NjFjMmIyMzAzNDdlNDhiMDUyM2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwMmM0MTRiNTRjZjg2ZGZiNGY5MGRmZTdkN2JkYmZhNjY2YjdkZGRkMzJmMTI4NmYyMzBhNWI1MzI0MTgxOGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhODhkZjU4NjQ1MDE4YTZiNjQ4ZTMxOWY0YTYzMmI5MWJhZmIxODNlMWY2MWE2Yzc5NjQ4ZWU4ZDVhZTQ3NGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0ZmUxM2EwNzFhY2YxYmMxOTkwMmQwOGNkODNjZGVjZmJiNjExMjNlNGE5MjVkOWRlNzk1NDMxOWFhMjE5MjgifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L813-L826",
+          "version": "repo-lines-v1:sha256:1f6482cbc3d10801d92b25324eeb343593c78a7868465cbe8533e0e604c6ef21:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwOWQwOWYzNGFiZGRiYTI0NTRiNTAxZjE1ZTI0NjBiN2Y1Njk2Njk4MzZkNDQwNDg4NTI0NzI0ZjI2MDVmYmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3M2Y3YjYxNTJkNTk2MjRlNzk3YzFmZWRkYjgwZmQ5MjlhZDc2YjFkMzA1YTNjYWJjY2I4Mzk5OWZkNWExNDEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d31a8ba6230e4cac9ba7af1c029e1461",
+      "statement": "shared/mcp/servers.json defines the shared MCP servers semble (via uvx), context-mode (routed through context-mode-dispatch.sh server), and context7, which the generator renders into .mcp.json, .vscode/mcp.json, .codex/config.toml, and .agents/mcp_config.json.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L944-L960",
+          "version": "repo-lines-v1:sha256:58d8adb89dbcae32f9e2f275e0643932fe91e80023c2392842da29d4e7a7dbf5:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzMmRkZGVhM2FhZDIxNWZlOTBlNzM1OWY1NDcxZTY5OTg2ZjUwZTZmNmE5ZTBjOGFhZThhZmM2NDJjMzExZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiMDllZmU4ZTBiZmY2MzYyYzE3ZmFhZmNjMjgyZjZmNmRlZDE0M2FjOGM1NWVhYzIxOTczMmQ1YzE3ZWY2MzkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg3ZmNkYmIxNzQyMDM3Y2JkY2JhNGFhOGJmYTk1YjQ3NTgzZTBhNmIwMDkzODRlNzA4NGUxOGZiODdhNjhmN2QifQ"
+        },
+        {
+          "resource": "repo://shared/mcp/servers.json",
+          "version": "repo-file-v1:sha256:68fb8cd4eef9f81333919a26086020be564dd6b433d240fa652f609eba783e87"
+        }
+      ]
+    },
+    {
+      "id": "claim_a2c1742ce2524c06934e1751f55a5e0b",
+      "statement": "validate_targets.py's main runs a fixed sequence of structural gates over dist/ (task-lane contract, agents, MCP and hooks, skills, docs parity, runtime drift, receipt-chain lifecycle, installer, state sync, determinism, and hook-gate regression tests), prints FAIL lines and exits 1 on any error, and otherwise prints 'PASS generated target is structurally valid'.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L10700-L10745",
+          "version": "repo-lines-v1:sha256:a5db2915b1cc80505b3e925e5b5f8958b92dc5ffe254a2df111293d85ee0d63d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMTMxYzFkNGUxZGM4MzY5M2ViNTQ0YWViMmY4ODk2NTdmZDFjZDNkMTRiYTY5NDQ2NzVmZGMzZjBkOTNhNDAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI3ZGRkODFlMGI3NjQ4M2ZiYzg5YWE3NDIzODkxODVlZjIwOTZiMjg5OTNiZGNjYTQxZTdmZTU2YWYxOGNhZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2M2Q1YjJkYzEyYzZmYzdkYzI2MDg2ZmY2MmYwNDc2NGI3ZmZiNDNjNGM4ODA2MDhjYTBmYjdmN2M0YjViOTQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_264b83c6bb274ca9846f9bdbb08038bc",
+      "statement": "validate_determinism regenerates the target into a temporary directory with generate_targets.py --all and requires it to match the committed dist/, so any hand edit to generated output fails validation.",
+      "evidence": [
+        {
+          "resource": "repo://docs/architecture.md#L108-L112",
+          "version": "repo-lines-v1:sha256:25db145e6dcf25c7533d96b58854319f6b9fed5084df5f1ab512f79a6ef4befe:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTQ0NGQ3ZWRkMmQwMmRlMWQ2MzhiZjY1YjYwYzI3MWQ1Njg3ZDE4NmE3OWVlYzBjNWM2OGY1NmMwYTA5NDM2ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTIxMGYxM2YzMTY4NTRmMWI4NTJlMTVjYjY0ZmM2ZDYyODVkMzY1YjYwNjk2N2JhMThjM2ViYzU1OWFmNGIwYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODcwM2QxMDBhZGM0ZjM4MmYzOWU5MDFkMTNhZmJhMmVjYmI5NGZiNGIwNzk0NjA1MjQ0NTEyZGEyNDhlMGJlOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNTEzODRmMmE5NDhiNjBmYzM1MzdmYWE1NzJiM2U4ZGVjOTUzNTE5Y2FhOTBmYzgwYzBjZjJjZTNjM2VjNzE2OCJ9"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L10636-L10660",
+          "version": "repo-lines-v1:sha256:25fd337c3783e9f25bde691b5b25923c616367f3ab1229dea197537640635342:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljNDA2ZGMzZThiNzNkNzhjN2YwZDQ2NWJhNTU1YjgxOTkyNTVmMTYzZTIwYTk5ZjNkMjM5MTRkNTFkMDU1MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkZTU3NTFiOTM2YTZiMWM4NzhiMTI5MmU5NWQ3OTg4MWY2YmRiMmE4ODk4MTJkZmRkNDlmY2Y0MDkzYzVjNzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVmNTM3Y2ZlZjM2NDc2NzliZGM1MmUzNjA4NGQ4NmY2MGEzOTg1Y2ZjZTRjNTM5NDVjOWRiZTZjNWRiMzZiOTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7bc0a2ae744947c09bdf6b8f6eb33df7",
+      "statement": "Policies are authored once with target-neutral applicability frontmatter and discovered natively per host: Claude Code loads conditional policies as path-scoped rules under .claude/rules/, Codex gets a nested AGENTS.md only for a policy owning a stable directory (otherwise a skill), and Copilot adapters derive applyTo from the same patterns with scope parity validated against Claude's paths.",
+      "evidence": [
+        {
+          "resource": "repo://docs/architecture.md#L27-L60",
+          "version": "repo-lines-v1:sha256:b57811648d9b092a9900d9a90387011d52d08fa90351935858feb9f44c75924f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMTc1YmNmMDYxMzgzZmFkMzA0MzkxN2NiYWI2OTdmOTEzZWFjNjg3NTFkM2JkOGRhMWQ0ZTM3MDA4ZjcwOGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZjM3OGVkMGVlN2E3MzY5M2JiNGMzOGJhNTZjOTEyOWMxMWIyOGE1Y2U4ODlhMDE2YWU3NWVlZTdmNzMxZTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0OGNlNzUyODMyMjlkOWJlNzk0M2UyMzMyNzRhNjI1N2FiOWE0YmI5YTgxMDgxMGVkYjcwMmU2M2JmZTE0YzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmNTgxODJiM2YzYWRhZjlmNjU1M2MwOWMwMWFkMjgyODM3YjcyMTY3Y2VjMDU3NjFhOTQxNWEyMTBkYTQxNzIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9dc79a419d9744bb912efa70bd17c25a",
+      "statement": "This repository self-installs its generated output with scripts/install_bootstrap.py --allow-self to exercise the lifecycle end to end, keeping tracked authoring adapters byte-stable; a normal consumer only receives the generated copy and never shared/.",
+      "evidence": [
+        {
+          "resource": "repo://README.md#L160-L182",
+          "version": "repo-lines-v1:sha256:ed27f7586bd825dc39fc311b56d793a8b2a4d641910117ee53f2e48763628757:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNDBkYzYyOTNjMGMyM2JjNjM4MDljZmZjNDAwMzFlZDIyNTIwZWE2MWEyZjNiZmJiMzRjMzNlZDBlODgzZGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZGU4NDdkN2FmZGYzOGQ2YmM3ZWNkYjdmZDA1Y2IyNzQ4MTMzNTEyODM0NjI4YTQ2Zjc0NjUzODI0NTExOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3YzA0NWUzNDgyNjk5YjJlMzZhMzgyZTQ4YjY2YzljMzViNTkwMTFiMmRhOWU4NGIzYzBjMDRlMDYzMGZkODgifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T03:23:13.016Z"
+  }
+}

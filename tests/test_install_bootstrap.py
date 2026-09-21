@@ -1508,6 +1508,46 @@ def test_agents_directory_is_a_refreshable_root_adapter(tmp_path: Path) -> None:
     ).read_text() == "generated coder v2\n"
 
 
+def test_agents_takeover_ignores_marker_claimed_third_party_skill_bundle(
+    tmp_path: Path,
+) -> None:
+    """OpenWiki's own marker-claimed `.agents/skills/openwiki` bundle is not a
+    takeover conflict, even with no mirror recorded for it yet (R-OPENWIKI-G5
+    for `install_bootstrap`'s own takeover gate, not just `check_runtime.py`
+    drift)."""
+    source = tmp_path / "generated"
+    # A real generated `.agents` tree already has a `skills/` directory (the
+    # other, ordinary bootstrap-generated skills); create the same empty
+    # shape here so the only difference from source is the pruned bundle
+    # itself, not this test's own missing sibling content.
+    (source / ".agents/skills").mkdir(parents=True)
+    target = tmp_path / "consumer"
+    bundle = target / ".agents/skills/openwiki"
+    bundle.mkdir(parents=True)
+    (bundle / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+    (bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    validate_agents_takeover(source, target)  # must not raise
+
+
+def test_agents_takeover_still_refuses_unmarked_openwiki_shaped_directory(
+    tmp_path: Path,
+) -> None:
+    """Without OpenWiki's marker, a `skills/openwiki`-shaped directory is
+    still unproven content and blocks the takeover exactly as before."""
+    source = tmp_path / "generated"
+    (source / ".agents/skills").mkdir(parents=True)
+    target = tmp_path / "consumer"
+    bundle = target / ".agents/skills/openwiki"
+    bundle.mkdir(parents=True)
+    (bundle / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=r"Refusing \.agents takeover") as error:
+        validate_agents_takeover(source, target)
+
+    assert ".agents/skills/openwiki/SKILL.md" in str(error.value)
+
+
 @pytest.mark.parametrize("dry_run", (False, True), ids=("write", "dry-run"))
 def test_agents_takeover_refuses_unproved_content_before_writes(
     tmp_path: Path, dry_run: bool
