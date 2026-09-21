@@ -198,7 +198,7 @@ Environment-variable bypasses are not supported.
 
 OpenWiki runs host-driven, not through a bootstrap-spawned process: the
 coding agent calls OpenWiki's own MCP tools directly (see
-`.claude/skills/openwiki/SKILL.md`), and OpenWiki's server writes
+`.claude/skills/knowledge-refresh/SKILL.md`), and OpenWiki's server writes
 `openwiki/**` and, at `openwiki_begin` only, a managed block into root
 `AGENTS.md` and `CLAUDE.md`. A hook guard, `openwiki-guard.sh`, snapshots
 both adapters and the OpenWiki workflow-file path before `openwiki_begin`
@@ -245,7 +245,7 @@ big plan fails validation if more than one phase carries the
 `-knowledge-refresh` suffix, or if one exists but is not the last phase.
 
 **Shape.** Small, and only this: refresh through
-`.claude/skills/openwiki/SKILL.md`, inspect the generated
+`.claude/skills/knowledge-refresh/SKILL.md`, inspect the generated
 diff, run the standing final-phase documentation/memory/LEARN audit already
 required below — the same `## Stale-claims surfaces checked` requirement;
 this phase is what satisfies it, not a second, competing one — then review,

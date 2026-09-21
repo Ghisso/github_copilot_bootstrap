@@ -1906,13 +1906,18 @@ def test_runtime_check_marker_gates_openwiki_skill_bundle_drift(
     assert runtime_drift_errors(target, GENERATED) == []
 
     # Without OpenWiki's marker, a diverged live copy is still ordinary
-    # generated content: the dogfood check reports it as drift.
+    # generated content: the dogfood check reports it as drift. The
+    # bootstrap no longer generates a `skills/openwiki` directory of its
+    # own (renamed to `knowledge-refresh`), so these paths only exist here
+    # because OpenWiki's own installer would have created them.
     diverged = b"# hand-edited, no OpenWiki marker\n"
-    (target / ".claude/skills/openwiki/SKILL.md").write_bytes(diverged)
-    (target / ".agents/skills/openwiki/SKILL.md").write_bytes(diverged)
-    (target / ".claude/bootstrap-root/.agents/skills/openwiki/SKILL.md").write_bytes(
-        diverged
-    )
+    for surface in (
+        ".claude/skills/openwiki",
+        ".agents/skills/openwiki",
+        ".claude/bootstrap-root/.agents/skills/openwiki",
+    ):
+        (target / surface).mkdir(parents=True, exist_ok=True)
+        (target / surface / "SKILL.md").write_bytes(diverged)
     unmarked_errors = runtime_drift_errors(target, GENERATED)
     assert any(".claude/skills/openwiki/SKILL.md" in error for error in unmarked_errors)
     assert any(".agents/skills/openwiki/SKILL.md" in error for error in unmarked_errors)

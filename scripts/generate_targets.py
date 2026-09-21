@@ -1318,7 +1318,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
 - Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
 - Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. A guarded bounded project index is optional for broader discovery, never repository truth, and missing optional helpers are warnings, not hard failures.
-- An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context, never authority over source, tests, or policy. Refresh only through `.claude/skills/openwiki/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
+- An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context, never authority over source, tests, or policy. Refresh only through `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 ## Task Lanes
 

@@ -167,7 +167,7 @@ written `openwiki/INSTRUCTIONS.md`, a human-authored repository brief that
 doubles as the deterministic enablement marker the hook guard checks.
 
 Refresh is host-driven: the coding agent calls OpenWiki's own MCP tools
-directly (see the `.claude/skills/openwiki/` skill for usage) — there is no
+directly (see the `.claude/skills/knowledge-refresh/` skill for usage) — there is no
 bootstrap-spawned process. OpenWiki's server writes `openwiki/**` and, at
 `openwiki_begin` only, a managed block into root `AGENTS.md` and
 `CLAUDE.md`. A hook guard, `openwiki-guard.sh pre|post`, snapshots both
