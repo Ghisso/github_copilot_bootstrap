@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-21
 **Plan:** `.claude/plans/2026-09-19_phase-I-openwiki-enable-and-first-generation.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 This is a transition phase, not the template for future knowledge-refresh
 phases. It enables OpenWiki in this checkout for the first time and proves
@@ -192,13 +192,39 @@ One round (profiles `code`, `architecture`, `security`, `tests`,
 
 ## Verification
 
-(pending: paste `verify closeout --format text` summary lines)
+```text
+PASS        1.2s  openwiki integrations list --project .
+PASS       29.8s  uv run pytest tests/test_install_bootstrap.py tests/test_verify.py -q --tb=short
+PASS        1.2s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      119.8s  uv run python .claude/scripts/verify.py phase --format json --persist
+closeout: PASS
+```
+
+Receipts under `.claude/quality_reports/`: phase receipt (`VFY-RUFF-001`,
+`VFY-MYPY-001`, `VFY-PYTEST-001` 1759 passed, `VFY-FRESH-001/002`,
+`VFY-GEN-001` all PASS) and the closeout receipt persisted after this log
+was checkpointed, with `--documentation-na` because the plan forbids manual
+documentation changes in this transition phase and the code change is a
+pure-internal ownership fix covered by tests. Findings report:
+`.claude/quality_reports/findings-2026-09-19_phase-I-openwiki-enable-and-first-generation.json`
+(0 findings, six profiles, `ponytail_reviewed=true`). Staged: the two MCP
+config files, `.openwikiignore`, `openwiki/**` (30 files, `.run.json` not
+staged), the installer, verifier, and two test files.
 
 - optional 1: NOT RUN — no Codex session was available in this phase; the Codex re-probe of the guard stays optional per the plan and can be run in Phase K.
 
 ## Open Questions / Next Steps
 
-- After Step I2b: restart the Claude Code session so it discovers the
-  `openwiki` MCP server and OpenWiki's installed `openwiki` skill; approve the
-  project server when asked; then the orchestrator runs Steps I3 and I4 on
-  the main thread.
+- **Stop.** Per the plan, Phase J
+  (`2026-09-19_phase-J-openwiki-docs-memory-migration`) starts only after
+  the user inspects `openwiki/**` and confirms in writing; that confirmation
+  is recorded in Phase J's session log.
+- Follow-ups carried: the Codex re-probe of the guard (optional here, can run
+  in Phase K); `verify closeout` traceback when the findings report is
+  missing (MINOR, from Phase F2); the overlay refresh removing the nested
+  `.claude/.gitignore` that `state-sync.sh` recreates.
+- Observed: Claude Code discovered the `openwiki` project MCP server without
+  an approval prompt in this session. The `knowledge-refresh` skill's
+  enablement step 3 says to approve it when asked; that wording still holds
+  (approve if asked) and needs no change.
