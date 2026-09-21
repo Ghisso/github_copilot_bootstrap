@@ -86,7 +86,7 @@ mirror. Phase G exempted these bundles from `check_runtime.py` drift only.
 
 ### Step I3 — Re-probe the guard against the real server
 
-- [ ] **Owner:** the orchestrator on the main thread, in a Claude Code session started after
+- [x] **Owner:** the orchestrator on the main thread, in a Claude Code session started after
   Step I2 (the `coder` agent's tool list has no OpenWiki MCP server, and a running session does
   not discover a server added to `.mcp.json`; the user approves the project server on restart)
 - **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
@@ -101,7 +101,7 @@ mirror. Phase G exempted these bundles from `check_runtime.py` drift only.
 
 ### Step I4 — Run the first host-driven generation
 
-- [ ] **Owner:** the orchestrator on the main thread, same session as Step I3 (same reason)
+- [x] **Owner:** the orchestrator on the main thread, same session as Step I3 (same reason)
 - **Target files:** generated `openwiki/**` except `openwiki/INSTRUCTIONS.md`; nothing else
 - **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`, then OpenWiki's installed
   `.claude/skills/openwiki/SKILL.md`
