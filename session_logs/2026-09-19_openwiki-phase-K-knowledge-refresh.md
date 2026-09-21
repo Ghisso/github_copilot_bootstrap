@@ -3,7 +3,7 @@
 **Date:** 2026-09-21
 **Plan:** `.claude/plans/2026-09-19_phase-K-knowledge-refresh.md`
 
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 Phases I and J were transition phases (first enablement and the one-time
 docs migration). This phase is the normal knowledge-refresh shape that
@@ -149,7 +149,23 @@ across `code`, `architecture`, `security`, `tests`, `documentation`,
 
 ## Verification
 
-(pending: paste `verify closeout --format text` summary lines)
+```text
+PASS       46.2s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      128.5s  uv run python .claude/scripts/verify.py phase --format json --persist
+closeout: PASS
+```
+
+Receipts under `.claude/quality_reports/`: phase receipt (all applicable
+checks PASS, pytest 1759 passed, `VFY-GEN-001` PASS with the OpenWiki
+managed-state conditions clean) and the closeout receipt persisted after
+this log was checkpointed, with `--documentation-na` because the
+deliverable is the regenerated `openwiki/` layer and its brief and the
+final stale-claims audit found no human doc to change. Findings report:
+`.claude/quality_reports/findings-2026-09-19_phase-K-knowledge-refresh.json`
+(0 findings; six profiles; `ponytail_reviewed=true`). Staged: `openwiki/`
+only, 24 files, 1220 insertions, 1254 deletions; `.run.json` absent.
 
 - optional 1: NOT RUN — no Codex session was available in this phase; the Codex guard re-probe remains an interactive check for a future Codex session and does not block this refresh, which ran on Claude Code where the guard was re-probed in Phase I.
 
