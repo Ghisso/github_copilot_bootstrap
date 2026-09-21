@@ -75,6 +75,36 @@ where the audit finds gaps.
     (7) architecture Git-Backed State Sync; (8) architecture Source
     Directories and target-mapping Shared Basis; (9) README What Is Included;
     (10) README Generated layout and target-mapping Native Adapters.
+- Step J2 disposition review (reviewer; `documentation`, `architecture`,
+  `security`; two passes). All ten edits approved, seven with conditions;
+  advisory gate FAIL until the conditions are bound into J3. Conditions:
+  1. `docs/target-mapping.md` Shared Basis must keep the exact link text
+     `[Memory Authority and Privacy](architecture.md#memory-authority-and-privacy)`;
+     `validate_targets.py` checks that literal substring (CRITICAL).
+  2. README Hooks must keep the `## Hooks` heading literal (self-link at
+     line 173), the design-intent bullets, the `--no-verify` note, and the
+     sentences on `commit-msg` under `git merge`, `rebase`, `cherry-pick`,
+     and `--amend` including the `MERGE_HEAD` passthrough escape; none are in
+     the wiki.
+  3. The Antigravity PreToolUse deny-by-default contract survives in
+     `docs/architecture.md` Hook Dispatcher (both copies were slated for
+     shortening).
+  4. The per-agent model and effort matrix survives in `docs/architecture.md`
+     Custom Agents; README Agent System keeps only a short roster table.
+  5. `docs/architecture.md` Lifecycle Enforcement keeps verbatim the
+     repository-scoped versus path-agnostic protection distinction for
+     `protect-files.sh` and `git-protection.sh`, and the reporting-reminder
+     183-byte / 200-byte ceiling sentence.
+  6. The `~/.openwiki` pre-creation instruction and the `--cap-add=SYS_ADMIN`
+     / `seccomp=unconfined` rationale survive in README What Is Included's
+     devcontainer bullet; the copies at README "Generated layout" and
+     `docs/architecture.md` Source Directories may go.
+  7. Two SHORTEN/LINK targets omitted from the list are folded in as edits
+     11 and 12: README Verification Defaults prose (command list stays
+     verbatim) and `docs/architecture.md` Task-Lane Routing prose (diagram
+     stays).
+  Downgrade suggestions (VS Code Tasks, the Design Decisions closing
+  paragraph) are deferred; over-preservation is the conservative direction.
 
 ## Review findings and dispositions
 
