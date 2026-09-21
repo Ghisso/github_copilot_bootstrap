@@ -131,6 +131,20 @@ where the audit finds gaps.
 - VERIFY: `validate_targets.py` PASS (link integrity over README, AGENTS.md,
   docs), `check_runtime.py` PASS, `verify.py fast` PASS, `verify.py phase`
   PASS (ruff 0, mypy 0, pytest 1759 passed, `VFY-GEN-001` PASS).
+- Step J4 review round 1 (`documentation`, `architecture`, `security`; two
+  passes): 0 CRITICAL, 1 MAJOR, 0 MINOR. The MAJOR: `docs/architecture.md`
+  Custom Agents claimed to be the "single surviving home" of the model and
+  effort matrix while README still carried the table the validator requires.
+  Fix applied by the orchestrator (a two-place wording change, no content
+  moved): the architecture doc now says README carries the same table because
+  `validate_targets.py` requires it there, that both are edited together, and
+  that the validator rejects a README copy drifting from `model_intent`;
+  README's closing pointer no longer sends readers to the architecture doc
+  for the matrix. `validate_targets.py` PASS. All seven conditions were
+  confirmed preserved; every new `openwiki/...` link and every pre-existing
+  anchor resolves; two risky-looking removals (the Codex hook-trust
+  reapproval step, the `luna_coder` escalation schema) were confirmed to
+  live in other human docs or in the canonical prompts.
 
 ## Review findings and dispositions
 
