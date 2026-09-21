@@ -19,18 +19,61 @@ big plan ends with; it carries none of I's or J's transition work.
 
 ## Steps
 
-### Step K1 — Refresh
+### Step K0 — Add a page-style section to the brief
 
-- [ ] **Owner:** `coder` (Claude Code or Codex session)
+Added 2026-09-21 after the user inspected the Phase I wiki: the content was judged fine, but
+the pages were paragraph-heavy, used few lists, no diagrams, and hard-wrapped lines made
+tables look misaligned. OpenWiki does not fix page style; the writing agent does, following
+`openwiki/INSTRUCTIONS.md` (returned verbatim as `wikiGoal` on every `openwiki_begin`).
+OpenWiki validates every fenced `mermaid` block with its pinned `mermaid` and `jsdom`
+peer dependencies and marks a failed parse with an `openwiki: mermaid parse failed` comment.
+
+- [ ] **Owner:** `documenter` (prose), orchestrator approves the wording
+- **Target files:** `openwiki/INSTRUCTIONS.md` only (human-authored; the one file under
+  `openwiki/` that is not generated)
+- **Required Skills:** `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`
+- **Content:** a `## Page style` section modeled on this repository's user-facing reporting
+  rules (`shared/policies/agent-reporting.instructions.md`), covering at least:
+  - lead with the answer or the mechanism, then the detail; define an uncommon term the first
+    time it appears; plain words, no idioms, no invented labels;
+  - one idea per sentence, about 20 words; paragraphs of two or three sentences; no em-dashes;
+  - a bulleted list for parallel facts and a numbered list for ordered steps, one or two
+    sentences per item; a table only for genuinely tabular data, with no hard line wrapping
+    inside a cell;
+  - do not hard-wrap prose at a fixed column; one sentence may run long, the renderer wraps;
+  - one Mermaid diagram (fenced ```mermaid) on every page where a flow, lifecycle, ownership
+    boundary, or call sequence is clearer as a picture, with a one-sentence lead-in saying what
+    the picture shows; keep node labels short; prefer `flowchart` and `sequenceDiagram`;
+  - commands, paths that the reader must open, and exact error text go in fenced code blocks
+    or backticks; name a file only when the reader needs to go there;
+  - every page opens with the one-sentence authority statement (source, tests, and policy
+    outrank the page) and closes with related pages.
+- **Acceptance criteria:** the section is plain language a new maintainer can follow without
+  the reporting policy open; it changes nothing about scope, priorities, or the historical
+  records rule already in the brief.
+- **Verification:** `documentation` profile review of the section wording before Step K1.
+
+### Step K1 — Refresh as a rebaseline
+
+- [ ] **Owner:** the orchestrator on the main thread in a Claude Code session (project MCP
+  servers are not in the `coder` agent's tool list; OpenWiki's own skill forbids page subagents)
 - **Target files:** generated `openwiki/**` only
 - **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`, then OpenWiki's installed
   `openwiki` skill
-- **Execution:** `openwiki_begin` with `mode: "update"`; confirm adapters clean; plan, page
-  loop, `openwiki_finish`. A `noop` result is valid and recorded. If the recorded base HEAD is
-  unreachable, follow the skill's rebaseline rule; never `init`.
-- **Acceptance criteria:** wiki reflects the post-migration source state; no reference to a
-  removed manual doc unless intentionally historical; changes confined to `openwiki/**`.
+- **Execution:** because Step K0 changes the style of every page and an incremental `update`
+  rewrites only pages whose source changed, run this refresh as the rebaseline the skill
+  documents: keep `openwiki/INSTRUCTIONS.md`, remove everything else under `openwiki/**`, then
+  `openwiki_begin` with `mode: "update"`; confirm adapters clean; submit a plan that keeps the
+  Phase I taxonomy unless Phase J's migration added material worth a page; page loop applying
+  the new style section; `openwiki_finish`. Never `init`.
+- **Acceptance criteria:** wiki reflects the post-migration source state in the new style
+  (every page has lists where facts are parallel, a Mermaid diagram where a flow or boundary is
+  the subject, no hard-wrapped table cells); no `openwiki: mermaid parse failed` comment
+  remains; no reference to a removed manual doc unless intentionally historical; changes
+  confined to `openwiki/**`.
 - **Verification:** `git diff --stat -- openwiki`; sample claims against source/tests;
+  `grep -rL 'mermaid' openwiki --include=*.md` lists only pages where no flow is the subject;
+  `grep -rn 'mermaid parse failed' openwiki` is empty;
   `uv run python .claude/scripts/verify.py fast --format json`
 
 ### Step K2 — Final stale-claims, MEMORY, and LEARN audit
@@ -64,9 +107,16 @@ big plan ends with; it carries none of I's or J's transition work.
 
 ```bash
 uv run python scripts/validate_targets.py
+uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
 ```
+
+## Optional Verification
+
+- Re-probe the guard in a Codex session (Phase I's optional item, carried): `openwiki_begin`
+  with `mode: "init"` denied, adapters clean after the turn. Interactive, cannot be scripted.
+  Record as `- optional 1: PASS|FAIL|NOT RUN — <detail>`.
 
 ## Closeout Checklist
 

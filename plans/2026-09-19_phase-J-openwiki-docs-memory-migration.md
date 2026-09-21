@@ -21,7 +21,7 @@ that. This is a transition phase, not the template for future knowledge-refresh 
 
 ### Step J1 — Confirmation gate
 
-- [ ] **Owner:** orchestrator
+- [x] **Owner:** orchestrator
 - **Behavior:** do not begin J2 until the user has explicitly confirmed migration after
   inspecting `openwiki/**`; quote the confirmation in this phase's session log. Requested wiki
   changes belong to a refresh (Phase K shape), not here.
