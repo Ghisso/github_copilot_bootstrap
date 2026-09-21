@@ -49,6 +49,7 @@ _ownership = importlib.util.module_from_spec(_ownership_spec)
 _ownership_spec.loader.exec_module(_ownership)
 owned_bootstrap_root_paths = _ownership.bootstrap_root_paths
 install_mode_from_manifest = _ownership.install_mode_from_manifest
+is_third_party_skill_dir = _ownership.is_third_party_skill_dir
 
 
 SCHEMA_VERSION = 4
@@ -837,12 +838,28 @@ def regular_tree_fingerprint_diagnostic(path: Path) -> tuple[bytes | None, str |
             return None, "unsupported-file-type"
         digest = hashlib.sha256()
         digest.update(b"directory\0")
+        excluded_dirs: list[Path] = []
         for descendant in sorted(path.rglob("*")):
+            if any(
+                excluded == descendant or excluded in descendant.parents
+                for excluded in excluded_dirs
+            ):
+                continue
             relative = descendant.relative_to(path).as_posix().encode("utf-8")
             child_info = descendant.lstat()
             if descendant.is_symlink():
                 return None, "missing-or-unsafe"
             if stat.S_ISDIR(child_info.st_mode):
+                if is_third_party_skill_dir(descendant):
+                    # OpenWiki's own installer owns this bundle once it
+                    # writes its marker inside it; exclude it (and
+                    # everything nested under it) from both the live and
+                    # the mirror fingerprint so drift inside it never
+                    # invalidates control-plane provenance. Parents sort
+                    # before their descendants, so this list is complete by
+                    # the time a nested path is checked above.
+                    excluded_dirs.append(descendant)
+                    continue
                 digest.update(b"directory\0" + relative + b"\0")
             elif stat.S_ISREG(child_info.st_mode):
                 try:
