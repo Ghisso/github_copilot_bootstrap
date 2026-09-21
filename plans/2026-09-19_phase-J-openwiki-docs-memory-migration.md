@@ -3,7 +3,7 @@ name: 2026-09-19_phase-J-openwiki-docs-memory-migration
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 12
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
