@@ -60,6 +60,30 @@ knowledge-refresh phases; the closeout log must say so.
   `*.openwiki-backup-*` directory exists.
 - **Verification:** `git diff -- .mcp.json .codex/config.toml`; `check_runtime.py`
 
+### Step I2b — Make the bootstrap refresh and the verifier honor OpenWiki's skill bundle
+
+Added 2026-09-21 after Step I2: with OpenWiki's `.agents/skills/openwiki` bundle installed, the
+self overlay refresh (`scripts/install_bootstrap.py . --local-only --allow-self`) refused with
+`Refusing .agents takeover ... .claude/bootstrap-root/.agents/skills/openwiki`, because
+`validate_agents_takeover` compares the live `.agents` tree with its mirror without skipping a
+marker-claimed third-party skill directory. `verify.py fast` also failed with `receipt metadata
+control-plane provenance is invalid`, because the live root adapters OpenWiki's installer edited
+(the MCP config files, possibly `.agents`) no longer match their `.claude/bootstrap-root/`
+mirror. Phase G exempted these bundles from `check_runtime.py` drift only.
+
+- [ ] **Owner:** `coder`
+- **Target files:** `scripts/install_bootstrap.py` (`_agents_tree` /
+  `validate_agents_takeover`), `shared/scripts/verify.py` only if its bootstrap-root
+  fingerprint covers `.agents` and needs the same exemption, `tests/test_install_bootstrap.py`,
+  `tests/test_verify.py` if `verify.py` changes
+- **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode,
+  `shared/skills/code-style/SKILL.md`, `shared/skills/testing-patterns/SKILL.md`
+- **Acceptance criteria:** the refresh exits 0 with the bundle present and leaves
+  `.agents/skills/openwiki/**` untouched; a `skills/openwiki` directory without the marker is
+  still reported as a takeover conflict; `verify.py fast` PASS after the refresh; both MCP
+  config files keep OpenWiki's entries across the refresh
+- **Verification:** focused pytest; the refresh command above; `verify.py fast`
+
 ### Step I3 — Re-probe the guard against the real server
 
 - [ ] **Owner:** the orchestrator on the main thread, in a Claude Code session started after
@@ -96,8 +120,8 @@ knowledge-refresh phases; the closeout log must say so.
 ### Step I5 — Review
 
 - [ ] **Owner:** `reviewer`
-- **Review Profiles:** `code`, `architecture`, `security`, `tests`, `documentation` (`ponytail`
-  only if a script changed)
+- **Review Profiles:** `code`, `architecture`, `security`, `tests`, `documentation`, `ponytail`
+  (Step I2b changes a script)
 - **Review focus:** MCP entries are exactly OpenWiki's managed form; no credential or private
   config in Git or ai-state; `.openwikiignore` hides state without hiding evidence; generated
   content subordinate to source/tests/policy; the brief does not treat archived records as
@@ -107,6 +131,7 @@ knowledge-refresh phases; the closeout log must say so.
 
 ```bash
 openwiki integrations list --project .
+uv run pytest tests/test_install_bootstrap.py tests/test_verify.py -q --tb=short
 uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 uv run python .claude/scripts/verify.py phase --format json --persist    # before REVIEW
