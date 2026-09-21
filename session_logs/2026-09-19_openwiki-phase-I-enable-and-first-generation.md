@@ -68,6 +68,23 @@ Phase J.
   `check_runtime.py` drift only. Step I2b fixes the installer (and the
   verifier's fingerprint if `.agents` is an owned path) with regression
   tests; `ponytail` added to the review profiles.
+- Step I2b (same coder): `_agents_tree` in `scripts/install_bootstrap.py`
+  now prunes a marker-claimed third-party skill directory from its walk, so
+  the takeover and mirror comparisons never see it; a same-shaped directory
+  without the marker still surfaces as a conflict. `.agents` is an owned
+  root adapter path (`ROOT_ADAPTER_PATHS`), so
+  `regular_tree_fingerprint_diagnostic` in `shared/scripts/verify.py` now
+  excludes marker-claimed bundles and everything under them on both the live
+  and mirror sides, through the file's existing dynamic import of
+  `runtime_ownership.py`. Four regression tests added (two per file). The
+  refresh then exits 0, leaves `.agents/skills/openwiki/**` untouched, and
+  keeps OpenWiki's entries in both MCP config files; nested state was
+  committed by the refresh as `bootstrap: update 2026-09-21T02:27:59Z`.
+  Focused pytest 353 passed; generate, validate, `check_runtime`, `verify.py
+  fast`, mypy, ruff all exit 0.
+- Stop for the user: the session must restart so Claude Code discovers the
+  `openwiki` MCP server and OpenWiki's installed `openwiki` skill; the user
+  approves the project server. Steps I3 and I4 resume on the main thread.
 
 ## Review findings and dispositions
 

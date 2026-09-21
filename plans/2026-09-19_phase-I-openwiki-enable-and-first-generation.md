@@ -23,7 +23,7 @@ knowledge-refresh phases; the closeout log must say so.
 
 ### Step I1 — Write the brief and the ignore file
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** create `openwiki/INSTRUCTIONS.md`; create `.openwikiignore`
 - **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`,
   `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`
@@ -43,7 +43,7 @@ knowledge-refresh phases; the closeout log must say so.
 
 ### Step I2 — Install the host integrations into this checkout
 
-- [ ] **Owner:** `coder`; the user approves the project MCP server in Claude Code
+- [x] **Owner:** `coder`; the user approves the project MCP server in Claude Code
 - **Target files (written by OpenWiki's installer, then reviewed):** `.mcp.json`,
   `.codex/config.toml` (tracked control-plane), `.claude/skills/openwiki/**` (nested ai-state
   repo), `.agents/skills/openwiki/**` (ignored)
@@ -71,7 +71,7 @@ control-plane provenance is invalid`, because the live root adapters OpenWiki's 
 (the MCP config files, possibly `.agents`) no longer match their `.claude/bootstrap-root/`
 mirror. Phase G exempted these bundles from `check_runtime.py` drift only.
 
-- [ ] **Owner:** `coder`
+- [x] **Owner:** `coder`
 - **Target files:** `scripts/install_bootstrap.py` (`_agents_tree` /
   `validate_agents_takeover`), `shared/scripts/verify.py` only if its bootstrap-root
   fingerprint covers `.agents` and needs the same exemption, `tests/test_install_bootstrap.py`,
