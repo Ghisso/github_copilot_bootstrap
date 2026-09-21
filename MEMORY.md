@@ -1185,3 +1185,8 @@
   scope distinction, two exact constants, one operator setup step) existed
   only in the human docs; shortening every copy in one phase would have left
   them nowhere. Name the surviving home for each before editing.
+- [LEARN:workflow] The commit gate treats any multi-file diff as high-risk and
+  demands `ponytail_reviewed=true` in the findings report, documentation-only
+  diffs included. Run the `ponytail` profile in the same review round as
+  `documentation` whenever more than one file changes, or the first commit
+  attempt fails and steps 4 to 7 of closeout must be redone.

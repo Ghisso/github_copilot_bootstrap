@@ -152,9 +152,14 @@ Round 1: 0 CRITICAL, 1 MAJOR, 0 MINOR (see the Work Log); the MAJOR was
 fixed by wording, since the validator requires README's copy of the table.
 Round 2 (same reviewer, delta only): PASS, no surviving findings. A
 non-blocking note about a noun-phrase lead-in was smoothed to a full
-sentence before closeout. Final: 0 findings across `documentation`,
-`architecture`, `security`; no code changed, so `code`, `tests`, and
-`ponytail` did not apply.
+sentence before closeout. The commit gate then refused the first commit
+with `this high-risk diff requires a fresh Ponytail review`: a four-file diff
+is multi-file and therefore high-risk regardless of content, so `ponytail`
+applies to documentation too. Round 3 (`ponytail` profile, two passes over
+every hunk): PASS, no findings; every "information lost" candidate was found
+consolidated elsewhere in the human docs. Final: 0 findings across
+`documentation`, `architecture`, `security`, `ponytail`; no code changed, so
+`code` and `tests` did not apply.
 
 ## [LEARN] Entries
 
@@ -184,8 +189,8 @@ Receipts under `.claude/quality_reports/`: phase receipt (all applicable
 checks PASS, pytest 1759 passed) and the closeout receipt persisted after
 this log was checkpointed. Findings report:
 `.claude/quality_reports/findings-2026-09-19_phase-J-openwiki-docs-memory-migration.json`
-(0 findings; `documentation`, `architecture`, `security`; no code changed so
-Ponytail did not apply). Staged: `README.md`, `docs/architecture.md`,
+(0 findings; `documentation`, `architecture`, `security`, `ponytail`;
+`ponytail_reviewed=true`). Staged: `README.md`, `docs/architecture.md`,
 `docs/target-mapping.md`, `openwiki/INSTRUCTIONS.md`; 271 insertions, 820
 deletions.
 
