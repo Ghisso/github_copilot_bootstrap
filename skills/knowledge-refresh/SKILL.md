@@ -47,11 +47,11 @@ A person, not an automated step, enables OpenWiki for a checkout:
    `installed` for both hosts.
 5. Commit the resulting `.mcp.json` and `.codex/config.toml` diffs.
 
-Never pass `--force`. If either command reports an unmanaged skill already
-at `.claude/skills/openwiki` or `.agents/skills/openwiki`, that is a stale
-bootstrap copy from before this skill's rename to `knowledge-refresh`:
-confirm it has no `.openwiki-install.json` marker, remove it, then re-run
-the install command.
+Never pass `--force`. If either command reports an unmanaged skill
+directory already occupying the `openwiki` slot under `.claude/skills/` or
+`.agents/skills/`, that is a stale bootstrap copy from before this skill's
+rename to `knowledge-refresh`: confirm it has no `.openwiki-install.json`
+marker, remove it, then re-run the install command.
 
 ## Running a refresh
 
