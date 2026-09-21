@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-21
 **Plan:** `.claude/plans/2026-09-19_phase-J-openwiki-docs-memory-migration.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 This is a transition phase, not the template for future knowledge-refresh
 phases. It reduces duplicated descriptive documentation and memory content
@@ -173,9 +173,23 @@ sentence before closeout. Final: 0 findings across `documentation`,
 
 ## Verification
 
-(pending: paste `verify closeout --format text` summary lines)
+```text
+PASS       47.5s  uv run python scripts/validate_targets.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+PASS      126.6s  uv run python .claude/scripts/verify.py phase --format json --persist
+closeout: PASS
+```
 
-- optional: none declared in the plan.
+Receipts under `.claude/quality_reports/`: phase receipt (all applicable
+checks PASS, pytest 1759 passed) and the closeout receipt persisted after
+this log was checkpointed. Findings report:
+`.claude/quality_reports/findings-2026-09-19_phase-J-openwiki-docs-memory-migration.json`
+(0 findings; `documentation`, `architecture`, `security`; no code changed so
+Ponytail did not apply). Staged: `README.md`, `docs/architecture.md`,
+`docs/target-mapping.md`, `openwiki/INSTRUCTIONS.md`; 271 insertions, 820
+deletions.
+
+- optional: the plan declares no `## Optional Verification` section, so there are no optional items.
 
 ## Open Questions / Next Steps
 
