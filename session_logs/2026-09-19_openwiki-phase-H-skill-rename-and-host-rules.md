@@ -147,7 +147,7 @@ checkpointed. Findings report:
 `.claude/quality_reports/findings-2026-09-19_phase-H-openwiki-skill-rename-and-host-rules.json`
 (0 findings, six profiles, `ponytail_reviewed=true`).
 
-- optional: none declared in the plan.
+- optional 1: NOT RUN — the plan's `## Optional Verification` bullet is the placeholder "None"; there is no optional check to run.
 
 ## Open Questions / Next Steps
 
