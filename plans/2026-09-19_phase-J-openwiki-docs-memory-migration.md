@@ -3,8 +3,8 @@ name: 2026-09-19_phase-J-openwiki-docs-memory-migration
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 12
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-J-docs-memory-migration.md
 ---
 
 # Small Plan: 2026-09-19_phase-J-openwiki-docs-memory-migration
@@ -59,7 +59,7 @@ that. This is a transition phase, not the template for future knowledge-refresh 
 
 ### Step J4 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Review Profiles:** `documentation`, `architecture`, `security`; `code`, `tests`, `ponytail`
   when any code changed
 - **Review focus:** no normative information exists only in generated OpenWiki; no unique human
@@ -77,15 +77,15 @@ uv run python .claude/scripts/verify.py phase --format json --persist    # befor
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] User confirmation quoted in the session log before any migration edit
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED` and names this a transition phase
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] User confirmation quoted in the session log before any migration edit
+- [x] Documentation updated
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED` and names this a transition phase
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
 
 ## Pause Checkpoint
 

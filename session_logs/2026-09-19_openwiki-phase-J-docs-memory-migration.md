@@ -148,7 +148,13 @@ where the audit finds gaps.
 
 ## Review findings and dispositions
 
-(pending)
+Round 1: 0 CRITICAL, 1 MAJOR, 0 MINOR (see the Work Log); the MAJOR was
+fixed by wording, since the validator requires README's copy of the table.
+Round 2 (same reviewer, delta only): PASS, no surviving findings. A
+non-blocking note about a noun-phrase lead-in was smoothed to a full
+sentence before closeout. Final: 0 findings across `documentation`,
+`architecture`, `security`; no code changed, so `code`, `tests`, and
+`ponytail` did not apply.
 
 ## [LEARN] Entries
 

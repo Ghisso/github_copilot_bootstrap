@@ -217,7 +217,7 @@ A fact that can be re-derived from current source/tests should normally not be c
 - [x] `2026-09-19_phase-G-openwiki-host-driven-guard` — built only against F's evidence: replace the subprocess runner with a PreToolUse/PostToolUse guard on `openwiki_begin`, add the OpenWiki managed-state backstop to `VFY-GEN-001` and the commit gate, fix the devcontainer smoke line, add a real-binary MCP handshake test, retire `openwiki_refresh.py`, and make OpenWiki-installed skill bundles third-party-owned.
 - [x] `2026-09-19_phase-H-openwiki-skill-rename-and-host-rules` — rename the bootstrap skill to `knowledge-refresh`, rewrite it for host-driven operation with the precise host-integration rule, and sweep every reference.
 - [x] `2026-09-19_phase-I-openwiki-enable-and-first-generation` — enable OpenWiki here, install the Claude Code and Codex integrations, re-probe the guard against the real server, run one host-driven generation, commit, and stop for inspection.
-- [ ] `2026-09-19_phase-J-openwiki-docs-memory-migration` — after explicit confirmation, migrate only proven duplicate descriptive docs and MEMORY content; no refresh.
+- [x] `2026-09-19_phase-J-openwiki-docs-memory-migration` — after explicit confirmation, migrate only proven duplicate descriptive docs and MEMORY content; no refresh.
 - [ ] `2026-09-19_phase-K-knowledge-refresh` — the small knowledge-refresh shape: one update, diff inspection, repository-wide stale-claims/MEMORY/LEARN audit, closeout.
 
 ## Step Summary

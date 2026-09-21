@@ -1174,3 +1174,14 @@
   `openwiki_submit_page` rejects evidence citing `.openwikiignore`-excluded
   files or generated OpenWiki output (including `openwiki/INSTRUCTIONS.md`),
   so cite the generator string or README for root-guidance facts.
+- [LEARN:documentation] Before shortening a human doc against generated
+  coverage, grep the validators for literal-text contracts on that doc.
+  `validate_targets.py` hard-requires README's agent lists and model table
+  (`readme_agent_contract_errors`) and target-mapping's Memory Authority
+  link; a disposition that ignores those gates fails at verification, not at
+  review.
+- [LEARN:documentation] A disposition review must check what the wiki does
+  not say. Seven sentences (escape hatches, a deny-by-default contract, a
+  scope distinction, two exact constants, one operator setup step) existed
+  only in the human docs; shortening every copy in one phase would have left
+  them nowhere. Name the surviving home for each before editing.
