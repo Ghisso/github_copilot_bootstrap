@@ -87,7 +87,28 @@ checkout's stale installed copies so Phase I's installer finds the paths free.
 
 ## Review findings and dispositions
 
-(pending)
+One round (profiles `code`, `architecture`, `security`, `tests`, `ponytail`,
+`documentation`; two sequential passes): 0 CRITICAL, 0 MAJOR, 0 MINOR. Gate
+PASS.
+
+- Raised in pass 1 and dropped in pass 2 as not a defect: the skill's "Reading
+  the result" list of `openwiki-guard.sh pre` denial reasons omits the
+  unresolved-prior-run and symlinked-path denials. The remediation the skill
+  gives for any denial (check `git status`, run `openwiki-guard.sh post
+  </dev/null`) is the correct action for those cases too, so no reader is
+  misled.
+- Independently confirmed, not only asserted by the plan: the skill's claims
+  about OpenWiki's own tool behaviour (`noop`, `openwiki_finish` returning
+  `complete`, `openwiki/.run.json` as the resumable run state) were checked
+  against the installed `openwiki@0.5.2` package source; the guard-restore
+  timing against `openwiki-guard.py`, the generated Codex `Stop` wiring, and
+  the spike's U6 observation.
+- Held up on review: every target keeps the skill (`dist/multi-agent`
+  `.claude/skills/knowledge-refresh`, `.agents/skills/knowledge-refresh`, and
+  54 `[[skills.config]]` entries equal to `shared/skills`); the test fix still
+  fails if the marker gate breaks in either direction; all `## References`
+  paths resolve; the four remaining `skills/openwiki` references are the
+  intentional third-party-ownership code.
 
 ## [LEARN] Entries
 

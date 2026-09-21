@@ -3,8 +3,8 @@ name: 2026-09-19_phase-H-openwiki-skill-rename-and-host-rules
 type: small-plan
 parent_plan: 2026-09-19_openwiki-knowledge-layer-integration
 phase_index: 10
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-19_openwiki-phase-H-skill-rename-and-host-rules.md
 ---
 
 # Small Plan: 2026-09-19_phase-H-openwiki-skill-rename-and-host-rules
@@ -28,7 +28,7 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
 
 ### Step H1 — Rename and rewrite the bootstrap skill
 
-- [ ] **Owner:** `coder` (rename, validators) + `documenter` (prose)
+- [x] **Owner:** `coder` (rename, validators) + `documenter` (prose)
 - **Target files:** move `shared/skills/openwiki/SKILL.md` →
   `shared/skills/knowledge-refresh/SKILL.md` (`name: knowledge-refresh`; `visibility: public`)
 - **Required Skills:** `shared/skills/ponytail/SKILL.md` in `full` mode,
@@ -70,7 +70,7 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
 
 ### Step H2 — Sweep every reference and amend the rules
 
-- [ ] **Owner:** `coder` for generator strings, `documenter` for prose
+- [x] **Owner:** `coder` for generator strings, `documenter` for prose
 - **Target files:** authoring `AGENTS.md:9`, `CLAUDE.md:14`, `render_root_guidance` in
   `scripts/generate_targets.py` (line 1321 at plan time); `shared/policies/workflow.instructions.md`
   (lines 201 and 248: OpenWiki Refresh; Knowledge-Refresh Shape);
@@ -93,7 +93,7 @@ authoring contract; the bootstrap's `knowledge-refresh` skill is the lifecycle p
 
 ### Step H3 — Review
 
-- [ ] **Owner:** `reviewer`
+- [x] **Owner:** `reviewer`
 - **Review Profiles:** `code`, `architecture`, `security`, `tests`, `ponytail`, `documentation`
 - **Review focus:** the rule is precise (what, by whom, when); no target loses the skill;
   wording consistent across policy, prompts, root guidance, docs, and the spike evidence.
@@ -117,15 +117,15 @@ uv run python .claude/scripts/verify.py phase --format json --persist    # befor
 
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
-- [ ] `.claude/skills/openwiki/` and `.agents/skills/openwiki/` no longer exist in this checkout
+- [x] Documentation updated
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` then `verify closeout` PASS)
+- [x] `.claude/skills/openwiki/` and `.agents/skills/openwiki/` no longer exist in this checkout
 
 ## Pause Checkpoint
 

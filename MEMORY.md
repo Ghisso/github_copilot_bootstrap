@@ -1143,3 +1143,17 @@
   environment that runs closeout, not only in the devcontainer image. Install
   the pinned version where the phase actually closes out and record that in
   the log, or the closeout runner fails on the first item.
+- [LEARN:planning] Re-read a small plan's factual claims against the
+  repository right before starting it, not when it was written. Phase H's
+  plan had four drifted statements after three intervening phases (a count of
+  rules, a "validator-enforced" claim, a pre-F2 verification block, an
+  inferred `check_runtime.py` outcome). Correcting the plan first costs
+  minutes; finding each mid-phase costs a review round.
+- [LEARN:workflow] The self overlay refresh (`install_bootstrap.py .
+  --local-only --allow-self`) prunes obsolete installed copies as a side
+  effect. Take any "before removal" observation before running it, or the
+  stale state has to be reconstructed to observe it.
+- [LEARN:planning] A plan that requires prose to name a path and also forbids
+  that path in an acceptance grep over the same file has two incompatible
+  requirements. Scope the grep to code, or phrase acceptance as "only
+  intentional references" and list them.
