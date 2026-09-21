@@ -36,6 +36,38 @@ surface for claims this big plan invalidated, and close the big plan.
   that a page states when a hook, validator, or test enforces a rule it
   describes. Nothing else in the brief changed. Orchestrator approved the
   wording; documentation-profile review requested before K1.
+- Step K0 review (`documentation` profile, two passes): PASS with two
+  advisory MINORs, both sentences in the new section that broke its own
+  20-word rule; the reviewer's replacement wording was applied. The section
+  covers every item in the plan's Content list; the Mermaid example parses
+  with the installed `mermaid` package; no contradiction with OpenWiki's own
+  page contract; nothing outside the section changed.
+- Step K1, rebaseline refresh on the main thread. Kept
+  `openwiki/INSTRUCTIONS.md`, removed everything else under `openwiki/`,
+  then `openwiki_begin(root=<repo>, mode=update)` returned `status: active`,
+  `phase: planning`, `lastUpdate: null`; adapters clean and snapshot
+  directory empty afterwards. Plan submitted with nine pages: the eight
+  Phase I pages plus the new `operations/context-mode-dispatcher.md` for the
+  brief's Context Mode coverage item added in Phase J. Nine
+  `openwiki_next_page` / write / `openwiki_submit_page` cycles in alphabetical
+  path order; every page rewritten in the new style (opening authority
+  sentence, lists for parallel facts, numbered sequences, one Mermaid
+  `flowchart` or `sequenceDiagram` with a lead-in sentence, no hard-wrapped
+  prose or cells, enforcement named in the same sentence as the rule,
+  Related pages). The state-sync page now cites `state-sync.sh` and the
+  installer rather than `docs/architecture.md`, whose Git-Backed State Sync
+  section Phase J shortened. `openwiki_finish` returned `status: complete`.
+- Step K1 acceptance: adapters porcelain empty; no workflow file; snapshot
+  directory empty; `openwiki/.run.json` absent; zero `mermaid parse failed`
+  comments; every page has a Mermaid block; changes confined to
+  `openwiki/**` (22 files changed, 953 insertions, 1254 deletions, plus the
+  new page and its claims sidecar). `verify.py phase --format text` PASS:
+  ruff 0, mypy 0, pytest 1759 passed, `VFY-GEN-001` PASS.
+- Step K2, wiki surfaces (orchestrator): `openwiki/INSTRUCTIONS.md`,
+  `quickstart.md`, and the four `index.md` files swept for the retired-design
+  vocabulary. One hit, "hook-event runner" in the operations index
+  describing the Context Mode dispatcher, is accurate and unrelated to the
+  retired OpenWiki runner. No stale claim.
 
 ## Stale-claims surfaces checked
 
@@ -60,7 +92,7 @@ full pattern set, every hit read in context (documenter, read-only).
 | `shared/MEMORY.md` | No hits. |
 | Live `.claude/MEMORY.md` | Entries about the retired runner are explicitly labelled as carried lessons (HISTORICAL); per-host restore and `openwiki@0.5.2` entries are CURRENT. No edit. |
 | `shared/devcontainer/**`, `.devcontainer/**` | CURRENT. Pins match exactly; authoring and generated Dockerfiles are byte-identical. |
-| `openwiki/INSTRUCTIONS.md` and the generated quickstart and index pages | (pending, audited after the Step K1 rebaseline) |
+| `openwiki/INSTRUCTIONS.md` and the generated quickstart and index pages (after the K1 rebaseline) | CURRENT. No retired-design vocabulary; the only "runner" hit describes the Context Mode dispatcher's hook-event role, not OpenWiki. The brief's Page style section changed no scope, priority, or historical-records rule. |
 
 Non-documentation observation: `shared/scripts/__pycache__/openwiki_refresh.cpython-313.pyc` is a stale bytecode artifact of the retired runner; `__pycache__` is git-ignored, so it is a local leftover only.
 
@@ -70,13 +102,25 @@ Non-documentation observation: `shared/scripts/__pycache__/openwiki_refresh.cpyt
 
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:documentation] OpenWiki fixes structure, claims, and validation;
+  the writing agent fixes page style. A style change therefore goes in the
+  brief's `## Page style` section, and applying it to existing pages needs a
+  rebaseline (keep `openwiki/INSTRUCTIONS.md`, remove the rest, `update`),
+  because an incremental update rewrites only pages whose source changed.
+- [LEARN:documentation] When a human doc is shortened, wiki claims that cited
+  it by line range go stale even though the fact is unchanged. Cite the
+  script or test that implements a fact, not the human doc that describes
+  it, so a later doc edit does not invalidate the evidence.
+- [LEARN:workflow] A style section that states a sentence-length rule must
+  itself obey it; the reviewer caught two sentences in the new section that
+  broke the rule they stated. Read a new instruction block against its own
+  rules before submitting it.
 
 ## Verification
 
 (pending: paste `verify closeout --format text` summary lines)
 
-- optional 1: (pending)
+- optional 1: NOT RUN — no Codex session was available in this phase; the Codex guard re-probe remains an interactive check for a future Codex session and does not block this refresh, which ran on Claude Code where the guard was re-probed in Phase I.
 
 ## Open Questions / Next Steps
 
