@@ -336,12 +336,18 @@ files in `shared/` instead.
 
 Generated layout:
 
-- `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos; Node.js 22.22.0, `context-mode`, and OpenWiki 0.5.2 are pre-installed. The container mounts `~/.cache/huggingface` and `~/.openwiki` from the host. Create the host `~/.openwiki` directory before the first container build, or Docker can create it as `root` and prevent the `vscode` user from writing to it. The mount holds optional OpenWiki provider configuration: host-driven refreshes do not need it, since the coding session's own model does the work; no provider key is forwarded by the devcontainer either way. The Hugging Face cache remains for projects themselves — HF sync moved to git (see [ADR-002](plans/adr-002-git-backed-state-sync.md)).
+- `.devcontainer/`: trackable GPU sandbox and AI-state sync bootloader for consumer repos
 - `.claude/`: installed canonical runtime basis for skills, canonical agent bodies, instructions, plans, explorations, logs, reports, memory, templates, prompts, hook scripts, and Claude settings — its own nested git repo on branch `ai-state`, gitignored in the outer repo
-- `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config; `tasks.json` auto-pulls AI state on folder open and exposes a manual push task
+- `.github/`, `.vscode/mcp.json`, `.vscode/tasks.json`: GitHub Copilot native adapters/config
 - `CLAUDE.md`, `.mcp.json`: Claude Code native entrypoint/config
 - `AGENTS.md`, `.codex/`: OpenAI Codex native entrypoint/adapters/config
 - `.agents/`: Google Antigravity workspace adapters, skills, MCP configuration, and safety hook configuration
+
+See [Installing the bootstrap, file ownership, and runtime drift
+checks](openwiki/operations/install-ownership-and-runtime-checks.md) for
+what each category means on refresh, and [Agent roster, prompts, and the
+skill library](openwiki/architecture/agents-and-skills.md) for how each
+native adapter renders an agent.
 
 Consumer repos should commit `.devcontainer/` and `.gitignore`, but generated AI
 content such as `.claude/`, `.codex/`, `AGENTS.md`, `CLAUDE.md`, native adapters,
@@ -439,9 +445,14 @@ Interpretation:
 - Skills: reusable workflows in [shared/skills/](shared/skills/)
 - Ponytail: pinned MIT-licensed coding and optional complexity-review skills with provenance in [shared/third_party/ponytail/](shared/third_party/ponytail/)
 - Hooks: policy and observability scripts in [shared/hooks/](shared/hooks/)
-- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/) — Node.js 22.22.0 (multi-stage build; avoids Ubuntu's outdated Node 18), `bubblewrap`, `context-mode`, and OpenWiki 0.5.2 are pre-installed. It mounts the host HF cache and `~/.openwiki`; create `~/.openwiki` before the first build so Docker does not create a root-owned directory that the `vscode` user cannot update. The mount carries optional, user-managed OpenWiki provider configuration — not required in host-driven mode, since the coding session's own model does the refresh work — with no provider key in `containerEnv` either way. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker; `huggingface_hub>=1.0` stays pinned for the projects' own use (models/datasets), not for AI state sync anymore — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
+- Devcontainer: GPU sandbox and git-backed AI-state sync bootloader in [shared/devcontainer/](shared/devcontainer/). Create the host `~/.openwiki` directory before the first container build, or Docker can create it as `root` and prevent the `vscode` user from writing to it. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are set so bubblewrap namespace creation works inside Docker — see [ADR-002](plans/adr-002-git-backed-state-sync.md)
 - MCP config: shared Semble, Context7, and filtered Context Mode server definitions in [shared/mcp/](shared/mcp/); Context Mode's MCP surface is pinned to exactly four guarded tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`)
 - Templates, prompts, memory, plans, session logs, quality reports, and deterministic verification receipts rendered into the shared `.claude/` basis
+
+See [Source, generated output, consumer repo, and nested AI
+state](openwiki/architecture/source-generated-consumer-layout.md) for what
+each of these directories holds, who edits it, and how generation renders
+`shared/` into `dist/multi-agent/`.
 
 ## Most Important Instructions
 
@@ -561,14 +572,10 @@ These skills encode battle-tested workflows and reduce ad-hoc execution.
 
 ## Agent System
 
-The agent layer gives me orchestration plus profile-driven reviews. Full shared agent bodies render into `.claude/agents/`; Copilot keeps thin native wrappers in `.github/agents/`. Codex custom-agent TOML files embed the transformed canonical shared prompt, so a spawned Codex agent receives its complete role contract without first reading a Claude-native agent file.
-
-The specialist flow for standard and high-risk implementation work is:
-
-- orchestrator -> conditional planner -> coder -> reviewer -> closeout
-
-PLAN is conditional. VERIFY and CLOSEOUT are lifecycle stages run by the
-orchestrator and canonical scripts, not delegated agent roles.
+The agent layer gives me orchestration plus profile-driven reviews. Five
+universal agents render for GitHub Copilot, Claude Code, and OpenAI Codex;
+Codex and Google Antigravity each add their own bounded specialists
+(`antigravity_flash_coder` for Antigravity).
 
 Universal agents:
 
@@ -583,19 +590,6 @@ Codex-only agents:
 - `luna_coder`
 - `sol_coder`
 
-Google Antigravity adds one derived role, `antigravity_flash_coder`. Its
-generated workspace has six roles: the main-thread orchestrator, the four
-universal specialists (`planner`, `coder`, `reviewer`, and `documenter`), and
-the Flash coder. It is included in the existing `multi-agent` target, not a
-second distribution. `luna_coder` and `sol_coder` remain Codex-only.
-
-Claude Code and GitHub Copilot keep the five universal agents. Codex generates
-those five plus the two bounded implementation specialists. Claude Code and
-Codex both carry per-agent model/effort tiers for their eligible agents.
-Copilot agents inherit the VS Code session-selected model because their
-generated metadata omits `model:`. If the user selects Auto, Auto remains that
-session choice; the bootstrap does not define per-role complexity routing.
-
 | Agent | Claude model | Claude effort | Codex model | Codex effort |
 | --- | --- | --- | --- | --- |
 | orchestrator | session (`/model`) | session (`/effort`) | `gpt-5.6-sol` | `xhigh` |
@@ -606,138 +600,29 @@ session choice; the bootstrap does not define per-role complexity routing.
 | luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
 | sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
 
-In VS Code Copilot, the visible orchestrator lists only the four universal
-specialists and is not generally model-invocable as a subagent. The planner has
-an explicit empty subagent list. Hidden agents remain out of the picker but are
-available when an allowed coordinator names them. Search-capable agents receive
-`search` plus the configured `semble/*`, `context-mode/*`, and `context7/*` MCP
-surfaces; Context Mode still enforces its filtered server boundary.
+The specialist flow for standard and high-risk implementation work is
+orchestrator -> conditional planner -> coder -> reviewer -> closeout. PLAN
+is conditional; VERIFY and CLOSEOUT are lifecycle stages run by the
+orchestrator and canonical scripts, not delegated agent roles. The unified
+`reviewer` loads one or more profiles from `.claude/review-profiles/`,
+routed via the single authoritative table in
+`.claude/instructions/workspace.instructions.md`, and runs a primary pass
+plus a verification pass that refutes and drops findings that do not
+survive, with no helper agents.
 
-**Google Antigravity:** the generated adapter configuration assigns Pro to the
-orchestrator, planner, canonical coder, and reviewer; it assigns Flash to the
-Flash coder and documenter. The configured coding contract starts a
-bounded implementation with `antigravity_flash_coder` and permits one
-implementation-attributable escalation to the Pro `coder`. It is configuration,
-not evidence of the backing Gemini model or a native routing result. In
-Antigravity, the native default agent is the main thread and receives the
-orchestration contract through root `AGENTS.md`. Every custom adapter has
-`mainAgent: false`; the five specialists are subagents, while the custom
-`orchestrator` is non-delegatable. Root `AGENTS.md` remains provider-neutral
-guidance shared by Codex and Antigravity.
-
-The generated `.agents/` surface contains the shared skill tree,
-`mcp_config.json`, and `hooks.json`. Native rules are deliberately not
-generated: the on-disk activation schema was not verified. The PreToolUse
-bridge hard-denies malformed or unsafe requests before execution by translating
-documented command and write requests into the existing canonical guards. It
-does not invent lifecycle equivalents for `PreInvocation`, `PostToolUse`,
-`Stop`, or `UserPromptSubmit`; durable state-sync remains with the existing Git
-hooks and explicit commands. Optional local MCP servers follow the normal
-fallback rules, so their absence does not break structural generation.
-
-The installer owns `.agents/` as one bootstrap-managed root adapter, like
-`.codex/`. The consumer `.gitignore` contains one `.agents/` entry, and the
-directory is mirrored at `.claude/bootstrap-root/.agents/` and restored through
-the ordinary `BOOTSTRAP_ROOT_PATH=.agents` manifest record. This is a deliberate
-consumer contract: move any private Antigravity files out of `.agents/` or add
-them to the shared bootstrap source before updating.
-
-Before the first write, installation proves that an existing `.agents/` tree is
-current generated output, matches the prior bootstrap mirror, or has strictly
-validated legacy ownership evidence. Unknown, modified, unsafe, or otherwise
-unproved content stops the install with paths and instructions to back it up or
-move it, remove it only if intended, and rerun. The installer never silently
-adopts or deletes that content. Repeat installs are deterministic, and no empty
-outer-repository commit is created when only AI-state files changed. It never
-writes `~/.gemini/`.
-
-Native Antigravity acceptance is partial. The authenticated `agy` CLI initially
-ran as 1.1.16 and later self-updated to 1.1.17. It first reused the development repository from
-a persisted project, so that run is invalid. Use `--new-project --sandbox` for
-isolation; it verified the workspace root
-`/tmp/antigravity-native-consumer.1ZpJpK`. Root `AGENTS.md` guidance loaded
-correctly, and exact-response invocations succeeded for `planner`, canonical
-`coder`, `reviewer`, `antigravity_flash_coder`, and
-the default native agent with root guidance. A custom main agent could not
-invoke a workspace custom subagent, which is why the default native agent now
-orchestrates through root guidance instead.
-
-The Flash-coder checks passed after the free-tier quota reset; successful
-loading is not model-tier evidence. Earlier parallel attempts
-retained no output and are not evidence. A fresh isolated `agy` 1.1.17 run in
-`/tmp/antigravity-final-native.y4Nx6j` used one tiny default-agent prompt that
-delegated to `antigravity_flash_coder` and then `coder`, returned exact `F/P`,
-and completed with `SUCCESS`. This proves default-agent delegation and the
-schedule bridge, not model tier or the formal automatic escalation contract.
-`agy mcp list` reported `No MCP servers configured`. There is no native
-`modelName` or tier proof, bounded Flash-only task, skill discovery or use,
-specialist MCP evidence, or native PreToolUse hard-deny execution. These gaps
-block complete native acceptance; they do not negate the structural checks or
-the limited isolated invocation evidence. See
-[runtime checks](docs/runtime-checks.md#google-antigravity-evidence-boundary).
-
-**Claude:** the orchestrator is the main thread, so its model and effort come from the session — run it on **Opus or Fable**. The planner uses `opus`/`xhigh`. Extended thinking is inherited from the session (Claude Code has no per-agent thinking knob), so it is intentionally not set per agent.
-
-**Codex:** the interactive root session is intentionally unpinned, so users can choose its model and reasoning effort manually. Every generated `.codex/agents/*.toml` pins its own model and `model_reasoning_effort` from the canonical `model_intent.openai-codex` object; in particular, the orchestrator is Sol/xhigh. Its `developer_instructions` consists of a generated metadata header followed by the exact target-transformed role prompt. `agent.yaml` remains the single source for metadata, target eligibility, and model intent; generated agent files omit MCP and skill overrides, so they inherit the trusted project's `.codex/config.toml` wiring. The generated config uses `agents.max_concurrent_threads_per_session = 6`, not the legacy `max_threads`, and omits the redundant `agents.enabled = true` because the documented default is enabled. Its `[features.multi_agent_v2]` table exposes spawn metadata so Codex selects those named profiles instead of inheriting the parent model; the table's `tool_namespace = "agents"` key is inert in Codex 0.147.0. Six-role routing was verified natively on 2026-08-09 **with the shim present**; that dated observation does not include the two current Codex-only specialists. Keep the shim and the separate `max_depth = 1` limit until the [dated Codex routing compatibility record](docs/2026-08-08-codex-routing-compatibility.md) removal gates are met. The shim-removed candidate has never been exercised. The current declarations use Sol for coordination, planning, review, and final implementation recovery; Terra for the normal coder; and Luna for documentation and bounded implementation.
-
-**Experimental bounded implementation route (Codex only):** for each approved
-implementation step, the orchestrator builds a compact packet with the goal and
-plan-step identity, relevant code or failures, constraints, rejected approaches
-when relevant, required skills, acceptance checks, verification commands, and
-room for the coder to choose the smallest maintainable implementation. It uses
-`luna_coder` only when the outcome, code locations, constraints, verification,
-and decision boundaries are already clear; otherwise it starts with `coder`.
-The route uses named agents and no spawn-time model or effort override:
-
-```mermaid
-flowchart LR
-    O[Orchestrator] --> P{Packet ready?}
-    P -->|Yes| L[luna_coder]
-    P -->|No| C[coder]
-    L -->|Block or fail| C
-    C -->|Attributed failure| S[sol_coder]
-    S -->|Failure| X[Stop and report]
-```
-
-`luna_coder` can return a prompt-enforced escalation object with `status`, one
-of six bounded `reason` values, `workspace_changed`, `evidence`, and `needed`.
-The orchestrator passes that object and the current diff to `coder`, which
-preserves and takes ownership of useful prior work. Before advancing from the
-Terra coder to `sol_coder`, the orchestrator classifies existing deterministic verification and
-reviewer evidence as `implementation`, `environment`, `baseline`, or
-`indeterminate`. Only `implementation` advances one tier automatically;
-environment and baseline failures stop model escalation, and indeterminate
-evidence returns to orchestrator judgment. A Sol failure stops the route. The
-route does not retry a tier, jump directly from Luna to Sol, or let a subagent
-choose its successor.
-
-`visibility: hidden` on `luna_coder` and `sol_coder` is an internal
-orchestration convention, not a guarantee that native Codex user interfaces
-hide them. Optional route facts such as `initial-coder`, `fallback`, and
-`reason` may be written to an existing closeout or session log. They do not
-create a telemetry schema, token tracker, new artifact, or quality gate.
-
-The unified `reviewer` loads one or more profiles from `.claude/review-profiles/` (`code`, `architecture`, `security`, `tests`, `api`, `config`, `performance`, `documentation`, `domain`), routed via the single authoritative table in `.claude/instructions/workspace.instructions.md`. It runs two passes itself — a primary pass, then a verification pass that refutes the primary findings and drops any that do not survive — then synthesizes the survivors into one report, with no helper agents.
-
-Planner delegation uses a compact evidence packet (approved decisions,
-verified facts, exact artifacts, constraints, rejected approaches, and
-unresolved questions), one active planner, and fresh/minimal scoped context. A
-pending wait means only that no mailbox event arrived during that polling
-window. Health checks use runtime state, observable activity, and terminal/tool
-errors; silence does not trigger duplicate spawns or effort changes. Keep users
-informed at least every five minutes when no stricter cadence applies. Thirty
-minutes is a provisional health-review floor, not an automatic interruption
-timer. Retain `max` only for two matched `xhigh` checklist failures resolved by
-a matched `max` control; consider `high` only after a paired benchmark. GitHub
-Copilot inherits the VS Code session model; Auto is a user-selected session
-choice, not a per-role effort policy. See the [dated planner calibration record](docs/2026-08-09-planner-reliability-calibration.md).
+See [Agent roster, prompts, and the skill
+library](openwiki/architecture/agents-and-skills.md) for how each target
+renders an agent, review-profile routing, and the skill library, and
+[Custom Agents](docs/architecture.md#custom-agents) for the Codex
+bounded-implementation route and the Google Antigravity native-acceptance
+status.
 
 ### Task lanes
 
 Task lanes are this bootstrap's repository policy, not Codex, Claude Code, or
 Copilot-native task thresholds. The single normative table is
-[`workflow.instructions.md`](shared/policies/workflow.instructions.md); this
-summary explains how to use it without creating a second classifier.
+[`workflow.instructions.md`](shared/policies/workflow.instructions.md), which
+also covers orchestrator routing and coder skill-loading tiers in full.
 
 | Lane | Typical example | Owner and outcome |
 | --- | --- | --- |
@@ -746,109 +631,26 @@ summary explains how to use it without creating a second classifier.
 | Standard implementation | Make a requested single-file behavior change, or any change for which you request a commit or PR. | The main-thread orchestrator runs the specialist loop and completes the lifecycle. |
 | Control-plane/high-risk | Change a hook, script, generator, dependency or lockfile, migration, security-sensitive behavior, user-data handling, or more than one file. | The orchestrator uses a full plan and the required `code`, `architecture`, `security`, `tests`, and `ponytail` review. |
 
-Classify before planning or delegating. High-risk conditions take precedence
-over every other lane; otherwise, a request is lightweight only when every
-lightweight condition holds. A requested commit or PR therefore always
-escalates to standard implementation or higher. This policy deliberately uses
-no time or line-count cutoff.
-
-Only the orchestrator chooses a planning mode after the lane is standard or
-high-risk. A micro-plan is for an obvious, one-phase standard implementation;
-a full plan is for ambiguous, multi-phase, or new-module work, and is mandatory
-for control-plane/high-risk work. A lightweight edit is not a micro-plan: it
-does not enter the lifecycle at all.
-
-The narrow `fixup!` and `squash!` commit bypasses are unconditional audited
-recovery exceptions; `chore(typo):` and `docs(typo):` bypass only when every
-changed path is eligible documentation content outside runtime/execution
-directories, so a substantive runtime/code change cannot hide under a typo
-subject. None of these classify a task as lightweight, permit skipping safety
-safeguards, or skip the branch-shape check; acknowledge any bypass before PR
-or push closeout. Existing hook gates remain in force for their normal
-lifecycle checks.
-
-Orchestrator routing details:
-
-- The orchestrator does a shallow exploration pass, then chooses `--mode micro-plan` or `--mode full-plan` under the task-lane policy before delegating to the planner.
-- To execute an approved existing plan, say `Implement big plan <plan-name>.` Approved plans that remain implementation-ready normally skip the planner. Evidence from a completed phase can trigger one planner pass to revise affected future phases only; unchanged future work proceeds directly.
-- Known authoritative files are read directly. When broader discovery helps, guarded Context Mode may optionally establish one bounded project index with pinned defaults. Indexing is nonblocking, never repository truth, and existing agent context and evidence are reused; independent reviewer judgment remains independent. Retrieval, language, verification, review, and lifecycle rules remain mandatory.
-- The planner does NOT self-classify; routing ownership stays with the orchestrator.
-- Planner micro-plan mode: load skills → draft → done (no interview required).
-- Planner full-plan mode: intake → exploration → interview (min 2 rounds) → module sketch → draft → optional devil's advocate.
-- Control-plane files (`.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, `AGENTS.md`) — the consumer-side surfaces that affect every session — always use the high-risk full-plan route and its profile-driven review.
-
-Coder skill loading:
-
-- Tier 1 (always for coding): `ponytail/SKILL.md` in `full` mode, `code-style/SKILL.md`, `testing-patterns/SKILL.md`. After implementation, the coder simplifies only the changed scope and re-verifies it; there is no standalone Ponytail lifecycle phase.
-- Tier 2: task-specific skills loaded by type (e.g. `hydra-config` for config work, `bentoml-service` for API work)
-- An explicit request or approved plan authorizes a known control-plane change; ask only when targets, authority, or material scope are unclear.
+See [Task lanes and the enforced lifecycle](openwiki/workflows/lifecycle-and-task-lanes.md)
+for how a request is classified, how the PRE-FLIGHT-to-PUSH lifecycle and
+closeout sequence run, and which rules hooks enforce mechanically versus
+policy text.
 
 ## Hooks
 
-Hooks provide guardrails and lightweight observability.
-
-Claude, Codex, and Copilot hook commands route through
-[run-hook.sh](shared/hooks/scripts/run-hook.sh), a dispatcher that resolves the
-repo root robustly — via `BASH_SOURCE`, environment variable fallbacks
-(`GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`), then `git rev-parse`.
-Google Antigravity is the deliberate exception: its static `.agents/hooks.json`
-adapter calls the direct Python 3.9 standard-library bridge
-`.claude/hooks/scripts/antigravity-pretool.py`, which normalizes provider input
-before invoking the canonical guards.
-
-[hooks.json](shared/hooks/hooks.json) sets `"cwd": "."` on every entry rather than `"${workspaceFolder}"`. Copilot's hook runner does not interpolate VS Code variables, so using the literal string would resolve to a non-existent path and produce `spawn /bin/sh ENOENT` errors. `run-hook.sh` resolves the repo root itself, so `"."` is sufficient.
-
-Generated Claude and Codex hook configs execute `run-hook.sh` directly, so the generator marks the generated dispatcher executable and the target validator fails if it is not runnable.
-
-Configured events:
-
-- SessionStart
-  - [session-start-state.sh](shared/hooks/scripts/session-start-state.sh) reminds agents about the current branch, active plan phase, and any open lifecycle state
-  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events when available
-- PreToolUse
-  - Claude and Codex both match native edits with `Edit|Write`. Only these mutation tools call [protect-files.sh](shared/hooks/scripts/protect-files.sh), so `Read` and MCP calls do not invoke a mutation classifier.
-  - Both primary targets send `Bash` through [pretool-bash-guard.sh](shared/hooks/scripts/pretool-bash-guard.sh). It runs `protect-files.sh`, [git-protection.sh](shared/hooks/scripts/git-protection.sh), [enforce-branch-state.sh](shared/hooks/scripts/enforce-branch-state.sh), [enforce-commit-gate.sh](shared/hooks/scripts/enforce-commit-gate.sh), and [enforce-pr-gate.sh](shared/hooks/scripts/enforce-pr-gate.sh) in that order, stopping at the first safety decision. Lifecycle wrappers are unchanged.
-  - The protected-file classifier runs directly with required `python3`, not `uv run`, so it works before a project environment exists. It derives targets per shell segment: read-only inspection of an existing protected configuration is allowed, but native edits, redirects, in-place `sed`/`perl`, missing `python3`, and ambiguous/unparseable commands fail closed. Known file operations resolve relative paths, shell-expanded wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. Unknown or interpreter-style commands retain conservative high-confidence path coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook paths, and protected hook configuration literals, while prose and ordinary source filenames containing `secret` are not credential evidence. Copy/install/move check resolved source operands as well as destinations, preventing protected-source exfiltration through write-bearing commands. Hook-config edits ask in Claude and are denied in Codex, whose `PreToolUse` cannot request approval.
-  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) stays in a separate wildcard matcher for best-effort observability. It makes no safety decision and does not mutate the ordered safety lane.
-- Google Antigravity PreToolUse
-  - `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `matcher: "*"` group. The bridge explicitly allows the documented non-mutating provider tools, routes `run_command` through `pretool-bash-guard.sh`, and routes write tools through `protect-files.sh`.
-  - The bridge requires valid JSON object payloads and documented fields, emits exactly one JSON decision on stdout, and writes diagnostics only to stderr. Unknown tools, malformed input, missing Python or guard failures, malformed guard output, and existing `ask` results deny by default because Antigravity has no approval response in this bridge.
-  - Canonical command and mutation guards retain symlink-safe path classification, protected-source checks, and deny-by-default handling for ambiguous or unsafe requests. Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalent; the bootstrap does not invent lifecycle parity. Native loading and cadence remain an external acceptance gap/blocker.
-- PostToolUse / PreCompact
-  - [record-branch-state.sh](shared/hooks/scripts/record-branch-state.sh) records branch metadata and the active phase in the big plan after successful branch creation
-  - [context-mode-dispatch.sh](shared/hooks/scripts/context-mode-dispatch.sh) forwards optional context-mode lifecycle events and warns without failing when context-mode is unavailable
-  - [reporting-reminder.sh](shared/hooks/scripts/reporting-reminder.sh) emits a 183-byte, non-blocking reporting reminder at prompt start and selected late-turn boundaries for Claude Code and OpenAI Codex only; the static reporting policy still applies to all four supported targets
-- SessionStart / Stop
-  - [session-log.sh](shared/hooks/scripts/session-log.sh) appends lifecycle entries to `.claude/session_logs/hooks-sessions.log`; generates timestamps in bash (Claude Code payloads carry no `timestamp` field) and accepts both snake_case (`hook_event_name`) and camelCase (`hookEventName`) field names for cross-tool compatibility
-- SessionStart
-  - [state-sync.sh](shared/hooks/scripts/state-sync.sh) `pull` first records local nested state, then reconciles it with the configured `ai-state` remote. A genuine conflict aborts cleanly, prints recovery guidance, and leaves local state intact; a sync problem never blocks a session from starting. The dated [state-sync rebase recovery record](docs/2026-08-09-state-sync-rebase-recovery.md) describes the observed latched-rebase incident and its repairs.
-- Stop
-  - [stop-session-log-check.sh](shared/hooks/scripts/stop-session-log-check.sh) warns when code or docs changed but no session log was updated for the day
-  - `state-sync.sh push` remains the compatible checkpoint-then-publish flow: it commits local nested changes, reconciles committed state, then publishes it when safe. Publication refuses a dirty nested worktree, preserving it for the next checkpoint; reconciliation conflicts skip publication rather than force a non-fast-forward push. Operational diagnostics go to stderr, and failures are also recorded in `.claude/session_logs/hooks-errors.log`; sync remains warn-never-fail and drains stdin with a two-second timeout. See [ADR-002](plans/adr-002-git-backed-state-sync.md) for why it is git-backed instead of a Hugging Face bucket mirror.
-  - Stop is a best-effort checkpoint-and-publish attempt: it only runs when the agent process emits the Stop event. Closing a browser tab or an editor window is not a guaranteed lifecycle event, so use `state-sync.sh checkpoint` when you need a network-free local durability boundary; use `publish` later to send that committed clean state. The existing post-commit hook and **AI state: push** VS Code task still invoke compatible `push`.
-  - Codex Stop is turn-scoped. Its single [codex-stop.sh](shared/hooks/scripts/codex-stop.sh) wrapper runs session logging, the session-log check, `checkpoint`, then best-effort `publish` in that order. Its stdout is exactly one valid JSON response; child diagnostics stay on stderr and failures remain recoverable through `.claude/session_logs/hooks-errors.log`.
-  - Claude CLI and the Claude runtime bundled with VS Code use the same generated `.claude/settings.json`; no separate VS Code adapter is installed. Its turn-scoped [claude-stop.sh](shared/hooks/scripts/claude-stop.sh) wrapper runs the same four steps sequentially, with no wrapper stdout.
-- Prompt and end retries
-  - Codex and Claude `UserPromptSubmit` run compatible `state-sync.sh push` with a 60-second timeout. A timeout or network failure preserves the local checkpoint for a later retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log` for recovery details.
-  - Codex `SessionEnd` is delayed and best-effort: it runs local-only `checkpoint` with a three-second limit and does not publish. Claude `StopFailure` also runs local-only `checkpoint`; its `SessionEnd` runs compatible `push` with a 60-second limit. These do not replace post-commit or the manual **AI state: push** task.
-- post-commit (git hook)
-  - [post-commit](shared/hooks/git-hooks/post-commit) first runs [record-commit-closeout.sh](shared/hooks/scripts/record-commit-closeout.sh) from the created `HEAD`, then runs `state-sync.sh push`. A completed phase advances only once to an `in-progress` next phase, or atomically completes the terminal big plan; bypass, merge, paused, incomplete, non-implementation, and repeated-HEAD paths do not advance state. Recorder failures are logged before synchronization. Like the Stop-hook push, this is warn-never-fail: git ignores a git hook's exit status, and `state-sync.sh` itself only warns and exits 0 on a missing remote, offline network, or rebase conflict, so a sync problem never blocks or fails the commit. Installed the same way as `commit-msg` and `pre-push` below, via `core.hooksPath`.
-
-### Deterministic Commit And Push Gates (Git Hooks)
-
-`enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath` ([install_bootstrap.py](scripts/install_bootstrap.py) sets it once at install time; `state-sync.sh`'s `setup`/`pull`/fresh `checkpoint` re-activate it on every later sync, including inside `post-start.sh`'s call to `setup`). Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on.
-
-Two layers, two invariants, one shared contract each:
-
-- **Commit invariant** — `enforce-commit-gate.sh` (`PreToolUse`) and `commit-msg` (git hook) both call `assert_commit_invariants` in [_lib-frontmatter.sh](shared/hooks/scripts/_lib-frontmatter.sh). A `complete` phase keeps the existing closeout, findings, LEARN, and documentation gates. A current small plan with valid explicit pause evidence may take the separate checkpoint path: it records durable incomplete work without final findings/LEARN/DOCUMENT/COMPLETED closeout and does not advance the phase. `in-progress` and `cancelled` phases still cannot certify commits; cancellation semantics are unchanged.
-- **Push invariant** — `pre-push` (git hook) calls the public `assert_push_invariants`. It permits a valid paused checkpoint and the exact completion commit of the phase immediately before the now-current in-progress phase; the latter must be directly certified by its receipt and findings, so later in-progress work cannot publish early. Its `dev..local_sha` count includes every prior completed phase plus the permitted commit, and future pre-created phases do not block that publication. `pre-push` reads ref lines from stdin and derives the branch from the ref being pushed, not from whatever is checked out, so `git push origin foo_implementation` from elsewhere still gates `foo_implementation`. `enforce-pr-gate.sh` sends `git push` through that public path but sends `gh pr create --base dev` directly through strict `assert_closeout_invariants`. PR/final closeout still requires every phase to be complete or carry the full cancellation evidence contract, at least one completed phase, completed-phase commit counts, bypass acknowledgement, and final findings/Ponytail gates.
-
-Both invariants deliberately diverge on branch scope the same way: the `PreToolUse` layer denies an *agent* commit/push on any wrong branch, while the git-hook layer passes through untouched on any branch other than `<plan_name>_implementation` — merges, deletions, and casual commits/pushes on `dev`/`main` are unaffected.
-
-- `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes: git skips the hook entirely, and there is no git hook that fires when hooks are skipped.
-- `.claude/` is gitignored in consumers, so on a fresh clone *before* `.claude/` is checked out, `.claude/hooks/git-hooks/` does not exist yet — git prints a warning and runs no hook (fails open for humans until the checkout completes). Since AI state moved from a Hugging Face bucket to a nested git repo ([ADR-002](plans/adr-002-git-backed-state-sync.md)), this window shrank: `post-start.sh` runs `state-sync.sh setup` (which checks `.claude/` out from the `ai-state` branch using the same git credentials as the code checkout — no separate auth to configure), and `setup` itself sets `core.hooksPath` immediately after, before the subsequent `state-sync.sh pull`, so the devcontainer path closes the window at checkout time rather than waiting on an authenticated bucket pull.
-- Per `githooks(5)`, `commit-msg` also fires for `git merge`, not just `git commit`. A plain merge commit carries no authored content of its own, so on an implementation branch it passes through unledgered — the ceremony re-attaches at the next real commit. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (git behavior, not a bootstrap gap); the commits they create skip the git layer, but the next real commit is still gated. `git commit --amend` does invoke it, and `content_hash` freshness survives a content-preserving amend. The `MERGE_HEAD` passthrough is, like `--no-verify`, a known accepted escape: `git merge --no-commit` followed by manually staging extra changes lands ungated content on an implementation branch, since the hook cannot distinguish a pure merge from a merge plus manual staging.
-- See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) and [plans/plan-post-review-hardening.md](plans/plan-post-review-hardening.md) for the full design rationale.
+Hooks provide guardrails and lightweight observability. GitHub Copilot,
+Claude Code, and OpenAI Codex hook commands route through
+[run-hook.sh](shared/hooks/scripts/run-hook.sh) into the same shared guard
+scripts under `shared/hooks/scripts/` (installed as
+`.claude/hooks/scripts/`); Google Antigravity's static `.agents/hooks.json`
+calls the direct Python bridge `antigravity-pretool.py` instead, which
+normalizes its payload into the same guards. A single ordered Bash lane
+(protected files, dangerous Git, branch, commit, then PR) decides every
+Bash tool call, and matching git hooks (`commit-msg`, `pre-push`) enforce
+the same commit and push contracts directly inside Git. See [Hook
+dispatcher and guardrail
+scripts](openwiki/architecture/hooks-and-guardrails.md) for the full event
+map, guard-by-guard behavior, and log locations.
 
 Core Copilot hook adapter source: [hooks.json](shared/hooks/hooks.json)
 
@@ -857,6 +659,14 @@ Design intent:
 - deny risky actions early
 - keep audit trails lightweight and local
 - leave nuanced coaching (reminders/cadence) to instruction files
+
+### Deterministic Commit And Push Gates (Git Hooks)
+
+`enforce-commit-gate.sh` and `enforce-pr-gate.sh` above are `PreToolUse` hooks: they can only gate the AI agent's own Bash tool calls, so a human `git commit`/`git push`, an IDE button, a script, or a `git ci` alias never pass through them. Two generated git hooks close that gap — [commit-msg](shared/hooks/git-hooks/commit-msg) for the commit invariant and [pre-push](shared/hooks/git-hooks/pre-push) for the push invariant — both installed via `core.hooksPath`. Because they fire from git's own lifecycle, every commit or push reaching a `<plan_name>_implementation` branch is gated on one code path regardless of how it was invoked, with no command string to parse, no stdout convention, and no timeout to fail open on. See [Hook dispatcher and guardrail scripts](openwiki/architecture/hooks-and-guardrails.md) for the full two-layer contract, including how each guard scopes to the repository a command targets.
+
+- `git commit --no-verify` / `git push --no-verify` are the sanctioned manual escapes: git skips the hook entirely, and there is no git hook that fires when hooks are skipped.
+- Per `githooks(5)`, `commit-msg` also fires for `git merge`, not just `git commit`. A plain merge commit carries no authored content of its own, so on an implementation branch it passes through unledgered — the ceremony re-attaches at the next real commit. `git rebase` and `git cherry-pick` do **not** invoke `commit-msg` at all (git behavior, not a bootstrap gap); the commits they create skip the git layer, but the next real commit is still gated. `git commit --amend` does invoke it, and `content_hash` freshness survives a content-preserving amend. The `MERGE_HEAD` passthrough is, like `--no-verify`, a known accepted escape: `git merge --no-commit` followed by manually staging extra changes lands ungated content on an implementation branch, since the hook cannot distinguish a pure merge from a merge plus manual staging.
+- See [docs/plan-deterministic-commit-gate.md](docs/plan-deterministic-commit-gate.md) and [plans/plan-post-review-hardening.md](plans/plan-post-review-hardening.md) for the full design rationale.
 
 ## Verification Defaults
 
@@ -871,24 +681,16 @@ Expected verification commands after implementation:
 - uv run python .claude/scripts/verify.py closeout --format json --persist [--documentation-na "<reason>"]
 - uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
 
-The generated `verify.py` commands produce machine-readable Phase A receipts:
-`fast` gives focused feedback, `phase` persists reusable evidence, and
-`closeout` reuses fresh phase evidence while binding the final tracked state.
-Run `phase` only after the ordinary checks are clean, and run `closeout` during
-final closeout after documentation and findings are current. The
-optional `--documentation-na` requires an explicit reason and is used only
-when the documentation review concludes that no update applies. The
-completed receipt is immutable per phase, binds exact child artifact paths and hashes, and is the sole
-completed-phase evidence entry point for commit, push, and PR gates.
-
-Quality gates:
-
-- `verify phase`/`verify closeout` PASS: required for a normal completion commit and PR/final closeout; a paused checkpoint does not make a final quality claim, may be pushed only as a valid remote checkpoint, and remains unfinished
-- `FAIL`: blocked until implementation, verification, and review are rerun
-- findings report `counts.critical == 0` and `counts.major == 0`: required for a normal completion commit. An intermediate commit made while the phase is still in progress is not blocked merely because an unresolved MAJOR exists
-- every surviving MINOR finding carries an explicit `disposition` and non-empty `reason`: required for a normal completion commit. The gate checks that the disposition is present and well-formed, not that it is correct
-- PR/push closeout re-checks that same contract across every completed phase, not only the last one
-- Ponytail metadata is required only when the authoritative routing table selects the `ponytail` profile. When selected, Ponytail findings follow the ordinary gates: CRITICAL and MAJOR both block the phase-completion commit, and a surviving MINOR needs a disposition and reason but is otherwise advisory. When not selected, metadata may be absent; legacy reports without it remain compatible.
+`fast` gives focused feedback during IMPLEMENT, `phase` persists reusable
+evidence once ordinary checks are clean, and `closeout` reuses that fresh
+evidence and binds the final tracked state during final closeout. A normal
+completion commit requires a passing receipt, zero open CRITICAL or MAJOR
+findings, and an explicit disposition and reason on every surviving MINOR;
+PR/push closeout re-checks that same contract across every completed
+phase. See [Deterministic verification: verify.py modes, receipts, and
+findings](openwiki/operations/deterministic-verification.md) for the full
+receipt schema, the Ponytail metadata contract, and what each `verify.py`
+mode measures.
 
 Documentation gate:
 

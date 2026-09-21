@@ -60,7 +60,11 @@ Cover, at minimum:
   establish and check consumer ownership (which files are
   bootstrap-controlled versus consumer-owned);
 - the Git-backed AI-state sync described above
-  (`shared/hooks/scripts/state-sync.sh`).
+  (`shared/hooks/scripts/state-sync.sh`);
+- the Context Mode dispatcher's security model: cache quarantine by the
+  provenance secret, `CONTEXT_MODE_DIR` containment, and the version-pin
+  self-check (`shared/hooks/scripts/context-mode-dispatch.sh`, README's
+  "Optional Retrieval Helpers").
 
 ## Historical records are not current behavior
 

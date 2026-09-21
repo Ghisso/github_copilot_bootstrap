@@ -11,32 +11,16 @@ git branch (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)).
 
 ## Shared Basis
 
-Bootstrap maintainers author reusable content in `shared/`. Generation renders
-that content into `.claude/`, which is the canonical runtime basis in an
-installed consumer project:
-
-- `.claude/skills/**/SKILL.md`
-- `.claude/skills/ponytail/SKILL.md` and `.claude/skills/ponytail-review/SKILL.md`
-- `.claude/review-profiles/*.md`
-- `.claude/third_party/ponytail/{LICENSE,UPSTREAM.md}`
-- `.claude/instructions/*.instructions.md`
-- `.claude/rules/*.instructions.md` for conditional Claude policy adapters
-- `.claude/agents/*.md`
-- `.claude/prompts/*.prompt.md`
-- `.claude/scripts/verify.py` and `.claude/scripts/record_findings.py`
-- `.claude/templates/*.md`, including big-plan, small-plan, session-log, and quality-report templates
-- `.claude/MEMORY.md`, `.claude/plans/`, `.claude/session_logs/`, `.claude/quality_reports/`, `.claude/explorations/`
-- `.claude/hooks/scripts/*.sh`
-
-`run-hook.sh` is the executable dispatcher for target-native hook configs. Generated output marks it runnable because Claude and Codex call it directly.
-
-The canonical `reporting-reminder.sh` script is included in that shared hook
-inventory. Static reporting guidance is installed for GitHub Copilot, Claude
-Code, OpenAI Codex, and Google Antigravity. Recurring prompt-start and selected
-late-turn reminders are wired only in Claude Code and OpenAI Codex. They are
-non-blocking and warn-never-fail. No periodic every-N-tool, `Stop`, or
-`PreCompact` reminder is generated; Copilot and Antigravity hook events remain
-unchanged, and Gemini CLI has no adapter.
+Bootstrap maintainers author reusable content in `shared/`. Generation
+renders that content into `.claude/` — skills, review profiles, Ponytail
+provenance, instructions and Claude policy rules, agents, prompts,
+`verify.py`/`record_findings.py`, templates, `MEMORY.md`/plans/session
+logs/quality reports/explorations, and hook scripts including the
+executable `run-hook.sh` dispatcher — which is the canonical runtime basis
+in an installed consumer project. See [Source, generated output, consumer
+repo, and nested AI
+state](../openwiki/architecture/source-generated-consumer-layout.md) for
+the full render sequence and what each rendered path holds.
 
 Keep `.claude/` when pruning optional tool adapters, because it is the shared basis for all supported systems.
 
@@ -67,9 +51,7 @@ Claude Code:
 - `.claude/settings.json`
 - `.claude/rules/*.instructions.md` for conditional policy adapters
 
-`CLAUDE.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively. Conditional shared policies are native `.claude/rules/` adapters with equivalent YAML `paths`; always-on policy remains root guidance. Claude VS Code bundles that same runtime and reads the generated `.claude/settings.json`, so no duplicate VS Code adapter is installed. Claude receives exactly five universal agents: `orchestrator`, `planner`, `coder`, `reviewer`, and `documenter`. Eligible agent names are not renamed between targets. (The reviewer runs its own primary and verification passes; there are no separate review-helper agents.)
-
-Generated Claude agent frontmatter has no `todo` tool mapping, so `CLAUDE_TOOL_MAP` in `scripts/generate_targets.py` omits the capability entirely; `render_claude_tools()` skips it through its existing default. Current Claude Code documentation says interactive sessions use the four Task tools (`TaskCreate`, `TaskGet`, `TaskList`, and `TaskUpdate`), while `TodoWrite` is for non-interactive and Agent SDK use. Setting `CLAUDE_CODE_ENABLE_TASKS=0` restores `TodoWrite` where that compatibility mode is supported. The bootstrap deliberately does not depend on either task-tracking interface for generated Claude agents: they track phases as prose, as `shared/agents/orchestrator/prompt.md` instructs, and the bootstrap sets no environment variable to change tool availability.
+`CLAUDE.md` is a consumer-neutral generated entrypoint; do not hand-edit it. Claude Code uses `.claude/agents/` and `.claude/skills/` natively and receives the five universal agents.
 
 OpenAI Codex:
 
@@ -78,133 +60,17 @@ OpenAI Codex:
 - `.codex/hooks.json`
 - `.codex/agents/*.toml`
 
-`AGENTS.md` is a consumer-neutral generated entrypoint to the installed `.claude/` basis; do not hand-edit it. Codex discovers project guidance from the repository root down to the current working directory, with closer `AGENTS.md` files taking precedence and a default 32 KiB combined-project-document cap. This bootstrap emits nested `AGENTS.md` only when a policy owns a stable concrete directory. The Phase C policy scopes are mixed/glob/file-specific, so their non-widening Codex mapping is the corresponding shared skill rather than speculative nested guidance.
-
-The shared agent loader resolves target eligibility before rendering. Omitted
-`targets` keeps the five universal agents eligible everywhere; explicit
-`targets: ["openai-codex"]` limits `luna_coder` and `sol_coder` to Codex.
-GitHub Copilot therefore also retains exactly the universal five, while Codex
-generates seven project-scoped `.codex/agents/*.toml` files.
-
-Codex custom agents contain `name`, `description`, `model`,
-`model_reasoning_effort`, and `developer_instructions`. The generator places a
-short metadata header before the exact target-transformed role body; it never
-tells the subagent to read `.claude/agents/<id>.md` at runtime. For an ordinary
-agent, the body is its `prompt.md` plus an optional Codex supplement. For
-`luna_coder` and `sol_coder`, one-level `prompt_base: "coder"` composition
-produces the transformed coder prompt, one literal role-supplement delimiter,
-and the specialist supplement. The loader rejects missing, copied, recursive,
-multi-level, or cyclic composition before rendering.
-
-`agent.yaml` remains the metadata, eligibility, composition, and model/effort
-source of truth, so the prompt body is not a second metadata source. The TOMLs
-intentionally omit `mcp_servers` and skill overrides: Codex applies the trusted
-project's `.codex/config.toml`, including the shared MCP and skill
-registrations. Structural validation checks exact body parity and records the
-actual `developer_instructions` size for all seven roles. The current official
-custom-agent schema does not publish a separate size cap; these measurements
-are observability, not a product limit or delivery evidence.
-
-The current declared Codex matrix is orchestrator Sol/xhigh, planner Sol/xhigh,
-reviewer Sol/high, coder Terra/high, and documenter Luna/medium,
-`luna_coder` Luna/xhigh, and `sol_coder` Sol/xhigh. The experimental named
-implementation path is exactly `luna_coder -> coder -> sol_coder`, with no
-successor after Sol and no spawn-time model or effort override. The Codex-only
-orchestrator supplement owns the bounded packet, Luna selection, structured
-blocker, evidence attribution, and stop behavior. `visibility: hidden` for the
-specialists is an internal orchestration convention, not a native Codex UI
-guarantee.
-
-The dated 2026-08-09 native record observed the historical six roles only.
-Future optional persistent-thread probes may exercise all seven current Codex roles;
-no native run is required for this feature. Claude and Copilot behavior remains
-unchanged.
+`AGENTS.md` is a consumer-neutral generated entrypoint; do not hand-edit it. Codex generates seven project-scoped `.codex/agents/*.toml` files — the five universal agents plus Codex-only `luna_coder` and `sol_coder` — each self-contained with its own pinned model and reasoning effort.
 
 Google Antigravity:
 
 - `AGENTS.md` — provider-neutral root guidance shared with Codex.
-- `.agents/agents/` — six static Markdown custom-agent adapters:
-  `orchestrator`, `planner`, `antigravity_flash_coder`, `coder`, `reviewer`,
-  and `documenter`. Codex-only `luna_coder` and `sol_coder` are not
-  emitted here.
+- `.agents/agents/` — six static Markdown custom-agent adapters (the five universal agents plus `antigravity_flash_coder`; Codex-only `luna_coder`/`sol_coder` are not emitted here).
 - `.agents/skills/` — the shared skill tree.
-- `.agents/mcp_config.json` — the shared MCP servers under Antigravity's
-  `mcpServers` schema.
+- `.agents/mcp_config.json` — the shared MCP servers under Antigravity's `mcpServers` schema.
 - `.agents/hooks.json` — the named `bootstrap-safety` configuration.
 
-Antigravity's default native agent is the main thread. Root `AGENTS.md` gives
-that agent the provider-neutral orchestration contract. Every custom adapter
-sets `mainAgent: false`; the five specialists set `subagent: true`, while the
-custom `orchestrator` remains non-delegatable with `subagent: false`. This
-layout follows native behavior: a custom main agent could not invoke workspace
-custom subagents in the tested client.
-
-The declared model intents are Pro for orchestrator, planner, canonical coder,
-and reviewer; Flash for `antigravity_flash_coder` and documenter.
-The Flash coder has one configured escalation target, the Pro `coder`. These
-are static configuration contracts, not evidence of a backing Gemini model or
-native tier routing. Specialist MCP inheritance and the shared skill/MCP files
-are structurally generated; an unavailable optional local MCP server follows
-the standard fallback behavior.
-
-`.agents/` is a bootstrap-owned root adapter, like `.codex/`. Consumers receive
-one `.agents/` ignore entry, and the whole directory is mirrored under
-`.claude/bootstrap-root/.agents/` and restored through
-`BOOTSTRAP_ROOT_PATH=.agents`. Private Antigravity files must be moved out of
-`.agents/` or incorporated into the shared source.
-
-Before writing, the installer proves an existing tree from current generated
-bytes, the prior mirror, or strictly validated legacy evidence. Unknown,
-modified, unsafe, non-regular, or unproved content blocks the operation before
-any mutation and reports paths with backup/move/remove-and-rerun guidance. The
-installer never silently adopts or deletes consumer content. After migration,
-there is no per-file allowlist or Antigravity ownership manifest. Native
-Antigravity rules are not generated because their exact activation metadata was
-not verified.
-
-The Antigravity hook surface is intentionally limited to one `PreToolUse` event
-with a catch-all `matcher: "*"`. It calls the direct Python 3.9 standard-library
-bridge `.claude/hooks/scripts/antigravity-pretool.py`, which normalizes
-documented provider payloads into the canonical Bash and protected-file guards.
-The bridge allows only the explicit non-mutating provider-tool list, protects
-`run_command` and write tools, and denies unknown or malformed input by
-default. It emits one JSON decision on stdout and keeps diagnostics on stderr.
-Antigravity has no generated `PreInvocation`, `PostToolUse`, `Stop`, or
-`UserPromptSubmit` equivalent. The bootstrap does not invent lifecycle parity;
-durable Git-hook/state-sync behavior remains the existing cross-provider path.
-The adapter does not claim native loading or trust acceptance. The native
-acceptance gap is recorded in [Runtime Checks](runtime-checks.md#google-antigravity-evidence-boundary).
-
-Codex skills are stored under `.claude/skills/` and enabled through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file, such as `../.claude/skills/run-tests/SKILL.md`. The config omits the redundant flat `[features]` block (Codex enables hooks by default), sets `agents.max_concurrent_threads_per_session = 6`, omits the legacy `max_threads` and redundant `agents.enabled`, configures `[features.multi_agent_v2]` to expose named-agent routing metadata (its `tool_namespace = "agents"` key is inert in Codex 0.147.0 — see the [dated record](2026-08-08-codex-routing-compatibility.md)), and wires the documented `PreCompact` event. Codex project trust is required for that project config, hooks, and skill wiring to load. Because `.codex/hooks.json` trust is content/hash-bound, reopen/reload Codex for VS Code and review/reapprove project hooks when prompted after an actual install or update; the installer never approves them or edits user trust settings.
-
-For Claude and Codex, generated `PreToolUse` separates mutation safety from
-observability: native edit matchers call `protect-files.sh`, `Bash` calls one
-ordered guard wrapper, and `*` calls only context-mode dispatch. The Codex
-native-edit matcher is `Edit|Write`; Claude uses the same matcher, since
-`MultiEdit` has no tool definition in the runtime.
-The Bash wrapper invokes direct `python3` target classification rather than
-`uv run`, allowing protection before a project environment exists. It classifies
-mutation targets segment by segment, allows proven read-only inspection, checks
-resolved copy/install/move sources and destinations (including shell-expanded
-wildcards, `cd`, Git `-C`, and symlink targets), and fails closed for missing Python,
-redirects, in-place edits, and ambiguous commands. This preserves Codex's
-deny-only hook-config protection and Claude's approval path without routing Read
-or MCP calls through a mutation handler. Opaque command handling is deliberately
-literal-based rather than a claim that every unknown command mutates: it covers
-high-confidence `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key`, hook paths,
-and protected hook configuration files; arbitrary prose and ordinary source
-filenames containing `secret` are not treated as credentials.
-
-The generated consumer config is mirrored under
-`.claude/bootstrap-root/.codex/` for restoration. The bootstrap repository's
-root `.codex/config.toml` is instead tracked authoring and stays protected when
-dogfooding refreshes generated siblings. The protected MultiAgent V2
-metadata-exposure configuration and `max_depth = 1` are distinct compatibility
-decisions: retain both until their respective gates in the [dated Codex routing
-compatibility record](2026-08-08-codex-routing-compatibility.md) pass. Current
-generation validation is structural; it is not evidence that a contemporary
-native client has routed all seven current Codex roles. The dated record preserves
-its six-role observations separately.
+`.agents/` is a bootstrap-owned root adapter, like `.codex/`, with the same pre-write takeover check described in [Installing the bootstrap, file ownership, and runtime drift checks](../openwiki/operations/install-ownership-and-runtime-checks.md).
 
 GitHub Copilot (secondary compatibility adapter):
 
@@ -214,9 +80,14 @@ GitHub Copilot (secondary compatibility adapter):
 - `.github/hooks/hooks.json`
 - `.vscode/mcp.json`
 
-Copilot files are native adapters. Agent wrappers preserve Copilot frontmatter
-and point to `.claude/agents/`; each policy adapter points to the canonical
-`.claude/instructions/` copy and derives `applyTo` from the target-neutral
-`applicability` patterns. This parity is generator-validated alongside Claude
-`paths`; it is not by itself a claim of real-client loading. Copilot generates
-only the five universal agents and receives no Codex routing supplement.
+Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
+
+See [Agent roster, prompts, and the skill
+library](../openwiki/architecture/agents-and-skills.md) for how each
+target renders an agent from the same `shared/agents/<id>/` metadata,
+including the Codex prompt-composition rules, the per-agent model/effort
+matrix (also in [Custom Agents](architecture.md#custom-agents)), and the
+Antigravity `mainAgent`/`subagent` layout. See [Hook dispatcher and
+guardrail scripts](../openwiki/architecture/hooks-and-guardrails.md) for
+the shared `PreToolUse` safety lane every target routes through, including
+the Antigravity Python bridge.
