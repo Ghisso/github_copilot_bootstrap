@@ -1,7 +1,7 @@
 ---
 name: 2026-09-19_openwiki-knowledge-layer-integration
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: 2026-09-19_openwiki-knowledge-layer-integration_implementation
 started_at: 2026-09-19T06:51:50Z
@@ -19,7 +19,7 @@ phases:
   - 2026-09-19_phase-I-openwiki-enable-and-first-generation
   - 2026-09-19_phase-J-openwiki-docs-memory-migration
   - 2026-09-19_phase-K-knowledge-refresh
-current_phase: 2026-09-19_phase-K-knowledge-refresh
+current_phase: 
 ---
 # Big Plan: 2026-09-19_openwiki-knowledge-layer-integration
 
