@@ -549,3 +549,4 @@
 2026-09-23T14:18:18.000Z,event=Stop,target=openai-codex,sessionId=01a0ce9f-ff49-74f1-aa69-9a5d118f010b
 2026-09-23T14:18:46.000Z,event=Stop,target=openai-codex,sessionId=01a0ce9f-ff49-74f1-aa69-9a5d118f010b
 2026-09-23T14:19:53.000Z,event=Stop,target=openai-codex,sessionId=01a0ce9f-ff49-74f1-aa69-9a5d118f010b
+2026-09-23T14:20:15.000Z,event=SessionStart,target=claude-code,sessionId=058072a0-3afd-4cd1-9be8-114032d6babd,source=startup
