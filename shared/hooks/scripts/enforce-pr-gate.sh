@@ -17,14 +17,48 @@ if ! is_bash_tool_payload "$INPUT"; then
 fi
 
 COMMAND="$(hook_command "$INPUT")"
-# Same nested-ai-state exemption as enforce-commit-gate.sh, for state-sync.sh's
-# `git -C .claude push`. See the comment there for why this checks the
-# specific push invocation rather than the whole command string.
-if git_targets_nested_claude "$COMMAND" push; then
+
+# This hook guards two unrelated command shapes: pushing (git push) and
+# opening a pull request (gh pr create). Work out once whether each is
+# present; `detector && FLAG=1` is never used here because this file runs
+# under `set -euo pipefail`, and that form would exit the whole hook (as an
+# allow) the moment a detector reports false.
+IS_PR=0
+if is_gh_pr_create_command "$COMMAND"; then
+  IS_PR=1
+fi
+IS_PUSH=0
+if is_git_push_command "$COMMAND"; then
+  IS_PUSH=1
+fi
+
+if [[ "$IS_PR" -eq 0 && "$IS_PUSH" -eq 0 ]]; then
   exit 0
 fi
-if ! is_gh_pr_create_command "$COMMAND" && ! is_git_push_command "$COMMAND"; then
-  exit 0
+
+# Only the push shape may stand down, and only when it is the sole shape
+# present: a pull request never carries a directory redirect (gh's -R names
+# an owner/repo pair, not a filesystem path), so it always reaches the
+# checks below. Standing down here for a command that ALSO opens a pull
+# request would let that pull request skip every check below unchecked,
+# which is the hole this restructure closes.
+if [[ "$IS_PR" -eq 0 ]]; then
+  # Same nested-ai-state exemption as enforce-commit-gate.sh, for
+  # state-sync.sh's `git -C .claude push`, plus a push explicitly redirected
+  # at some other repository entirely (git -C <dir> push, --git-dir,
+  # --work-tree). Both check each push invocation individually and fail
+  # closed on anything undeterminable, so a compound command mixing a push
+  # elsewhere with a push targeting this repository still gates in full.
+  PUSH_ELSEWHERE=0
+  if git_targets_nested_claude "$COMMAND" push; then
+    PUSH_ELSEWHERE=1
+  fi
+  if [[ "$PUSH_ELSEWHERE" -eq 0 ]] && git_targets_other_repository "$COMMAND" push; then
+    PUSH_ELSEWHERE=1
+  fi
+  if [[ "$PUSH_ELSEWHERE" -eq 1 ]]; then
+    exit 0
+  fi
 fi
 
 CURRENT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"

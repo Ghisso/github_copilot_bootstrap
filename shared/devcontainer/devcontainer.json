@@ -12,7 +12,8 @@
     "--security-opt=seccomp=unconfined"
   ],
   "mounts": [
-    "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.cache/huggingface,target=/home/vscode/.cache/huggingface,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.openwiki,target=/home/vscode/.openwiki,type=bind,consistency=cached"
   ],
   "containerEnv": {
     "HF_XET_HIGH_PERFORMANCE": "1",

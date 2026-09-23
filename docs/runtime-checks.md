@@ -167,6 +167,7 @@ Guardrail scripts are generated under the shared `.claude/hooks/scripts/` basis:
 
 - `run-hook.sh`
 - `protect-files.sh`
+- `openwiki-guard.sh`
 - `pretool-bash-guard.sh`
 - `git-protection.sh`
 - `context-mode-dispatch.sh`
@@ -227,7 +228,34 @@ opaque command or interpreter syntax, verify conservative high-confidence path
 coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
 paths, and protected hook configuration files; do not treat prose or ordinary
 source filenames containing `secret` as credentials, and do not require denial
-of unknown commands that carry none of those path literals.
+of unknown commands that carry none of those path literals. Within that
+coverage, the hook paths and the protected hook configuration files — the
+names that identify this repository's own guardrail setup — are scoped to
+this repository only, decided on the resolved real path of the candidate; the
+four credential-shaped alternatives (`.env*`, `uv.lock`, `credentials*`,
+`.pem`/`.key`) stay protected on any path, in this repository or any other;
+and a candidate whose real path cannot be resolved stays protected rather
+than being allowed.
+
+Three gates besides the classifier — commit, push, and branch creation — now
+stand down for a command that provably targets a different repository: a
+`git commit`, `git push`, or `git checkout -b`/`git switch -c` that carries an
+explicit `-C`, `--git-dir`, or `--work-tree` redirect resolving to a
+repository other than this checkout stands down, so `git -C <dir> commit`,
+`git -C <dir> push`, and `git -C <dir> switch -c` are the supported ways to
+act on another repository from this checkout. `--git-dir` given without
+`--work-tree` does not stand down: git then treats the current directory as the
+working tree, so from inside this checkout such a command still acts on this
+repository's files. Creating a pull request never
+stands down: `gh pr create` is always checked against this checkout, whatever
+repository `-R` names, because comparing remote URLs to decide otherwise
+could wrongly let a real pull request skip this repository's closeout
+ceremony. Every undeterminable case — no explicit redirect, a redirect that
+does not resolve to a repository, or a `cd` into another directory before the
+command — keeps the full gate, exactly like the classifier's
+unresolvable-path rule above. `git branch foo`, which creates a branch
+without switching to it, is not covered by the branch-creation gate at all;
+this is unchanged.
 
 The runtime checker also runs the shipped `scripts/validate_plan_frontmatter.py` when it is present, and surfaces its failures as hard `FAIL` errors, not `WARN` — plan-frontmatter validation is a hard runtime contract, not an advisory check. A missing validator script is not itself an error here; the required-files/required-directories checks already gate on the generated tree.
 
@@ -495,11 +523,25 @@ of this changes what a gate checks, only what an operator should expect.
 | Gate | Effect on a refreshed consumer | Recovery |
 | --- | --- | --- |
 | Plan-frontmatter validation (`.claude/scripts/validate_plan_frontmatter.py`) runs at commit time | An existing plan with an invalid `status` blocks the next commit | Fix the plan's `status`. Valid small-plan values: `planned`, `in-progress`, `paused`, `complete`, `cancelled`. Valid big-plan values: `planning`, `in-progress`, `complete`, `cancelled` |
+| A big plan's `phases:` list may carry at most one dedicated final knowledge-refresh phase, and it must be last | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh`; `the knowledge-refresh phase must be the last phase in phases` blocks validation when one exists but is not the last entry | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:` |
 | A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
 | `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
 | `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
+| Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks approval when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
+| `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
+| Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
+| OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
+
+The reverse also holds: three gates in this table's family now stand down
+instead of newly blocking. The commit, push, and branch-creation gates skip a
+command whose invocations all carry an explicit `-C`, `--git-dir`, or
+`--work-tree` redirect resolving to a repository other than this checkout; an
+undeterminable redirect keeps the gate active, the same unresolvable-target
+rule stated above for the protected-file classifier. Creating a pull request
+is not part of this stand-down and keeps gating from this checkout regardless
+of what repository it names.
 
 Three practical notes worth knowing before a refresh:
 
@@ -539,6 +581,16 @@ Three practical notes worth knowing before a refresh:
   refreshing, not after. Once tracked files are owned correctly and
   formatted, and the refresh has run, the obsolete `hf-ai-sync.py` stops
   mattering because it is already gone.
+
+`verify.py closeout` runs the completing phase's required `## Verification`
+block itself, in order, before it binds the tree — it never accepts a
+session-log claim that a check ran instead. The run results are stored at
+`extensions.verification_items` in the closeout receipt, one entry per item,
+each bounded by a 600-second timeout. The commit gate judges only the phase
+being completed, and only under the `exact` head relation. See the canonical
+definition in `shared/policies/workflow.instructions.md`, section
+"Verification Evidence Contract", rather than restating its parsing rules
+here.
 
 ## Two Layers, Two Invariants: Commit And Push Enforcement
 

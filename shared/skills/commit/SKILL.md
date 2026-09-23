@@ -43,6 +43,7 @@ git add src/changed_file.py tests/test_changed.py
 - **Never stage**: `.env`, secrets, credentials
 - Review: `git diff --cached`
 - Stage only after focused/fast checks, review, documentation, final plan/log/LEARN state, and before `record_findings.py`, `verify phase --persist`, and `verify closeout --persist`.
+- Run `git commit` in its own Bash command. The commit gate hook judges the text of a command before it runs, so a chain that ends in `git commit` is denied on the old receipts and nothing in the chain executes. The full order is the numbered CLOSEOUT sequence in `.claude/instructions/workflow.instructions.md`.
 - Once every plan, log, and memory edit is final and before `record_findings.py`, checkpoint nested plan state. Use `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` from an agent; `bash .claude/hooks/scripts/state-sync.sh checkpoint` is the same operation for the editor task and hooks, but the file-protection hook denies any Bash command naming a `.claude/hooks/` path. The closeout receipt binds the big plan's bytes, and the push gate can only re-derive that digest from bytes Git already holds, so a big plan left dirty through the receipt steps yields a completion commit that can never be published. Never checkpoint after the receipts are persisted: that stales them and fails the next commit closed.
 - `dirty` in the findings and receipt gates means unstaged tracked changes. Untracked files do not appear in `git diff`; stage intended files before recording findings.
 
@@ -51,8 +52,10 @@ Choose one explicit commit path.
 
 For a normal completion commit, commit exactly one completed small plan after
 all gates pass: `status: complete`, a closeout log containing
-`**Status:** COMPLETED`, LEARN evidence, and a passing `verify phase`/`verify
-closeout` receipt matching the branch, phase, and HEAD.
+`**Status:** COMPLETED`, LEARN evidence, a `## Verification` section
+satisfying the Verification Evidence Contract in
+`.claude/instructions/workflow.instructions.md`, and a passing `verify
+phase`/`verify closeout` receipt matching the branch, phase, and HEAD.
 
 For a paused checkpoint, commit only after the user explicitly asks to stop and
 resume later. The same small plan must be `status: paused` with `paused_at`,

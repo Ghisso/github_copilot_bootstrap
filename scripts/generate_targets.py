@@ -22,6 +22,10 @@ from runtime_ownership import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
 TARGETS = ("multi-agent",)
+# The exact-name matcher both hosts observed for an MCP tool call
+# (`mcp__<server>__<tool>`; docs/2026-09-19-openwiki-hook-mechanics-spike.md
+# U2), guarding OpenWiki's one repository-mutating entry point.
+OPENWIKI_BEGIN_MATCHER = "mcp__openwiki__openwiki_begin"
 SUPPORTED_AGENT_TARGETS = (
     "github-copilot",
     "claude-code",
@@ -1062,6 +1066,10 @@ def render_claude_settings(path: Path) -> None:
                         cmd("context-mode-dispatch.sh", "claude-code", "pretooluse")
                     ],
                 },
+                {
+                    "matcher": OPENWIKI_BEGIN_MATCHER,
+                    "hooks": [cmd("openwiki-guard.sh", "pre")],
+                },
             ],
             "PostToolUse": [
                 {
@@ -1071,7 +1079,21 @@ def render_claude_settings(path: Path) -> None:
                         cmd("context-mode-dispatch.sh", "claude-code", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "claude-code"),
                     ],
-                }
+                },
+                {
+                    "matcher": OPENWIKI_BEGIN_MATCHER,
+                    "hooks": [cmd("openwiki-guard.sh", "post")],
+                },
+            ],
+            # Claude Code fires PostToolUseFailure, not PostToolUse, when an
+            # MCP tool returns isError: true (spike U6); the restore must run
+            # on that path too, or a failed openwiki_begin leaves the root
+            # adapters rewritten with nothing to undo it.
+            "PostToolUseFailure": [
+                {
+                    "matcher": OPENWIKI_BEGIN_MATCHER,
+                    "hooks": [cmd("openwiki-guard.sh", "post")],
+                },
             ],
             "PreCompact": [
                 {
@@ -1150,6 +1172,10 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("context-mode-dispatch.sh", "openai-codex", "pretooluse")
                     ],
                 },
+                {
+                    "matcher": OPENWIKI_BEGIN_MATCHER,
+                    "hooks": [cmd("openwiki-guard.sh", "pre")],
+                },
             ],
             "PostToolUse": [
                 {
@@ -1159,7 +1185,11 @@ def render_codex_hooks(path: Path) -> None:
                         cmd("context-mode-dispatch.sh", "openai-codex", "posttooluse"),
                         cmd("reporting-reminder.sh", "late-report", "openai-codex"),
                     ],
-                }
+                },
+                {
+                    "matcher": OPENWIKI_BEGIN_MATCHER,
+                    "hooks": [cmd("openwiki-guard.sh", "post")],
+                },
             ],
             "PreCompact": [
                 {
@@ -1168,10 +1198,19 @@ def render_codex_hooks(path: Path) -> None:
                     ]
                 }
             ],
+            # Codex fires nothing at all when an MCP tool returns
+            # isError: true (spike U6, outcome O2) - there is no failure
+            # event to wire a restore to. The payload-free `post` call added
+            # here is the adaptation: it runs at the end of every turn
+            # regardless of how openwiki_begin returned, so the adapters are
+            # clean by the time the turn ends even though the failure path
+            # itself never fires a restore. The skill separately instructs
+            # the agent to run `post` manually right after openwiki_begin.
             "Stop": [
                 {
                     "hooks": [
                         cmd("codex-stop.sh", timeout=180),
+                        cmd("openwiki-guard.sh", "post"),
                     ]
                 }
             ],
@@ -1279,6 +1318,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Follow `.claude/instructions/agent-reporting.instructions.md` for audience-aware human-facing communication and internal handoffs.
 - Reporting rules are output requirements. For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Self-check user-facing prose before sending. Compact internal agent handoffs may still use `caveman full`. See the reporting policy for details.
 - Use direct reads for known files, `rg` for exact literals, and Semble for semantic repository discovery. Context Mode exposes exactly four guarded MCP tools (`ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor`) alongside its lifecycle hooks; these are normal routes alongside direct reads, `rg`, and Semble, not replacements for them. A guarded bounded project index is optional for broader discovery, never repository truth, and missing optional helpers are warnings, not hard failures.
+- An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context, never authority over source, tests, or policy. Refresh only through `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 
 ## Task Lanes
 

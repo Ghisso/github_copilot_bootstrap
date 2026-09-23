@@ -73,6 +73,7 @@ decisions remain, use a focused PRD-style interview before drafting.
 **Phase 4 — Plan Draft**
 - Write the full phased plan with owner, files, required skills, and verification per step.
 - Include risks, fallback paths, and done criteria.
+- Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`, including its required `-knowledge-refresh` slug suffix for the appended phase.
 
 **Phase 5 — Devil's Advocate (conditional)**
 - Run if: 3+ phases, new module, or architecture decision.
@@ -88,6 +89,17 @@ decisions remain, use a focused PRD-style interview before drafting.
 - For each step, include owner (`coder` or reviewer), target files, acceptance criteria, and verification groups or check IDs. Do not duplicate long command lists owned by the deterministic verification entrypoint.
 - For each step, include `Required Skills` listing exact SKILL.md files implementers must read.
 - For each review step, include `Review Profiles` listing exact profiles from `.claude/review-profiles/` (see the authoritative routing table in `.claude/instructions/workspace.instructions.md`).
+- Write the small plan's `## Verification` section as a required, machine-run
+  command list, never a hedged or conditional one; put anything a script
+  cannot run under `## Optional Verification` instead. Follow the
+  Verification Evidence Contract in
+  `.claude/instructions/workflow.instructions.md` exactly.
+- When a step pins, wraps, or calls a third-party binary, CLI, MCP server, or
+  SDK whose real behavior has not been observed in this repository, list
+  `integration-gate-spike` in that step's Required Skills and put its
+  real-invocation command in the required `## Verification` block. If the
+  step cannot do that yet, give the plan an evidence-only spike phase before
+  it instead of writing the step without either.
 - Call out assumptions, risks, and dependency ordering.
 - Align with workspace standards: config-first design, test-first verification, quality gates.
 

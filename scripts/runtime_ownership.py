@@ -7,7 +7,7 @@ bootstrap refreshes; it is not a manifest of every generated file.
 
 from __future__ import annotations
 
-from pathlib import PurePath, PurePosixPath
+from pathlib import Path, PurePath, PurePosixPath
 
 
 # The source repository deliberately keeps concise root adapters tracked. They
@@ -66,6 +66,21 @@ STATE_DIR_OWNED_README_PATHS = tuple(
     for state_dir in ("plans", "explorations", "session_logs", "quality_reports")
 )
 
+# OpenWiki's own installer takes ownership of its skill bundle inside every
+# skill-hosting surface (`.claude/skills/openwiki`, `.agents/skills/openwiki`)
+# once it runs there. Each entry is checked relative to the surface root that
+# hosts it (`.claude` or `.agents`), the same way `CONSUMER_STATE_PATHS` is
+# checked relative to `.claude`. A path shaped like one of these entries is
+# ordinary bootstrap-generated content — refreshed and drift-checked like any
+# other — until `THIRD_PARTY_SKILL_MARKER` actually exists in it; see
+# `is_third_party_skill_dir`.
+THIRD_PARTY_SKILL_PATHS = ("skills/openwiki",)
+
+# The file OpenWiki's own installer writes into a skill directory it takes
+# ownership of. Its presence, not the path shape alone, is what stops the
+# bootstrap from generating, drift-checking, or refreshing that directory.
+THIRD_PARTY_SKILL_MARKER = ".openwiki-install.json"
+
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
 
 
@@ -116,6 +131,31 @@ def is_consumer_state_path(relative_path: str | PurePath) -> bool:
         path == PurePosixPath(owner) or PurePosixPath(owner) in path.parents
         for owner in CONSUMER_STATE_PATHS
     )
+
+
+def is_third_party_skill_path(relative_path: str | PurePath) -> bool:
+    """Return whether a skill-surface-relative path is shaped like a
+    third-party skill bundle. Shape alone does not mean it is owned; see
+    ``is_third_party_skill_dir`` for the marker-gated ownership check."""
+    path = PurePosixPath(relative_path)
+    return any(
+        path == PurePosixPath(owner) or PurePosixPath(owner) in path.parents
+        for owner in THIRD_PARTY_SKILL_PATHS
+    )
+
+
+def is_third_party_skill_dir(dir_path: Path) -> bool:
+    """Return whether a live directory is a marker-claimed third-party bundle.
+
+    Requires both that ``dir_path`` is shaped like an entry in
+    ``THIRD_PARTY_SKILL_PATHS`` (e.g. ends in ``skills/openwiki``) and that
+    OpenWiki's own installer has already claimed it by writing
+    ``THIRD_PARTY_SKILL_MARKER`` directly inside it. Before that marker
+    exists, the directory is ordinary bootstrap-generated content.
+    """
+    posix_dir = PurePosixPath(dir_path.as_posix())
+    is_owned_shape = any(posix_dir.match(owner) for owner in THIRD_PARTY_SKILL_PATHS)
+    return is_owned_shape and (dir_path / THIRD_PARTY_SKILL_MARKER).is_file()
 
 
 def is_root_adapter_path(relative_path: str | PurePath) -> bool:

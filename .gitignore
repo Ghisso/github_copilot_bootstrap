@@ -35,4 +35,5 @@ AGENTS.md
 CLAUDE.md
 .uv-cache/
 .context-mode-provenance.secret*
+openwiki/.run.json
 # END multi-agent bootstrap generated/private AI content

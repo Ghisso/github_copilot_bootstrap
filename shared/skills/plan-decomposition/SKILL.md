@@ -99,8 +99,16 @@ and must appear in the big plan's `phases` list. Fill:
   function/class signatures (contracts, with type hints), the behavior and edge
   cases in prose, must/must-not constraints, and the test scenarios + verify
   command. Let the coding agent adapt bodies to the actual codebase.
-- **Verification** — the exact commands (pytest, mypy, ruff, and
-  `uv run python .claude/scripts/verify.py phase --format json --persist`).
+- **Verification** — a `## Verification` section holding fenced `bash`/`sh`
+  blocks; every non-comment line is a required shell command that `verify
+  closeout` runs itself and that must exit 0 (for example pytest, mypy,
+  ruff, and `uv run python .claude/scripts/verify.py phase --format json
+  --persist`). Never list `verify.py closeout` as an item. Put anything a
+  script cannot run — an interactive probe, a host session, a manual
+  inspection — under `## Optional Verification` instead, never as
+  conditional prose in the required section. See the Verification Evidence
+  Contract in `.claude/instructions/workflow.instructions.md` for the full
+  parsing and hedge rules.
 - **Closeout Checklist** — leave the template's checklist; it gates the normal
   completion commit. An explicitly requested paused checkpoint uses its own
   evidence path and does not complete or advance the phase.
@@ -117,6 +125,12 @@ surfaces checked` heading in that phase's closeout session log. Do not limit
 the sweep to that phase's own changes. Use that exact heading: `verify.py`'s
 closeout gate requires it, with non-empty content, whenever the phase it is
 closing out is this list's last entry.
+
+In a repository where `openwiki/INSTRUCTIONS.md` exists, that last phase may
+also need to be a dedicated knowledge-refresh phase: see the canonical
+Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+for exactly when and how, including its required `-knowledge-refresh` slug
+suffix and its recursion guard. Do not restate that rule here.
 
 ### Step 5: Cross-Phase Consistency
 

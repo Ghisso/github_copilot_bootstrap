@@ -70,10 +70,28 @@ QUOTED_VARIABLE_AFFIX = re.compile(
 QUOTED_VARIABLE_MARKER = re.compile(
     r"^__PROTECT_FILES_QUOTED_VARIABLE_([A-Za-z_][A-Za-z0-9_]*)__$"
 )
+# Every alternative below is a *candidate* generator for `protected()`, not
+# the decider (see `protected_path_literals`'s docstring). Each one carries
+# word/token boundaries so it cannot extract a false-positive fragment out of
+# a longer identifier or path: `(?<![\w.-])`/`(?![\w.-])` refuse a preceding
+# or following identifier character (letter, digit, `_`, `.`, `-`), so
+# `os.environ` no longer yields `.env` and `myuv.lock` no longer yields
+# `uv.lock`, while `.env.local` and `foo/.env.production` still match in
+# full. The three control-plane alternatives (hooks-dir paths and the
+# `HOOK_CONFIGS` filenames) additionally capture the **whole** path token
+# via an explicit, optional `(?:[^\s'\"]*/)?` directory-prefix group, rather
+# than only the fixed repository-relative-looking tail: `/tmp/scratch/
+# .claude/settings.json` now extracts as that whole absolute string, so
+# `protected()` can tell it apart from an in-repository reference instead of
+# reading every occurrence as repository-relative (Phase F3.4).
 PROTECTED_PATH_LITERAL = re.compile(
-    r"(?:\.env(?:\.[\w.-]+)?|uv\.lock|credentials[-_.][\w.-]+|"
-    r"[^\s/'\"]+\.(?:pem|key)|(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
-    r"\.claude/settings\.json|\.codex/(?:config\.toml|hooks\.json))",
+    r"(?:(?<![\w.-])\.env(?:\.[\w.-]+)?(?![\w.-])|"
+    r"(?<![\w.-])uv\.lock(?![\w.-])|"
+    r"(?<![\w.-])credentials[-_.][\w.-]+|"
+    r"[^\s/'\"]+\.(?:pem|key)(?![\w.-])|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?\.claude/settings\.json|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?\.codex/(?:config\.toml|hooks\.json))",
     re.IGNORECASE,
 )
 OPAQUE_WRITE_PATH = re.compile(
@@ -180,7 +198,76 @@ def normalize(path: str, repo_root: str) -> str:
     return posixpath.normpath(value).removeprefix("./")
 
 
+def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
+    """Fail-closed containment test gating the control-plane clause below.
+
+    `source` is the single path `normalized` (in the loop in `protected()`)
+    was actually derived from - `candidate` for the lexical, symlink-
+    unresolved form, `resolved` for the `os.path.realpath()` form - never
+    the other one. Pairing each name-pattern match with its own source is
+    what keeps a same-repository symlink pointing at a foreign control-plane
+    file from reading as protected merely because the *link itself* lives in
+    this repository (its `resolved` form, which is what matched the name
+    pattern, does not).
+
+    `source` is tested against **both** `repo_root`'s own literal form and
+    its `os.path.realpath()` form, contained if either succeeds.
+    `repo_root_from_script` (`_lib-frontmatter.sh`) resolves `REPO_ROOT` with
+    a plain `cd && pwd`, which preserves a symlinked path component instead
+    of resolving it (macOS `/tmp` -> `/private/tmp` is the standard case; a
+    symlinked home directory or mount is another). Without this, a `source`
+    reached through the *other* form of the same directory - `resolved`
+    following symlinks down to `repo_root`'s physical path while `repo_root`
+    itself is still the symlinked one, or vice versa - would read as outside
+    a repository it is actually inside.
+
+    Containment is decided on resolved path components via
+    `os.path.commonpath`, never a string prefix, so a sibling directory
+    whose name merely starts with `repo_root` (`/repo-evil` vs `/repo`) is
+    never mistaken for containment.
+
+    Returns True - in-repository, keep protecting - for every case this
+    classifier cannot safely rule out: an empty or non-existent `repo_root`,
+    a `source` that still carries an unresolved shell construct (`$`, a
+    backtick, a glob metacharacter this classifier could not expand, or the
+    internal `QUOTED_VALUE_PREFIX` marker for an unresolved quoted
+    variable), or any `OSError`/`ValueError` from the path comparison
+    itself.
+    """
+    if not repo_root or not os.path.isdir(repo_root):
+        return True
+    if (
+        "$" in source
+        or "`" in source
+        or QUOTED_VALUE_PREFIX in source
+        or glob.has_magic(source)
+    ):
+        return True
+    try:
+        source_norm = os.path.normpath(source)
+        repo_lexical = os.path.normpath(repo_root)
+        repo_real = os.path.realpath(repo_root)
+        lexically_inside = (
+            os.path.commonpath([repo_lexical, source_norm]) == repo_lexical
+        )
+        really_inside = os.path.commonpath([repo_real, source_norm]) == repo_real
+    except (OSError, ValueError):
+        return True
+    return lexically_inside or really_inside
+
+
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
+    """Classify one path as an in-repository control-plane file, an
+    anywhere-protected secret-shaped file, or unprotected.
+
+    The two clauses use different scopes on purpose (Phase F3.4): the
+    control-plane clause only refuses a name this repository's own hooks,
+    settings or devcontainer identify, and only inside this repository - the
+    same name elsewhere is that checkout's own control plane, not this
+    repository's to govern. The secret-shaped clause is unconditionally
+    global, because a credential-shaped file is harmful to mutate or
+    exfiltrate in any tree.
+    """
     raw = normalize(path, repo_root)
     candidate = path.strip().strip("\"'").replace("\\", "/")
     if candidate.startswith("file://"):
@@ -188,22 +275,29 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     if not os.path.isabs(candidate):
         candidate = os.path.join(repo_root, candidate)
     resolved = os.path.realpath(candidate)
-    normalized_paths = [raw]
+    # Each normalized form is paired with the single path it was actually
+    # derived from, so `_control_plane_in_repo_root` is never asked about
+    # one form's name while deciding the other form's location.
+    normalized_paths = [(raw, candidate)]
     if repo_root:
-        normalized_paths.append(os.path.relpath(resolved, repo_root).replace("\\", "/"))
+        normalized_paths.append(
+            (os.path.relpath(resolved, repo_root).replace("\\", "/"), resolved)
+        )
     else:
-        normalized_paths.append(resolved.replace("\\", "/"))
-    for normalized in normalized_paths:
+        normalized_paths.append((resolved.replace("\\", "/"), resolved))
+    for normalized, source in normalized_paths:
         normalized = posixpath.normpath(normalized).removeprefix("./")
-        if (
+        is_control_plane_name = (
             normalized in HOOK_CONFIGS
+            or any(normalized.endswith("/" + name) for name in HOOK_CONFIGS)
             or normalized.startswith(
                 (".github/hooks/", ".claude/hooks/", ".codex/hooks/")
             )
             or "/.claude/hooks/" in normalized
             or "/.github/hooks/" in normalized
             or "/.codex/hooks/" in normalized
-        ):
+        )
+        if is_control_plane_name and _control_plane_in_repo_root(source, repo_root):
             return normalized, True
         base = posixpath.basename(normalized).lower()
         if (

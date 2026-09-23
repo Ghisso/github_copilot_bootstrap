@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7c79e21eb18c46990e7c13076c9a945a4ad1133abed03ae2fba50339afc1fac8",
+  "claims": [
+    {
+      "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
+      "statement": "Each shared agent is defined once under shared/agents/<id>/ by a JSON metadata file named agent.yaml plus prompt bodies; load_shared_agents parses every agent.yaml as JSON, validates it, requires unique ids, and validates prompt composition and escalation targets before rendering.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L764-L800",
+          "version": "repo-lines-v1:sha256:55e0159f43fe205acce5dd2c542760b148a4c725b1b025178d2a36e087c7c64c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1Yjk4NjQwN2Q5MGRiNWY2Yjk5ZGVkN2ZmODVmYTE5ZTBlYWVmZjcwZTU4NDg0OTdjYTI4NzE0ZTY2YjYwYzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkZjU5OTgyNmYwYzJjNTdmNzZkMzdiMDMzMGE1ZDQ3ZTEwZDFlYWFmZTU2YTY3MjA5OWJiYmFkYjJmNmU5MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkYjczZmI5YWYyNWMwMzAwZWI1MWExYzA3YTIxZmM5NzdjYWIyYTM1M2ZmMTQzYmJiNmMzODQ1OWIyYmZiMTIifQ"
+        },
+        {
+          "resource": "repo://shared/agents/coder/agent.yaml",
+          "version": "repo-file-v1:sha256:da883206c8097f755a3747a922128c69c610a8f2452729b7ff9d60afca84face"
+        }
+      ]
+    },
+    {
+      "id": "claim_f7d9f6143a2e45ad87c88caffd32559c",
+      "statement": "validate_agent_metadata rejects unknown metadata fields, requires id, description, role_type, and a visibility of public or hidden, checks capabilities against a fixed vocabulary, validates delegates as stable agent ids, and requires model_intent entries for exactly the agent's eligible targets.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L29-L60",
+          "version": "repo-lines-v1:sha256:3583deb88f8ac3be6504b01cff81657ed70baf92ea74e9c90b48e509c6c5217b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5ODk1Mzk2YWM5ODA1N2U2ZjEyYmY5N2ViZGM4YjQwODljMjFmOTY4ZDk5MTg2Nzk2NWIwMmJlNzk1NzJmMTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiZDNlODc3MzI1ZDNjYWMwY2MzZjYxYmNiOTZlM2E1M2VlNmU0MGJmN2JiNWQ3NDFhODIzYTRkNDAxZTc4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzZjIxODMwOWY3ZmJjMTRiNjdhYTFjMGRiZWI0MjYyM2Q0NWE1MDMyM2FhYzg4NDhlOTg5MjM0YmJmOGUwNGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5YTM4OWExMjg4Yjc2Y2FkOTkxMGU1NzdkNTllYmQ5ZmM2NjY5OWE5YTM2MmQ3ZGYyZGJhM2U4MDdkMTIzYjgifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L552-L616",
+          "version": "repo-lines-v1:sha256:89197f1647ecad694bc75087cf23dbd7fdb10749b487eecb95bceee09abcd364:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2NjRhMzAwNGMwMWZkYzMyMzU1Yjg2ZWJjYTgyM2YxODg5YzNhMmUyNDJlYTE5ZTQ1ZTJjOTBlZGE3ODBhZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2ZGZiZjQ1M2Y3ZjFiZWJhYjcyODM2MWIwZjM5M2VlYjRjMWZiNjY4ZjllYTIyYjkxNmRhY2Y1ZGZmODFkODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2OTUyMzVjM2VmYTYyMDMxYmUzYjhiYmIwMDI1OGE3ZDM4OTY5OTQzMWQ1OWFlMDJmNmJjM2RmZTJhNDY5YjgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_672c6049f01e4d688111edc7ded4cff5",
+      "statement": "An agent that omits targets is eligible for all four supported targets (github-copilot, claude-code, openai-codex, google-antigravity); an agent that declares targets is rendered only for those.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L417-L437",
+          "version": "repo-lines-v1:sha256:d46680607577ed3898cbce847c618da4456da7ae146199acb88874f658c06359:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlODBkOWRhZTIyMGRiMDdiMmU1MjVhM2M3MjQwY2Q0NjYzYWZkMzQ3YWZlOWFjMmE1MDVmMzlhMzAzZWU0ZjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzYjgxN2FjNWQ5NDQ1M2VkMmU1YThkZDkzMmQ4NzY3NTczNzllNjcwNWRkMTcyYmQ2ZDNkNzQxOGUwNzgyYWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjMzk2OWZmZDU4YmRiYTNkOTk5MjYyZWMwY2M3ZGUwMGM0ZGNhYWYxNDk5YzYzZGIzNTIyMWExZWQ0ZWVhNWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5ZWEzNmEwOTdlNjY4NGU5NzUyYTllY2RkOTAxY2Q0YTY5ZmIxMzMwNmMxOGVjYzQ3ZmJmMzNhYzJiOTkyNzYifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L792-L800",
+          "version": "repo-lines-v1:sha256:9bffe2b4600fbcc6e9f034baff8dfeaa13b61599a9b8d0ddfa78e39ab71ab449:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjAwMTQwODdlMWZiM2E1NGU5NmZhNDYwOGFlN2YzMTkzNzUwOGYyYzBmOWFiYzExZWU4MDVkYjU5Y2YwZDlkMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjg2YjBlMmQ3MzE4OGE0YWRlYWUyMmRlZjVkZTlmMTJjOGQ3NTdlNTJmY2M5MGNkODkwMDRlODI4OWJmNjA1NiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRiNzNmYjlhZjI1YzAzMDBlYjUxYTFjMDdhMjFmYzk3N2NhYjJhMzUzZmYxNDNiYmI2YzM4NDU5YjJiZmIxMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_90fd6c48a6724d0f886fa0705b3c221a",
+      "statement": "Provider-specific agents (luna_coder and sol_coder for openai-codex, antigravity_flash_coder for google-antigravity) are derived from the coder agent through prompt_base and carry only a provider supplement file rather than their own prompt.md.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L123-L126",
+          "version": "repo-lines-v1:sha256:1dedd4f38cd47252dd9fe3bbd84f23dc55293ef1ad64c58c82324c071e00f0ee:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGRiOWQzMjk1MDA2OGFhNDQwMTJkYjA5ZGJlOTQ2YmJjMzJjZDM5NjBlNGZmNWQwZDYwYzhjN2RmMGM0NDJmNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjAxOWI2ZGUxYzA4NTUwOTUyOGRmN2NkYTE0NGJkNjRhYzM2ZmU5YzBmNTBkNGI3NWEzMWI1OGUyZWI3YTQyOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQ0MjA4ZDVmZjBlYTVjZjAwMjc2YjdjNDhkMDY0ZjVkMGZlNWZmMGVmYmI0Y2EyNDNkZDk1MjlkNDNkZDAyMiJ9"
+        },
+        {
+          "resource": "repo://shared/agents/antigravity_flash_coder/agent.yaml",
+          "version": "repo-file-v1:sha256:5853742f40c0a2a4bc008013bb65ce48bd356789732de226ad8682691ade63f8"
+        },
+        {
+          "resource": "repo://shared/agents/luna_coder/agent.yaml",
+          "version": "repo-file-v1:sha256:ae49dac6a2fa3e7d74c506b8b53311f184699598b79d34dfbf0380da229645ba"
+        },
+        {
+          "resource": "repo://shared/agents/sol_coder/agent.yaml",
+          "version": "repo-file-v1:sha256:819ddd423316ad14054aea643646f40b516da7d480594891abf4bcde3db1bb81"
+        }
+      ]
+    },
+    {
+      "id": "claim_2279bf663ed94655a65798b4c5f45808",
+      "statement": "Prompt composition is limited to one level: validate_prompt_composition refuses a prompt_base that self-references, points at a missing agent, or points at an agent that itself has a prompt_base; refuses a derived agent that ships its own prompt.md; refuses an empty supplement; and refuses a supplement containing the full transformed base prompt.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L623-L720",
+          "version": "repo-lines-v1:sha256:310abe4cf9131894f0bbeb2078a6c9d7ad33fbc9bb0d5b74e5c7f59c2e9616b1:eyJzZWxlY3RlZExpbmVDb3VudCI6OTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzZTE0NTM3ZTdiZDk2OGMzODJmOTU4OTIyNGMzODMzOTc4NWYyMTkwZTI4Y2Y1YjlhMjBhOGYwOWRkZWQ5Y2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlZGNjMjk0NDg5OGZkYmQyYjc5MDEzYmU1Y2Q3NGY0ODI5NGNjMDNjZWI0MjgxZDMzMTMzYWI2MmU1NTYxNTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjZDlkODQ4MzFjNzY5MTI4Y2U4Yzg4ODhjZGY1NTNkMTg5N2IzOTVlYzZlYjg4ODgzYTBhMjg3MDNhMWI0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_5d2f44d04a104b0098e63d243bc10db6",
+      "statement": "The orchestrator is the only shared agent with delegates (planner, coder, reviewer, documenter) and is public; planner, coder, reviewer, and documenter are hidden agents.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/coder/agent.yaml",
+          "version": "repo-file-v1:sha256:da883206c8097f755a3747a922128c69c610a8f2452729b7ff9d60afca84face"
+        },
+        {
+          "resource": "repo://shared/agents/orchestrator/agent.yaml",
+          "version": "repo-file-v1:sha256:94af48c49274f0bacd3c9454fb6927d8d86c7464e784c0a6c5029f3d47753f3c"
+        }
+      ]
+    },
+    {
+      "id": "claim_63facc6f9b0c49d59d24e90b585a2c06",
+      "statement": "For Claude Code, render_claude_agents writes .claude/agents/<name>.md with name, description, a tools list derived from capabilities, and optional model and effort from model_intent['claude-code'], followed by the transformed canonical prompt body.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1582-L1613",
+          "version": "repo-lines-v1:sha256:5272a40a8b5651c879ec86214398a1ef1d2f6482f1b9ae17fde3428f886dc779:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhYTdlNWIzNmU5YmM4ZWVhODFlZTY5MTJhY2U5MTU0ZjQzZTlkMTNkODYyMGI5YmZiNzliYzgyZDQ4NDQwMjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM1YWUxN2NiODQ1NzRjNDU2Nzg4NzgxODRmNjc2MzgxMjBiNGE2ZGQxNjdjYTM3MTY4MDFlNjBhMmMwMmM1OWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYyZjM5MzdkYzAxNDJmNGI4YWNhNjRmOTU1OGIyZjU0YTQzMjhkYjhlN2UzNTQ0MmNkMWYyNmMxYWI2YTM0MmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2bb75e382f0b4e3caa089e45721d9c2d",
+      "statement": "The GitHub Copilot agent adapter is a thin pointer to the canonical .claude agent file for Claude-eligible agents, carrying delegates as an agents list, user-invocable: false for hidden agents, and disable-model-invocation: true for the orchestrator; an agent not eligible for Claude Code gets a self-contained prompt body instead.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1530-L1581",
+          "version": "repo-lines-v1:sha256:2f3fe5d98dd92744c66758b8424cedd42796e93332e42ce42d07d01df22c8b86:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE5NjU0M2I2MjU4ZGNmMWQzZmRkNGVlMDYxODE2NTE4YTAwZDRhMjUzNDA4ZWUxY2UxMjMzNGFlZTU2ZDA3MzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU2ZGZiZjQ1M2Y3ZjFiZWJhYjcyODM2MWIwZjM5M2VlYjRjMWZiNjY4ZjllYTIyYjkxNmRhY2Y1ZGZmODFkODMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM2MWJmMDc0Y2E5NTRkMGY5MjJlOWJmYTAxZjAwOTU4MzM1YTQ3ZTMzMTQ0YmIxNTk5Y2MzZmRkMGQ4NGNmNTEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_075a949fbea94285863cd7e9c7325776",
+      "statement": "The Codex agent adapter is TOML carrying name, description, optional model and model_reasoning_effort from model_intent['openai-codex'], a sandbox_mode derived from capabilities, and the composed prompt as developer_instructions.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1614-L1645",
+          "version": "repo-lines-v1:sha256:dad00c247a428799ba47b8a0eb7c36192df5a903a757b7ea0d48b5a4f7551d69:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2OGE3ZmI2NTQ2MGE1OGVkMGM4MDZkYTkzYmRhMzQ0MjFjMjE2N2ExOWE1ZDAyMTU4YWM0NDI3MTk4OGU1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkYjZiZmNmM2M1OWZkZTEwMTkzMDI1MzEyYmM0OWI3NTA1NmYzMjZjMWE2ODhjMTRhZDVkMDc2YjU0ODlhZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI1N2Q0MDhiMjFjY2I3ZGUwZGQ2NDRmN2I1ZDNhZTMzMjkwMWJjMmMyZDJlZDRhZDJkOWMwNmMzNDVjNzRmN2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_47b0e75ce6d2499faade3c65085b8b33",
+      "statement": "The Antigravity adapter writes .agents/agents/<id>/agent.md with mainAgent: false, subagent: true for every agent except the orchestrator, the provider model from model_intent, and inheritMcp: true for subagents; render_antigravity also copies the whole shared skill tree to .agents/skills.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1690-L1728",
+          "version": "repo-lines-v1:sha256:69cf3fb10e71bb627c789aae0c1573c5a5f629eea725339d6de01e264865463b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwY2I5MDJiNmU0ZmMwYTY5MDZmYzgxYjg4MmQwYzI2YzdiMGQxMWQ4MDg1ZjA2ZjBmZTFlMDQ3OGJhODMwZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY5MjFlMmEzNTAzNjllZGU1ODk3NjIzZTdkZjQwMmUzNzM2NDg1N2E5MWU2MjM5YTc3MjlmMjBkMzY0NmQxMDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_77e4112fe74b4db290e59d7df0aeadaa",
+      "statement": "The reviewer loads checklists from review profiles rather than carrying them in its prompt, and runs a primary pass followed by a verification pass that attempts to refute each finding, repeating until a pass changes nothing (at most 3 rounds).",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L21-L44",
+          "version": "repo-lines-v1:sha256:6894a5e3123c64dbd7be24c01bb319f90f4cf028bbf70bf53898f5a980b8a1bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3MWRhNjVkMTdjZmIxZWQzYzNkN2QxNjNlNDU1YmQzZGYzMDM2OTExZjFhM2NlZjBhNzc4NzhkMTNiOGE3MTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyNTE2MTA0ZmM5ZTBlN2EwYmI4ZjBjZWNmMjJkNGM2ZTQ1M2NlOTdkYTU5NzYyMzNmYjdiY2ExYmEzNDFiZGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMTVhZjc2MjFhYzAwMWUxYWZhYzRjYWE3OGQzZGU0N2E5MmMxZGM2YmZhZWJiYzQ4ZDhjOWE0Nzg2ZTNhNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzOTY2Yjk0MGJiMmVjZjY2ODVjODkwMDVkMzhlMjQ0MWFjNTgxNGZhYWE2OWQ2OTgxMDhkYmMxNTEzOTFlODQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8885ff4dc9bf4d03a3728eb202daa9b2",
+      "statement": "Review-profile selection is governed by the single routing table in workspace.instructions.md: hooks, scripts, generators, and control-plane code always receive code, architecture, security, tests, and ponytail, and Ponytail is required for every control-plane, high-risk, or multi-file diff.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workspace.instructions.md#L121-L144",
+          "version": "repo-lines-v1:sha256:f56db69fb924b728d0fe1cb04820189f2debf062208ec7467466c205e930dc9f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjODU1ZGQ5ODMwNTY4N2FiNjM1ZGI1ZmVmYmMzN2I1NGYzZjMxMzkyMTQ1YjJkZTIxNjhmMTFlNGYzMTcyNzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0ZWZiMTZmNDMxNmQ1MDhmYzc4N2ZiNTAwMWNmZjczZThkNTA5NmVkZmUwZDdiZDAwNmUxYzM5NmUzNmM5N2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyN2JhZWM2ZjE2ODlkYjg5NTkyMjU3YTBmMzliMWZhYjc5MzNiMzlmMWVlYjhhZWZhNDRlZWZhYzJiNGJkYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkOTM5MjJjZDMzOWY2MjNlMDczOGU5Mjg1MjNiMDFhMTkxOTY0NTBkMjc4YTIyNjkzN2FiYjJmZjYyYjI1OGEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ddf53d214e2f4bd9b28e3ed0618c3056",
+      "statement": "The commit gate enforces the Ponytail rule: a high-risk (multi-file) diff is refused with 'this high-risk diff requires a fresh Ponytail review' unless the findings report records ponytail_reviewed=true.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L771-L890",
+          "version": "repo-lines-v1:sha256:d74e6be3fe05936b3b48564ccef139e1d888f69d4091bbabf64487064ae3483c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlYjM0ZWU4ZGMyMzQ3MjdhYTE3OTk2MGFiODAzMWRlZjU2MTBjNWIyYzQ4M2Q3ZWFjZDc1N2ExOTRmNWQ0YmQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxNWVmZWJiMTkzNjcwNmJiMmMxMzczYjFkMjU1NzY2NDEyYWY1MWNkMWU0NTI0M2E3NjZhOTZmNjkyZjk1MWUzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkNDMyOTQyMWJkZTU4ZmMxMWZjNTMzZmY4Yzc3OTAyZjI0M2ZjYjQyMDQ2OTg0MDNjY2UxNzQ4MWFhZjFkM2UyIn0"
+        },
+        {
+          "resource": "repo://shared/scripts/record_findings.py#L225-L265",
+          "version": "repo-lines-v1:sha256:f8fce0a94223e3a8e2bc6e0d23079abf2af42d90bdcc1fb7c597335ecbd24fed:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5ZGRmZjdhZTA1ZDlhM2Q2MjhlZjBhZjdmYmM4YjcyZGYyZTJlMTFkNDEzOTdkZDAwNDVkMDhmMWRkOTg2ZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5MDRkOWUxNjNiNGJjNzg4MzdlY2U5NDVlYjk4OWE1YThkYTNhMTJkZTJmOGY4Nzg4ZjEwMWZmZjRmYTk5YjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiMmU3ZDM3YzNlY2VhOTNhZTBhM2Y4NDVmMmQwOTU0YTQ2OTk2MDg0OGU2MWFjOTk4N2U1ODFjNzdkZTdkNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlMTY4ZDJlOWQ4ZjkyOWJhY2RiOWQ5MmU5MmFiMGNkYWU0ZDg0ZWM0N2Q5MmE5MDExM2NkNzBkMThiY2Q3MjIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3f5034344b9d4f3f9f54c02532936418",
+      "statement": "The workflow policy requires the coder to apply the ponytail skill once in full mode during IMPLEMENT and to simplify and re-verify the changed scope; Ponytail is not a standalone lifecycle phase.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L135-L137",
+          "version": "repo-lines-v1:sha256:61e3c7af40cb8a75af00bc06839645046241b89fc34bb1bad9c97c4798f30175:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQ5ZmU4NjE4MzE2NDQ2MmE0N2FiY2M2OWQ1NjVmNzc2YTdjN2U4YjI2ZTg4MzVkZTg1MzJhNGEyYjQzZWNlOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNzE2N2NjMDU0NTNhMWM0N2U1MjdjYTRlYWI4MDVjMjYyNTE2MjEyY2M3ZWNiZTJiMjQ2OThiOTVkZjY3OWQ1NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2Q2OWI4OWRlNmNkYTQ5ZTNjY2VkYWM1YzgwMjdjYmVjZWQxMmE1ZDJmZmFiMDMyNDNiNTBlYTMyNWRjNzY3MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNDEwYzc5YzgyODMyMGNiZjQwMjI5NmFlODlhNDlkM2MwOTUzZDY2N2Q2NjMzODQ0ZWI1NTQ0MzAxYWRkYWFkOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b0c33ecf4bc046f48fcfbf2101a00969",
+      "statement": "Skills reach hosts from one library: copy_skills copies shared/skills into the target .claude/skills with path rewrites for .md, .py, and .sh files, and the Codex config gains one [[skills.config]] entry per shared skill pointing at ../.claude/skills/<name>/SKILL.md.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L224-L231",
+          "version": "repo-lines-v1:sha256:34da63e23e2286781ffed196f66b047e98ad6cdfcf074780c80e5ac64a53eed1:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTg3YzgyODllOWVhYjdkZGM1Yjk1MTRlYzJlOTEzNDk4ZThiOTJmMWQyNDgwMzMwYzkwZWNkN2ExNGY0OWYyNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjAzMDU5MzQ4NTY1NDViOWNkNmNiOTcxYTgxN2EyODdjOWYxY2Y1ZDQyZWM1YjM2Y2NjZWRmYWZjYWQ0NThiZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGI4Yzk3OTcyODBhOThhODJkYjMyMjBhZTRiMThkYTAxMzhjZDNiY2Q5ODNkZmE3MzEwMmNiNzdiYTZiNTk5OSJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L937-L942",
+          "version": "repo-lines-v1:sha256:c8dfa839f5970d72abcd82bc85894dfe4ffdf52516eac432c46afc605b35c9f9:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGJlZGUyODVhMDNkMjZhOTdkNDFkYzZkYTBhN2RhNTZmZDExZDI0NTY4N2U1NTA3YzAyMDY1NmE2MWQ4YTdiNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjA4ZmM0NTA3Nzk1MzU3NDZlNmY4MTA4MWJmMmFhNWFkZDAwYTNkN2JhNjRiMDlkMWRkNzRmNGVmYzE0YzhlZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTViNzM1YjYwYWViZTYzMzExMDA4MWY2ODNkZDFmOGI4ZmY2NmJmYzNmYjQ0ZDA2NmE1NjJhOTBiZThjNTU2MiJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L994-L1001",
+          "version": "repo-lines-v1:sha256:e5d79bb2550a8a465c1af7c5a2262455b7684d4dc163c5075aec1bc9329e8043:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzUxYTc3ZjZmOTE2MjAyY2I5NDAyZmFkN2ZjN2MwYmE4YjJiMWJhM2U5MWNhNzliZTUxYzZjNzY4NGYxNjJlOSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWI3YWQyZjZjZTg1ZGZkYmIxZDZlY2NkMTgxODVkMmJiZDIwZDQzNDBlYTQ5ZGJjYjY5NmEwMWUzN2YzZGZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGY3OTg0NzU0ZjY2Mjc1OWRiM2Q5ZDI0MmRlZDhkNGNmNDZjYzlmZjhjYjQzNDQxNTIzZDI0NzE1ZDE0M2I5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmJkMGYzZTY5NDNiOGFiNDM1NmU0YTIzYTQ5M2VlZjA2OTlkNDdkZDAyODlmMTBlNTkzZDA2MmUyZjBhOTI3ZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d3de19e9cc304a61ad12d88a9727078f",
+      "statement": "shared_skill_integrity_errors enforces hard skill-library rules: a root SKILL.md per directory, well-formed flat YAML frontmatter, frontmatter name equal to the directory name, visibility public or background, a non-empty description unique across the library, and backtick-quoted repository paths that resolve to real files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L8054-L8147",
+          "version": "repo-lines-v1:sha256:ef39a50b487990a81c8064e94c644ac9178870e8e46381df31a910e0d7838331:eyJzZWxlY3RlZExpbmVDb3VudCI6OTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MTg2YTIyNjFlODg1YjRiMjUyYWEyNDE5YzRmYzAwOWJhMTBiZGMwZTQ1Zjk0OWM5ZDg4ZmQyMWZlMDRjZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlNGQ1YTY2MTVmMzczNGRjOGI5OTk5OWI3NGI2ODIyMmQxZWE4MWUwN2FhMTUxNWVlNTNkOGJlNDExNGI4YTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFlMWQ1OWNlNzAxZDEzMTg5ZTAwMGY2NTQ2OWExMGIzNTFkMGVmMmI1NWEzYTI1MGMxZWI4Nzc1M2RlMjYzMTQifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L8240-L8300",
+          "version": "repo-lines-v1:sha256:d650019a0e1109b320d406b224947421a993f7fecc8f2b9d5cf11bfcfb5e21b0:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlMzJmYzFiYmI5NmNkNGJmNGFjNThkYTFkYWI5NThlMDgzY2I4YzAwM2I2MmViMDkyNDJiZWYzNjBjMTFhNWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYzYjlhZjRkMTI4NTVhZTFjNTU4OGNjYjhiMzBjNTk3MWUwMzI2MzZlYjExNDUwMTczMmNkY2ExNDU3NTExYWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzOGE5MTJkYTUzODM5M2I1OWVlM2ZmNmU5NDYzMzgyNzFmNzc1MjU0Yjk0Zjk1ZDMyZjZhZTEwOTI4NmU1ZmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_2f92f8a6311348398e1d9ff2d20b50e5",
+      "statement": "validate_skills_and_paths requires the generated skill count to equal the shared count, requires the generated ponytail and ponytail-review skills to remain public with MIT license metadata and shipped provenance, and requires humanize to be exposed while the upstream avoid-ai-writing name is not.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L7608-L7700",
+          "version": "repo-lines-v1:sha256:9af535f6e874220bd876251870255788e063dcee4a18d9e8f51824276d15c6fc:eyJzZWxlY3RlZExpbmVDb3VudCI6OTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMjNkYjRjOWMwYzMyNTQwYTkwYTU5NWFlYjYwOThmYjA0ZTE1NDljYTgwMWM0NDhmMjRiZWVmYzVlNTI1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA5NGI3OTY2OWYyMjZlNmI5M2FhMjhiYzZkNzVjN2I1Nzc3YzhlNTYxZGYwZWJhYmM4NDkzZmEwMjI3MDU1MzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc3MmYyMmU2ZmIxNTkwZDgzMDVjYmJlMWU4YTAzMjhjM2ZmZDk2M2YzYTg5NmRlZWE3ODg1YmM5NjI0MWYyYTcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_11607a5947c146aab8883cf5b3f30f9a",
+      "statement": "Duplicate skill descriptions are treated as an error because background skills are loaded by description match, so two skills sharing a description would break loading.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L8282-L8298",
+          "version": "repo-lines-v1:sha256:4f4cace4bc929a4d67bf53a635b33e119786b47fa410ff0e668b0b5656a81aec:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJlNGEwMzI5NjgzZTM4YzE5MzkwY2EyNDllYTI2MTAxZTRkOTBlMjkyOTRlYThjMzlmYWZmMGVkNDhkMzM2NzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzOTcxNDg1YzM2NTJjM2ZjM2JlMmE3NWRjMDc1ZWZlNDg3NWNlN2JjMDFhNGViZGFlMDYzNjY2OTA3OTBmN2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjljNTBhZjEyMDI2OWE0MzRmNmRkODA4YjM2MjAyZGQyZmFkMTVlNGI4NTFhMjI0Y2RkZDJkNTY1YzZhOTM5YWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmYjllNWU4ZWExYTBiYTNjMjhmZWJmNDM0MDU5N2RiMjQ2NjdmMWEzYmE4ODNiNmYxODBjOGRiZTY1ZjFkZGUifQ"
+        },
+        {
+          "resource": "repo://shared/templates/skill-template.md#L1-L14",
+          "version": "repo-lines-v1:sha256:77f71a73b3071df8b51d4bc40ad006bd941a7efff93e22d63b3a27969b3238dd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1MmQ3MTExMDNkNTBhNDM3ODMwYzZmYmNkMDRmYjRiYWI0OWEwZjgyZjZkMjZkMWM3OTFjNmU4NDg4ZGQwOTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY1MmQ3MTExMDNkNTBhNDM3ODMwYzZmYmNkMDRmYjRiYWI0OWEwZjgyZjZkMjZkMWM3OTFjNmU4NDg4ZGQwOTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVhNGI1NzRlN2Q4ZmM2ZjUyZWI5NzI1Y2Q0ZDg0MjFjYjQzZGMzYWNkMTI3NDgxOWNlY2FlODVmZTQyNTc1NWUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T05:37:12.382Z"
+  }
+}

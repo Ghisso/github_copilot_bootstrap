@@ -15,6 +15,10 @@ description: |
   - "Plan mentions external service but can't verify the endpoint exists"
   - Planning adapter code where contract uncertainty blocks an
     implementation decision
+  - Invocation contract — flags, exit codes, TTY needs, stdio protocol,
+    config-file side effects — is unknown
+  - Any third-party binary, CLI, MCP server, or SDK whose real behavior has
+    not been observed in this repository
 user-invocable: false
 ---
 
@@ -55,6 +59,10 @@ to this integration:
 - **Auth** — required headers/tokens, if unknown.
 - **Rate limits** — needed only if this plan's call volume could plausibly
   hit them.
+- **Invocation contract** — flags, exit codes, TTY needs, stdio protocol,
+  config-file side effects — needed for any third-party binary, CLI, MCP
+  server, or SDK whose real behavior has not been observed in this
+  repository.
 
 Do not add feature flags, retry policy, or caching to this list unless a
 concrete requirement (for example, "this runs in a batch of 10,000") already

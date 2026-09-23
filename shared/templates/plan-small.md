@@ -30,9 +30,24 @@ closeout_session_log:
 
 ## Verification
 
+<!-- Every non-comment line in a `bash`/`sh` block below is a required item:
+     a shell command `verify closeout` runs itself, from the repository
+     root, and that must exit 0. Never list `verify.py closeout` itself.
+     Anything a script cannot run — an interactive probe, a host session, a
+     manual inspection — belongs under `## Optional Verification` instead.
+     See the Verification Evidence Contract in
+     `shared/policies/workflow.instructions.md`. -->
+
 ```bash
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
 ```
+
+## Optional Verification
+
+<!-- The only place a check may be conditional or non-executable. One `- `
+     bullet per item, numbered in the order it appears. -->
+
+- [Optional check]
 
 ## Closeout Checklist
 
@@ -47,7 +62,7 @@ rather than restating it.
 - [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
 - [ ] Every surviving MINOR has an explicit disposition and non-empty reason
 - [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` then `verify closeout` PASS)
+- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

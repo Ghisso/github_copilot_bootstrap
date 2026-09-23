@@ -420,50 +420,92 @@ git_command_has_subcommand() {
   return 1
 }
 
+# Per-invocation body of parse_branch_create_command: the branch name ONE
+# git invocation would create, given its tokens (starting right after
+# "git "), mirroring _git_invocation_targets_nested_claude's shape. Prints
+# the branch name and returns 0 when this invocation creates one; prints
+# nothing and returns 1 otherwise (no checkout/switch subcommand, or no
+# -b/-B/-c/-C/--create(=) flag on it).
+_git_invocation_created_branch() {
+  local -a tokens=("$@")
+  local i=0 n="${#tokens[@]}" tok sub="" branch=""
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
+        i=$((i + 2)); continue ;;
+      --*=*|-*) break ;;
+      *) sub="$tok"; i=$((i + 1)); break ;;
+    esac
+  done
+  if [[ "$sub" == "checkout" ]]; then
+    while (( i < n )); do
+      case "${tokens[$i]}" in
+        -b|-B) branch="${tokens[$((i + 1))]:-}"; break ;;
+        *) i=$((i + 1)) ;;
+      esac
+    done
+  elif [[ "$sub" == "switch" ]]; then
+    while (( i < n )); do
+      case "${tokens[$i]}" in
+        -c|-C|--create) branch="${tokens[$((i + 1))]:-}"; break ;;
+        --create=*) branch="${tokens[$i]#--create=}"; break ;;
+        *) i=$((i + 1)) ;;
+      esac
+    done
+  fi
+  if [[ -n "$branch" ]]; then
+    branch="${branch%\"}"
+    branch="${branch#\"}"
+    branch="${branch%\'}"
+    branch="${branch#\'}"
+    printf '%s' "$branch"
+    return 0
+  fi
+  return 1
+}
+
 parse_branch_create_command() {
-  local rest="$1" after
+  local rest="$1" after branch
   while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
     after="${BASH_REMATCH[2]}"
     local -a tokens
     _shell_tokenize "$after"
     tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
-    local i=0 n="${#tokens[@]}" tok sub="" branch=""
-    while (( i < n )); do
-      tok="${tokens[$i]}"
-      case "$tok" in
-        -C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)
-          i=$((i + 2)); continue ;;
-        --*=*|-*) break ;;
-        *) sub="$tok"; i=$((i + 1)); break ;;
-      esac
-    done
-    if [[ "$sub" == "checkout" ]]; then
-      while (( i < n )); do
-        case "${tokens[$i]}" in
-          -b|-B) branch="${tokens[$((i + 1))]:-}"; break ;;
-          *) i=$((i + 1)) ;;
-        esac
-      done
-    elif [[ "$sub" == "switch" ]]; then
-      while (( i < n )); do
-        case "${tokens[$i]}" in
-          -c|-C|--create) branch="${tokens[$((i + 1))]:-}"; break ;;
-          --create=*) branch="${tokens[$i]#--create=}"; break ;;
-          *) i=$((i + 1)) ;;
-        esac
-      done
-    fi
-    if [[ -n "$branch" ]]; then
-      branch="${branch%\"}"
-      branch="${branch#\"}"
-      branch="${branch%\'}"
-      branch="${branch#\'}"
+    if branch="$(_git_invocation_created_branch ${tokens[@]+"${tokens[@]}"})"; then
       printf '%s' "$branch"
       return 0
     fi
     rest="$after"
   done
   return 0
+}
+
+# True only when the command contains at least one branch-creating git
+# invocation (per _git_invocation_created_branch) AND every one of them
+# resolves, via _git_invocation_top_level, to a non-empty physical top level
+# different from $REPO_ROOT. Walks git invocations the same way
+# git_targets_other_repository does, but this cannot reuse that helper
+# directly: branch creation spans two subcommand shapes with different flag
+# grammars (`git checkout -b`, `git switch -c`), and calling the subcommand-
+# keyed helper once per shape would require BOTH shapes to appear before
+# either could exempt anything.
+branch_create_targets_other_repository() {
+  local rest="$1" after found=0 target physical_repo_root
+  physical_repo_root="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)" || return 1
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    local -a tokens
+    _shell_tokenize "$after"
+    tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
+    if _git_invocation_created_branch ${tokens[@]+"${tokens[@]}"} >/dev/null; then
+      found=1
+      target="$(_git_invocation_top_level ${tokens[@]+"${tokens[@]}"})" || return 1
+      [[ -n "$target" && "$target" != "$physical_repo_root" ]] || return 1
+    fi
+    rest="$after"
+  done
+  [[ "$found" -eq 1 ]]
 }
 
 is_git_commit_command() {
@@ -533,6 +575,103 @@ git_targets_nested_claude() {
     if [[ "$sub" == "$want" ]]; then
       found=1
       _git_invocation_targets_nested_claude ${tokens[@]+"${tokens[@]}"} || return 1
+    fi
+    rest="$after"
+  done
+  [[ "$found" -eq 1 ]]
+}
+
+# Print the physical top level of the repository ONE git invocation's global
+# flags target, mirroring _git_invocation_targets_nested_claude's shape
+# (tokens starting right after "git "). Reads only the global flags before
+# the first positional token (the subcommand) and stops there.
+#
+# Forwards exactly -C, --git-dir, --git-dir=, --work-tree and --work-tree= to
+# `git -C "$REPO_ROOT" <forwarded> rev-parse --show-toplevel`, anchoring a
+# relative value to REPO_ROOT the same way reporting-reminder.sh's
+# git_command_targets_repo_root already does (a leading -C "$REPO_ROOT"
+# followed by the forwarded flags, so git's own -C accumulation resolves a
+# relative redirect against REPO_ROOT rather than the hook's cwd). When an
+# invocation carries none of these flags, this correctly resolves to
+# REPO_ROOT itself: -C "$REPO_ROOT" alone is a fully determined target, and
+# callers that need "no explicit redirect" to read as "not this invocation's
+# business" (git_targets_other_repository, below) get that for free from the
+# equality test against REPO_ROOT, not from a refusal here. -c,
+# --config-env, --exec-path, --namespace and --super-prefix are never
+# forwarded, so a command string cannot inject configuration into this
+# resolver's own git call; seeing one of them, or any other flag this
+# function does not recognize, makes the invocation undeterminable. Prints
+# nothing and returns non-zero when the target cannot be determined: a
+# value-taking flag with no value token, an empty value, a value containing
+# $, a backtick, or a leading ~ (this hook never evaluates shell expansion),
+# or a redirect that git itself cannot resolve to a real work tree (a
+# nonexistent path, a bare repository, a path that is not a repository at
+# all). --git-dir given without --work-tree is a real git footgun, not an
+# unresolvable input: git defines the CURRENT directory as the work tree in
+# that case (confirmed against git 2.43), so it resolves to REPO_ROOT and
+# reads as "not foreign" here too - correctly, since the invocation would
+# still act on REPO_ROOT's own working tree, only recording into a borrowed
+# object database.
+_git_invocation_top_level() {
+  local -a tokens=("$@")
+  local -a forward=()
+  local i=0 n=${#tokens[@]} tok next
+  while (( i < n )); do
+    tok="${tokens[$i]}"
+    case "$tok" in
+      -C|--git-dir|--work-tree)
+        next="${tokens[$((i + 1))]:-}"
+        case "$next" in
+          ''|*'$'*|*'`'*|'~'*) return 1 ;;
+        esac
+        forward+=("$tok" "$next")
+        i=$((i + 2))
+        ;;
+      --git-dir=*|--work-tree=*)
+        next="${tok#*=}"
+        case "$next" in
+          ''|*'$'*|*'`'*|'~'*) return 1 ;;
+        esac
+        forward+=("$tok")
+        i=$((i + 1))
+        ;;
+      -c|--config-env|--exec-path|--namespace|--super-prefix)
+        return 1 ;;
+      --*=*|-*)
+        return 1 ;;
+      *) break ;;
+    esac
+  done
+  local effective physical
+  effective="$(git -C "$REPO_ROOT" ${forward[@]+"${forward[@]}"} rev-parse --show-toplevel 2>/dev/null || true)"
+  [[ -n "$effective" ]] || return 1
+  physical="$(cd "$effective" 2>/dev/null && pwd -P)" || return 1
+  [[ -n "$physical" ]] || return 1
+  printf '%s' "$physical"
+}
+
+# True only when the command contains at least one `git $subcommand`
+# invocation AND every one of them carries an explicit directory redirect
+# that resolves to a non-empty physical top level different from
+# $REPO_ROOT. Mirrors git_targets_nested_claude's all-invocations semantics
+# (checks each matching invocation individually, not "does ANY git call
+# anywhere in the string resolve elsewhere") and fails closed the same way
+# _git_invocation_top_level does: an undeterminable invocation of the named
+# subcommand makes the whole command NOT provably foreign, so the caller
+# keeps gating rather than standing down.
+git_targets_other_repository() {
+  local rest="$1" want="$2" after sub found=0 target physical_repo_root
+  physical_repo_root="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)" || return 1
+  while [[ "$rest" =~ (^|[[:space:];|\&])git[[:space:]]+(.*) ]]; do
+    after="${BASH_REMATCH[2]}"
+    local -a tokens
+    _shell_tokenize "$after"
+    tokens=(${_TOKENS[@]+"${_TOKENS[@]}"})
+    sub="$(_git_first_subcommand "$after")"
+    if [[ "$sub" == "$want" ]]; then
+      found=1
+      target="$(_git_invocation_top_level ${tokens[@]+"${tokens[@]}"})" || return 1
+      [[ -n "$target" && "$target" != "$physical_repo_root" ]] || return 1
     fi
     rest="$after"
   done

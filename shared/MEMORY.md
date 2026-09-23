@@ -17,6 +17,13 @@ data, and unredacted logs belong in approved protected data systems, never
 shared or native memory. Only non-sensitive preferences and scratch may remain
 local.
 
+OpenWiki, when enabled, generates descriptive `openwiki/**` pages from the
+current repository. Those pages are derived knowledge, not project memory:
+do not copy source-derived architecture, module, API, or test facts from
+them into this file merely to help a future agent. See
+`.claude/instructions/workspace.instructions.md`'s Knowledge Ownership
+section for the full contract.
+
 ---
 
 ## Python / General

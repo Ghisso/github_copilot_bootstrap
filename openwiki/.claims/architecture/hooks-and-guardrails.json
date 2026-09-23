@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:6912547aa4edd2bad370b4e191fba04889b53e5544e82abcd71af30bfa7ed221",
+  "claims": [
+    {
+      "id": "claim_577abfccd7214b578dafc049c57d3ba8",
+      "statement": "run-hook.sh is the shared dispatcher for Copilot, Claude Code, and Codex hooks: it resolves the repository root from its own location, then GITHUB_WORKSPACE, WORKSPACE_FOLDER, VSCODE_CWD, or PWD, then git rev-parse, exits 2 on a missing script name, and only warns and exits 0 when the named script file is missing.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/run-hook.sh",
+          "version": "repo-file-v1:sha256:fbf6d4ed20fa552013a4a7a85fc9a2cb2446eb512436ea297599968a65e435bc"
+        }
+      ]
+    },
+    {
+      "id": "claim_87a241e013674e9a893bc8edab214ed6",
+      "statement": "Google Antigravity's generated .agents/hooks.json wires a single '*' PreToolUse matcher to antigravity-pretool.py, a Python bridge that normalizes the payload and invokes the canonical guards, with no lifecycle hooks.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1230-L1262",
+          "version": "repo-lines-v1:sha256:f79e739ba534e6de73d0f011f17f32447a3dba6ece5cfd1c0283a193cf2ce893:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MjJjNDJjZDE5YzZkMDNkODA4YzQ1MjcyMDU1MjgyNWI3ZWExYzViNDkxYjIxODUxMWNhYzc0MTVjZjlkOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE4ZjU5MjA0YzFjM2RmMzlkNGY5ZDVlN2E5N2Q5N2E4NTU1MDExYzM0YTg2MzIxMjQ3YTE3MWQyMzhkOTFmNDIifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/antigravity-pretool.py#L1-L30",
+          "version": "repo-lines-v1:sha256:e45e8089858513e5969c6c81dc21650d3e0a8cc0e48b0fe3bed520b13abaaa4b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjNmRlZWFhZmI4NGY2NTI0YTE4YmEyMmQ1NTBiM2Q0OWY3MTlmYmU0YTI3ZjUzZjc1ZTQwNzg4YzFmZmU1MjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMTU3NzcyYjNiYmRhYzJjYmE0Zjc2OTAyYmViNWUxN2JhZTkyMDg2MDkwOTllYzdiMDRjNDBiOTY4NmFmMjUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_dabc98b50b474e5385a3f3b7e13cc9ce",
+      "statement": "Claude Code and Codex PreToolUse routing is split by matcher: Edit|Write runs protect-files.sh, Bash runs pretool-bash-guard.sh, the wildcard runs only context-mode-dispatch.sh, and mcp__openwiki__openwiki_begin runs openwiki-guard.sh pre; PostToolUse on Bash runs record-branch-state.sh, context-mode-dispatch.sh, and reporting-reminder.sh late-report.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1042-L1110",
+          "version": "repo-lines-v1:sha256:bbc65a54e994bbef4fe257e1aec372e71d990701fa8c14aa4a0127a199f3b43d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUzOGRkMmNjNTdmYjM4ZDI2Mzc0ZjYyZDU0OTRkNjE1ZDdjOWZlMGRkMmE4YWYzZjZhOTY2ZWNlM2Q0OWI5MmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBjNjQ3OWNjMjMwNDQwZmQ0MWU4MjI0MjE4Njc5Njk4NTU5ZDI4OTNiZDY3YjQzODBhZmFiODExYjM4YTU1YWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZmNlZGNjZDA4MTkxNTgzNzY1NzhlOWRlMGI5MDE1MzJmODQwYWRhOWYyYWRiOTEwYzg1NzUyZDlhOTg5YTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA2NTRjYWI1MzQ1ZmQwMTNiYzQwMjMxOTUwNDgyMWQ3ODZlNDUxYjY4ZjlkODM5ZjkxZTllZjY3YmNlMTA1NDUifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1150-L1195",
+          "version": "repo-lines-v1:sha256:69d723cc8a3ee4083215d6dba8cd53ab4494cd286a74f64dac09bf46a918d528:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxOGMyYjk2OWZhOTc5MjJhNTdhYjMxZDgwMTMwZDdlOTUxYmMyMGExNmQxZWU3OTFiMjA5ZGJmOTM0YjkyYmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3YjUzNmM4NjQ5ZWQxNDYwZDU3MjE3ZTVjYzBiMmVkNjEyNDdmMmUwMDE0MjI2NGZhN2EwMjFiY2Q4MDU5OGEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg3MjNmZmRiNzVlNGM1ZmIxYjljNjA2NzIxYTJmOTkxOTQwMWM2Mzg3NjU3MmNjMjM4YzQzNTNlYTJhZmY3YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1OTAzM2YzODE1MmFmMmI5OTk5OWZjZDhhMjFiODdjMDlkOGU2M2RhNWFiOGY2NDMxMTc5Zjg0YTQyYWM0OWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9ef8ef66bf964990b0cda7d52ba5552c",
+      "statement": "Claude Code wires openwiki-guard.sh post to PostToolUseFailure as well as PostToolUse, while Codex fires nothing on an MCP error and instead runs a payload-free openwiki-guard.sh post at Stop; Codex also runs state-sync.sh push and reporting-reminder.sh prompt on UserPromptSubmit and state-sync.sh checkpoint on SessionEnd.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L1086-L1098",
+          "version": "repo-lines-v1:sha256:22afe3ccc41dc7299f5ab735b2f2810f150e05559c3aa798f3ca6f99e42ca2bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxY2E3YWJiNzg3Mzc2NTY1ODQxNzRlNjcyMGIwYjk1MGU3NmU0ZDlkNjJlMjdhODJiYWNkY2I4NGViNTZkYTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhM2VjMmRiMGQ3ODFjMGFlMTk3NjhiOTBlOTBlZTYxNWU1NmU1YzMyODJkNWMwMTk5OGY5Yjc0NzE0YzhkNzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIwOGM1MmY0NGFjYzlhNDVlY2YyYzk1OTQ0ZTVmYTAzNTEyMDFkZGFkMWIwNTgyMTE5MjQ2Mjk3NjlmMTRhODAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4ODJhZmFjMDQ5MTA5MWRhYjA4MzY0NTIwZDJiMzMzNWI4YTIxNDAzMDIyZTA5ODg4ZGJmODU4YWZhYTZmOWYifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1203-L1226",
+          "version": "repo-lines-v1:sha256:a68bb58a99e36547ed18b146db3545f03c324e17e844b3801cf5c323d1a5721c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmM2IzMzg2NzhiYjY1ZTA0NGJjMzQyYjEwM2Q1MTRiNTQ1NjhiM2RjZTY0ZjQxYjIzNjY5ZDdhZDE2NTgxZjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlNjczYWJkNDU3YTk3ZWVhMTdhNjAwNjJlYjBmYWVhNmJkZjA5NDg2OGNjNmI4ZjhjMGViZGEyZjYxZWQ0MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIxNzdiYmYwMzVjMzg2MGM2YzRiZDQ1ZmQzMGM2MjgwNmZiMDA4MTM4ODcwZTQ4YjI3NTkwMGVjZjdkZGUyYjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlZGUxYjRmNDNkZmM4YjA3M2UyNzEzYzkwNTYyOWNmMTZiYWViYWI5Yzk1YTAyZDA4Y2RiOGE3NmVjMTE1N2IifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_772a4fb0d28f46228762876e9942510d",
+      "statement": "GitHub Copilot's hooks.json has no matchers and lists protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh individually under PreToolUse, with state-sync.sh pull, session-log.sh, session-start-state.sh, and context-mode-dispatch.sh on SessionStart and session-log.sh, stop-session-log-check.sh, and state-sync.sh push on Stop.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/hooks.json",
+          "version": "repo-file-v1:sha256:c9f1cc1901d9b57dce12b531e0dbcdeb5867cc90fa8fc0b70ef015767f0506c0"
+        }
+      ]
+    },
+    {
+      "id": "claim_159063903b2f4105a9fa09ba3b0c90b4",
+      "statement": "pretool-bash-guard.sh runs protect-files.sh, git-protection.sh, enforce-branch-state.sh, enforce-commit-gate.sh, and enforce-pr-gate.sh in sequence with the same payload, exits on the first deny or ask decision, and fails closed if a guard exits non-zero or prints malformed output.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/pretool-bash-guard.sh#L6-L32",
+          "version": "repo-lines-v1:sha256:e25f9177b72c1e54e82c44bc19c7cc2b9e9cd843501472e697d7832549f35de3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0ZTJkYTdjNTU4MzdmZDY2NWYwYzZhNDllYjY0NTI0NjYxZmQzNzMzODk2ZDEyZWY2NDMyZWE4MDE2YzJhMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxMTdmYTAwNmJhOTIwODUwMGIyOTMwY2U2OWNiZGU0MzZjNjQ3YWZhOTE3Y2I3Mzk2YTliYzkxMTFhNDZkZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkYTMzYjE0MTZjNTZjZjUwNmUwMThjMThlODU2NzU2NmMwNTBlZjM0Y2M2MWNkODRmMmNlYjUxMzE4ZWE0OWIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d3c79d2aaa174cc7bf6ef62495ddcb20",
+      "statement": "fail_closed appends a timestamped line to .claude/session_logs/hooks-errors.log, emits a deny decision whose reason begins 'hook could not evaluate the request safely, denying:', and exits 2; an empty payload is allowed while an unparseable one fails closed.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L36-L87",
+          "version": "repo-lines-v1:sha256:af02cd81305148f845695a2b33e5264f01d17a2fcd08479cb71ff2b897a1a00f:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdiMjI0NWQwMjg0ZDE1NDk3YjAwNzhmMzE3NmJmNTNhMWI2NmZhMWI3ODU1ZjZjNDg1N2FjOTYxMjE5Mzk4ODgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkwOTMwYzM5ODlkMjMwMGNkN2RjNTk0OWQyYzVlYTg3M2YwMzBmZDlhYzljNjgzNDFiY2QwZmFjYjBmZTAzNjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRjZWFhNTI0YzBlYmY1MDlhYmZhMGNmOGM0ZWRmYzhlZmUwNjRmMzk1NmNmYzlmOTEzNjU4ZDQzOGUzNmE5YjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgyOTdmMDM0N2FjZmZlMTdkYWJhZjkxYTE3MGYyNzA3ZDU2MDY0MGM5YWI4ZjBiMTViYzdiOTNjZTIwZDY5OTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3023c921163348fb87d94ede8990cd19",
+      "statement": "protect-files.py classifies mutations of credential-shaped names (.env, .env.*, credentials*), uv.lock, and the four hook configuration files; a protected mutation is denied on openai-codex and google-antigravity and produces an ask decision on other hosts; the wrapper runs the classifier with plain python3 and fails closed when it exits non-zero.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L14-L19",
+          "version": "repo-lines-v1:sha256:0f37a18609366a5af5fa83ed80b21273f55a0c6bce0653cde4f2c10371c051e0:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjg0Y2M4ODE0ZGMxNjEzNDQ2OTdmNDYyYWNjOTVhNmM3OWFkZGUzOWZhOWVlY2RlYmM2YmY2NmI3ODM3NDc2ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjg2Y2E3YjIzNDdhYjFlYjNiNzYzNjMxN2U5ODk0NjUzYTZhOWQ3MmE2MGY1YjVkMTg2NGNkMGJkYTNlNjJjOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc1MzUyYTZlZjIwYTYxMTM4MDgzYTcwNzA4YThhMDk4OGE1YWQ3ZjAyM2MxMjZiMTBhNDkwZTVhODdlYzQ4ZiJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1420-L1445",
+          "version": "repo-lines-v1:sha256:fceff6e2283711f30bfdc5c8eb42a52d8cc08d2651a3c08e17befa6fac358ab1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZGUzNWVmYmI3Yzg2ZmYxNmEyMTdkMDgwNjk1MjdlMDg0Mjk1ZTk5MjU4MTA4ZjI0ZmQ4M2Y5Mzg5MDY2ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzM2I4M2Y1ZTE5MDY3ZjcyN2Q1MDYxOWU5MTQxZWZjZTAzYmUzNGRlMDQ5YzFlYTkwNjIyMDVlMWJlYTI5ZWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMTg1NjgxZTkyNjc1YzllMWFlN2U3YzI5YTAyMzg5NWJhMWMwOGZmMDkyNjdkNTFjNjFlMGM5NTk0NWU2MTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ0MzlkMmVlN2NmYjYzOTk3MDFlYTQ4MmU0NjVmZDEwZDRiOTlmOTcyYzlkNWJkNmMxZjJiMTViOTM4NGFkOWMifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L300-L306",
+          "version": "repo-lines-v1:sha256:94697756a5a3dbefee21c2214ec955f36389258b670537f662dbe7ab05b1862a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMzYTk3ZWNkZjZkMTc2YTQ4NzM2MWEwODdjNmUyMTM0MzkxMTU4NzY1OGMzOTBiMWU4ZWM4ZjI5NGQ5NmJjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmVhNWQyZGI1MDAxNjJmMTEzNDJhMjQ1ZWM5Y2MyOTliZjM2Njk3ODE4MmE0MzEzYTAzNjhkN2Q0MmE5NDIwZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDNlMTUyY2M3NzJhOWFiZWM3NTQ4YjYxMDM1ZTBhOTlhZWE5NDM2NDY0NjdhNTY2NDc0MmQ4ODFmN2ExNzg2NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYThlZmRmYTkwMmZjNzU5YzM0MzdlODJlZjNhMTc1M2RmM2MzZTAzNGVmMTI4MGY0OTRkNWYzNjM5NTljNzY5ZiJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.sh#L20-L56",
+          "version": "repo-lines-v1:sha256:4d61f41d51678212d4a12313a531077ddc176d042b08f3f4f7c9a5ba82764619:eyJzZWxlY3RlZExpbmVDb3VudCI6MzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhmN2FkMzAxYzMxNDc2YjBlNzc4MGJiNWIyN2VlYzA0YzY1N2Q0NmNhNzFmMDdmMmQ1NjQyYWJiMTc1MzkzNjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_78cd7284343e4088a4ba850e7a0da96f",
+      "statement": "git-protection.sh denies git reset --hard, force pushes (-f, --force, --force-with-lease), git push --mirror, git checkout --, git restore --source, git clean with both f and d flags, and deleting main or master, tokenizing each git clause up to the next unquoted shell operator and lowercasing tokens.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/git-protection.sh#L27-L123",
+          "version": "repo-lines-v1:sha256:9ccf65aa8f5ee715d40327b33e310320c77824985b0e481adf13fdcdf2ae49a1:eyJzZWxlY3RlZExpbmVDb3VudCI6OTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2MDIyNGVlOTVkOWNhYWE0ZGJmZWJhMzQ3MjY4M2QwZTc0NWNmMjdiOTYwOWExZjYyMzk3ZDRiOWU5YjBkYmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJlMDA3ZGY5YzllZDhiYWFhNDM2NTMzZGQ1ZDM5OTc4MDRjNGYyODk5OTllN2ExZjZiYjRmMzMwNzBiMTA0M2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_ec605c1578ae40c0a87d272f6418e355",
+      "statement": "enforce-branch-state.sh requires a new branch named <plan_name>_implementation created from a clean dev checkout and backed by a big plan with type big-plan, one status field, and status planning or in-progress; a branch created in another repository via -C, --git-dir, or --work-tree is not judged by this repository.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/enforce-branch-state.sh#L8-L87",
+          "version": "repo-lines-v1:sha256:9eabe477fbcc793f5d2ee1daf51721cf91a5f1099f01bd65660cb44c2048b8cb:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4NjBjODcyY2IxNGU0MmZjMzg3Mzc3ZDI3MGUzYzNiZTFlMDg1YWE4OWFjZTUxM2YyOTllNmI3MmEzYWNhNjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5YzBkNjIzYWM4MzRlMDAxZjZhNGM5NzUxY2E2NmM1ZTFhOTNkNDNlMzMzNDI4NzA4ZTNhMjcxM2Y2OGYxMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_983fec4b498146feb407d7dd2c7375b8",
+      "statement": "enforce-commit-gate.sh stands down for commits targeting the nested .claude repository or another repository, requires an implementation branch, runs assert_commit_invariants for ordinary commits, and lets bypass subjects skip only the plan ceremony while still enforcing the branch check.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/enforce-commit-gate.sh#L21-L80",
+          "version": "repo-lines-v1:sha256:624ab14a47969a7b665b89c7495cb40470831c794cbe298c37c21e14a696ae6b:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY0ZDc1YmNlM2M5ZDk1MjE0YzRjZTcxOTE2MzU4MTVkOWIyZjBjZjE4ZWM4YzU4NzUyY2RhOGExNzFlMjU4NGEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlN2RlNzIzZTgyOTdiMGM4ZjVjZTM5NWZiNTRjZjE3MzQ0YmVmMmVhMzAyMzZmMGM1MDE5MjY1ZGU3OTUyMWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_edb385a7d6f84e4bb88c0004967c1453",
+      "statement": "enforce-pr-gate.sh lets a push aimed at the nested or another repository stand down but never a pull request, requires an implementation branch, requires --base dev for gh pr create, runs assert_closeout_invariants for pull requests and assert_push_invariants for pushes, and refuses a chained commit-and-push with an explanation.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/enforce-pr-gate.sh#L21-L99",
+          "version": "repo-lines-v1:sha256:d967e452782b0115a0696eac4870ce83eb0e05bda006fc98ac4a2f92c8f682ec:eyJzZWxlY3RlZExpbmVDb3VudCI6NzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5YzdmODllZWY3MTFiOGZlZDU5YTE5NmJkODY0ZTAxNWVkNDJmOWZjMWVkZGE4YjBiY2FmYmZjYmVlYmY2OTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkxMWMzMzJmMTE3MThjMjMxY2U3ODMyZjk1ODk4YWZhOWZiYWI5ZWM3ZTcwNjk0MTBkNmJhZDU3ZjI0Y2E5MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9bb9df3a839a4e25be7746b2df708ac8",
+      "statement": "openwiki-guard.py pre denies mode init, a foreign or missing root, and a missing openwiki/INSTRUCTIONS.md, otherwise snapshotting AGENTS.md, CLAUDE.md, and the OpenWiki workflow path under .claude/.cache/openwiki-guard; post restores byte for byte, removes an adapter absent before, refuses symlinked paths, and exits 2 for a concurrently edited adapter.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/openwiki-guard.py#L1-L45",
+          "version": "repo-lines-v1:sha256:46f6e1a21ee7a71bfea7607870e964af12b26a3ad0396eeb9365dc47247e9939:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYwZTQ5MzA0NGI2YjMxNTg4YmY4MzkwZTUzMDg0NTk1MzhjYzRjM2YzODM3ZDRlNDNiMmY2N2M0YzQ5ZjhjN2QifQ"
+        },
+        {
+          "resource": "repo://tests/test_openwiki_guard.py",
+          "version": "repo-file-v1:sha256:088289ab9fc4711ebc4a6bc7ef265eaa83c1d68888f0abb27cfa7888cac4987b"
+        }
+      ]
+    },
+    {
+      "id": "claim_e852686953f14d27b2ac7a8499aa9e91",
+      "statement": "claude-stop.sh and codex-stop.sh are single ordered Stop wrappers that run session-log.sh, stop-session-log-check.sh, state-sync.sh checkpoint, and state-sync.sh publish in sequence, logging and skipping each child failure.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/claude-stop.sh",
+          "version": "repo-file-v1:sha256:fc442d7cd1972321d7f1241635f00d3f3b8eed59a27bb643795c5d897270c3de"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/codex-stop.sh",
+          "version": "repo-file-v1:sha256:c554dd7c5f01b5812acaebf9703f7017bad300c9eedb5f25bc5ddd5ce7d1918e"
+        }
+      ]
+    },
+    {
+      "id": "claim_196c129be00d4f4ba5953a664fdecd78",
+      "statement": "record-branch-state.sh writes originating_branch, implementation_branch, started_at, and current_phase into the big plan after a branch creation and activates the first planned phase, reporting rather than writing an unsafe value or unexpected status; record-commit-closeout.sh advances current_phase from the post-commit hook and never infers a transition from a merge.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/record-branch-state.sh#L39-L52",
+          "version": "repo-lines-v1:sha256:1277b644aaa162c38b3630c8938e20ab3835ea592221ea81e8ab3849a778640f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiOTk1M2UyY2QxNmEwYzc2MTU4ZmRmMjZkYWVlYjU2MzkxYjljZTIxODlhZTlhMGNlMjMwOTVlYjM1ZmU4ODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NmE4NGE1NDViMmI4Zjk0ZTM3MzQyNjNlZjVlY2UyNjViNDQzZWUyYmIwOWE0MzdiNjAzYjZlM2Q2Y2I0N2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZTkzZWIwYTc2OWJmZDE4MDQ1ZjEyNzJhZDU3NTZjNGM5MDk3YmE5N2M1ZjE1YWU2Yzg4NTU4Mjk5MDZhNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkZWQxNzkwMDJkZDU5ZWFhODFhODk4NTYzY2M3NTkxYTQwN2NlZTZiZjcxODQ3MjNkODY2NzAwYjdjNDcyZTgifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/record-commit-closeout.sh#L1-L40",
+          "version": "repo-lines-v1:sha256:7940dab6cb4eebfb148b601ca53355d83280626050ddf4e2589685a1482dd2b2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlNWMxNWMwMjVkOWRkMzQyNmQ0NDVmMDk4ZjA5NzE0MzRlZDdmMzEyMTk4OTQ5ZDM0ZmE1ZjdjN2NkYmMxZWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxMWJhNmU5NDUzZjIwZDVkOTJjYWEzM2E1ZWYzYWVlNTc2NTcwMjcxODQzNjZhYzI4MDVlZjczYjk1ZWE3YWUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_eff473358884421798092cd703e2535e",
+      "statement": "The Git hooks commit-msg, pre-push, and post-commit form a second enforcement layer that Git runs from the working-tree root with no command string to evade; post-commit runs the closeout recorder then state-sync.sh push and can never fail the commit.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/git-hooks/commit-msg#L1-L14",
+          "version": "repo-lines-v1:sha256:4657e5f7bbc54c44554c32405975e13afa4b79c7d087b839e324f2ba5f98f529:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQwZTQ2Y2NhNGUxOGJkMmFjMjYwZDNjOGYwM2UzNGU0MjFiYTc1NDM4MTE4YTU5ZmMyMzcxZDkwZTQ2NTI5ZWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlhMTU3OGI3MDk2ZjY5YTBhMjkyNzI4ZDNkNWJiMzBhNTM1OGNlMjc0NjA2NjdhYzk2NTM1MWNlNjZjZjIyM2MifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/git-hooks/post-commit",
+          "version": "repo-file-v1:sha256:e28fcd747bbf3028143ee19500c0f0d2c28934237b5233dd8395496c00d877e1"
+        },
+        {
+          "resource": "repo://shared/hooks/git-hooks/pre-push#L1-L14",
+          "version": "repo-lines-v1:sha256:331a855b31f2b14594709c366593229a4106a615a0c10a8092c6c40c39fdb109:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg0NDk1NTI2YWZhM2I2YjE3NjdjMTUxYWY5YWM5OWUxYjZkNmYzYTZkMmM2OWQxMDllYTNiMDg5NTQzNzM4MDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9aa01cfc28ff433e9c9c474c350ec0e9",
+      "statement": "hooks-errors.log is local-only diagnostics that state-sync.sh gitignores and untracks in the nested repository, while hooks-bypass.log stays tracked and blocks publication until bypasses are acknowledged in the big plan.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L1548-L1577",
+          "version": "repo-lines-v1:sha256:2e107162c03c9c97f4ca2ad7c7c41fef10428b722d780f151c9db41db3a35904:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQyY2RiODAyOThmNTFhM2E2OWQxZWJlZDM5MmQ4NzA3YWNkNDIxZGY4N2Q0YTU0NDY4NDZlYzg5MGNlNjk4ODciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjYTcyYzViNDM2MTVkYTU4YWQyNzBjOWFhNWRkNTY3NzA0NWM3OTc0NmM1M2I5YzZiOWYyNzMzYzg1MzI5MjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyZjQwOTVhODViNjYwODY3NTZiN2M1Y2UzNzgyNzBkMjIyZDU5NTk0YjY2MTdhOGQ2Njk3ZTM4N2RlZjYwODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhMzlkYWE4MmViZjRjY2RhZWUxYzNmN2E3YjExNzg5N2ZiYWE3ZjlmNGQyYjVjNmExYjI4MmYxYjIyYjE0MGYifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L105-L125",
+          "version": "repo-lines-v1:sha256:ec524aec1c2d1a9444350a6e0719832e0cccc7230f860134d3b567bedf3519bd:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzOWI3YWRkMTRjODUwYzNjZDdlYjhmY2UxMzE4NmE2MWVhYzI4MTBkOGZiOGViYzg3ZjRiNzY0ZjcwZDBhMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0ZGQ2MjYxMGZiNzNkZTUyNjllNjJmNDdlYTk4ZGQ2YTk2OWU0ODlhNDkxOTAxMTI0NjYyNjMyZDkxOWZjYjIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhNGMxZGJlM2Y1ZTJjMzBjYmU3MTQ5YzVhNjlmYzAwODAwOTM0NGIwZWVmZTY4NzFlNGVlNjE4ODUxNzU2MmEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_4004699af35f4919a91b9058fef65c9b",
+      "statement": "reporting-reminder.sh is advisory only: it traps errors to fail open and skips the reminder instead of denying anything.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/reporting-reminder.sh#L1-L15",
+          "version": "repo-lines-v1:sha256:e384657842acf96a53410a40cb795a52dd0bd650ed09ed1e622ec88731fa3213:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkNTZiYjU3ODBmZjIwOGZmYzZlZTcwYjEwZWYzYTM3YmEwYmFiOTkzZjY4ZWU3YzUwZWZiYjk0NmMwMTBiMGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY5YzBkNjIzYWM4MzRlMDAxZjZhNGM5NzUxY2E2NmM1ZTFhOTNkNDNlMzMzNDI4NzA4ZTNhMjcxM2Y2OGYxMDAifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T05:37:12.382Z"
+  }
+}

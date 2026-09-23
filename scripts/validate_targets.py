@@ -24,6 +24,7 @@ from check_runtime import runtime_drift_errors
 from generate_targets import (
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
+    OPENWIKI_BEGIN_MATCHER,
     ROOT_GUIDANCE_WORKFLOW,
     SUPPORTED_AGENT_TARGETS,
     antigravity_hook_command,
@@ -233,11 +234,30 @@ REQUIRED_HOOK_SCRIPTS = (
     "claude-stop.sh",
     "codex-stop.sh",
     "reporting-reminder.sh",
+    "openwiki-guard.sh",
+    "openwiki-guard.py",
 )
 # Approved Context Mode capability contract (Phase F). The allowlist is exact
 # and closed; a new upstream tool needs a later approved plan before it can
 # join CONTEXT_MODE_ALLOWED_TOOLS.
 CONTEXT_MODE_PINNED_VERSION = "1.0.169"
+OPENWIKI_PINNED_VERSION = "0.5.2"
+MERMAID_PINNED_VERSION = "11.16.0"
+JSDOM_PINNED_VERSION = "29.1.1"
+OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"
+# Exact, closed allowlist of legitimate devcontainer containerEnv keys. Any
+# other key -- most importantly a provider credential such as OPENAI_API_KEY
+# or ANTHROPIC_API_KEY -- must fail validation instead of silently passing.
+ALLOWED_DEVCONTAINER_ENV_KEYS = frozenset(
+    {
+        "HF_XET_HIGH_PERFORMANCE",
+        "UV_CACHE_DIR",
+        "UV_LINK_MODE",
+        "UV_PROJECT_ENVIRONMENT",
+        "HF_TOKEN",
+        "HUGGING_FACE_HUB_TOKEN",
+    }
+)
 CONTEXT_MODE_ALLOWED_TOOLS = ("ctx_index", "ctx_search", "ctx_stats", "ctx_doctor")
 CONTEXT_MODE_BLOCKED_TOOLS = (
     "ctx_execute",
@@ -1313,6 +1333,11 @@ CLAUDE_EXPECTED_EVENTS = {
     "SessionStart",
     "PreToolUse",
     "PostToolUse",
+    # Fires instead of PostToolUse when an MCP tool returns isError: true
+    # (docs/2026-09-19-openwiki-hook-mechanics-spike.md U6); the openwiki
+    # guard's restore is wired to it so a failed openwiki_begin still gets
+    # cleaned up.
+    "PostToolUseFailure",
     "PreCompact",
     "Stop",
     "UserPromptSubmit",
@@ -1369,10 +1394,31 @@ def reporting_reminder_hook_errors(hooks: object, target: str) -> list[str]:
             handler("reporting-reminder.sh", "late-report", target),
         ],
     }
-    if post_groups != [expected_post]:
+    expected_openwiki_post = {
+        "matcher": OPENWIKI_BEGIN_MATCHER,
+        "hooks": [handler("openwiki-guard.sh", "post")],
+    }
+    if post_groups != [expected_post, expected_openwiki_post]:
         errors.append(
-            f"{target} Bash PostToolUse must leave commit closeout to native Git and append one late reminder"
+            f"{target} PostToolUse must leave commit closeout to native Git, append one "
+            "late reminder, and restore the openwiki adapters"
         )
+
+    if target == "claude-code":
+        # Claude Code fires PostToolUseFailure instead of PostToolUse when an
+        # MCP tool returns isError: true (spike U6); the restore is wired
+        # there too, so a failed openwiki_begin still gets cleaned up.
+        failure_groups = hooks.get("PostToolUseFailure")
+        expected_failure = [
+            {
+                "matcher": OPENWIKI_BEGIN_MATCHER,
+                "hooks": [handler("openwiki-guard.sh", "post")],
+            }
+        ]
+        if failure_groups != expected_failure:
+            errors.append(
+                f"{target} PostToolUseFailure must restore the openwiki adapters"
+            )
     return errors
 
 
@@ -1399,10 +1445,19 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
         native_matcher: ("protect-files.sh",),
         "Bash": ("pretool-bash-guard.sh",),
         "*": ("context-mode-dispatch.sh",),
+        OPENWIKI_BEGIN_MATCHER: ("openwiki-guard.sh",),
     }
     if len(groups) != len(expected):
-        errors.append(f"{target} PreToolUse must have exactly three routing groups")
+        errors.append(
+            f"{target} PreToolUse must have exactly {len(expected)} routing groups"
+        )
     found: dict[str, tuple[str, ...]] = {}
+    known_scripts = (
+        *expected[native_matcher],
+        "pretool-bash-guard.sh",
+        "context-mode-dispatch.sh",
+        *expected[OPENWIKI_BEGIN_MATCHER],
+    )
     for group in groups:
         if not isinstance(group, dict):
             errors.append(f"{target} PreToolUse group must be an object")
@@ -1416,11 +1471,7 @@ def pretool_routing_errors(hooks: object, target: str) -> list[str]:
             next(
                 (
                     script
-                    for script in (
-                        *expected[native_matcher],
-                        "pretool-bash-guard.sh",
-                        "context-mode-dispatch.sh",
-                    )
+                    for script in known_scripts
                     if script in str(handler.get("command", ""))
                 ),
                 "",
@@ -3065,12 +3116,22 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                         errors,
                     )
 
-    expected_lifecycle_hooks = {
-        "Stop": ("codex-stop.sh", (), 180),
-        "SessionEnd": ("state-sync.sh", ("checkpoint",), 3),
+    # Values are a tuple of (script, args, timeout) triples, one per expected
+    # handler in that event's single group, in order. Stop carries two: the
+    # existing codex-stop.sh, plus the payload-free openwiki-guard.sh post
+    # call (Codex's O2 adaptation - it fires no failure event at all, spike
+    # U6, so the restore instead runs unconditionally at end of turn).
+    expected_lifecycle_hooks: dict[
+        str, tuple[tuple[str, tuple[str, ...], int], ...]
+    ] = {
+        "Stop": (
+            ("codex-stop.sh", (), 180),
+            ("openwiki-guard.sh", ("post",), 10),
+        ),
+        "SessionEnd": (("state-sync.sh", ("checkpoint",), 3),),
     }
     if isinstance(hooks_by_event, dict):
-        for event_name, (script, args, timeout) in expected_lifecycle_hooks.items():
+        for event_name, expected_handlers in expected_lifecycle_hooks.items():
             groups = hooks_by_event.get(event_name)
             check(
                 isinstance(groups, list) and len(groups) == 1,
@@ -3091,37 +3152,38 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
                 errors,
             )
             check(
-                isinstance(handlers, list) and len(handlers) == 1,
-                f"Codex {event_name} must have exactly one command handler",
+                isinstance(handlers, list) and len(handlers) == len(expected_handlers),
+                f"Codex {event_name} must have exactly {len(expected_handlers)} command handler(s)",
                 errors,
             )
-            if (
-                not isinstance(handlers, list)
-                or len(handlers) != 1
-                or not isinstance(handlers[0], dict)
+            if not isinstance(handlers, list) or len(handlers) != len(
+                expected_handlers
             ):
                 continue
-            handler = handlers[0]
-            check(
-                set(handler) == {"type", "command", "timeout"},
-                f"Codex {event_name} handler must not use unsupported fields",
-                errors,
-            )
-            check(
-                handler.get("type") == "command",
-                f"Codex {event_name} handler must be a command",
-                errors,
-            )
-            check(
-                handler.get("command") == codex_hook_command(script, *args),
-                f"Codex {event_name} must invoke {script} with the expected operation",
-                errors,
-            )
-            check(
-                handler.get("timeout") == timeout,
-                f"Codex {event_name} timeout must be exactly {timeout}",
-                errors,
-            )
+            for handler, (script, args, timeout) in zip(handlers, expected_handlers):
+                if not isinstance(handler, dict):
+                    errors.append(f"Codex {event_name} handler must be an object")
+                    continue
+                check(
+                    set(handler) == {"type", "command", "timeout"},
+                    f"Codex {event_name} handler must not use unsupported fields",
+                    errors,
+                )
+                check(
+                    handler.get("type") == "command",
+                    f"Codex {event_name} handler must be a command",
+                    errors,
+                )
+                check(
+                    handler.get("command") == codex_hook_command(script, *args),
+                    f"Codex {event_name} must invoke {script} with the expected operation",
+                    errors,
+                )
+                check(
+                    handler.get("timeout") == timeout,
+                    f"Codex {event_name} timeout must be exactly {timeout}",
+                    errors,
+                )
         session_end = json.dumps(hooks_by_event.get("SessionEnd", {}))
         check(
             "publish" not in session_end and "push" not in session_end,
@@ -4063,8 +4125,21 @@ def write_fixture_closeout_receipt(repo: Path, phase: str = "phase-one") -> None
         artifacts = verification.closeout_artifacts(
             repo, metadata, "fixture change does not alter public behavior"
         )
+        # The Verification Evidence Contract (G1) requires a matching result
+        # for the plan's "true" item written by write_small_plan.
+        extensions = {
+            "verification_items": [
+                {
+                    "item": "true",
+                    "status": "PASS",
+                    "exit_code": 0,
+                    "duration_seconds": 0.01,
+                    "output_tail": "",
+                }
+            ]
+        }
         closeout_receipt = verification.build_receipt(
-            "closeout", closeout_checks, metadata, artifacts
+            "closeout", closeout_checks, metadata, artifacts, extensions
         )
         verification.receipt_path(repo, "closeout", phase).write_text(
             verification.canonical_json(closeout_receipt) + "\n", encoding="utf-8"
@@ -4210,6 +4285,7 @@ def write_small_plan(
     if status == "paused":
         pause = "".join(f"{key}: {value}\n" for key, value in pause_values.items())
     duplicate_status_line = f"status: {duplicate_status}\n" if duplicate_status else ""
+    # The Verification Evidence Contract (L1) requires a real bash/sh block.
     write(
         repo / ".claude" / "plans" / f"{phase}.md",
         f"""---
@@ -4221,6 +4297,12 @@ status: {status}
 {duplicate_status_line}{closeout}{cancellation}{pause}---
 
 # {phase}
+
+## Verification
+
+```bash
+true
+```
 """,
     )
     if (
@@ -8583,6 +8665,22 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "devcontainer must forward HUGGING_FACE_HUB_TOKEN",
             errors,
         )
+        openwiki_mount = (
+            "source=${localEnv:HOME}/.openwiki,"
+            "target=/home/vscode/.openwiki,type=bind,consistency=cached"
+        )
+        check(
+            openwiki_mount in data.get("mounts", []),
+            "devcontainer must bind-mount the host OpenWiki configuration directory",
+            errors,
+        )
+        unexpected_env_keys = sorted(set(container_env) - ALLOWED_DEVCONTAINER_ENV_KEYS)
+        check(
+            set(container_env) <= ALLOWED_DEVCONTAINER_ENV_KEYS,
+            "devcontainer containerEnv must not forward an unexpected key "
+            f"(no provider credential such as an API key is allowed): {', '.join(unexpected_env_keys)}",
+            errors,
+        )
         check(
             container_env.get("UV_PROJECT_ENVIRONMENT") == "/home/vscode/.venv",
             "devcontainer must not reuse a host-mounted project .venv",
@@ -8615,6 +8713,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
     if (devcontainer_root / "Dockerfile").exists():
         dockerfile = read(devcontainer_root / "Dockerfile")
         check(
+            f"FROM {OPENWIKI_NODE_IMAGE} AS nodejs" in dockerfile,
+            "devcontainer Dockerfile must pin a Node image that satisfies OpenWiki's engine",
+            errors,
+        )
+        check(
             "cuda-dl-base" in dockerfile,
             "devcontainer Dockerfile must use the GPU base image",
             errors,
@@ -8632,6 +8735,30 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
         check(
             "context-mode --help >/dev/null" in dockerfile,
             "devcontainer Dockerfile must verify context-mode CLI execution",
+            errors,
+        )
+        for package, version in (
+            ("openwiki", OPENWIKI_PINNED_VERSION),
+            ("mermaid", MERMAID_PINNED_VERSION),
+            ("jsdom", JSDOM_PINNED_VERSION),
+        ):
+            check(
+                f"{package}@{version}" in dockerfile,
+                f"devcontainer Dockerfile must install {package} pinned to {version}",
+                errors,
+            )
+        # `openwiki --version` exits 1 ("Unknown option") and broke the image
+        # build; the working check instead compares the installed package's
+        # own package.json version to the pin and proves the CLI can start
+        # non-interactively (docs/2026-09-19-openwiki-hook-mechanics-spike.md).
+        check(
+            "command -v openwiki" in dockerfile
+            and "openwiki --version" not in dockerfile
+            and "package.json').version" in dockerfile
+            and f'"{OPENWIKI_PINNED_VERSION}"' in dockerfile
+            and "openwiki integrations list </dev/null" in dockerfile,
+            "devcontainer Dockerfile must verify the OpenWiki CLI is on PATH, "
+            "pinned, and able to start non-interactively",
             errors,
         )
         check(
@@ -8799,6 +8926,11 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "v4.8.4"
             in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
             "installed Ponytail provenance must retain the pinned release",
+            errors,
+        )
+        check(
+            "openwiki/.run.json" in read(temp_repo / ".gitignore"),
+            "installer must ignore resumable OpenWiki run state",
             errors,
         )
 

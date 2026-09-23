@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:d1435dbf39e1331f5dc6595699db6239f06d70ad66eee9a004ab0c0137d524b8",
+  "claims": [
+    {
+      "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
+      "statement": ".claude/ in a consumer is a self-contained Git repository on the branch ai-state tracking both installed bootstrap files and mutable AI state, and the outer repository ignores it entirely so its commits are visible only through git -C .claude.",
+      "evidence": [
+        {
+          "resource": "repo://.gitignore#L1-L6",
+          "version": "repo-lines-v1:sha256:ac6f1e07a2b981f381714cfa151a85eddf710553d96606360ef36e726c205a13:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGVhYzZjYjQ2NTcxNzE3OTc0NGRlMTIxNDE5YjMwZDkzMGRiYzQyOTkxMGJlNTAyNWY0Yzg3NzdiYTFjN2U1YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWJlYjE1ZDBmZDgzNWVmNTZhZjExZmYwZmI4NWRjODM2NDU4MTNiN2FkZTc0MTljZmIxMGRkMzBjZmNlZmM1YyJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L1-L48",
+          "version": "repo-lines-v1:sha256:83211c3f76971cf6421568f954564b4a23e988bfd84c66ff635b6def3164013e:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZDEwYTIzYTI0ZDMyMGM5YTZkOWE2OWNiYmRjNTFiMWYyZDkwMTc2OWYyZjk1MTg0MWUwOTkxZjNmYmM4OWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljMmQzOTE3MDU3MzUwNzFiNzJmZDA2ZDk0MTVmNzZmZDUxZTgyM2JhYWE3ZmUwMTNlNTIwMDlkYzQwYWMzMjcifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_63a1061c0a7e4da7a63cbffd4676974e",
+      "statement": "state-sync.sh is pure Bash rendered into both .claude/hooks/scripts/ and .devcontainer/ so a fresh clone can bootstrap .claude before it exists; it resolves the repository root from its own location or AI_STATE_REPO_ROOT and honors --local-only or AI_STATE_LOCAL_ONLY=1 to skip all remote interaction.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L1-L48",
+          "version": "repo-lines-v1:sha256:83211c3f76971cf6421568f954564b4a23e988bfd84c66ff635b6def3164013e:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVhZDEwYTIzYTI0ZDMyMGM5YTZkOWE2OWNiYmRjNTFiMWYyZDkwMTc2OWYyZjk1MTg0MWUwOTkxZjNmYmM4OWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjljMmQzOTE3MDU3MzUwNzFiNzJmZDA2ZDk0MTVmNzZmZDUxZTgyM2JhYWE3ZmUwMTNlNTIwMDlkYzQwYWMzMjcifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L78-L89",
+          "version": "repo-lines-v1:sha256:11125df4e0acda4fef369976373e1e90b1f6b1a747ba6ff5aa5e80d7aa070c8d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ODBlYmRjMDU5MWUyMTJkZDJmZDlmMGIyYWZmNjExNmZlYTEyZGM2NzI3Zjg5MmJlNzFiMWYwN2U1NThlOGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMyZDk5YTM1MTUyYzI1MjU0ZmNhYjU4ZmU2YjViYWU1MDRiMTMwODVmZTJlOWMzMzdhZTliMjYzZDEzOGVhNGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImExMGJlMDYyNjY3NDFmNDc0ZmVmMjFkMTRiNmQ4OTVkNDBmZWIwZDMwMTEzMWVkMzdjNmM3MjczMmRiYzAyZWIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_baa20830255a451fa093151451d666c3",
+      "statement": "Every mutating state-sync.sh command is dispatched with a trailing warn-and-continue and the script always exits 0, so a missing remote, offline network, or rebase conflict can never block a session or fail an outer commit; warnings go to stderr and hooks-errors.log.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L51-L63",
+          "version": "repo-lines-v1:sha256:33cd07e2ab96c21b9eac00b95fca76520a8b331cb2ce0cefead0f36ae9bd7a07:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiZDU3ZDYwNGZiYWRiMzJiY2I2N2IzODcwYzdjZTEyYmQ3MzRmMmJhZjFiYjEyZmM5MzliNGQ3OTBiMDdjYWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkYTI4NzAxMWYwOWZiZmJlN2Y1ZmIwNTI3NWM1NzM2MTZiYTMxYjdlYjMyYzZjMTExYzlkYzZjOTM2OWE5NzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0Y2YyN2MxNWMwMGFlNzBiMGI5OGU5MDIwNTYyMzMwNzU0ZGJiZWU4ZDY1ZGM3ODM2MmNkOTk1NGYyYmQxY2UifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L640-L652",
+          "version": "repo-lines-v1:sha256:46261184269467f510da2b16cfaf0f5ab462e4ca106be4f156779a4c51512db3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzNDNiZmYyMTUzYTc2ODk4NTYxZTk4NjU2Y2Y3OGIyNjRmMmZjNjViMDhiYTlmYWNlZWM1OWViZTUyNjJjNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f109b479bf784688ab94dadcab98ee16",
+      "statement": "checkpoint initializes the nested repository if needed (restoring root adapters on that path) and commits local AI state with no remote operation; push is checkpoint followed by publish and skips publication when the checkpoint fails.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L385-L392",
+          "version": "repo-lines-v1:sha256:4f095bf5225db0d3bf0d48cdeb8892a8deade950e59ca030a98b32c73f226f9a:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2QwMjY5NzYyYmRlZThiNjk2NmI3M2Y4ZjkwODljOWVkNWU5MGM2NDVhMjA4N2Y5NTFhZTBkYzQ5NzZkOGY2OSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzUxNmVlZGU5ZTQ1ZjU1ZGUzMDAxNGU0MjMyNTE5MGJhMzZlM2FjMmQ3MGJhYWM2NDVhNmFkZmU0YWIzOGI5YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjNmZTY5ZTM3YzViMmI3NzA5YjRmNGU2MjVhN2ViOGM2YzE4MGM0MDRhODU1MzNkNTY5ZjhlM2Q3ZWVkZGU4YiJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L551-L557",
+          "version": "repo-lines-v1:sha256:514a990f170f0bb77107c645d0f16de67ab2ddac015316ea0d30f21866f1f731:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTU1NTc0ZDVkMmJkNWUwNGFlNzAwMTM4NjQzMjBiYWQxZjRkNTJiZmU1ZjdhZDY1OTQzZWI1NjJiOTJjNDkzZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDEyY2EzNDVjY2Y3NWJmOWMwODA2YmNlNjk1YmU4ZGU4MDhiNzk5ODQyNTFhN2E1NGQyMDJjZjYxMDFkZDQ1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmVjZGRiNzNmZjdhZjJlMzIxZjA3NDZmMTcwMDM5MWRiYTYzMTBhZjAzMjI4YTEwYzY2ZWYyZDZlNGViOTllYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTRiNDA2ZDFmMjQ4ZThkNTM2NGRjYzI4M2JiNzk4YmIwZjA0NTEyNmI3ODc0ZjE3YmJiYjliMTdmZWFjMjkyNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_03bbd220263d4ac2b7f9ed0296c0c624",
+      "statement": "pull records local nested state first, reconciles committed state with origin/ai-state when a remote is configured and not in local-only mode, and only after a successful reconcile restores root adapters and checkpoints.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L515-L550",
+          "version": "repo-lines-v1:sha256:abe30fb2601e1e4cfe3cd9a1b3ec431cfc80d136a64531637ebc128a498af732:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0NjdmMGQ5NzAyN2U4YTYzMWU5NWQ1NjIzMGRhZDViYjQ3NTdhYjdmMTYzNmZhYjNiMWJkZWY2Y2NmNmZhYjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5ODYzOTAwOTQ4MDU1MDFkZGEyOTRiMjM2MTEwMWMyZmEyY2YzMGI0ODdiZjdiNTE3MmQ4NzU5Yjc4NTVmY2YifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fbec7137d5e9400e8ef82fb4f25e1443",
+      "statement": "publish sends only already committed state: a dirty nested worktree makes it warn and preserve the uncheckpointed state, a clean one reconciles then pushes, and repeated clean publication is a no-op.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L473-L514",
+          "version": "repo-lines-v1:sha256:7b385629cc0bd86be520aeac4b1a5f72ee78a052c6237eec6cac027f4eac47aa:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRiOTNjYjM0YjdjNDVlM2YyYmE3MjUwZmJiNWUwZWI3ODEwOWZlOTAxNzUyZDYwM2E3ZGJiOWRkMzllYTg5MDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZkNzJiZDkxNDQwMzA4ZTgzYjg1ZWE0MmRiMTEyYjNkNThkY2IyZjg1NGZhYTBjNDIwOGYyZDkwZWY5YjVmZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3MzQ2YmI0Mzc0ZjhjNDFjMjMyNTk1NzgzNTAwNDc5OGVlYTZlNzVlZTMxYmM0M2ZhZDk1NTMzYWQzMDhhOTMifQ"
+        },
+        {
+          "resource": "repo://tests/test_state_sync.py",
+          "version": "repo-file-v1:sha256:2093e9cb93f700045e222bcefc334975acb6975c12eab57213b6aebf7dfaf4fc"
+        }
+      ]
+    },
+    {
+      "id": "claim_a2f92e3b07734514a48d782d33b3522f",
+      "statement": "reconcile_committed_state returns immediately in local-only mode or without a configured remote, otherwise re-pins the origin refspecs to the ai-state branch before any fetch and treats a refspec failure as a reason to skip remote reconciliation while keeping local commits.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L203-L211",
+          "version": "repo-lines-v1:sha256:f78953dd7574a56bd415b53cbff582d3e123fe025fafc65c04b6002bda9aa0d0:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNWVlMDFmOGQ2MTk0MDE1NWY1YTFhNjVkNTgzZjkwMjQ1YzQ0MjI5OGE5ODYyY2M5ZTljODU4NThhZjhlYWYyZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzJmODZmN2RlMWVlZjdjNGY1NThjMTg3NTYwOWUzZjQ2NjViZDZlMzUxZWY2MTc1ZjRjZmU3OTYxZTBjNmI1YSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWY3MDZiOGI0N2Y3YjM5ZTU2MTNlMDMwMjg5OTllYTlmODFjMjM4OTJmMWNjNjgzODhjNDc5NWU5ODI2ODYyMiJ9"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L393-L412",
+          "version": "repo-lines-v1:sha256:895b20fe7cccc24c97244624b16fb462a1b6714b65310ae629571966522f0b6f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3NjcyMjA3ZjA5MmMxNjYwMDhhN2IyN2Q4OTkyYmFlZWRiODkzN2I4Yjc5MzAxN2EwYWJhY2FhMDdiYTM3ZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjllYzA4YzQxNTI2MDdjYjVkMmNkZjQwN2M3ODgxZTc5MTY1NDFkMzk4NDhjMDFkYzE5ZGU5Yzg2ZWU1ZWE1ODAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1OGIxZjJmNmI4ZjJhODhmMDhmZjgwYTMzMmNmMDk2ZTVlMzYxN2EyY2M4MmJiNWFkYmZhMzUxNWQyM2JkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjIzNjdkOTFhYzc1Mzk5MDljZWM3ZmM1NzQ0NjdjYTZiZTI5NTZmMzE5ZjNlMTkzNGU5OWFjNGEzMmRjZTJhYzMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f1c50b80e9c746cf88de1f03764d96a3",
+      "statement": "Mutating commands run through dispatch_mutating, which preflights rebase state inside the nested repository and preserves a valid pre-existing rebase rather than clobbering it, returning a distinct protected-rebase status.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L218-L295",
+          "version": "repo-lines-v1:sha256:c78f1b896bca0119d224b6652a6acbe135e88cbd87bebc029217a0ccd3168a8a:eyJzZWxlY3RlZExpbmVDb3VudCI6NzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NjMzZmMyNjhiMGI5NTFiNWUwZDI3YjRhOWVlODFiYTZlMjJkYTg0YTgxNDk5NGE5NWVmNDdmNWEwMmMwNTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjViMTgyY2Y5MzNkODMzYzk1YmEzMzJkYWUxMjI3MTk3MDFiZDZlOTM1Y2UxOTY4YWU5YjY0ZjU4MzE4Y2IwMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0NGM1ZWU1ZTc4Mjg4ZTI3MzYxMjQ1MTJjZTJlZjQ0YWYyMjUyNzRmMmRlY2QzNjkyNWZlMjkzZmI0MGYwNTMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_53f56b1c64b74d459b42026b0d71f835",
+      "statement": "The nested repository's .gitignore excludes .cache/ and session_logs/hooks-errors.log, both untracked without deletion by checkpoint and after every successful reconcile, while session_logs/hooks-bypass.log stays tracked; a .gitattributes gives session_logs/*.log the merge=union driver.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L90-L144",
+          "version": "repo-lines-v1:sha256:560a48b42f8d1a82bfa1e3fba44cafe1833602bf1eea28da76e39688110573d6:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMyZmQ4YzcyNjU0MWUyYzc5MWMzZTM5MGEzNTgxMWVmYjBhY2FiZWEzMTAwOWQ0MzA3MzI4NWMyMTI4YzY0ZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjExMTdjMDc2MWZhNTJiYjJlZWQ3ZTMzMWQ0YzM2NzdhMzI4YzViMGQ1OGRhYTVkZGZkZTg5NjI1OTIwNTdjNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTQwZjJiZjhjMzZmOGY4Y2Q0MzczZTdhNzFiMzVjODJiZGZhYTIxYmY1M2JhYmM2ZDU5MmU5NWZjMTgxOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk1NDMxMDY5NzdlM2I2M2IwMzJjMjJiMzM2MzMwOTZjOTdlYjU0NThlMmQ4ZDRjNDliMzc5NTZkMjlmYTMyODQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_39bca007e28a4304a19a02f7626846ba",
+      "statement": "restore-root-adapters.sh copies the installer-owned root adapters carried in .claude/bootstrap-root/ back to their real locations outside .claude/, reading the list from .claude/bootstrap-ownership.env, and exits 0 silently when either the mirror or the manifest is absent.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/restore-root-adapters.sh#L1-L40",
+          "version": "repo-lines-v1:sha256:80118b7fc8f5cd75a403e9476f43d0de0de5752aad12c392c93a50ad88161153:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyZTVhN2VhZDg2ZGFmMDkxOWRmNWQ1N2Q5ZDQ2MzYwNzA0NjliM2RkZjRiYmFkMTc0MTUyMWMyOTc2YTdlMjEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d0c8e95388354bca9444c2fa94c12532",
+      "statement": "configure_outer_hooks_path sets the outer repository's core.hooksPath to the fixed literal .claude/hooks/git-hooks once that directory exists, leaves a matching value alone, overwrites a different value with a warning naming the old one, and only warns on failure; it is the one write state-sync.sh makes outside .claude/.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L296-L337",
+          "version": "repo-lines-v1:sha256:ad8d824b5dc53ada0a60af9c8344712581201bc61103ad3ce7fdf4c14830c087:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ODhjYzM0NWFhMmRjODUzZjYxZTU2MDFiYjE0NzA4MDc5NDM1Y2RmY2ZmY2U0YTZiMjI3OWYwYWVmZWQ3YjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVkNDJjMjU0Zjc2NzdhYmI3NjUxODBiOGU2OGM3ZDRhNzQ4MzY1MDljOGYyZTg2NWY4ZGZmNTVjOWE1ZTU2YzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2MDdiZjUyNDZiMzI3ZDNhMjBkOGRlZDk1MjhmZWIxMzFjYjMzMzNhMjM0OGNmMTlkNTM4YThiNWVhYzhiOGIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f12524dca73446ecb026fe70bac27cb0",
+      "statement": "The outer post-commit Git hook runs record-commit-closeout.sh to advance a completed phase and then state-sync.sh push with stdin from /dev/null; Git ignores its exit status so it can never fail the commit.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/git-hooks/post-commit",
+          "version": "repo-file-v1:sha256:e28fcd747bbf3028143ee19500c0f0d2c28934237b5233dd8395496c00d877e1"
+        }
+      ]
+    },
+    {
+      "id": "claim_f6e9159963a844b99a467481fffd5cb3",
+      "statement": "Bootstrap refreshes land as bootstrap:-prefixed nested commits made by the installer's sync step, distinct from the session: commits session hooks make, so the nested log separates the two sources of change.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1136-L1200",
+          "version": "repo-lines-v1:sha256:03c98d08c3d94b3f4f2b75194ac2ffbb995e836703dc795e5469c7e2e390368e:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ODk3YzM4YTAwZGQyNWZkZjYzYzRjZDgxMDU4MTRhZDYzNDU2Y2FkMjMzYzUzMmM4YjQ5ODM3OWVlZjMzY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFmOTM3MjkyNjFhYjE1NzQ1NGYxYmEzYWQzNjNmMDhiNTBlODhkN2I2ZmY1NDg0OWYyOTk2NzFkZDdkNDkxYmUifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/state-sync.sh#L174-L202",
+          "version": "repo-lines-v1:sha256:5d9e22e83affb37125aff1c0f4db29054ef74ccaf822e8692eb577cc1f6d2cda:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmYzI2YjJhYWE0YWY0ODU5MmRkMGIxY2E5OTZlZDVmOTNlYTY4Zjg0NDU3NGJjNjE5ZGQyN2ExNWFmMmNkZDUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0Y2M3MmNmMmIzM2EwZjZkZjliMzhkMDQwODg3ODZiZmM1OTZlOTVmMDZkMWEyZjQ1ZTA5YmRhZGVlNjI5MjUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.5.2",
+    "at": "2026-09-21T05:37:12.382Z"
+  }
+}

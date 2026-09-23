@@ -48,9 +48,22 @@ editing it.
 2. **BRANCH:** Create `<plan_name>_implementation` from `dev`; branch hooks record `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
 3. **PLAN WHEN NEEDED:** Use the planner only when no implementation-ready plan exists. When an approved existing plan remains implementation-ready, skip the planner and proceed to IMPLEMENT. Before every new phase, inspect completed-phase implementation outcomes and relevant deterministic verification/reviewer findings. If new evidence, constraints, regressions, or architecture decisions materially affect remaining work, invoke one planner with a compact evidence packet to revise affected future phases only; do not reopen completed or unaffected scope. Otherwise proceed directly to IMPLEMENT.
 4. **IMPLEMENT:** Require `.claude/skills/ponytail/SKILL.md` in `full` mode for every coding task, then delegate implementation to `coder` (including Gradio/Streamlit UI work, for which `coder` loads the `gradio-streamlit` skill).
+
+### Knowledge-refresh phase
+
+Treat a knowledge-refresh small plan as an explicit IMPLEMENT phase, not a
+hidden closeout hook: its IMPLEMENT step is invoking OpenWiki's MCP tools
+per `.claude/skills/knowledge-refresh/SKILL.md`, then reviewing the generated diff,
+before moving to VERIFY -> REVIEW -> CLOSEOUT like any other phase. See the
+canonical Knowledge-Refresh Final Phase rule in
+`.claude/instructions/workflow.instructions.md` for exactly when the planner
+adds this phase and how its failures are handled. A repository without
+`openwiki/INSTRUCTIONS.md` runs this same Core Workflow unchanged — nothing
+here alters it.
+
 5. **VERIFY:** During implementation, run focused checks and `uv run python .claude/scripts/verify.py fast --format json`. Give deterministic failures to the coder; do not delegate repetitive test execution to another model.
 6. **REVIEW:** Run `reviewer` with targeted profiles based on the authoritative routing table, including its Ponytail applicability and documentation-only precedence rules.
-7. **CLOSEOUT:** After REVIEW, perform this exact order: documentation applicability/update (delegate to `documenter` unless pure-internal); when the current phase is the big plan's last entry in `phases:`, also run the standing final-phase documentation, memory, and LEARN audit below; record final plan, LEARN/no-learn, and COMPLETED session-log state; checkpoint nested plan state with `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"` (the file-protection hook denies any Bash command naming a `.claude/hooks/` path, so do not invoke `state-sync.sh` directly; the editor task and the `post-commit` hook use the script); explicitly stage intended outer files and inspect `git diff --cached`; give every surviving MINOR finding an explicit `disposition` and non-empty `reason`, then persist converged findings with `record_findings.py --out .claude/quality_reports/findings-<current_phase>.json`; run `uv run python .claude/scripts/verify.py phase --format json --persist`; then run `uv run python .claude/scripts/verify.py closeout --format json --persist`. Documentation must precede findings so findings bind to final code+docs. The reviewer does not persist findings itself, and the coder cannot create final receipts. Checkpoint nested plan state exactly once, after every plan/log/memory edit is final and before persisting findings and receipts. The closeout receipt binds the big plan's bytes, and the terminal push gate can only re-derive that digest from bytes Git already holds, so a big plan left dirty through the receipt steps produces a receipt that no later state can satisfy and a completion commit that can never be published. Never checkpoint or publish nested state after the receipts are persisted: that stales them and fails the next commit closed. Leave nested publication to the native `post-commit` hook after the outer commit. An open CRITICAL or MAJOR finding blocks the phase-completion commit; resolve it before COMMIT rather than deferring it to push/PR. If verification, review, or closeout fails, update task tracking and repeat IMPLEMENT/VERIFY/REVIEW/CLOSEOUT.
+7. **CLOSEOUT:** After REVIEW, follow the numbered **CLOSEOUT sequence** in `.claude/instructions/workflow.instructions.md` step by step, in order, including its two hard rules (never chain `git commit` with the findings or receipt commands; never touch nested state between the receipts and the commit). You perform every step yourself except documentation, which you may delegate to `documenter`. If any step fails, update task tracking and return to IMPLEMENT.
 
 ### Standing final-phase audit
 

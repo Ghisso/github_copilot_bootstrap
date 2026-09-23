@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "shared" / "scripts"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import validate_plan_frontmatter as lint  # noqa: E402
 import verify  # noqa: E402
 from runtime_ownership import (  # type: ignore[import-not-found]  # noqa: E402
     bootstrap_root_paths,
@@ -327,8 +328,15 @@ def _write_root_adapter_pairs(root: Path, mode: bool = True) -> None:
     manifest.write_text(restore_manifest(mode), encoding="utf-8")
 
 
-def _closeout_receipt() -> dict[str, object]:
-    """Build minimal syntactically valid completed evidence references."""
+def _closeout_receipt(
+    verification_items: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    """Build minimal syntactically valid completed evidence references.
+
+    ``verification_items`` builds ``extensions.verification_items`` only
+    when given, so a caller testing G1 (a receipt with no extensions at
+    all) still gets that by omitting it.
+    """
     checks = [
         verify.not_applicable(check_id, "closeout reuses phase evidence")
         if check_id
@@ -342,6 +350,11 @@ def _closeout_receipt() -> dict[str, object]:
         for check_id in verify.CHECK_IDS
     ]
     digest = "a" * 64
+    extensions = (
+        {"verification_items": verification_items}
+        if verification_items is not None
+        else None
+    )
     return verify.build_receipt(
         "closeout",
         checks,
@@ -364,6 +377,7 @@ def _closeout_receipt() -> dict[str, object]:
                 "reason": "no documentation paths changed",
             },
         },
+        extensions,
     )
 
 
@@ -2281,6 +2295,71 @@ def test_root_adapter_diagnostics_skip_nonreplaceable_live_recovery(
     assert "restore-root-adapters.sh" not in detail
 
 
+def test_bootstrap_root_fingerprint_ignores_marker_claimed_skill_bundle(
+    tmp_path: Path,
+) -> None:
+    """A marker-claimed `.agents/skills/openwiki` bundle never breaks the
+    live/mirror pairing, whether it exists on only one side or with
+    different bytes on each side -- OpenWiki, not the bootstrap installer,
+    owns writes to it once it claims it (Step I2b)."""
+    _write_root_adapter_pairs(tmp_path)
+    # A real generated `.agents` already has a `skills/` directory shared
+    # identically by both sides (the other, ordinary bootstrap-generated
+    # skills); create the same matching shape here so the only difference
+    # introduced below is the bundle itself, not this fixture's own gap.
+    for base in (tmp_path, tmp_path / ".claude" / "bootstrap-root"):
+        other_skill = base / ".agents" / "skills" / "some-skill" / "SKILL.md"
+        other_skill.parent.mkdir(parents=True)
+        other_skill.write_text("shared skill\n", encoding="utf-8")
+    baseline = verify.bootstrap_root_fingerprint(tmp_path)
+    assert baseline != ""
+
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed v1\n", encoding="utf-8")
+    (live_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    assert diagnostics == ()
+    assert fingerprint == baseline
+
+    mirror_bundle = (
+        tmp_path / ".claude" / "bootstrap-root" / ".agents" / "skills" / "openwiki"
+    )
+    mirror_bundle.mkdir(parents=True)
+    (mirror_bundle / "SKILL.md").write_text(
+        "openwiki-managed v2 (drifted)\n", encoding="utf-8"
+    )
+    (mirror_bundle / ".openwiki-install.json").write_text("{}\n", encoding="utf-8")
+
+    fingerprint_with_drifted_mirror, diagnostics = (
+        verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+    )
+    assert diagnostics == ()
+    assert fingerprint_with_drifted_mirror == baseline
+
+
+def test_bootstrap_root_fingerprint_still_flags_unmarked_extra_directory(
+    tmp_path: Path,
+) -> None:
+    """Without OpenWiki's own marker file, an extra `.agents/skills/openwiki`
+    directory is ordinary unrecognized drift, exactly as before this
+    exemption existed."""
+    _write_root_adapter_pairs(tmp_path)
+    live_bundle = tmp_path / ".agents" / "skills" / "openwiki"
+    live_bundle.mkdir(parents=True)
+    (live_bundle / "SKILL.md").write_text("openwiki-managed\n", encoding="utf-8")
+
+    fingerprint, diagnostics = verify.bootstrap_root_fingerprint_diagnostics(tmp_path)
+
+    assert fingerprint == ""
+    assert {
+        "path": ".agents",
+        "side": "pair",
+        "category": "content-difference",
+    } in diagnostics
+
+
 @pytest.mark.parametrize(
     "replacement",
     (
@@ -3131,6 +3210,297 @@ def test_generation_check_requires_generated_verifier(tmp_path: Path) -> None:
     source.parent.mkdir(parents=True)
     source.write_text("same\n", encoding="utf-8")
     assert verify.generation_check(tmp_path)["status"] == "UNVERIFIED"
+
+
+# --- OpenWiki managed-state backstop (Phase G, Step G2) ---
+
+
+def test_openwiki_managed_state_violations_empty_on_a_clean_tree(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+@pytest.mark.parametrize("adapter", ["AGENTS.md", "CLAUDE.md"])
+def test_openwiki_managed_state_violations_flags_a_live_managed_block(
+    tmp_path: Path, adapter: str
+) -> None:
+    (tmp_path / adapter).write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(v.startswith(f"{adapter} still carries") for v in violations)
+
+
+def test_openwiki_managed_state_violations_flags_an_untracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is untracked")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_flags_a_staged_new_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith(".github/workflows/openwiki-update.yml is staged as a new file")
+        for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_a_tracked_unchanged_workflow_file(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_accepts_a_staged_modification_to_a_tracked_workflow_file(
+    tmp_path: Path,
+) -> None:
+    """A staged edit to an already-tracked workflow file is not "staged as
+    new" - only a brand-new file staged for the first time is."""
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    workflow.write_text("name: openwiki\non: [push]\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_openwiki_managed_state_violations_flags_a_tracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    violations = verify.openwiki_managed_state_violations(tmp_path)
+
+    assert any(
+        v.startswith("openwiki/.run.json is tracked or staged") for v in violations
+    )
+
+
+def test_openwiki_managed_state_violations_accepts_an_untracked_run_json(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    assert verify.openwiki_managed_state_violations(tmp_path) == []
+
+
+def test_generation_check_fails_on_a_live_managed_block(tmp_path: Path) -> None:
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "AGENTS.md" in str(result["summary"])
+
+
+def test_generation_check_fails_on_an_untracked_openwiki_workflow(
+    tmp_path: Path,
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert ".github/workflows/openwiki-update.yml" in str(result["summary"])
+
+
+def test_generation_check_fails_on_a_tracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    result = verify.generation_check(tmp_path)
+
+    assert result["status"] == "FAIL"
+    assert "openwiki/.run.json" in str(result["summary"])
+
+
+def test_gate_flags_a_live_managed_block_under_exact(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any("openwiki-managed-state: AGENTS.md" in error for error in errors)
+
+
+def test_gate_does_not_flag_a_managed_block_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_an_untracked_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is untracked"
+        in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_an_untracked_workflow_file_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_staged_new_workflow_file_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _git(["add", ".github/workflows/openwiki-update.yml"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: .github/workflows/openwiki-update.yml is staged "
+        "as a new file" in error
+        for error in errors
+    )
+
+
+def test_gate_accepts_a_tracked_unchanged_workflow_file(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    workflow = tmp_path / ".github" / "workflows" / "openwiki-update.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: openwiki\n", encoding="utf-8")
+    _commit_all(tmp_path, "initial with a tracked workflow")
+    _write_gate_phase_plan(tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_flags_a_tracked_run_json_under_exact(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any(
+        "openwiki-managed-state: openwiki/.run.json is tracked or staged" in error
+        for error in errors
+    )
+
+
+def test_gate_does_not_flag_a_tracked_run_json_under_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+    _git(["add", "openwiki/.run.json"], tmp_path)
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any("openwiki-managed-state" in error for error in errors)
+
+
+def test_gate_accepts_an_untracked_run_json(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial")
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "openwiki").mkdir()
+    (tmp_path / "openwiki" / ".run.json").write_text("{}", encoding="utf-8")
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert not any("openwiki-managed-state" in error for error in errors)
 
 
 def test_canonical_serialization_is_stable() -> None:
@@ -4646,3 +5016,661 @@ def test_persist_guard_allows_failing_receipt_when_no_prior_passing_receipt(
     assert receipt_path.is_file()
     persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert persisted["status"] == "FAIL"
+
+
+# --- Verification Evidence Contract: run_verification_items / gate ---
+
+
+def test_plan_verification_items_matches_the_lint_copy() -> None:
+    """The extractor is mirrored on purpose (see its own docstring); this
+    guards the two copies from drifting apart."""
+    import inspect
+
+    assert inspect.getsource(verify.plan_verification_items) == inspect.getsource(
+        lint.plan_verification_items
+    )
+
+
+def test_phase_a_plan_verification_block_has_five_passing_commands() -> None:
+    """The runner only ever reads the ``## Verification`` block itself; all
+    five of Phase A's real listed commands are ordinary and none of them is
+    the hedge, proving the lint - not the runner - is what would have
+    caught Phase A."""
+    source = (
+        REPO_ROOT
+        / ".claude/plans/2026-09-19_phase-A-openwiki-runtime-and-safety-boundary.md"
+    ).read_text(encoding="utf-8")
+    required, _optional = verify.plan_verification_items(source)
+    assert len(required) == 5
+    assert not any("devcontainer" in item for item in required)
+
+
+def test_plan_verification_items_joins_backslash_continuation_before_a_comment_line() -> (
+    None
+):
+    """A comment line right after a backslash continuation is joined into
+    the same logical command and then cut as a trailing comment, matching
+    real bash: the newline after the comment is real, so the next line is
+    still a separate item."""
+    text = "## Verification\n\n```bash\necho foo \\\n# a real comment\necho bar\n```\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["echo foo", "echo bar"]
+
+
+def test_plan_verification_items_ignores_hash_inside_quotes_but_cuts_real_comment() -> (
+    None
+):
+    text = '## Verification\n\n```bash\ngit commit -m "Fix bug # 123" # note\n```\n'
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ['git commit -m "Fix bug # 123"']
+
+
+def test_plan_verification_items_accepts_tilde_fences_same_as_backtick_fences() -> None:
+    """Both fence styles were already symmetric in the extraction regex
+    (same alternation, backreferenced closing mark); this pins that as
+    intended behavior rather than an accident. Report to the canonical-text
+    owner (Step F2.1): the policy text should say both count, not
+    backtick-only."""
+    text = "## Verification\n\n~~~bash\ntrue\n~~~\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true"]
+
+
+def test_plan_verification_items_handles_crlf_line_endings() -> None:
+    text = "## Verification\r\n\r\n```bash\r\ntrue\r\necho hello\r\n```\r\n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true", "echo hello"]
+
+
+def test_plan_verification_items_continues_past_an_h3_subheading() -> None:
+    """A ``### `` sub-heading does not match the ``^## `` section-boundary
+    lookahead, so items on either side of it still count as one section."""
+    text = (
+        "## Verification\n\n```bash\nfirst\n```\n\n"
+        "### Details\n\nSome prose.\n\n```bash\nsecond\n```\n"
+    )
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["first", "second"]
+
+
+def test_plan_verification_items_tolerates_trailing_spaces_on_fence_lines() -> None:
+    text = "## Verification\n\n```bash   \ntrue\n```   \n"
+
+    required, _optional = verify.plan_verification_items(text)
+
+    assert required == ["true"]
+
+
+def test_names_closeout_matches_the_lint_copy() -> None:
+    """``_names_closeout`` is duplicated for the same reason as
+    ``plan_verification_items``; guard it the same way."""
+    import inspect
+
+    assert inspect.getsource(verify._names_closeout) == inspect.getsource(
+        lint._names_closeout
+    )
+
+
+def test_shell_flatten_matches_the_lint_copy() -> None:
+    """``_shell_flatten`` is duplicated for the same reason as
+    ``plan_verification_items``; guard it the same way."""
+    import inspect
+
+    assert inspect.getsource(verify._shell_flatten) == inspect.getsource(
+        lint._shell_flatten
+    )
+
+
+def _write_runner_plan(tmp_path: Path, phase: str, verification_block: str) -> None:
+    """Write the smallest plan ``run_verification_items`` can read."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    (plans / f"{phase}.md").write_text(
+        f"---\nname: {phase}\ntype: small-plan\n---\n\n# Phase\n\n"
+        f"## Verification\n\n{verification_block}",
+        encoding="utf-8",
+    )
+
+
+def test_run_verification_items_all_pass_with_tail_and_positive_duration(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "```bash\ntrue\necho hello\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert [result["item"] for result in results] == ["true", "echo hello"]
+    assert all(result["status"] == "PASS" for result in results)
+    assert all(result["exit_code"] == 0 for result in results)
+    assert all(
+        isinstance(result["duration_seconds"], float) and result["duration_seconds"] > 0
+        for result in results
+    )
+    assert results[1]["output_tail"] == "hello"
+
+
+def test_run_verification_items_stops_at_first_failure(tmp_path: Path) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "```bash\nexit 3\ntrue\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["exit_code"] == 3
+    assert results[1] == {
+        "item": "true",
+        "status": "NOT RUN",
+        "exit_code": None,
+        "duration_seconds": 0.0,
+        "output_tail": "",
+    }
+
+
+def test_run_verification_items_times_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(verify, "VERIFICATION_ITEM_TIMEOUT_SECONDS", 1)
+    _write_runner_plan(tmp_path, "phase-one", "```bash\nsleep 2\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "TIMEOUT"
+    assert results[0]["exit_code"] is None
+
+
+@pytest.mark.parametrize(
+    "closeout_item",
+    [
+        "uv run python .claude/scripts/verify.py closeout --format json",
+        'uv run python .claude/scripts/verify.py "closeout" --format json',
+        'uv run python .claude/scripts/verify.py clos""eout --format json',
+        "uv run python .claude/scripts/verify.py --format json closeout",
+        r"uv run python .claude/scripts/verify.py clos\eout --format json",
+    ],
+    ids=(
+        "plain",
+        "quoted",
+        "split-quotes",
+        "mode-after-options",
+        "backslash-broken",
+    ),
+)
+def test_run_verification_items_refuses_closeout_unexecuted(
+    tmp_path: Path, closeout_item: str
+) -> None:
+    _write_runner_plan(tmp_path, "phase-one", f"```bash\n{closeout_item}\ntrue\n```\n")
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "FAIL"
+    assert results[0]["output_tail"] == "closeout may not list itself"
+    assert results[0]["exit_code"] is None
+    assert results[0]["duration_seconds"] == 0.0
+    assert results[1]["status"] == "NOT RUN"
+
+
+def test_run_verification_items_item_write_changes_tree_sha(tmp_path: Path) -> None:
+    """Proves why the runner must precede metadata collection: an item's own
+    file write changes what ``state_metadata`` later observes."""
+    _init_repo(tmp_path)
+    _commit_all(tmp_path, "initial commit")
+    _git(["branch", "dev"], tmp_path)
+    before = verify.state_metadata(tmp_path, "dev", "")["tree_sha"]
+    _write_runner_plan(
+        tmp_path,
+        "phase-one",
+        "```bash\necho hi > touched.txt && git add touched.txt\n```\n",
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    assert results[0]["status"] == "PASS"
+    after = verify.state_metadata(tmp_path, "dev", "")["tree_sha"]
+    assert before != after
+
+
+def test_run_verification_items_output_tail_truncates_to_twenty_lines(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(
+        tmp_path,
+        "phase-one",
+        '```bash\npython3 -c "[print(i) for i in range(40)]"\n```\n',
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    tail = results[0]["output_tail"]
+    assert isinstance(tail, str)
+    lines = tail.splitlines()
+    assert len(lines) == 20
+    assert lines[0] == "20"
+    assert lines[-1] == "39"
+
+
+def test_run_verification_items_output_tail_caps_at_2000_characters(
+    tmp_path: Path,
+) -> None:
+    _write_runner_plan(
+        tmp_path, "phase-one", "```bash\npython3 -c \"print('x' * 5000)\"\n```\n"
+    )
+
+    results = verify.run_verification_items(tmp_path, "phase-one")
+
+    tail = results[0]["output_tail"]
+    assert isinstance(tail, str)
+    assert len(tail) == 2000
+
+
+def test_run_verification_items_empty_block_yields_empty_list(tmp_path: Path) -> None:
+    _write_runner_plan(tmp_path, "phase-one", "")
+
+    assert verify.run_verification_items(tmp_path, "phase-one") == []
+
+
+def test_closeout_persists_empty_results_for_an_empty_verification_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A plan with no ``## Verification`` block (the default fixture shape)
+    yields an empty results list and a passing closeout."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("PASS"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "json",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 0
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["extensions"]["verification_items"] == []
+
+
+def test_closeout_persist_writes_no_receipt_when_a_required_item_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8")
+        + "\n## Verification\n\n```bash\nexit 3\ntrue\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+    captured = capsys.readouterr()
+    assert "FAIL" in captured.err
+    assert "NOT RUN" in captured.err
+
+
+def test_closeout_persist_leaves_existing_passing_receipt_unchanged_on_item_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8")
+        + "\n## Verification\n\n```bash\nexit 1\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    seed_bytes = (json.dumps(_closeout_receipt()) + "\n").encode("utf-8")
+    receipt_path.write_bytes(seed_bytes)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    assert receipt_path.read_bytes() == seed_bytes
+
+
+def test_closeout_persist_binds_tree_sha_after_a_passing_items_file_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A required item's own tracked-file write lands inside the tree_sha
+    the persisted closeout receipt binds, proving the runner precedes
+    metadata collection end to end through ``main()``, not just at the
+    ``run_verification_items`` unit level."""
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8") + "\n## Verification\n\n"
+        "```bash\necho hi > touched.txt && git add touched.txt\n```\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        verify,
+        "closeout_checks",
+        lambda root, metadata, adapter_diagnostics=(): _closeout_check_list("PASS"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "json",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "fixture reason",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 0
+    assert (tmp_path / "touched.txt").is_file()
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    persisted = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert persisted["metadata"]["tree_sha"] == _git(["write-tree"], tmp_path)
+
+
+def test_closeout_refuses_a_quoted_closeout_self_reference_at_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _write_closeout_ready_repo(tmp_path, phase="phase-one")
+    plan_path = tmp_path / ".claude/plans/phase-one.md"
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8") + "\n## Verification\n\n"
+        '```bash\nuv run python .claude/scripts/verify.py "closeout" --format json\n```\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify.py",
+            "closeout",
+            "--format",
+            "text",
+            "--persist",
+            "--phase",
+            "phase-one",
+            "--documentation-na",
+            "guard test",
+        ],
+    )
+
+    exit_code = verify.main()
+
+    assert exit_code == 2
+    receipt_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    assert not receipt_path.exists()
+    assert "closeout may not list itself" in capsys.readouterr().err
+
+
+def _write_gate_phase_plan(
+    tmp_path: Path,
+    *,
+    verification_block: str = "```bash\ntrue\n```\n",
+    optional_block: str = "",
+    log_verification_section: str = "",
+) -> None:
+    """Write the ``phase-one`` plan (matching ``_metadata``/
+    ``_closeout_receipt``'s phase) with a ``## Verification`` block plus its
+    closeout log, for ``verification_items_errors``/gate testing."""
+    plans = tmp_path / ".claude" / "plans"
+    plans.mkdir(parents=True, exist_ok=True)
+    optional_section = (
+        f"\n## Optional Verification\n\n{optional_block}\n" if optional_block else ""
+    )
+    (plans / "phase-one.md").write_text(
+        "---\n"
+        "name: phase-one\n"
+        "type: small-plan\n"
+        "parent_plan: big\n"
+        "phase_index: 1\n"
+        "status: complete\n"
+        "closeout_session_log: .claude/session_logs/phase-one-closeout.md\n"
+        "---\n\n# Phase\n\n"
+        f"## Verification\n\n{verification_block}"
+        f"{optional_section}",
+        encoding="utf-8",
+    )
+    log_path = tmp_path / ".claude" / "session_logs" / "phase-one-closeout.md"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        "# Session\n\n**Status:** COMPLETED\n\n## [LEARN] Entries\n\n"
+        "- [LEARN] none - no new lessons this session\n\n"
+        f"## Verification\n\n{log_verification_section}",
+        encoding="utf-8",
+    )
+
+
+def _run_gate(
+    tmp_path: Path, receipt: dict[str, object], **overrides: object
+) -> list[str]:
+    closeout_path = verify.receipt_path(tmp_path, "closeout", "phase-one")
+    closeout_path.parent.mkdir(parents=True, exist_ok=True)
+    closeout_path.write_text(json.dumps(receipt), encoding="utf-8")
+    kwargs: dict[str, object] = {
+        "branch": "verification-test",
+        "phase": "phase-one",
+        "head": "head",
+        "head_relation": "exact",
+        "require_major": False,
+        "require_ponytail": False,
+        "enforce_final_state": False,
+    }
+    kwargs.update(overrides)
+    return verify.gate_receipt_errors(tmp_path, **kwargs)  # type: ignore[arg-type]
+
+
+def test_gate_g1_flags_a_receipt_with_no_verification_items(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path)
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    assert any("G1 verification-results-missing" in error for error in errors)
+
+
+def test_gate_g2_flags_a_plan_item_added_after_the_receipt(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path, verification_block="```bash\ntrue\nuv run pytest tests/ -q\n```\n"
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any(
+        "G2 verification-item-unrun" in error and "uv run pytest tests/ -q" in error
+        for error in errors
+    )
+
+
+def test_gate_g3_flags_a_non_passing_result(tmp_path: Path) -> None:
+    _write_gate_phase_plan(tmp_path, verification_block="```bash\ntrue\n```\n")
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "FAIL",
+                "exit_code": 1,
+                "duration_seconds": 0.1,
+                "output_tail": "boom",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G3 verification-item-failed" in error for error in errors)
+
+
+def test_gate_g4_flags_an_unaccounted_optional_item(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G4 optional-verification-unaccounted" in error for error in errors)
+
+
+def test_gate_g4_accepts_a_not_run_optional_item_with_a_reason(tmp_path: Path) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+        log_verification_section=(
+            "- optional 1: NOT RUN — no compatible host available\n"
+        ),
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert not any("G4" in error for error in errors)
+
+
+def test_gate_g4_rejects_a_not_run_optional_item_without_a_reason(
+    tmp_path: Path,
+) -> None:
+    _write_gate_phase_plan(
+        tmp_path,
+        verification_block="```bash\ntrue\n```\n",
+        optional_block="- run a manual smoke check\n",
+        log_verification_section="- optional 1: NOT RUN\n",
+    )
+    receipt = _closeout_receipt(
+        [
+            {
+                "item": "true",
+                "status": "PASS",
+                "exit_code": 0,
+                "duration_seconds": 0.1,
+                "output_tail": "",
+            }
+        ]
+    )
+
+    errors = _run_gate(tmp_path, receipt)
+
+    assert any("G4 optional-verification-unaccounted" in error for error in errors)
+
+
+def test_gate_ancestor_relation_never_runs_verification_items_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """G1-G4 must never fire for an ``ancestor`` relation, even with a
+    receipt that has no ``extensions`` at all."""
+    _write_gate_phase_plan(tmp_path)
+    monkeypatch.setattr(verify, "git_is_ancestor", lambda *a, **k: True)
+
+    errors = _run_gate(tmp_path, _closeout_receipt(), head_relation="ancestor")
+
+    assert not any(f"G{n}" in error for error in errors for n in range(1, 5))
+
+
+def test_receipt_without_extensions_still_loads(tmp_path: Path) -> None:
+    """A pre-F2 closeout receipt (no ``extensions`` field) still loads and
+    validates, since ``validate_receipt`` already treats it as optional."""
+    receipt = _closeout_receipt()
+    assert "extensions" not in receipt
+    path = tmp_path / "receipt.json"
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    loaded = verify.load_receipt(path)
+
+    assert loaded["status"] == "PASS"

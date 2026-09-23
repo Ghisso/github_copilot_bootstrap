@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from generate_targets import (  # noqa: E402
+    OPENWIKI_BEGIN_MATCHER,
     render_antigravity_hooks,
     render_claude_settings,
     render_codex_hooks,
@@ -345,8 +346,15 @@ def test_online_prompt_pushes_offline_stop_plan_and_keeps_diagnostic_local(
     assert "fetch from origin/ai-state failed" in errors.read_text(encoding="utf-8")
 
 
-def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> None:
-    """Generated Codex lifecycle hooks use the planned local/network boundaries."""
+def test_rendered_codex_lifecycle_keeps_stop_local_with_the_openwiki_guard(
+    tmp_path: Path,
+) -> None:
+    """Generated Codex lifecycle hooks use the planned local/network
+    boundaries. `codex-stop.sh` remains the sole session-lifecycle wrapper;
+    the only other `Stop` handler is the payload-free `openwiki-guard.sh
+    post` call (Codex's O2 adaptation - it fires no failure event at all, so
+    the restore instead runs unconditionally at end of turn), and neither
+    handler performs a network publish."""
     hooks_path = tmp_path / "hooks.json"
 
     render_codex_hooks(hooks_path)
@@ -354,9 +362,11 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     hooks = json.loads(hooks_path.read_text(encoding="utf-8"))["hooks"]
     stop = hooks["Stop"]
     assert len(stop) == 1
-    assert len(stop[0]["hooks"]) == 1
+    assert len(stop[0]["hooks"]) == 2
     assert "codex-stop.sh" in stop[0]["hooks"][0]["command"]
-    assert "state-sync.sh" not in stop[0]["hooks"][0]["command"]
+    assert "openwiki-guard.sh" in stop[0]["hooks"][1]["command"]
+    assert stop[0]["hooks"][1]["command"].rstrip().endswith("post")
+    assert "state-sync.sh" not in json.dumps(stop[0]["hooks"])
 
     prompt = hooks["UserPromptSubmit"]
     assert len(prompt) == 1
@@ -368,13 +378,19 @@ def test_rendered_codex_lifecycle_uses_single_stop_wrapper(tmp_path: Path) -> No
     )
 
     posttool = hooks["PostToolUse"]
-    assert len(posttool) == 1
+    assert len(posttool) == 2
+    bash_group, openwiki_group = posttool
+    assert bash_group["matcher"] == "Bash"
     assert [
         "record-branch-state.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report openai-codex" in handler["command"]
-        for handler in posttool[0]["hooks"]
+        for handler in bash_group["hooks"]
     ] == [True, True, True]
+    assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(openwiki_group["hooks"]) == 1
+    assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]
+    assert openwiki_group["hooks"][0]["command"].rstrip().endswith("post")
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == []
     prompt[0]["hooks"][1]["timeout"] = 99
     assert reporting_reminder_hook_errors(hooks, "openai-codex") == [
@@ -422,7 +438,11 @@ def test_rendered_antigravity_hook_uses_only_proven_pretool_safety(
 def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     tmp_path: Path,
 ) -> None:
-    """Generated Claude settings keep lifecycle boundaries single and ordered."""
+    """Generated Claude settings keep lifecycle boundaries single and
+    ordered. `Stop` itself stays untouched by the openwiki guard - Claude
+    Code fires a real `PostToolUseFailure` event (unlike Codex), so the
+    guard's restore is wired to `PostToolUse` and `PostToolUseFailure`
+    instead of piggybacking on `Stop`."""
     settings_path = tmp_path / "settings.json"
 
     render_claude_settings(settings_path)
@@ -445,13 +465,26 @@ def test_rendered_claude_lifecycle_uses_serialized_durability_boundaries(
     )
 
     posttool = hooks["PostToolUse"]
-    assert len(posttool) == 1
+    assert len(posttool) == 2
+    bash_group, openwiki_group = posttool
+    assert bash_group["matcher"] == "Bash"
     assert [
         "record-branch-state.sh" in handler["command"]
         or "context-mode-dispatch.sh" in handler["command"]
         or "reporting-reminder.sh late-report claude-code" in handler["command"]
-        for handler in posttool[0]["hooks"]
+        for handler in bash_group["hooks"]
     ] == [True, True, True]
+    assert openwiki_group["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(openwiki_group["hooks"]) == 1
+    assert "openwiki-guard.sh" in openwiki_group["hooks"][0]["command"]
+    assert openwiki_group["hooks"][0]["command"].rstrip().endswith("post")
+
+    posttool_failure = hooks["PostToolUseFailure"]
+    assert len(posttool_failure) == 1
+    assert posttool_failure[0]["matcher"] == OPENWIKI_BEGIN_MATCHER
+    assert len(posttool_failure[0]["hooks"]) == 1
+    assert "openwiki-guard.sh" in posttool_failure[0]["hooks"][0]["command"]
+    assert posttool_failure[0]["hooks"][0]["command"].rstrip().endswith("post")
 
     stop_failure = hooks["StopFailure"]
     assert len(stop_failure) == 1
@@ -956,3 +989,146 @@ def test_enforce_pr_gate_plain_push_denial_omits_the_chained_commit_hint(
     assert '"permissionDecision":"deny"' in result.stdout
     assert PUSH_GATE_SEPARATE_COMMANDS_PREFIX not in result.stdout
     assert "missing big-plan file" in result.stdout
+
+
+def test_enforce_pr_gate_scopes_a_foreign_push(tmp_path: Path) -> None:
+    """F3.5: a `git push` explicitly redirected at another repository is not
+    this repository's release ceremony. Fails before the change."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(script, tmp_path, f"git -C {other_repo} push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_push_targeting_this_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof the push gate still fires for a push that does target this
+    repository."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_denies_when_only_some_pushes_are_foreign(
+    tmp_path: Path,
+) -> None:
+    """One push is undeterminable relative to REPO_ROOT, so the whole
+    command still gates."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, f"git -C {other_repo} push && git push"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_denies_a_push_to_an_unresolvable_target(
+    tmp_path: Path,
+) -> None:
+    script = enforce_pr_gate_repo(tmp_path)
+    not_a_repo = tmp_path / "not-a-repo"
+    not_a_repo.mkdir()
+
+    result = run_enforce_pr_gate(script, tmp_path, f"git -C {not_a_repo} push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_ignores_a_cd_prefix_and_still_denies(tmp_path: Path) -> None:
+    """Documented limit: the same `cd` limit as the commit gate."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "cd /tmp/elsewhere && git push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_pull_request(tmp_path: Path) -> None:
+    """The proof the pull-request gate is unchanged."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "gh pr create --base dev")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_still_denies_a_pull_request_naming_another_repository(
+    tmp_path: Path,
+) -> None:
+    """The proof that naming another repository does not excuse a pull
+    request: `gh pr create` has no directory redirect, so it is always
+    checked from this checkout (Scope)."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, "gh pr create -R other/repo --base dev"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_closes_the_nested_push_pull_request_hole(
+    tmp_path: Path,
+) -> None:
+    """The pre-existing hole: before this change, the nested-.claude push
+    exemption exited the whole hook, letting a chained `gh pr create` skip
+    every check below unchecked. This test fails before the change and is
+    the one test here that proves the restructure rather than the scoping."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(
+        script, tmp_path, "git -C .claude push && gh pr create --base dev"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_closes_the_foreign_push_pull_request_hole(
+    tmp_path: Path,
+) -> None:
+    """The same hole in its new form: a push that provably targets another
+    repository must not excuse a chained pull request either, proving the
+    added push exemption did not reopen the hole F3.5 closes."""
+    script = enforce_pr_gate_repo(tmp_path)
+    other_repo = tmp_path / "other-repo"
+    other_repo.mkdir()
+    run_git(["init", "-q"], other_repo)
+
+    result = run_enforce_pr_gate(
+        script,
+        tmp_path,
+        f"git -C {other_repo} push && gh pr create --base dev",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+
+
+def test_enforce_pr_gate_nested_push_alone_still_exits_clean(tmp_path: Path) -> None:
+    """Unchanged: a nested-.claude push with no pull request still stands
+    down entirely."""
+    script = enforce_pr_gate_repo(tmp_path)
+
+    result = run_enforce_pr_gate(script, tmp_path, "git -C .claude push")
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' not in result.stdout

@@ -4,18 +4,19 @@ The bootstrap now uses a source-of-truth plus generated-target layout.
 
 ## Source Directories
 
-- `shared/policies/`: reusable workflow, quality, code, testing, routing, and deployment guidance.
-- `shared/skills/`: reusable skills with `visibility: public|background` metadata.
-- `shared/third_party/ponytail/`: pinned Ponytail provenance and MIT license; portable skills live in `shared/skills/ponytail*`.
-- `shared/hooks/`: hook config and guardrail scripts.
-- `shared/devcontainer/`: GPU devcontainer bootloader. The `Dockerfile` uses a two-stage build: Node.js 22 binaries are copied from `node:22-bookworm-slim` into the NVIDIA CUDA DL base image (Ubuntu ships Node 18, which is too old for `context-mode`). `bubblewrap` and `context-mode` are installed so hook events work inside the container. `--cap-add=SYS_ADMIN` and `--security-opt=seccomp=unconfined` are required for bubblewrap namespace creation inside Docker. The `Dockerfile` also handles pre-existing GID/UID 1000 conflicts (GID guard by numeric ID; user rename via `usermod`/`groupmod` when UID is already taken). The devcontainer bind-mounts `~/.cache/huggingface` from the host so cached credentials and models are available without re-authenticating inside the container — used by the projects themselves, not by AI state sync (see [ADR-002](../plans/adr-002-git-backed-state-sync.md)). `post-start.sh` bootstraps AI state via `state-sync.sh`, which restores root adapters by calling `restore-root-adapters.sh` internally; both scripts are also rendered here (see "Git-Backed State Sync" below).
-- `shared/mcp/servers.json`: shared MCP definitions for Semble, Context7, and Context Mode. Context Mode routes through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`, which starts a public-stdio filter (`context-mode-mcp-filter.mjs`) in front of pinned Context Mode `1.0.169`. The filter advertises and allows exactly four tools — `ctx_index`, `ctx_search`, `ctx_stats`, `ctx_doctor` — and rejects every other tool, including any unknown one, before it reaches upstream. Guarded `ctx_index` accepts content, a contained regular file, or a contained real directory; directory-policy knobs remain fixed at the pinned upstream defaults. The `1.0.169` pin is enforced on both routes rather than only over MCP: hook mode verifies a direct `context-mode` executable against its owning package manifest before running it, and refuses any binary whose version is wrong or undeterminable, falling back to pinned `npx` when available. The dispatcher owns exactly one cache location, `.claude/.cache/context-mode`; a `CONTEXT_MODE_DIR` override is honoured only at or beneath that subtree, and any other value is refused while the bootstrap keeps its project-local cache boundary.
-- `shared/vscode/tasks.json`: VS Code workspace tasks source. Rendered into `.vscode/tasks.json` by the generator. Contains two tasks: an auto-pull on `folderOpen` (runs `state-sync.sh pull` silently when the workspace opens) and a manual push task for non-AI sessions.
-- `shared/agents/`: canonical custom-agent metadata and neutral prompts.
-- `shared/review-profiles/`: checklists consumed by the unified `reviewer` agent.
-- `shared/prompts/`: reusable prompt templates.
-- `shared/templates/`, `shared/scripts/`, `shared/MEMORY.md`, and state README directories: source inputs rendered into the shared `.claude/` basis.
-- `shared/schemas/`: schema documentation for shared metadata.
+`shared/` holds every canonical source a maintainer edits: `policies/`
+(workflow, quality, code, testing, routing, and deployment guidance),
+`skills/` (public and background skills), `third_party/ponytail/` (pinned
+provenance and license), `hooks/` (config and guardrail scripts),
+`devcontainer/` (the GPU devcontainer bootloader, including
+`state-sync.sh`/`restore-root-adapters.sh`), `mcp/servers.json` (Semble,
+Context7, and the filtered Context Mode server), `vscode/tasks.json`,
+`agents/` (canonical custom-agent metadata and prompts), `review-profiles/`,
+`prompts/`, `templates/`, `scripts/`, `MEMORY.md`, and `schemas/`. See
+[Source, generated output, consumer repo, and nested AI
+state](../openwiki/architecture/source-generated-consumer-layout.md) for
+what each holds, who edits it, and the fixed render sequence
+`scripts/generate_targets.py` runs over them.
 
 Communication guidance is centralized in
 [`shared/policies/agent-reporting.instructions.md`](../shared/policies/agent-reporting.instructions.md).
@@ -31,33 +32,20 @@ reminders only for Claude Code and OpenAI Codex.
 ### Policy applicability and native discovery
 
 Policy scope is authored once in `shared/policies/` with target-neutral
-frontmatter: `applicability: always` or an explicit list of repository-relative
-patterns. The generator validates that minimal schema, installs every canonical
-policy under `.claude/instructions/`, and derives native discovery adapters.
-The adapters are not editable policy copies.
-
-Claude Code is the primary scoped-policy implementation. A conditional policy
-becomes `.claude/rules/<policy>.instructions.md` with equivalent YAML `paths`;
-always-on policy stays in the concise root guidance. Claude natively loads
-path-scoped rules when it reads a matching file, keeping unrelated guidance out
-of context. [Claude's rules documentation](https://code.claude.com/docs/en/memory)
-describes this behavior and its use alongside skills.
-
-Codex is the other primary implementation. Its `AGENTS.md` guidance is
-hierarchical: discovery runs from repository root to the current working
-directory, and a closer file overrides earlier guidance. The default combined
-project-document cap is 32 KiB. Therefore this bootstrap creates a nested
-`AGENTS.md` only for a policy that owns a stable concrete directory; a mixed,
-file-specific, or glob scope instead maps to an existing `.claude/skills/`
-workflow. That avoids broadening scope or consuming Codex's combined guidance
-budget. [Codex's AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
-is the source for this native behavior.
-
-GitHub Copilot is secondary compatibility coverage. Its instruction adapters
-derive `applyTo` from the same canonical patterns, and generation validates
-their scope parity with Claude's `paths`. These structural checks do not claim
-that a real client has loaded an adapter; runtime loading is probed separately
-by `scripts/check_native_clients.py`.
+frontmatter (`applicability: always` or an explicit path-pattern list), and
+generation derives each target's native discovery adapter from it: Claude
+Code conditional `.claude/rules/` with `paths`, Codex nested `AGENTS.md`
+only where a policy owns a stable directory, and GitHub Copilot
+`applyTo`-scoped instruction adapters. These are discovery adapters, not
+editable policy copies, and structural parity is not itself proof that a
+real client loaded one — runtime loading is probed separately by
+`scripts/check_native_clients.py`. See [Source, generated output, consumer
+repo, and nested AI
+state](../openwiki/architecture/source-generated-consumer-layout.md)'s
+"Policy discovery per host" for the full per-target mechanics, and
+[Claude's rules documentation](https://code.claude.com/docs/en/memory) and
+[Codex's AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
+for the native behavior each adapter follows.
 
 ## Generated Target
 
@@ -159,6 +147,39 @@ This division complements, rather than replaces, project instructions:
 only non-sensitive local scratch. The [security model](../SECURITY.md) defines the related
 trust and credential boundaries.
 
+## OpenWiki Knowledge Layer
+
+OpenWiki is an optional, opt-in knowledge layer: repository-descriptive wiki
+pages generated under `openwiki/**`. It is enabled only when a maintainer has
+written `openwiki/INSTRUCTIONS.md`, a human-authored repository brief that
+doubles as the deterministic enablement marker the hook guard checks.
+
+Refresh is host-driven: the coding agent calls OpenWiki's own MCP tools
+directly (see the `.claude/skills/knowledge-refresh/` skill for usage) — there is no
+bootstrap-spawned process. OpenWiki's server writes `openwiki/**` and, at
+`openwiki_begin` only, a managed block into root `AGENTS.md` and
+`CLAUDE.md`. A hook guard, `openwiki-guard.sh pre|post`, snapshots both
+adapters and the OpenWiki workflow-file path before `openwiki_begin` and
+restores them byte-for-byte after; `mode: "update"` is the only mode it
+allows, because `init` creates a scheduled workflow and replaces the wiki.
+Automatic restore coverage differs by host: on Claude Code it is wired to
+both `PostToolUse` and `PostToolUseFailure`, so a failed call still
+restores; on Codex it is wired to `PostToolUse` and to the `Stop` hook, with
+no automatic restore when the tool call itself errors, so the skill has the
+agent run `openwiki-guard.sh post` manually right after `openwiki_begin`.
+The guard's own module docstring documents the residual limits inherited
+from the earlier runner design: a write outside this repository is
+invisible to it, it covers only the two adapters and the workflow path, and
+the agent's own writes stay governed by the existing `protect-files` hooks.
+A commit-time check in `verify.py` is an independent backstop: it refuses a
+commit that still carries the managed block, an untracked or newly staged
+OpenWiki workflow file, or a tracked `openwiki/.run.json`, whether or not
+the guard ran.
+
+See `workspace.instructions.md`'s Knowledge Ownership section for the
+authority contract: OpenWiki is derived context, never authority over
+source, tests, or human-authored policy.
+
 ## Ponytail Integration
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
@@ -195,73 +216,56 @@ uv run python scripts/generate_targets.py --all
 
 ## Hook Dispatcher
 
-Claude, Codex, and Copilot hook commands route through
-`shared/hooks/scripts/run-hook.sh`. Google Antigravity is the deliberate
-exception: its static `.agents/hooks.json` adapter calls
-`antigravity-pretool.py` directly because its documented payload and response
-protocol require a Python bridge. The bridge invokes the canonical guards after
-normalizing the payload. The shared dispatcher resolves `REPO_ROOT` in order:
-
-1. `BASH_SOURCE[0]` relative navigation (primary — works when the script is called by path)
-2. Environment variable fallbacks: `GITHUB_WORKSPACE`, `WORKSPACE_FOLDER`, `VSCODE_CWD`, `PWD`
-3. `git rev-parse --show-toplevel` from the current directory
-
-This fixes two real failure modes found in consumer repos:
-
-- `$CLAUDE_PROJECT_DIR` being empty in Claude Code, producing paths like `/.claude/hooks/scripts/...`
-- `$(git rev-parse --show-toplevel)` resolving to a different directory than the repo root when invoked from certain working directories
-
-The generated Claude, Codex, and Copilot hook configs use the pattern:
-
-```bash
-REPO_ROOT="<root-expr>"; "$REPO_ROOT/.claude/hooks/scripts/run-hook.sh" <script> [args...]
-```
-
-Claude and Codex generated configs execute `run-hook.sh` directly. `scripts/generate_targets.py` therefore marks the generated dispatcher executable, and `scripts/validate_targets.py` treats a non-executable dispatcher as a structural failure.
-
-Hook errors (from `state-sync.sh` and others) are written to `.claude/session_logs/hooks-errors.log` in addition to stderr, so failures are auditable after the fact. This log is local-only: `state-sync.sh` gitignores it and untracks it (without deleting the file) from any nested repository that already committed it, so it never syncs through `ai-state` and needs no size cap or rotation. `session_logs/hooks-bypass.log` is a different, still-tracked file.
+GitHub Copilot, Claude Code, and OpenAI Codex hook commands route through
+`shared/hooks/scripts/run-hook.sh`, which resolves the repository root and
+then dispatches into the shared guard scripts under
+`shared/hooks/scripts/`. Google Antigravity is the deliberate exception:
+its static `.agents/hooks.json` adapter calls `antigravity-pretool.py`
+directly because its documented payload and response protocol require a
+Python bridge. Both routes converge on the same ordered Bash safety lane
+and the same protected-file classifier. See [Hook dispatcher and guardrail
+scripts](../openwiki/architecture/hooks-and-guardrails.md) for the full
+`REPO_ROOT` resolution order, the per-target `PreToolUse` matcher groups,
+and the hook error log locations.
 
 ### Target-native PreToolUse routing
 
-Claude and Codex use target-native matcher groups to keep the safety lane narrow.
-Both send `Edit|Write` to `protect-files.sh` and `Bash` to
-`pretool-bash-guard.sh`, while the wildcard matcher runs only optional
-`context-mode-dispatch.sh` observability. Read and MCP tools have no mutation
-guard handler, so they do not incur a no-op safety classification.
-
-`pretool-bash-guard.sh` is one ordered Bash lane: `protect-files.sh`,
-`git-protection.sh`, `enforce-branch-state.sh`, `enforce-commit-gate.sh`, then
-`enforce-pr-gate.sh`. It returns the first deny/ask decision and fails closed
-if a safety guard errors or produces malformed output. This avoids relying on
-the target runtime's parallel execution order while leaving lifecycle wrappers
-and wildcard observability independent.
+Claude and Codex use target-native matcher groups to keep the safety lane
+narrow: native edits to `protect-files.sh`, `Bash` to
+`pretool-bash-guard.sh`, and the wildcard matcher to optional
+`context-mode-dispatch.sh` observability only. `pretool-bash-guard.sh` runs
+one ordered lane — protected files, dangerous Git, branch, commit, then PR
+— and fails closed on any guard error or malformed output. See [Hook
+dispatcher and guardrail
+scripts](../openwiki/architecture/hooks-and-guardrails.md) for the exact
+guard order and behavior.
 
 ### Google Antigravity safety boundary
 
 Antigravity uses one named `bootstrap-safety` configuration with one
-`PreToolUse` group whose matcher is `*`. The bridge runs with the Python 3.9
-standard library and emits exactly one JSON decision on stdout; diagnostics go
-to stderr. It allows the explicit documented non-mutating provider tools,
-normalizes `run_command` into the canonical Bash guard, and normalizes write
-tools into the canonical protected-file guard. Unknown tools, malformed
-payloads, missing command or target fields, guard failures, and malformed guard
-responses deny by default. Existing `ask` results also deny because this
-provider has no approval response in the bridge.
-
-The canonical guards retain command and mutation protection, including
-symlink-safe path classification and protected-source checks. The Antigravity
-adapter intentionally defines no `PreInvocation`, `PostToolUse`, `Stop`, or
-`UserPromptSubmit` equivalence. It does not claim lifecycle parity; durable
-Git-hook/state-sync behavior remains the existing cross-provider boundary.
+`PreToolUse` group whose matcher is `*`. The bridge requires valid JSON
+object payloads and documented fields, emits exactly one JSON decision on
+stdout, and writes diagnostics only to stderr. Unknown tools, malformed
+input, missing Python or guard failures, malformed guard output, and
+existing `ask` results deny by default because Antigravity has no approval
+response in this bridge. The canonical guards retain command and mutation
+protection, including symlink-safe path classification and
+protected-source checks. The Antigravity adapter intentionally defines no
+`PreInvocation`, `PostToolUse`, `Stop`, or `UserPromptSubmit` equivalence;
+it does not claim lifecycle parity, and durable Git-hook/state-sync
+behavior remains the existing cross-provider boundary.
 
 ### Google Antigravity adapters and ownership
 
-The generator creates the Antigravity workspace surface from the same canonical
-metadata and assets as the other adapters. The installer treats `.agents/` as a
-single bootstrap-owned root adapter, like `.codex/`. The consumer `.gitignore`
-therefore has one `.agents/` entry, while the nested state mirror uses
-`.claude/bootstrap-root/.agents/` and the ordinary `BOOTSTRAP_ROOT_PATH=.agents`
-record.
+The generator creates the Antigravity workspace surface from the same
+canonical metadata and assets as the other adapters, and the installer
+treats `.agents/` as a single bootstrap-owned root adapter, like `.codex/`,
+with a pre-write takeover check that never silently adopts or deletes
+consumer content. See [Agent roster, prompts, and the skill
+library](../openwiki/architecture/agents-and-skills.md) for the roster
+Antigravity renders and [Runtime
+Checks](runtime-checks.md#google-antigravity-evidence-boundary) for the
+external native-acceptance blocker.
 
 ```mermaid
 flowchart LR
@@ -272,36 +276,14 @@ flowchart LR
     M --> R[Safe restore]
 ```
 
-`AGENTS.md` is provider-neutral guidance shared by Codex and Antigravity.
-Antigravity structurally receives six roles: the five universal roles plus
-`antigravity_flash_coder`; Codex-only `luna_coder` and `sol_coder` do not
-render. The native default agent is the Antigravity main thread and reads its
-orchestration contract from root `AGENTS.md`. All custom adapters set
-`mainAgent: false`; the five specialists set `subagent: true`, and the custom
-`orchestrator` sets `subagent: false`. The declared Flash-to-Pro coder handoff,
-model tiers, specialist MCP inheritance, shared skills, and MCP configuration
-are static contracts. They are not native loading, routing, escalation, skill,
-or MCP-use proof.
-
-An existing `.agents/` tree must pass a pre-write takeover check. The installer
-accepts only current generated bytes, a byte-matching prior
-`.claude/bootstrap-root/.agents/` mirror, or strictly validated legacy
-Antigravity evidence. Unknown, modified, unsafe, non-regular, or unproved
-content blocks before any filesystem, nested-state, ignore, or Git mutation and
-reports sorted paths with instructions to back up or move the content, remove
-it only if intended, and rerun. It never silently adopts or deletes consumer
-content. After migration, there is no Antigravity per-file allowlist or manifest;
-the directory-level root record is the only ownership contract. Rules are
-deferred because no verified serialized activation schema exists. The external
-native-acceptance blocker is documented in [Runtime Checks](runtime-checks.md#google-antigravity-evidence-boundary).
-
 ## Task-Lane Routing
 
 The Task Lanes table in `shared/policies/workflow.instructions.md` is the
-single normative classifier. It is repository policy over the generated
+single normative classifier — repository policy over the generated
 bootstrap, not a claim that Codex, Claude Code, or Copilot applies these
-thresholds natively. Target-native instructions and agents refer back to that
-one table instead of defining competing lane rules.
+thresholds natively. High-risk triggers take precedence over every other
+lane, and a requested commit or PR always escalates past a lightweight
+edit.
 
 ```mermaid
 flowchart TD
@@ -314,25 +296,9 @@ flowchart TD
     L -->|No| SI[Standard implementation<br>micro-plan or full plan]
 ```
 
-High-risk triggers take precedence: control-plane, security,
-dependency/lockfile, migration, multi-file, user-data, generator, and script
-changes always use the full orchestrated lane. A lightweight edit requires an
-explicit request, exactly one non-control-plane file, low risk, no high-risk
-impact, and no requested commit or PR. For example, correcting one explicit
-README typo can be lightweight; changing a hook or requesting a commit cannot.
-
-Standard implementation covers every remaining requested change, including all
-commit- or PR-bound work. The orchestrator chooses a micro-plan only for an
-obvious, one-phase standard change; ambiguous, multi-phase, and new-module work
-uses a full plan. A lightweight edit is not a micro-plan and creates no
-lifecycle artifacts. An explicit request or approved plan is enough authority
-for a known high-risk change; only unclear targets, authority, or material scope
-require clarification.
-
-The audited `fixup!`, `squash!`, `chore(typo):`, and `docs(typo):` bypasses are
-recovery exceptions, not lane classification or a safety exemption. The
-existing branch, commit, and PR gates remain unchanged; the bypasses retain the
-branch-shape check and require acknowledgement before PR or push closeout.
+See [Task lanes and the enforced lifecycle](../openwiki/workflows/lifecycle-and-task-lanes.md)
+for the full lane table, the audited commit-subject bypasses, and how the
+orchestrator chooses between a micro-plan and a full plan.
 
 ## Lifecycle Enforcement
 
@@ -342,180 +308,64 @@ The canonical workflow is:
 PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> CLOSEOUT -> COMMIT -> PUSH
 ```
 
-Lifecycle hook scripts keep that workflow stateful without mutating during validation hooks:
-
-- `enforce-branch-state.sh` runs before branch commands and validates clean `dev`, branch naming, and big-plan metadata. It recognizes `git checkout -b`, `git checkout -B`, `git switch -c`, `git switch -C`, `git switch --create`, and `git switch --create=<branch>` forms.
-- `record-branch-state.sh` runs after successful branch creation and records `originating_branch`, `implementation_branch`, `started_at`, and `current_phase`.
-- `enforce-commit-gate.sh` keeps two paths. A normal completion commit requires completed small-plan metadata, a completed closeout log with `## [LEARN] Entries` evidence (real entries or the exact sanctioned no-lessons marker - `MEMORY.md`'s mtime is never accepted as a substitute), and a fresh findings report for the current branch and phase with zero open CRITICAL findings, zero open MAJOR findings, and an explicit disposition and reason for every surviving MINOR finding; the report must also match `base_ref`, merge-base SHA, current HEAD SHA, `dirty: false`, a repo-relative target, and a matching `content_hash`. `verify.py phase`/`closeout` report deterministic checks as PASS/FAIL directly - there is no numeric score anywhere in this contract. An explicit pause checkpoint is separate: it requires valid pause evidence and real outer work, creates no empty outer-repository commit, does not advance the phase, and does not require final findings, LEARN, DOCUMENT, or `**Status:** COMPLETED` closeout. `in-progress` and `cancelled` phases still cannot certify commits. `chore(typo):`/`docs(typo):` bypass subjects skip this ceremony only when every changed path is eligible documentation content outside runtime/execution directories; `fixup!`/`squash!` keep their unconditional recovery bypass. The report selection, content-hash freshness, tokenized Git classification, and nested `ai-state` exemption remain as documented by `_lib-frontmatter.sh`; compound commands are checked per Git invocation.
-- `record-commit-closeout.sh` runs from the native Git `post-commit` hook, before AI-state synchronization. It reads the created `HEAD`, not a tool payload, so editor, GUI, `-m`, and every `-F` message source use the same path. It advances only one completed current phase to an `in-progress` next phase, or atomically completes the terminal big plan. Bypass, merge, paused, incomplete, non-implementation, and repeated-HEAD paths do not advance state. A recorder failure or unexpected result is written to `hooks-errors.log` before state synchronization continues.
-- `enforce-pr-gate.sh` permits an outer-repository push immediately after a normal phase-completion commit, once `post-commit` has advanced to the next in-progress phase. The receipt and findings must directly certify that pushed commit, so no later in-progress commit may use this path. It otherwise blocks PRs and final push closeout unless every phase is complete or fully evidenced as cancelled, at least one phase is complete, the base is `dev`, and bypass commits have been acknowledged. Commit counts include completed phases only, and findings bind to the last completed phase. Every earlier completed phase in the big plan's declared order is additionally validated by `verify.py`'s historical receipt-chain check (ancestor/tree/artifact-hash integrity against its certified completion commit); only the terminal completed phase gets current-tree/current-runtime freshness. It exempts nested `.claude/` pushes (`state-sync.sh push`) the same way and with the same per-invocation scoping as the commit gate above. A denial whose Bash command also contains a `git commit` (e.g. `git commit -m x && git push`) is prefixed with a note that the commit and the push must be separate Bash commands, since the gate evaluates the pre-commit HEAD before that command's own commit would exist.
-
-The orchestrator attempts a normal, non-force outer-repository push after each successful commit. It uses the branch upstream when configured, otherwise `origin`. Missing remotes and authentication or network failures are warnings that leave the local commit intact. This automated publication does not affect the nested `.claude` `ai-state` synchronization, PR creation, or merge decisions.
-- `session-start-state.sh` and `stop-session-log-check.sh` provide reminders for stale phase and session-log state.
-
-`verify.py closeout --persist` refuses to write a receipt the terminal push gate
-could never accept: when the big plan's recorded `big_plan_digest` is not
-retrievable from a nested Git revision, it fails closed and names
-`bash .claude/hooks/scripts/state-sync.sh checkpoint`. The closeout ceremony therefore
-checkpoints nested plan state after the plan, log, and memory edits are final
-and before the findings and receipts are persisted. An agent does that with
-a direct nested-repository commit rather than by invoking `state-sync.sh`, which
-the file-protection hook denies through the Bash tool.
-
-Every nested-state reader in `verify.py` (`nested_git_head`,
-`nested_tracked_state_fingerprint`, `indexed_nested_file`,
-`nested_revision_file`, and `relevant_nested_status_changes`) decides whether
-`.claude` is its own Git repository by looking for `.claude/.git`, never by
-asking Git. Git walks up to the outer repository from a plain `.claude`
-directory: `rev-parse` returns the outer `HEAD`, `git show :path` reads the
-outer file at that path, and `git status --porcelain` reports outer paths
-spelled exactly like nested ones. When `.claude/.git` is absent the readers
-report absence instead, the receipt contract fails closed, and `verify.py`
-exits with one plain message naming
-`bash .claude/hooks/scripts/state-sync.sh checkpoint` rather than building a
-receipt. Only `gate` mode, which reads persisted receipts, is exempt.
+Lifecycle hook scripts keep that workflow stateful: `enforce-branch-state.sh`
+and `record-branch-state.sh` gate and record branch creation;
+`enforce-commit-gate.sh` and `record-commit-closeout.sh` gate the commit
+ceremony and advance the plan's current phase from the native `post-commit`
+hook; `enforce-pr-gate.sh` gates the push and PR contract, including the
+historical receipt-chain check across every completed phase;
+`session-start-state.sh` and `stop-session-log-check.sh` provide reminders
+for stale phase and session-log state. `verify.py closeout --persist`
+refuses to write a receipt the terminal push gate could never accept when
+the big plan is not yet retrievable from nested Git. See [Task lanes and
+the enforced lifecycle](../openwiki/workflows/lifecycle-and-task-lanes.md)
+for the full closeout sequence, the pause/cancel paths, and which rules
+these hooks enforce mechanically versus policy text.
 
 ### Reporting reminders
 
-`reporting-reminder.sh` is a short, warn-never-fail context reminder. Prompt
-mode emits one `UserPromptSubmit` context object for Claude Code and OpenAI
-Codex. Late-report mode emits one `PostToolUse` context object after a
-`verify.py closeout` command or a `record_findings.py` invocation with
-`--out`; both match on command shape only and do not inspect the command's
-outcome, so a failed run of either can still produce one reminder. It also
-emits one after a phase-completion commit, which is confirmed against
-the plan state committed in the nested `.claude` repository. Its current
-reminder is 183 bytes and stays below
-the 200-byte ceiling. Ordinary commands produce no
-output; malformed input and internal errors warn on stderr, never block, and
-exit successfully.
-
-The reminder is deliberately not periodic and does not rewrite output at
-`Stop` or inject at `PreCompact`. GitHub Copilot and Google Antigravity keep
-their existing hook events, and Gemini CLI is not supported.
+`reporting-reminder.sh` is a short, warn-never-fail context reminder wired
+only for Claude Code and OpenAI Codex, though the static reporting policy
+applies to all four supported targets. Its current reminder is 183 bytes
+and stays below the 200-byte ceiling. The reminder is deliberately not
+periodic and does not rewrite output at `Stop` or inject at `PreCompact`.
 
 ### Deterministic verification and provenance
 
 `shared/scripts/verify.py` is the authoritative verifier rendered into each
 consumer's `.claude/scripts/verify.py`. `fast` runs cheap changed-Python
-feedback only. `phase` runs the complete measurement group and can persist a
-reusable phase receipt. `closeout` reuses that receipt and persists the final
-closeout receipt; lifecycle gates consume that receipt rather than selecting a
-newest report themselves.
+feedback only; `phase` runs the full measurement group and can persist a
+reusable receipt; `closeout` reuses that receipt and persists the final
+receipt that lifecycle gates consume rather than selecting a newest report
+themselves. See [Deterministic verification: verify.py modes, receipts,
+and findings](../openwiki/operations/deterministic-verification.md) for
+the full receipt schema, `control_plane_provenance`, the findings report,
+and the `gate` mode relations.
 
-Verification chooses its scope from the repository being verified. The
-bootstrap authoring repository uses its explicit `shared`, `scripts`, and
-`tests` groups. A generated consumer runs Ruff over the consumer root while
-excluding `.claude`, uses native Mypy configuration (`files`, `packages`, or
-`modules`) or a proven `src` root, and uses native pytest discovery. If a
-required Mypy scope cannot be established, the result is `UNVERIFIED` rather
-than an invented target. This keeps bootstrap runtime files out of consumer
-application checks.
-
-Any `UNVERIFIED` check makes the whole receipt `UNVERIFIED`, and the commit
-and push gates accept only a `PASS` receipt status; `NOT_APPLICABLE` does not
-block them. A repository with no test files yet reports its pytest check as
-`NOT_APPLICABLE` instead of `UNVERIFIED`, so a brand-new consumer can still
-reach a passing receipt. Once test files exist, pytest not collecting them
-stays `UNVERIFIED`, and a missing Ruff, mypy, or pytest executable is
-`UNVERIFIED` naming the `uv add --dev ruff mypy pytest` fix.
-
-Every phase and closeout receipt binds the measured outer repository state:
-base ref, branch, phase, `head_sha`, merge-base SHA, path discovery, relevant
-paths, and content/tracked-state hashes. It also records
-`control_plane_provenance`, which includes the nested `.claude` Git HEAD,
-relevant nested index/dirty-state fingerprint, active big- and small-plan
-digests, and a schema version. Runtime fingerprints cover governing nested
-files but exclude mutable evidence roots (`plans`, `session_logs`,
-`quality_reports`, and other consumer state), so writing a receipt or report
-does not make its own evidence stale.
-
-Closeout compares all governing provenance fields except `nested_head`. A
-nested HEAD advance is therefore acceptable when it changes only excluded
-evidence state; changes to tracked runtime files, relevant nested state, or
-active plans make the evidence stale. The receipt schema and deterministic
-measurements validate structural invariants directly. They do not emit
-synthetic PASS records for facts that cannot independently fail.
-
-Bypass commit prefixes `fixup!` and `squash!` are allowed unconditionally for short-lived recovery work; `chore(typo):` and `docs(typo):` are allowed only when every changed path is eligible documentation content outside runtime/execution directories (a substantive runtime/code change cannot hide under a typo subject). An eligible bypass skips only the plan-ceremony checks (small-plan/closeout/findings/LEARN) — branch-shape validation still runs, so a bypass commit off a non-`*_implementation` branch is still denied, and an ineligible typo subject simply falls through to the full ceremony gate. Bypasses are logged and must be acknowledged before PR or push.
-
-`protect-files.sh` invokes its bundled classifier directly with `python3`; it
-does not use `uv run`, because protection must work before a project environment
-exists. `python3` is therefore a required safety dependency: if it is absent,
-the hook fails closed. `git-protection.sh` remains a Bash guard. A classifier
-error, incomplete redirect, in-place edit without a determinable target, or
-ambiguous shell segment also fails closed. Classification is target-aware per
-segment rather than a whole-command heuristic, so a proven read-only
-protected-config inspection is allowed while mutations through native tools,
-redirects, `sed -i`/`perl -i`, and mutating commands remain protected. Copy,
-install, and move operations include both source and destination operands in
-the protection check, preventing a protected source file from being copied out
-through a write-bearing command; unknown command syntax with a protected literal
-is denied rather than guessed.
-
-`git-protection.sh` scans a possibly-chained Bash command for destructive git subcommands (`reset --hard`, `push --force`, `checkout --`, `clean -fd`, deleting `main`/`master`). Because `_shell_tokenize` drops shell operators (`;`/`|`/`&`) as mere separators, the flattened token stream for `git clean -f && ls -d /tmp` has no trace of the `&&` — scanning "does -d appear anywhere after clean" would misattribute `ls`'s unrelated `-d` to `git clean`, denying a wholly benign command (and the same shape misattributes an unrelated later `--force` to an earlier `git push`). `git_danger_reason` bounds each invocation's argument scan to `_unquoted_operator_boundary` — the point right before the next unquoted operator — so a later chained command's flags can never bleed into an earlier invocation's danger check, while a real danger later in the same chain (`git status && git reset --hard`) is still caught on its own invocation.
-
-The direct Python classifier normalizes repository-relative and absolute paths.
-For an opaque or interpreter-style command that is not on the proven read-only
-list, conservative protected-literal detection covers `.env*`, `uv.lock`,
-`credentials*`, names containing `secret`, `.pem`/`.key` files, every
-`.github`/`.claude`/`.codex` hook path, and the protected Claude/Codex hook
-configuration files. It does not claim all unfamiliar commands are mutations:
-an unfamiliar command is denied only when it carries one of those protected
-literals, while syntax that prevents safe parsing fails closed. This prevents
-bypasses such as `cp app/secrets/db_secret.txt other/` and false confidence in
-an unfamiliar interpreter or archive command, while the explicit read-only
-command set remains inspectable.
+`protect-files.sh` invokes its bundled classifier directly with `python3`;
+it does not use `uv run`, because protection must work before a project
+environment exists. `git-protection.sh` remains a Bash guard. How far the
+classifier reaches differs by rule: the hook paths and protected hook
+configuration files that identify this repository's own guardrail setup
+are scoped to this repository only, decided on the candidate's resolved
+real path, while the credential-shaped rules (`.env*`, `uv.lock`,
+`credentials*`, `.pem`/`.key`) reach any path, in this repository or any
+other. A candidate whose real path cannot be resolved stays protected
+rather than being allowed.
 
 ## Git-Backed State Sync
 
-`.claude/` in each consumer is a plain, self-contained git repository (its own `.git/` inside `.claude/`), tracking both the bootstrap-controlled files and mutable AI state (`MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, `quality_reports/**`) on one branch, `ai-state`. The outer consumer repo gitignores `.claude/` entirely, so the nested repo is invisible to the code branches. See [ADR-002](../plans/adr-002-git-backed-state-sync.md) for the full rationale and the alternatives it replaced (Hugging Face bucket mirroring, `git worktree`, committing state into code branches) — `git worktree` in particular was rejected, not overlooked: a worktree must belong to the same repository as its parent, which would rule out pointing state at a different remote (the `--state-remote` privacy escape) and would couple the state checkout to the outer repo's worktree bookkeeping.
-
-**This is a genuinely separate repository, not a branch of the outer one — plain `git branch`/`git log` run at the consumer root will never show `ai-state` or its commits.** Inspect it with `git -C .claude <command>` (e.g. `git -C .claude branch`, `git -C .claude log --oneline`), or `cd .claude` first. Looking for `ai-state` with the outer repo's own `git branch -a` and finding nothing is expected, not a sign that the sync failed.
-
-`shared/hooks/scripts/state-sync.sh` (pure bash, no `uv`/Python) implements seven subcommands. It drains stdin with the same two-second timeout as the old helper. `setup`, `pull`, `checkpoint`, `publish`, `push`, and `migrate-from-hf` remain warn-never-fail for hook compatibility and emit operational diagnostics on stderr; only `status` deliberately writes its stable report to stdout.
-
-- **`setup`** — idempotent. If `.claude/.git` is missing: `git init`, resolve and configure the remote (`AI_STATE_REMOTE` / `--state-remote` at install time, else the outer repo's own `origin`), commit whatever is already on disk (there is always something — at minimum this script itself), then reconcile with `origin/ai-state` via `git merge --allow-unrelated-histories` if it already exists remotely (a real merge, not a bare checkout, so it combines file-by-file instead of refusing to overwrite untracked files that are about to converge anyway). A genuine conflict aborts the merge and warns, leaving the local commit as the source of truth. On this fresh-nested-repository path it also restores the installer-owned root adapters carried in `.claude/bootstrap-root/` (the D5/F1 invariant: even a non-devcontainer machine that only runs `setup` gets them back) and activates the outer repository's Git hooks: `configure_outer_hooks_path` (called from `restore_root_adapters`, so also on every `pull` and fresh `checkpoint`) sets `core.hooksPath` to `.claude/hooks/git-hooks` once that directory exists, comparing the current value first so an already-correct setting is left alone and a different one is overwritten with a warning naming the old value; a failure here only warns. If `.claude/.git` already exists, `setup` stays local-only and does not restore, activate hooks, or checkpoint.
-- **`pull`** — records local nested changes, then reconciles committed state with `origin/ai-state`. On conflict, it aborts cleanly, leaves local files intact, and skips restoration entirely. Once local setup succeeds and any configured remote reconciliation also succeeds (including the no-remote-configured and local-only cases), `pull` restores the installer-owned root adapters from `.claude/bootstrap-root/` and checkpoints, so state that failed to reconcile is never used to overwrite them.
-- **`checkpoint`** — initializes local nested Git state if needed and commits local AI state as the durable boundary. It performs no remote Git operation, including no fetch, `ls-remote`, pull, merge, or push.
-- **`publish`** — sends already committed state only. It never stages or commits; if the nested worktree is dirty, it warns and preserves that uncheckpointed state. From a clean worktree it reconciles with `origin/ai-state`, then pushes; repeated clean publication is a no-op. With `--local-only`, it skips remote interaction without mutation.
-- **`push`** — the backward-compatible composition: checkpoint, then publish. Existing SessionStop, post-commit, and VS Code task wiring continues to use it.
-- **`status`** — read-only and network-free. It reports whether the nested repository is initialized, its clean/dirty worktree state, remote configuration without exposing its URL, and cached tracking ahead/behind information when available. It also reports the existing error-log path and the last state-sync error; it never fetches or exposes credentials.
-- **`migrate-from-hf`** — one-way, explicit: if `.claude/` has content but no `.claude/.git` yet, initializes it, commits everything on disk as `migrate: import pre-git state`, then reconciles and publishes when safe. No automatic pull from the retired Hugging Face bucket occurs; the local tree is the source of truth at migration time. `install_bootstrap.py` invokes this before replacing generated files.
-
-Bootstrap updates land as `bootstrap:`-prefixed commits (made by `install_bootstrap.py` through the updater); session state lands as `session:`-prefixed commits when a consumer's Stop hook runs the normal push flow. The commit log on `ai-state` cleanly separates the two — `git -C .claude log --stat` is a full audit trail of what every session and every bootstrap update changed, something the old bucket mirror had no equivalent of.
-
-**Multi-writer conflict policy.** `init_nested_repo` writes a `.gitattributes` into the nested `.claude/` repo alongside its `.gitignore`. Append-only machine logs matching `session_logs/*.log` get git's built-in `merge=union` driver, so two sessions appending different lines to the same log auto-reconcile during rebase instead of conflicting. Narrative state — `plans/**`, `MEMORY.md`, and session-log prose — intentionally keeps the default conflict-and-abort behavior, so a genuine divergence there still stops for a manual semantic merge rather than being silently resolved ours/theirs. Both files are written by `init_nested_repo` at nested-repo init, so this policy reaches every fresh nested `.claude/` repo the same way the existing `.gitignore` does — not just repos created before this policy existed.
-
-**Durable checkpoints vs. best-effort hooks.** `checkpoint` is the explicit network-free local durability boundary. Post-commit continues to invoke compatible `push`, which attempts checkpoint then publication. Runtime-specific Stop paths are best-effort: they run only when the runtime emits the event, and closing a browser tab or editor window is not guaranteed to do so. Run `checkpoint` explicitly when local durability matters before a later `publish`; the hooks remain warn-never-fail, so sync trouble never blocks a session or outer-repo commit.
-
-**Runtime lifecycle boundaries.** Matching Stop handlers can run concurrently, so Codex and Claude each use one sequential wrapper. Both continue after a child failure; checkpointed local commits remain available for a later retry, with failures recorded in `.claude/session_logs/hooks-errors.log` and inspectable through `state-sync.sh status`.
-
-| Runtime | Turn-scoped Stop | Prompt retry | Failure/end boundary |
-| --- | --- | --- | --- |
-| Codex | [`codex-stop.sh`](../shared/hooks/scripts/codex-stop.sh): log, check, checkpoint, publish; one JSON stdout response | `push`, 60 seconds | Delayed best-effort SessionEnd: local `checkpoint`, 3 seconds, no publication |
-| Claude CLI / VS Code | [`claude-stop.sh`](../shared/hooks/scripts/claude-stop.sh): log, check, checkpoint, publish; no stdout | `push`, 60 seconds | StopFailure: local `checkpoint`; SessionEnd: `push`, 60 seconds |
-
-Claude VS Code bundles the Claude runtime and reads the same generated `.claude/settings.json` as the CLI; no second settings adapter exists. Post-commit and the manual **AI state: push** VS Code task remain the durable checkpoint-and-publish paths.
-
-**Codex for VS Code trust.** `.codex/hooks.json` is a project hook surface
-whose trust is bound to its content/hash. A direct install or per-consumer batch
-update can therefore require review and renewed approval. Reopen/reload the
-repository in Codex for VS Code and approve the project hooks when prompted;
-the installer reports this requirement but never approves hooks or changes
-user trust settings. A dry run only previews that possible action and does not
-claim to have changed hook content.
-
-Both human CLIs push by default after a complete refresh. Their `--local-only`
-mode still refreshes all bootstrap-controlled files and creates durable nested
-commits, including ordered `migrate:` then `bootstrap:` commits for a legacy
-consumer, but has a hard remote-I/O boundary: it performs no fetch,
-`ls-remote`, pull, merge, or push. The installer prints nested status and a
-shell-quoted manual `state-sync.sh push` command so publication is deliberate.
-
-`state-sync.sh` and `restore-root-adapters.sh` (which copies `.claude/bootstrap-root/` — the root-level adapter files that live outside `.claude/`, such as `CLAUDE.md`/`AGENTS.md`/`.mcp.json`/`.codex/**` — back out to the repo root) are rendered in two locations: `.claude/hooks/scripts/` for normal use, and `.devcontainer/` so `post-start.sh`'s call to `state-sync.sh` has its own copy of both scripts to run (`state-sync.sh` invokes `restore-root-adapters.sh` internally) before `.claude/` exists at all on a fresh clone.
-
-`MEMORY.md` is single-homed as a tracked file in `.claude/`, evolving via `session:`/`bootstrap:` commits like everything else — no separate bundle or restore-order dependency the old bucket split required.
+`.claude/` in each consumer is its own self-contained git repository on
+branch `ai-state`, tracking both the bootstrap-controlled files and mutable
+AI state, chosen over Hugging Face bucket mirroring, `git worktree`, or
+committing state into code branches so that state can privately point at a
+different remote and stay decoupled from the outer repo's worktree
+bookkeeping. See [ADR-002](../plans/adr-002-git-backed-state-sync.md) for
+the full rationale and rejected alternatives, and [Git-backed AI-state
+sync](../openwiki/operations/git-backed-ai-state-sync.md) for
+`state-sync.sh`'s `setup`/`pull`/`checkpoint`/`publish`/`push`/`status`
+commands, the warn-never-fail contract, the root-adapter mirror, and where
+each hook and git-hook path runs it.
 
 ## VS Code Tasks
 
@@ -530,69 +380,44 @@ run `state-sync.sh checkpoint` explicitly before publishing later.
 
 ## Custom Agents
 
-Custom agents are source-controlled under `shared/agents/<agent-id>/`.
+Custom agents are source-controlled under `shared/agents/<agent-id>/`: an
+`agent.yaml` (metadata, capabilities, visibility, delegates, target
+eligibility, prompt composition, and per-target model/effort intent) plus
+one or more prompt bodies. The shared loader validates all metadata before
+any target renders; `luna_coder` and `sol_coder` declare only
+`openai-codex`, so they never generate a Claude or Copilot adapter.
 
-Each agent contains:
+The table below is the per-agent model and reasoning-effort matrix. `README.md`'s Agent
+System section carries the same table because `scripts/validate_targets.py` requires it there; edit both
+together, and the validator rejects a README copy that no longer matches the canonical
+`model_intent` metadata:
 
-- `agent.yaml`: stable metadata, capabilities, visibility, delegates, target
-  eligibility, prompt composition, and per-target model/effort intent.
-- `prompt.md`: target-neutral behavior for a normal agent or prompt base.
-- `prompt.openai-codex.md`: an optional Codex-only supplement. Derived agents
-  use it with `prompt_base` instead of copying the base `prompt.md`.
+| Agent | Claude model | Claude effort | Codex model | Codex effort |
+| --- | --- | --- | --- | --- |
+| orchestrator | session (`/model`) | session (`/effort`) | `gpt-5.6-sol` | `xhigh` |
+| planner | `opus` | `xhigh` | `gpt-5.6-sol` | `xhigh` |
+| reviewer | `sonnet` | `xhigh` | `gpt-5.6-sol` | `high` |
+| coder | `sonnet` | `xhigh` | `gpt-5.6-terra` | `high` |
+| documenter | `sonnet` | `medium` | `gpt-5.6-luna` | `medium` |
+| luna_coder | — | — | `gpt-5.6-luna` | `xhigh` |
+| sol_coder | — | — | `gpt-5.6-sol` | `xhigh` |
 
-The shared loader validates all metadata before any target renders. Omitted
-`targets` means all supported targets, which keeps the five universal agents
-eligible for GitHub Copilot, Claude Code, and Codex. `luna_coder` and
-`sol_coder` explicitly declare only `openai-codex`, so they never generate a
-Claude or Copilot adapter. The loader also rejects empty, duplicated, unknown,
-or model-inconsistent targets. Copilot model fields are target bindings, not
-portable semantics. GitHub Copilot agent `model` fields must be one supported
-Copilot model string. Claude and Codex adapters must not include Copilot model
-pins.
+The orchestrator (main-thread persona) follows the session's model/effort
+in Claude Code; Claude subagents inherit the session's extended-thinking
+state, so there is no per-agent thinking knob. Codex's interactive root
+session is intentionally unpinned in `.codex/config.toml`; every generated
+`.codex/agents/*.toml` is self-contained with its own pinned model and
+effort and does not read `.claude/agents/<id>.md` at runtime. Antigravity's
+declared intents are Pro for orchestrator/planner/canonical
+coder/reviewer and Flash for `antigravity_flash_coder`/documenter, with
+one configured Flash-to-Pro escalation target — a static configuration
+contract, not evidence of a backing model or native tier routing.
 
-The Claude Code target carries per-agent model and reasoning-effort tiers. Each `agent.yaml` sets `model_intent.claude-code` to an object (`{ "model": ..., "effort": ... }`); the generator emits matching `model:` and `effort:` frontmatter on each `.claude/agents/*.md`, skipping `inherit` values so the orchestrator (main-thread persona) follows the session. Effort-heavy roles run on the stronger model (planner `opus`/`xhigh`, reviewer and coder `sonnet`/`xhigh`, documenter `sonnet`/`medium`). Verification runs through canonical lifecycle scripts rather than a dedicated agent. **Extended thinking is intentionally not configured per agent**: Claude Code subagents inherit the session's thinking state, so there is no per-agent knob to set.
-
-Agent names are identical wherever an agent is eligible; the generator performs
-no per-target renaming. Codex agents are project-scoped
-`.codex/agents/*.toml` files. Each file is self-contained: a generated metadata
-header is followed by the exact target-transformed role body, and the agent does
-not read `.claude/agents/<id>.md` at runtime. A normal role body is its own
-`prompt.md`, optionally followed by exactly one derived role-supplement
-delimiter and its Codex supplement. A derived role body is exactly one
-target-transformed base `prompt.md`, the same delimiter, and its supplement.
-The loader permits only one inheritance level, rejects self-reference,
-multi-level inheritance, cycles, missing bases or supplements, duplicate
-delimiters, and supplements that copy the complete base prompt.
-
-`agent.yaml` remains the source for metadata, eligibility, composition, and
-model intent; the Codex prompt is derived output, not a second editable role
-definition. The root Codex session is intentionally unpinned in
-`.codex/config.toml`, leaving the user free to choose the interactive model and
-effort. The five universal Codex agents are orchestrator Sol/xhigh, planner
-Sol/xhigh, reviewer Sol/high, coder Terra/high, and documenter Luna/medium.
-The two Codex-only agents are `luna_coder` Luna/xhigh and
-`sol_coder` Sol/xhigh. Agent files omit per-agent MCP and skill overrides and
-inherit the trusted project's registrations. Structural size measurements are
-observability only; no official per-agent instruction-size cap is asserted.
-The dated 2026-08-09 native evidence covers the historical six-role matrix, not
-the two newly declared specialists. Future optional persistent-thread probes
-may exercise the current seven Codex roles, but this feature does not require a
-native run. Claude and Copilot retain their existing five-agent output.
-
-The orchestrator's own `prompt.openai-codex.md` is also target-scoped. It adds
-the experimental bounded implementation policy only to the generated Codex
-orchestrator; Claude and Copilot keep their existing behavior. For every
-approved step, the orchestrator builds a packet containing the goal and
-plan-step identity, relevant code or failures, constraints, rejected approaches
-when relevant, required skills, acceptance criteria, verification commands,
-and freedom to choose the smallest maintainable implementation. It chooses
-`luna_coder` only when five conditions establish a clear outcome, known code
-locations, known constraints, objective verification, and no unresolved
-architecture, interface, root-cause, migration, security, or ownership
-decision. Otherwise it chooses `coder` directly.
-
-The named Codex route is shown below. Every tier has a fixed model in its own
-self-contained agent TOML; spawning does not supply a model or effort override.
+The Codex-only orchestrator supplement (`prompt.openai-codex.md`) adds an
+experimental bounded-implementation route: for each approved step it
+builds a packet and starts with `luna_coder` only when the outcome, code
+locations, constraints, and verification are already clear, otherwise
+`coder` directly.
 
 ```mermaid
 flowchart LR
@@ -604,29 +429,17 @@ flowchart LR
     S -->|Failure| X[Stop and report]
 ```
 
-Before editing where possible, `luna_coder` validates the packet. If it cannot
-proceed, it returns only a prompt-enforced object with `status`, one of six
-exact `reason` values, `workspace_changed`, `evidence`, and `needed`. This is a
-handoff contract, not a native typed protocol. If Luna changed the workspace,
-`coder` inspects the current diff and preserves useful prior work instead of
-restarting blindly. The declared escalation graph is exactly
-`luna_coder -> coder -> sol_coder`; Sol has no successor, and the route never
-retries or skips a tier.
-
-Before automatic Terra-to-Sol recovery, the orchestrator classifies the
-existing verification commands/results and reviewer findings as exactly one of
-`implementation`, `environment`, `baseline`, or `indeterminate`. Only an
-implementation-attributable failure advances automatically. Environment and
-baseline failures stop model escalation and are reported. Indeterminate
-evidence returns to orchestrator judgment with no automatic escalation. A
-verification failure alone is not implementation attribution, and the orchestrator
-must not invent evidence. `visibility: hidden` on the two specialists is an
-internal orchestration convention, not a native Codex invisibility guarantee.
-Optional `initial-coder`, `fallback`, and `reason` facts may use an existing
-closeout or session log; they do not introduce telemetry, a token tracker, a
-new artifact, or a gate.
-
-Codex skills are wired through `[[skills.config]]` entries in `.codex/config.toml` whose `path` points at each skill's `SKILL.md` file; the config omits the redundant flat `[features]` block (hooks are on by default), uses the documented `agents.max_concurrent_threads_per_session = 6`, and does not restate the enabled-by-default `agents.enabled`. It retains `max_depth = 1` independently and sets `hide_spawn_agent_metadata = false` with `tool_namespace = "agents"` so named model/effort profiles are selectable. Measured against Codex 0.147.0 on 2026-08-09, `tool_namespace` has **no observable effect** — the collaboration tools are exposed as `collaboration.spawn_agent`, `followup_task`, `send_message`, `interrupt_agent`, `list_agents`, and `wait_agent`, with nothing under `agents.*`. Named routing was nonetheless verified correct with the block present, so this records an inert key, not a removable shim. The [dated compatibility record](2026-08-08-codex-routing-compatibility.md) distinguishes the historical 0.144.x runtime result, local alpha parsing evidence, and current official documentation; static validation protects the configuration, while native probes remain the only removal gate for the shim or `max_depth`. Routing itself was verified on 2026-08-09 with the shim present; the shim-removed candidate is still untested.
+The escalation graph is exactly `luna_coder -> coder -> sol_coder`; Sol has
+no successor, and the route never retries or skips a tier. Before
+automatic Terra-to-Sol recovery, the orchestrator classifies existing
+verification/review evidence as `implementation`, `environment`,
+`baseline`, or `indeterminate`, and only an implementation-attributable
+failure advances automatically. See [Agent roster, prompts, and the skill
+library](../openwiki/architecture/agents-and-skills.md) for how each
+target renders an agent from this metadata, prompt-composition rules, and
+review-profile routing, and the [dated Codex routing compatibility
+record](2026-08-08-codex-routing-compatibility.md) for the `[features.multi_agent_v2]`
+shim and `max_depth` removal gates.
 
 ## Design Decisions
 

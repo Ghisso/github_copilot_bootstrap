@@ -28,6 +28,16 @@ COMMAND="$(hook_command "$INPUT")"
 if git_targets_nested_claude "$COMMAND" commit; then
   exit 0
 fi
+# A commit explicitly redirected at some other repository entirely (git -C
+# <dir> commit, --git-dir, --work-tree) is equally none of this repository's
+# ceremony's business. git_targets_other_repository checks each `git commit`
+# invocation individually and fails closed on anything undeterminable, so a
+# compound command that mixes a commit in another repository with a commit
+# targeting this one is still gated in full: only when EVERY commit
+# invocation provably resolves elsewhere does this stand down.
+if git_targets_other_repository "$COMMAND" commit; then
+  exit 0
+fi
 if ! is_git_commit_command "$COMMAND"; then
   exit 0
 fi

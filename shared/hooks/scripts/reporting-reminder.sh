@@ -98,9 +98,15 @@ head_frontmatter_value() {
   '
 }
 
+# Delegates target resolution to the shared _git_invocation_top_level
+# (_lib-frontmatter.sh); this function keeps only the caller-specific parts
+# that resolver has no reason to know: the whole $COMMAND must literally
+# start with the "git" token, and the invocation's subcommand must be
+# "commit" (mirroring the fail-closed-on-any-other-flag walk that resolver
+# now performs internally, so the two stay in lockstep rather than drifting).
 git_command_targets_repo_root() {
-  local index=1 token effective
-  local -a options=(-C "$REPO_ROOT")
+  local index=1 token target physical_repo_root
+  local -a forward=()
   _shell_tokenize "$COMMAND"
   [[ "${_TOKENS[0]:-}" == "git" ]] || return 1
   while (( index < ${#_TOKENS[@]} )); do
@@ -108,19 +114,20 @@ git_command_targets_repo_root() {
     case "$token" in
       -C|--git-dir|--work-tree)
         (( index + 1 < ${#_TOKENS[@]} )) || return 1
-        options+=("$token" "${_TOKENS[$((index + 1))]}")
+        forward+=("$token" "${_TOKENS[$((index + 1))]}")
         index=$((index + 2))
         ;;
       --git-dir=*|--work-tree=*)
-        options+=("$token")
+        forward+=("$token")
         index=$((index + 1))
         ;;
       -*) return 1 ;;
       *) [[ "$token" == "commit" ]] || return 1; break ;;
     esac
   done
-  effective="$(git "${options[@]}" rev-parse --show-toplevel 2>/dev/null || true)"
-  [[ -n "$effective" && "$(cd "$effective" && pwd -P)" == "$REPO_ROOT" ]]
+  target="$(_git_invocation_top_level ${forward[@]+"${forward[@]}"})" || return 1
+  physical_repo_root="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)" || return 1
+  [[ "$target" == "$physical_repo_root" ]]
 }
 
 is_phase_completion_commit() {

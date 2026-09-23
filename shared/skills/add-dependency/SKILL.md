@@ -10,6 +10,10 @@ argument-hint: "[package-name]"
 
 # add-dependency — Dependency Management
 
+For a third-party binary or CLI (not an importable Python package), run
+`.claude/skills/integration-gate-spike/SKILL.md` first to verify its real
+invocation contract before wiring it in.
+
 ## Step 1: Check Package
 ```bash
 uv pip index versions [package] 2>/dev/null | head -5
