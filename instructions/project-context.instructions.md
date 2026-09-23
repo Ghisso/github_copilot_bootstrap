@@ -73,14 +73,17 @@ consumer workflow: plan -> implement -> verify -> review -> score -> document
 
 ## Current status and verification
 
-Onboarding was refreshed on `dev` on 2026-09-11 from clean outer and nested
+Onboarding was refreshed on `dev` on 2026-09-23 from clean outer and nested
 worktrees. `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
 scripts/validate_targets.py` passed with `PASS generated target is structurally
-valid`; `scripts/check_runtime.py` also passed. The structural validator checks
-generation, determinism, hooks, adapters, lifecycle contracts, and its
-regression suite. It is not proof that every supported native client routed
-every role at runtime; use the optional `scripts/check_native_clients.py`
-release probe when that evidence is needed.
+valid`. `scripts/check_runtime.py` was also run; after this source-policy edit it
+reports the expected stale self-installed workspace copies until the bootstrap
+is reinstalled into this authoring repository with
+`uv run python scripts/install_bootstrap.py . --allow-self --local-only`. The
+structural validator checks generation, determinism, hooks, adapters, lifecycle
+contracts, and its regression suite. It is not proof that every supported native
+client routed every role at runtime; use the optional
+`scripts/check_native_clients.py` release probe when that evidence is needed.
 
 Before merging bootstrap changes, run:
 
