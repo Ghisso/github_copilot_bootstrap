@@ -13,8 +13,10 @@ closeout_session_log:
 
 Prove that sidecar consumers update correctly across bootstrap versions
 through `update_consumers.py`, including batches that mix full and sidecar
-consumers. Then document both modes. Reconciliation logic already exists from
-Phases B and C; this phase adds no second update path.
+consumers. Change the updater so that a refused or failed target no longer
+stops the batch (big plan, Decision 20). Then document both modes.
+Reconciliation logic already exists from Phases B and C; this phase adds no
+second update path.
 
 ### Required Skills
 
@@ -27,23 +29,38 @@ Phases B and C; this phase adds no second update path.
 
 ## Primary Files
 
+- `scripts/update_consumers.py` — skip-and-report batch handling, and a
+  docstring that describes both modes.
 - `tests/test_sidecar_update.py` — new.
-- `scripts/update_consumers.py` — change only if a batch test exposes a gap.
 - `scripts/sidecar_overlay.py` — fixes found by the upgrade suite only.
+- `scripts/validate_targets.py` — only where its updater checks need the new
+  failure summary.
 - `README.md`, `docs/target-mapping.md`, and `docs/architecture.md` where
   they describe installer ownership.
 
 ## Steps
 
-- [ ] **1. Confirm batch behavior.**
+- [ ] **1. Make batches skip and report failures.**
   - **Owner:** `coder`
+  - In `update_consumers.py`, run every target. When the installer exits
+    non-zero, or a target is not a directory, record the target and its exit
+    code and continue with the next one. After the last target, print one
+    line per failed target and exit 1. Print `All projects updated.` only
+    when every target succeeded.
+  - A generator failure still stops the batch before any target runs.
+  - Keep the dry-run lines that `check_batch_dry_run_summary` in
+    `validate_targets.py` requires, and print `=== Preview complete: ...`
+    only for targets that succeeded.
   - `update_consumers.py` passes no `--mode`, so the installer detects each
     target's mode.
+
+- [ ] **2. Confirm option forwarding in mixed batches.**
+  - **Owner:** `coder`
   - Test a mixed batch with `--local-only` and with
     `--commit-copilot-surface`. Full targets use the options; sidecar targets
     warn once and ignore them.
 
-- [ ] **2. Add the upgrade regression suite.**
+- [ ] **3. Add the upgrade regression suite.**
   - **Owner:** `coder`
   - In `tests/test_sidecar_update.py`, build two bootstrap versions as
     fixture sources, install the first, and update to the second:
@@ -56,28 +73,46 @@ Phases B and C; this phase adds no second update path.
     7. unrelated tracked team config added after install -> untouched;
     8. exclude block deleted by the user -> restored;
     9. owned projection deleted by the user -> reinstalled;
-    10. manifest corrupted -> abort with remedy; after the remedy, the rerun adopts matching units;
-    11. full-to-sidecar and sidecar-to-full attempts through `update_consumers.py` -> abort;
-    12. dry-run update -> no changes;
-    13. mixed batch through `update_consumers.py`;
-    14. install, update, update -> the second update changes no file.
+    10. manifest corrupted -> abort with remedy; after the remedy, the rerun adopts the listed units that match;
+    11. a batch target with both full and sidecar evidence -> refused before any write, the next target updated, the summary names the refused target, exit 1;
+    12. a batch target that the full path refuses (for example an unproved `.agents/` tree) -> reported, the other targets updated, exit 1;
+    13. dry-run update -> no changes;
+    14. mixed batch of full and sidecar targets through `update_consumers.py` -> both updated, exit 0;
+    15. install, update, update -> the second update changes no file.
   - Every test must fail when the rule it covers is removed.
 
-- [ ] **3. Document consumer behavior.**
+- [ ] **4. Document consumer behavior.**
   - **Owner:** `documenter`
   - In README, split install and update guidance into four parts: full
     install, personal sidecar install, updating full consumers, and updating
     sidecar consumers.
   - Explain the team-repository use case, what the sidecar does not include,
     the `SKIPPED` and `RETAINED` reports and their remedies, manual removal
-    (delete the paths listed in the manifest, the marked exclude block, and
-    the manifest), and how to switch modes manually.
-  - State the two behavior changes for full installs: a plain install now
-    refuses a repository that tracks agent configuration and has no
-    bootstrap evidence (pass `--mode full` to keep today's takeover), and
-    sidecar mode supports the main worktree only.
-  - Add the sidecar projection table to `docs/target-mapping.md` and point
-    at `docs/sidecar-provider-contract.md` for evidence.
+    (delete the paths listed in the manifest, the marked exclude block, the
+    manifest, and the staging folder), and how to switch modes manually.
+  - State the behavior changes:
+    - a plain install now refuses a repository that tracks a path the full
+      install writes and has no bootstrap evidence; pass `--mode full` to
+      keep today's takeover;
+    - sidecar mode supports the main worktree only;
+    - a batch update now finishes the other targets when one fails, then
+      exits 1.
+  - Describe the full install's takeover as the big plan's Context lists it,
+    including the deleted untracked files in root adapter folders and the
+    overwritten `.devcontainer/`.
+  - Document the limits:
+    - the main worktree's exclude lines also hide those paths in linked
+      worktrees;
+    - worktrees that VS Code or the Codex app create for background sessions
+      contain no sidecar files unless they are listed in
+      `git.worktreeIncludeFiles` or `.worktreeinclude`;
+    - Git overwrites an edited sidecar file without warning when the team
+      later commits a file at the same path, so keep personal edits
+      elsewhere.
+  - Say that the vendored Ponytail skills ship with their MIT `LICENSE`.
+  - Add the sidecar projection table (write roots, read roots, and bridges)
+    to `docs/target-mapping.md`, and point at
+    `docs/sidecar-provider-contract.md` for evidence.
   - Do not describe the sidecar as equivalent to the full bootstrap.
 
 ## Acceptance Criteria
@@ -97,7 +132,8 @@ The updater:
 - leaves `git status --porcelain --untracked-files=all` unchanged;
 - removes only unchanged, obsolete, sidecar-owned units;
 - preserves and reports locally modified sidecar files;
-- aborts before any write on unsafe states.
+- refuses an unsafe target before any write, finishes the other targets,
+  and exits 1 with a summary.
 
 ## Verification
 

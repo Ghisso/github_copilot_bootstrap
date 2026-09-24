@@ -14,7 +14,8 @@ closeout_session_log:
 The big plan's final knowledge-refresh phase, as defined by the
 Knowledge-Refresh Final Phase rule in `shared/policies/workflow.instructions.md`.
 Refresh the OpenWiki layer, then audit stale claims that assume every
-consumer installation owns the full agent harness.
+consumer installation owns the full agent harness, or that a batch update
+stops at the first failure.
 
 Add no implementation scope unless the audit exposes a concrete defect.
 
@@ -34,9 +35,9 @@ Add no implementation scope unless the audit exposes a concrete defect.
     MCP tools with `mode: "update"`. Never run an init, and never create a
     scheduled workflow.
   - The `openwiki` MCP server must connect first. On 2026-09-24 it failed
-    with `Executable not found in $PATH: openwiki`. A provider or
-    authentication failure blocks this phase until it is fixed; it is never
-    skipped.
+    twice: once with `Executable not found in $PATH: openwiki`, and later
+    with a 30-second connection timeout. A provider or authentication failure
+    blocks this phase until it is fixed; it is never skipped.
 
 - [ ] **2. Review the generated diff.**
   - **Owner:** `documenter`
@@ -47,13 +48,19 @@ Add no implementation scope unless the audit exposes a concrete defect.
 - [ ] **3. Audit stale claims.**
   - **Owner:** `documenter`
   - Surfaces: `README.md`, `docs/architecture.md`, `docs/target-mapping.md`,
-    `docs/runtime-checks.md`, `shared/policies/`, skills that describe
-    installer ownership, `.claude/instructions/project-context.instructions.md`,
-    and `.claude/MEMORY.md`.
+    `docs/runtime-checks.md`, `docs/smoke-tests.md`, `shared/policies/`,
+    skills that describe installer ownership (including
+    `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md`), the docstrings
+    and `--help` text of `scripts/install_bootstrap.py` and
+    `scripts/update_consumers.py`,
+    `.claude/instructions/project-context.instructions.md`, and
+    `.claude/MEMORY.md`.
   - Topics: consumer installation, `.claude` and `.agents` ownership, update
-    behavior, supported clients, Copilot VS Code versus CLI scope, hooks,
-    local Git exclusion, generated target structure (`dist/sidecar/`), and
-    any assumption that every consumer uses a full install.
+    behavior, batch failure handling, supported clients, Copilot VS Code
+    versus CLI scope, VS Code session types, hooks, local Git exclusion,
+    worktree limits, license notices for vendored skills, generated target
+    structure (`dist/sidecar/`), and any assumption that every consumer uses
+    a full install.
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked` in the closeout session log.
 
@@ -80,6 +87,8 @@ Add no implementation scope unless the audit exposes a concrete defect.
 - No documentation implies that every consumer installation owns the full
   agent harness.
 - Full and sidecar modes are documented with correct ownership boundaries.
+- No documentation says that a batch update stops at the first failed
+  target.
 - The generated knowledge layer reflects the sidecar lifecycle.
 - No generated OpenWiki page is hand-edited.
 - No unrelated feature scope is introduced.
