@@ -34,10 +34,26 @@ Add no implementation scope unless the audit exposes a concrete defect.
   - Follow `.claude/skills/knowledge-refresh/SKILL.md`: call OpenWiki's own
     MCP tools with `mode: "update"`. Never run an init, and never create a
     scheduled workflow.
-  - The `openwiki` MCP server must connect first. On 2026-09-24 it failed
-    twice: once with `Executable not found in $PATH: openwiki`, and later
-    with a 30-second connection timeout. A provider or authentication failure
-    blocks this phase until it is fixed; it is never skipped.
+  - The `openwiki` MCP server must be connected before this step. Check it
+    with `/mcp`. A provider or authentication failure blocks this phase until
+    it is fixed; it is never skipped.
+  - Known cause of a failed connection: a cold start. On 2026-09-23 and
+    2026-09-24 the server timed out within a minute of WSL booting, when
+    every MCP server was slow (`semble` took 28 s instead of about 1 s), and
+    it passed Claude Code's 30-second startup limit (`MCP_TIMEOUT`, default
+    `30000` ms). Later starts in the same boot took 1.3-7 s. Reconnect it
+    with `/mcp`, or start a new session.
+  - To prevent the cold-start failure, set `MCP_TIMEOUT=90000` in the
+    environment that starts VS Code's WSL server, for example in
+    `~/.profile`. The docs do not confirm that the `env` key in
+    `settings.json` changes this startup limit, or that the VS Code extension
+    reads it, so read the connection log after the next WSL boot:
+    `~/.cache/claude-cli-nodejs/-home-ghisso-work-github-copilot-bootstrap/mcp-logs-openwiki/`.
+  - `Executable not found in $PATH: openwiki` is a different failure: the
+    client that started the server could not find `openwiki` on its `PATH`.
+    The current devcontainer image installs `openwiki@0.5.2`, so rebuild an
+    older container, or add `~/.local/bin` to the launching client's `PATH`
+    on the host.
 
 - [ ] **2. Review the generated diff.**
   - **Owner:** `documenter`

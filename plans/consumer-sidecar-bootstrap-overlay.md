@@ -320,8 +320,12 @@ Checked 2026-09-24 on `dev` at `1a06f1e`, after the second review:
 - `uv run python scripts/validate_plan_frontmatter.py` passes every plan,
   including `hook-python-3.9-follow-up.md`.
 - `uv run pytest` works on this host (pytest 9.0.3).
-- The `openwiki` MCP server does not connect: in the review session it timed
-  out. Phase E needs it, so fix it before Phase E starts.
+- The `openwiki` MCP server is installed and configured correctly: a manual
+  start answered the MCP handshake in 4 seconds and listed its 6 tools. It
+  failed in the review session only because it started within a minute of
+  WSL booting, when every MCP server was slow, and it passed Claude Code's
+  30-second startup limit. Phase E step 1 says how to reconnect it and how to
+  raise the limit.
 
 Right before creating the implementation branch, confirm again. `verify.py
 phase` needs an active phase, so it first runs inside Phase A.
