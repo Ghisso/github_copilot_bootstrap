@@ -116,12 +116,14 @@ Do not hand-edit `dist/`.
   - In `scripts/sidecar_overlay.py`, add functions for manifest parsing and
     schema validation, per-file and per-unit hashing, classification, and
     exclude-line rendering: one anchored line per unit, and one escaped
-    exact-path line per `retained` file (big plan, Decision 17). They return
-    actions, reports, and aborts.
+    exact-path line for each untracked file of a team-taken unit that the run
+    deletes or retains (big plan, Decisions 16 and 17). The lines of deleted
+    files are dropped after deletion. The functions return actions, reports,
+    and aborts.
   - The manifest schema holds `schema_version`, one record per unit with its
     per-file SHA-256 hashes, `retained` entries, and a diagnostic
     `bootstrap_commit`. No timestamps and no pending flags (big plan,
-    Decision 10).
+    Decision 12).
   - Inputs are data: the desired units read from `dist/sidecar/`, the parsed
     manifest, the unit lines currently in the sidecar's exclude block, the
     skill names found in each read-only folder of the read list, and a
@@ -153,8 +155,9 @@ Do not hand-edit `dist/`.
     - recorded unit whose bytes already equal the new desired content (an
       interrupted update) -> adopted with the new record;
     - team tracks one file of a recorded sidecar skill folder -> matching
-      untracked files deleted, a hidden user-added file kept as `retained`
-      with its own line;
+      untracked files deleted, each keeping its own line until deletion, a
+      hidden user-added file kept as `retained` with its own line, and a
+      visible untracked file left alone with no line;
     - team tracks a skill folder that the manifest does not record ->
       team-owned, no line, no `retained` entry;
     - a `retained` file later deleted or tracked -> entry and line dropped;

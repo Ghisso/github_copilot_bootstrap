@@ -142,7 +142,7 @@ and report it at the end, and discard the unrelated uncommitted edit on `dev`.
 | 13 | Full-only options | On a sidecar target, `--commit-copilot-surface`, `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, and `--allow-self` are ignored with one warning. In sidecar mode `validate_install_roots` always receives `allow_self=False`, so a sidecar can never target this repository. `--local-only` is accepted as a no-op. `--dry-run` works. | `update_consumers.py` forwards `--dry-run`, `--local-only`, `--allow-self`, and the Copilot option to every target in a batch (verified), and `AI_STATE_REMOTE` reaches every target through the environment. |
 | 14 | Claims follow evidence | A projection root or bridge path ships only when at least one client has `native-run` evidence for it in Phase A. A client without that evidence is documented as unverified, not supported. If no client reaches `native-run` evidence, cancel Phases B-E. | No later phase may depend on "probably discovered" behavior, and without evidence there is nothing to ship. |
 | 15 | Worktrees | Sidecar mode aborts in a linked worktree (absolute `--git-dir` differs from absolute `--git-common-dir`). Document two side effects: the main worktree's exclude lines also hide those paths in every linked worktree, and worktrees that clients create for background sessions contain no sidecar files, because those tools copy ignored files only when they are listed (`git.worktreeIncludeFiles` in VS Code, `.worktreeinclude` for the Codex app). | Verified with Git 2.50 and again with 2.43.0: `info/exclude` is shared by all worktrees, while `--git-path ai-bootstrap-sidecar.json` is per worktree. Trimming the shared block from one worktree would expose another worktree's files. The client worktree behavior is documented by VS Code and Codex. |
-| 16 | Team takeover | When the team starts tracking a file in a unit that the manifest records: delete untracked files in that unit whose bytes match the record; keep every other untracked file that the sidecar's unit line currently hides as `retained`, each with its own escaped exact-path line (Decision 17); report retained files on every run until they are deleted or tracked. When the team tracks a unit that the manifest does not record, the unit is simply team-owned: skip and report, add no line, and record nothing. | Verified: `git checkout` silently overwrites an ignored file with the team's tracked version and leaves our other files behind. Dropping the directory line would then show them in `git status`, and `git add -A` would commit them. Keeping the directory line instead would hide the team's own new files in that folder. Without a record, those untracked files were never ours to hide. |
+| 16 | Team takeover | When the team starts tracking a file in a unit that the manifest records: delete untracked files in that unit whose bytes match the record; keep every other untracked file there that is currently ignored as `retained`, each with its own escaped exact-path line (Decision 17); leave visible untracked files alone. From the step-2 exclude write until step 3 deletes them, the matching files keep their own exact-path lines too, so a crash never exposes them. Report retained files on every run until they are deleted or tracked. When the team tracks a unit that the manifest does not record, the unit is simply team-owned: skip and report, add no line, and record nothing. | Verified: `git checkout` silently overwrites an ignored file with the team's tracked version and leaves our other files behind. Dropping the directory line would then show them in `git status`, and `git add -A` would commit them. Keeping the directory line instead would hide the team's own new files in that folder. Without a record, those untracked files were never ours to hide. |
 | 17 | Ignore gate | Pipe every path that must stay ignored to `git check-ignore --stdin -z` without `-v`, and pass only when the printed set equals that set, byte for byte. Use `-v` only to explain a failure. Exact-path lines escape the gitignore pattern characters: `\`, `*`, `?`, `[`, a leading `!` or `#`, and trailing spaces. | Verified: with a team `!.claude/skills/**` rule, `git check-ignore -v` exits 0 although the file is not ignored, and `--stdin` exits 0 when any one path is ignored. Without `-z`, non-ASCII names come back quoted, so the sets never match. An unescaped `notes[1].md` line does not hide that file but hides an unrelated `notes1.md`. |
 | 18 | Unbootstrapped team repository | With no `--mode` and no bootstrap evidence, abort when `git ls-files` lists any path under `FULL_INSTALL_ROOT_PATHS` (`.claude`, `.devcontainer`, and `RESTORABLE_ROOT_PATHS`). The message offers `--mode full` (today's takeover) and `--mode sidecar`. `--allow-self` with this repository as the target counts as full evidence. | Without this, the first plain install into a team repository is still a full takeover, which is the problem this plan exists to solve. `.devcontainer/` is the only full-install path that the restorable list misses, and the installer overwrites it even when tracked. `--allow-self` keeps this repository's own refresh working on a fresh clone, where `CLAUDE.md` and `AGENTS.md` are tracked by design. Explicit `--mode full` keeps today's behavior. |
 | 19 | License notices | Ship `shared/third_party/ponytail/LICENSE` as `LICENSE` inside each vendored skill folder (`ponytail/`, `ponytail-review/`) at every write root. The rewritten `humanize` citation keeps a plain credit: `avoid-ai-writing v3.25.0` by Conor Bronsdon (MIT). | Both Ponytail skills are copies of MIT-licensed upstream work, and MIT requires the notice to travel with copies. The full install already ships it, and `validate_targets.py` requires that (`scripts/validate_targets.py:8914-8930`). `humanize` is informed by, not copied from, its source, so a credit line is enough. |
@@ -226,7 +226,7 @@ Each unit is then classified. The first matching row wins:
 
 | Current state | Manifest record | Desired content | Action |
 | --- | --- | --- | --- |
-| Any file in the unit is tracked by the outer repository | present | any | Team takeover (Decision 16). Never touch tracked files. Delete untracked files whose bytes match the record, keep the other hidden untracked files as `retained`, drop the unit record and its line, and report. |
+| Any file in the unit is tracked by the outer repository | present | any | Team takeover (Decision 16). Never touch tracked files. Delete untracked files whose bytes match the record, keep the other ignored untracked files as `retained`, leave visible untracked files alone, drop the unit record and its line, and report. |
 | Any file in the unit is tracked by the outer repository | none | any | Team-owned. Skip and report. Add no line and record nothing. |
 | Untracked, hash equals the record | present | same hash | Unchanged. |
 | Untracked, hash equals the record | present | different hash | Update. |
@@ -250,9 +250,9 @@ Write order:
 1. Preflight and classification. No writes.
 2. Write the exclude block. It has a line for every unit that is owned after
    this run, being written, or being removed. A team-taken unit loses its
-   unit line in this same write, and each of its untracked files gets its own
-   escaped exact-path line. Then run the ignore gate on every path that must
-   stay ignored.
+   unit line in this same write, and each of its untracked files that this
+   run deletes or retains gets its own escaped exact-path line. Then run the
+   ignore gate on every path that must stay ignored.
 3. Empty the staging folder, then write and remove units. Build each new unit
    in staging, move the old copy into staging, and move the new copy into
    place with `os.replace`. Remove a unit by moving it into staging. Delete a
@@ -296,10 +296,10 @@ real run's gate is authoritative.
 
 ```text
 git status --porcelain --untracked-files=all : identical before and after install and update, except
-                                               two recovery runs: re-hiding the sidecar's own units after
-                                               a person deleted its exclude block, and un-hiding
-                                               non-matching files after a person moved an invalid
-                                               manifest aside
+                                               two recovery runs: after a person deleted the exclude
+                                               block, a rerun re-hides or removes the sidecar's own
+                                               files; after a person moved an invalid manifest aside,
+                                               a rerun un-hides the files that no longer match
 pre-existing team files                     : byte-identical after install and update
 hooks                                       : no hook file copied, no core.hooksPath change, no provider hook config change
 ownership                                   : never inferred from a filename or a location; adoption needs the sidecar's own exclude line

@@ -94,8 +94,9 @@ empty repository or calls `copy_generated_tree` directly.
     anchored unit line with no trailing slash, for example
     `/.claude/skills/ponytail`, for every unit that is owned after this run,
     being written, or being removed. It also holds one escaped exact-path
-    line for each untracked file of a team-taken unit, and that unit loses
-    its unit line in this same write (big plan, Decisions 16 and 17).
+    line for each untracked file of a team-taken unit that this run deletes
+    or retains, and that unit loses its unit line in this same write (big
+    plan, Decisions 16 and 17).
   - Preserve every byte outside the block. Write the file atomically: a
     temporary file in `info/`, then `os.replace`.
   - Run the ignore gate (Decision 17): pipe every path that must stay
@@ -175,6 +176,7 @@ empty repository or calls `copy_generated_tree` directly.
     manifest moved aside after a good install, then rerun          -> listed units adopted
     one file changed after a good install, then rerun              -> reported as locally modified, bytes kept
     team checkout tracks one file of a sidecar skill folder        -> matching files deleted, hidden user file retained, status unchanged
+    fault after the takeover exclude write, before deleting files  -> matching files still hidden; rerun deletes them, retained file stays hidden
     rerun with no upstream change                                  -> no file changes, including exclude and manifest
     ```
 
