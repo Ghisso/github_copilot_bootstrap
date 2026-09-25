@@ -1259,3 +1259,7 @@
 - [LEARN:documentation] `.openwikiignore` excludes `CLAUDE.md`, so
   `openwiki_submit_page` rejects a claim citing it; cite `README.md` or the
   code for command and guidance facts.
+- [LEARN:tooling] The protected-file guard refuses any Bash command that
+  names a script under `.claude/hooks/scripts/`, even a read-only run of
+  `session-start-state.sh`. Observe a hook's output at the next session
+  start, or through tests that isolate `REPO_ROOT`; do not run it by hand.

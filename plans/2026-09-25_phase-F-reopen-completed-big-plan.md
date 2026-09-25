@@ -3,7 +3,8 @@ name: 2026-09-25_phase-F-reopen-completed-big-plan
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 6
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-F-reopen-completed-big-plan.md
 ---
 
 # Small Plan: Phase F — Reopen After a Completed Knowledge Refresh
@@ -56,7 +57,7 @@ no errors.
 
 ## Steps
 
-- [ ] **1. Change the validator rule.**
+- [x] **1. Change the validator rule.**
   - **Owner:** `coder`
   - Keep the signature
     `validate_knowledge_refresh_phase_position(path: Path, phases: list[str], errors: list[str]) -> None`.
@@ -86,7 +87,7 @@ no errors.
   - Update the comment above `KNOWLEDGE_REFRESH_PHASE_SUFFIX` to describe the
     exemption in one sentence.
 
-- [ ] **2. Test the rule.**
+- [x] **2. Test the rule.**
   - **Owner:** `coder`
   - Build real big-plan and small-plan files under `tmp_path`, like the
     existing knowledge-refresh tests.
@@ -105,7 +106,7 @@ no errors.
   - Every existing test in the file passes unchanged, including the exact
     error message substrings.
 
-- [ ] **3. Write the workflow text.**
+- [x] **3. Write the workflow text.**
   - **Owner:** `coder`
   - In `shared/policies/workflow.instructions.md`, amend the Termination
     paragraph of "Knowledge-Refresh Final Phase": when a completed big plan
@@ -149,7 +150,7 @@ no errors.
     implies a completed plan cannot be reopened. Change such text only if it
     restates the rule; today these files link to the canonical rule.
 
-- [ ] **4. Regenerate and install.**
+- [x] **4. Regenerate and install.**
   - **Owner:** `coder`
   - Run `uv run python scripts/generate_targets.py --all`, then
     `uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
@@ -157,7 +158,7 @@ no errors.
   - Then `uv run python scripts/validate_plan_frontmatter.py` must pass on
     every real plan, including this reopened big plan.
 
-- [ ] **5. Record the lesson.**
+- [x] **5. Record the lesson.**
   - **Owner:** `orchestrator`
   - In closeout LEARN, update the existing MEMORY entry "Adding a phase to a
     big plan defers the strict terminal check" only if it now points to the
@@ -206,11 +207,11 @@ before `verify closeout`, because this block regenerates targets.
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

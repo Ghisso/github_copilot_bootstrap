@@ -62,11 +62,47 @@ workflow instructions (big plan, Decision 21).
   subsection should say "below"; (2) `ponytail` shrink, the slug regex was
   duplicated in `scripts/validate_plan_frontmatter.py` instead of one
   module-level `PHASE_SLUG_PATTERN` constant. Fixes delegated to `coder`.
+- Fix loop: `coder` fixed both; `verify.py phase --format text` PASS again
+  (1892 tests). Review round 2 over the whole diff with all six profiles:
+  both fixes confirmed, no findings (`[]`).
+- CLOSEOUT step 1: `docs/runtime-checks.md` stated the old "at most one, and
+  it must be last" rule (line 526); `documenter` updated that row. A focused
+  `documentation` and `code` review of the row: no findings (`[]`).
+- Self-install (`install_bootstrap.py . --allow-self --local-only`) ran
+  before closeout; it committed nested state (`fba22bd`). The installed
+  validator now passes every real plan, including the reopened big plan, and
+  `check_runtime.py` passes.
 
 ## [LEARN] Entries
 
+- [LEARN:workflow] Run `validate_plan_frontmatter.py` on every new or
+  renamed phase slug before approval. The validator counts any slug ending in
+  `-knowledge-refresh` as a knowledge-refresh phase, whatever the phase does:
+  a first draft of this phase's slug was counted as a third refresh phase.
+  The reopening procedure in `shared/policies/workflow.instructions.md` now
+  warns about this, so MEMORY carries no separate entry for it.
+- [LEARN:tooling] The protected-file guard refuses any Bash command that
+  names a script under `.claude/hooks/scripts/`, even a read-only run of
+  `session-start-state.sh`. Observe a hook's output at the next session
+  start, or through tests that isolate `REPO_ROOT`; do not try to run it by
+  hand. Added to MEMORY.
+
 ## Verification
+
+Optional items:
+
+- optional 1: NOT RUN — the protected-file guard refuses running `.claude/hooks/scripts/session-start-state.sh` from Bash, and this phase ends before a new session starts. Evidence instead: the scratch-clone investigation ran the real hook functions on the reopened shape and reported `phases done=5 pending=2, current_phase=...F...`; the installed validator now passes the reopened big plan; the next session start will show `phases done=6 pending=3` with Phase G current.
 
 ## Documentation
 
+Updated in this phase: `shared/policies/workflow.instructions.md` (the
+Termination paragraph of "Knowledge-Refresh Final Phase", and the new
+"Reopening a completed big plan" subsection under "Branch Lifecycle") and the
+knowledge-refresh row of `docs/runtime-checks.md`. `README.md` does not state
+the rule, so it is unchanged. Generated copies were refreshed through
+`generate_targets.py --all` and the self-install.
+
 ## Open Questions / Next Steps
+
+- Next: Phase G (`2026-09-25_phase-G-sidecar-ownership-and-precedence`). The
+  post-commit hook activates it after this phase's commit.
