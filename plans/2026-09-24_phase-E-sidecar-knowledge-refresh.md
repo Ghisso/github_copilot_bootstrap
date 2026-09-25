@@ -3,8 +3,8 @@ name: 2026-09-24_phase-E-sidecar-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 5
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-E-knowledge-refresh.md
 ---
 
 # Small Plan: Phase E — Sidecar Knowledge Refresh
@@ -29,7 +29,7 @@ Add no implementation scope unless the audit exposes a concrete defect.
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki.**
+- [x] **1. Refresh OpenWiki.**
   - **Owner:** `documenter`
   - Follow `.claude/skills/knowledge-refresh/SKILL.md`: call OpenWiki's own
     MCP tools with `mode: "update"`. Never run an init, and never create a
@@ -55,13 +55,13 @@ Add no implementation scope unless the audit exposes a concrete defect.
     older container, or add `~/.local/bin` to the launching client's `PATH`
     on the host.
 
-- [ ] **2. Review the generated diff.**
+- [x] **2. Review the generated diff.**
   - **Owner:** `documenter`
   - Treat generated pages as descriptive context, not policy. Source, tests,
     and policies stay authoritative.
   - Never hand-edit a generated page. Never stage `openwiki/.run.json`.
 
-- [ ] **3. Audit stale claims.**
+- [x] **3. Audit stale claims.**
   - **Owner:** `documenter`
   - Surfaces: `README.md`, `docs/architecture.md`, `docs/target-mapping.md`,
     `docs/runtime-checks.md`, `docs/smoke-tests.md`, `shared/policies/`,
@@ -80,7 +80,7 @@ Add no implementation scope unless the audit exposes a concrete defect.
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked` in the closeout session log.
 
-- [ ] **4. Correct normative documentation.**
+- [x] **4. Correct normative documentation.**
   - **Owner:** `documenter`
   - Keep the distinction explicit:
 
@@ -89,12 +89,12 @@ Add no implementation scope unless the audit exposes a concrete defect.
     sidecar install -> local personal overlay inside a team-owned harness
     ```
 
-- [ ] **5. Record reusable lessons only.**
+- [x] **5. Record reusable lessons only.**
   - **Owner:** `documenter`
   - Run LEARN for reusable implementation knowledge. Do not store transient
     phase details as durable memory.
 
-- [ ] **6. Complete the final lifecycle checks.**
+- [x] **6. Complete the final lifecycle checks.**
   - **Owner:** `orchestrator`
   - Run verification, review, and closeout as the workflow requires.
 
@@ -134,11 +134,11 @@ phase uses the full set:
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

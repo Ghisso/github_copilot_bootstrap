@@ -111,9 +111,27 @@ steps 1-2:
 
 ## Verification
 
-Pending.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PENDING
+```
+
+This plan has no `## Optional Verification` section.
+
+## Documentation
+
+Updated in this phase: the OpenWiki brief and five generated pages
+(through OpenWiki's tools), `AGENTS.md` line 7, and the Layout section of
+`.claude/instructions/project-context.instructions.md`. The standing
+final-phase audit is recorded under `## Stale-claims surfaces checked`.
 
 ## Open Questions / Next Steps
 
-- Run the refresh, review the generated diff, run the audit, review, and
-  close out the big plan.
+- Every small plan of the big plan is complete. A PR to `dev` is opened
+  only when the user asks for one.
+- Antigravity remains unverified for the sidecar; a later native run
+  (`agy --new-project --sandbox`, default and Strict mode) could add its
+  rules-file bridge.
+- The Phase A fixture at `/home/ghisso/sidecar-fixture-20260925-122447`
+  can now be deleted by the user.
