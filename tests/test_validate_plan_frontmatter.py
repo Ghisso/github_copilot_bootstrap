@@ -649,6 +649,190 @@ def test_knowledge_refresh_check_skips_non_string_phase_entries_safely(
     assert not any("knowledge-refresh" in error for error in errors)
 
 
+def test_accepts_a_settled_knowledge_refresh_phase_before_the_last_phase(
+    tmp_path: Path,
+) -> None:
+    """Reopening after a completed refresh keeps that phase where it is."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\nstatus: complete\n---\n\n# Plan\n", encoding="utf-8"
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+  - 2026-08-11_phase-C-knowledge-refresh
+""",
+    )
+
+    assert not any("knowledge-refresh" in error for error in validation_errors(plan))
+
+
+def test_rejects_appending_a_phase_after_a_settled_knowledge_refresh_phase(
+    tmp_path: Path,
+) -> None:
+    """A settled refresh phase does not license a further phase after it."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\nstatus: complete\n---\n\n# Plan\n", encoding="utf-8"
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-example
+""",
+    )
+
+    assert any(
+        "the knowledge-refresh phase must be the last phase in phases" in error
+        for error in validation_errors(plan)
+    )
+
+
+@pytest.mark.parametrize(
+    "sibling_status",
+    ("in-progress", "planned", None, "unreadable"),
+    ids=("in_progress", "planned", "missing", "unreadable"),
+)
+def test_rejects_an_unsettled_mid_list_knowledge_refresh_phase(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    sibling_status: str | None,
+) -> None:
+    """Only a complete or cancelled small plan exempts an earlier refresh phase."""
+    sibling = tmp_path / "2026-08-11_phase-A-knowledge-refresh.md"
+    if sibling_status == "unreadable":
+        sibling.write_text("---\nstatus: complete\n---\n", encoding="utf-8")
+        real_read_text = Path.read_text
+
+        def deny_read(
+            self: Path, encoding: str | None = None, errors: str | None = None
+        ) -> str:
+            if self == sibling:
+                raise PermissionError("permission denied")
+            return real_read_text(self, encoding, errors)
+
+        monkeypatch.setattr(Path, "read_text", deny_read)
+    elif sibling_status is not None:
+        sibling.write_text(f"---\nstatus: {sibling_status}\n---\n", encoding="utf-8")
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_two_unsettled_knowledge_refresh_phases_neither_last(
+    tmp_path: Path,
+) -> None:
+    """Two mid-list refresh phases are never both exempt at once."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+  - 2026-08-11_phase-C-example
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_accepts_a_cancelled_knowledge_refresh_phase_before_the_last_phase(
+    tmp_path: Path,
+) -> None:
+    """A cancelled refresh phase is exempt from the count too."""
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\nstatus: cancelled\n---\n\n# Plan\n", encoding="utf-8"
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert not any("knowledge-refresh" in error for error in validation_errors(plan))
+
+
+def test_knowledge_refresh_slug_guard_skips_reading_outside_the_plans_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An invalid slug is unsettled without ever touching its would-be sibling."""
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - ../escape-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+    original_is_file = Path.is_file
+    original_parse_frontmatter = validator.parse_frontmatter
+
+    def guarded_is_file(self: Path) -> bool:
+        assert "escape" not in self.name, f"must not stat {self}"
+        return original_is_file(self)
+
+    def guarded_parse_frontmatter(path: Path) -> dict[str, object]:
+        assert "escape" not in path.name, f"must not read {path}"
+        return original_parse_frontmatter(path)
+
+    monkeypatch.setattr(Path, "is_file", guarded_is_file)
+    monkeypatch.setattr(validator, "parse_frontmatter", guarded_parse_frontmatter)
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
 def test_rejects_big_plan_body_phase_inventory_drift(tmp_path: Path) -> None:
     """The readable phase list cannot silently diverge from frontmatter."""
     plan = write_plan(
