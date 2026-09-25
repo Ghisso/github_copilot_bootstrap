@@ -27,6 +27,38 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   and 10; run 2 covers step 9 (`--uninstall`) on top of run 1. Step 11 goes
   to `documenter`. Lesson from Phase G: the coder gets the full list of
   required test scenarios up front.
+- Coder run 1 (steps 1-8, 10) landed:
+  - `scrub_inherited_git_environment()` with `GIT_REPO_LOCAL_ENV_VARS`.
+  - Mode detection: `lstat` on `.claude/.git` plus an index check, Git run
+    with `LC_ALL=C`, `GitDetectionError` for any failure other than "not a
+    git repository", bytes-safe `tracked_generated_paths`, and a
+    `sidecar_evidence` that reads only a regular file.
+  - Git-directory paths built from `--git-dir` and checked with `lstat`
+    before any write.
+  - `_find_exclude_markers` and `ExcludeMarkerError` refuse unbalanced
+    markers.
+  - `os.fsencode`/`os.fsdecode` throughout, `check-ignore -v --stdin -z`,
+    and `_can_express_in_gitignore`.
+  - Repository-boundary, filesystem-shape, and writability checks.
+  - `sidecar_source_violations` shared with `validate_targets.py`, and
+    `require_full_source_complete` for full mode.
+  - `bootstrap_commit` removed.
+  - Message fixes.
+  Results: 345 tests across the four suites pass, the full `tests/` suite
+  passes (2060), and ruff, mypy, `validate_targets.py`, and `verify.py fast`
+  pass.
+- Deviation rejected: the source check required only a non-empty tree with
+  the same skills at each root, so a half-rendered source could still
+  silently uninstall missing skills or bridges (S13). Sent back: enforce
+  Decision 31's full set, use a monkeypatched profile in the tests that need
+  a reduced one, and add refusal tests for missing skills, bridges, and
+  licenses.
+- Deviation accepted, for review to confirm: the boundary check covers the
+  four structural paths (both write roots and the bridge parents), not
+  every unit path. A nested repository at a unit path is an untracked
+  foreign unit, which the sidecar never writes into.
+- Coder run 2 (the same agent, keeping its context): fix the completeness
+  check, then step 9 (`--uninstall`) with every listed scenario.
 
 ## [LEARN] Entries
 
