@@ -149,6 +149,18 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   after the block, a "kept" unit is reported as kept while `git status`
   shows it. It is the same defect class as round 1's MAJOR.
 - Both sent back to `coder`.
+- Fixes:
+  - `_uninstall_conflict_pre_write_gate` runs before any unit action, and
+    `_uninstall_conflict_post_rewrite_gate` runs after the rewrite and
+    restores the exclude file on failure. Both run only when there are
+    preserve conflicts, and the dry run mirrors both.
+  - New test `test_preserve_conflict_with_a_negation_aborts_before_any_write`
+    (dry and real), which fails on the old code; the no-drift guard still
+    passes.
+  - The vacuous assertion was replaced with real ones.
+  The full suite passes (2094). Re-verification and review round 3 (the
+  uninstall area) started. The rest of Phase H is unchanged since its two
+  clean reviews, apart from that assertion.
 
 ## [LEARN] Entries
 
