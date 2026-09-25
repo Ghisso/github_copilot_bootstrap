@@ -136,6 +136,19 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
     with `lstat`), through the new `_git_rev_parse_or_raise`.
   The full suite passes (2093). Re-verification and review round 2 (parts
   A and B) started.
+- `verify.py phase --format text` PASS (2093 tests).
+- Review round 2, part A: PASS. It confirmed the three changes and found
+  the Git-directory paths consistent across detection, preflight, install,
+  and uninstall, with the full-install path unchanged apart from the
+  intended refusals. One MINOR (`tests`): a vacuous `assert ... or True` in
+  `tests/test_sidecar_overlay.py`.
+- Review round 2, part B: both earlier fixes confirmed, and detection and
+  uninstall agree on "a sidecar is present". One new CRITICAL (`code`),
+  reproduced live: the uninstall preserve-conflict branch rewrites the
+  block without running the ignore gate. With the person's own negation
+  after the block, a "kept" unit is reported as kept while `git status`
+  shows it. It is the same defect class as round 1's MAJOR.
+- Both sent back to `coder`.
 
 ## [LEARN] Entries
 
