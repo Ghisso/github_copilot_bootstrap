@@ -1202,3 +1202,20 @@
   OpenWiki `update` run scoped to the affected pages, using
   `openwiki_inspect_page_claims` to get the claim id to revise; source need
   not have changed for `openwiki_begin` to start a run.
+- [LEARN:testing] Native discovery probes need evidence the model cannot
+  produce by reading files. `claude -p --tools "" --output-format
+  stream-json --verbose` gives the loaded skills in the `system`/`init`
+  event (`skills`, `slash_commands`; `memory_paths` lists only auto-memory,
+  not rules), and with no tools any quoted marker phrase proves the file
+  was loaded. `codex debug prompt-input` prints Codex's model-visible input
+  as JSON with no model call. In `codex exec --json`, any
+  `command_execution` item invalidates a marker result.
+- [LEARN:architecture] Sidecar discovery, native runs 2026-09-25
+  (`docs/sidecar-provider-contract.md`): Claude Code 2.1.226, Codex
+  0.147.0, and VS Code Copilot Chat 0.67.0 all load skills and rules that
+  only `info/exclude` ignores. Copilot's Local agent lists one copy per
+  skill name and prefers `.agents/skills/`, so a sidecar copy there hid a
+  team skill of the same name in `.github/skills/`; skip any name taken in
+  any read folder. The Local agent loads both `.github/instructions/` and
+  `.claude/rules/`; an Agent Host session in the Copilot format loads only
+  `.github/instructions/`, and `applyTo: "**"` loads with no attached file.

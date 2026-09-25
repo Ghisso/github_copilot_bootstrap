@@ -99,7 +99,32 @@ test code changes in this phase.
 
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:testing] Native discovery probes need evidence the model cannot
+  produce by reading files: `claude -p --tools ""` with the stream-json
+  `system`/`init` event (`skills`, `slash_commands`), and
+  `codex debug prompt-input` (model-visible input as JSON, no model call).
+  Any `command_execution` item in `codex exec --json` invalidates a marker
+  result. Saved to `.claude/MEMORY.md`.
+- [LEARN:architecture] All tested clients load skills and rules that only
+  `info/exclude` ignores; Copilot's Local agent prefers `.agents/skills/`
+  and let a sidecar copy hide a team skill of the same name in
+  `.github/skills/`; the Local agent loads both `.github/instructions/` and
+  `.claude/rules/`. Saved to `.claude/MEMORY.md`.
+
+## Review
+
+- Reviewer profiles `documentation`, `architecture`, `security`: gate PASS,
+  0 critical, 0 major, 1 minor (Step 3's "Record" list omitted the skill
+  names and folders that Step 4 reports). Fixed with the reviewer's
+  suggested bullet; the same reviewer was asked to confirm the fix.
+- `ponytail` was not selected, as the big plan specifies for Phase A. The
+  commit gate agrees: `diff_requires_ponytail` requires it only for more
+  than one outer path or a control-plane/script path, and the outer diff is
+  the single file `docs/sidecar-provider-contract.md`. The plan-note edits
+  live in the nested `.claude` repository.
+- Documentation: the new contract document is this phase's documentation.
+  README is unchanged because sidecar mode does not exist until Phase C;
+  Phase D adds the README guidance and links the contract.
 
 ## Verification
 
