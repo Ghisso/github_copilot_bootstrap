@@ -35,7 +35,13 @@ workflow instructions (big plan, Decision 21).
   reopened big plan ("at most one knowledge-refresh phase is allowed, found
   2"), so no outer commit is possible. The scratch-tested rule accepts every
   real plan.
-- User approved the plan on 2026-09-25. Phase F set to `in-progress`.
+- User approved the plan on 2026-09-25. Phase F set to `in-progress`, and the
+  nested `.claude` repository checkpointed (`2367c5f`).
+- Owner change for plan step 4: the coder regenerates `dist/` only. The
+  self-install (`install_bootstrap.py . --allow-self --local-only`) commits
+  nested AI state, so the orchestrator runs it at closeout (MEMORY LEARN on
+  `check_runtime.py` staleness in the authoring repository).
+- IMPLEMENT: steps 1-3 and the `dist/` regeneration delegated to `coder`.
 
 ## [LEARN] Entries
 
