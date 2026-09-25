@@ -49,9 +49,22 @@ for the native behavior each adapter follows.
 
 ## Generated Target
 
-The single installable output is `dist/multi-agent/`.
+The full-install output is `dist/multi-agent/`.
 
 It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
+
+A second generated target, `dist/sidecar/`, sits beside `dist/multi-agent/`.
+It renders the fixed, four-skill sidecar profile from `scripts/runtime_ownership.py`'s
+`SIDECAR_SKILLS`, plus the two client bridges, with the bootstrap's own
+remaining self-references rewritten so a sidecar file never names a path the
+sidecar does not install. `scripts/install_bootstrap.py --mode sidecar`
+copies from this target instead of `dist/multi-agent/`, into a repository
+whose agent harness a team, not this bootstrap, owns. See [README.md's
+Personal Sidecar Install](../README.md#personal-sidecar-install) and
+[docs/target-mapping.md's Sidecar
+Overlay](target-mapping.md#sidecar-overlay) for what it installs and how it
+updates, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
+for the per-client evidence behind it.
 
 ### Skill Library Validation Contract
 
@@ -183,8 +196,10 @@ source, tests, or human-authored policy.
 ## Ponytail Integration
 
 Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
-as a per-user plugin. Every target receives `.claude/skills/ponytail/`,
-`.claude/skills/ponytail-review/`, and the upstream license/provenance. The
+as a per-user plugin. Every full-install target receives `.claude/skills/ponytail/`,
+`.claude/skills/ponytail-review/`, and the upstream license/provenance; the
+sidecar overlay ships the same two skills, with the same license notice, at
+its own two write roots. The
 `ponytail` skill is coder-time implementation discipline: once per coding task,
 the coder applies `full` mode, then simplifies and re-verifies the changed
 scope. It is not a standalone lifecycle phase. Minimality means fewer concepts,

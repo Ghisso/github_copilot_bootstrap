@@ -16,7 +16,6 @@ skills, two write roots, two bridges), real, and already self-contained
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
@@ -25,11 +24,21 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import sidecar_overlay as sidecar_overlay_module  # noqa: E402
-from runtime_ownership import SIDECAR_MANIFEST_NAME  # noqa: E402
 from sidecar_overlay import escape_exact_path, git_path, install_sidecar  # noqa: E402
+from sidecar_test_helpers import (  # noqa: E402
+    _commit,
+    _commit_staged,
+    _exclude_path,
+    _git,
+    _init_repo,
+    _manifest_path,
+    _read_manifest,
+    _status,
+)
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 SOURCE = REPO_ROOT / "dist" / "sidecar"
@@ -37,48 +46,9 @@ BAD_SOURCE = REPO_ROOT / "dist" / "multi-agent"
 
 
 # --------------------------------------------------------------------------
-# Git helpers
+# Helpers local to this file (the shared git/file helpers live in
+# tests/sidecar_test_helpers.py)
 # --------------------------------------------------------------------------
-
-
-def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(root), *args],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-
-def _commit_staged(root: Path, message: str) -> None:
-    commit = _git(
-        root,
-        "-c",
-        "user.name=sidecar-test",
-        "-c",
-        "user.email=sidecar-test@example.invalid",
-        "commit",
-        "-q",
-        "-m",
-        message,
-    )
-    assert commit.returncode == 0, commit.stderr
-
-
-def _commit(root: Path, message: str, *paths: str) -> None:
-    """Stage ``paths`` (or everything, on a fresh fixture with nothing else
-    untracked) and commit. Never use bare ``-A`` once a sidecar file might be
-    visible: that would sweep it into tracking instead of leaving it as the
-    "still untracked" state a given scenario needs."""
-    add = _git(root, "add", "--", *paths) if paths else _git(root, "add", "-A")
-    assert add.returncode == 0, add.stderr
-    _commit_staged(root, message)
-
-
-def _init_repo(root: Path) -> None:
-    root.mkdir(parents=True, exist_ok=True)
-    result = _git(root, "init", "-q")
-    assert result.returncode == 0, result.stderr
 
 
 def _write(path: Path, content: str) -> None:
@@ -86,26 +56,8 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _status(root: Path) -> str:
-    result = _git(root, "status", "--porcelain", "--untracked-files=all")
-    assert result.returncode == 0, result.stderr
-    return result.stdout
-
-
 def _is_ignored(root: Path, relative_path: str) -> bool:
     return _git(root, "check-ignore", "-q", "--", relative_path).returncode == 0
-
-
-def _exclude_path(root: Path) -> Path:
-    return git_path(root, "info/exclude")
-
-
-def _manifest_path(root: Path) -> Path:
-    return git_path(root, SIDECAR_MANIFEST_NAME)
-
-
-def _read_manifest(root: Path) -> dict:
-    return json.loads(_manifest_path(root).read_text(encoding="utf-8"))
 
 
 def _raise_at(name: str):

@@ -1,6 +1,9 @@
 # Target Mapping
 
-The repo generates one installable output: `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build).
+The repo generates two installable outputs: `dist/multi-agent/`, the full
+bootstrap, and `dist/sidecar/`, the personal per-clone overlay described
+below (both gitignored — run `uv run python scripts/generate_targets.py --all`
+to build).
 
 ## Devcontainer Bootloader
 
@@ -81,6 +84,32 @@ GitHub Copilot (secondary compatibility adapter):
 - `.vscode/mcp.json`
 
 Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
+
+## Sidecar Overlay
+
+`dist/sidecar/` is a second generated target: a narrow, per-clone developer
+overlay that `scripts/install_bootstrap.py --mode sidecar` installs inside a
+repository whose agent harness a team already owns, without changing any
+tracked file. See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install) for install and update
+instructions, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
+for the native-run evidence behind every row below.
+
+| Projection | Path(s) | Client(s) that read it |
+| --- | --- | --- |
+| Skill write root | `.claude/skills/<skill>/` | Claude Code; Copilot in VS Code (Local agent and Agent Host) |
+| Skill write root | `.agents/skills/<skill>/` | Codex; Copilot in VS Code (Local agent and Agent Host) |
+| Skill read-only check (never written) | `.github/skills/`, `.agent/skills/`, `.codex/skills/` | Scanned only to detect a name collision with team-owned content; the sidecar skips a skill at every write root rather than shadow a skill in one of these folders |
+| Bridge | `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) | Claude Code; also loaded by Copilot's Local agent |
+| Bridge | `.github/instructions/ai-bootstrap-sidecar.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+
+The four skills — `debug-investigator`, `humanize`, `ponytail`, and
+`ponytail-review` — are the sidecar's fixed profile. No bridge ships for
+Codex (skill-only by design) or for Google Antigravity (unverified for
+sidecar v1). The manifest and staging folder that track sidecar ownership
+live inside the Git directory (`ai-bootstrap-sidecar.json` and
+`ai-bootstrap-sidecar-staging/`, at `git rev-parse --git-path ...`), never in
+the worktree, so neither can be tracked.
 
 See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for how each
