@@ -3,7 +3,7 @@ name: 2026-09-25_phase-G-sidecar-ownership-and-precedence
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 7
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase G — Sidecar Ownership and Precedence
