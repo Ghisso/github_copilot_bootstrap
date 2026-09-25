@@ -68,6 +68,18 @@ No consumer repository and no installer CLI change in this phase.
   - MINOR: the bridge wording of the team-owned remedy has no test.
   - MINOR (ponytail): `retained` stores hashes that no decision reads.
   All four sent back to the planner coder to fix.
+- Fixes (only `scripts/sidecar_overlay.py` and `tests/test_sidecar_overlay.py`
+  changed): a second anti-shadow pass emits one SKIPPED report
+  ("the repository has `<folder>/<skill>`; the sidecar skips `<skill>` at
+  every root") for a skill taken only in a read-only folder, with no
+  duplicate when a write-root unit already reports; new tests for the
+  `update` -> `remove` conversion, the no-duplicate case, and the bridge
+  remedy; `Manifest.retained` is now a set of paths (sorted JSON list).
+  48 planner tests pass; the coder proved three new tests fail when their
+  rules are broken.
+- Review round 2 (same reviewer, fix delta only): gate PASS; all four
+  findings resolved; no new findings. All four recorded with disposition
+  `fixed`.
 
 ## [LEARN] Entries
 
