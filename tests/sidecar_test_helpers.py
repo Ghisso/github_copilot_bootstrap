@@ -74,3 +74,15 @@ def _manifest_path(root: Path) -> Path:
 
 def _read_manifest(root: Path) -> dict:
     return json.loads(_manifest_path(root).read_text(encoding="utf-8"))
+
+
+def _raise_at(name: str):
+    """Return a ``_fault_point`` replacement that raises only at ``name``,
+    for monkeypatching ``sidecar_overlay._fault_point`` in a crash-recovery
+    test."""
+
+    def _fault_point(point: str) -> None:
+        if point == name:
+            raise RuntimeError(f"injected fault at {point}")
+
+    return _fault_point

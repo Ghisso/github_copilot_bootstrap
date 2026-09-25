@@ -485,20 +485,42 @@ manifest, `ai-bootstrap-sidecar.json`, and a staging folder,
 **Reports on install, rerun, and update.** Re-running the same command later
 reconciles your sidecar to the current bootstrap version: it updates a
 changed skill, installs an added one, and removes an unchanged one that was
-dropped, while leaving team-tracked files alone. Two report categories name a
-path the sidecar left untouched, together with the fix:
+dropped, while leaving team-tracked files alone. The report categories name
+paths the sidecar skipped or kept untouched, plus `PRESERVED`, where it moved
+an edited copy out of the way, together with the fix in each case:
 
 | Category | Cause | Meaning | Remedy |
 | --- | --- | --- | --- |
 | `SKIPPED` | Team-tracked path | A file inside a sidecar unit is tracked by the team. | The repository tracks that path; the sidecar already skips that skill at every root. To get the skill back, the team would need to stop tracking the path. |
-| `SKIPPED` | Skill name taken | A skill name is taken by non-sidecar content the sidecar can see, tracked or not (in `.claude/skills/`, `.agents/skills/`, `.github/skills/`, `.agent/skills/`, or `.codex/skills/`). | The repository already has that folder and skill name; the sidecar skips that skill at every root. This does not mean the colliding content is tracked — only that it exists. |
+| `SKIPPED` | Skill name taken | A skill name is taken by non-sidecar content the sidecar can see, tracked or not: an entry with that name at a write root (`.claude/skills/`, `.agents/skills/`), an entry with that name in a read-only skill folder (`.github/skills/`, `.agent/skills/`, `.codex/skills/`), a case variant of the name in any of those folders when Git's `core.ignorecase` is true, or another skill's `SKILL.md` frontmatter `name:` field declaring it. A symlinked folder counts the same as a real one. | The repository already has that folder and skill name; the sidecar skips that skill at every root. This does not mean the colliding content is tracked — only that it exists. |
 | `SKIPPED` | Foreign file in the way | An untracked file is in a path the sidecar wants to use, but the manifest does not own it. | The sidecar will not replace that path; rename or remove the file only if you do not need it. |
-| `RETAINED` | Team took over a sidecar unit | The team started tracking a file inside a unit the sidecar used to own; the sidecar deleted its own copies that matched what it wrote, but left behind untracked files it did not recognize. | Delete the file or commit it. |
+| `RETAINED` | Team took over a sidecar unit | The team started tracking a file inside a unit the sidecar used to own; the sidecar deleted its own copies that matched what it wrote, but left behind untracked files it did not recognize. | Move the file out of the folder, or commit it with `git add -f`. It stays hidden until then, and a pull can overwrite it. |
+| `RETAINED` | Unrecognized line in the sidecar's exclude block | A line sits between `# BEGIN ai-bootstrap sidecar` and `# END ai-bootstrap sidecar` in `.git/info/exclude` that the sidecar does not recognize as one of its own unit or retained-file lines. | The sidecar does not recognize `<line>` in its own exclude block and keeps it; move it outside the block to keep it, or delete it if you do not need it. |
+| `PRESERVED` | Skill name taken, and your copy had edits | A skill name became taken (see the row above) while your sidecar copy of that skill had local edits. | Copy the preserved file(s) out of the Git directory if you want to keep them; see **Preserved copies** below. |
 
 A locally modified sidecar file (one you hand-edited) is kept, not
-overwritten, and reported with "delete or restore `<path>`, then rerun to
-take the current version" on every run until you act. See **Limits** below
-for why editing a sidecar file is fragile in the first place.
+overwritten. Because the file is hidden from Git, a pull or checkout can
+overwrite it without warning (see **Limits** below), so keep personal edits
+somewhere else, not inside a sidecar file. Each run reports it: if the
+skill is still shipped, the remedy reads "`<path>` has local edits, so the
+sidecar keeps it. A pull can overwrite hidden files without warning. To take
+the current version, copy your edits elsewhere, delete `<path>`, and rerun".
+If the sidecar no longer ships that skill at all, the remedy instead reads
+"`<path>` has local edits and the sidecar no longer ships `<skill>`; copy
+your edits elsewhere, then delete `<path>`".
+
+**Preserved copies.** When a skill name becomes taken by other content (the
+`SKIPPED`/"Skill name taken" row above) and your sidecar copy of that skill
+has local edits, the sidecar does not just skip the skill — it stops
+managing that skill at every write root. An unmodified sidecar copy is
+removed outright. A copy you hand-edited is moved instead, into
+`<git dir>/ai-bootstrap-sidecar-preserved/<unit path with "/" replaced by
+"__">--<content hash>`, and the run prints `PRESERVED <unit> -> <path>`. If
+that destination already exists — an earlier preserve landed the same
+bytes — the edited copy stays where it is instead of being moved, and the
+run reports a conflict so it never overwrites the existing preserved copy.
+To recover a preserved copy, copy it out of the Git directory; the sidecar
+never empties `ai-bootstrap-sidecar-preserved/` on its own.
 
 **Manual removal.** There is no uninstall command. To remove the sidecar by
 hand:

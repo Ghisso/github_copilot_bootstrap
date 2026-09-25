@@ -25,6 +25,7 @@ Two groups of tests:
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -36,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import sidecar_overlay as sidecar_overlay_module  # noqa: E402
 from runtime_ownership import SIDECAR_MANIFEST_NAME  # noqa: E402
 from sidecar_overlay import git_path, install_sidecar  # noqa: E402
 from sidecar_test_helpers import (  # noqa: E402
@@ -45,6 +47,7 @@ from sidecar_test_helpers import (  # noqa: E402
     _git,
     _init_repo,
     _manifest_path,
+    _raise_at,
     _read_manifest,
     _status,
 )
@@ -192,7 +195,8 @@ def test_skill_removed_deletes_unmodified_copy_but_keeps_modified_one(
     # skill's removal upstream.
     assert modified.read_bytes() == edited_bytes
     out = capsys.readouterr().out
-    assert "delete or restore" in out
+    assert "has local edits" in out
+    assert "copy your edits elsewhere" in out
 
 
 def test_bridge_text_change_updates_bridge_files(repo: Path, tmp_path: Path) -> None:
@@ -246,8 +250,8 @@ def test_user_modified_projection_is_kept_and_reported_every_run(
     assert exit_code_1 == 0
     assert exit_code_2 == 0
     assert skill_md.read_bytes() == edited_bytes
-    assert "delete or restore" in out_1
-    assert "delete or restore" in out_2
+    assert "has local edits" in out_1
+    assert "has local edits" in out_2
 
 
 def test_projection_replaced_by_tracked_team_file_drops_record_and_line(
@@ -584,3 +588,255 @@ def test_full_only_options_forwarded_to_full_and_warned_once_on_sidecar(
     # hide the Copilot surface it would hide by default.
     gitignore_text = (full_target / ".gitignore").read_text(encoding="utf-8")
     assert ".github/agents/" not in gitignore_text
+
+
+# --------------------------------------------------------------------------
+# Phase G step 2: R1, recovery obeys team precedence too
+# --------------------------------------------------------------------------
+
+
+def test_manifest_lost_then_team_collision_removes_all_copies_and_reports_correctly(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # R1 (round-1 review, finding 1): the collision rule must apply to every
+    # recovery outcome, including "adopt" -- the supported path for a lost
+    # manifest -- not just unchanged/update/install.
+    assert install_sidecar(repo, SIDECAR_SOURCE) == 0
+    manifest_path = _manifest_path(repo)
+    manifest_path.rename(manifest_path.with_name(manifest_path.name + ".bak"))
+
+    team_skill = repo / ".github" / "skills" / "ponytail" / "SKILL.md"
+    team_skill.parent.mkdir(parents=True, exist_ok=True)
+    team_skill.write_text("---\nname: ponytail\n---\nTEAM-OWNED\n", encoding="utf-8")
+    _commit(repo, "team tracks ponytail in .github/skills", ".github/skills/ponytail")
+    status_before = _status(repo)
+
+    exit_code = install_sidecar(repo, SIDECAR_SOURCE)
+
+    assert exit_code == 0
+    assert not (repo / ".claude" / "skills" / "ponytail").exists()
+    assert not (repo / ".agents" / "skills" / "ponytail").exists()
+    manifest = _read_manifest(repo)
+    assert ".claude/skills/ponytail" not in manifest["units"]
+    assert ".agents/skills/ponytail" not in manifest["units"]
+    exclude_text = _exclude_path(repo).read_text(encoding="utf-8")
+    assert "/.claude/skills/ponytail\n" not in exclude_text
+    assert "/.agents/skills/ponytail\n" not in exclude_text
+    out = capsys.readouterr().out
+    assert "SKIPPED .github/skills/ponytail" in out
+    assert _status(repo) == status_before
+
+    # Second run and dry run stay stable.
+    status_before_2 = _status(repo)
+    assert install_sidecar(repo, SIDECAR_SOURCE) == 0
+    assert _status(repo) == status_before_2
+    assert install_sidecar(repo, SIDECAR_SOURCE, dry_run=True) == 0
+    assert _status(repo) == status_before_2
+
+
+# --------------------------------------------------------------------------
+# Phase G step 3: ownership proof by record or exclude line (S3)
+# --------------------------------------------------------------------------
+
+
+def test_crash_before_manifest_write_then_new_content_stays_hidden_as_unfinished(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # S3: a crash during a fresh install, then new content before the
+    # rerun. The unit must stay hidden and reported as unfinished, not
+    # become "foreign" and lose its line.
+    v1 = tmp_path / "v1"
+    v2 = tmp_path / "v2"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2 -- different\n"})
+
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_fault_point", _raise_at("before_manifest_write")
+    )
+    with pytest.raises(RuntimeError, match="before_manifest_write"):
+        install_sidecar(repo, v1)
+    capsys.readouterr()
+    monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
+
+    # Pre-rerun state: the unit is fully installed with v1's bytes, listed
+    # in the exclude block, but has no manifest record yet.
+    skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    assert skill_md.read_text(encoding="utf-8") == "content v1\n"
+    assert not _manifest_path(repo).exists()
+
+    exit_code = install_sidecar(repo, v2)
+
+    assert exit_code == 0
+    # Content differs from the new desired bytes and there is no record: it
+    # must stay exactly as it is, hidden, and reported -- never silently
+    # exposed and never silently replaced with v2's bytes either.
+    assert skill_md.read_text(encoding="utf-8") == "content v1\n"
+    status = _status(repo)
+    assert ".claude/skills/ponytail" not in status
+    out = capsys.readouterr().out
+    assert "unfinished" in out
+
+
+def test_crash_or_manifest_moved_aside_then_skill_stops_shipping_stays_hidden(
+    repo: Path, tmp_path: Path
+) -> None:
+    # S3: the unit must still be classified (required_snapshot_units), even
+    # though the manifest is gone and the skill is no longer desired, so its
+    # line is never silently dropped.
+    v1 = tmp_path / "v1"
+    v2 = tmp_path / "v2"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n", "humanize": "humanize v1\n"})
+    _write_sidecar_source(v2, {"humanize": "humanize v1\n"})  # ponytail no longer ships
+    assert install_sidecar(repo, v1) == 0
+
+    manifest_path = _manifest_path(repo)
+    manifest_path.rename(manifest_path.with_name(manifest_path.name + ".bak"))
+
+    exit_code = install_sidecar(repo, v2)
+
+    assert exit_code == 0
+    skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    assert skill_md.read_text(encoding="utf-8") == "content v1\n"
+    status = _status(repo)
+    assert ".claude/skills/ponytail" not in status
+    exclude_text = _exclude_path(repo).read_text(encoding="utf-8")
+    assert "/.claude/skills/ponytail\n" in exclude_text
+
+
+def test_stale_record_matching_new_content_after_crashed_update_is_adopted(
+    repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # S3: a crash during an update, then the block deleted: equal content
+    # must be adopted, never reported as locally modified.
+    v1 = tmp_path / "v1"
+    v2 = tmp_path / "v2"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2\n"})
+    assert install_sidecar(repo, v1) == 0
+
+    # Simulate a completed swap whose manifest write never landed, by
+    # writing v2's bytes directly and deleting the exclude block (both
+    # crash symptoms in the same recovery run).
+    skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    skill_md.write_text("content v2\n", encoding="utf-8")
+    agents_skill_md = repo / ".agents" / "skills" / "ponytail" / "SKILL.md"
+    agents_skill_md.write_text("content v2\n", encoding="utf-8")
+    _exclude_path(repo).write_text("", encoding="utf-8")
+
+    exit_code = install_sidecar(repo, v2)
+
+    assert exit_code == 0
+    assert skill_md.read_text(encoding="utf-8") == "content v2\n"
+    out = capsys.readouterr().out
+    assert "has local edits" not in out
+    assert "unfinished" not in out
+    manifest = _read_manifest(repo)
+    assert manifest["units"][".claude/skills/ponytail"]["files"]["SKILL.md"] == (
+        sidecar_overlay_module.compute_file_hash(b"content v2\n")
+    )
+
+
+def test_invalid_manifest_recovery_run_does_not_unhide_other_files(
+    repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # S3: the invalid-manifest recovery run must not un-hide a unit whose
+    # content does not match desired just because the manifest is gone.
+    v1 = tmp_path / "v1"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    assert install_sidecar(repo, v1) == 0
+    skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    skill_md.write_text("content v1\nEDITED BY A PERSON\n", encoding="utf-8")
+    edited_bytes = skill_md.read_bytes()
+
+    manifest_path = _manifest_path(repo)
+    manifest_path.write_text("{not valid json", encoding="utf-8")
+    exit_code = install_sidecar(repo, v1)
+    assert exit_code != 0
+    capsys.readouterr()
+
+    manifest_path.rename(manifest_path.with_name(manifest_path.name + ".bak"))
+    status_before = _status(repo)
+
+    exit_code = install_sidecar(repo, v1)
+
+    assert exit_code == 0
+    assert skill_md.read_bytes() == edited_bytes
+    assert _status(repo) == status_before
+    out = capsys.readouterr().out
+    assert "unfinished" in out or "has local edits" in out
+
+
+# --------------------------------------------------------------------------
+# Phase G step 5: an empty leftover unit folder counts as absent (S9)
+# --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# Phase G step 7: stable manifest namespace (Decision 32, L1, L4)
+# --------------------------------------------------------------------------
+
+
+def test_retired_bridge_manifest_entry_is_valid_and_goes_through_remove(
+    repo: Path, tmp_path: Path, monkeypatch
+) -> None:
+    v1 = tmp_path / "v1"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    assert install_sidecar(repo, v1) == 0
+
+    retired_bridge = ".claude/rules/old-bridge.md"
+    monkeypatch.setattr(
+        sidecar_overlay_module,
+        "_ALL_BRIDGES",
+        sidecar_overlay_module._ALL_BRIDGES | {retired_bridge},
+    )
+
+    # Hand-craft a retired-bridge unit and file, as an earlier bootstrap
+    # version would have left them (Decision 32 must accept this path on
+    # manifest read instead of aborting the whole run on schema validation).
+    bridge_path = repo / retired_bridge
+    bridge_path.parent.mkdir(parents=True, exist_ok=True)
+    bridge_path.write_text("an old bridge\n", encoding="utf-8")
+    file_hash = sidecar_overlay_module.compute_file_hash(bridge_path.read_bytes())
+    manifest = _read_manifest(repo)
+    manifest["units"][retired_bridge] = {
+        "files": {"old-bridge.md": file_hash},
+        "hash": sidecar_overlay_module.compute_unit_hash({"old-bridge.md": file_hash}),
+    }
+    _manifest_path(repo).write_text(json.dumps(manifest), encoding="utf-8")
+    exclude_path = _exclude_path(repo)
+    exclude_text = exclude_path.read_text(encoding="utf-8")
+    line = sidecar_overlay_module.unit_exclude_line(retired_bridge)
+    exclude_path.write_text(
+        exclude_text.replace(
+            "# END ai-bootstrap sidecar", f"{line}\n# END ai-bootstrap sidecar"
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = install_sidecar(repo, v1)
+
+    assert exit_code == 0
+    assert not bridge_path.exists()
+    manifest_after = _read_manifest(repo)
+    assert retired_bridge not in manifest_after["units"]
+    assert _status(repo) == ""
+
+
+def test_manifest_unit_path_with_backslash_is_invalid(
+    repo: Path, tmp_path: Path
+) -> None:
+    v1 = tmp_path / "v1"
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    assert install_sidecar(repo, v1) == 0
+
+    # The backslash sits inside an otherwise valid unit-path shape, so a
+    # check that only rejects the wrong overall shape would miss it (L4).
+    manifest = _read_manifest(repo)
+    manifest["units"][".claude/skills/pony\\tail"] = manifest["units"][
+        ".claude/skills/ponytail"
+    ]
+    _manifest_path(repo).write_text(json.dumps(manifest), encoding="utf-8")
+
+    exit_code = install_sidecar(repo, v1)
+
+    assert exit_code != 0

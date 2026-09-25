@@ -28,19 +28,26 @@ from runtime_ownership import (  # noqa: E402
 from sidecar_overlay import (  # noqa: E402
     Action,
     DesiredUnit,
+    ExcludeBlockContents,
     Manifest,
     ManifestError,
     ManifestUnit,
     Report,
     UnitSnapshot,
+    _parse_frontmatter_name,
+    _unit_index_relpaths,
     compute_file_hash,
     compute_unit_hash,
     escape_exact_path,
     escape_ignore_segment,
+    parse_exclude_block,
     parse_manifest,
     plan_sidecar_reconciliation,
+    preserved_unit_slug,
     required_snapshot_units,
     serialize_manifest,
+    unescape_exact_path,
+    unescape_ignore_segment,
     unit_exclude_line,
 )
 
@@ -99,15 +106,27 @@ def plan(
     desired_units=None,
     manifest=None,
     excluded=frozenset(),
+    listed_files=frozenset(),
+    unrecognized_lines=frozenset(),
     read_list=None,
+    declared_skill_names=None,
+    ignorecase=False,
     snapshots=None,
+    preserved_conflicts=frozenset(),
+    preserved_destinations=None,
 ):
     return plan_sidecar_reconciliation(
         desired_units=desired_units or {},
         manifest=manifest,
         excluded_units=excluded,
+        listed_files=listed_files,
+        unrecognized_lines=unrecognized_lines,
         read_list_skill_names=read_list or {},
+        declared_skill_names=declared_skill_names,
+        ignorecase=ignorecase,
         snapshots=snapshots or {},
+        preserved_conflicts=preserved_conflicts,
+        preserved_destinations=preserved_destinations,
     )
 
 
@@ -406,7 +425,8 @@ def test_row_locally_modified_keeps_files_record_and_line():
     assert kinds(result) == []
     assert result.next_manifest.units[UNIT] == recorded(recorded_content)
     assert unit_exclude_line(UNIT) in result.exclude_lines_final
-    assert "delete or restore" in result.reports[0].remedy
+    assert "has local edits" in result.reports[0].remedy
+    assert "copy your edits elsewhere" in result.reports[0].remedy
 
 
 def test_row_team_owned_when_tracked_and_unrecorded():
@@ -584,7 +604,9 @@ def test_skill_name_found_only_in_read_only_folder_is_skipped_at_both_roots():
     assert ".github/skills" in report.remedy
 
 
-def test_skill_taken_keeps_and_reports_a_modified_copy_at_the_other_root():
+def test_skill_taken_preserves_and_reports_a_modified_copy_at_the_other_root():
+    # Decision 24 (round-2 review, design item 2): a taken skill's modified
+    # copy is moved out of the client folders, not merely left in place.
     record_content = {"SKILL.md": b"recorded"}
     edited_content = {"SKILL.md": b"edited-locally"}
     result = plan(
@@ -598,15 +620,17 @@ def test_skill_taken_keeps_and_reports_a_modified_copy_at_the_other_root():
             OTHER_UNIT: snapshot(edited_content),
         },
     )
-    assert kinds(result, OTHER_UNIT) == []
-    assert result.next_manifest.units[OTHER_UNIT] == recorded(record_content)
-    assert any(r.path == OTHER_UNIT for r in result.reports)
+    assert kinds(result, OTHER_UNIT) == ["preserve"]
+    assert OTHER_UNIT not in result.next_manifest.units
+    assert unit_exclude_line(OTHER_UNIT) not in result.exclude_lines_final
+    preserved = [r for r in result.reports if r.category == "PRESERVED"]
+    assert any(r.path == OTHER_UNIT for r in preserved)
 
 
-def test_skill_taken_at_write_root_and_read_only_folder_gets_one_report():
-    # A skill can be simultaneously taken at a write root (which already
-    # reports itself) and present in a read-only folder. It must not also
-    # get the separate read-only-folder report.
+def test_skill_taken_at_write_root_and_read_only_folder_gets_both_reports():
+    # S15: the report names every path that took the skill, so a write-root
+    # collision (which already self-reports) never suppresses the separate
+    # read-only-folder report.
     content = {"SKILL.md": b"fresh"}
     result = plan(
         desired_units={UNIT: desired(content), OTHER_UNIT: desired(content)},
@@ -618,8 +642,9 @@ def test_skill_taken_at_write_root_and_read_only_folder_gets_one_report():
         },
     )
     assert kinds(result, OTHER_UNIT) == []
-    assert len(result.reports) == 1
-    assert result.reports[0].path == UNIT
+    assert len(result.reports) == 2
+    paths = {r.path for r in result.reports}
+    assert paths == {UNIT, f".github/skills/{SKILL}"}
 
 
 # --------------------------------------------------------------------------
@@ -643,7 +668,7 @@ def test_bridge_team_owned_remedy_has_no_skill_name():
     assert unit_exclude_line(BRIDGE) not in result.exclude_lines_write
     assert result.reports == (Report("SKIPPED", BRIDGE, result.reports[0].remedy),)
     assert result.reports[0].remedy == (
-        f"the repository tracks `{BRIDGE}`; the sidecar skips it at every root"
+        f"the repository tracks `{BRIDGE}`; the sidecar does not install this bridge"
     )
 
 
@@ -757,3 +782,597 @@ def test_plan_apply_plan_again_yields_no_further_actions():
         first.next_manifest
     )
     assert second.exclude_lines_final == first.exclude_lines_final
+
+
+# --------------------------------------------------------------------------
+# Phase G step 2: one precedence decision per skill (S12, S15, L3)
+# --------------------------------------------------------------------------
+
+
+def test_foreign_write_root_plus_read_only_collision_reports_both():
+    # S15: a write-root copy being foreign must not suppress the separate
+    # read-only-folder report.
+    foreign_content = {"SKILL.md": b"foreign-here"}
+    desired_content = {"SKILL.md": b"something-else"}
+    result = plan(
+        desired_units={
+            UNIT: desired(desired_content),
+            OTHER_UNIT: desired(desired_content),
+        },
+        manifest=None,
+        read_list={".github/skills": frozenset({SKILL})},
+        snapshots={UNIT: snapshot(foreign_content), OTHER_UNIT: snapshot(exists=False)},
+    )
+    assert kinds(result, UNIT) == []
+    assert kinds(result, OTHER_UNIT) == []
+    paths = {r.path for r in result.reports}
+    assert paths == {UNIT, f".github/skills/{SKILL}"}
+
+
+def test_ignorecase_case_variant_in_read_only_folder_skips_without_hiding_it():
+    content = {"SKILL.md": b"fresh"}
+    result = plan(
+        desired_units={UNIT: desired(content), OTHER_UNIT: desired(content)},
+        manifest=None,
+        read_list={".github/skills": frozenset({"Ponytail"})},
+        ignorecase=True,
+        snapshots={UNIT: snapshot(exists=False), OTHER_UNIT: snapshot(exists=False)},
+    )
+    assert kinds(result, UNIT) == []
+    assert kinds(result, OTHER_UNIT) == []
+    report = next(r for r in result.reports if r.path == ".github/skills/Ponytail")
+    # The real (case-variant) path, not the reconstructed ``folder/skill``.
+    assert report.remedy == (
+        "the repository has `.github/skills/Ponytail`; the sidecar skips "
+        f"`{SKILL}` at every root"
+    )
+    assert (
+        escape_exact_path(".github/skills/Ponytail") not in result.exclude_lines_final
+    )
+
+
+def test_ignorecase_false_does_not_treat_case_variant_as_taken():
+    content = {"SKILL.md": b"fresh"}
+    result = plan(
+        desired_units={UNIT: desired(content), OTHER_UNIT: desired(content)},
+        manifest=None,
+        read_list={".github/skills": frozenset({"Ponytail"})},
+        ignorecase=False,
+        snapshots={UNIT: snapshot(exists=False), OTHER_UNIT: snapshot(exists=False)},
+    )
+    assert kinds(result, UNIT) == ["install"]
+    assert kinds(result, OTHER_UNIT) == ["install"]
+
+
+def test_ignorecase_case_variant_at_write_root_skips_without_hiding_it():
+    content = {"SKILL.md": b"fresh"}
+    result = plan(
+        desired_units={UNIT: desired(content), OTHER_UNIT: desired(content)},
+        manifest=None,
+        read_list={CLAUDE_ROOT: frozenset({"Ponytail"})},
+        ignorecase=True,
+        snapshots={UNIT: snapshot(exists=False), OTHER_UNIT: snapshot(exists=False)},
+    )
+    assert kinds(result, UNIT) == []
+    assert kinds(result, OTHER_UNIT) == []
+    assert any(r.path == f"{CLAUDE_ROOT}/Ponytail" for r in result.reports)
+
+
+def test_frontmatter_declared_name_takes_the_skill_everywhere():
+    content = {"SKILL.md": b"fresh"}
+    result = plan(
+        desired_units={UNIT: desired(content), OTHER_UNIT: desired(content)},
+        manifest=None,
+        declared_skill_names={SKILL: frozenset({".github/skills/team-humanize"})},
+        snapshots={UNIT: snapshot(exists=False), OTHER_UNIT: snapshot(exists=False)},
+    )
+    assert kinds(result, UNIT) == []
+    assert kinds(result, OTHER_UNIT) == []
+    report = next(r for r in result.reports if r.path == ".github/skills/team-humanize")
+    # The real declaring path, not the reconstructed ``folder/skill`` (which
+    # would have printed the wrong ".github/skills/ponytail").
+    assert report.remedy == (
+        "the repository has `.github/skills/team-humanize`; the sidecar "
+        f"skips `{SKILL}` at every root"
+    )
+
+
+@pytest.mark.parametrize(
+    "outcome_kind",
+    ["install", "unchanged", "update", "adopt"],
+)
+def test_taken_skill_never_produces_a_disallowed_outcome(outcome_kind):
+    # Decision 22: an allowlist of outcomes cannot miss a future kind, unlike
+    # the old enumerated conversion that let "adopt" escape (R1).
+    if outcome_kind == "install":
+        other_snapshot = snapshot(exists=False)
+        manifest = None
+    elif outcome_kind == "unchanged":
+        content = {"SKILL.md": b"same"}
+        other_snapshot = snapshot(content)
+        manifest = manifest_with(units={OTHER_UNIT: recorded(content)})
+    elif outcome_kind == "update":
+        old_content = {"SKILL.md": b"old"}
+        other_snapshot = snapshot(old_content)
+        manifest = manifest_with(units={OTHER_UNIT: recorded(old_content)})
+    else:  # adopt
+        content = {"SKILL.md": b"reborn"}
+        other_snapshot = snapshot(content)
+        manifest = None
+
+    result = plan(
+        desired_units={
+            UNIT: desired({"SKILL.md": b"new"}),
+            OTHER_UNIT: desired({"SKILL.md": b"new"}),
+        },
+        manifest=manifest,
+        excluded={OTHER_UNIT} if outcome_kind == "adopt" else frozenset(),
+        snapshots={
+            UNIT: snapshot({"SKILL.md": b"team"}, tracked={"SKILL.md"}),
+            OTHER_UNIT: other_snapshot,
+        },
+    )
+    assert kinds(result, OTHER_UNIT) not in (
+        ["install"],
+        ["unchanged"],
+        ["update"],
+        ["adopt"],
+    )
+
+
+# --------------------------------------------------------------------------
+# Phase G step 2: L3, frontmatter name parsing
+# --------------------------------------------------------------------------
+
+
+def test_parse_frontmatter_name_reads_a_plain_value():
+    assert _parse_frontmatter_name(b"---\nname: humanize\n---\nbody\n") == "humanize"
+
+
+def test_parse_frontmatter_name_strips_quotes_and_trailing_comment():
+    assert (
+        _parse_frontmatter_name(b"---\nname: 'humanize'  # a comment\n---\n")
+        == "humanize"
+    )
+    assert (
+        _parse_frontmatter_name(b'---\nname: "humanize" # trailing\n---\n')
+        == "humanize"
+    )
+    assert (
+        _parse_frontmatter_name(b"---\nname: humanize # trailing\n---\n") == "humanize"
+    )
+
+
+def test_parse_frontmatter_name_malformed_block_declares_nothing():
+    assert _parse_frontmatter_name(b"no frontmatter here\nname: humanize\n") is None
+    assert _parse_frontmatter_name(b"---\nname: humanize\nno closing marker\n") is None
+    assert _parse_frontmatter_name(b"---\ntitle: something\n---\n") is None
+    assert _parse_frontmatter_name(b"\xff\xfe not utf-8") is None
+
+
+# --------------------------------------------------------------------------
+# Phase G step 3: ownership proof by record or exclude line
+# --------------------------------------------------------------------------
+
+
+def test_unescape_exact_path_round_trips_every_special_character():
+    for name in [
+        "back\\slash.txt",
+        "glob[1].txt",
+        "wild*card.txt",
+        "ques?tion.txt",
+        "!bang.txt",
+        "#hash.txt",
+        "héllo.txt",
+    ]:
+        path = f"sub/{name}"
+        line = escape_exact_path(path)
+        assert unescape_exact_path(line) == path
+        assert escape_exact_path(unescape_exact_path(line)) == line
+
+
+def test_unescape_exact_path_rejects_a_line_with_no_leading_slash():
+    assert unescape_exact_path("not/anchored") is None
+
+
+def test_unescape_ignore_segment_is_the_plain_inverse_of_escape():
+    for segment in ["plain", "back\\\\slash", "wild\\*card", "!bang", "trailing\\ "]:
+        assert escape_ignore_segment(unescape_ignore_segment(segment)) in (
+            segment,
+            escape_ignore_segment(unescape_ignore_segment(segment)),
+        )
+
+
+def test_parse_exclude_block_classifies_unit_file_and_unrecognized_lines():
+    text = "\n".join(
+        [
+            "# BEGIN ai-bootstrap sidecar",
+            unit_exclude_line(UNIT),
+            escape_exact_path(f"{UNIT}/scratch.txt"),
+            "some line the sidecar does not understand",
+            "# END ai-bootstrap sidecar",
+        ]
+    )
+    parsed = parse_exclude_block(text)
+    assert parsed.listed_units == frozenset({UNIT})
+    assert parsed.listed_files == frozenset({f"{UNIT}/scratch.txt"})
+    assert parsed.unrecognized_lines == ("some line the sidecar does not understand",)
+
+
+def test_parse_exclude_block_finds_a_listed_unit_for_a_skill_that_no_longer_ships():
+    # The manifest is empty and the profile no longer includes this skill,
+    # but the line is still recognized as a unit line (Decision 23).
+    text = "\n".join(
+        [
+            "# BEGIN ai-bootstrap sidecar",
+            unit_exclude_line(UNIT),
+            "# END ai-bootstrap sidecar",
+        ]
+    )
+    parsed = parse_exclude_block(text)
+    assert parsed.listed_units == frozenset({UNIT})
+
+
+def test_parse_exclude_block_empty_without_markers():
+    assert parse_exclude_block("no sidecar block here\n") == ExcludeBlockContents()
+
+
+def test_recorded_content_matches_desired_but_line_missing_is_adopted_not_reported():
+    # S3 sibling: a stale record whose bytes already equal the desired
+    # content is proof enough on its own (Decision 23); no exclude line and
+    # no "locally modified" false report.
+    content = {"SKILL.md": b"already-current"}
+    result = plan(
+        desired_units={UNIT: desired(content)},
+        manifest=manifest_with(units={UNIT: recorded(content)}),
+        excluded=frozenset(),  # the line is missing entirely
+        snapshots={UNIT: snapshot(content)},
+    )
+    assert kinds(result) == ["unchanged"]
+    assert result.reports == ()
+    assert unit_exclude_line(UNIT) in result.exclude_lines_final
+
+
+def test_listed_no_record_content_differs_from_desired_is_unfinished():
+    # S3: a crash during a fresh install, then new content before the rerun.
+    # The unit is listed (the write-phase exclude block already covered it)
+    # but has no record; it must stay hidden and reported, not become
+    # "foreign" and lose its line.
+    on_disk = {"SKILL.md": b"partial-old-content"}
+    new_desired = {"SKILL.md": b"brand-new-content"}
+    result = plan(
+        desired_units={UNIT: desired(new_desired)},
+        manifest=None,
+        excluded={UNIT},
+        snapshots={UNIT: snapshot(on_disk)},
+    )
+    assert kinds(result) == []
+    assert result.reports[0].category == "SKIPPED"
+    assert "unfinished" in result.reports[0].remedy
+    assert unit_exclude_line(UNIT) in result.exclude_lines_write
+    assert unit_exclude_line(UNIT) in result.exclude_lines_final
+    assert UNIT not in result.next_manifest.units
+
+
+def test_listed_unit_with_no_desired_content_is_unfinished_not_dropped():
+    # S3: a crash, or the manifest moved aside, then a skill stops
+    # shipping. Because the unit is still listed, it must be classified
+    # (required_snapshot_units) and kept hidden, not silently un-hidden.
+    on_disk = {"SKILL.md": b"leftover-content"}
+    result = plan(
+        desired_units={},
+        manifest=None,
+        excluded={UNIT},
+        snapshots={UNIT: snapshot(on_disk)},
+    )
+    assert kinds(result) == []
+    assert UNIT not in result.next_manifest.units
+    assert unit_exclude_line(UNIT) in result.exclude_lines_final
+    assert any(r.path == UNIT for r in result.reports)
+
+
+def test_tracked_and_listed_with_no_record_is_team_takeover_using_desired_reference():
+    # S3: a crash during a fresh install, then the team tracks a file in the
+    # unit. Must become a team takeover (using the desired content as the
+    # ownership reference), not a bare team_owned that leaves our own
+    # untracked bytes exposed.
+    desired_content = {"SKILL.md": b"team", "notes.txt": b"sidecar-owned"}
+    disk = {
+        "SKILL.md": b"team-checked-out",
+        "notes.txt": b"sidecar-owned",  # untracked, matches desired -> deleted
+    }
+    snap = snapshot(disk, tracked={"SKILL.md"})
+    result = plan(
+        desired_units={UNIT: desired(desired_content)},
+        manifest=None,
+        excluded={UNIT},
+        snapshots={UNIT: snap},
+    )
+    action_kinds = {(a.kind, a.path) for a in result.actions if a.unit == UNIT}
+    assert ("team_takeover_delete", f"{UNIT}/notes.txt") in action_kinds
+    assert UNIT not in result.next_manifest.units
+
+
+def test_team_takeover_after_crashed_update_matches_desired_not_only_record():
+    # S3: a crash during an update, then a team takeover. Sidecar bytes must
+    # not be marked RETAINED just because they no longer match the stale
+    # record (Decision 23: match the record OR the desired content).
+    old_content = {"SKILL.md": b"team", "notes.txt": b"old-bytes"}
+    new_content = {"SKILL.md": b"team", "notes.txt": b"new-bytes-after-swap"}
+    disk = {
+        "SKILL.md": b"team-checked-out",
+        "notes.txt": b"new-bytes-after-swap",  # already swapped to the new bytes
+    }
+    snap = snapshot(disk, tracked={"SKILL.md"})
+    result = plan(
+        desired_units={UNIT: desired(new_content)},
+        manifest=manifest_with(units={UNIT: recorded(old_content)}),
+        snapshots={UNIT: snap},
+    )
+    action_kinds = {(a.kind, a.path) for a in result.actions if a.unit == UNIT}
+    assert ("team_takeover_delete", f"{UNIT}/notes.txt") in action_kinds
+    assert not any(r.category == "RETAINED" for r in result.reports)
+
+
+# --------------------------------------------------------------------------
+# Phase G step 4: preserving edited copies of a taken skill (Decision 24)
+# --------------------------------------------------------------------------
+
+
+def test_preserved_unit_slug_is_one_level_deep_and_content_addressed():
+    slug = preserved_unit_slug(UNIT, "a" * 64)
+    assert "/" not in slug
+    assert slug == f"{UNIT.replace('/', '__')}--{'a' * 64}"
+
+
+def test_taken_skill_locally_modified_unit_is_preserved():
+    record_content = {"SKILL.md": b"recorded"}
+    edited_content = {"SKILL.md": b"edited-by-a-person"}
+    result = plan(
+        desired_units={
+            UNIT: desired(record_content),
+            OTHER_UNIT: desired(record_content),
+        },
+        manifest=manifest_with(units={OTHER_UNIT: recorded(record_content)}),
+        preserved_destinations={
+            OTHER_UNIT: "/fake/git-dir/ai-bootstrap-sidecar-preserved/x"
+        },
+        snapshots={
+            UNIT: snapshot({"SKILL.md": b"team"}, tracked={"SKILL.md"}),
+            OTHER_UNIT: snapshot(edited_content),
+        },
+    )
+    assert kinds(result, OTHER_UNIT) == ["preserve"]
+    assert OTHER_UNIT not in result.next_manifest.units
+    assert unit_exclude_line(OTHER_UNIT) not in result.exclude_lines_final
+    preserved_reports = [r for r in result.reports if r.category == "PRESERVED"]
+    assert len(preserved_reports) == 1
+    assert preserved_reports[0].path == OTHER_UNIT
+
+
+def test_taken_skill_unfinished_unit_is_preserved():
+    on_disk = {"SKILL.md": b"unfinished-copy"}
+    result = plan(
+        desired_units={
+            UNIT: desired({"SKILL.md": b"team"}),
+            OTHER_UNIT: desired({"SKILL.md": b"team"}),
+        },
+        manifest=None,
+        excluded={OTHER_UNIT},
+        snapshots={
+            UNIT: snapshot({"SKILL.md": b"team"}, tracked={"SKILL.md"}),
+            OTHER_UNIT: snapshot(on_disk),
+        },
+    )
+    assert kinds(result, OTHER_UNIT) == ["preserve"]
+    assert OTHER_UNIT not in result.next_manifest.units
+
+
+def test_taken_skill_preserve_conflict_keeps_unit_in_place_and_reports():
+    record_content = {"SKILL.md": b"recorded"}
+    edited_content = {"SKILL.md": b"edited-by-a-person"}
+    result = plan(
+        desired_units={
+            UNIT: desired(record_content),
+            OTHER_UNIT: desired(record_content),
+        },
+        manifest=manifest_with(units={OTHER_UNIT: recorded(record_content)}),
+        preserved_conflicts={OTHER_UNIT},
+        preserved_destinations={OTHER_UNIT: "/fake/preserved/already-exists"},
+        snapshots={
+            UNIT: snapshot({"SKILL.md": b"team"}, tracked={"SKILL.md"}),
+            OTHER_UNIT: snapshot(edited_content),
+        },
+    )
+    assert kinds(result, OTHER_UNIT) == []
+    assert result.next_manifest.units[OTHER_UNIT] == recorded(record_content)
+    assert unit_exclude_line(OTHER_UNIT) in result.exclude_lines_final
+    report = next(r for r in result.reports if r.path == OTHER_UNIT)
+    assert report.category == "SKIPPED"
+    assert "already-exists" in report.remedy
+
+
+# --------------------------------------------------------------------------
+# Phase G step 7: stable manifest namespace (Decision 32, L1, L4)
+# --------------------------------------------------------------------------
+
+
+def test_manifest_rejects_a_unit_path_with_a_backslash():
+    # The backslash sits inside an otherwise valid segment (a normal "/"
+    # write-root prefix), so a check that only looks for the wrong path
+    # shape would miss it (L4).
+    path = f"{CLAUDE_ROOT}/pony\\tail"
+    body = {
+        "schema_version": 1,
+        "units": {path: {"files": {"a": "a" * 64}, "hash": "a" * 64}},
+        "retained": [],
+    }
+    with pytest.raises(ManifestError, match="unsafe unit path"):
+        parse_manifest(json.dumps(body))
+
+
+def test_manifest_rejects_a_retained_path_with_a_backslash():
+    path = f"{UNIT}/notes\\file.txt"
+    body = {
+        "schema_version": 1,
+        "units": {},
+        "retained": [path],
+    }
+    with pytest.raises(ManifestError, match="unsafe retained path"):
+        parse_manifest(json.dumps(body))
+
+
+def test_retired_write_root_manifest_unit_is_still_valid_and_goes_through_remove():
+    import sidecar_overlay as sidecar_overlay_module
+
+    retired_root = ".claude/retired-skills"
+    original = sidecar_overlay_module._ALL_SKILL_WRITE_ROOTS
+    sidecar_overlay_module._ALL_SKILL_WRITE_ROOTS = original + (retired_root,)
+    try:
+        retired_unit = f"{retired_root}/{SKILL}"
+        body = {
+            "schema_version": 1,
+            "units": {
+                retired_unit: {"files": {"SKILL.md": "a" * 64}, "hash": "a" * 64}
+            },
+            "retained": [],
+        }
+        parsed = parse_manifest(json.dumps(body))
+        assert retired_unit in parsed.units
+    finally:
+        sidecar_overlay_module._ALL_SKILL_WRITE_ROOTS = original
+
+
+# --------------------------------------------------------------------------
+# Phase G step 1 follow-up: case-insensitive team takeover (Decision 25,
+# MAJOR in the round-2 review; plan step 1's last bullet)
+# --------------------------------------------------------------------------
+
+
+def test_case_insensitive_tracked_folder_triggers_team_takeover_not_preserve():
+    # Index entry ".claude/skills/Ponytail/SKILL.md" (case variant); disk
+    # unit ".claude/skills/ponytail/" holds the team's checked-out SKILL.md
+    # bytes plus the sidecar's own untracked LICENSE. With core.ignorecase
+    # true, this must be a team takeover: LICENSE (matches the record) is
+    # deleted, SKILL.md is never deleted, removed, or preserved -- team
+    # content must never be touched, and it must not fall through to
+    # "locally modified"/"preserve" just because its hash doesn't match.
+    license_bytes = b"MIT-LICENSE-TEXT\n"
+    record = recorded({"SKILL.md": b"sidecar-original\n", "LICENSE": license_bytes})
+    disk = {"SKILL.md": b"TEAM-CHECKED-OUT-CONTENT\n", "LICENSE": license_bytes}
+    index_path = f"{CLAUDE_ROOT}/Ponytail/SKILL.md"
+
+    tracked_files = _unit_index_relpaths(
+        UNIT, frozenset({index_path}), ignorecase=True, disk_relpaths=frozenset(disk)
+    )
+    snap = UnitSnapshot(
+        exists=True,
+        tracked_files=tracked_files,
+        file_hashes=unit_files(disk),
+        ignored_files=frozenset(),
+    )
+
+    result = plan(
+        desired_units={
+            UNIT: desired({"SKILL.md": b"sidecar-original\n", "LICENSE": license_bytes})
+        },
+        manifest=manifest_with(units={UNIT: record}),
+        ignorecase=True,
+        snapshots={UNIT: snap},
+    )
+
+    action_kinds = {(a.kind, a.path) for a in result.actions if a.unit == UNIT}
+    assert ("team_takeover_delete", f"{UNIT}/LICENSE") in action_kinds
+    assert not any(a.path == f"{UNIT}/SKILL.md" for a in result.actions)
+    assert not any(a.kind == "preserve" for a in result.actions if a.unit == UNIT)
+    assert UNIT not in result.next_manifest.units
+
+
+def test_case_variant_tracked_file_is_never_counted_as_untracked():
+    # A tracked "skill.md" (lowercase, as it appears in the index) must
+    # reconcile against the disk's actual "SKILL.md" casing, or the exact
+    # string-based ``untracked_files`` computation would still expose it.
+    tracked_index_path = f"{UNIT}/skill.md"
+    disk_relpaths = frozenset({"SKILL.md"})
+
+    tracked_files = _unit_index_relpaths(
+        UNIT,
+        frozenset({tracked_index_path}),
+        ignorecase=True,
+        disk_relpaths=disk_relpaths,
+    )
+    assert tracked_files == frozenset({"SKILL.md"})
+
+    snap = UnitSnapshot(
+        exists=True,
+        tracked_files=tracked_files,
+        file_hashes=unit_files({"SKILL.md": b"team-content\n"}),
+        ignored_files=frozenset(),
+    )
+    assert snap.untracked_files == frozenset()
+
+
+def test_case_variant_without_ignorecase_is_not_reconciled():
+    # Sanity guard: without core.ignorecase, casing is never reconciled --
+    # a case-variant tracked path is a genuinely different file.
+    tracked_files = _unit_index_relpaths(
+        UNIT,
+        frozenset({f"{UNIT}/skill.md"}),
+        ignorecase=False,
+        disk_relpaths=frozenset({"SKILL.md"}),
+    )
+    assert tracked_files == frozenset({"skill.md"})
+
+
+# --------------------------------------------------------------------------
+# Phase G review round 3: CRITICAL, unrecognized exclude-block lines
+# --------------------------------------------------------------------------
+
+
+def test_unrecognized_line_is_kept_and_reported_every_run():
+    garbage_line = "not-a-recognized-sidecar-line"
+    result = plan(
+        desired_units={},
+        manifest=None,
+        unrecognized_lines={garbage_line},
+        snapshots={},
+    )
+    assert garbage_line in result.exclude_lines_write
+    assert garbage_line in result.exclude_lines_final
+    matching = [r for r in result.reports if r.path == garbage_line]
+    assert len(matching) == 1
+    assert matching[0].category == "RETAINED"
+    assert garbage_line in matching[0].remedy
+    assert "does not recognize" in matching[0].remedy
+
+
+def test_unrecognized_line_survives_plan_apply_plan_again():
+    garbage_line = "notes.txt"
+    first = plan(desired_units={}, manifest=None, unrecognized_lines={garbage_line})
+    second = plan(
+        desired_units={},
+        manifest=first.next_manifest,
+        unrecognized_lines={garbage_line},
+    )
+    assert first.exclude_lines_final == second.exclude_lines_final
+    assert garbage_line in second.exclude_lines_final
+    assert any(r.path == garbage_line for r in second.reports)
+
+
+def test_parse_exclude_block_unrecognized_line_reaches_the_planner_via_real_text():
+    text = "\n".join(
+        [
+            "# BEGIN ai-bootstrap sidecar",
+            "notes.txt",
+            "# END ai-bootstrap sidecar",
+        ]
+    )
+    parsed = parse_exclude_block(text)
+    assert parsed.unrecognized_lines == ("notes.txt",)
+    result = plan(
+        desired_units={},
+        manifest=None,
+        unrecognized_lines=parsed.unrecognized_lines,
+    )
+    assert "notes.txt" in result.exclude_lines_write
+    assert "notes.txt" in result.exclude_lines_final

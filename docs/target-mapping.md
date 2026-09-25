@@ -106,10 +106,18 @@ for the native-run evidence behind every row below.
 The four skills — `debug-investigator`, `humanize`, `ponytail`, and
 `ponytail-review` — are the sidecar's fixed profile. No bridge ships for
 Codex (skill-only by design) or for Google Antigravity (unverified for
-sidecar v1). The manifest and staging folder that track sidecar ownership
-live inside the Git directory (`ai-bootstrap-sidecar.json` and
-`ai-bootstrap-sidecar-staging/`, at `git rev-parse --git-path ...`), never in
-the worktree, so neither can be tracked.
+sidecar v1). The manifest, staging folder, and preserved-copy folder that
+track sidecar ownership live inside the Git directory
+(`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`, and
+`ai-bootstrap-sidecar-preserved/`), never in the worktree, so none of them can
+be tracked. The manifest and staging folder are resolved with
+`git rev-parse --git-path ...`; the preserved-copy folder is instead built
+from the already-verified `git rev-parse --git-dir` value, because
+`--git-path` would resolve a symlinked path before printing it. The preserved
+folder holds
+an edited sidecar copy that a taken skill name displaced; see
+[README.md's Personal Sidecar Install](../README.md#personal-sidecar-install)
+for its naming and recovery.
 
 See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for how each
