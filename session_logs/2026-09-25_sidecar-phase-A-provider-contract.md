@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-24_phase-A-sidecar-provider-contract.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -132,8 +132,13 @@ test code changes in this phase.
 Required items (`verify closeout --format text` summary lines):
 
 ```text
-PENDING
+PASS        0.0s  test -s docs/sidecar-provider-contract.md
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`verify.py phase --format json --persist`: PASS. Findings report:
+`.claude/quality_reports/findings-2026-09-24_phase-A-sidecar-provider-contract.json`
+(0 critical, 0 major, 1 minor with disposition `fixed`).
 
 - optional 1: PASS — Claude Code 2.1.226 native run against the fixture on 2026-09-25, run by the orchestrator with the user's explicit authorization (user decision in this session); results in the Work Log and in the contract's Step 4.
 - optional 2: PASS — Codex 0.147.0 native run against the fixture on 2026-09-25 (`codex debug prompt-input` and `codex exec --json --ephemeral -s read-only`), run by the orchestrator with the user's explicit authorization.

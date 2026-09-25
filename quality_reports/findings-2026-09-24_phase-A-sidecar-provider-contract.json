@@ -1,0 +1,37 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "documentation",
+    "security"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "docs/sidecar-provider-contract.md",
+      "line": 445,
+      "title": "Step 3's 'Record, and nothing more' list omits the skill-folder/name data that Step 4's matrix requires",
+      "detail": "The Step 3 operator checklist listed only marker yes/no, the sidecar-marker-b copy, version, session type, and date, while Step 4 reports skill names and folders per client.",
+      "suggested_fix": "Add one bullet to the Step 3 'Record' list: 'Which skill names and source folders the client's structured output (or reference panel) showed.'",
+      "disposition": "fixed",
+      "reason": "Added the suggested bullet to the Step 3 Record list; the same reviewer re-read the list and confirmed the finding resolved with no new finding."
+    }
+  ],
+  "generated_at": "2026-09-25T03:47:59Z",
+  "branch": "consumer-sidecar-bootstrap-overlay_implementation",
+  "head_sha": "1a06f1e06855a79514640a437478154b4fb00b81",
+  "base_ref": "dev",
+  "merge_base_sha": "1a06f1e06855a79514640a437478154b4fb00b81",
+  "phase": "2026-09-24_phase-A-sidecar-provider-contract",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "78ce98ac171ee6e9b09371882826ba43beae1a6b",
+  "changed_files": [
+    "docs/sidecar-provider-contract.md"
+  ]
+}
