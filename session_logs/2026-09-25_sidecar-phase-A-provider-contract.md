@@ -35,7 +35,40 @@ test code changes in this phase.
     therefore does not ship in v1 (Decision 14); `.agents/skills/` can still
     ship on Codex evidence.
 - Steps 1-2 (documentation re-check and fixture recipe) delegated to
-  `coder`.
+  `coder`. Result: `docs/sidecar-provider-contract.md`. Notable change from
+  the plan's table: `code.claude.com/docs/en/memory` now documents that a
+  rule without `paths` loads at launch with `CLAUDE.md` priority. The
+  orchestrator added a "save as a file and run with bash" instruction,
+  because pasting a `set -e` / `exit 1` block into an interactive shell
+  closes that shell on the first error.
+- Step 3, fixture: the user ran the recipe in their own shell on 2026-09-25;
+  it printed `FIXTURE OK` at `/home/ghisso/sidecar-fixture-20260925-122447`.
+  Orchestrator confirmed 7 tracked team files, 7 `!!` ignored sidecar files,
+  empty `git status --porcelain --untracked-files=all`.
+- Step 3, Claude Code 2.1.226 (`claude -p`, `--tools ""`,
+  `--no-session-persistence`, `--strict-mcp-config`, clean environment via
+  `env`-filtered subprocess; raw output discarded):
+  - `system/init` event `skills` and `slash_commands`: `sidecar-marker-a`,
+    `sidecar-marker-b`, `team-claude-skill`; no `team-agents-skill`, no
+    `team-github-skill`. Ignored skills through `info/exclude` are
+    discovered.
+  - Zero tool uses; the reply quoted `TEAM-CLAUDE-MD-MARKER` and
+    `BRIDGE-CLAUDE-RULE-MARKER`, not the `AGENTS.md`, Copilot, or
+    Antigravity markers. The rule without `paths` loads with `CLAUDE.md`.
+  - `/sidecar-marker-b` -> `SIDECAR-MARKER-B-CLAUDE`; `/sidecar-marker-a`
+    -> `SIDECAR-MARKER-A-CLAUDE`.
+  - `memory_paths` in the init event lists only the auto-memory folder, so
+    it is not evidence for rules.
+- Step 3, Codex 0.147.0:
+  - `codex debug prompt-input` (the model-visible input, no model call):
+    contains `TEAM-AGENTS-MD-MARKER`; skills `team-agents-skill`,
+    `sidecar-marker-a`, `sidecar-marker-b`, all with
+    `.agents/skills/<name>/SKILL.md` paths; no `.claude/` or `.github/`
+    skill paths; no bridge marker.
+  - `codex exec --json --ephemeral -s read-only`: zero
+    `command_execution` items; reply lists the same three skills and the
+    `AGENTS.md` marker.
+- Fixture unchanged after both probes (empty status, still 7 ignored).
 
 ## [LEARN] Entries
 
