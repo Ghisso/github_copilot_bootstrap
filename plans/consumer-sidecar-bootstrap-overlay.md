@@ -338,7 +338,7 @@ uv run python .claude/scripts/verify.py fast --format text
 
 ## Phases
 
-- [ ] `2026-09-24_phase-A-sidecar-provider-contract` — record documented and native discovery evidence per client, and freeze the read list, write list, and bridges; no code.
+- [x] `2026-09-24_phase-A-sidecar-provider-contract` — record documented and native discovery evidence per client, and freeze the read list, write list, and bridges; no code.
 - [ ] `2026-09-24_phase-B-sidecar-profile-and-ownership` — generate `dist/sidecar/` with license notices, validate self-containment, and build the pure reconciliation planner.
 - [ ] `2026-09-24_phase-C-sidecar-install-and-provider-bridges` — add `--mode`, mode detection, preflight, the ignore gate, and the atomic apply step for install and rerun.
 - [ ] `2026-09-24_phase-D-sidecar-update-and-reconciliation` — make batches skip and report failures, prove updates across bootstrap versions and mixed batches, then document both modes.
