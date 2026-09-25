@@ -49,6 +49,18 @@ L3, L4).
   behavior, how to recover, never emptied), and the preserved folder in the
   `docs/target-mapping.md` sidecar layout. The strings were checked against
   `scripts/sidecar_overlay.py`.
+- Coder round 2 added 14 regression tests. Each one fails on the pre-Phase-G
+  code, except a forward guard for the named-pipe `SKILL.md` case (the old
+  code had no frontmatter scan to guard). It found and fixed a real defect:
+  under `core.ignorecase`, `_unit_index_relpaths` returned tracked paths in
+  the index's casing, so a case-variant tracked file was still counted as
+  untracked. It now takes the on-disk casing (new `disk_relpaths`
+  parameter). It also fixed a test that asserted on the wrong run's output.
+  Results: 175 sidecar tests and 75 installer tests pass; ruff, mypy,
+  `validate_targets.py`, and `verify.py fast` pass.
+- The documenter noted that the README's manual removal steps do not
+  mention the preserved folder. Phase H's plan (step 11) now covers it.
+- VERIFY and REVIEW (six profiles) started.
 
 ## [LEARN] Entries
 
