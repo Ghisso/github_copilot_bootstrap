@@ -1,7 +1,7 @@
 ---
 name: consumer-sidecar-bootstrap-overlay
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-sidecar-bootstrap-overlay_implementation
 started_at: 2026-09-25T03:07:56Z
@@ -11,7 +11,11 @@ phases:
   - 2026-09-24_phase-C-sidecar-install-and-provider-bridges
   - 2026-09-24_phase-D-sidecar-update-and-reconciliation
   - 2026-09-24_phase-E-sidecar-knowledge-refresh
-current_phase: 
+  - 2026-09-25_phase-F-reopen-completed-big-plan
+  - 2026-09-25_phase-G-sidecar-ownership-and-precedence
+  - 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
+  - 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
+current_phase: 2026-09-25_phase-F-reopen-completed-big-plan
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
@@ -87,6 +91,12 @@ generated provider surfaces, consumer update behavior, and safety boundaries.
 - Never overwrite, delete, or shadow team-owned content in any skill folder a
   supported client reads. Preserve and report local edits to sidecar-owned
   files.
+- Phases F-I (added 2026-09-25): make team precedence, ownership proof, and
+  Git-directory safety hold in every recovery path and repository shape the
+  two reviews found, and fix the messages and docs they found wrong
+  (Decisions 22-33, 35, 36).
+- Add `--uninstall`, which removes only unmodified sidecar files and keeps
+  every personal file (Decision 34).
 
 ## Non-Goals
 
@@ -106,7 +116,9 @@ generated provider surfaces, consumer update behavior, and safety boundaries.
 - Sidecar support when a projection parent directory is a symlink, or when
   the Git directory is on a different filesystem from the worktree.
 - Merging into an existing `CLAUDE.local.md`.
-- A sidecar uninstall command. Phase D documents manual removal.
+- An uninstall command that deletes anything other than unmodified sidecar
+  files, sidecar metadata, and the sidecar's exclude block (Decision 34
+  replaced the earlier "no uninstall command" non-goal).
 - An always-on Codex instruction. Every documented Codex mechanism either
   replaces `AGENTS.md` or needs a config file (Decision 7).
 - Intent records or any other multi-step transaction state in the manifest
@@ -148,6 +160,37 @@ and report it at the end, and discard the unrelated uncommitted edit on `dev`.
 | 19 | License notices | Ship `shared/third_party/ponytail/LICENSE` as `LICENSE` inside each vendored skill folder (`ponytail/`, `ponytail-review/`) at every write root. The rewritten `humanize` citation keeps a plain credit: `avoid-ai-writing v3.25.0` by Conor Bronsdon (MIT). | Both Ponytail skills are copies of MIT-licensed upstream work, and MIT requires the notice to travel with copies. The full install already ships it, and `validate_targets.py` requires that (`scripts/validate_targets.py:8914-8930`). `humanize` is informed by, not copied from, its source, so a credit line is enough. |
 | 20 | Batch failures | `update_consumers.py` runs every target. When an installer exits non-zero, or a target is not a directory, the updater records it and continues. At the end it prints one line per failed target with its exit code and exits 1. It prints `All projects updated.` only when every target succeeded. A generator failure still stops the batch before any target runs. | User decision, 2026-09-24. One refused team repository should not block updates to the others, and the non-zero exit still tells scripts that something failed. Today `check=True` stops the batch at the first failure. |
 
+Decisions 21-36 come from two reviews of the completed Phases A-E on
+2026-09-25:
+[round 1](../quality_reports/2026-09-25_consumer-sidecar-bootstrap-overlay-review.md)
+and [round 2](../quality_reports/2026-09-25_consumer-sidecar-bootstrap-overlay-review-2.md).
+Finding IDs (R1-R6, S1-S17, L1-L4) refer to those reports. User decisions
+on 2026-09-25: add the fixes to this big plan after Phase E with a
+plan-checker change, use four new phases, move an edited copy of a taken
+skill into a backup folder inside the Git directory, and cover every
+confirmed finding plus an uninstall command and the latent items L1-L4.
+Where Decisions 21-36 conflict with the design text below them, the
+decisions win; the design text has been updated to match.
+
+| # | Topic | Decision | Why |
+| --- | --- | --- | --- |
+| 21 | Reopening | Keep Phase E, its plan, log, findings, and receipts unchanged. Append Phases F-I; Phase I is the new final knowledge-refresh phase. Phase F changes `scripts/validate_plan_frontmatter.py` so a knowledge-refresh phase that is not last and whose small plan is `complete` no longer counts toward "unique and last". A plan that has knowledge-refresh phases must still end with one. | Tested in a scratch clone (round 2, workflow finding): appending after E fails the validator; inserting before E stops the post-commit advance and fails the push and PR gates permanently; renaming E breaks the receipt chain. The final refresh and the stale-claims audit must follow the final code. |
+| 22 | One precedence decision | Decide which skills are taken before choosing any unit action. A skill is taken when any read folder has an index entry for its name; any read-only folder has a disk entry for it (folder, symlink, or broken symlink); a write root holds team-owned or foreign content for it; a non-sidecar `SKILL.md` in a read folder declares it as its frontmatter `name:`; or, when `core.ignorecase` is true, a case variant of it exists in a read folder. A taken skill may only produce these outcomes: team-owned, team takeover, foreign (left untouched), no-op, drop the record, remove (content proven ours and unmodified), and preserve (Decision 24). The report names every path that took the skill, and never says "skipped at every root" while a sidecar copy of it remains in a client folder. | R1 and design item 1: the old loop rewrote only `unchanged`, `update`, and `install`, so `adopt` escaped. An allowlist of outcomes cannot miss a future kind. The frontmatter and case checks are conservative: a false match costs one sidecar skill, never a team file (L3, S12). |
+| 23 | Ownership proof | A unit is ours when its manifest record matches, or when the sidecar's own exclude block lists it. Every unit the block lists is classified, even with no record and no desired content. A listed unit with no record whose content differs from the desired content is an unfinished sidecar copy: keep its files and its line, and report it. A recorded unit whose content equals the desired content is adopted even when its line is missing. A team takeover deletes untracked files whose bytes match the record or the desired content. A file-level line in the block keeps hiding its file while that file exists and is untracked. | S3: treating "no record" as "not ours" dropped lines and exposed sidecar files after a crash, a lost manifest, or a dropped skill. This also removes the "moved an invalid manifest aside" exception from the `git status` invariant. |
+| 24 | Preserving edited copies | When a skill is taken and a sidecar copy of it is locally modified or unfinished, move that unit with `os.replace` into `<git dir>/ai-bootstrap-sidecar-preserved/<unit path>/<unit hash>/`, drop its record and its final line, and print `PRESERVED <unit> -> <path>`. Never overwrite: when the destination exists, leave the unit in place and report a conflict. Uninstall (Decision 34) uses the same move. | User decision, 2026-09-25 (design item 2, option A). Clients stop seeing the copy, and `git checkout` or `git clean` cannot reach the Git directory. Preflight already requires one filesystem. A crash after the move converges: the next run finds the unit absent and drops the record. |
+| 25 | Index is the ownership source | A unit is tracked when the index has any entry at or under its path, including `skip-worktree`, intent-to-add, gitlink (`160000`), and symlink (`120000`) entries, whether or not the file is on disk. Read-folder names come from the index and the disk together. A tracked unit is team-owned before any symlink check, so a team symlink with a sidecar skill name skips that skill instead of aborting the run. Never restore or write over a deleted tracked file. | R4: disk-only ownership made sparse checkouts, local deletions, and team symlinks abort the whole run or miss a collision. |
+| 26 | Git-directory metadata | Build the manifest, staging, preserved, and `info/exclude` paths from the verified absolute Git directory, never from `--git-path`. Before any write, and in dry-run too, refuse when any of them, or `info/`, is a symlink, or has the wrong type: the manifest and the exclude file must be absent or regular files, and staging and preserved must be absent or real folders. Never open a named pipe. The exclude file must hold no sidecar markers, or exactly one BEGIN line followed later by one END line; anything else aborts before a write and names the lines. | R3, S6, S7: `--git-path` resolves links, so a staging link made a run delete a team folder; an orphan BEGIN line made a run erase the person's own ignore lines. |
+| 27 | Mode detection hardening | `.claude/.git` counts as full evidence only when it is a directory and the outer index has no entry at or under `.claude`. A Git failure other than "not a Git repository" aborts detection in every mode, with Git's message and a remedy. Detection reads `info/exclude` as bytes and refuses a non-regular exclude file. Every Git call against a target runs without the inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, and `GIT_NAMESPACE` variables. | S1, S2, S10, and an R5 sibling: a team `.claude` submodule was taken over by a plain install; a "dubious ownership" error fell through to a full install; an exported `GIT_DIR` redirected every write; a non-UTF-8 exclude byte crashed full installs. |
+| 28 | Repository boundary and filesystem shape | Sidecar preflight aborts before any write when an existing write root or bridge parent belongs to another Git repository (nested clone or submodule), when an existing ancestor of a planned path is not a folder or is on another device, or when a folder that a move changes is not writable. | S5, S11: a nested clone received visible sidecar files, and bad shapes crashed after the exclude write on every run. Decision 9 already requires unsafe states to abort before any write. |
+| 29 | Bytes-safe paths | Decode Git `-z` output with `os.fsdecode`, encode Git input and hashed relative paths with `os.fsencode`, read and write `info/exclude` as bytes, and use `-z` for the explanatory `check-ignore -v` call. A file name that gitignore cannot express (a newline or a carriage return) never gets a line; it is reported instead. Printed paths escape undecodable bytes. | R5, S15: strict UTF-8 crashed on legal Git names, and a newline in a retained name wrote a raw pattern line such as `src`. `os.fsencode` is byte-identical to UTF-8 for valid names, so existing manifest hashes do not change. |
+| 30 | Ignore gate on folders | Gate each skill unit as `<unit>/`, so directory-only rules apply before the folder exists. A gate failure names only the paths that are not ignored. | S4: team rules ending in `/` passed the gate and exposed files. Verified in scratch: `check-ignore --stdin -z` applies directory-only rules to an absent `unit/` path. |
+| 31 | Complete, exact sources | One exact allowlist, shared by `validate_targets.py` and the installer, defines the sidecar source: every sidecar skill at every write root, both Ponytail licenses, every bridge, and nothing else. The installer refuses an incomplete source. Full mode refuses a source that lacks `.claude/hooks/scripts/state-sync.sh` or that matches the sidecar allowlist. | S13, S14, L2: an empty source silently uninstalled every unit, and `dist/sidecar` given to a full install wrecked a full consumer. A complete source also makes a one-root install impossible. |
+| 32 | Stable manifest namespace | Manifest validation accepts the current write roots and bridges plus `SIDECAR_RETIRED_SKILL_WRITE_ROOTS` and `SIDECAR_RETIRED_BRIDGES`, both empty today. A recorded unit outside the current desired set goes through the normal remove row. A unit path containing a backslash is rejected. | L1, L4: dropping a bridge constant would make every existing install abort, and the documented remedy would silently un-hide the old bridge. |
+| 33 | No `bootstrap_commit` | Remove the field from the manifest model and writer. An old manifest that carries it still parses. `KNOWN_SCHEMA_VERSION` stays 1, and Decision 12's diagnostic field is withdrawn. | R6: no reliable source exists, and no decision reads it. Unknown keys are already ignored on read. |
+| 34 | Uninstall | `install_bootstrap.py TARGET --mode sidecar --uninstall`, with `--dry-run` support, reconciles against an empty desired set. It removes units whose content matches the record, preserves modified and unfinished units (Decision 24), un-hides retained files and reports them, then deletes the exclude block, the manifest, and the staging folder. It keeps the preserved folder and prints its path. It needs sidecar evidence and refuses full evidence. `update_consumers.py` never passes it. A rerun after a crash finishes the removal. | User decision, 2026-09-25, replacing the earlier non-goal. The manual removal steps could delete personal edits, retained files, and, after a pull, team files (design item 4). Reusing the planner keeps one ownership code path. |
+| 35 | Hidden files and pulls | State plainly in user docs and in the relevant remedies that a pull or checkout overwrites a hidden (ignored) file without warning, so personal edits must not live in sidecar files. No code change. | S8, already accepted in Devil's Advocate point 11 but never stated to users. |
+| 36 | Messages and docs | Every refusal and remedy names the evidence, what was written (normally nothing), and a safe next step that never asks the person to change tracked team content. README and docs replace the manual removal steps with `--uninstall`, keep a safe manual fallback, and correct the claims listed in S16 and S17. Generated OpenWiki pages are corrected only by Phase I's refresh. | S15-S17 and design item 4. |
+
 ## Design Overview
 
 ### Consumer layout after a sidecar install
@@ -155,6 +198,7 @@ and report it at the end, and discard the unrelated uncommitted edit on `dev`.
 ```text
 <git dir>/ai-bootstrap-sidecar.json                          manifest (cannot be tracked)
 <git dir>/ai-bootstrap-sidecar-staging/                      staging for atomic moves; emptied by every run
+<git dir>/ai-bootstrap-sidecar-preserved/<unit>/<hash>/      edited copies moved out of client folders (Decision 24); never emptied by the sidecar
 <git dir>/info/exclude                                       marked block: one line per owned unit, one escaped line per retained file
 .claude/skills/<skill>/                                      skill root read by Claude Code and Copilot VS Code
 .agents/skills/<skill>/                                      skill root read by Codex, Antigravity, and Copilot VS Code
@@ -173,12 +217,18 @@ change, and no `.gitignore` edit.
 ### Mode detection
 
 ```text
-sidecar evidence = a manifest file at the Git-dir path (valid or not)
-                   OR the sidecar marker block in info/exclude
-full evidence    = .claude/.git OR .claude/bootstrap-ownership.env
+sidecar evidence = anything at the manifest path, including a dangling
+                   symlink (valid or not)
+                   OR a sidecar marker line in info/exclude (read as bytes)
+full evidence    = .claude/.git as a directory, with no index entry at or
+                   under .claude (Decision 27)
+                   OR .claude/bootstrap-ownership.env
                    OR --allow-self with this repository as the target
-team config      = git ls-files lists a path under FULL_INSTALL_ROOT_PATHS
+team config      = git ls-files -z lists a path under FULL_INSTALL_ROOT_PATHS
                    (.claude, .devcontainer, and RESTORABLE_ROOT_PATHS)
+
+any mode         a Git error other than "not a Git repository" -> abort
+                 a non-regular info/exclude -> abort
 
 --mode sidecar   full evidence -> abort
                  linked worktree -> abort
@@ -217,33 +267,54 @@ Preflight aborts, before any write, with a non-zero exit when:
   a fixed bridge path, or a `retained` file inside one of those), an absolute
   path, or `..`;
 - a planned path, or any existing ancestor of it inside the worktree, is a
-  symlink, or `info/exclude` is a symlink;
-- after the exclude block is written, the ignore gate fails (Decision 17).
-  The installer restores the previous exclude file and names each path with
-  the rule that `git check-ignore -v` shows winning.
+  symlink and not a tracked team entry (Decision 25);
+- the manifest, staging, preserved, or `info/exclude` path, or `info/`, is a
+  symlink or has the wrong type, or the exclude file's sidecar markers are
+  unbalanced or repeated (Decision 26);
+- an existing write root or bridge parent belongs to another Git repository,
+  or an existing ancestor of a planned path is not a folder, is on another
+  device, or is not writable where a move happens (Decision 28);
+- the source is incomplete or holds a file outside the sidecar allowlist
+  (Decision 31);
+- after the exclude block is written, the ignore gate fails (Decisions 17
+  and 30). The installer restores the previous exclude file and names each
+  failing path with the rule that `git check-ignore -v -z` shows winning.
+
+Before classifying units, the planner decides which skills are taken
+(Decision 22). "Tracked" below means the index has an entry at or under the
+unit path, whether or not it exists on disk (Decision 25). "Listed" means the
+sidecar's own exclude block has the unit's line (Decision 23). Every listed
+unit is classified, even with no record and no desired content. An existing
+unit folder that holds no files and is not tracked counts as absent.
 
 Each unit is then classified. The first matching row wins:
 
 | Current state | Manifest record | Desired content | Action |
 | --- | --- | --- | --- |
-| Any file in the unit is tracked by the outer repository | present | any | Team takeover (Decision 16). Never touch tracked files. Delete untracked files whose bytes match the record, keep the other ignored untracked files as `retained`, leave visible untracked files alone, drop the unit record and its line, and report. |
-| Any file in the unit is tracked by the outer repository | none | any | Team-owned. Skip and report. Add no line and record nothing. |
+| Tracked | present, or none but listed | any | Team takeover (Decision 16). Never touch tracked files or restore deleted ones. Delete untracked files whose bytes match the record or the desired content, keep the other ignored untracked files as `retained`, leave visible untracked files alone, drop the unit record and its line, and report. |
+| Tracked | none, not listed | any | Team-owned. Skip and report. Add no line and record nothing. |
 | Untracked, hash equals the record | present | same hash | Unchanged. |
 | Untracked, hash equals the record | present | different hash | Update. |
 | Untracked, hash equals the record | present | none | Remove. |
-| Untracked, hash equals the desired content, and the sidecar's exclude block already lists the unit | any | present | Adopt and record. This finishes an interrupted install or update, or rebuilds a lost manifest. |
-| Untracked, hash differs from the record | present | any | Locally modified. Keep the files, the record, and the line. Report with remedy. |
-| Untracked | none | any | Foreign. Skip. Report with remedy. |
+| Untracked, hash equals the desired content, and either the unit is listed or a record exists | any | present | Adopt and record. This finishes an interrupted install or update, or rebuilds a lost manifest. |
+| Untracked, hash differs from the record | present | any | Locally modified. Keep the files, the record, and the line, and report with remedy. When the skill is taken, preserve instead (Decision 24). |
+| Untracked, listed | none | any | Unfinished sidecar copy. Keep the files and the line, record nothing, and report with remedy. When the skill is taken, preserve instead (Decision 24). |
+| Untracked, not listed | none | any | Foreign. Skip. Report with remedy. |
 | Absent | any | present | Install (this also reinstalls a deleted owned unit). |
 | Absent | present | none | Drop the record. |
 
 A `retained` file keeps its exact-path line and its report until it is
-deleted (drop it) or tracked (drop it).
+deleted (drop it) or tracked (drop it). With no manifest, a file-level line
+in the block keeps hiding its file while that file exists and is untracked
+(Decision 23). A name that gitignore cannot express is never retained; it is
+reported (Decision 29).
 
-Skill-level rule: when any folder on the read list (Decision 8) holds a copy
-of a skill name that the sidecar does not own, skip that skill at every write
-root. Remove an unchanged sidecar copy at the other write roots, and keep and
-report a modified one.
+Skill-level rule (Decision 22): for a taken skill, convert every unit
+outcome to an allowed one. `install` becomes no-op; `unchanged`, `update`,
+and `adopt` become remove; locally modified and unfinished copies are
+preserved (Decision 24); team-owned, team takeover, foreign, no-op, drop,
+and remove stay as they are. A test asserts that no taken skill produces
+any other outcome.
 
 Write order:
 
@@ -255,9 +326,12 @@ Write order:
    ignore gate on every path that must stay ignored.
 3. Empty the staging folder, then write and remove units. Build each new unit
    in staging, move the old copy into staging, and move the new copy into
-   place with `os.replace`. Remove a unit by moving it into staging. Delete a
-   team-taken unit's untracked files that match the record.
-4. Drop the exclude lines of removed units and deleted files.
+   place with `os.replace`. Remove a unit by moving it into staging. Preserve
+   a unit by moving it into the preserved folder (Decision 24). Delete a
+   team-taken unit's untracked files that match the record or the desired
+   content.
+4. Drop the exclude lines of removed and preserved units and of deleted
+   files.
 5. Write the manifest (temporary file in the Git directory, then
    `os.replace`), and empty the staging folder.
 
@@ -268,20 +342,32 @@ extra lines cover only sidecar paths; each unit is old, new, or absent; the
 adopt row takes a new unit whose record was not written yet; the install row
 restores an absent one; and the next run empties staging.
 
-Remedies printed in the report:
+Remedies printed in the report (Decisions 35 and 36; Phases G and H may
+tighten the wording but not the meaning):
 
-- Locally modified: "delete or restore `<path>`, then rerun to take the
-  current version".
-- Foreign: "the sidecar will not replace `<path>`; rename or remove it only
-  if it is not needed".
-- Team-owned: "the repository tracks `<path>`; the sidecar skips `<skill>` at
-  every root".
+- Locally modified: "`<path>` has local edits, so the sidecar keeps it. A
+  pull can overwrite hidden files without warning. To take the current
+  version, copy your edits elsewhere, delete `<path>`, and rerun". When the
+  sidecar no longer ships the skill: "`<path>` has local edits and the
+  sidecar no longer ships `<skill>`; copy your edits elsewhere, then delete
+  `<path>`".
+- Unfinished sidecar copy: "`<path>` is an unfinished sidecar copy that the
+  sidecar cannot verify. It stays hidden. Copy anything you need from it,
+  delete it, and rerun".
+- Preserved: "`PRESERVED <unit> -> <preserved path>`: the repository now uses
+  `<skill>`, so your edited copy was moved out of the client folders".
+- Foreign: "the sidecar will not replace `<path>` and skips `<skill>` at every
+  root; rename or remove `<path>` only if you do not need it".
+- Team-owned skill: "the repository tracks `<tracked path>`; the sidecar skips
+  `<skill>` at every root". Team-owned bridge: "the repository tracks
+  `<path>`; the sidecar does not install this bridge".
 - Retained: "`<path>` was left behind when the repository started tracking
-  its folder; delete it or commit it".
+  its folder. It stays hidden, and a pull can overwrite it. Move it out of the
+  folder, or commit it with `git add -f`".
 - Invalid manifest: "move `<manifest path>` aside and rerun with
-  `--mode sidecar`. Units that the exclude block lists and that match current
-  content are adopted. Any other sidecar file is reported as foreign and
-  stops being ignored".
+  `--mode sidecar`. Units that the exclude block lists are recovered: matching
+  units are adopted, and any other listed unit is kept hidden and reported.
+  Keep the old manifest until the report looks right".
 
 Dry-run runs preflight and classification. It runs the same ignore-gate
 function on the candidate exclude text through a temporary
@@ -296,15 +382,16 @@ real run's gate is authoritative.
 
 ```text
 git status --porcelain --untracked-files=all : identical before and after install and update, except
-                                               two recovery runs: after a person deleted the exclude
-                                               block, a rerun re-hides or removes the sidecar's own
-                                               files; after a person moved an invalid manifest aside,
-                                               a rerun un-hides the files that no longer match
-pre-existing team files                     : byte-identical after install and update
+                                               after a person deleted the exclude block, when a rerun
+                                               re-hides or removes the sidecar's own files. Uninstall
+                                               un-hides retained files and reports each one
+pre-existing team files                     : byte-identical after install, update, and uninstall
 hooks                                       : no hook file copied, no core.hooksPath change, no provider hook config change
-ownership                                   : never inferred from a filename or a location; adoption needs the sidecar's own exclude line
+ownership                                   : never inferred from a filename or a location; it needs a matching record or the sidecar's own exclude line
+precedence                                  : a taken skill never produces install, update, unchanged, or adopt
 second run from the same bootstrap commit   : no file changes, including the manifest and the exclude file
-written paths                               : only the sidecar namespace, the exclude block, and the Git-directory manifest and staging folder
+written paths                               : only the sidecar namespace, the exclude block, and the Git-directory manifest,
+                                               staging folder, and preserved folder
 ```
 
 ## Pre-Flight Before Branching
@@ -343,6 +430,15 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-24_phase-C-sidecar-install-and-provider-bridges` — add `--mode`, mode detection, preflight, the ignore gate, and the atomic apply step for install and rerun.
 - [x] `2026-09-24_phase-D-sidecar-update-and-reconciliation` — make batches skip and report failures, prove updates across bootstrap versions and mixed batches, then document both modes.
 - [x] `2026-09-24_phase-E-sidecar-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit.
+- [ ] `2026-09-25_phase-F-reopen-completed-big-plan` — let the plan validator accept a completed earlier knowledge-refresh phase, and write the procedure for reopening a completed big plan (Decision 21).
+- [ ] `2026-09-25_phase-G-sidecar-ownership-and-precedence` — decide taken skills first, prove ownership by record or exclude line, read ownership from the index, preserve edited copies, and gate folders with a trailing slash (Decisions 22-25, 30, 32).
+- [ ] `2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall` — harden mode detection and preflight, make paths bytes-safe, require complete sources, add `--uninstall`, and correct messages and docs (Decisions 26-29, 31, 33-36).
+- [ ] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
+
+Phase F must land before any other outer commit on this branch: once
+Phases F-I are listed, the installed validator rejects two knowledge-refresh
+phases, and the commit gate runs it on every outer commit. Commits in the
+nested `.claude` repository are not gated.
 
 ## Decision Gate After Phase A
 
@@ -410,7 +506,10 @@ the host where the clients are installed.
 Required review profiles: Phases B-E use `code`, `architecture`, `security`,
 `tests`, and `ponytail`, plus `documentation` where documentation changes.
 Phase A changes one evidence document and uses `documentation`,
-`architecture`, and `security`.
+`architecture`, and `security`. Phases F-H use `code`, `architecture`,
+`security`, `tests`, `ponytail`, and `documentation`. Phase I uses the same
+full set, as Phase E did, because every multi-file diff is
+control-plane/high-risk (`shared/policies/workspace.instructions.md`).
 
 ## Done Criteria
 
@@ -444,12 +543,29 @@ Phase A changes one evidence document and uses `documentation`,
 - A repeated update is idempotent.
 - README and docs describe full versus sidecar installation correctly,
   including the worktree limits.
-- The final knowledge refresh and stale-claims audit are complete.
+- Every confirmed finding in the two 2026-09-25 review reports has a
+  regression test that failed before its fix, or a documented disposition.
+  Nothing is deferred: L1-L4 and the uninstall command are in scope.
+- A taken skill never keeps, installs, adopts, or updates a sidecar copy at
+  any root, in any recovery path, and an edited copy of a taken skill ends up
+  in the preserved folder.
+- No run exposes a sidecar file or one of the person's own ignored files in
+  `git status`, except the documented block-deletion recovery and uninstall's
+  retained files.
+- A team `.claude` submodule, a Git error, a nested repository, a symlink in
+  the Git directory, unbalanced markers, non-UTF-8 names, and an incomplete
+  source each end in a clear refusal before any write, or in a correct run.
+- `--uninstall` removes only unmodified sidecar files and sidecar metadata,
+  preserves edited copies, and is idempotent.
+- The final knowledge refresh and stale-claims audit are complete, and they
+  ran after the last code change (Phase I).
 
 ## Completion Evidence
 
-The final phase listed under `phases:`,
-`2026-09-24_phase-E-sidecar-knowledge-refresh`, runs the documentation,
+Phase E, `2026-09-24_phase-E-sidecar-knowledge-refresh`, was the final phase
+until the plan was reopened on 2026-09-25 (Decision 21); its closeout evidence
+stays as it is. The final phase listed under `phases:` is now
+`2026-09-25_phase-I-sidecar-hardening-knowledge-refresh`. It runs the documentation,
 memory, and LEARN audit. It sweeps every live-advice surface for claims this
 plan invalidated, corrects or supersedes each one, leaves dated records
 unchanged, and records the audited surfaces and each outcome under
