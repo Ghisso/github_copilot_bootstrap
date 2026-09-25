@@ -3,7 +3,7 @@ name: 2026-09-24_phase-C-sidecar-install-and-provider-bridges
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
