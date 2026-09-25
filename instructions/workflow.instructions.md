@@ -121,6 +121,37 @@ binds findings to the last completed phase. Commit closeout skips cancelled
 phases when advancing `current_phase`, while a commit whose current phase is
 cancelled remains blocked.
 
+### Reopening a completed big plan
+
+A `complete` big plan can take new phases instead of starting a new plan.
+The "Knowledge-Refresh Final Phase" exemption below is what keeps this legal
+for a plan that already ended with a knowledge-refresh phase.
+
+1. Reopen only while the implementation branch exists and is not merged.
+   After a merge, start a new big plan instead.
+2. Inspect the completed phases' outcomes and review findings. Record new
+   findings in a quality report.
+3. Draft the new small plans as `planned`, with the next phase letters and
+   `phase_index` values. Only a knowledge-refresh phase's slug may end in
+   `-knowledge-refresh`; the validator counts any slug with that suffix.
+4. If any listed phase is a knowledge-refresh phase, append one new
+   `-knowledge-refresh` phase after the new phases. The validator requires a
+   plan with knowledge-refresh phases to end with one.
+5. Edit the big plan: `status: in-progress`, `current_phase:` the first new
+   phase, and the new phases appended to `phases:` and to the body
+   `## Phases` list in the same order. Update Done Criteria and Completion
+   Evidence to name the new final phase. Keep `started_at` and the branch
+   fields.
+6. Never edit a completed phase's small plan, closeout session log,
+   findings report, or receipts (Immutability under "Session Logging").
+   Never re-persist a completed phase's receipts, even when `verify.py`
+   suggests it while the big plan is still `complete`.
+7. Set the first new phase to `in-progress` when its implementation starts;
+   no hook does this on an existing branch.
+8. Checkpoint the nested `.claude` repository.
+9. The new final phase meets the same strict terminal gates as any other
+   phase. Reopening defers them; it never escapes them.
+
 ---
 
 ## Canonical Orchestrator Loop
@@ -243,6 +274,12 @@ of the same plan or as the reason for a follow-up plan.
 `scripts/validate_plan_frontmatter.py` enforces this deterministically: a
 big plan fails validation if more than one phase carries the
 `-knowledge-refresh` suffix, or if one exists but is not the last phase.
+Reopening a completed big plan (see "Reopening a completed big plan" under
+Branch Lifecycle) does not defeat this rule: the validator exempts an
+earlier, non-final knowledge-refresh phase from that count once its own
+small plan has already settled as `complete` or `cancelled`, so a finished
+refresh phase stays where it is and the rule still requires the reopened
+plan to end with one new knowledge-refresh phase.
 
 **Shape.** Small, and only this: refresh through
 `.claude/skills/knowledge-refresh/SKILL.md`, inspect the generated
