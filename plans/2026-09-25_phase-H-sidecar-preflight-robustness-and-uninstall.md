@@ -321,7 +321,9 @@ real run and the dry run.
     - Keep a safe manual fallback: skip any unit that `git ls-files` lists,
       delete only files whose hash matches the manifest, never delete
       retained files, move edited files out first, and remove the block
-      last.
+      last. Say that `<git dir>/ai-bootstrap-sidecar-preserved/` holds the
+      person's preserved edits (Phase G) and is left alone; delete it only
+      on purpose.
     - Correct each claim listed under S17: line 61, the linked-worktree
       reason, "before anything is written", exit codes, and "a second run
       writes nothing".
