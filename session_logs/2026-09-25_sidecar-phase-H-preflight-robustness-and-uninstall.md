@@ -161,6 +161,18 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   The full suite passes (2094). Re-verification and review round 3 (the
   uninstall area) started. The rest of Phase H is unchanged since its two
   clean reviews, apart from that assertion.
+- `verify.py phase --format text` PASS (2094 tests).
+- Review round 3 (the uninstall area): the fix is confirmed for recorded
+  units, and the corrected assertion is right. One new CRITICAL
+  (`security`), reproduced live: an unrecorded ("unfinished") unit that
+  hits a preserve conflict has no actions and no record, so it is in
+  neither gate path set. With a negation, it is reported as kept while
+  visible. One MINOR (`ponytail`): an unused `unrecognized_lines`
+  parameter on `_uninstall_sidecar_dry_run`.
+- Pattern: every uninstall finding so far is in the preserve-conflict
+  path. The fix now builds the gate paths from `preserved_conflicts`
+  itself, so no category of kept unit can slip past. Sent back to
+  `coder`.
 
 ## [LEARN] Entries
 
