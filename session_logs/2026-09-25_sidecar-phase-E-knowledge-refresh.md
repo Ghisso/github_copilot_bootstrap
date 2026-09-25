@@ -48,6 +48,29 @@ at the first failure.
   (`.claims/`, indexes, `.page-manifest.json`, `.last-update.json`), the
   five pages, and the brief. No generated page was edited outside its page
   job.
+- Steps 3-5, audit (`documenter`): see `## Stale-claims surfaces checked`.
+  Changed `AGENTS.md` line 7 and the Layout section of
+  `.claude/instructions/project-context.instructions.md`; no `shared/`
+  file changed; no new LEARN entry beyond those already recorded. The
+  documenter's self-refresh after the `AGENTS.md` edit also exercised the
+  new installer's `--allow-self` full-evidence path on this repository.
+- Verification before review: `validate_targets.py` PASS,
+  `check_runtime.py` PASS, full `verify.py phase` PASS (pytest 1883
+  passed; ruff 0; mypy 0; `VFY-GEN-001`, which includes the OpenWiki
+  backstop, PASS).
+- Review (`documentation`, `code`, `architecture`, `security`, `tests`,
+  `ponytail`): gate PASS, 0 critical, 0 major, 1 minor. The reviewer
+  checked every wiki statement against the code line by line, reproduced
+  the `git check-ignore -v` negation behavior in a scratch repository, and
+  found nothing the audit missed. MINOR (documentation): `info/exclude` was
+  not defined on first use in the install-ownership and sidecar-overlay
+  pages.
+- Corrective OpenWiki refresh for the MINOR: `openwiki_begin`
+  (`mode: "update"`, run `53dc9bf2-9e4e-4693-a281-d54cc9cb2c05`), a plan of
+  those 2 pages, one parenthetical added at each first use, no claim
+  change, `openwiki_finish` `complete`. `CLAUDE.md` unchanged, `AGENTS.md`
+  unchanged by the run, no `openwiki/.run.json` left. Sent to the same
+  reviewer to confirm.
 
 ## Stale-claims surfaces checked
 
