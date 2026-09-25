@@ -42,6 +42,21 @@ workflow instructions (big plan, Decision 21).
   nested AI state, so the orchestrator runs it at closeout (MEMORY LEARN on
   `check_runtime.py` staleness in the authoring repository).
 - IMPLEMENT: steps 1-3 and the `dist/` regeneration delegated to `coder`.
+  Changed `scripts/validate_plan_frontmatter.py` (new
+  `_knowledge_refresh_phase_settled`, rewritten
+  `validate_knowledge_refresh_phase_position`),
+  `tests/test_validate_plan_frontmatter.py` (9 new cases), and
+  `shared/policies/workflow.instructions.md` (Termination paragraph and a new
+  "Reopening a completed big plan" subsection). The planner, orchestrator,
+  plan-decomposition, and template sources restate no rule, so they are
+  unchanged. Coder checks: 635 validator and runtime tests passed; the
+  canonical validator passed every real plan; ruff, mypy, and
+  `validate_targets.py` passed.
+- VERIFY: `verify.py phase --format text` PASS (ruff, mypy, 1892 tests).
+- REVIEW: `reviewer` with `code`, `architecture`, `security`, `tests`,
+  `ponytail`, and `documentation`. Orchestrator note for the fix loop: the
+  new subsection calls the Knowledge-Refresh exemption "above", but that
+  section comes later in the file.
 
 ## [LEARN] Entries
 
