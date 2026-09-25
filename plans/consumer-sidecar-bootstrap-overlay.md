@@ -1,17 +1,17 @@
 ---
 name: consumer-sidecar-bootstrap-overlay
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-sidecar-bootstrap-overlay_implementation
-started_at:
+started_at: 2026-09-25T03:07:56Z
 phases:
   - 2026-09-24_phase-A-sidecar-provider-contract
   - 2026-09-24_phase-B-sidecar-profile-and-ownership
   - 2026-09-24_phase-C-sidecar-install-and-provider-bridges
   - 2026-09-24_phase-D-sidecar-update-and-reconciliation
   - 2026-09-24_phase-E-sidecar-knowledge-refresh
-current_phase:
+current_phase: 2026-09-24_phase-A-sidecar-provider-contract
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay

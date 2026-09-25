@@ -3,7 +3,7 @@ name: 2026-09-24_phase-A-sidecar-provider-contract
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
