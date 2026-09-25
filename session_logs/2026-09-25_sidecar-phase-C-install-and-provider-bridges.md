@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-24_phase-C-sidecar-install-and-provider-bridges.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -135,8 +135,15 @@ over by a plain full install.
 Required items (`verify closeout --format text` summary lines):
 
 ```text
-PENDING
+PASS        0.6s  uv run python scripts/generate_targets.py --all
+PASS       35.7s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_install_bootstrap.py -q --tb=short
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`verify.py phase --format json --persist`: PASS. Findings report:
+`.claude/quality_reports/findings-2026-09-24_phase-C-sidecar-install-and-provider-bridges.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`).
 
 - optional 1: PASS — orchestrator, 2026-09-25: sidecar installed into a clean `git clone` of the Phase A fixture's committed team state; `git status` unchanged, `installed 10`, rerun `unchanged 10` with byte-identical exclude file and manifest; one native check per skill root: Claude Code 2.1.226 loaded the four skills from `.claude/skills/` and the Claude bridge, Codex 0.147.0 listed the four skills at `.agents/skills/` (details in the Work Log). Copilot was not rerun; its Phase A native evidence stands.
 

@@ -1,0 +1,38 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-25T06:15:47Z",
+  "branch": "consumer-sidecar-bootstrap-overlay_implementation",
+  "head_sha": "ede3591d438fc24c2c75df7662c05f2b78db534e",
+  "base_ref": "dev",
+  "merge_base_sha": "1a06f1e06855a79514640a437478154b4fb00b81",
+  "phase": "2026-09-24_phase-C-sidecar-install-and-provider-bridges",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "6386851306a2edadaad8ade0e4d0eed02a7a25c0",
+  "changed_files": [
+    "docs/sidecar-provider-contract.md",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/sidecar_overlay.py",
+    "scripts/validate_targets.py",
+    "shared/sidecar/bridge.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_sidecar_install.py",
+    "tests/test_sidecar_overlay.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
