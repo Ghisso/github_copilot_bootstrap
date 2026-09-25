@@ -60,7 +60,16 @@ L3, L4).
   `validate_targets.py`, and `verify.py fast` pass.
 - The documenter noted that the README's manual removal steps do not
   mention the preserved folder. Phase H's plan (step 11) now covers it.
-- VERIFY and REVIEW (six profiles) started.
+- VERIFY and REVIEW (six profiles) started. `verify.py phase --format text`
+  PASS (1966 tests).
+- Review round 1: one MAJOR (`code`), confirmed by the orchestrator at
+  `scripts/sidecar_overlay.py:1646`. `_declared_skill_names` keeps the first
+  frontmatter declaration per name across all read folders, and the write
+  roots sort first, so after any install the sidecar's own copies hide a
+  team `SKILL.md` that declares the same name. The skill is then never taken
+  and nothing is reported. The tests missed it because they injected
+  `declared_skill_names` into the pure planner. Sent back to `coder` with
+  three real-Git tests. No MINOR findings.
 
 ## [LEARN] Entries
 
