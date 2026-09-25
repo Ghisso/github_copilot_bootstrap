@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Install the generated multi-agent bootstrap into a consumer repository."""
+"""Install the generated bootstrap into a consumer repository.
+
+Two modes, chosen by ``--mode`` or auto-detected from the target alone
+(``detect_install_mode``): **full** takes over the agent harness (today's
+behavior, and the default when the target shows no other evidence), while
+**sidecar** installs a private, per-clone overlay inside a team-owned
+harness and never changes a tracked file. See the big plan's "Mode
+detection" table (``.claude/plans/consumer-sidecar-bootstrap-overlay.md``).
+"""
 
 from __future__ import annotations
 
@@ -14,9 +22,11 @@ import sys
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
+from typing import Literal
 
 from runtime_ownership import (
     COPILOT_SURFACE_PATHS,
+    FULL_INSTALL_ROOT_PATHS,
     RESTORABLE_ROOT_PATHS,
     STATE_DIR_OWNED_README_PATHS,
     active_ignore_patterns,
@@ -27,10 +37,13 @@ from runtime_ownership import (
     is_third_party_skill_dir,
     restore_manifest,
 )
+from sidecar_overlay import install_sidecar, rev_parse, sidecar_evidence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT / "dist" / "multi-agent"
+DEFAULT_SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar"
+InstallMode = Literal["full", "sidecar"]
 IGNORE_BLOCK_START = "# BEGIN multi-agent bootstrap generated/private AI content"
 IGNORE_BLOCK_END = "# END multi-agent bootstrap generated/private AI content"
 LEGACY_ANTIGRAVITY_KEY = "BOOTSTRAP_ANTIGRAVITY_PATH"
@@ -49,10 +62,22 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target_repo", type=Path, help="Consumer repository root.")
     parser.add_argument(
+        "--mode",
+        choices=("full", "sidecar"),
+        default=None,
+        help="Installation mode. 'full' takes over the agent harness (today's "
+        "behavior). 'sidecar' installs a private per-clone overlay inside a "
+        "team-owned harness and never changes a tracked file. Omitting this "
+        "auto-detects the mode from the target alone; an unbootstrapped "
+        "repository that already tracks bootstrap paths refuses to guess.",
+    )
+    parser.add_argument(
         "--source",
         type=Path,
-        default=DEFAULT_SOURCE,
-        help="Generated bootstrap source directory.",
+        default=None,
+        help="Generated bootstrap source directory. Defaults to dist/multi-agent "
+        "for a full install or dist/sidecar for a sidecar install, once the mode "
+        "is known.",
     )
     parser.add_argument(
         "--state-remote",
@@ -1133,11 +1158,161 @@ def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
     print(f"git rm --cached -r -- {' '.join(unique_roots)}")
 
 
+def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
+    """Full-install evidence per the mode table. Reads only ``target``: two
+    plain path checks under ``.claude``, plus ``--allow-self`` naming this
+    repository itself as the target. Neither path check requires ``target``
+    to be a Git repository."""
+    evidence: list[str] = []
+    nested_git = target / ".claude" / ".git"
+    if nested_git.exists():
+        evidence.append(f"nested AI-state repository {nested_git}")
+    ownership_env = target / ".claude" / "bootstrap-ownership.env"
+    if ownership_env.exists():
+        evidence.append(f"full-install manifest {ownership_env}")
+    if allow_self and target == REPO_ROOT:
+        evidence.append("--allow-self with this repository as the target")
+    return tuple(evidence)
+
+
+def _sidecar_evidence(target: Path) -> tuple[str, ...]:
+    """Sidecar evidence per the mode table. A target that is not a Git
+    repository (or has no commits) has no Git-directory evidence to read, so
+    ``sidecar_evidence``'s underlying ``git rev-parse`` failure is read back
+    as "no evidence" rather than a crash."""
+    try:
+        return sidecar_evidence(target)
+    except subprocess.CalledProcessError:
+        return ()
+
+
+def _team_config_evidence(target: Path) -> tuple[str, ...]:
+    """Tracked paths under ``FULL_INSTALL_ROOT_PATHS``. Empty when ``target``
+    is not a Git repository (or has no commits): ``git ls-files`` then finds
+    nothing tracked, which is exactly the "no team config" reading."""
+    return tuple(tracked_generated_paths(target, FULL_INSTALL_ROOT_PATHS))
+
+
+def _is_linked_worktree(target: Path) -> bool:
+    """Return whether ``target``'s Git directory differs from the common Git
+    directory. A target where either cannot be resolved (not a Git
+    repository) is read as "not linked" rather than a crash; a later step
+    that actually needs a Git repository reports that failure on its own."""
+    git_dir = rev_parse(target, "--git-dir")
+    common_dir = rev_parse(target, "--git-common-dir")
+    return git_dir is not None and common_dir is not None and git_dir != common_dir
+
+
+def detect_install_mode(
+    target: Path, requested_mode: str | None, allow_self: bool
+) -> InstallMode:
+    """Return the install mode for ``target``, or raise ``SystemExit``.
+
+    Implements the big plan's mode-detection table exactly ("Design
+    Overview" -> "Mode detection" in
+    ``.claude/plans/consumer-sidecar-bootstrap-overlay.md``). Reads only
+    ``target``, and only for the row that ``requested_mode`` selects: a
+    linked-worktree check is never made for ``--mode full`` or no
+    ``--mode``, since the table never asks for it there.
+    """
+    sidecar_ev = _sidecar_evidence(target)
+    full_ev = _full_install_evidence(target, allow_self)
+
+    if requested_mode == "sidecar":
+        if full_ev:
+            raise SystemExit(
+                "Refusing --mode sidecar: "
+                f"{target} already has full-install evidence ({'; '.join(full_ev)}). "
+                "This consumer is already managed by a full install; refresh it with "
+                "--mode full, or no --mode at all, instead."
+            )
+        if _is_linked_worktree(target):
+            raise SystemExit(
+                "Refusing --mode sidecar in a linked worktree: "
+                f"{target} has its own Git directory, separate from the main "
+                "worktree's shared one. Run the installer from the main worktree "
+                "checkout instead."
+            )
+        return "sidecar"
+
+    if requested_mode == "full":
+        if sidecar_ev:
+            raise SystemExit(
+                "Refusing --mode full: "
+                f"{target} already has sidecar evidence ({'; '.join(sidecar_ev)}). "
+                "Remove that sidecar evidence manually first, or run without --mode "
+                "full to keep the sidecar overlay."
+            )
+        return "full"
+
+    # No --mode: auto-detect, in the table's exact order.
+    if sidecar_ev and full_ev:
+        raise SystemExit(
+            "Refusing to auto-detect an install mode: "
+            f"{target} has both full-install evidence ({'; '.join(full_ev)}) and "
+            f"sidecar evidence ({'; '.join(sidecar_ev)}). Pass --mode full or "
+            "--mode sidecar explicitly to say which one this run means."
+        )
+    if sidecar_ev:
+        return "sidecar"
+    if full_ev:
+        return "full"
+
+    team_config = _team_config_evidence(target)
+    if team_config:
+        message = (
+            "Refusing a plain install with no --mode: "
+            f"{target} already tracks bootstrap-owned paths ({', '.join(team_config)}) "
+            "and carries no bootstrap or sidecar evidence. Pass --mode sidecar for a "
+            "private per-clone overlay that never changes tracked files, or --mode "
+            "full for today's takeover."
+        )
+        if ".devcontainer/state-sync.sh" in team_config:
+            message += (
+                " This looks like a fresh clone of a full consumer whose .claude/ is "
+                "not restored yet: run `bash .devcontainer/state-sync.sh setup` first, "
+                "or pass --mode full."
+            )
+        raise SystemExit(message)
+
+    return "full"
+
+
+def warn_full_only_options_ignored(args: argparse.Namespace) -> None:
+    """Name every full-only option a sidecar target received and ignores
+    (Decision 13). ``--local-only`` is a silent no-op and ``--dry-run`` works
+    normally, so neither is named here."""
+    ignored: list[str] = []
+    if args.commit_copilot_surface is True:
+        ignored.append("--commit-copilot-surface")
+    elif args.commit_copilot_surface is False:
+        ignored.append("--no-commit-copilot-surface")
+    if args.state_remote is not None:
+        ignored.append("--state-remote")
+    if os.environ.get("AI_STATE_REMOTE"):
+        ignored.append("AI_STATE_REMOTE")
+    if args.allow_self:
+        ignored.append("--allow-self")
+    if ignored:
+        warn("sidecar install ignores full-only option(s): " + ", ".join(ignored))
+
+
 def main() -> int:
     args = parse_args()
-    state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     target = args.target_repo.expanduser().resolve()
-    source = args.source.expanduser().resolve()
+    mode = detect_install_mode(target, args.mode, args.allow_self)
+    source = (
+        args.source.expanduser().resolve()
+        if args.source is not None
+        else (DEFAULT_SOURCE if mode == "full" else DEFAULT_SIDECAR_SOURCE)
+    )
+
+    if mode == "sidecar":
+        validate_install_roots(source, target, allow_self=False)
+        warn_full_only_options_ignored(args)
+        return install_sidecar(target, source, dry_run=args.dry_run)
+
+    state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     validate_install_roots(source, target, args.allow_self)
     validate_agents_takeover(source, target)
     persisted_mode = persisted_install_mode(target)

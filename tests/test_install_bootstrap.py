@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -14,8 +15,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import install_bootstrap  # noqa: E402
 from install_bootstrap import (  # noqa: E402
     copy_generated_tree,
+    detect_install_mode,
     merge_gitignore,
     persisted_install_mode,
     populate_bootstrap_root,
@@ -26,6 +29,7 @@ from install_bootstrap import (  # noqa: E402
     validate_install_roots,
 )
 from runtime_ownership import (  # noqa: E402
+    SIDECAR_MANIFEST_NAME,
     bootstrap_root_paths,
     restore_manifest,
 )
@@ -1114,6 +1118,8 @@ def test_generated_session_pull_restores_ignored_adapter_after_branch_switch(
             str(consumer),
             "--source",
             str(GENERATED),
+            "--mode",
+            "full",
             "--local-only",
         ],
         cwd=REPO_ROOT,
@@ -1971,3 +1977,481 @@ def test_runtime_check_marker_gates_openwiki_skill_bundle_drift(
         "{}", encoding="utf-8"
     )
     assert runtime_drift_errors(target, GENERATED) == []
+
+
+# ---------------------------------------------------------------------------
+# Phase C: install mode detection (`--mode {full,sidecar}`), big plan
+# Decisions 11, 13, 15, 18 and "Design Overview" -> "Mode detection".
+# ---------------------------------------------------------------------------
+
+
+def _init_repo(target: Path) -> None:
+    """Init a Git repository with a deterministic author identity."""
+    target.mkdir(parents=True, exist_ok=True)
+    assert _git(target, "init", "-q").returncode == 0
+    assert _git(target, "config", "user.name", "Installer Test").returncode == 0
+    assert _git(target, "config", "user.email", "installer@example.com").returncode == 0
+
+
+def _commit_tracked_paths(target: Path, message: str) -> None:
+    assert _git(target, "add", "-A").returncode == 0
+    commit = subprocess.run(
+        ["git", "-C", str(target), "commit", "-q", "-m", message],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert commit.returncode == 0, commit.stderr
+
+
+def _write_sidecar_manifest(target: Path) -> Path:
+    """Fabricate sidecar evidence without running the (Phase C) sidecar
+    installer: write a manifest file straight at its Git-directory path."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(target),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            SIDECAR_MANIFEST_NAME,
+        ],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    manifest = Path(result.stdout.strip())
+    manifest.write_text("{}", encoding="utf-8")
+    return manifest
+
+
+def _porcelain_status(target: Path) -> str:
+    result = _git(target, "status", "--porcelain", "--untracked-files=all")
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def _repo_exclude_path(target: Path) -> Path:
+    return target / ".git" / "info" / "exclude"
+
+
+def _exclude_bytes(target: Path) -> bytes | None:
+    path = _repo_exclude_path(target)
+    return path.read_bytes() if path.is_file() else None
+
+
+# --- Unit tests: detect_install_mode implements the mode table exactly -----
+
+
+def test_detect_mode_defaults_to_full_with_no_evidence(tmp_path: Path) -> None:
+    """A fresh, evidence-free repository defaults to full (today's default)."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_defaults_to_full_when_not_a_git_repository(
+    tmp_path: Path,
+) -> None:
+    """A non-Git target (or one with no commits) reads back no Git evidence
+    and does not crash; it falls through to today's full-install default,
+    matching the full installer's own tolerance for such a target."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_sidecar_evidence_selects_sidecar_with_no_mode(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+    assert detect_install_mode(target, None, False) == "sidecar"
+
+
+def _add_nested_git_evidence(target: Path) -> None:
+    (target / ".claude" / ".git").mkdir(parents=True)
+
+
+def _add_ownership_env_evidence(target: Path) -> None:
+    claude_dir = target / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    (claude_dir / "bootstrap-ownership.env").write_text("x", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "make_evidence",
+    (_add_nested_git_evidence, _add_ownership_env_evidence),
+    ids=("nested-git", "ownership-env"),
+)
+def test_detect_mode_full_evidence_selects_full_with_no_mode(
+    tmp_path: Path, make_evidence: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    make_evidence(target)
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_both_evidence_kinds_abort_with_no_mode(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    _write_sidecar_manifest(target)
+    with pytest.raises(SystemExit, match="both full-install evidence") as error:
+        detect_install_mode(target, None, False)
+    assert "sidecar evidence" in str(error.value)
+    assert "--mode full or --mode sidecar" in str(error.value)
+
+
+def test_detect_mode_team_config_aborts_offering_both_modes(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    with pytest.raises(SystemExit, match="CLAUDE.md") as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+    assert "state-sync.sh setup" not in message
+
+
+def test_detect_mode_team_config_devcontainer_only_aborts(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer" / "devcontainer.json"
+    devcontainer.parent.mkdir(parents=True)
+    devcontainer.write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer")
+    with pytest.raises(SystemExit, match=r"\.devcontainer/devcontainer\.json") as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+    assert "state-sync.sh setup" not in message
+
+
+def test_detect_mode_tracked_state_sync_script_adds_setup_hint(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    state_sync = target / ".devcontainer" / "state-sync.sh"
+    state_sync.parent.mkdir(parents=True)
+    state_sync.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer state-sync")
+    with pytest.raises(SystemExit, match="bash .devcontainer/state-sync.sh setup"):
+        detect_install_mode(target, None, False)
+
+
+def test_detect_mode_sidecar_mode_aborts_on_full_evidence(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="already has full-install evidence"):
+        detect_install_mode(target, "sidecar", False)
+
+
+def test_detect_mode_full_mode_aborts_on_sidecar_evidence(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+    with pytest.raises(SystemExit, match="already has sidecar evidence"):
+        detect_install_mode(target, "full", False)
+
+
+def test_detect_mode_full_mode_ignores_team_config(tmp_path: Path) -> None:
+    """Explicit --mode full keeps today's takeover behavior unconditionally."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    assert detect_install_mode(target, "full", False) == "full"
+
+
+def test_detect_mode_sidecar_mode_ignores_team_config(tmp_path: Path) -> None:
+    """Explicit --mode sidecar proceeds even over tracked bootstrap paths;
+    the team-config abort only applies to the no---mode auto-detect row."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+
+
+def test_detect_mode_sidecar_mode_aborts_in_linked_worktree(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _commit_tracked_paths(target, "seed")
+    worktree = tmp_path / "linked-worktree"
+    added = _git(target, "worktree", "add", "-q", str(worktree), "-b", "linked")
+    assert added.returncode == 0, added.stderr
+    with pytest.raises(SystemExit, match="linked worktree"):
+        detect_install_mode(worktree, "sidecar", False)
+
+
+def test_detect_mode_allow_self_with_repo_root_counts_as_full_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--allow-self naming this repository as the target is full evidence
+    (Decision 18), even with no other evidence present at all."""
+    fake_repo_root = tmp_path / "fake-bootstrap-repo"
+    _init_repo(fake_repo_root)
+    monkeypatch.setattr(install_bootstrap, "REPO_ROOT", fake_repo_root)
+
+    with pytest.raises(SystemExit, match="--allow-self with this repository"):
+        detect_install_mode(fake_repo_root, "sidecar", True)
+
+    # Without --allow-self, the same target has no full evidence at all, so
+    # --mode sidecar proceeds instead of refusing.
+    assert detect_install_mode(fake_repo_root, "sidecar", False) == "sidecar"
+
+
+def test_detect_mode_allow_self_with_other_repository_is_not_full_evidence(
+    tmp_path: Path,
+) -> None:
+    """--allow-self only counts as evidence when the target *is* the
+    bootstrap repository; any other target is unaffected."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    assert detect_install_mode(target, None, True) == "full"
+    assert detect_install_mode(target, "sidecar", True) == "sidecar"
+
+
+# --- CLI refusals: never reach the sidecar dispatch, nothing is written ----
+
+
+def test_cli_refuses_mode_sidecar_when_full_evidence_present(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    first = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+    before_exclude = _exclude_bytes(target)
+
+    refused = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "sidecar",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert refused.returncode != 0
+    assert "already has full-install evidence" in refused.stderr
+    assert "nested AI-state repository" in refused.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+    assert _exclude_bytes(target) == before_exclude
+
+
+def test_cli_refuses_mode_full_when_sidecar_evidence_present(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "already has sidecar evidence" in result.stderr
+    assert "sidecar manifest" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+    assert not (target / ".claude" / ".git").exists()
+    assert not (target / ".claude" / "bootstrap-ownership.env").exists()
+
+
+def test_cli_refuses_auto_detect_when_both_evidence_kinds_present(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    _write_sidecar_manifest(target)
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "both full-install evidence" in result.stderr
+    assert "sidecar evidence" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+
+
+def test_cli_refuses_plain_install_when_repo_tracks_claude_md(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "CLAUDE.md" in result.stderr
+    assert "--mode sidecar" in result.stderr
+    assert "--mode full" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert not (target / ".claude" / ".git").exists()
+
+
+def test_cli_refuses_plain_install_when_repo_tracks_devcontainer_only(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer" / "devcontainer.json"
+    devcontainer.parent.mkdir(parents=True)
+    devcontainer.write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert ".devcontainer/devcontainer.json" in result.stderr
+    assert "--mode sidecar" in result.stderr
+    assert "--mode full" in result.stderr
+    assert "state-sync.sh setup" not in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+
+
+def test_cli_refuses_plain_install_and_hints_state_sync_setup(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    state_sync = target / ".devcontainer" / "state-sync.sh"
+    state_sync.parent.mkdir(parents=True)
+    state_sync.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer state-sync")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "bash .devcontainer/state-sync.sh setup" in result.stderr
+    assert "--mode full" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+
+
+def test_cli_mode_full_installs_into_repo_that_tracks_claude_md(
+    tmp_path: Path,
+) -> None:
+    """The plan's required regression: an unbootstrapped repository tracking
+    CLAUDE.md still gets today's full-install behavior under --mode full."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (target / ".claude" / ".git").is_dir()
+    agent_relative = Path(".github/agents/orchestrator.agent.md")
+    assert (target / agent_relative).read_bytes() == (
+        GENERATED / agent_relative
+    ).read_bytes()

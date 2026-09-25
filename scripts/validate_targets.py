@@ -10467,6 +10467,9 @@ def validate_state_sync(errors: list[str]) -> None:
             )
 
         # 6. --state-remote: a fresh install's state lands on that remote, not origin.
+        # Machine C clones a full consumer whose .claude/ is not restored, so it
+        # tracks .devcontainer/ with no bootstrap evidence; a plain install
+        # refuses that (Decision 18), and this case asks for the takeover.
         state_remote = temp_root / "state-remote.git"
         subprocess.run(["git", "init", "-q", "--bare", str(state_remote)], check=False)
         machine_c = temp_root / "machine-c"
@@ -10482,6 +10485,8 @@ def validate_state_sync(errors: list[str]) -> None:
                 sys.executable,
                 str(installer),
                 str(machine_c),
+                "--mode",
+                "full",
                 "--state-remote",
                 str(state_remote),
             ],
