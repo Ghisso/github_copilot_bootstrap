@@ -173,6 +173,15 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   path. The fix now builds the gate paths from `preserved_conflicts`
   itself, so no category of kept unit can slip past. Sent back to
   `coder`.
+- Fixes: both gates now take `preserved_conflicts` directly, and
+  `_preserve_conflict_remedy(..., unfinished=...)` reports a kept
+  unfinished unit accurately. The unused parameter is removed. Three new
+  tests: an unfinished conflict with a negation (fails on the old code), an
+  unfinished conflict without one, and a conflicting bridge. The full suite
+  passes (2097).
+- Review round 4 asked for an exhaustive matrix over the conflict path
+  (unit kind, state, destination, ignore state, run, and crash point)
+  instead of spot checks.
 
 ## [LEARN] Entries
 
