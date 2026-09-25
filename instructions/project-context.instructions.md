@@ -31,10 +31,15 @@ this repository's bootstrap scripts, shell hooks, or generated adapters.
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader.
 - `shared/scripts/` and `shared/templates/`: shared scoring, findings, and
   workflow artifacts rendered into targets.
-- `scripts/generate_targets.py`: renders the single `dist/multi-agent/` target.
-- `scripts/install_bootstrap.py`: installs generated output into a consumer and
-  initializes its nested `.claude` `ai-state` repository.
-- `scripts/update_consumers.py`: regenerates and updates consumer repositories.
+- `scripts/generate_targets.py`: renders both `dist/multi-agent/` (the full
+  bootstrap) and `dist/sidecar/` (the personal per-clone overlay).
+- `scripts/install_bootstrap.py`: installs generated output into a consumer,
+  in `full` mode (a takeover, including a nested `.claude` `ai-state`
+  repository) or `sidecar` mode (a private overlay inside a team-owned
+  harness), chosen by `--mode` or auto-detected from the target.
+- `scripts/update_consumers.py`: regenerates and updates consumer repositories
+  in a batch that may mix full and sidecar targets; it finishes every target
+  even when one fails.
 - `scripts/validate_targets.py`: structural and behavioral target validator.
 - `scripts/check_runtime.py`: runtime-file and optional-helper checker.
 - `scripts/check_native_clients.py`: runs optional native-client probes and
