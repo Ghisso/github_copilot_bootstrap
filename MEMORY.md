@@ -1263,3 +1263,9 @@
   names a script under `.claude/hooks/scripts/`, even a read-only run of
   `session-start-state.sh`. Observe a hook's output at the next session
   start, or through tests that isolate `REPO_ROOT`; do not run it by hand.
+- [LEARN:testing] A test that injects gathered data into a pure planner
+  cannot catch a defect in the gathering code. In the sidecar, a first-wins
+  frontmatter collector (masked by the sidecar's own installed copies) and a
+  parsed-but-unused `unrecognized_lines` both passed planner tests and failed
+  only through `install_sidecar` on real Git. Give every new planner input a
+  real-gathering test, run after an install as well as on a fresh target.

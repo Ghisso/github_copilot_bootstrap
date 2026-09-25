@@ -122,11 +122,48 @@ L3, L4).
     untouched", but `PRESERVED` makes three and moves the copy;
   - `docs/target-mapping.md` said the preserved folder is found with
     `--git-path`, but the code builds it from `--git-dir` on purpose.
+- Both fixed by `documenter`. A focused `documentation` and `code` review of
+  the two sentences: no findings (`[]`).
+- Self-install (`install_bootstrap.py . --allow-self --local-only`) before
+  closeout committed nested state (`e896f55`); `check_runtime.py` reports
+  nothing stale.
 
 ## [LEARN] Entries
 
+- [LEARN:testing] A test that injects gathered data straight into the pure
+  planner cannot catch a defect in the gathering code. Two defects in this
+  phase passed planner-level tests and were caught only by real-Git runs
+  through `install_sidecar`: the first-wins frontmatter collector that the
+  sidecar's own installed copies masked, and a parsed `unrecognized_lines`
+  value that nothing consumed. Give every new planner input at least one
+  real-gathering test, and run it after an install, not only on a fresh
+  target, because the sidecar's own copies sit in the folders it scans.
+  Added to MEMORY.
+- [LEARN:workflow] A coder asked to add "the plan's listed tests" still
+  implemented a representative subset. A follow-up message that listed each
+  missing scenario by name closed the gap and exposed one more real defect
+  (case-insensitive tracked paths kept the index's casing). Hand the coder
+  the explicit scenario list up front.
+
 ## Verification
+
+Required items are pasted at closeout step 4.
+
+This plan has no `## Optional Verification` section.
 
 ## Documentation
 
+Updated in this phase: `README.md` ("Personal Sidecar Install": the report
+table's taken-skill row lists every taking path, the `PRESERVED` row, the
+`RETAINED` remedy with `git add -f`, the row for unrecognized block lines,
+both locally-modified remedies, the "Preserved copies" paragraph, and the
+corrected intro sentence) and `docs/target-mapping.md` (the preserved folder
+in the sidecar layout, and how each Git-directory path is resolved). Phase H
+does the full documentation pass.
+
 ## Open Questions / Next Steps
+
+- Next: Phase H (`2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall`).
+  The post-commit hook activates it after this phase's commit.
+- Carried into Phase H's plan: `--uninstall` must keep unrecognized block
+  lines, and the manual removal fallback must name the preserved folder.
