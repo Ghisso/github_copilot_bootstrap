@@ -1,11 +1,8 @@
 ---
 type: operations
 title: Installing the bootstrap, file ownership, and runtime drift checks
-description: How install_bootstrap.py installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater, and what check_runtime.py reports.
+description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, and what check_runtime.py reports.
 tags: [install, refresh, ownership, runtime-ownership, check-runtime, drift, bootstrap-root, consumers]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T06:07:33.954Z
 sources:
   - id: openwiki-source-42e51bf2d8e7ed2f137178e1
     resource: repo://scripts/check_runtime.py
@@ -17,18 +14,48 @@ sources:
     resource: repo://scripts/update_consumers.py
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
-generated: { by: "claude-code", at: "2026-09-21T06:07:33.954Z" }
+generated: { by: "claude-code", at: "2026-09-25T07:35:33.028Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-09-25T07:35:33.028Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
 
 Source, tests, and the policies under `shared/policies/` outrank this page.
 
-The installer copies the generated target into a consumer and refreshes it later without touching what the consumer owns. What it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share.
+The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository and never changes a tracked file; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) covers it in full.
+
+## Install modes and mode detection
+
+`--mode full` or `--mode sidecar` selects a mode. Without `--mode`, `detect_install_mode` in `scripts/install_bootstrap.py` decides from the target alone, before any write. It looks for three kinds of evidence:
+
+- Sidecar evidence: a manifest file at the Git-directory path `ai-bootstrap-sidecar.json`, valid or not, or the `# BEGIN ai-bootstrap sidecar` block in `info/exclude` (a local, untracked ignore file inside the Git directory, separate from the team's tracked `.gitignore`).
+- Full evidence: `.claude/.git`, `.claude/bootstrap-ownership.env`, or `--allow-self` with this repository as the target.
+- Team configuration: `git ls-files` lists a path under `FULL_INSTALL_ROOT_PATHS` (`.claude`, `.devcontainer`, and the restorable root adapter paths).
+
+The table shows the result for each case, in the order the function checks it.
+
+| Request | Evidence found | Result |
+| --- | --- | --- |
+| `--mode sidecar` | full evidence | refuse |
+| `--mode sidecar` | a linked worktree (its `--git-dir` differs from `--git-common-dir`) | refuse |
+| `--mode sidecar` | anything else | sidecar install |
+| `--mode full` | sidecar evidence | refuse |
+| `--mode full` | anything else | full install |
+| no `--mode` | both kinds of evidence | refuse |
+| no `--mode` | sidecar evidence | sidecar install |
+| no `--mode` | full evidence | full install (refresh) |
+| no `--mode` | team configuration only | refuse, offering `--mode full` or `--mode sidecar` |
+| no `--mode` | nothing | full install (fresh default) |
+
+Every refusal is a `SystemExit` that names the evidence found and the way forward. When the tracked paths include `.devcontainer/state-sync.sh`, the team-configuration refusal adds that the target looks like a fresh clone of a full consumer and says to run `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`. A target that is not a Git repository, or has no commits, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table and each refusal message.
+
+After detection, `main` picks the source: `--source` when given, otherwise `dist/multi-agent/` for a full install or `dist/sidecar/` for a sidecar install. A sidecar target then gets `validate_install_roots` with `allow_self=False`, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`), and a hand-off to `install_sidecar`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
 
 ## The ownership model
 
-`scripts/runtime_ownership.py` classifies only the boundaries that matter during a refresh. Each category has a fixed effect.
+`scripts/runtime_ownership.py` classifies only the boundaries that matter during a full-install refresh. Each category has a fixed effect.
 
 | Category | Paths | On refresh |
 | --- | --- | --- |
@@ -49,15 +76,15 @@ The marker rule matters most. A directory shaped like `skills/openwiki` is ordin
 
 Ownership keys on a fact only the intended owner produces, not on path shape. `is_third_party_skill_dir` requires both the shape and the marker.
 
-## The installer sequence
+## The full-install sequence
 
 ```
-uv run python scripts/install_bootstrap.py <target-repo> [--source dist/multi-agent]
-    [--state-remote <git-url>] [--commit-copilot-surface] [--local-only]
-    [--dry-run] [--allow-self]
+uv run python scripts/install_bootstrap.py <target-repo> [--mode full|sidecar]
+    [--source <generated-tree>] [--state-remote <git-url>]
+    [--commit-copilot-surface] [--local-only] [--dry-run] [--allow-self]
 ```
 
-This diagram shows the order `main` follows.
+This diagram shows the order `main` follows in full mode, after mode detection.
 
 ```mermaid
 flowchart TD
@@ -92,7 +119,16 @@ This repository refreshes its own overlay with `uv run python scripts/install_bo
 
 ## Batch updates
 
-`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer, passing through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags. Each consumer gets the same migration-then-`bootstrap:` commit order.
+`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer. It passes through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags, but never `--mode`, so the installer detects each target's mode. A mixed batch of full and sidecar consumers therefore works, and a sidecar target warns once about the full-only options it ignores. Each full consumer gets the same migration-then-`bootstrap:` commit order.
+
+A failed target no longer stops the batch:
+
+1. A generator failure still stops everything before any target runs.
+2. A target that is not a directory, or whose installer exits non-zero (for example a mode refusal), is recorded, and the batch moves on to the next target.
+3. After the last target, each failure prints as `FAILED: <path> (exit <code>)` and the updater exits 1.
+4. `All projects updated.`, or `Preview complete; no projects were updated.` in `--dry-run`, prints only when every target succeeded.
+
+`tests/test_sidecar_update.py` covers refused targets in the middle of a batch, a mixed full and sidecar batch, and option forwarding.
 
 ## What `check_runtime.py` reports
 
@@ -108,11 +144,13 @@ On success it prints `PASS` lines for optional binaries found, the Semble launch
 
 ## Representative tests
 
-- `tests/test_install_bootstrap.py` covers the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption.
+- `tests/test_install_bootstrap.py` covers mode detection and every refusal, the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption.
+- `tests/test_sidecar_update.py` covers batch updates that mix full and sidecar consumers and continue past a refused target.
 - `tests/test_check_runtime.py` covers the plan-frontmatter delegation and every shape of the Bash 3.2 array-expansion rule.
 
 ## Related pages
 
+- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)
 - [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
 - [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md)
 - [Deterministic verification: verify.py modes, receipts, and findings](/openwiki/operations/deterministic-verification.md)

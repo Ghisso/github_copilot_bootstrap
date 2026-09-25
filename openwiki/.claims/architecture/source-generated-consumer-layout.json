@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:3e95f1329da9f5924075b024eb60dd8d1cfc476ccb86455712dc968a337e8e66",
+  "pageVersion": "sha256:00835c44b114f4394b77219c63174f261318b89e670a22da4d0dc86374e353c1",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -28,15 +28,15 @@
     },
     {
       "id": "claim_f9b5f02bc824485682006f1441dbe483",
-      "statement": "generate_targets.py has exactly one target, multi-agent; generate resets the output root, calls render_multi_agent, and strips quarantined content, and the CLI accepts --all, --target, and --output.",
+      "statement": "generate_targets.py has two targets, multi-agent and sidecar; generate resets each target's output directory, calls render_multi_agent or render_sidecar, raises ValueError for any other target name, and strips quarantined content, and the CLI accepts --all, --target, and --output.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1739-L1770",
-          "version": "repo-lines-v1:sha256:67c56e21d0ce0ae20bf852a837ed5540bec5a2d0570cf66e48aac708a8c9d566:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmMjYxYmIyZWEzYjAzZDNlMWZkMTA5OGUyOGRkZjcwMGE5ZjgzNzRkZDdlZGNjYzRjMjBmNTcyNmE2NWI0MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc5MWQzYjcxNzRmZjRiNDEzYTFiNWM4MTBmZGFhMDI2YTdjODY2MDQ5MjllOTFmOWJlYjYyYzA5OGM1MWQ5YWMifQ"
+          "resource": "repo://scripts/generate_targets.py#L1802-L1826",
+          "version": "repo-lines-v1:sha256:74af762c5764b6e23afca89df5223d363cd2e8008808fd73ab40796324ea2a9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZGY0YTg1Mzc3M2RkZTMyNjY1NTg0NTdiMzM5MmM0ZTA2MWRlMTI5MDcyMzQxZTBmZTM3NjA4YmFkMzhkNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUxMGEwZTlmZmQ1MzVjMzAzMjI3ZmRiZmJkZTA4YmVlOWE3MmY3NjY5NTllZWFlZTRiZjMyZmE2NGM0Y2MwMTcifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L24-L24",
-          "version": "repo-lines-v1:sha256:3bf699d7021db394ef11e374fe6fa7e268356bfc4ac1d1a4430b74e0dbb50c04:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JmNjk5ZDcwMjFkYjM5NGVmMTFlMzc0ZmU2ZmE3ZTI2ODM1NmJmYzRhYzFkMWE0NDMwYjc0ZTBkYmI1MGMwNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2JmNjk5ZDcwMjFkYjM5NGVmMTFlMzc0ZmU2ZmE3ZTI2ODM1NmJmYzRhYzFkMWE0NDMwYjc0ZTBkYmI1MGMwNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWIyM2EyMzlmODE1YTg4MzMyYTk1ZjQ4YTM5OGYwNTcyNGZlN2NlNGNkYmRjZWFhMmRiOWMyNGRiOWI3YzQ3OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDI0OGFjNTJhNzcyODNkMjViMTJlZDJlMDI1ZmZlMDMwMGMzMTAyZDdhM2E0NzQ3YmY3N2Y4OTg2OTE3YTRkZSJ9"
+          "resource": "repo://scripts/generate_targets.py#L27-L27",
+          "version": "repo-lines-v1:sha256:0b42be446bf3361f407c89ab96a244ea9281ab4fe755fae40dd85edda5128283:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI0MmJlNDQ2YmYzMzYxZjQwN2M4OWFiOTZhMjQ0ZWE5MjgxYWI0ZmU3NTVmYWU0MGRkODVlZGRhNTEyODI4MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMGI0MmJlNDQ2YmYzMzYxZjQwN2M4OWFiOTZhMjQ0ZWE5MjgxYWI0ZmU3NTVmYWU0MGRkODVlZGRhNTEyODI4MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWIyM2EyMzlmODE1YTg4MzMyYTk1ZjQ4YTM5OGYwNTcyNGZlN2NlNGNkYmRjZWFhMmRiOWMyNGRiOWI3YzQ3OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDI0OGFjNTJhNzcyODNkMjViMTJlZDJlMDI1ZmZlMDMwMGMzMTAyZDdhM2E0NzQ3YmY3N2Y4OTg2OTE3YTRkZSJ9"
         }
       ]
     },
@@ -100,11 +100,11 @@
     },
     {
       "id": "claim_83dd86c150c649749b392023e5bd792a",
-      "statement": "validate_targets.py's main runs a fixed sequence of structural gates over dist/ (task-lane contract, agents, MCP and hooks, skills, docs parity, runtime drift, receipt-chain lifecycle, installer, state sync, determinism, and hook-gate regression tests), prints FAIL lines and exits 1 on any error, and otherwise prints 'PASS generated target is structurally valid'.",
+      "statement": "validate_targets.py's main runs a fixed sequence of structural gates over dist/ (task-lane contract, agents, MCP and hooks, skills, the sidecar target and FULL_INSTALL_ROOT_PATHS coverage with their adversarial cases, docs parity, runtime drift, receipt-chain lifecycle, installer, state sync, determinism, and hook-gate regression tests), prints FAIL lines and exits 1 on any error, and otherwise prints 'PASS generated target is structurally valid'.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L10700-L10745",
-          "version": "repo-lines-v1:sha256:a5db2915b1cc80505b3e925e5b5f8958b92dc5ffe254a2df111293d85ee0d63d:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMTMxYzFkNGUxZGM4MzY5M2ViNTQ0YWViMmY4ODk2NTdmZDFjZDNkMTRiYTY5NDQ2NzVmZGMzZjBkOTNhNDAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI3ZGRkODFlMGI3NjQ4M2ZiYzg5YWE3NDIzODkxODVlZjIwOTZiMjg5OTNiZGNjYTQxZTdmZTU2YWYxOGNhZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ2M2Q1YjJkYzEyYzZmYzdkYzI2MDg2ZmY2MmYwNDc2NGI3ZmZiNDNjNGM4ODA2MDhjYTBmYjdmN2M0YjViOTQifQ"
+          "resource": "repo://scripts/validate_targets.py#L11654-L11697",
+          "version": "repo-lines-v1:sha256:c483144e33102b5105755d7fa5da4e08490742d33629c53fccc42bfab0f257da:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
         }
       ]
     },
@@ -127,8 +127,8 @@
       "statement": "Policies are authored once with target-neutral applicability frontmatter and discovered natively per host: Claude Code loads conditional policies as path-scoped rules under .claude/rules/, Codex gets a nested AGENTS.md only for a policy owning a stable directory (otherwise a skill), and Copilot adapters derive applyTo from the same patterns with scope parity validated against Claude's paths.",
       "evidence": [
         {
-          "resource": "repo://docs/architecture.md#L27-L60",
-          "version": "repo-lines-v1:sha256:5826467b2931ed99f55dd80ceab51e01ec64b39582d87366341c3b58045db253:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzZGI0MzJlZGZjOTJkMzRkMTUwMzFiYWYxY2ZiMDlhNmJjZGFhMjc3MTVhYzcwYjIxNTg0NzM0ZGM2YjhlOTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMGI2NDNlMGQwNWM4NTI2NTYwYTAxODg1ZDlhYmJmOGNhNTJkMTkzOWQyYTJiZWJlMDg1MjQwZmRkOWY2OTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3NGVkNTU0MDMzNTEzZDBiOTczODkzZjQ1MjcyZWI1MTc0MjgxMzdmN2JkNTU2NGY3YmNjZjZmNWEzOGM2ZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlNGIzYzdkYjUyNjZmODc5NjgzZGEyOGRmYjZkZmNlZWU2NjA1OWQ1YTZlNDExM2U3OTc1MWRlMTc2OWFhN2QifQ"
+          "resource": "repo://docs/architecture.md#L32-L48",
+          "version": "repo-lines-v1:sha256:200b3695aa6d0efa96e60f05309d4327840dad5e4493486066d3f881388dc555:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkMTJmOTYxYTI5ZDhjZTJmNjZiY2UzOTFlZWU4NWMyZGRjNzIyN2U3ZWEyMGMzNmQ1MzkyZWYwZWQ2MTNkODEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyNzA2MjYxMTZmODA1ZTY2MDk1MWRlN2ViMzFiNjI4NDAwOTJlZWEwODg1ZWY1NGY5NzEzZDQwOTY1MjNlMTIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlNTdkYzk5NDc2OWE3MjIxMTY4YjcxYzkzZTA4MjIwMWMyNTBlZjg1ZDllMjYyNTFiMzhjNWE4MjE3M2FhZmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdmNTgxODJiM2YzYWRhZjlmNjU1M2MwOWMwMWFkMjgyODM3YjcyMTY3Y2VjMDU3NjFhOTQxNWEyMTBkYTQxNzIifQ"
         }
       ]
     },
@@ -137,14 +137,46 @@
       "statement": "This repository self-installs its generated output with scripts/install_bootstrap.py --allow-self to exercise the lifecycle end to end, keeping tracked authoring adapters byte-stable; a normal consumer only receives the generated copy and never shared/.",
       "evidence": [
         {
-          "resource": "repo://README.md#L160-L182",
-          "version": "repo-lines-v1:sha256:ed27f7586bd825dc39fc311b56d793a8b2a4d641910117ee53f2e48763628757:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNDBkYzYyOTNjMGMyM2JjNjM4MDljZmZjNDAwMzFlZDIyNTIwZWE2MWEyZjNiZmJiMzRjMzNlZDBlODgzZGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZGU4NDdkN2FmZGYzOGQ2YmM3ZWNkYjdmZDA1Y2IyNzQ4MTMzNTEyODM0NjI4YTQ2Zjc0NjUzODI0NTExOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3YzA0NWUzNDgyNjk5YjJlMzZhMzgyZTQ4YjY2YzljMzViNTkwMTFiMmRhOWU4NGIzYzBjMDRlMDYzMGZkODgifQ"
+          "resource": "repo://README.md#L177-L197",
+          "version": "repo-lines-v1:sha256:29ea18bcaf2950d10211d2641866f6070bae03d039f53e07a1162f09847fbdc5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0Y2Y0NjIyYzExNzMyOTVlOWNkYzY5YzEwYWRlYjNiMmI1ZGUwMjViM2NhZjBlY2ZmYTliOTFmNzlhNDk5MDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU2OWQ4MzA2NzhiZDRlMGU2ODVmNjVlMjBhNGE4MWFhOTVjYmYyMjk0ODgzNGYxM2QxOTc4MmJmZmI2ZmEyNDciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRhZGU4NDdkN2FmZGYzOGQ2YmM3ZWNkYjdmZDA1Y2IyNzQ4MTMzNTEyODM0NjI4YTQ2Zjc0NjUzODI0NTExOTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM1NmZiNzkzNzA0YWJlZGIwYjMxODJiNjAwMDUwOTFiMjg4NWYxZDBkMTE0MjI3YzJmMzY0ZmJlOTRkMzM3MjIifQ"
+        },
+        {
+          "resource": "repo://scripts/check_runtime.py#L61-L61",
+          "version": "repo-lines-v1:sha256:dbfc90473d40b797aa9e51f94540e5212f2c3f31994711bb9bfca98b1a5d1477:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGJmYzkwNDczZDQwYjc5N2FhOWU1MWY5NDU0MGU1MjEyZjJjM2YzMTk5NDcxMWJiOWJmY2E5OGIxYTVkMTQ3NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGJmYzkwNDczZDQwYjc5N2FhOWU1MWY5NDU0MGU1MjEyZjJjM2YzMTk5NDcxMWJiOWJmY2E5OGIxYTVkMTQ3NyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZWZmM2YwZDhhYmQ3MTU4NzRmM2E2OWRkNjE1NGQ1MTdjOTBlOWM5ZWRmMTVkZmM1NDYyNmZmMTMzZDYyYzczOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDQ4ZTQ5MjAwZGNiMDdiMjI2N2JhNWIwMzJkYTJiMTc5ZDg5YmNkMGU5Y2I0NDljZTdjYjEzMjhmZDYzZWJjNCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_f66af294cc7d4709be0684bc6d9ca6d2",
+      "statement": "render_sidecar copies each SIDECAR_SKILLS skill into both sidecar write roots (.claude/skills and .agents/skills), rewrites each SKILL.md through SIDECAR_TEXT_REPLACEMENTS, copies the vendored Ponytail LICENSE into ponytail and ponytail-review, and renders each SIDECAR_BRIDGES file from shared/sidecar/bridge.md with only that client's frontmatter.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/generate_targets.py#L159-L182",
+          "version": "repo-lines-v1:sha256:d0228d869e31f5a94d93c3ac066702f24e2b32898f81add716e6cfc9b1163399:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1MTMyZjdkYzAzZTU1ZTIxMjE2MThlYzJhMTk5ZDc3Yzk2NjJhMGVlYjZhODRlNmRmZTBlZmY0NjhjZDgxMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyMGZjNDRkMzIyZjlmY2MxMGQyYWI0YjVlZWU0ZTcyZTI1NTc3ZDZkNGEyZTA3ZTU5MjZjODc1YzRkZTRmMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNjOGVlZWE0NzFiM2I0ZTRhOWUzNGFhYjBiOGNiM2FiMjBiNDgzNjM4NWVhYmI4M2M0MjFmYjMzMDBjMDhkOWQifQ"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1771-L1799",
+          "version": "repo-lines-v1:sha256:0cbfe32ad7650e06970efaa4925f2b064c9c8a92ae1dddb1eade5d395ee2547c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2NzQwMzM4ODk2Y2UzNzVmZDY3MzZiZjFkZDdmMDZiODg5MGYxNWExNGNhMTNmMjcwNjNmY2NkZjNhYmI4ZjQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2ZTNiZTc2ZWVlZmQwNjcxNDgxNWI0ODRkMzQwZjBhYzUwYzE1NmU2ZjFmOGJjNTM2ZjYxOTA4YjIwODVmODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRmMjYxYmIyZWEzYjAzZDNlMWZkMTA5OGUyOGRkZjcwMGE5ZjgzNzRkZDdlZGNjYzRjMjBmNTcyNmE2NWI0MGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmZWMzYzViOTBjZWRhNzc2ZGJlOTJiZDJhODczYzY4MjhlYjU3OTkzZjA0OGY4ZDY2NjhlY2M3ZWI0NzY4NmIifQ"
+        },
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L93-L107",
+          "version": "repo-lines-v1:sha256:22ef5fecebb4724cbee583fb14db9db21a160199871ab754234cd53c5d0b92db:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzYmNjYjUxYWU2YWE1NGVkNWQ2NzYwYTNmYTU5OTBjM2QwY2IzZDVlYjU5NGVmZDAzZGJjYTA2MGJmMjY4NjEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b832f30a18ae4be09dada4285ca8f8ae",
+      "statement": "The sidecar validator rejects any dist/sidecar/ file outside the allowlisted skill, LICENSE, and bridge paths, any bootstrap-only path or MCP tool reference, any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, and a bridge without its client's frontmatter; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L8612-L8736",
+          "version": "repo-lines-v1:sha256:32375825cda89c38f664faa8484a4e7682013142119f42fe1c6bb86399e1a0f2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTI1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIxNzZlMGUxMGI5NTgxMWE1N2Y3M2QwOGM0ZjBiZmQ1OWQ4NGUwY2NkNzE4ZmI5ZTBlMzQxM2VlMzA5Yzc0ZGM2IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhOThiMDYzZDliNDdlNjUzNzk2MjU1NzJjY2UxOTc2NjlkNTc2N2UxMmMxOGJlMDc1NjUyYjhjZDk4MWNlOGQ1IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJjODBkZjk2MGJjYjAyMjE1YmZkMzY0YzRjYWRmNjM1MDg1YTNiZTVkNDhjMWQ4ZTIxMWNlMTY0N2U3N2JkNzFhIn0"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T05:37:12.382Z"
+    "at": "2026-09-25T07:11:38.676Z"
   }
 }

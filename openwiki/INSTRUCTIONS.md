@@ -14,13 +14,18 @@ Four places hold different parts of the system. Keep them distinct:
 - **Authoring source** (`shared/`) is what a maintainer edits: policies,
   agent prompts, skills, hooks, MCP config, templates, and scripts. Every
   real behavior change originates here.
-- **Generated build output** (`dist/multi-agent/`), produced by
-  `scripts/generate_targets.py`, is a rendered, installable copy of
-  `shared/` for one target family. It is never hand-edited, and it is
-  gitignored in this repository.
+- **Generated build output**, produced by `scripts/generate_targets.py`,
+  has two targets: `dist/multi-agent/`, the rendered, installable copy of
+  `shared/` for a full install, and `dist/sidecar/`, a small personal
+  overlay (four skills and two instruction bridges). It is never
+  hand-edited, and it is gitignored in this repository.
 - **A consumer's outer repository** is any project that installs the
-  generated bootstrap. It gets root entrypoint files (`AGENTS.md`,
-  `CLAUDE.md`, `.mcp.json`, `.codex/**`) and a `.claude/` directory.
+  generated bootstrap, in one of two modes. A full install owns the agent
+  harness: it writes root entrypoint files (`AGENTS.md`, `CLAUDE.md`,
+  `.mcp.json`, `.codex/**`) and a `.claude/` directory. A sidecar install
+  (`--mode sidecar`) adds only Git-ignored skill and bridge files inside a
+  team-owned repository, keeps its manifest in the Git directory, and never
+  changes a tracked file.
 - **The nested `.claude` ai-state repository** is its own separate Git
   repository living inside `.claude/`, on a branch named `ai-state`. It
   tracks both the installed bootstrap files and mutable AI state
@@ -59,6 +64,11 @@ Cover, at minimum:
 - how `scripts/install_bootstrap.py` and `scripts/check_runtime.py`
   establish and check consumer ownership (which files are
   bootstrap-controlled versus consumer-owned);
+- the two install modes: mode detection and its refusals in
+  `scripts/install_bootstrap.py`, the sidecar planner and apply step in
+  `scripts/sidecar_overlay.py` (manifest, `info/exclude` block, ignore
+  gate, atomic moves), and batch updates in `scripts/update_consumers.py`,
+  which finish every target and report failures at the end;
 - the Git-backed AI-state sync described above
   (`shared/hooks/scripts/state-sync.sh`);
 - the Context Mode dispatcher's security model: cache quarantine by the

@@ -3,9 +3,6 @@ type: operations
 title: Git-backed AI-state sync
 description: How the nested .claude repository on the ai-state branch stores installed bootstrap files and mutable AI state, what each state-sync.sh command does, why every path warns and never fails, how root adapters are restored from the bootstrap-root mirror, and where sync runs.
 tags: [state-sync, ai-state, nested-repository, git, hooks, durability, restore]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T05:37:12.382Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -19,14 +16,19 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
+generated: { by: "claude-code", at: "2026-09-25T07:11:38.676Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-09-25T07:11:38.676Z
 ---
 
 # Git-backed AI-state sync
 
 Source, tests, and the policies under `shared/policies/` outrank this page.
 
-In every consumer, `.claude/` is a plain, self-contained Git repository with its own `.git/` directory on one branch named `ai-state`. It tracks the installed bootstrap files and the mutable AI state: `MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, and `quality_reports/**`. The outer repository ignores `.claude/` entirely, so `git branch` and `git log` at the root never show `ai-state`. Inspect it with `git -C .claude <command>`.
+In every full-install consumer, `.claude/` is a plain, self-contained Git repository with its own `.git/` directory on one branch named `ai-state`. It tracks the installed bootstrap files and the mutable AI state: `MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, and `quality_reports/**`. The outer repository ignores `.claude/` entirely, so `git branch` and `git log` at the root never show `ai-state`. Inspect it with `git -C .claude <command>`.
+
+A sidecar install (`--mode sidecar`) has none of this. The installer hands a sidecar target to `install_sidecar` before any full-install step, so no nested repository, `ai-state` branch, or state sync is created; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
 
 ## Two kinds of commit
 
@@ -108,3 +110,4 @@ The dispatcher wraps every command in a warn-and-continue and always exits 0. Wa
 - [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md)
 - [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md)
 - [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md)
+- [Sidecar overlay](/openwiki/operations/sidecar-overlay.md)

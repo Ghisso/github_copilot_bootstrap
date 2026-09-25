@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:a4ddba601c309f5f6b5bb5556a6c7719f72af1879182eac6858c18af9d74a285",
+  "pageVersion": "sha256:f9ab316f721b1bf509043ab8bae639e361c5ca1e64837c74d0a3d96ed9c33e26",
   "claims": [
     {
       "id": "claim_b1af9741cfc242439d4d2f5655e2f681",
@@ -41,22 +41,26 @@
       "statement": "The installer's --commit-copilot-surface mode decides whether the Copilot surface is committed to the outer repository or kept as a local mirrored overlay; the mode is persisted in .claude/bootstrap-ownership.env and reused on later refreshes unless overridden.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1136-L1152",
-          "version": "repo-lines-v1:sha256:2d7c2e56725268710af2fa790674b7a423feb6015ee77f4dcb9fb2cced73025c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlMDIzNGY5YTYxYWRjMzdmNTU5NjA4MWYyNGQzYTBkY2Q1NzYzYTM5NjEwMDAyOTZmMGZhYTQ2NTFmMmQ1NjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmNGRmYzc5Mzg3Y2M3YzAxZjU0NGIwMjcxNjgwYzMxNGNkYTE1N2E0MWEyMGYxNjVhZGQwMGI2ZDllODEwYjUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1315-L1330",
+          "version": "repo-lines-v1:sha256:9a212382fb92e9333280fa8605f9d39d097fbb99e495342ecd90328e19023654:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmODljODJlZDZjMDBlMGViNWVkNTBlNTNjNzMxYWJmNTJmMTM5YWY5NDk3ZjIxNjAyNTRmZTUwZDQyMzZjOWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1ODViYWJmM2FjYjMxYzRiMGQ5Y2ZjYjc5ZGIyYjUzYmYyMWI3M2I4ZjkwZjEwZjdkMzkzMmIwY2FkNzQ5OTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg2YmQzZWM2ZjkxZjcyZTE2N2Y4NTFjOTI5YmRhYTMxYTEyYTkyZmRkZDdjZDhiNzcwZTU4NDZlZGMwZTllOTcifQ"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L87-L125",
-          "version": "repo-lines-v1:sha256:41ead2da5289aebf3c090d6d298080bbb90d1faf46369d5fd1c9a736a0f6875c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NmU4N2JiMjBhOTNmYTEyMjVkNjBiMGZkMGYyMzMwZTgyNjkzYTljYTMzMDBjYjQwN2ExNjQyMTA5MWQwMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNlZmRlYWJjYTMzYTdmY2EyMWRjZjcyNjQyZDc2NTk3YzkwZDgxYmRkMWI5ODliZjQwNjI2NjhkMzQxYWFiNjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQwOTY3NWMyMGFkZjE2MWY1NWYyMTg0NmZhMzQ4YWZmZTNmZTUyYmU2NDIyMTRhNjBlNTUyMDFhMjkyMmZlNmQifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L638-L650",
+          "version": "repo-lines-v1:sha256:87201ff943941d9c3e865dcb132d509b0507e6dc906c21c7bc30a99cd880b9c3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ZDY4NjFiZDVmNGFmZGUzZmMwNmUyMWRhMGQzN2Y0NTViNWFiZDJlMDI5NjU0NzU0MjQ1Y2Q3YmNmMzY5MDkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlMGM0NThjNWUzYzU0YTI0ODI5YTRiNzc5MWJiNDYyYjBjNjEyYzYwOWRhOGFkNjc1M2RjMGQwMmVmYjc4ZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlNjc5YzQzMTMzMTQ2NTgzNzU2MjEyODgyNGJmYTk1MGQzY2FlY2IyMDU0YzJmNjEyNWI3YjM5NzBmYjczZTYifQ"
+        },
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L114-L152",
+          "version": "repo-lines-v1:sha256:41ead2da5289aebf3c090d6d298080bbb90d1faf46369d5fd1c9a736a0f6875c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NmU4N2JiMjBhOTNmYTEyMjVkNjBiMGZkMGYyMzMwZTgyNjkzYTljYTMzMDBjYjQwN2ExNjQyMTA5MWQwMzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQ5OTY1ZjBiY2Q1NDJjM2EyYzA2YzliOGFmZjdkOGEyODEyZTk5YjQ5NjExYWRjYTFhMDQ3MTIzYmU5YmE2NmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQwOTY3NWMyMGFkZjE2MWY1NWYyMTg0NmZhMzQ4YWZmZTNmZTUyYmU2NDIyMTRhNjBlNTUyMDFhMjkyMmZlNmQifQ"
         }
       ]
     },
     {
       "id": "claim_2640e40d15e04a8ab30ad2acd5ae0eb9",
-      "statement": "install_bootstrap.py's main runs a fixed sequence: validate roots, validate the .agents takeover, resolve the Copilot mode, migrate pre-Git state, copy the generated tree, substitute project name and Python version, populate .claude/bootstrap-root, update the devcontainer state remote, merge the .gitignore block, chmod runtime scripts, configure core.hooksPath, warn about tracked ignored paths, sync nested state, and report the Codex hook-trust reminder.",
+      "statement": "In full mode, after mode detection and source selection, install_bootstrap.py's main runs a fixed sequence: validate roots, validate the .agents takeover, resolve the Copilot mode, migrate pre-Git state, copy the generated tree, substitute project name and Python version, populate .claude/bootstrap-root, update the devcontainer state remote, merge the .gitignore block, chmod runtime scripts, configure core.hooksPath, warn about tracked ignored paths, sync nested state, and report the Codex hook-trust reminder.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1136-L1205",
-          "version": "repo-lines-v1:sha256:92f357cb7e80e16caff1abf2852331eaf93fc680d947d036389d2da22a66a03a:eyJzZWxlY3RlZExpbmVDb3VudCI6NzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1300-L1380",
+          "version": "repo-lines-v1:sha256:06ea2d69dab4ccbf21102d5c803c7158c51a22e838034d06185ed4854d03c92e:eyJzZWxlY3RlZExpbmVDb3VudCI6ODEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkYjQ5OGYyY2VmMzJjMDc0MjcxMGVlYjk4YmNjOGE3YmUwNjRkYjRiN2UxYTg0Y2U2ZjkwMmRhMWNlMTdiNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
         }
       ]
     },
@@ -123,22 +127,22 @@
       "statement": "sync_state_after_install runs state-sync.sh to create the distinct 'bootstrap: install/update <timestamp>' nested commit, and migrate_pre_existing_state first commits a pre-Git .claude with real content as 'migrate: import pre-git state'.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1136-L1200",
-          "version": "repo-lines-v1:sha256:03c98d08c3d94b3f4f2b75194ac2ffbb995e836703dc795e5469c7e2e390368e:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ODk3YzM4YTAwZGQyNWZkZjYzYzRjZDgxMDU4MTRhZDYzNDU2Y2FkMjMzYzUzMmM4YjQ5ODM3OWVlZjMzY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFmOTM3MjkyNjFhYjE1NzQ1NGYxYmEzYWQzNjNmMDhiNTBlODhkN2I2ZmY1NDg0OWYyOTk2NzFkZDdkNDkxYmUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1083-L1125",
+          "version": "repo-lines-v1:sha256:8136658ae824e4757a522d84a2f8852149a832f406fe3ac491c700729508254e:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2ZjBiNWUwNzA3YzNkODIzOTFlOWNhYTc5YmRlOTliZjg3ZGI5ZTk1MjliOGNiNThiMjhmZTU4NmFjZWViZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY2YjFiZjEyNzg0MTk2YzIwMDM5MDA2NGYwNTQ1ZDgyZTM0OWE1ZDcyNzVmZWIxZmIxMDMzMTAxMDMzYTY1OGMifQ"
         },
         {
-          "resource": "repo://scripts/update_consumers.py#L1-L25",
-          "version": "repo-lines-v1:sha256:302a1571fd096f45a4d9815bbd3e169e298e1113c2a7bc01fdeae31d8d96e31f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM1NDM0ZGRiMmM3NzNkNDczYWY5Yzk5MDBlYTI1ZWQxZTFiOTEyMzNjYTI5OTg5NTRiOGFmN2RiY2QxZmY0NjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM3ZDU0N2QyNWQzZjQ3OTJlMjk5N2M1NjAyNDg2YjAwMzc5ODcxYjA4NGRlOTY3ZjBiNjlhOTIzOTcwODIzZTEifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L971-L1045",
+          "version": "repo-lines-v1:sha256:7ec836b3c3f276a2afb063c7d82a6a80c0aba6c66c5b01ef1586ddf2dec8aa49:eyJzZWxlY3RlZExpbmVDb3VudCI6NzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMTBkYzNmMGJhMTFhMjBhMmRjNTc2NjBhZjNhYjg4ZWIwNDkzM2VlODlkYzExMzFhNTA2MjU3YWE3ODFlMTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZlZTI1YjY3ZjQ3MmZlNzc1MjUzZDg1MzRjMjRiNTM2OWU2NTE5NmVhZTUwYzZjOTE0MTQxYmRlZjNjMmMzN2IifQ"
         }
       ]
     },
     {
       "id": "claim_03532a56451548fc896200a658d16f96",
-      "statement": "update_consumers.py regenerates dist/ unless --skip-regen and runs install_bootstrap.py for each consumer, passing through --dry-run, --local-only, --allow-self, and the Copilot surface flags.",
+      "statement": "update_consumers.py regenerates dist/ unless --skip-regen (a generator failure stops the batch before any target), runs install_bootstrap.py without --mode for each consumer while passing through --dry-run, --local-only, --allow-self, and the Copilot surface flags, records a non-directory target or a non-zero installer exit and continues, then prints one 'FAILED: <path> (exit <code>)' line per failure and exits 1; its success banner prints only when every target succeeded.",
       "evidence": [
         {
-          "resource": "repo://scripts/update_consumers.py",
-          "version": "repo-file-v1:sha256:930bdbaedc9d56920933d79393e0a90a0d562d0dcb5036e91b2875a34cf8c8b7"
+          "resource": "repo://scripts/update_consumers.py#L56-L157",
+          "version": "repo-lines-v1:sha256:8de866af1e6d6117a919080c732dcf29e373ea4576b0bd090d5d100ce5d5e6f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI1MjMwZTA1YTFkY2VhMGQ5MjJjODExYTQ4YWU4OWEzNjJkMGYxMWE3ZjNlNmYwZmIzMTllMzI4ZGZjNDY1YjlkIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4MDJmMWJjNTk0NDI4M2E3MTE4NjhlYjYzYTk5N2I1Y2YzOTIzZGFkNmJhM2ZjZDUyYzkzOTUwZDJmMDY4ODkzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIzZDQxMzQwY2MyMzlhMTU5Y2U5YjYwMjJlOWY2MzIyODMyZTJlYWQ3NmNhZTllNDc1NGQyMTBlYjhmYjZkNWU4In0"
         }
       ]
     },
@@ -183,10 +187,52 @@
           "version": "repo-lines-v1:sha256:26efff0f718ce0364d7971a4309ea0b5622fbf1f63b5d3a2d50532a95627f6c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjMTA5NGJmOWYwNGY0NDkwZGY1NjA3NWQ1MTRiYWM0MWQ0MTAwNmVkMWUxNzg5MDFlYWQzNGE5MDBkOWNkNzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ2M2Q2Yzk0ZmE4OGEwNzA1MDBmNjgxYjRhM2ZhOTc0OWJhMDdiNzNmOTk4ZjJlNjRiZjFkMmU1Yzk3NGNjMjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYzNzhmMTgwOGQ5NTU3ZWY2YWNlNWRjZjZlNTZkZTA2NDYzMjYwZTMzNjM0MTcwNGYzM2U5MjM5YzBmMTAwYTIifQ"
         }
       ]
+    },
+    {
+      "id": "claim_e234f8062ebc4f059667f510156ef81e",
+      "statement": "detect_install_mode reads only the target: --mode sidecar refuses full evidence or a linked worktree, --mode full refuses sidecar evidence, and without --mode it refuses both evidence kinds, selects sidecar or full from a single kind, refuses an unbootstrapped target that tracks a FULL_INSTALL_ROOT_PATHS path, and otherwise defaults to a full install.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1161-L1278",
+          "version": "repo-lines-v1:sha256:b2debd0955387181e797ede0e6919ee257e3f8781cf0d99545a70660649524b1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE4LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIyZTZiNTFhMWM4YjYyODFhNjgxMjQyZGE3NGUzMDVhNmY3NzhiZDlkZmRhYjY5YjlhNWJlNTJlNTg5ZGE1ZjFmIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJmNmYwODJkNWM4MjM3Mzk3MzhjZDA5ZGUyYmRlMjgxYzU1NWRjYjY5N2JmZDQyMGFmZTdmMTgxOGYzNjg5MzY5IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhNmE4MmFlNjlmY2RjMWI0MTMzYzE0YTU5MDczYjU5MTI5YmEwZDAwMzMzYjVjYzVjZjE4MTBhMTMxMDFmM2Q4IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJiOGY3MjZjZGRlZTM5OGE2NTY1NmVkMTZkMTUwODAyYzYwMGRiZjQ5OTkxYTZkMGQ0YzkzZmYzZTQwYzkyM2ZiIn0"
+        },
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L86-L89",
+          "version": "repo-lines-v1:sha256:ec90ec56833ab4ac349b02b589a03f1df03b016b05de6087b1da55c4adb3d547:eyJzZWxlY3RlZExpbmVDb3VudCI6NCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmIwMTNhZjkyNTg0MmQwZjdkYWMwNGY4NmVjMGQ5ODRkMTA1MmQyODMyMzA5ZDcxNjNlY2I5YzBmNTA0ZWUwYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDZhZGJjN2U1NzhhNTc2OTExNTdjODQ0NzAyYjMwYTZkNGFmMzJmNjlmNzdiYWNlYTljN2RjYzk1MzgyN2FmNyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMzE3ZGYyYjUyMjQzNmNlMWI5ZmNlMDA0NjcyZTBhNTM0ZTk2NWMzYjdiZDFkOTMyYmFkOGQ0ODUxMGMyNzI1NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDY5ZjdhMDI0ODM2ZjZlOTVmZTYzN2ExYjE3YjI4NmZiOGJiNjFmODk2M2Y5YzM1MDE3ODE0MTFmMGM2N2NmOSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_931a097522584a8c8f9e6e12bc8c7e9e",
+      "statement": "When the tracked team configuration includes .devcontainer/state-sync.sh, the plain-install refusal says the target looks like a fresh clone of a full consumer and tells the user to run bash .devcontainer/state-sync.sh setup first or pass --mode full.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1261-L1276",
+          "version": "repo-lines-v1:sha256:3c170f17a996e36a8529f5312c8ceebda0550ea0d56e2953f4afcaf270d9c48c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjNzY0NzQ0MDcyMzgwNmI2ZjBmMGQ5ODUzMDMzYjZjNWQzNWUxMDA5OGEyMjE1ZDE3YmViNWEwYjA4MDBjOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxYTViYTM5ZjI5M2Q4ZjdmZjFiYTcxYTkxODY2NzAyMWU1MGI1NmFiODljYmI2MzhiMGNiZTY0OTliNmM4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyMGQ3MTc3YjcyNzY0ZTU0N2QwZTNkYmNmMWFmODg2YzdmZDE4ZTM1OGExYjYyOWI0OTUwODk4NDE2MTUyNTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEyNmIyMGJlNzg2MmRhMjEzMzE3OTg2OGYwMDAwZjc0MzdhMzliYWYwOTBhMTVkM2Y5Njk3ZWNlZTE0YTlkZjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_fa2bd80b2aaf4091addd182cb3272a40",
+      "statement": "main picks --source when given, otherwise dist/multi-agent for full mode or dist/sidecar for sidecar mode; a sidecar target then gets validate_install_roots with allow_self=False, one warning naming ignored full-only options, and install_sidecar, and no full-install step runs for it.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1281-L1297",
+          "version": "repo-lines-v1:sha256:f07de3280b17c7502820e1e0ccdfbe086f5eec354b95e08bf69a3e1a25cf4150:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQwODBmOGZiNzRiMTNlYzgyYzczOGQwNGM2NDgyNzM2OTc3ZWQ1MjJhYWZlYTg3Nzc5NjNjNWQ1MmM1OTBmZGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU1NzUwYTgxMzVlODY1OGJmYjFhZGEzMjkzNjExNWVhZGMyZjgxZTUwOTVkOTM0NGI4Y2Q2N2ZjMmM3MzAzMWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlYjYxYTYzNWVlOGY4MDc3ZThhODk3NWQ1NmZlMDU3NWMwZWIyOTdiNGE1ZWFmMTZlZDhiMzcwMGI0YTZlMjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0OGQ3NDgzZDA2MGYxNzIyZTI0NTM2ODg4MzM0MjU2YjU0OTBlOGJiZTg2OTgyMDY3NmNhOWVhZjM1MDljYzkifQ"
+        },
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1300-L1313",
+          "version": "repo-lines-v1:sha256:c45d8f031335ddaf0ad34b0943355acdd5b16154f7c44788eacc5c1b6f87066c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxOWRmYzg5MTBmZjBiNDIzMWNiMWM5OGQ1ZjNmMzVmOTVlOWY0YjQ3MGRkOGU4MzA2ZGZmZTMyMjIzZDBlMmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkYjQ5OGYyY2VmMzJjMDc0MjcxMGVlYjk4YmNjOGE3YmUwNjRkYjRiN2UxYTg0Y2U2ZjkwMmRhMWNlMTdiNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0YmUyZWExMTA1NWY4ZGQ3MzQ1M2I0ZGMwMTMyOTNkMGQyNmY0NmQ4ZmRlZWNkZjM0NmYwN2E3Yzg2N2I1ZmMifQ"
+        },
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L44-L45",
+          "version": "repo-lines-v1:sha256:b2193c6e44e2093eb2c1fdeb890bcbeaee4474bb893ca0b99d78bb25fcde6454:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY3ZDRjODRiODkzZTZiZmQ3OTA1ZjQ5MmY0YTdkMDc5ZDgwNmI5ZTliNDgyM2E0OGFhNTE5ODA4ODVjOTNkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTI5Y2IwOTYzOTFiMmFiMjQxMmNkNzkxOTk3NjEwM2Q1Zjk5MTVmYzk3MmUxZDgwYWExNzNhYzQwMWY2N2I5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmYwZWM2ZWY0NTg5ODZhYjg5NzVmMzdkYTdhMjgyNDgyOWFmNThlNjM4ZDgzYzlmYzY4YjAzMGM0NTA3OTM2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWQ4NTViMTliMmYwNTcwNmQ5ZmQyOTE1M2U0OGM3NGUxZjQzODlkOTZhYTE1MjU5MDkwODg0ZTkyNGM2Y2IxZiJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T06:07:33.954Z"
+    "at": "2026-09-25T07:35:33.028Z"
   }
 }
