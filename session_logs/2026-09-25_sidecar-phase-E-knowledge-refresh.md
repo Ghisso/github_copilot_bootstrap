@@ -51,11 +51,40 @@ at the first failure.
 
 ## Stale-claims surfaces checked
 
-Pending.
+Audit by `documenter` (steps 3-5), plus the orchestrator's own items from
+steps 1-2:
+
+- openwiki/INSTRUCTIONS.md (human-authored brief): corrected by the orchestrator before the refresh; it named `dist/multi-agent/` as the only generated output and described every consumer as receiving the full harness.
+- openwiki/ generated pages: refreshed through OpenWiki's MCP tools (5 pages: new sidecar-overlay page; install-ownership, source-generated-consumer-layout, git-backed-ai-state-sync, and quickstart updated); no page hand-edited outside its page job.
+- README.md: no stale claim found (Phase D already documents `--mode {full,sidecar}`, mode detection, batch-finishes-every-target, and client support).
+- docs/architecture.md: no stale claim found (already describes `dist/sidecar/`, sidecar skill projection, ownership boundaries).
+- docs/target-mapping.md: no stale claim found (already has the Sidecar Overlay projection table).
+- docs/runtime-checks.md: no stale claim found; it describes only the full-install and dogfood runtime, which sidecar mode never touches, and claims no universality.
+- docs/smoke-tests.md: no stale claim found; full-target generation and portability checks only.
+- shared/policies/: no stale claim found (no install, update, or consumer-mode references).
+- shared/skills/safe-consumer-bootstrap-refresh/SKILL.md: no stale claim found; generic warn-never-fail sync safety.
+- shared/skills/setup-project/SKILL.md: no stale claim found; its `install_bootstrap.py` reference documents the default full path for a new project.
+- scripts/install_bootstrap.py docstring and `--help`: no stale claim found; both modes and auto-detection documented.
+- scripts/update_consumers.py docstring and `--help`: no stale claim found; mixed batches and finish-every-target documented.
+- .claude/instructions/project-context.instructions.md: corrected; the Layout section called `dist/multi-agent/` the single generated target and described the installer and updater without modes.
+- .claude/MEMORY.md: no stale claim found; the sidecar-phase lessons are present and nothing is superseded.
+- CLAUDE.md: no stale claim found.
+- AGENTS.md: corrected line 7, which named only `dist/multi-agent/` as generated output; it now also names `dist/sidecar/`. The standard self-refresh (`generate_targets.py --all`, then `install_bootstrap.py . --allow-self --local-only`) resynced `.claude/bootstrap-root/` afterwards.
+- docs/plan-deterministic-commit-gate.md: no stale claim found; its installer references are scoped to the commit-gate design.
+- docs/native-client-acceptance.md: no stale claim found.
+- shared/agents/documenter/prompt.md: no stale claim found (its "sidecar" is OpenWiki's `.claims` sidecar file).
+- State READMEs (`shared/*README*`, `.claude/*/README.md`): no stale claim found.
+- Dated records (`docs/2026-*`, `plans/architecture-review-2026-07.md`, closed session logs, completed plans): left unchanged by rule.
 
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:workflow] Only the main session has the `openwiki` MCP tools; the
+  `documenter` agent's tool list has none. A knowledge-refresh phase's
+  refresh step is therefore run by the orchestrator itself; delegate only
+  the stale-claims audit.
+- [LEARN:documentation] `.openwikiignore` excludes `CLAUDE.md`, so
+  `openwiki_submit_page` rejects a claim that cites it. Cite `README.md`
+  or the code for command and guidance facts instead.
 
 ## Verification
 

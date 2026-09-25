@@ -1252,3 +1252,10 @@
   when the plan fixes the behavior exactly; tell the documenter to describe
   the coder's behavior without quoting output strings that do not exist
   yet, and to take exact strings only from committed code.
+- [LEARN:workflow] Only the main session has the `openwiki` MCP tools; the
+  `documenter` agent has none. In a knowledge-refresh phase the
+  orchestrator runs the refresh itself and delegates only the stale-claims
+  audit.
+- [LEARN:documentation] `.openwikiignore` excludes `CLAUDE.md`, so
+  `openwiki_submit_page` rejects a claim citing it; cite `README.md` or the
+  code for command and guidance facts.
