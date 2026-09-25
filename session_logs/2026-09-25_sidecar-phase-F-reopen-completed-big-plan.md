@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-25_phase-F-reopen-completed-big-plan.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -88,6 +88,24 @@ workflow instructions (big plan, Decision 21).
   hand. Added to MEMORY.
 
 ## Verification
+
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS        1.5s  uv run pytest tests/test_validate_plan_frontmatter.py tests/test_check_runtime.py -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS       51.9s  uv run python scripts/validate_targets.py
+PASS        1.1s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`: PASS (ruff, mypy, full pytest,
+freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-25_phase-F-reopen-completed-big-plan.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`). The two fixed MINOR findings are recorded in the
+Work Log.
 
 Optional items:
 
