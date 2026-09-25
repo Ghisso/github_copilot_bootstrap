@@ -51,7 +51,33 @@ over by a plain full install.
   `--allow-self` (full evidence), and `update_consumers.py` targets
   consumers with `.claude/.git`. Phase D must document that a fresh clone
   of a full consumer needs `bash .devcontainer/state-sync.sh setup` (or
-  `--mode full`) before a plain install.
+  `--mode full`) before a plain install. Note added to Phase D step 4.
+- `validate_targets.py` after the fixture fix: PASS, no `FAIL` lines.
+- C2 result: `install_sidecar` apply step (preflight -> gather ->
+  `plan_sidecar_reconciliation` unchanged -> apply or dry-run), gate
+  function `run_ignore_gate(target, must_be_ignored, candidate_exclude_text,
+  *, dry_run)`, fault points `after_exclude_write`, `mid_unit_swap`,
+  `before_manifest_write`; 36 tests in `tests/test_sidecar_install.py`, 3
+  of them through the CLI. No planner change. C2 fixed one defect of its
+  own before hand-over: `git rev-parse --git-path info/exclude` resolves a
+  symlinked `info/exclude` to its target, so the symlink check now builds
+  the path from the verified `--git-dir`.
+- Optional check (orchestrator, 2026-09-25): `git clone` of the Phase A
+  fixture into the scratch folder (committed team files only, so none of
+  the old marker files or exclude block), then
+  `install_bootstrap.py <clone> --mode sidecar`: `installed 10`; `git
+  status --porcelain --untracked-files=all` empty before and after; no
+  `core.hooksPath`; the exclude block lists exactly the 10 units; manifest
+  in the Git directory; staging empty. A plain rerun with no `--mode`
+  detected sidecar mode, reported `unchanged 10`, and left the exclude file
+  and manifest byte-identical. Native checks in the clone: Claude Code
+  2.1.226 (`--tools ""`, zero tool uses) listed `debug-investigator`,
+  `humanize`, `ponytail`, `ponytail-review` in the init `skills` and quoted
+  the Claude bridge line; Codex 0.147.0 `debug prompt-input` listed the
+  four skills at `.agents/skills/<skill>/SKILL.md` and no `.claude/skills/`
+  path. This also closes Phase A's residual frontmatter risk for these two
+  clients: the real skills, with `visibility`, `license`, and
+  `argument-hint`, load.
 
 ## [LEARN] Entries
 
