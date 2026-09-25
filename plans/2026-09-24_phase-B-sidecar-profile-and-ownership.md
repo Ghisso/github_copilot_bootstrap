@@ -3,7 +3,7 @@ name: 2026-09-24_phase-B-sidecar-profile-and-ownership
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

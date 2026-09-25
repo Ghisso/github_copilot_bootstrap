@@ -11,7 +11,7 @@ phases:
   - 2026-09-24_phase-C-sidecar-install-and-provider-bridges
   - 2026-09-24_phase-D-sidecar-update-and-reconciliation
   - 2026-09-24_phase-E-sidecar-knowledge-refresh
-current_phase: 2026-09-24_phase-A-sidecar-provider-contract
+current_phase: 2026-09-24_phase-B-sidecar-profile-and-ownership
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
