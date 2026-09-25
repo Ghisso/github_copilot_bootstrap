@@ -98,9 +98,27 @@ No consumer repository and no installer CLI change in this phase.
 
 ## Verification
 
-Pending.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PENDING
+```
+
+Full `verify.py phase` on the final tree (before persisting): PASS (ruff 0,
+mypy 0, pytest 1807 passed, generated runtime matches source).
+
+- optional 1: PASS — `dev` exported with `git archive` and generated into the scratch folder; `diff -r` of its `dist/multi-agent/` against this branch's shows exactly one differing file, `.claude/scripts/runtime_ownership.py`, the approved data-only copy of the ownership module (see Work Log); every rendered file is identical.
+
+## Documentation
+
+Not applicable for this phase: it adds an internal generator target, a
+validator, and a pure planner, with no user-facing command until Phase C.
+Phase D owns the README and `docs/` changes for both modes. A search of
+`README.md`, `docs/`, and `shared/policies/` found no claim that
+`multi-agent` is the only generator target.
 
 ## Open Questions / Next Steps
 
-- Integrate both coders' results, run the Phase B verification block, then
-  review with `code`, `architecture`, `security`, `tests`, `ponytail`.
+- Next: Phase C (`2026-09-24_phase-C-sidecar-install-and-provider-bridges`):
+  `--mode`, mode detection, preflight, the ignore gate, and the apply step
+  that executes this planner's actions.

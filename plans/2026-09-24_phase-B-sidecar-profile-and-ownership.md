@@ -3,8 +3,8 @@ name: 2026-09-24_phase-B-sidecar-profile-and-ownership
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-B-profile-and-ownership.md
 ---
 
 # Small Plan: Phase B — Sidecar Profile and Ownership
@@ -36,7 +36,7 @@ Do not hand-edit `dist/`.
 
 ## Steps
 
-- [ ] **1. Add the sidecar constants.**
+- [x] **1. Add the sidecar constants.**
   - **Owner:** `coder`
   - In `scripts/runtime_ownership.py`, add `SIDECAR_SKILLS`, the write roots
     and the read roots frozen in Phase A, the bridge paths, the manifest file
@@ -48,7 +48,7 @@ Do not hand-edit `dist/`.
     keep a second list by hand.
   - Do not add a mode class. Phase C adds one mode-detection function.
 
-- [ ] **2. Add the `sidecar` generator target.**
+- [x] **2. Add the `sidecar` generator target.**
   - **Owner:** `coder`
   - Add `"sidecar"` to `TARGETS` and a `render_sidecar()` branch in
     `generate()`, so `--all` renders `dist/sidecar/`. `TARGETS` alone only
@@ -82,7 +82,7 @@ Do not hand-edit `dist/`.
     is not rendered, and no `trigger: always_on` branch is written.
   - `dist/multi-agent/` output must not change.
 
-- [ ] **3. Write the bridge body.**
+- [x] **3. Write the bridge body.**
   - **Owner:** `coder`
   - `shared/sidecar/bridge.md` contains exactly two rules:
     - Repository-provided tracked instructions and conventions are
@@ -92,7 +92,7 @@ Do not hand-edit `dist/`.
       repository guidance says otherwise, and use `ponytail-review` on
       non-trivial diffs.
 
-- [ ] **4. Validate the sidecar target.**
+- [x] **4. Validate the sidecar target.**
   - **Owner:** `coder`
   - `validate_targets.py` rejects, in `dist/sidecar/`:
     - any path outside the allowlisted skill folders, their `LICENSE` files,
@@ -116,7 +116,7 @@ Do not hand-edit `dist/`.
   - Add an adversarial case for each rejection, and prove each one fails
     when its rule is removed.
 
-- [ ] **5. Build the pure planner.**
+- [x] **5. Build the pure planner.**
   - **Owner:** `coder`
   - In `scripts/sidecar_overlay.py`, add functions for manifest parsing and
     schema validation, per-file and per-unit hashing, classification, and
@@ -142,7 +142,7 @@ Do not hand-edit `dist/`.
     record, and adoption only for a unit that the exclude block lists.
     Planner functions never write to disk.
 
-- [ ] **6. Add failing-first planner tests.**
+- [x] **6. Add failing-first planner tests.**
   - **Owner:** `coder`
   - In `tests/test_sidecar_overlay.py`, add one case per classification row,
     plus:
@@ -209,11 +209,11 @@ uv run python .claude/scripts/verify.py fast --format json
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
