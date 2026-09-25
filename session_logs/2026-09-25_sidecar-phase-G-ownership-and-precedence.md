@@ -70,6 +70,15 @@ L3, L4).
   and nothing is reported. The tests missed it because they injected
   `declared_skill_names` into the pure planner. Sent back to `coder` with
   three real-Git tests. No MINOR findings.
+- Fix: `_declared_skill_names` now returns every declaring path per name, and
+  `_extra_taking_paths` subtracts only the sidecar's own two unit paths. New
+  real-Git tests:
+  `test_frontmatter_collision_at_read_only_folder_takes_the_skill_and_removes_copies`,
+  `test_frontmatter_collision_at_write_root_different_name_takes_the_skill`
+  (both fail on the old collector), and the guard
+  `test_own_installed_copies_never_take_their_own_skill`. 178 sidecar tests
+  and 75 installer tests pass; ruff, mypy, `validate_targets.py`, and
+  `verify.py fast` pass. Re-verification and review round 2 started.
 
 ## [LEARN] Entries
 
