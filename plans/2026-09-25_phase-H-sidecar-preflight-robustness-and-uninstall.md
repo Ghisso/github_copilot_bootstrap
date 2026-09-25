@@ -357,7 +357,7 @@ real run and the dry run.
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_install_bootstrap.py -q --tb=short
+uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_install_bootstrap.py -q --tb=short
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json
