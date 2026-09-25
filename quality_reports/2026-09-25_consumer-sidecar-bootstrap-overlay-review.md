@@ -81,8 +81,56 @@ Correction: populate the field from reliable generated-source metadata, or remov
 
 The test suite was executed without replacing completed lifecycle receipts. Its existing tests do not cover these particular combinations. Native client sessions were not rerun; this review used the recorded provider evidence and exercised the filesystem and Git behavior directly. Antigravity remains unverified as documented.
 
+## Design assessment
+
+The core architecture fits the intended goal: personal skills inside a team repository, with the team's configuration taking priority. Keep the architecture and make targeted improvements. Explicit install modes, ownership records outside tracked files, one reconciliation path for installation and updates, and content checks before deleting owned files are sound choices for that goal.
+
+The recommendations below are design follow-ups, separate from the six implementation findings above. They have not been implemented and do not change the recorded finding counts.
+
+### Make team precedence one rule for every action
+
+**Priority: high. Recommendation: CHANGE.**
+
+The recovery bug arose because collision handling covered `install`, `update`, and `unchanged`, but missed `adopt`. Determine ownership and whether a skill name is available before selecting the final action, then constrain every action by the same precedence decision. Recovery must obey the same collision rules as an ordinary installation.
+
+Keep the existing planner and data model where practical. This needs a consistent decision boundary, not a new framework. Ensure adopted copies have sufficient ownership evidence before removing them, and continue to preserve modified content.
+
+### Resolve preservation versus active discovery for modified copies
+
+**Priority: high. Recommendation: CHANGE.**
+
+The current design deliberately keeps a modified sidecar copy when the team takes the same skill name. The existing test, [`test_skill_taken_keeps_and_reports_a_modified_copy_at_the_other_root`](../../tests/test_sidecar_overlay.py#L587), confirms this behavior. Preserving the bytes protects personal edits, but leaving the copy in a discovery folder can keep it available alongside the team's skill. The design therefore cannot promise both unconditional preservation in place and absence of competing skills.
+
+Report this state as an unresolved conflict. Provide an explicit, safe resolution that preserves the personal copy outside client discovery folders while disabling the competing projection. Any backup must avoid overwriting existing content and identify where the preserved copy can be recovered. Until the conflict is resolved, do not report that the skill was successfully skipped at every root.
+
+This is a policy improvement to the existing behavior, not a claim that the current implementation accidentally omitted its documented preservation rule.
+
+### Test combinations and transitions
+
+**Priority: medium. Recommendation: CHANGE.**
+
+Individual mechanisms have substantial coverage. The review failures appeared where mechanisms interacted: recovery plus a team collision, or tracked ownership plus missing files. Add a small, explicit matrix of these combinations using the existing real-Git test helpers.
+
+Assert the actual guarantees: team files and local deletions are preserved, competing sidecar skills are absent or explicitly reported as unresolved, Git status remains unchanged within the documented recovery exceptions, invalid metadata is refused before writes, and reruns reach a stable result. A new testing framework is unnecessary.
+
+### Make removal safer
+
+**Priority: medium, after the correctness fixes. Recommendation: CHANGE the instructions; consider an uninstall command later.**
+
+The current [manual removal instructions](../../README.md#personal-sidecar-install) say to delete every manifest-owned path. Those paths can contain personal modifications that the installer deliberately preserved. At minimum, require checking for and preserving such content before removal.
+
+A later uninstall command could reuse ownership and content checks to remove unchanged copies while preserving modified or foreign content. It should remove only its own metadata and exclude entries, and clearly report anything left behind. This is an optional usability improvement, not a prerequisite for retaining the current architecture.
+
+### Keep the scope limits explicit
+
+**Recommendation: ACCEPT the limits for the stated v1 goal; revisit them if the intended workflow expands.**
+
+In this implementation, Codex gets skills without an always-on bridge, and sidecar installation refuses linked worktrees. The sidecar also omits the full bootstrap's hooks, agents, and plan/review/commit lifecycle. It does not provide the full workflow automatically in every agent session.
+
+These limits are deliberate in the [big plan's non-goals](../plans/consumer-sidecar-bootstrap-overlay.md#non-goals). If automatic activation or background-worktree support becomes essential, investigate that requirement separately with native client evidence before expanding the design.
+
 ## Next step
 
-Correct the two collision defects before release, address or explicitly disposition the smaller findings, add focused regressions, and rerun the affected checks and review. This was a review request; production fixes have not been applied.
+Keep the architecture. Correct the two collision defects before release, resolve the precedence policy for modified copies, address or explicitly disposition the smaller findings, and add focused transition regressions. Improve the removal instructions; defer an uninstall command unless it is needed. Rerun the affected checks and review after implementation. This was a review and design-assessment request; production fixes have not been applied.
 
 No independent over-engineering finding was identified. Required safety checks should remain. Ponytail review net: -0 lines possible.
