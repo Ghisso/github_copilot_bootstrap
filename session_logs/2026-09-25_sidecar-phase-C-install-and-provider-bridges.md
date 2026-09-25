@@ -95,7 +95,23 @@ over by a plain full install.
 
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:tooling] `git rev-parse --git-path info/exclude` resolves a
+  symlinked `info/exclude` to its target, so an `is_symlink()` check on
+  that result never fires. Build the path from `--git-dir` to detect the
+  symlink.
+- [LEARN:workflow] A new installer refusal can break
+  `scripts/validate_targets.py` self-tests that simulate real states (here
+  `validate_state_sync()`'s fresh clone of a full consumer), not only
+  pytest. Grep every installer call in `validate_targets.py` when adding a
+  refusal.
+- [LEARN:testing] A test for a destructive branch needs fixture data that
+  reaches it: after a team takeover of the one-file `humanize` skill,
+  nothing was left to delete. Use a multi-file unit and prove the test by
+  disabling the delete.
+- [LEARN:tooling] The `protect-files.sh` hook denies compound Bash commands
+  it cannot parse (seen with `rm -rf`, `tar -x`, and `git apply` inside
+  chains and loops). Split them, or put multi-step file work in a small
+  Python script in the scratch folder.
 
 ## Verification
 

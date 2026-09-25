@@ -1234,3 +1234,17 @@
   survived the final review round. The commit gate counts every MAJOR in
   the report whatever its `disposition`, so a fixed MAJOR left in the list
   blocks the commit. Record fixed findings in the session log instead.
+- [LEARN:tooling] `git rev-parse --git-path info/exclude` resolves a
+  symlinked `info/exclude` to its target, so `is_symlink()` on that result
+  never fires; build the path from `--git-dir` to detect the symlink.
+- [LEARN:workflow] A new installer refusal can break
+  `scripts/validate_targets.py` self-tests that simulate real states (for
+  example `validate_state_sync()`'s fresh clone of a full consumer), not
+  only pytest; grep every installer call there when adding a refusal.
+- [LEARN:testing] A test for a destructive branch needs fixture data that
+  reaches it: a team takeover of a one-file skill leaves nothing to delete.
+  Use a multi-file unit and prove the test by disabling the delete.
+- [LEARN:tooling] The `protect-files.sh` hook denies compound Bash commands
+  it cannot parse (seen with `rm -rf`, `tar -x`, `git apply` in chains or
+  loops). Split them, or put multi-step file work in a scratch Python
+  script.
