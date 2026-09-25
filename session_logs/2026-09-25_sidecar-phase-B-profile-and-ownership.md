@@ -36,6 +36,28 @@ No consumer repository and no installer CLI change in this phase.
 - Steps 2-4 (generator target, bridge body, validator) delegated to one
   `coder`; steps 5-6 (pure planner and tests) delegated to a second
   `coder`, with disjoint file ownership.
+- Steps 2-4 result: `TARGETS = ("multi-agent", "sidecar")`,
+  `render_sidecar()`, `SIDECAR_TEXT_REPLACEMENTS` (three rewrites) and
+  `SIDECAR_HUMANIZE_CREDIT` in `scripts/generate_targets.py`;
+  `shared/sidecar/bridge.md`; sidecar and `FULL_INSTALL_ROOT_PATHS`
+  coverage checks with `*_cases` self-tests in `scripts/validate_targets.py`
+  (each of 10 rules proven by stubbing it). `dist/sidecar/` has exactly 14
+  files. `diff -r` of `dist/multi-agent/` before and after the generator
+  change: identical. Every real `dist/multi-agent/` path is covered by
+  `FULL_INSTALL_ROOT_PATHS`. `validate_targets.py` keeps its own
+  `TARGETS = ("multi-agent",)` on purpose, because its support-file checks
+  assume the full-install shape.
+- Steps 5-6 result: `scripts/sidecar_overlay.py` (pure planner, desired-unit
+  reader) and `tests/test_sidecar_overlay.py` (45 tests, including a real
+  `git check-ignore --stdin -z` check of escaping). Interpretation calls
+  sent to review: team takeover reuses the team-owned remedy; bridge
+  takeover wording; idempotency means no action besides `unchanged`;
+  `next_manifest` is the post-apply manifest.
+- Orchestrator verification on the combined tree: generate PASS; validate
+  PASS; `test_sidecar_overlay.py` + `test_validate_targets.py` 205 passed;
+  `test_install_bootstrap.py` 52 passed; `verify.py fast` PASS.
+- Review started with `code`, `architecture`, `security`, `tests`,
+  `ponytail`.
 
 ## [LEARN] Entries
 
