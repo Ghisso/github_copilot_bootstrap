@@ -1219,3 +1219,14 @@
   any read folder. The Local agent loads both `.github/instructions/` and
   `.claude/rules/`; an Agent Host session in the Copilot format loads only
   `.github/instructions/`, and `applyTo: "**"` loads with no attached file.
+- [LEARN:architecture] `scripts/runtime_ownership.py` is copied
+  byte-for-byte to `dist/multi-agent/.claude/scripts/runtime_ownership.py`,
+  so every constant added there ships to every full consumer, and a
+  "`dist/multi-agent/` unchanged" check must allow that one file.
+- [LEARN:workflow] Two coders can work in parallel in one worktree when the
+  orchestrator first lands the shared constants they both import, gives
+  each coder disjoint files, and tells each to run `ruff format` only on
+  its own files.
+- [LEARN:testing] Assert on report output, not only on actions: a skip
+  caused by a folder that no unit snapshot covers gave the right actions
+  and no report, and only a `result.reports` assertion caught it.

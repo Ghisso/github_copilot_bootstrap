@@ -71,7 +71,18 @@ No consumer repository and no installer CLI change in this phase.
 
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:architecture] `scripts/runtime_ownership.py` is copied
+  byte-for-byte to `dist/multi-agent/.claude/scripts/runtime_ownership.py`,
+  so every constant added there ships to every full consumer. A check that
+  `dist/multi-agent/` is unchanged must allow that one file.
+- [LEARN:workflow] Two coders can work in parallel in one worktree when the
+  orchestrator first lands the shared constants they both import, gives
+  each coder disjoint files, and tells each to run `ruff format` only on
+  its own files.
+- [LEARN:testing] Assert on the report output, not only on the actions. A
+  skill skipped because of a folder that no unit snapshot covers produced
+  the right actions and no report; only a `result.reports` assertion
+  catches that.
 
 ## Verification
 
