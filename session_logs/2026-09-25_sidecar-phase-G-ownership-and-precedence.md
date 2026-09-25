@@ -41,7 +41,14 @@ L3, L4).
   local delete, a tracked bridge deleted locally, two S3 real-Git scenarios,
   the named-pipe `SKILL.md`, and exact per-path report lines.
 - Step 9 delegated to `documenter` in parallel (`README.md`,
-  `docs/target-mapping.md` only).
+  `docs/target-mapping.md` only). Done: the README "Personal Sidecar
+  Install" report table (the taken-skill row lists every taking path, a new
+  `PRESERVED` row, the `RETAINED` remedy with `git add -f`), both
+  locally-modified remedies quoted verbatim from the code, a new "Preserved
+  copies" paragraph (path format, `PRESERVED <unit> -> <path>`, conflict
+  behavior, how to recover, never emptied), and the preserved folder in the
+  `docs/target-mapping.md` sidecar layout. The strings were checked against
+  `scripts/sidecar_overlay.py`.
 
 ## [LEARN] Entries
 
