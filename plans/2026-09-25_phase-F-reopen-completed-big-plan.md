@@ -3,7 +3,7 @@ name: 2026-09-25_phase-F-reopen-completed-big-plan
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 6
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase F — Reopen After a Completed Knowledge Refresh
