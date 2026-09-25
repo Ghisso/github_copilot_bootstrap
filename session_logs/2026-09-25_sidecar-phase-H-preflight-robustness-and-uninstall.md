@@ -182,11 +182,57 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
 - Review round 4 asked for an exhaustive matrix over the conflict path
   (unit kind, state, destination, ignore state, run, and crash point)
   instead of spot checks.
+- `verify.py phase --format text` PASS (2097 tests).
+- Review round 4: PASS with no findings. It traced the whole matrix and
+  reproduced 11 live scenarios: symlinked, dangling, and wrong-type preserve
+  destinations; a directory-only negation; both fault points followed by a
+  rerun; conflicts at both write roots; both bridges; and an unfinished unit
+  with different content.
+- Self-install before closeout committed nested state (`2c1a213`);
+  `check_runtime.py` reports nothing stale, and all plans validate.
 
 ## [LEARN] Entries
 
+- [LEARN:review] When review keeps finding defects in one code path (here
+  four rounds in uninstall's preserve-conflict path: a missing gate, a gate
+  path set that missed unrecorded units, and wrong reports), stop asking
+  for spot checks. Ask the reviewer for an exhaustive matrix over that
+  path's input dimensions (unit kind, state, destination, ignore state, run,
+  crash point), and ask the coder to build safety checks from the
+  authoritative set (`preserved_conflicts`), not from sets derived from
+  outcome shapes. The matrix review then passed clean on its first run.
+  Added to MEMORY.
+- [LEARN:workflow] Splitting a large phase's review by area into two
+  parallel reviewers, each with all six profiles, kept every review round
+  reviewable. The clean area needed no rerun after later changes that did
+  not touch it, apart from a note on the one test assertion that did.
+
 ## Verification
+
+Required items are pasted at closeout step 4.
+
+- optional 1: NOT RUN — the Phase A fixture is the operator's own folder outside the repository, which this session does not write to. The same check is automated: `test_clean_install_then_uninstall_restores_status_and_removes_everything` installs into a real temporary Git repository, uninstalls, and asserts that `git status --porcelain --untracked-files=all` matches the state before the install and that no block, manifest, staging folder, or sidecar file remains.
 
 ## Documentation
 
+Updated in this phase:
+
+- `README.md`: the Quick Install detection sentence; in "Personal Sidecar
+  Install", "Uninstall" and a safe "Manual fallback" replace the manual
+  removal steps, plus the linked-worktree reason, the timing of the
+  exclude proof, and "Switching modes manually"; new bullets under
+  "Behavior changes you should know about".
+- `docs/target-mapping.md`: `--uninstall`, and which command resolves each
+  Git-directory path.
+- `docs/architecture.md`: the exact source allowlist.
+- `docs/sidecar-provider-contract.md`: checked and unchanged.
+OpenWiki pages are refreshed in Phase I.
+
 ## Open Questions / Next Steps
+
+- Next: Phase I (`2026-09-25_phase-I-sidecar-hardening-knowledge-refresh`),
+  the final knowledge refresh and stale-claims audit. The post-commit hook
+  activates it after this phase's commit.
+- For Phase I's audit: `sidecar_evidence` now builds its paths from
+  `--git-dir` and `--git-common-dir`, and the OpenWiki claims `229e75d4`
+  and `e46454b4` are known to be stale.

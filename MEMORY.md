@@ -1269,3 +1269,9 @@
   parsed-but-unused `unrecognized_lines` both passed planner tests and failed
   only through `install_sidecar` on real Git. Give every new planner input a
   real-gathering test, run after an install as well as on a fresh target.
+- [LEARN:review] When review keeps finding defects in one code path, stop
+  spot-checking: ask the reviewer for an exhaustive matrix over that path's
+  input dimensions, and have the coder build safety checks from the
+  authoritative set rather than sets derived from outcome shapes. Sidecar
+  uninstall's preserve-conflict path took three failing rounds; the matrix
+  review passed on its first run once the gates used `preserved_conflicts`.

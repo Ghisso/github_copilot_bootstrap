@@ -3,7 +3,8 @@ name: 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 8
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-H-preflight-robustness-and-uninstall.md
 ---
 
 # Small Plan: Phase H — Sidecar Preflight, Robustness, and Uninstall
@@ -72,7 +73,7 @@ remedy. Also assert that the `info/exclude` bytes, `git status`, and the
 worktree are unchanged, and that no staging folder is created, in both the
 real run and the dry run.
 
-- [ ] **1. Drop inherited repository variables at startup (Decision 27; S10).**
+- [x] **1. Drop inherited repository variables at startup (Decision 27; S10).**
   - **Owner:** `coder`
   - At the start of `install_bootstrap.main()`, before detection, remove
     Git's repository-local environment variables from `os.environ`: the list
@@ -85,7 +86,7 @@ real run and the dry run.
     repository, and an exported `GIT_INDEX_FILE`. The target gets its own
     block and manifest, and the other repository is untouched.
 
-- [ ] **2. Harden mode detection (Decision 27; S1, S2, R5 sibling).**
+- [x] **2. Harden mode detection (Decision 27; S1, S2, R5 sibling).**
   - **Owner:** `coder`
   - `_full_install_evidence`: `.claude/.git` counts only when it is a
     directory (checked with `lstat`) and Phase G's index reader finds no
@@ -127,7 +128,7 @@ real run and the dry run.
     - `tests/test_install_bootstrap.py` passes unchanged except for new
       cases.
 
-- [ ] **3. Validate Git-directory metadata before any write (Decision 26; R3, S6).**
+- [x] **3. Validate Git-directory metadata before any write (Decision 26; R3, S6).**
   - **Owner:** `coder`
   - Build the manifest, staging, and preserved paths from
     `git rev-parse --absolute-git-dir`, and the exclude path from
@@ -153,7 +154,7 @@ real run and the dry run.
       install and `--mode full` are still refused on the shared sidecar
       block.
 
-- [ ] **4. Require balanced exclude markers (Decision 26; S7).**
+- [x] **4. Require balanced exclude markers (Decision 26; S7).**
   - **Owner:** `coder`
   - The exclude file holds either no marker lines, or exactly one BEGIN line
     followed later by one END line. Anything else aborts before a write, in
@@ -163,7 +164,7 @@ real run and the dry run.
     BEGIN. Each is refused before any write, the person's own lines are
     byte-identical, and a normal block with CRLF line endings still works.
 
-- [ ] **5. Make paths bytes-safe (Decision 29; R5, S15).**
+- [x] **5. Make paths bytes-safe (Decision 29; R5, S15).**
   - **Owner:** `coder`
   - Use `os.fsdecode` for Git `-z` output and `os.fsencode` for Git input
     and for the relative paths hashed in `compute_unit_hash`. Read and write
@@ -192,7 +193,7 @@ real run and the dry run.
     - A fixed fixture's unit hash equals the value computed before this
       change.
 
-- [ ] **6. Check repository boundaries and filesystem shape (Decision 28; S5, S11).**
+- [x] **6. Check repository boundaries and filesystem shape (Decision 28; S5, S11).**
   - **Owner:** `coder`
   - For every planned path (unit, write root, and bridge parent), run
     `git rev-parse --show-toplevel` in its nearest existing ancestor; it must
@@ -219,7 +220,7 @@ real run and the dry run.
       fix.)
     - A different `st_dev`, simulated with a monkeypatched `os.lstat` result.
 
-- [ ] **7. Require complete, exact sources (Decision 31; S13, S14, L2).**
+- [x] **7. Require complete, exact sources (Decision 31; S13, S14, L2).**
   - **Owner:** `coder`
   - Move the exact sidecar source set into `scripts/runtime_ownership.py`:
     - every sidecar skill's `SKILL.md` at every write root;
@@ -245,7 +246,7 @@ real run and the dry run.
     - A crafted tree gets the same verdict from the validator's check and
       the installer's check.
 
-- [ ] **8. Remove `bootstrap_commit` (Decision 33; R6).**
+- [x] **8. Remove `bootstrap_commit` (Decision 33; R6).**
   - **Owner:** `coder`
   - Remove it from the manifest dataclass, the serializer, the planner
     parameter, and the install call. Parsing still accepts and ignores it.
@@ -254,7 +255,7 @@ real run and the dry run.
     parses; the first update rewrites the manifest once and the next run
     changes nothing.
 
-- [ ] **9. Add `--uninstall` (Decision 34; design item 4).**
+- [x] **9. Add `--uninstall` (Decision 34; design item 4).**
   - **Owner:** `coder`
   - CLI: `install_bootstrap.py TARGET --mode sidecar --uninstall`, also
     accepted with no `--mode` when detection finds sidecar evidence.
@@ -293,7 +294,7 @@ real run and the dry run.
     - Full evidence and `--mode full --uninstall` are refused.
     - `update_consumers.py` never forwards the flag.
 
-- [ ] **10. Correct preflight and installer messages (Decision 36; S15, S16).**
+- [x] **10. Correct preflight and installer messages (Decision 36; S15, S16).**
   - **Owner:** `coder`
   - A gate failure lists only the paths that are not ignored, with the
     winning rule from `check-ignore -v -z`. Git cannot name a
@@ -317,7 +318,7 @@ real run and the dry run.
     `install_bootstrap.py:1180-1182` and `1190-1192`.
   - Tests assert each message.
 
-- [ ] **11. Documentation pass (Decisions 35, 36; S8, S17, design item 4).**
+- [x] **11. Documentation pass (Decisions 35, 36; S8, S17, design item 4).**
   - **Owner:** `documenter`
   - `README.md`:
     - Replace the manual removal steps with `--uninstall`.
@@ -386,11 +387,11 @@ after regenerating and before `verify closeout`.
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
