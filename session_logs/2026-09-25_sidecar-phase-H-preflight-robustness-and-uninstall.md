@@ -107,6 +107,26 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
 - REVIEW split into two parallel `reviewer` runs, each with all six
   profiles: part A (detection, preflight, bytes-safety, sources) and part B
   (`--uninstall` and the docs).
+- Review round 1, part A: PASS with no findings. It confirmed the
+  linked-worktree refusal via the common-directory `info/exclude`, the
+  environment list against `git rev-parse --local-env-vars`, the unchanged
+  full-install path, refusal ordering, and that patched-profile tests never
+  hide a real regression. Side note: detection still resolves the manifest
+  through `git_path`.
+- Orchestrator finding, from that note: `sidecar_evidence` builds the
+  manifest and exclude paths with `git_path`, and `--git-path` resolves
+  symlinks. A dangling manifest symlink is therefore not counted as
+  evidence, although Decision 27 requires it.
+- Review round 1, part B: FAIL.
+  - CRITICAL (`code`): with a lost manifest and a block holding only
+    unrecognized lines, `--uninstall` says "nothing to do" and leaves the
+    block. Installs keep refusing on that block, so it is a dead end.
+  - MAJOR (`code`): when uninstall is the first run to notice a team
+    takeover, `_team_takeover` reports a retained file as "stays hidden"
+    and then un-hides it.
+  The docs were checked accurate: the S17 claims are fixed, and the manual
+  fallback is safe.
+- All three sent back to `coder`, with tests.
 
 ## [LEARN] Entries
 
