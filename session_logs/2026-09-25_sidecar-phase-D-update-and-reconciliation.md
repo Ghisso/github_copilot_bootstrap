@@ -54,6 +54,14 @@ document full and sidecar installation.
     from `tests/test_sidecar_install.py`.
   All three are being fixed: the documenter takes the two README items,
   and the coder moves the shared helpers into one test helper module.
+- Fixes: the SKIPPED row is split into three rows with a Cause column,
+  each remedy matching its function in `scripts/sidecar_overlay.py`;
+  manual removal is a numbered list; two long sentences are split; the
+  eight shared helpers live in `tests/sidecar_test_helpers.py`, imported by
+  both sidecar test files. 176 tests pass; validator PASS.
+- Review round 2 (fix delta): all three resolved, no new finding, gate
+  PASS. The findings report lists surviving findings only, so it is
+  empty; the three fixed findings are recorded here.
 
 ## [LEARN] Entries
 

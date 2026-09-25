@@ -3,8 +3,8 @@ name: 2026-09-24_phase-D-sidecar-update-and-reconciliation
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-D-update-and-reconciliation.md
 ---
 
 # Small Plan: Phase D — Sidecar Update and Reconciliation
@@ -40,7 +40,7 @@ second update path.
 
 ## Steps
 
-- [ ] **1. Make batches skip and report failures.**
+- [x] **1. Make batches skip and report failures.**
   - **Owner:** `coder`
   - In `update_consumers.py`, run every target. When the installer exits
     non-zero, or a target is not a directory, record the target and its exit
@@ -54,13 +54,13 @@ second update path.
   - `update_consumers.py` passes no `--mode`, so the installer detects each
     target's mode.
 
-- [ ] **2. Confirm option forwarding in mixed batches.**
+- [x] **2. Confirm option forwarding in mixed batches.**
   - **Owner:** `coder`
   - Test a mixed batch with `--local-only` and with
     `--commit-copilot-surface`. Full targets use the options; sidecar targets
     warn once and ignore them.
 
-- [ ] **3. Add the upgrade regression suite.**
+- [x] **3. Add the upgrade regression suite.**
   - **Owner:** `coder`
   - In `tests/test_sidecar_update.py`, build two bootstrap versions as
     fixture sources, install the first, and update to the second:
@@ -81,7 +81,7 @@ second update path.
     15. install, update, update -> the second update changes no file.
   - Every test must fail when the rule it covers is removed.
 
-- [ ] **4. Document consumer behavior.**
+- [x] **4. Document consumer behavior.**
   - **Owner:** `documenter`
   - In README, split install and update guidance into four parts: full
     install, personal sidecar install, updating full consumers, and updating
@@ -169,11 +169,11 @@ uv run python .claude/scripts/verify.py fast --format json
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
