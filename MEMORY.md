@@ -1248,3 +1248,7 @@
   it cannot parse (seen with `rm -rf`, `tar -x`, `git apply` in chains or
   loops). Split them, or put multi-step file work in a scratch Python
   script.
+- [LEARN:workflow] A coder and a documenter can run one phase in parallel
+  when the plan fixes the behavior exactly; tell the documenter to describe
+  the coder's behavior without quoting output strings that do not exist
+  yet, and to take exact strings only from committed code.

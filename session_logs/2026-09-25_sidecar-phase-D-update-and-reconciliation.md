@@ -57,13 +57,30 @@ document full and sidecar installation.
 
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:workflow] A coder and a documenter can run the same phase in
+  parallel when the plan fixes the behavior exactly. Tell the documenter to
+  describe the coder's behavior without quoting output strings that do not
+  exist yet, and to take exact strings only from committed code.
 
 ## Verification
 
-Pending.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PENDING
+```
+
+- optional 1: NOT RUN — no clone of a real team repository with configuration for all four clients is available in this session. Partial substitute by the orchestrator, 2026-09-25: `update_consumers.py --skip-regen` on the Phase C sidecar clone (tracked `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, team skills in three folders) detected sidecar mode, reported `unchanged 10` and `All projects updated.`; `git status --porcelain --untracked-files=all` empty before and after; `info/exclude` and manifest SHA-256 identical before and after. The four-client batch behavior is covered by `tests/test_sidecar_update.py`.
+
+## Documentation
+
+Updated in this phase: `README.md` (four install and update parts, the
+team-repository use case, the takeover description, behavior changes,
+limits, client support, SKIPPED/RETAINED remedies, manual removal),
+`docs/target-mapping.md` (Sidecar Overlay projection table),
+`docs/architecture.md` (`dist/sidecar/`, sidecar Ponytail license).
 
 ## Open Questions / Next Steps
 
-- Integrate, verify, and review with `code`, `architecture`, `security`,
-  `tests`, `ponytail`, `documentation`.
+- Next: Phase E (`2026-09-24_phase-E-sidecar-knowledge-refresh`): OpenWiki
+  refresh through its MCP tools, then the final stale-claims audit.
