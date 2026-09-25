@@ -93,7 +93,10 @@ second update path.
   - State the behavior changes:
     - a plain install now refuses a repository that tracks a path the full
       install writes and has no bootstrap evidence; pass `--mode full` to
-      keep today's takeover;
+      keep today's takeover. This includes a fresh clone of a full consumer
+      whose `.claude/` is not restored yet: run
+      `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`
+      (Phase C found this through `validate_state_sync()`);
     - sidecar mode supports the main worktree only;
     - a batch update now finishes the other targets when one fails, then
       exits 1.

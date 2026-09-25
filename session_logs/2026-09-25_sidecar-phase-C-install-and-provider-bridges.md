@@ -32,6 +32,26 @@ over by a plain full install.
   gathering, exclude block and ignore gate, atomic apply, report, dry-run,
   fault points; owns `scripts/sidecar_overlay.py` and
   `tests/test_sidecar_install.py`.
+- C1 result: `detect_install_mode(target, requested_mode, allow_self)` with
+  helpers `_full_install_evidence`, `_sidecar_evidence` (catches
+  `CalledProcessError` for non-Git targets), `_team_config_evidence`
+  (reuses `tracked_generated_paths`), `_is_linked_worktree`;
+  `warn_full_only_options_ignored`; `DEFAULT_SIDECAR_SOURCE`. A non-Git or
+  no-commit target still falls through to today's full default. 15
+  detection unit tests and 7 CLI tests; `--mode full` added to
+  `test_generated_session_pull_restores_ignored_adapter_after_branch_switch`.
+  `tests/test_install_bootstrap.py`: 75 passed.
+- Gap the plan's 2026-09-24 review missed: `validate_state_sync()` in
+  `scripts/validate_targets.py` installs into machine C, a fresh clone of a
+  full consumer whose `.claude/` is not restored (tracked `.devcontainer/`,
+  no bootstrap evidence). The new Decision 18 refusal correctly blocks it.
+  The orchestrator added `--mode full` to that fixture call with a comment,
+  matching the plan's own remedy for that scenario. No real script runs the
+  installer there: `check_runtime.py`'s reinstall command uses
+  `--allow-self` (full evidence), and `update_consumers.py` targets
+  consumers with `.claude/.git`. Phase D must document that a fresh clone
+  of a full consumer needs `bash .devcontainer/state-sync.sh setup` (or
+  `--mode full`) before a plain install.
 
 ## [LEARN] Entries
 
