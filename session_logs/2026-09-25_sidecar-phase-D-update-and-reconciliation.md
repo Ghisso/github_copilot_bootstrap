@@ -41,6 +41,19 @@ document full and sidecar installation.
   test files.
 - Review started with `code`, `architecture`, `security`, `tests`,
   `ponytail`, `documentation`, while the full phase verifier runs.
+- Full `verify.py phase` before review fixes: PASS (pytest 1883 passed;
+  ruff 0; mypy 0); `validate_targets.py` PASS; Phase D block 176 passed.
+- Review round 1: gate PASS, 0 critical, 0 major, 3 minor. The reviewer
+  confirmed the updater's batch handling, the 15 cases plus option
+  forwarding, and every documented claim against the code.
+  - MINOR (documentation): the README's SKIPPED remedy did not cover a
+    skill name taken in a read-only folder.
+  - MINOR (documentation): the manual-removal procedure and two other
+    README sentences were long run-on sentences.
+  - MINOR (ponytail): `tests/test_sidecar_update.py` copied eight helpers
+    from `tests/test_sidecar_install.py`.
+  All three are being fixed: the documenter takes the two README items,
+  and the coder moves the shared helpers into one test helper module.
 
 ## [LEARN] Entries
 
