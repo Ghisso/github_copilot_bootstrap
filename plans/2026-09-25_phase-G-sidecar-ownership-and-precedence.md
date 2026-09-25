@@ -22,7 +22,8 @@ and fixes the report lines and remedies these rules produce.
 
 Findings covered (IDs from the two 2026-09-25 review reports): R1, R2, R4,
 design items 1-3, S3, S4, S9, S12, S15 (planner items), S16 (planner
-remedies), L1, L2, L3, L4. Big plan Decisions 22-25, 30, 32.
+remedies), L1, L3, L4. Big plan Decisions 22-25, 30, 32. L2 is closed by
+Phase H's complete-source rule (Decision 31).
 
 This phase changes planner inputs and outputs, adds one action kind
 (`preserve`), and changes snapshot gathering and the gate paths. Installer
@@ -79,13 +80,21 @@ changes, and run a dry run and assert that it predicts the same result.
     unit (the exact path for a bridge), relative to the unit, whether or not
     it exists on disk. Update the `UnitSnapshot` docstring.
     `untracked_files` stays "files on disk minus tracked".
-  - Read the index with `git ls-files -z` and decode each path with
-    `os.fsdecode`. Index entries include `skip-worktree`, intent-to-add,
-    gitlink, and symlink entries.
+  - Read the index once with `git ls-files -s -z` and return each path
+    (decoded with `os.fsdecode`) with its mode. Index entries include
+    `skip-worktree`, intent-to-add, gitlink (`160000`), and symlink
+    (`120000`) entries. Phase H reuses this reader for its gitlink and
+    `.claude` checks; do not add a second one.
+  - When `core.ignorecase` is true, compare index paths with unit paths, and
+    with files inside a unit, using `casefold()`. A case-variant tracked
+    folder then makes the unit tracked (team-owned or team takeover), and a
+    case-variant tracked file is never counted as untracked, deleted,
+    removed, or preserved.
   - A tracked unit is classified as team-owned or team takeover before the
     planner's symlink abort, so a tracked team symlink at a unit path skips
-    that skill instead of aborting the run. A symlinked ancestor that is not
-    itself a tracked unit still aborts (non-goal).
+    that skill instead of aborting the run. An untracked symlink at a unit
+    path is foreign: the skill is taken, and nothing is written through it.
+    A symlinked ancestor of a unit still aborts, tracked or not (non-goal).
   - `_read_list_skill_names` adds the first path segment of every index path
     under each read folder to that folder's names.
   - `_team_takeover` still iterates only files on disk. Never restore,
@@ -98,10 +107,19 @@ changes, and run a dry run and assert that it predicts the same result.
     deleted locally; a tracked symlink `.agents/skills/ponytail`. In each:
     exit 0, `ponytail` is skipped with a report naming the tracked path, the
     other units are installed, and nothing is written into or next to the
-    tracked path. The local deletion stays (`git status` still shows ` D`,
-    or `git ls-files -t` still shows `S`).
+    tracked path. The local deletion stays (`git status --short` still lists
+    the file as deleted, or `git ls-files -t` still shows `S`).
+  - Also test an untracked personal symlink at `.claude/skills/ponytail`:
+    `ponytail` is skipped at every root, and the link and its target are
+    untouched.
+  - Case-insensitive test (pure planner, since Linux has no
+    case-insensitive filesystem): the index entry
+    `.claude/skills/Ponytail/SKILL.md`, a disk folder `ponytail/` holding the
+    team bytes plus the sidecar `LICENSE`, a record, and ignorecase true.
+    Expect a team takeover: `LICENSE` deleted, `SKILL.md` untouched, no
+    preserve.
 
-- [ ] **2. Decide taken skills first (Decision 22; R1, R2, S12, L2, L3, design item 1).**
+- [ ] **2. Decide taken skills first (Decision 22; R1, R2, S12, L3, design item 1).**
   - **Owner:** `coder`
   - Keep `plan_sidecar_reconciliation` pure. Add inputs through the
     gathered data, not new I/O inside the planner.
@@ -112,18 +130,18 @@ changes, and run a dry run and assert that it predicts the same result.
       a broken symlink;
     - a write-root unit for it is team-owned, team takeover, or foreign;
     - a non-sidecar `SKILL.md` directly under a read folder declares it as
-      its frontmatter `name:` (read the leading `---` block only; an
-      unreadable or malformed file declares nothing);
+      its frontmatter `name:`. Open only a regular file (checked with
+      `lstat`), read at most 4 KB, read the leading `---` block only, and
+      strip quotes and a trailing comment from the value. An unreadable or
+      malformed file declares nothing;
     - `git config --bool core.ignorecase` is true and a case variant of its
-      name exists in a read folder.
+      name exists in a read folder. An unset value (exit 1, no output) means
+      false; it is not a Git error.
   - Symlinks: list a symlinked read folder through its link, unless the link
     resolves to a write root or to a folder inside one. Skip an entry that
     resolves to one of the sidecar's own unit paths. Never write through a
     symlink. The common layout `.github/skills -> ../.claude/skills` must
     stay stable: no alternating install and remove.
-  - L2: `required_snapshot_units` also includes `<write root>/<skill>` for
-    every write root and every sidecar skill, so a non-sidecar folder at a
-    root the source does not ship is still classified.
   - For a taken skill, convert each unit outcome: `install` becomes no-op;
     `unchanged`, `update`, and `adopt` become remove; locally modified and
     unfinished become preserve (step 4); team-owned, team takeover, foreign,
@@ -147,18 +165,22 @@ changes, and run a dry run and assert that it predicts the same result.
       variant at a write root. The person's visible `Ponytail/` folder is
       never hidden.
     - L3: `.github/skills/team-humanize/SKILL.md` declaring `name: humanize`;
-      a malformed frontmatter block declares nothing.
-    - L2: the pure planner with a desired set that ships ponytail at one root
-      only, and an untracked team folder at the other root.
+      a malformed frontmatter block declares nothing; a named pipe named
+      `SKILL.md` is never opened.
+    - S15: a foreign copy at a write root plus a `.github/skills` collision
+      for the same skill. The report names both paths.
 
 - [ ] **3. Prove ownership with the record or the exclude line (Decision 23; S3).**
   - **Owner:** `coder`
-  - Parse the sidecar block into unit lines and file lines. A unit line is
-    `unit_exclude_line(unit)` for a unit in the manifest namespace (current
-    plus retired roots and bridges, step 7). A file line is a line that
-    round-trips through `escape_exact_path` and names a valid retained path.
-    Add an `unescape_exact_path` inverse only if the round-trip check needs
-    it.
+  - Add `unescape_exact_path`, the inverse of `escape_exact_path`. Parse the
+    sidecar block into unit lines and file lines. A unit line is one whose
+    unescaped path passes `_validate_unit_path` (current plus retired roots
+    and bridges, step 7) and re-escapes to the same line. This also finds a
+    listed unit for a skill that no longer ships. A file line is one whose
+    unescaped path passes `_validate_retained_path` and re-escapes to the
+    same line.
+  - Keep any other line inside the block, and report it once, so no run
+    un-hides a file through a line it does not understand.
   - Add every listed unit to the required units, so it is always classified.
   - Rows, per the big plan's updated table:
     - listed, no record, content equals desired: adopt (unchanged);
@@ -190,10 +212,14 @@ changes, and run a dry run and assert that it predicts the same result.
     locally modified or unfinished unit. `_write_raw_paths` includes it, so
     the unit keeps its line during the write phase, and the final block drops
     it.
-  - Destination: `<git dir>/ai-bootstrap-sidecar-preserved/<unit path>/<unit hash>/`,
-    built from the verified absolute Git directory already used for
-    `info/exclude` in `_install_sidecar_apply`, never from `git_path`. Add
+  - Destination: `<git dir>/ai-bootstrap-sidecar-preserved/<unit path with "/" replaced by "__">--<unit hash>`,
+    one level deep: a folder for a skill, a file for a bridge (a bridge is
+    preserved only by Phase H's uninstall). Build it from
+    `git rev-parse --absolute-git-dir`, never from `git_path`. Add
     `SIDECAR_PRESERVED_NAME` to `scripts/runtime_ownership.py`.
+  - Before any write, refuse a preserved path that is a symlink or exists and
+    is not a folder. Phase H step 3 folds this into its general Git-directory
+    checks.
   - Pass the set of units whose destination already exists into the planner,
     so dry-run matches the real run. When the destination exists, the unit
     stays in place with its record and line, and the report names a
@@ -213,8 +239,9 @@ changes, and run a dry run and assert that it predicts the same result.
 - [ ] **5. Treat an empty leftover unit folder as absent (S9).**
   - **Owner:** `coder`
   - `_gather_unit` reports `exists=False` for an untracked unit folder that
-    holds no files at any depth. `_place_unit` must then replace that empty
-    folder (remove empty subfolders first, never a file).
+    holds only folders (no file, symlink, pipe, or socket at any depth).
+    `_place_unit` already moves any existing folder into staging with
+    `os.replace`, so it needs no change.
   - Test: team takeover, then the team stops tracking, then the person deletes
     the retained file as told. The rerun reinstalls the skill.
 
@@ -285,8 +312,14 @@ changes, and run a dry run and assert that it predicts the same result.
 uv run python scripts/generate_targets.py --all
 uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py -q --tb=short
 uv run python scripts/validate_targets.py
+uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json
 ```
+
+This phase changes `scripts/runtime_ownership.py`, which is installed as
+`.claude/scripts/runtime_ownership.py`. Run the self-install
+(`uv run python scripts/install_bootstrap.py . --allow-self --local-only`)
+after regenerating and before `verify closeout`.
 
 ## Review Profiles
 

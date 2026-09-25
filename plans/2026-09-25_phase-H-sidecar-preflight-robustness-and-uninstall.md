@@ -25,8 +25,8 @@ This phase also adds `--uninstall` (a user decision) and does the full
 documentation pass for both new phases.
 
 Findings covered (IDs from the two 2026-09-25 review reports): S1, S2, S5,
-S6, S7, S10, S11, S13, S14, R3, R5, R6, S8 (docs), S15 and S16 (preflight and
-installer messages), S17, and design item 4. Big plan Decisions 26-29, 31,
+S6, S7, S10, S11, S13, S14, L2, R3, R5, R6, S8 (docs), S15 and S16
+(preflight and installer messages), S17, and design item 4. Big plan Decisions 26-29, 31,
 and 33-36.
 
 Phase G already changed the planner, the snapshot gathering, the gate paths,
@@ -72,43 +72,56 @@ remedy. Also assert that the `info/exclude` bytes, `git status`, and the
 worktree are unchanged, and that no staging folder is created, in both the
 real run and the dry run.
 
-- [ ] **1. Run target Git calls without inherited repository variables (Decision 27; S10).**
+- [ ] **1. Drop inherited repository variables at startup (Decision 27; S10).**
   - **Owner:** `coder`
-  - One helper returns `os.environ` without `GIT_DIR`, `GIT_WORK_TREE`,
-    `GIT_INDEX_FILE`, `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`,
-    `GIT_ALTERNATE_OBJECT_DIRECTORIES`, and `GIT_NAMESPACE`. Every Git call
-    against a target in `scripts/sidecar_overlay.py` and in mode detection
-    uses it. Full-install steps after detection are unchanged.
-  - Tests: an exported `GIT_DIR` that points at another repository, and an
-    exported `GIT_INDEX_FILE`. The target gets its own block and manifest,
-    and the other repository is untouched.
+  - At the start of `install_bootstrap.main()`, before detection, remove
+    Git's repository-local environment variables from `os.environ`: the list
+    that `git rev-parse --local-env-vars` prints on Git 2.43, hard-coded as
+    a constant, plus `GIT_NAMESPACE`. This covers both modes and every Git
+    call the process makes. It changes a full install only when such a
+    variable is exported, which always points Git at the wrong repository.
+  - Tests go through the CLI (a subprocess), so the test process's own
+    environment is untouched: an exported `GIT_DIR` that points at another
+    repository, and an exported `GIT_INDEX_FILE`. The target gets its own
+    block and manifest, and the other repository is untouched.
 
 - [ ] **2. Harden mode detection (Decision 27; S1, S2, R5 sibling).**
   - **Owner:** `coder`
   - `_full_install_evidence`: `.claude/.git` counts only when it is a
-    directory (checked with `lstat`) and `git ls-files -z -- .claude` prints
-    nothing. A submodule's `.git` file, or an embedded repository that the
-    outer index tracks as a gitlink, is team config instead.
+    directory (checked with `lstat`) and Phase G's index reader finds no
+    entry at or under `.claude`. A submodule's `.git` file, or an embedded
+    repository that the outer index tracks as a gitlink, is team config
+    instead.
+  - Run every detection Git call with `LC_ALL=C`, so Git's messages are in
+    English whatever the person's locale.
   - Classify a failed `git rev-parse`: stderr saying "not a git repository"
-    means no Git evidence (today's fresh-install default). Any other failure,
-    for example "detected dubious ownership", aborts detection in every mode.
-    The message quotes Git's error and names the remedy (for example
-    `git config --global --add safe.directory <path>`).
+    means no Git evidence (today's fresh-install default). A target folder
+    that does not exist also means no Git evidence, as today. Any other
+    failure, for example "detected dubious ownership", aborts detection in
+    every mode. The message quotes Git's error and names the remedy (for
+    example `git config --global --add safe.directory <path>`).
   - `tracked_generated_paths` uses `-z` and `os.fsdecode`. It returns an
-    empty list only for "not a git repository" and raises otherwise.
-  - `sidecar_evidence` reads `info/exclude` as bytes, compares against the
-    encoded marker lines, and never opens a non-regular file. A non-regular
-    exclude file aborts detection with a remedy. Anything at the manifest
+    empty list only for "not a git repository" or a missing folder, and
+    raises otherwise.
+  - `sidecar_evidence` checks `info/exclude` with `lstat` and never opens a
+    non-regular file; a non-regular file is not sidecar evidence (step 3's
+    sidecar preflight refuses it). It reads a regular file as bytes and
+    compares against the encoded marker lines. Anything at the manifest
     path, including a dangling symlink, is sidecar evidence.
   - Tests:
     - A team `.claude` submodule, and an embedded repository tracked as a
-      gitlink: a plain install refuses as team config, `--mode sidecar`
-      proceeds, and the submodule's remote, branch, and files are unchanged.
+      gitlink: a plain install refuses as team config, and the submodule's
+      remote, branch, and files are unchanged. `--mode sidecar` passes
+      detection and is then refused by step 6's nested-repository message;
+      nothing is written.
     - `GIT_TEST_ASSUME_DIFFERENT_OWNER=1` aborts in every mode.
-    - Latin-1 bytes, UTF-16 text, and a directory at `info/exclude`: a full
-      install still works for the byte cases and refuses the directory.
-    - A named pipe at `info/exclude` is refused without hanging. Guard the
-      test with a timeout.
+    - `LANG=de_DE.UTF-8` (or any non-English locale) on a non-Git folder
+      still gives today's full-install default.
+    - A target folder that does not exist: a full-install dry run behaves as
+      today.
+    - Latin-1 bytes, UTF-16 text, a folder, and a named pipe at
+      `info/exclude`: a full install still works in every case. Guard the
+      pipe test with a timeout.
     - `core.quotePath=false` with a non-UTF-8 tracked name gives the
       team-config refusal, not a traceback.
     - `tests/test_install_bootstrap.py` passes unchanged except for new
@@ -116,11 +129,13 @@ real run and the dry run.
 
 - [ ] **3. Validate Git-directory metadata before any write (Decision 26; R3, S6).**
   - **Owner:** `coder`
-  - Build the manifest, staging, preserved, and exclude paths from
-    `git rev-parse --absolute-git-dir` (run with the step 1 environment).
-    Remove every remaining use of `git_path` for these paths. Update
-    `tests/sidecar_test_helpers.py` if it still resolves paths through
-    `git_path`.
+  - Build the manifest, staging, and preserved paths from
+    `git rev-parse --absolute-git-dir`, and the exclude path from
+    `git rev-parse --path-format=absolute --git-common-dir` plus
+    `info/exclude`. Git reads the exclude file from the common directory; in
+    the main worktree both paths are the same. Remove every remaining use of
+    `git_path` for these paths. Update `tests/sidecar_test_helpers.py` if it
+    still resolves paths through `git_path`.
   - Before any write, in the real run and the dry run, refuse when:
     - the manifest path is a symlink (dangling or not) or not a regular file;
     - the staging or preserved path is a symlink or exists and is not a folder;
@@ -134,6 +149,9 @@ real run and the dry run.
       tracked file. The linked folder's contents must be untouched.
     - `info/` as a symlink to a shared folder; `info/exclude` as a folder and
       as a named pipe.
+    - A linked worktree of a main worktree that has a sidecar: a plain
+      install and `--mode full` are still refused on the shared sidecar
+      block.
 
 - [ ] **4. Require balanced exclude markers (Decision 26; S7).**
   - **Owner:** `coder`
@@ -176,21 +194,29 @@ real run and the dry run.
 
 - [ ] **6. Check repository boundaries and filesystem shape (Decision 28; S5, S11).**
   - **Owner:** `coder`
-  - For every existing write root and bridge parent, `git rev-parse
-    --show-toplevel` run there must equal the target, and the target index
-    must have no gitlink at or above it. Otherwise abort with "sidecar mode
-    does not support the nested repository or submodule at `<path>`; nothing
-    was written".
+  - For every planned path (unit, write root, and bridge parent), run
+    `git rev-parse --show-toplevel` in its nearest existing ancestor; it must
+    equal the target. Phase G's index reader must show no gitlink at or above
+    the planned path. Otherwise abort with "sidecar mode does not support the
+    nested repository or submodule at `<path>`; nothing was written".
   - Every existing ancestor of each planned path must be a real folder
-    (`lstat`) with the target's `st_dev`. Every folder that a move changes
-    must be writable (`os.access(..., os.W_OK)`).
+    (`lstat`) with the target's `st_dev`.
+  - Writable (`os.access(..., os.W_OK)`) means: the parent of every unit
+    that moves, every unit folder that moves, and every folder inside a unit
+    that is removed, replaced, or later emptied from staging. On Linux,
+    moving a folder to another parent needs write permission on the folder
+    itself.
   - Tests:
-    - A nested clone at `.claude/skills`: refused, and the nested
-      repository's status is unchanged.
-    - A submodule at a write root: refused with the new message, not the
-      `.gitignore` remedy.
-    - A regular file at `.agents`, and a read-only unit folder during an
-      update: refused before any write.
+    - A nested clone at `.claude/skills`, and a nested clone at `.agents`
+      with no `skills/` folder yet: refused, and the nested repository's
+      status is unchanged.
+    - A submodule at a write root, and a submodule at `.claude` with no
+      `skills/` inside: refused with the new message, not the `.gitignore`
+      remedy.
+    - A regular file at `.agents`; a read-only unit folder during an update;
+      a unit with a read-only subfolder during a remove: refused before any
+      write. (The devcontainer user is not root, so these fail before the
+      fix.)
     - A different `st_dev`, simulated with a monkeypatched `os.lstat` result.
 
 - [ ] **7. Require complete, exact sources (Decision 31; S13, S14, L2).**
@@ -202,11 +228,17 @@ real run and the dry run.
     - every bridge.
   - `validate_targets.py` and the installer both use this set. The installer
     refuses a source with any missing or extra file.
-  - Full mode refuses a source that lacks `.claude/hooks/scripts/state-sync.sh`,
-    or whose files all fall inside the sidecar set.
+  - Full mode refuses a source that lacks
+    `.claude/hooks/scripts/state-sync.sh`. Run this check after
+    `validate_install_roots` and `validate_agents_takeover` and before
+    `migrate_pre_existing_state`, so the four existing tests that pass an
+    empty or partial full source
+    (`test_installer_rejects_overlapping_roots_before_writes` and the three
+    `test_agents_takeover_refuses_*` tests) keep their messages.
   - Tests:
     - An empty source and a source with only `.claude/`: refused, and no unit
-      is removed.
+      is removed. The second case also closes L2: a source that ships a skill
+      at one root only is refused.
     - A source with an extra file: refused.
     - `--source dist/sidecar` in full mode, on a fresh target and on an
       existing full consumer: refused before any write.
@@ -226,20 +258,26 @@ real run and the dry run.
   - **Owner:** `coder`
   - CLI: `install_bootstrap.py TARGET --mode sidecar --uninstall`, also
     accepted with no `--mode` when detection finds sidecar evidence.
-    `--dry-run` works. Refuse `--uninstall` with `--mode full`, and with full
-    evidence. With no sidecar evidence, print "no sidecar found; nothing to
-    do" and exit 0. `update_consumers.py` never passes it.
+    `--dry-run` works. With `--uninstall`, detection skips the team-config
+    refusal. Refuse `--uninstall` with `--mode full`, and with full evidence.
+    With no sidecar evidence, print "no sidecar found; nothing to do" and
+    exit 0. `update_consumers.py` never passes it.
   - Behavior, through the same preflight (steps 3, 4, 6) and Phase G's
-    planner with an empty desired set:
+    planner with an empty desired set, treating every sidecar skill and
+    bridge as taken:
     - a unit whose content matches its record is removed;
-    - a locally modified or unfinished unit is preserved (Decision 24);
+    - a locally modified or unfinished unit is preserved (Decision 24),
+      including a listed copy with no record that equals the current
+      source. A bridge is preserved as a file;
     - team and foreign content is untouched;
-    - retained files lose their lines, so they become visible, and each is
-      reported.
+    - retained files lose their lines, so they become visible. Each is
+      reported as now visible to `git add -A`.
   - Order: move or remove every unit first. Only then remove the whole
     block, then delete the manifest, then remove the staging folder. When a
-    preserve destination already exists, keep that unit, its line, the
-    block, and the manifest, report the conflict, and exit 1.
+    preserve destination already exists, keep that unit and its line, keep
+    the block, rewrite the manifest to hold only the kept units, report the
+    conflict, and exit 1. This is the one exception to Decision 9, because
+    the uninstall did not finish.
   - Keep the preserved folder, and print its path.
   - Tests:
     - A clean install then uninstall: status matches the state before the
@@ -255,7 +293,11 @@ real run and the dry run.
 - [ ] **10. Correct preflight and installer messages (Decision 36; S15, S16).**
   - **Owner:** `coder`
   - A gate failure lists only the paths that are not ignored, with the
-    winning rule from `check-ignore -v -z`.
+    winning rule from `check-ignore -v -z`. Git cannot name a
+    directory-only negation for an absent `unit/` path (its source, line, and
+    pattern fields come back empty). In that case, say that a rule ending in
+    `/` in a `.gitignore` file or in `info/exclude` un-ignores the folder.
+    Test it with a team `!.claude/skills/*/` rule.
   - The ignore-gate remedy says to ask the team to change a rule, or to
     remove the person's own negation from `info/exclude`. It never tells the
     person to edit the team `.gitignore` themselves.
@@ -315,6 +357,11 @@ uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
 uv run python .claude/scripts/verify.py fast --format json
 ```
+
+This phase changes `scripts/runtime_ownership.py` and
+`scripts/install_bootstrap.py`. Run the self-install
+(`uv run python scripts/install_bootstrap.py . --allow-self --local-only`)
+after regenerating and before `verify closeout`.
 
 ## Optional Verification
 

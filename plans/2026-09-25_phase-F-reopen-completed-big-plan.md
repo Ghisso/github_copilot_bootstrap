@@ -14,8 +14,8 @@ This big plan was complete, and its last phase (E) is a completed
 knowledge-refresh phase. The plan validator requires a knowledge-refresh
 phase to be unique and last, so the plan cannot take new phases today. This
 phase changes the validator so a knowledge-refresh phase that is not last,
-and whose small plan is already `complete`, no longer counts toward that
-rule. A plan that has knowledge-refresh phases must still end with one (big
+and whose small plan is already `complete` or `cancelled`, no longer counts
+toward that rule. A plan that has knowledge-refresh phases must still end with one (big
 plan, Decision 21). It also writes the procedure for reopening a completed
 big plan into the canonical workflow instructions, so the next reopen needs
 no investigation.
@@ -62,8 +62,15 @@ no errors.
     `validate_knowledge_refresh_phase_position(path: Path, phases: list[str], errors: list[str]) -> None`.
   - A knowledge-refresh phase (slug ends in `-knowledge-refresh`) is
     *settled* when it is not the last entry of `phases` and its small plan,
-    `path.parent / f"{phase}.md"`, parses with `status: complete`. Use the
-    module's existing frontmatter parser; add no new parsing code.
+    `path.parent / f"{phase}.md"`, parses with `status: complete` or
+    `status: cancelled`. Check the phase name against the existing slug
+    pattern (`[A-Za-z0-9][A-Za-z0-9._-]*`) before building that path, so the
+    rule never reads a file outside the plans folder. Use the module's
+    existing frontmatter parser; add no new parsing code.
+  - Standard library only, and keep Python 3.9-compatible runtime syntax:
+    the commit gate runs this script with each consumer's system `python3`
+    (Bootstrap Hooks Runtime Contract in
+    `shared/policies/workspace.instructions.md`).
   - Count only unsettled knowledge-refresh phases. More than one gives the
     existing "at most one knowledge-refresh phase is allowed" error. One that
     is not last gives the existing "must be the last phase in phases" error.
@@ -91,7 +98,12 @@ no errors.
     `in-progress`, `planned`, missing, or unreadable, plus a refresh phase
     last. Parametrize these four.
   - Reject: two unsettled refresh phases with neither of them last.
-  - Every existing test in the file passes unchanged.
+  - Accept: a `cancelled` refresh phase in the middle and a refresh phase
+    last.
+  - A phase name that fails the slug pattern is unsettled, and no file
+    outside `tmp_path` is read.
+  - Every existing test in the file passes unchanged, including the exact
+    error message substrings.
 
 - [ ] **3. Write the workflow text.**
   - **Owner:** `coder`
@@ -99,36 +111,35 @@ no errors.
     paragraph of "Knowledge-Refresh Final Phase": when a completed big plan
     is reopened, its completed knowledge-refresh phase stays where it is, and
     the rule appends one new knowledge-refresh phase after the new phases.
-    Name the validator's exemption (only completed, non-final refresh
-    phases).
+    Name the validator's exemption (only completed or cancelled, non-final
+    refresh phases).
   - Add `### Reopening a completed big plan` under "Branch Lifecycle", after
     "Cancelling a plan or phase", as a numbered procedure (a repeated
     procedure belongs in the canonical instructions, not in memory):
-    1. Inspect the completed phases' outcomes and review findings. Record new
+    1. Reopen only while the implementation branch exists and is not merged.
+       After a merge, start a new big plan instead.
+    2. Inspect the completed phases' outcomes and review findings. Record new
        findings in a quality report.
-    2. Draft the new small plans as `planned`, with the next phase letters
+    3. Draft the new small plans as `planned`, with the next phase letters
        and `phase_index` values. Only a knowledge-refresh phase's slug may
        end in `-knowledge-refresh`; the validator counts any slug with that
        suffix (a first draft of this phase's own slug did).
-    3. If the last listed phase is a completed knowledge-refresh phase and the
-       new work changes documentable behavior, append a new
-       `-knowledge-refresh` phase after the new phases.
-    4. Edit the big plan: `status: in-progress`, `current_phase:` the first
+    4. If any listed phase is a knowledge-refresh phase, append one new
+       `-knowledge-refresh` phase after the new phases. The validator
+       requires a plan with knowledge-refresh phases to end with one.
+    5. Edit the big plan: `status: in-progress`, `current_phase:` the first
        new phase, and the new phases appended to `phases:` and to the body
        `## Phases` list in the same order. Update Done Criteria and
        Completion Evidence to name the new final phase. Keep `started_at`
        and the branch fields.
-    5. Never edit a completed phase's small plan, closeout session log,
+    6. Never edit a completed phase's small plan, closeout session log,
        findings report, or receipts (see Immutability under "Session
        Logging"). Never re-persist a completed phase's receipts, even when
        `verify.py` suggests it while the big plan is still `complete`.
-    6. Set the first new phase to `in-progress` when its implementation
+    7. Set the first new phase to `in-progress` when its implementation
        starts. No hook does this on an existing branch.
-    7. Checkpoint the nested `.claude` repository. If the reopened shape
-       needs a validator change, that change belongs to the first new phase,
-       because the installed validator blocks every outer commit until it
-       lands.
-    8. The new final phase meets the same strict terminal gates. Reopening
+    8. Checkpoint the nested `.claude` repository.
+    9. The new final phase meets the same strict terminal gates. Reopening
        defers them; it never escapes them.
   - Keep the subsection short and link to existing sections instead of
     restating them.
