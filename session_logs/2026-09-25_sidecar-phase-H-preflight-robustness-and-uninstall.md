@@ -87,6 +87,26 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
 - Added `tests/test_sidecar_uninstall.py` to this plan's required pytest
   line. The documentation pass (step 11) was delegated to `documenter`.
   VERIFY started.
+- `verify.py phase --format text` PASS (2085 tests); the installed validator
+  passes every plan.
+- Step 11 done by `documenter`:
+  - `README.md`: the Quick Install detection sentence (full is the
+    default with no evidence); in "Personal Sidecar Install", the
+    linked-worktree reason (shared `info/exclude`, per-worktree manifest),
+    the timing of the exclude proof, and "Uninstall" plus a safe "Manual
+    fallback" in place of the manual removal steps; new bullets under
+    "Behavior changes you should know about".
+  - `docs/target-mapping.md`: `--uninstall`, and which command resolves
+    each Git-directory path.
+  - `docs/architecture.md`: the exact source allowlist shared by the
+    validator and the installer.
+  - `docs/sidecar-provider-contract.md` checked and left unchanged: it is
+    Phase A's dated evidence and still matches the code.
+  - One S17 claim ("a second run writes nothing") is not in the current
+    README; its OpenWiki form is Phase I's.
+- REVIEW split into two parallel `reviewer` runs, each with all six
+  profiles: part A (detection, preflight, bytes-safety, sources) and part B
+  (`--uninstall` and the docs).
 
 ## [LEARN] Entries
 
