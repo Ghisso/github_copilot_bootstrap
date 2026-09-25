@@ -3,7 +3,7 @@ name: 2026-09-24_phase-E-sidecar-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 5
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
