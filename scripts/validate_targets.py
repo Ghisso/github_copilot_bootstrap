@@ -16,7 +16,7 @@ import sys
 import tempfile
 import time
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from collections.abc import Sequence
 from typing import Any, TypedDict, Unpack
 
@@ -26,6 +26,8 @@ from generate_targets import (
     CODEX_ROLE_SUPPLEMENT_DELIMITER,
     OPENWIKI_BEGIN_MATCHER,
     ROOT_GUIDANCE_WORKFLOW,
+    SIDECAR_HUMANIZE_CREDIT,
+    SIDECAR_TEXT_REPLACEMENTS,
     SUPPORTED_AGENT_TARGETS,
     antigravity_hook_command,
     render_antigravity_default_agent_contract,
@@ -38,6 +40,10 @@ from generate_targets import (
 from install_bootstrap import copy_generated_tree
 from runtime_ownership import (
     CONSUMER_STATE_PATHS,
+    FULL_INSTALL_ROOT_PATHS,
+    SIDECAR_BRIDGES,
+    SIDECAR_SKILL_WRITE_ROOTS,
+    SIDECAR_SKILLS,
     STATE_DIR_OWNED_README_PATHS,
     bootstrap_root_paths,
     render_restore_script,
@@ -8586,6 +8592,309 @@ def validate_antigravity_manifest_and_skills(errors: list[str]) -> None:
     )
 
 
+# Bootstrap-only paths and tool references the sidecar must never mention: a
+# unit the sidecar does not install, or an MCP tool no sidecar hook exposes
+# (big plan, Decision 4; small plan Phase B step 4).
+SIDECAR_FORBIDDEN_TEXT_TOKENS = (
+    ".claude/instructions/",
+    ".claude/scripts/",
+    ".claude/agents/",
+    ".claude/hooks/",
+    ".claude/review-profiles/",
+    "third_party/",
+    "verify.py",
+    "record_findings",
+    "mcp__",
+    "ctx_",
+)
+
+
+def sidecar_allowed_relative_path(relative_path: PurePosixPath) -> bool:
+    """Return whether a sidecar-tree path is one of the units it installs."""
+    parts = relative_path.parts
+    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+        root_parts = PurePosixPath(write_root).parts
+        depth = len(root_parts)
+        if parts[:depth] != root_parts or len(parts) <= depth:
+            continue
+        skill, *remainder = parts[depth:]
+        if skill not in SIDECAR_SKILLS:
+            return False
+        if remainder == ["SKILL.md"]:
+            return True
+        return remainder == ["LICENSE"] and skill in {"ponytail", "ponytail-review"}
+    return str(relative_path) in SIDECAR_BRIDGES
+
+
+def sidecar_text_errors(relative_path: PurePosixPath, text: str) -> list[str]:
+    """Reject a leftover bootstrap-only reference in one sidecar file's text."""
+    errors: list[str] = []
+    for token in SIDECAR_FORBIDDEN_TEXT_TOKENS:
+        if token in text:
+            errors.append(f"{relative_path} still references {token!r}")
+    for old, _new in SIDECAR_TEXT_REPLACEMENTS:
+        if old in text:
+            errors.append(f"{relative_path} still contains a replaced phrase: {old!r}")
+    return errors
+
+
+def sidecar_license_errors(target_root: Path) -> list[str]:
+    """Require the vendored MIT notice and the humanize credit at every root."""
+    errors: list[str] = []
+    upstream_license = (
+        REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE"
+    ).read_bytes()
+    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+        for skill in ("ponytail", "ponytail-review"):
+            license_path = target_root / write_root / skill / "LICENSE"
+            if (
+                not license_path.is_file()
+                or license_path.read_bytes() != upstream_license
+            ):
+                errors.append(f"missing or mismatched sidecar LICENSE: {license_path}")
+        humanize_skill = target_root / write_root / "humanize" / "SKILL.md"
+        if humanize_skill.is_file() and SIDECAR_HUMANIZE_CREDIT not in read(
+            humanize_skill
+        ):
+            errors.append(f"humanize skill missing its credit line: {humanize_skill}")
+    return errors
+
+
+def sidecar_bridge_errors(target_root: Path) -> list[str]:
+    """Require each rendered bridge to carry exactly its client's frontmatter."""
+    errors: list[str] = []
+    for bridge_path, frontmatter in SIDECAR_BRIDGES.items():
+        full_path = target_root / bridge_path
+        if not full_path.is_file():
+            errors.append(f"missing sidecar bridge: {bridge_path}")
+            continue
+        text = read(full_path)
+        if frontmatter:
+            expected_prefix = f"---\n{frontmatter}\n---\n\n"
+            if not text.startswith(expected_prefix):
+                errors.append(f"sidecar bridge missing its frontmatter: {bridge_path}")
+        elif text.startswith("---\n"):
+            errors.append(f"sidecar bridge must not carry frontmatter: {bridge_path}")
+    return errors
+
+
+def sidecar_target_errors(target_root: Path) -> list[str]:
+    """Return every self-containment and allowlist violation in a sidecar tree."""
+    errors: list[str] = []
+    for path in text_files(target_root):
+        relative_path = PurePosixPath(path.relative_to(target_root).as_posix())
+        if not sidecar_allowed_relative_path(relative_path):
+            errors.append(f"sidecar target has a disallowed path: {relative_path}")
+            continue
+        errors.extend(sidecar_text_errors(relative_path, read(path)))
+    errors.extend(sidecar_license_errors(target_root))
+    errors.extend(sidecar_bridge_errors(target_root))
+    return errors
+
+
+def full_install_root_coverage_errors(target_root: Path) -> list[str]:
+    """Reject a full-install file that FULL_INSTALL_ROOT_PATHS does not cover.
+
+    Keeps the unbootstrapped-team-repository refusal list (big plan, Decision
+    18) honest: it must cover every real path the full install writes.
+    """
+    errors: list[str] = []
+    for path in target_root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative_path = PurePosixPath(path.relative_to(target_root).as_posix())
+        covered = any(
+            relative_path == PurePosixPath(root)
+            or PurePosixPath(root) in relative_path.parents
+            for root in FULL_INSTALL_ROOT_PATHS
+        )
+        if not covered:
+            errors.append(f"full install has an uncovered path: {relative_path}")
+    return errors
+
+
+def generate_sidecar_fixture(output_root: Path) -> Path:
+    """Generate a real sidecar tree into a scratch root for self-tests."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "generate_targets.py"),
+            "--target",
+            "sidecar",
+            "--output",
+            str(output_root),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr or result.stdout)
+    return output_root / "sidecar"
+
+
+def validate_sidecar_target(errors: list[str]) -> None:
+    """Validate the real generated `dist/sidecar/` overlay."""
+    target_root = DIST_ROOT / "sidecar"
+    if not target_root.exists():
+        errors.append("missing generated target: sidecar")
+        return
+    errors.extend(sidecar_target_errors(target_root))
+
+
+def validate_sidecar_target_cases(errors: list[str]) -> None:
+    """Prove each sidecar self-containment rule rejects its own violation."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        good_root = generate_sidecar_fixture(Path(temp_dir_name))
+        check(
+            not sidecar_target_errors(good_root),
+            f"a freshly generated sidecar target must pass: "
+            f"{sidecar_target_errors(good_root)}",
+            errors,
+        )
+
+        stray = good_root / ".claude" / "skills" / "ponytail" / "extra.md"
+        write(stray, "stray file\n")
+        check(
+            any(
+                "disallowed path" in error for error in sidecar_target_errors(good_root)
+            ),
+            "a file outside the sidecar allowlist must be rejected",
+            errors,
+        )
+        stray.unlink()
+
+        skill_md = good_root / ".claude" / "skills" / "ponytail" / "SKILL.md"
+        original_skill = read(skill_md)
+        write(
+            skill_md,
+            original_skill
+            + "\nSee `.claude/instructions/code-standards.instructions.md`.\n",
+        )
+        check(
+            any(
+                "still references" in error
+                for error in sidecar_target_errors(good_root)
+            ),
+            "a leftover bootstrap-only path reference must be rejected",
+            errors,
+        )
+        write(skill_md, original_skill + "\nCall `mcp__semble__search` for this.\n")
+        check(
+            any(
+                "still references" in error
+                for error in sidecar_target_errors(good_root)
+            ),
+            "an MCP tool reference must be rejected",
+            errors,
+        )
+        write(
+            skill_md,
+            original_skill
+            + "\nthe workflow's final Ponytail diff review remains mandatory.\n",
+        )
+        check(
+            any(
+                "replaced phrase" in error for error in sidecar_target_errors(good_root)
+            ),
+            "a leftover SIDECAR_TEXT_REPLACEMENTS phrase must be rejected",
+            errors,
+        )
+        write(skill_md, original_skill)
+
+        license_path = good_root / ".claude" / "skills" / "ponytail" / "LICENSE"
+        original_license = license_path.read_bytes()
+        license_path.write_bytes(b"not the upstream license\n")
+        check(
+            any("LICENSE" in error for error in sidecar_target_errors(good_root)),
+            "a mismatched ponytail LICENSE must be rejected",
+            errors,
+        )
+        license_path.unlink()
+        check(
+            any("LICENSE" in error for error in sidecar_target_errors(good_root)),
+            "a missing ponytail LICENSE must be rejected",
+            errors,
+        )
+        license_path.write_bytes(original_license)
+
+        humanize_md = good_root / ".claude" / "skills" / "humanize" / "SKILL.md"
+        original_humanize = read(humanize_md)
+        write(humanize_md, original_humanize.replace(SIDECAR_HUMANIZE_CREDIT, ""))
+        check(
+            any("credit line" in error for error in sidecar_target_errors(good_root)),
+            "a humanize skill missing its credit line must be rejected",
+            errors,
+        )
+        write(humanize_md, original_humanize)
+
+        github_bridge = (
+            good_root
+            / ".github"
+            / "instructions"
+            / "ai-bootstrap-sidecar.instructions.md"
+        )
+        original_github_bridge = read(github_bridge)
+        write(github_bridge, original_github_bridge.split("\n\n", 1)[-1])
+        check(
+            any(
+                "missing its frontmatter" in error
+                for error in sidecar_target_errors(good_root)
+            ),
+            "a Copilot bridge missing its frontmatter must be rejected",
+            errors,
+        )
+        write(github_bridge, original_github_bridge)
+
+        claude_bridge = good_root / ".claude" / "rules" / "ai-bootstrap-sidecar.md"
+        original_claude_bridge = read(claude_bridge)
+        write(claude_bridge, "---\nsomething: true\n---\n\n" + original_claude_bridge)
+        check(
+            any(
+                "must not carry frontmatter" in error
+                for error in sidecar_target_errors(good_root)
+            ),
+            "a Claude bridge that adds frontmatter must be rejected",
+            errors,
+        )
+        write(claude_bridge, original_claude_bridge)
+
+        check(
+            not sidecar_target_errors(good_root),
+            "sidecar target must be restored to a clean state after every case",
+            errors,
+        )
+
+
+def full_install_root_coverage_cases(errors: list[str]) -> None:
+    """Prove the FULL_INSTALL_ROOT_PATHS coverage rule rejects an uncovered file."""
+    with tempfile.TemporaryDirectory() as temp_dir_name:
+        target_root = Path(temp_dir_name)
+        write(target_root / "CLAUDE.md", "generated\n")
+        write(target_root / ".claude" / "settings.json", "{}\n")
+        check(
+            not full_install_root_coverage_errors(target_root),
+            "a full install using only covered root paths must pass",
+            errors,
+        )
+
+        write(target_root / ".vscode" / "extensions.json", "{}\n")
+        check(
+            any(
+                "uncovered path" in error
+                for error in full_install_root_coverage_errors(target_root)
+            ),
+            "a full-install file outside FULL_INSTALL_ROOT_PATHS must be rejected",
+            errors,
+        )
+
+
+def validate_full_install_root_coverage(errors: list[str]) -> None:
+    """Reject any real dist/multi-agent file FULL_INSTALL_ROOT_PATHS misses."""
+    errors.extend(full_install_root_coverage_errors(TARGET_ROOT))
+
+
 def validate_generated_hygiene(errors: list[str]) -> None:
     for path in DIST_ROOT.rglob("*"):
         if path.name == "__pycache__" or path.suffix == ".pyc":
@@ -11352,6 +11661,10 @@ def main() -> int:
         validate_antigravity_manifest_and_skills(errors)
         validate_context_mode_tool_surface(errors)
         validate_skills_and_paths(errors)
+        validate_sidecar_target(errors)
+        validate_sidecar_target_cases(errors)
+        validate_full_install_root_coverage(errors)
+        full_install_root_coverage_cases(errors)
         validate_docs_parity(errors)
         validate_memory_security_authority(errors)
         validate_routing_table_parity(errors)

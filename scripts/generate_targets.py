@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from runtime_ownership import (
+    SIDECAR_BRIDGES,
+    SIDECAR_SKILL_WRITE_ROOTS,
+    SIDECAR_SKILLS,
     render_restore_script,
     restore_manifest,
 )
@@ -21,7 +24,7 @@ from runtime_ownership import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "dist"
-TARGETS = ("multi-agent",)
+TARGETS = ("multi-agent", "sidecar")
 # The exact-name matcher both hosts observed for an MCP tool call
 # (`mcp__<server>__<tool>`; docs/2026-09-19-openwiki-hook-mechanics-spike.md
 # U2), guarding OpenWiki's one repository-mutating entry point.
@@ -148,6 +151,35 @@ TARGET_PATH_REPLACEMENTS = {
         ("copilot-instructions.md", "AGENTS.md"),
     ),
 }
+
+# The plain MIT credit that replaces humanize's bootstrap-relative citation of
+# the vendored `avoid-ai-writing` snapshot in the sidecar overlay (Decision 4).
+# A named constant, not an inline literal, so validate_targets.py can require
+# its exact presence without duplicating the string.
+SIDECAR_HUMANIZE_CREDIT = (
+    "credited to `avoid-ai-writing v3.25.0` by Conor Bronsdon (MIT)."
+)
+
+# Rewrites the four sidecar skills' remaining bootstrap-only references to
+# repository-neutral wording (big plan, Decision 4). Applied uniformly to both
+# sidecar write roots: none of SIDECAR_SKILLS contains a client-specific
+# string, unlike TARGET_PATH_REPLACEMENTS, which stays keyed by client names.
+SIDECAR_TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    (
+        "informed by the inert\n"
+        "`avoid-ai-writing v3.25.0` snapshot in\n"
+        "`../../third_party/avoid-ai-writing/`.",
+        SIDECAR_HUMANIZE_CREDIT,
+    ),
+    (
+        "the workflow's final Ponytail diff review remains mandatory.",
+        "running `ponytail-review` on any non-trivial diff remains expected.",
+    ),
+    (
+        "Return findings to the coder",
+        "Return findings to whoever changes the diff",
+    ),
+)
 
 ROOT_GUIDANCE_WORKFLOW = (
     "PRE-FLIGHT -> BRANCH -> PLAN WHEN NEEDED -> IMPLEMENT -> VERIFY -> REVIEW -> "
@@ -1736,11 +1768,44 @@ def render_multi_agent(target_root: Path) -> None:
     render_antigravity(target_root)
 
 
+def render_sidecar(target_root: Path) -> None:
+    """Render the sidecar overlay: allowlisted skills, licenses, and bridges.
+
+    Big plan Decisions 2-5 and 19: a private, per-clone overlay projected into
+    every write root, self-contained (no bootstrap-only reference survives),
+    and carrying its vendored MIT notices.
+    """
+    bridge_body = (REPO_ROOT / "shared" / "sidecar" / "bridge.md").read_text(
+        encoding="utf-8"
+    )
+    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+        for skill in SIDECAR_SKILLS:
+            destination = target_root / write_root / skill
+            copy_tree(REPO_ROOT / "shared" / "skills" / skill, destination)
+            skill_file = destination / "SKILL.md"
+            text = skill_file.read_text(encoding="utf-8")
+            for old, new in SIDECAR_TEXT_REPLACEMENTS:
+                text = text.replace(old, new)
+            skill_file.write_text(text, encoding="utf-8")
+            if skill in {"ponytail", "ponytail-review"}:
+                copy_file(
+                    REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE",
+                    destination / "LICENSE",
+                )
+    for bridge_path, frontmatter in SIDECAR_BRIDGES.items():
+        rendered = (
+            f"---\n{frontmatter}\n---\n\n{bridge_body}" if frontmatter else bridge_body
+        )
+        write_text(target_root / bridge_path, rendered)
+
+
 def generate(targets: list[str], output_root: Path) -> None:
     for target in targets:
         target_root = reset_target(output_root, target)
         if target == "multi-agent":
             render_multi_agent(target_root)
+        elif target == "sidecar":
+            render_sidecar(target_root)
         else:
             raise ValueError(f"unknown target: {target}")
         strip_quarantine(target_root)

@@ -83,6 +83,33 @@ THIRD_PARTY_SKILL_MARKER = ".openwiki-install.json"
 
 INSTALL_MODE_KEY = "BOOTSTRAP_COMMIT_COPILOT_SURFACE"
 
+# Every root path a full install writes. A repository that tracks one of them
+# and carries no bootstrap evidence is team-owned, so a plain install refuses
+# it instead of taking it over.
+FULL_INSTALL_ROOT_PATHS = (".claude", ".devcontainer") + RESTORABLE_ROOT_PATHS
+
+# The sidecar: a private, per-clone overlay inside a team-owned harness. Paths
+# come from the native runs frozen in docs/sidecar-provider-contract.md.
+SIDECAR_SKILLS = ("debug-investigator", "humanize", "ponytail", "ponytail-review")
+SIDECAR_SKILL_WRITE_ROOTS = (".claude/skills", ".agents/skills")
+# Every repository skill folder a supported client reads. A skill name taken
+# in any of them by content the sidecar does not own is skipped everywhere,
+# so a sidecar copy never hides a team skill.
+SIDECAR_SKILL_READ_ROOTS = SIDECAR_SKILL_WRITE_ROOTS + (
+    ".github/skills",
+    ".agent/skills",
+    ".codex/skills",
+)
+# Bridge path -> the frontmatter its client needs ("" means none).
+SIDECAR_BRIDGES = {
+    ".claude/rules/ai-bootstrap-sidecar.md": "",
+    ".github/instructions/ai-bootstrap-sidecar.instructions.md": 'applyTo: "**"',
+}
+SIDECAR_MANIFEST_NAME = "ai-bootstrap-sidecar.json"
+SIDECAR_STAGING_NAME = "ai-bootstrap-sidecar-staging"
+SIDECAR_EXCLUDE_BEGIN = "# BEGIN ai-bootstrap sidecar"
+SIDECAR_EXCLUDE_END = "# END ai-bootstrap sidecar"
+
 
 def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
     """Return install-time ignore patterns for generated runtime overlays."""
