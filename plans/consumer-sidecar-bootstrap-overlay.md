@@ -442,7 +442,7 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-24_phase-D-sidecar-update-and-reconciliation` — make batches skip and report failures, prove updates across bootstrap versions and mixed batches, then document both modes.
 - [x] `2026-09-24_phase-E-sidecar-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit.
 - [x] `2026-09-25_phase-F-reopen-completed-big-plan` — let the plan validator accept a completed earlier knowledge-refresh phase, and write the procedure for reopening a completed big plan (Decision 21).
-- [ ] `2026-09-25_phase-G-sidecar-ownership-and-precedence` — decide taken skills first, prove ownership by record or exclude line, read ownership from the index, preserve edited copies, and gate folders with a trailing slash (Decisions 22-25, 30, 32).
+- [x] `2026-09-25_phase-G-sidecar-ownership-and-precedence` — decide taken skills first, prove ownership by record or exclude line, read ownership from the index, preserve edited copies, and gate folders with a trailing slash (Decisions 22-25, 30, 32).
 - [ ] `2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall` — harden mode detection and preflight, make paths bytes-safe, require complete sources, add `--uninstall`, and correct messages and docs (Decisions 26-29, 31, 33-36).
 - [ ] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
 

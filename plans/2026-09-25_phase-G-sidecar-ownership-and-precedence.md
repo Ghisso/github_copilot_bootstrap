@@ -3,7 +3,8 @@ name: 2026-09-25_phase-G-sidecar-ownership-and-precedence
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 7
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-G-ownership-and-precedence.md
 ---
 
 # Small Plan: Phase G — Sidecar Ownership and Precedence
@@ -73,7 +74,7 @@ report, and `git status --porcelain --untracked-files=all`, not only on
 actions. Run a second run after each scenario and assert that nothing
 changes, and run a dry run and assert that it predicts the same result.
 
-- [ ] **1. Read ownership from the Git index (Decision 25; R4).**
+- [x] **1. Read ownership from the Git index (Decision 25; R4).**
   - **Owner:** `coder`
   - Replace the disk-filtered tracked set in `_build_snapshots`:
     `UnitSnapshot.tracked_files` becomes every index path at or under the
@@ -119,7 +120,7 @@ changes, and run a dry run and assert that it predicts the same result.
     Expect a team takeover: `LICENSE` deleted, `SKILL.md` untouched, no
     preserve.
 
-- [ ] **2. Decide taken skills first (Decision 22; R1, R2, S12, L3, design item 1).**
+- [x] **2. Decide taken skills first (Decision 22; R1, R2, S12, L3, design item 1).**
   - **Owner:** `coder`
   - Keep `plan_sidecar_reconciliation` pure. Add inputs through the
     gathered data, not new I/O inside the planner.
@@ -170,7 +171,7 @@ changes, and run a dry run and assert that it predicts the same result.
     - S15: a foreign copy at a write root plus a `.github/skills` collision
       for the same skill. The report names both paths.
 
-- [ ] **3. Prove ownership with the record or the exclude line (Decision 23; S3).**
+- [x] **3. Prove ownership with the record or the exclude line (Decision 23; S3).**
   - **Owner:** `coder`
   - Add `unescape_exact_path`, the inverse of `escape_exact_path`. Parse the
     sidecar block into unit lines and file lines. A unit line is one whose
@@ -206,7 +207,7 @@ changes, and run a dry run and assert that it predicts the same result.
     - Also check that the invalid-manifest recovery run no longer un-hides
       anything.
 
-- [ ] **4. Preserve edited copies of taken skills (Decision 24; design item 2).**
+- [x] **4. Preserve edited copies of taken skills (Decision 24; design item 2).**
   - **Owner:** `coder`
   - Add action kind `preserve`. The planner emits it for a taken skill's
     locally modified or unfinished unit. `_write_raw_paths` includes it, so
@@ -236,7 +237,7 @@ changes, and run a dry run and assert that it predicts the same result.
     existing destination (conflict, nothing moved), dry run, and the fault
     point.
 
-- [ ] **5. Treat an empty leftover unit folder as absent (S9).**
+- [x] **5. Treat an empty leftover unit folder as absent (S9).**
   - **Owner:** `coder`
   - `_gather_unit` reports `exists=False` for an untracked unit folder that
     holds only folders (no file, symlink, pipe, or socket at any depth).
@@ -245,7 +246,7 @@ changes, and run a dry run and assert that it predicts the same result.
   - Test: team takeover, then the team stops tracking, then the person deletes
     the retained file as told. The rerun reinstalls the skill.
 
-- [ ] **6. Gate skill folders with a trailing slash (Decision 30; S4).**
+- [x] **6. Gate skill folders with a trailing slash (Decision 30; S4).**
   - **Owner:** `coder`
   - `_write_raw_paths` returns `<unit>/` for skill units (bridges stay file
     paths). The gate's expected set and its comparison use the same
@@ -257,7 +258,7 @@ changes, and run a dry run and assert that it predicts the same result.
     exclude file. The common `.claude/*` plus `!.claude/skills/` pattern
     still passes.
 
-- [ ] **7. Stable manifest namespace (Decision 32; L1, L4).**
+- [x] **7. Stable manifest namespace (Decision 32; L1, L4).**
   - **Owner:** `coder`
   - Add `SIDECAR_RETIRED_SKILL_WRITE_ROOTS: tuple[str, ...] = ()` and
     `SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()` to
@@ -269,7 +270,7 @@ changes, and run a dry run and assert that it predicts the same result.
     the old bridge and drops its line, with status unchanged. A manifest with
     a backslash path is invalid.
 
-- [ ] **8. Correct the planner's report and remedies (S15, S16 planner items).**
+- [x] **8. Correct the planner's report and remedies (S15, S16 planner items).**
   - **Owner:** `coder`
   - Use the remedy texts in the big plan's "Remedies printed in the report"
     section (the wording may tighten, the meaning may not change): locally
@@ -281,7 +282,7 @@ changes, and run a dry run and assert that it predicts the same result.
     preserved path, as well as the counts.
   - Tests assert the exact report lines for each category.
 
-- [ ] **9. Document this phase's behavior.**
+- [x] **9. Document this phase's behavior.**
   - **Owner:** `documenter`
   - `README.md` "Personal sidecar install": the preserved folder and how to
     recover from it, the taken-skill rule (index, symlinks, case variants,
@@ -335,11 +336,11 @@ after regenerating and before `verify closeout`.
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
