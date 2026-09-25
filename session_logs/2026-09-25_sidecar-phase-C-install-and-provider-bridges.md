@@ -78,6 +78,20 @@ over by a plain full install.
   path. This also closes Phase A's residual frontmatter risk for these two
   clients: the real skills, with `visibility`, `license`, and
   `argument-hint`, load.
+- Verification on the combined tree before review: Phase C block PASS
+  (159 tests), `validate_targets.py` PASS, full `verify.py phase` PASS
+  (pytest 1866 passed; ruff 0; mypy 0; generated runtime matches source).
+- Review round 1: gate FAIL, 0 critical, 1 major, 2 minor. No defect that
+  deletes, overwrites, exposes, or hides a team file.
+  - MAJOR (tests): no end-to-end test proves a team takeover deletes an
+    untracked file that matches its record; the takeover test used one-file
+    `humanize`, and the fault test's extra file did not match a record.
+  - MINOR (ponytail): `_is_linked_worktree` repeats the `rev-parse` helper
+    from `sidecar_overlay.py`.
+  - MINOR (code): the `sidecar_overlay.py` module docstring still says it
+    never writes to disk.
+  All three sent to coder C2 (C1 is done, so C2 may make the one
+  `install_bootstrap.py` edit).
 
 ## [LEARN] Entries
 
