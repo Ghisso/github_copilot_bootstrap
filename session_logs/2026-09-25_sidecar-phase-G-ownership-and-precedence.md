@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-25_phase-G-sidecar-ownership-and-precedence.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -147,7 +147,23 @@ L3, L4).
 
 ## Verification
 
-Required items are pasted at closeout step 4.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS        0.4s  uv run python scripts/generate_targets.py --all
+PASS       20.7s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py -q --tb=short
+PASS       53.0s  uv run python scripts/validate_targets.py
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`: PASS (ruff, mypy, full pytest,
+freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-25_phase-G-sidecar-ownership-and-precedence.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`). The fixed findings (round 1: one MAJOR; round 2:
+one CRITICAL, two MAJOR, one MINOR; round 3: two MINOR) are recorded in the
+Work Log.
 
 This plan has no `## Optional Verification` section.
 
