@@ -112,6 +112,16 @@ L3, L4).
     sidecar skill's name: only that skill is lost, and no team file changes.
 - `documenter` is adding the kept-and-reported behavior to the README's
   report table. Re-verification started.
+- README row for unrecognized block lines added (`RETAINED`, the remedy
+  quoted verbatim). `verify.py phase --format text` PASS (1977 tests).
+- Review round 3 (six profiles, with live scratch reproductions): all
+  round-2 fixes confirmed, and every taking source is proven through real
+  gathering code. Gate PASS, with two MINOR (`documentation`) findings, both
+  being fixed rather than accepted:
+  - the README intro sentence still said "Two report categories ... left
+    untouched", but `PRESERVED` makes three and moves the copy;
+  - `docs/target-mapping.md` said the preserved folder is found with
+    `--git-path`, but the code builds it from `--git-dir` on purpose.
 
 ## [LEARN] Entries
 
