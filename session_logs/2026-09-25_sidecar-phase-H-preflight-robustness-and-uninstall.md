@@ -127,6 +127,15 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   The docs were checked accurate: the S17 claims are fixed, and the manual
   fallback is safe.
 - All three sent back to `coder`, with tests.
+- Fixes (12 new tests, each failing on the previous code):
+  - `ExcludeBlockContents.has_block`; uninstall's "nothing to do" check is
+    now "no manifest entry and no block".
+  - `_team_takeover(..., uninstall=...)` threaded through `_classify_unit`.
+  - `sidecar_evidence` builds the manifest path from `--git-dir` (checked
+    with `lexists`) and the exclude path from `--git-common-dir` (checked
+    with `lstat`), through the new `_git_rev_parse_or_raise`.
+  The full suite passes (2093). Re-verification and review round 2 (parts
+  A and B) started.
 
 ## [LEARN] Entries
 
