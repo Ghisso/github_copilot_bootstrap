@@ -95,7 +95,23 @@ L3, L4).
     rationale, but untested).
   All four were sent back to `coder`.
 - Note for Phase H: `--uninstall` must keep unrecognized block lines when it
-  removes the block.
+  removes the block. Added to Phase H's plan, step 9.
+- Fixes for round 2 (8 new tests; 186 sidecar tests pass):
+  - Unrecognized block lines now reach the planner (new
+    `unrecognized_lines` parameter). They are kept in both the write and
+    the final block and reported once per run as `RETAINED` with
+    `_unrecognized_line_remedy`. The real-Git tests for a line that hides a
+    personal file and for a garbage line fail on the old code.
+  - `_read_only_taken_remedy` now takes the real taking path. Full remedy
+    strings are asserted for a case-variant test and a frontmatter test,
+    and both fail on the old code.
+  - Real-Git tests for `_ignorecase()` (unset means False, set means True)
+    and an end-to-end `core.ignorecase=true` run against
+    `.github/skills/Ponytail`.
+  - A forward guard for an edited sidecar copy that declares another
+    sidecar skill's name: only that skill is lost, and no team file changes.
+- `documenter` is adding the kept-and-reported behavior to the README's
+  report table. Re-verification started.
 
 ## [LEARN] Entries
 
