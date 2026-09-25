@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-24_phase-E-sidecar-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -69,8 +69,8 @@ at the first failure.
   (`mode: "update"`, run `53dc9bf2-9e4e-4693-a281-d54cc9cb2c05`), a plan of
   those 2 pages, one parenthetical added at each first use, no claim
   change, `openwiki_finish` `complete`. `CLAUDE.md` unchanged, `AGENTS.md`
-  unchanged by the run, no `openwiki/.run.json` left. Sent to the same
-  reviewer to confirm.
+  unchanged by the run, no `openwiki/.run.json` left. The same reviewer
+  confirmed it resolved with no new finding; final gate PASS.
 
 ## Stale-claims surfaces checked
 
@@ -114,8 +114,14 @@ steps 1-2:
 Required items (`verify closeout --format text` summary lines):
 
 ```text
-PENDING
+PASS       57.9s  uv run python scripts/validate_targets.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`verify.py phase --format json --persist`: PASS. Findings report:
+`.claude/quality_reports/findings-2026-09-24_phase-E-sidecar-knowledge-refresh.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`). The one fixed MINOR is recorded in the Work Log.
 
 This plan has no `## Optional Verification` section.
 
