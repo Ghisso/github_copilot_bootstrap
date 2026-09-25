@@ -1230,3 +1230,7 @@
 - [LEARN:testing] Assert on report output, not only on actions: a skip
   caused by a folder that no unit snapshot covers gave the right actions
   and no report, and only a `result.reports` assertion caught it.
+- [LEARN:workflow] Pass `record_findings.py` only the findings that
+  survived the final review round. The commit gate counts every MAJOR in
+  the report whatever its `disposition`, so a fixed MAJOR left in the list
+  blocks the commit. Record fixed findings in the session log instead.

@@ -1,0 +1,35 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-25T05:02:21Z",
+  "branch": "consumer-sidecar-bootstrap-overlay_implementation",
+  "head_sha": "0f490a96ed8d19380d92ef5e072108941ec6e5d6",
+  "base_ref": "dev",
+  "merge_base_sha": "1a06f1e06855a79514640a437478154b4fb00b81",
+  "phase": "2026-09-24_phase-B-sidecar-profile-and-ownership",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "267d8e5cf42cf91216b0adbd35b4a61e11f6bdd5",
+  "changed_files": [
+    "docs/sidecar-provider-contract.md",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/sidecar_overlay.py",
+    "scripts/validate_targets.py",
+    "shared/sidecar/bridge.md",
+    "tests/test_sidecar_overlay.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

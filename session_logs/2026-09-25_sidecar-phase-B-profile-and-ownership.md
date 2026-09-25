@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-24_phase-B-sidecar-profile-and-ownership.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -78,8 +78,10 @@ No consumer repository and no installer CLI change in this phase.
   48 planner tests pass; the coder proved three new tests fail when their
   rules are broken.
 - Review round 2 (same reviewer, fix delta only): gate PASS; all four
-  findings resolved; no new findings. All four recorded with disposition
-  `fixed`.
+  findings resolved; no new findings. The findings report lists surviving
+  findings only, so it is empty: the commit gate counts every MAJOR in the
+  report regardless of disposition. The four fixed findings are recorded
+  here.
 
 ## [LEARN] Entries
 
@@ -95,14 +97,27 @@ No consumer repository and no installer CLI change in this phase.
   skill skipped because of a folder that no unit snapshot covers produced
   the right actions and no report; only a `result.reports` assertion
   catches that.
+- [LEARN:workflow] Pass `record_findings.py` only the findings that
+  survived the final review round; the commit gate counts every MAJOR in
+  the report whatever its `disposition`. Fixed findings belong in the
+  session log.
 
 ## Verification
 
 Required items (`verify closeout --format text` summary lines):
 
 ```text
-PENDING
+PASS        0.4s  uv run python scripts/generate_targets.py --all
+PASS       57.9s  uv run python scripts/validate_targets.py
+PASS       57.7s  uv run pytest tests/test_sidecar_overlay.py tests/test_validate_targets.py -q --tb=short
+PASS       30.2s  uv run pytest tests/test_install_bootstrap.py -q --tb=short
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`verify.py phase --format json --persist`: PASS. Findings report:
+`.claude/quality_reports/findings-2026-09-24_phase-B-sidecar-profile-and-ownership.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`).
 
 Full `verify.py phase` on the final tree (before persisting): PASS (ruff 0,
 mypy 0, pytest 1807 passed, generated runtime matches source).
