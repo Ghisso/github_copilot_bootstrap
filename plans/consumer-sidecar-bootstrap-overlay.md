@@ -15,7 +15,7 @@ phases:
   - 2026-09-25_phase-G-sidecar-ownership-and-precedence
   - 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
   - 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
-current_phase: 2026-09-25_phase-G-sidecar-ownership-and-precedence
+current_phase: 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay

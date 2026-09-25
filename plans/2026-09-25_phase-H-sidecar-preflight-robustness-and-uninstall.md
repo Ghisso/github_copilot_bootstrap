@@ -3,7 +3,7 @@ name: 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 8
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase H — Sidecar Preflight, Robustness, and Uninstall
