@@ -7,6 +7,7 @@ bootstrap refreshes; it is not a manifest of every generated file.
 
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
 from pathlib import Path, PurePath, PurePosixPath
 
 
@@ -119,6 +120,77 @@ SIDECAR_EXCLUDE_END = "# END ai-bootstrap sidecar"
 # through the normal remove row (Decision 32). Both are empty today.
 SIDECAR_RETIRED_SKILL_WRITE_ROOTS: tuple[str, ...] = ()
 SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
+
+# Git's own repository-local environment variables (the exact list
+# ``git rev-parse --local-env-vars`` prints on Git 2.43), plus ``GIT_NAMESPACE``
+# (not included in that list, but equally repository-local). An exported one
+# of these -- typically left behind by a wrapper script or a previous
+# ``git -C`` invocation -- silently redirects every Git call the installer
+# makes to a different repository (Decision 27; S10). Popped from the
+# process's own environment once, at the start of ``install_bootstrap.main()``,
+# before any detection or Git call.
+GIT_REPO_LOCAL_ENV_VARS: tuple[str, ...] = (
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_NAMESPACE",
+)
+
+
+def sidecar_source_exact_allowlist() -> frozenset[str]:
+    """Return the exact set of relative POSIX paths a valid sidecar source
+    must contain (Decision 31): every current ``SIDECAR_SKILLS`` skill's
+    ``SKILL.md`` at every write root, ``LICENSE`` in the ``ponytail`` and
+    ``ponytail-review`` folders (only when the current profile still ships
+    them) at every write root, and every bridge in ``SIDECAR_BRIDGES``.
+
+    Reads the profile constants fresh on every call (module globals, not
+    captured at import time), so a test that monkeypatches ``SIDECAR_SKILLS``
+    (in every module that imported it) gets a matching exact allowlist
+    without weakening this function for real installs.
+    """
+    expected: set[str] = set()
+    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+        for skill in SIDECAR_SKILLS:
+            expected.add(f"{write_root}/{skill}/SKILL.md")
+            if skill in ("ponytail", "ponytail-review"):
+                expected.add(f"{write_root}/{skill}/LICENSE")
+    expected.update(SIDECAR_BRIDGES)
+    return frozenset(expected)
+
+
+def sidecar_source_violations(present: AbstractSet[str]) -> tuple[str, ...]:
+    """Return every way a candidate sidecar source tree fails the exact
+    source contract (Decision 31; S13, S14, L2).
+
+    ``present`` is the set of relative POSIX file paths actually found in
+    the candidate tree. Shared by ``scripts/sidecar_overlay.py`` (the
+    installer's own ``--source`` check) and ``scripts/validate_targets.py``
+    (the generated-target validator), so a crafted tree gets the same
+    verdict from both: a plain set comparison against
+    ``sidecar_source_exact_allowlist()``, so a half-rendered tree that is
+    merely internally self-consistent (for example two of four skills at
+    both write roots, or no bridges at all) is refused, not silently
+    accepted as a smaller-but-valid profile.
+    """
+    expected = sidecar_source_exact_allowlist()
+    violations = [f"missing {path}" for path in sorted(expected - set(present))]
+    violations.extend(
+        f"unexpected path: {path}" for path in sorted(set(present) - expected)
+    )
+    return tuple(violations)
 
 
 def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
