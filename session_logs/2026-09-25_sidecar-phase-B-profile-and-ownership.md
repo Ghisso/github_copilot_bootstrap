@@ -58,6 +58,16 @@ No consumer repository and no installer CLI change in this phase.
   `test_install_bootstrap.py` 52 passed; `verify.py fast` PASS.
 - Review started with `code`, `architecture`, `security`, `tests`,
   `ponytail`.
+- Full `verify.py phase` (not persisted) on the pre-review tree: PASS
+  (ruff 0, mypy 0, pytest 1804 passed, generated runtime matches source).
+- Review round 1: gate FAIL, 0 critical, 2 major, 2 minor. The reviewer
+  accepted interpretation calls 1, 3, and 4 and turned call 2 into a minor.
+  - MAJOR: a skill taken only in a read-only folder is skipped with no
+    report (Decision 8 says "skipped and reported").
+  - MAJOR: the anti-shadow `update` -> `remove` conversion has no test.
+  - MINOR: the bridge wording of the team-owned remedy has no test.
+  - MINOR (ponytail): `retained` stores hashes that no decision reads.
+  All four sent back to the planner coder to fix.
 
 ## [LEARN] Entries
 
