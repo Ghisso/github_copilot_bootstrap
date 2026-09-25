@@ -59,6 +59,34 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
   foreign unit, which the sidecar never writes into.
 - Coder run 2 (the same agent, keeping its context): fix the completeness
   check, then step 9 (`--uninstall`) with every listed scenario.
+- Run 2 landed:
+  - `sidecar_source_exact_allowlist()` builds the exact required set from
+    the live profile constants; `sidecar_source_violations` reports each
+    missing and each unexpected path. It is shared by the installer and
+    `validate_targets.py`, and the validator's own license and bridge
+    checks are unchanged.
+  - Tests that use a reduced profile now go through
+    `patch_sidecar_skills` / `install_sidecar_with_profile` in
+    `tests/sidecar_test_helpers.py`, which patch `SIDECAR_SKILLS` in both
+    modules. The test fixture always writes both bridges and the Ponytail
+    licenses.
+  - New refusal tests for a source with 2 of 4 skills, a missing bridge,
+    and a missing license.
+  - `--uninstall`: `_run_uninstall` runs before mode detection, so the
+    team-config refusal cannot apply. `uninstall_sidecar` shares
+    `_run_target_preflight` with the install, and the planner runs with
+    `uninstall=True` (every skill and bridge treated as taken; retained
+    files un-hidden and reported). `_remove_exclude_block` writes
+    unrecognized lines back as plain lines. The order is: units, fault
+    point `after_units_removed`, the block, fault point
+    `before_manifest_write`, the manifest, then the staging folder is
+    removed. A preserve conflict exits 1.
+  - 21 tests in the new file `tests/test_sidecar_uninstall.py`.
+  Results: the full `tests/` suite passes (2085); ruff, mypy,
+  `validate_targets.py`, and `verify.py fast` pass.
+- Added `tests/test_sidecar_uninstall.py` to this plan's required pytest
+  line. The documentation pass (step 11) was delegated to `documenter`.
+  VERIFY started.
 
 ## [LEARN] Entries
 
