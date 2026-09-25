@@ -92,6 +92,21 @@ over by a plain full install.
     never writes to disk.
   All three sent to coder C2 (C1 is done, so C2 may make the one
   `install_bootstrap.py` edit).
+- Fixes: both takeover tests now use the two-file `ponytail` unit
+  (`SKILL.md` tracked by the team, `LICENSE` hash-matching, plus an
+  untracked `user-notes.txt`) and assert `LICENSE` deleted, the user file
+  retained and hidden, and status unchanged; the fault test also asserts
+  the pre-rerun state; both fail when the delete is disabled. One shared
+  public `rev_parse` helper in `sidecar_overlay.py`, used by
+  `_is_linked_worktree`. Module docstring describes both roles.
+  Verification after the fixes: Phase C block PASS (159), validator PASS,
+  full `verify.py phase` PASS (pytest 1866 passed).
+- Review round 2 (fix delta): all three resolved; gate PASS; one new MINOR:
+  the reworked tests used the bare `_commit` helper (`git add -A`) next to
+  an untracked sidecar file. The orchestrator switched both calls to
+  `_commit_staged` (the file was already staged with `git add -f`); the two
+  tests and all 159 Phase C tests pass. Sent to the same reviewer to
+  confirm.
 
 ## [LEARN] Entries
 
@@ -115,10 +130,23 @@ over by a plain full install.
 
 ## Verification
 
-Pending.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PENDING
+```
+
+- optional 1: PASS — orchestrator, 2026-09-25: sidecar installed into a clean `git clone` of the Phase A fixture's committed team state; `git status` unchanged, `installed 10`, rerun `unchanged 10` with byte-identical exclude file and manifest; one native check per skill root: Claude Code 2.1.226 loaded the four skills from `.claude/skills/` and the Claude bridge, Codex 0.147.0 listed the four skills at `.agents/skills/` (details in the Work Log). Copilot was not rerun; its Phase A native evidence stands.
+
+## Documentation
+
+Not applicable for this phase, by the approved plan: Phase D owns the
+README and `docs/` changes for both modes. This phase updated the
+installer's module docstring and `--help` text for `--mode`. Phase D's
+plan now also covers the fresh-clone case found here.
 
 ## Open Questions / Next Steps
 
-- Integrate both coders' work, run the Phase C verification block and the
-  full phase verifier, then review with `code`, `architecture`, `security`,
-  `tests`, `ponytail`.
+- Next: Phase D (`2026-09-24_phase-D-sidecar-update-and-reconciliation`):
+  batch skip-and-report in `update_consumers.py`, the upgrade regression
+  suite, and README/docs for both modes.
