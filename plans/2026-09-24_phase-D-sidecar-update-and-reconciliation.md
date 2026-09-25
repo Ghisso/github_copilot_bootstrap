@@ -113,6 +113,10 @@ second update path.
   - Add the sidecar projection table (write roots, read roots, and bridges)
     to `docs/target-mapping.md`, and point at
     `docs/sidecar-provider-contract.md` for evidence.
+  - From the Phase A native runs: Antigravity is unverified for sidecar v1
+    (no rules-file bridge ships), Codex is skill-only, and Copilot's Local
+    agent loads both the `.github/instructions/` and `.claude/rules/`
+    bridges, so it sees the same bridge text twice.
   - Do not describe the sidecar as equivalent to the full bootstrap.
 
 ## Acceptance Criteria

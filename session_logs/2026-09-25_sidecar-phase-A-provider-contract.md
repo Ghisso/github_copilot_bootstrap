@@ -69,6 +69,33 @@ test code changes in this phase.
     `command_execution` items; reply lists the same three skills and the
     `AGENTS.md` marker.
 - Fixture unchanged after both probes (empty status, still 7 ignored).
+- Step 3, Copilot in VS Code 1.139.0 (built-in Copilot Chat 0.67.0, WSL
+  remote), run by the user:
+  - Local agent: prompt with no tool steps quoted both bridge markers
+    (`.github/instructions` and `.claude/rules`), `copilot-instructions.md`,
+    `AGENTS.md`, and `CLAUDE.md`. Each sidecar skill listed once, from
+    `.agents/skills/`. `/sidecar-marker-b` -> `SIDECAR-MARKER-B-AGENTS`: the
+    sidecar copy hid the team's `.github/skills/sidecar-marker-b` (native
+    evidence for Decision 8). The `/sidecar-marker-a` reply was not captured
+    (the paste repeated the marker-b reply).
+  - Agent Host, Copilot harness: prompt quoted the `.github/instructions`
+    bridge, `copilot-instructions.md`, `AGENTS.md`, `CLAUDE.md`; not the
+    `.claude/rules` bridge. Skills listed once each. `/sidecar-marker-a` ->
+    `.agents` copy. `/sidecar-marker-b` -> `-GITHUB-TEAM`, but weak: the
+    agent ran terminal commands and read all three copies first.
+- Step 4 (owner changed from `coder` to orchestrator, because the
+  orchestrator held the raw observations): froze the matrix and the read
+  list, write list, and bridge lists in `docs/sidecar-provider-contract.md`.
+  Write list: `.claude/skills/`, `.agents/skills/`. Bridges:
+  `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) and
+  `.github/instructions/ai-bootstrap-sidecar.instructions.md`
+  (`applyTo: "**"`). Read list adds `.github/skills/` (native-run),
+  `.agent/skills/` (documented), `.codex/skills/` (source).
+- Step 5, decision gate: proceed. The only change from the expected layout
+  is that the Antigravity bridge does not ship (Antigravity
+  `unavailable`). The plan already made it conditional, so no planner
+  revision; one-line notes added to Phase B step 2 and Phase D step 4.
+  `validate_plan_frontmatter.py` exits 0 after the edits.
 
 ## [LEARN] Entries
 

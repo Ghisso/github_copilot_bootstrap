@@ -73,8 +73,13 @@ Do not hand-edit `dist/`.
   - Copy `shared/third_party/ponytail/LICENSE` as `LICENSE` into `ponytail/`
     and `ponytail-review/` at both roots (big plan, Decision 19).
   - Render each proven bridge from `shared/sidecar/bridge.md`, adding only
-    its client's frontmatter: none for Claude Code, `applyTo: "**"` for
-    Copilot, and `trigger: always_on` for Antigravity.
+    its client's frontmatter: none for Claude Code and `applyTo: "**"` for
+    Copilot. Phase A (2026-09-25, `docs/sidecar-provider-contract.md`,
+    Step 4) proved exactly two bridges:
+    `.claude/rules/ai-bootstrap-sidecar.md` and
+    `.github/instructions/ai-bootstrap-sidecar.instructions.md`.
+    Antigravity was `unavailable`, so `.agents/rules/ai-bootstrap-sidecar.md`
+    is not rendered, and no `trigger: always_on` branch is written.
   - `dist/multi-agent/` output must not change.
 
 - [ ] **3. Write the bridge body.**
