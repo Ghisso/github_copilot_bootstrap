@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-25
 **Plan:** `.claude/plans/2026-09-24_phase-D-sidecar-update-and-reconciliation.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -75,8 +75,17 @@ document full and sidecar installation.
 Required items (`verify closeout --format text` summary lines):
 
 ```text
-PENDING
+PASS        0.5s  uv run python scripts/generate_targets.py --all
+PASS       54.9s  uv run python scripts/validate_targets.py
+PASS       47.4s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_install_bootstrap.py -q --tb=short
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
 ```
+
+`verify.py phase --format json --persist`: PASS (full suite 1883 passed in
+the run just before). Findings report:
+`.claude/quality_reports/findings-2026-09-24_phase-D-sidecar-update-and-reconciliation.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`).
 
 - optional 1: NOT RUN — no clone of a real team repository with configuration for all four clients is available in this session. Partial substitute by the orchestrator, 2026-09-25: `update_consumers.py --skip-regen` on the Phase C sidecar clone (tracked `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, team skills in three folders) detected sidecar mode, reported `unchanged 10` and `All projects updated.`; `git status --porcelain --untracked-files=all` empty before and after; `info/exclude` and manifest SHA-256 identical before and after. The four-client batch behavior is covered by `tests/test_sidecar_update.py`.
 

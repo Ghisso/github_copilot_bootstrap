@@ -1,0 +1,45 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-25T07:03:45Z",
+  "branch": "consumer-sidecar-bootstrap-overlay_implementation",
+  "head_sha": "4ad6b9cb6b40bf0924daa56ec90da5d376147fab",
+  "base_ref": "dev",
+  "merge_base_sha": "1a06f1e06855a79514640a437478154b4fb00b81",
+  "phase": "2026-09-24_phase-D-sidecar-update-and-reconciliation",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "3e7c7d8b187047e74673b2da1797f04611845d45",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "docs/sidecar-provider-contract.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/sidecar_overlay.py",
+    "scripts/update_consumers.py",
+    "scripts/validate_targets.py",
+    "shared/sidecar/bridge.md",
+    "tests/sidecar_test_helpers.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_sidecar_install.py",
+    "tests/test_sidecar_overlay.py",
+    "tests/test_sidecar_update.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
