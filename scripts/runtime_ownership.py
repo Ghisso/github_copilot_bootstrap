@@ -107,8 +107,18 @@ SIDECAR_BRIDGES = {
 }
 SIDECAR_MANIFEST_NAME = "ai-bootstrap-sidecar.json"
 SIDECAR_STAGING_NAME = "ai-bootstrap-sidecar-staging"
+# Edited copies of a taken skill are moved here instead of staying discoverable
+# next to a team skill (Decision 24). Never emptied by the sidecar itself.
+SIDECAR_PRESERVED_NAME = "ai-bootstrap-sidecar-preserved"
 SIDECAR_EXCLUDE_BEGIN = "# BEGIN ai-bootstrap sidecar"
 SIDECAR_EXCLUDE_END = "# END ai-bootstrap sidecar"
+
+# A future version may retire a write root or a bridge. Manifest validation
+# keeps accepting these so an existing install does not abort on schema
+# validation; a recorded unit outside the current desired set still goes
+# through the normal remove row (Decision 32). Both are empty today.
+SIDECAR_RETIRED_SKILL_WRITE_ROOTS: tuple[str, ...] = ()
+SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
 
 
 def active_ignore_patterns(commit_copilot_surface: bool) -> tuple[str, ...]:
