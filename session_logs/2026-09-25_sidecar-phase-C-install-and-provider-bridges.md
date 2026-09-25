@@ -105,8 +105,10 @@ over by a plain full install.
   the reworked tests used the bare `_commit` helper (`git add -A`) next to
   an untracked sidecar file. The orchestrator switched both calls to
   `_commit_staged` (the file was already staged with `git add -f`); the two
-  tests and all 159 Phase C tests pass. Sent to the same reviewer to
-  confirm.
+  tests and all 159 Phase C tests pass. The same reviewer confirmed it
+  resolved with no new finding; final gate PASS. The findings report lists
+  surviving findings only, so it is empty; the four fixed findings are
+  recorded here.
 
 ## [LEARN] Entries
 

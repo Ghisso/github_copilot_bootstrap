@@ -3,8 +3,8 @@ name: 2026-09-24_phase-C-sidecar-install-and-provider-bridges
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-C-install-and-provider-bridges.md
 ---
 
 # Small Plan: Phase C — Sidecar Install and Provider Bridges
@@ -41,7 +41,7 @@ empty repository or calls `copy_generated_tree` directly.
 
 ## Steps
 
-- [ ] **1. Add the CLI mode.**
+- [x] **1. Add the CLI mode.**
   - **Owner:** `coder`
   - Add `--mode {full,sidecar}`. Omitting it keeps today's default except
     for the new refusals in step 2.
@@ -53,7 +53,7 @@ empty repository or calls `copy_generated_tree` directly.
     `--local-only` is accepted as a no-op (big plan, Decision 13). In sidecar
     mode, `validate_install_roots` always receives `allow_self=False`.
 
-- [ ] **2. Add mode detection.**
+- [x] **2. Add mode detection.**
   - **Owner:** `coder`
   - One function in `install_bootstrap.py` implements the big plan's mode
     table. That includes the linked-worktree abort (Decision 15), the
@@ -74,7 +74,7 @@ empty repository or calls `copy_generated_tree` directly.
     also says to run `bash .devcontainer/state-sync.sh setup` first, or to
     pass `--mode full`.
 
-- [ ] **3. Run preflight.**
+- [x] **3. Run preflight.**
   - **Owner:** `coder`
   - Gather the planner inputs with Git, always with
     `--path-format=absolute`, because `--git-path` prints a relative path in
@@ -88,7 +88,7 @@ empty repository or calls `copy_generated_tree` directly.
     Git older than 2.31, a Git directory on a different filesystem from the
     worktree, and a symlinked `info/exclude` included.
 
-- [ ] **4. Write the exclude block and prove it.**
+- [x] **4. Write the exclude block and prove it.**
   - **Owner:** `coder`
   - Create `info/` when it is missing. Keep one marked block. It holds one
     anchored unit line with no trailing slash, for example
@@ -107,7 +107,7 @@ empty repository or calls `copy_generated_tree` directly.
   - The gate is one function that takes candidate exclude text, so dry-run
     can call it without writing `info/exclude`.
 
-- [ ] **5. Apply the plan.**
+- [x] **5. Apply the plan.**
   - **Owner:** `coder`
   - Empty the staging folder, then execute the Phase B actions: install,
     update, remove, adopt, drop, and team takeover cleanup. There are no
@@ -121,14 +121,14 @@ empty repository or calls `copy_generated_tree` directly.
     and empty the staging folder.
   - Write the exclude file and the manifest only when their bytes change.
 
-- [ ] **6. Report the result.**
+- [x] **6. Report the result.**
   - **Owner:** `coder`
   - Print counts for installed, updated, removed, adopted, and unchanged
     units, then one `SKIPPED` or `RETAINED` line per path with its reason and
     remedy.
   - Exit 0 unless preflight aborted.
 
-- [ ] **7. Implement dry-run.**
+- [x] **7. Implement dry-run.**
   - **Owner:** `coder`
   - Run preflight and planning, and call the same ignore-gate function on
     the candidate exclude text through a temporary `core.excludesFile`.
@@ -137,7 +137,7 @@ empty repository or calls `copy_generated_tree` directly.
   - Say in the output that the dry-run gate is an approximation: Git ranks
     `info/exclude` above `core.excludesFile`, so the real run's gate decides.
 
-- [ ] **8. Add failing-first installer tests.**
+- [x] **8. Add failing-first installer tests.**
   - **Owner:** `coder`
   - Required cases:
 
@@ -225,11 +225,11 @@ uv run python .claude/scripts/verify.py fast --format json
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
