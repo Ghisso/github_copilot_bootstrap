@@ -272,6 +272,9 @@ real run and the dry run.
     - team and foreign content is untouched;
     - retained files lose their lines, so they become visible. Each is
       reported as now visible to `git add -A`.
+  - Lines inside the block that the sidecar does not recognize (Phase G keeps
+    and reports them) are never dropped: when the block is removed, write
+    them back as plain lines where the block was, and report each one.
   - Order: move or remove every unit first. Only then remove the whole
     block, then delete the manifest, then remove the staging folder. When a
     preserve destination already exists, keep that unit and its line, keep

@@ -79,6 +79,23 @@ L3, L4).
   `test_own_installed_copies_never_take_their_own_skill`. 178 sidecar tests
   and 75 installer tests pass; ruff, mypy, `validate_targets.py`, and
   `verify.py fast` pass. Re-verification and review round 2 started.
+- `verify.py phase --format text` PASS (1969 tests).
+- Review round 2 confirmed the frontmatter fix and found new problems, each
+  reproduced live:
+  - CRITICAL (`code`): unrecognized lines inside the sidecar block are
+    silently dropped. `ExcludeBlockContents.unrecognized_lines` is computed
+    but never read; the orchestrator confirmed this with `grep`. This breaks
+    step 3's "keep and report once" rule.
+  - MAJOR (`code`): `_read_only_taken_remedy` rebuilds `folder/skill`, so
+    case-variant and frontmatter collisions name a path that does not
+    exist.
+  - MAJOR (`tests`): `_ignorecase()` is never run against real Git.
+  - MINOR (`tests`): no guard test for the sidecar's own edited copy
+    declaring another sidecar skill's name (accepted by Decision 22's
+    rationale, but untested).
+  All four were sent back to `coder`.
+- Note for Phase H: `--uninstall` must keep unrecognized block lines when it
+  removes the block.
 
 ## [LEARN] Entries
 
