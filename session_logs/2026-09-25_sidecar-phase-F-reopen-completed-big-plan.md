@@ -57,6 +57,11 @@ workflow instructions (big plan, Decision 21).
   `ponytail`, and `documentation`. Orchestrator note for the fix loop: the
   new subsection calls the Knowledge-Refresh exemption "above", but that
   section comes later in the file.
+- Review round 1: no CRITICAL or MAJOR. Two MINOR, both fixed rather than
+  accepted: (1) `documentation`, the "above" cross-reference in the new
+  subsection should say "below"; (2) `ponytail` shrink, the slug regex was
+  duplicated in `scripts/validate_plan_frontmatter.py` instead of one
+  module-level `PHASE_SLUG_PATTERN` constant. Fixes delegated to `coder`.
 
 ## [LEARN] Entries
 
