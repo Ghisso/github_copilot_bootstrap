@@ -20,6 +20,28 @@ L3, L4).
   workflow text; nothing in this phase's scope depends on it.
 - IMPLEMENT: steps 1-8 delegated to `coder`; step 9 (docs) to `documenter`
   after the code lands.
+- Coder round 1 landed steps 1-8: index-based ownership (`_read_index_entries`,
+  `_unit_index_relpaths`), taken skills first with an allowlist of outcomes
+  (`_ALLOWED_TAKEN_OUTCOMES`, `_convert_for_taken_skill`), symlinked and
+  case-variant read folders, frontmatter names, block parsing
+  (`unescape_exact_path`, `parse_exclude_block`), the unfinished outcome, the
+  `preserve` action (`preserved_unit_slug`, `SIDECAR_PRESERVED_NAME`), empty
+  unit folders as absent, `<unit>/` gate spelling, retired-namespace
+  constants and backslash rejection, and the new remedies and per-path report
+  lines. It found and fixed a real defect while testing L1: six call sites
+  checked only the current bridges, so a retired bridge would have been
+  gathered as an empty folder. Deviation accepted: the existing
+  `excluded_units` parameter serves as the plan's "listed" set. Results: 161
+  sidecar tests and 75 installer tests pass; ruff, mypy, `validate_targets.py`,
+  and `verify.py fast` pass; `check_runtime.py` reports the expected stale
+  installed `runtime_ownership.py` until the closeout self-install.
+- The coder skipped some of the plan's listed regression scenarios. Sent
+  back to add them: the case-insensitive team takeover (a MAJOR from the plan
+  review), three R1 siblings, sparse checkout, `skip-worktree`, takeover then
+  local delete, a tracked bridge deleted locally, two S3 real-Git scenarios,
+  the named-pipe `SKILL.md`, and exact per-path report lines.
+- Step 9 delegated to `documenter` in parallel (`README.md`,
+  `docs/target-mapping.md` only).
 
 ## [LEARN] Entries
 
