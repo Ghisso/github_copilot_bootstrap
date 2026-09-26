@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26
 **Plan:** `.claude/plans/2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -94,6 +94,20 @@ knowledge-refresh phase.
   the planner's `kept_conflicts` as the authoritative set (O3).
 
 ## Verification
+
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS       53.3s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`: PASS (ruff, mypy, full pytest
+with 2143 passed, freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh.json`
+(0 critical, 0 major, 0 minor; `ponytail_reviewed=true`). The plan has no
+optional verification items.
 
 ## Stale-claims surfaces checked
 
