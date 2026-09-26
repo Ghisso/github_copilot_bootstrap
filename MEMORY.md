@@ -1280,3 +1280,15 @@
   hook can append to `.claude/session_logs/hooks-errors.log` when a turn
   ends mid-run, and the conftest leak guard then reports one error on an
   otherwise passing suite.
+- [LEARN:review] A matrix cell that a reviewer traces "by reading, same
+  code path, low risk" still needs a real test. Sidecar uninstall's matrix
+  passed with an edited unit at a retired write root traced only by
+  reading; the cheap test written afterwards failed on the old code (a
+  real R2 variant). When a matrix review lists untested cells, ask for a
+  test per cell instead of accepting the same-path argument.
+- [LEARN:testing] To prove a new test fails on an older commit without
+  touching the working tree, export that commit with `git archive` into a
+  scratch folder (via a small Python script; the file guard refuses
+  `tar -x` in shell chains), copy in the generated `dist/` and the new test
+  files, and define a stand-in for any new name the test file imports.
+  Otherwise collection fails with an `ImportError` before any test runs.

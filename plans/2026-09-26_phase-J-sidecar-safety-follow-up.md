@@ -3,7 +3,8 @@ name: 2026-09-26_phase-J-sidecar-safety-follow-up
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 10
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-26_sidecar-phase-J-safety-follow-up.md
 ---
 
 # Small Plan: Phase J — Sidecar Safety Follow-up
@@ -90,7 +91,7 @@ Test rules for every step (Decision 47):
 - Never open a named pipe; run pipe scenarios in a subprocess with a
   timeout.
 
-- [ ] **1. Git line splitting (Decision 42; O5).**
+- [x] **1. Git line splitting (Decision 42; O5).**
   - **Owner:** `coder`
   - One helper splits exclude text on `\n` only and ignores one trailing
     `\r` when comparing, while writes keep the original bytes. Use it in
@@ -102,7 +103,7 @@ Test rules for every step (Decision 47):
       separate pattern line, and a team `app/src/main.py` stays visible.
     - Guard: a CRLF block still works, and the existing escape tests pass.
 
-- [ ] **2. Repository boundaries at units (Decision 37; R1, O1).**
+- [x] **2. Repository boundaries at units (Decision 37; R1, O1).**
   - **Owner:** `coder`
   - Gathering detects a `.git` entry (file or folder) at any depth in a
     unit folder without following symlinks, stops hashing below it, and
@@ -149,7 +150,7 @@ Test rules for every step (Decision 47):
       or a `git` shim on `PATH` that exits 128. The run aborts naming
       Git's message, and nothing is written.
 
-- [ ] **3. Complete snapshots (Decision 38; R4, O9, the O17 special-file bullet).**
+- [x] **3. Complete snapshots (Decision 38; R4, O9, the O17 special-file bullet).**
   - **Owner:** `coder`
   - A unit folder with no non-folder entry at any depth and no unreadable
     subfolder counts as absent, and install replaces it. Otherwise
@@ -184,7 +185,7 @@ Test rules for every step (Decision 47):
       visible.
     - Guard: a symlinked ancestor still aborts.
 
-- [ ] **4. Retained files of dropped skills (Decision 43; O4).**
+- [x] **4. Retained files of dropped skills (Decision 43; O4).**
   - **Owner:** `coder`
   - `required_snapshot_units` also adds the owning unit of every file line
     in the block.
@@ -193,7 +194,7 @@ Test rules for every step (Decision 47):
     `notes.md` stays hidden and reported. Uninstall reports it as now
     visible.
 
-- [ ] **5. Planner gate paths (Decision 40; O10, O11).**
+- [x] **5. Planner gate paths (Decision 40; O10, O11).**
   - **Owner:** `coder`
   - The planner returns the gate paths next to the exclude lines, from
     what it already knows about each path and unit type:
@@ -218,7 +219,7 @@ Test rules for every step (Decision 47):
       exits 0 and reports it as locally modified and still hidden, with no
       gate failure.
 
-- [ ] **6. Uninstall on the install's write order (Decision 39; R2, O2, O3, O18).**
+- [x] **6. Uninstall on the install's write order (Decision 39; R2, O2, O3, O18).**
   - **Owner:** `coder`
   - Planner: during uninstall, every classified unit is taken (`taken_units`
     is every unit in `outcomes`), including dropped skills, retired roots,
@@ -265,7 +266,7 @@ Test rules for every step (Decision 47):
     - Every fault point converges on rerun, and every existing uninstall
       test still passes.
 
-- [ ] **7. Accurate reports and the NITs (Decisions 44, 46; O12, O15, O16, O17).**
+- [x] **7. Accurate reports and the NITs (Decisions 44, 46; O12, O15, O16, O17).**
   - **Owner:** `coder`
   - While a conflict copy remains, a taken skill's reports say it is kept
     until the conflict is resolved, never "skips at every root".
@@ -282,7 +283,7 @@ Test rules for every step (Decision 47):
     gets a plain full install.
   - Tests assert each message.
 
-- [ ] **8. One path-identity rule for collision sources (Decision 41; R3, O6, O7, O8).**
+- [x] **8. One path-identity rule for collision sources (Decision 41; R3, O6, O7, O8).**
   - **Owner:** `coder`
   - Add one enumerator over the read folders:
     - a read-only folder is listed through its symlink unless it resolves
@@ -309,7 +310,7 @@ Test rules for every step (Decision 47):
     - Guard: `.github/skills -> ../.claude/skills` stays stable over three
       runs.
 
-- [ ] **9. Precedence property test (Decision 47; O13).**
+- [x] **9. Precedence property test (Decision 47; O13).**
   - **Owner:** `coder`
   - Fix the fixtures so the adopt case's content equals the desired content,
     and the unchanged case's record equals the desired content.
@@ -336,7 +337,7 @@ Test rules for every step (Decision 47):
       wrong `name`, and an empty big-plan `name`.
     - Every real plan still validates.
 
-- [ ] **11. Documentation (Decisions 44, 45, 46; O14, O15).**
+- [x] **11. Documentation (Decisions 44, 45, 46; O14, O15).**
   - **Owner:** `documenter`
   - `README.md` (around lines 692-696) must say that full mode checks only
     `state-sync.sh`, and that the sidecar source must match its exact
@@ -414,11 +415,11 @@ guard).
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

@@ -208,6 +208,15 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   retired root; the step 6 code already fixed it. Orchestrator re-check:
   the test fails against the `010f08c` copy and passes now. Full suite
   2143 passed. Part B re-review asked for.
+- Part B re-review: PASS, no findings. The docstring matches the apply
+  order line by line; the new test asserts preservation, cleanup, and a
+  clean `git status`, and its `_ALL_SKILL_WRITE_ROOTS` patch is needed to
+  build the scenario (every reader looks the name up at call time) and
+  cannot hide a regression. Review closed: 0 surviving findings in both
+  parts, so the findings report is `[]`.
+- CLOSEOUT started. Documentation (step 1) is step 11's work, already
+  reviewed; the last code changes (plain-file `kind`, a docstring, two
+  tests) change no documented behavior.
 
 ## [LEARN] Entries
 
@@ -227,6 +236,24 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   `ImportError` before any test runs. Added to MEMORY.
 
 ## Verification
+
+## Documentation
+
+Updated in this phase (step 11):
+
+- `README.md`:
+  - "agent-harness path" wording, excluding `.gitignore` (Decision 46);
+  - the source-check bullet (full mode checks only `state-sync.sh`);
+  - the ignore gate's coverage;
+  - three boundary bullets: the boundary checks, incomplete units, and
+    unit-level nested repositories and submodules;
+  - Uninstall: the preserved-folder path, the only exit 1, team rules
+    never blocking, and uninstall after a dropped skill.
+- `shared/policies/workflow.instructions.md`: the Termination paragraph
+  states the settled-refresh identity check.
+- `docs/target-mapping.md`: checked and unchanged.
+
+OpenWiki pages are refreshed in Phase K.
 
 ## Open Questions / Next Steps
 
