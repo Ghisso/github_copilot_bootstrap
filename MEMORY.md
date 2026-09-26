@@ -1272,9 +1272,12 @@
 - [LEARN:review] When review keeps finding defects in one code path, stop
   spot-checking: ask the reviewer for an exhaustive matrix over that path's
   input dimensions, and have the coder build safety checks from the
-  authoritative set rather than sets derived from outcome shapes. Sidecar
-  uninstall's preserve-conflict path took three failing rounds; the matrix
-  review passed on its first run once the gates used `preserved_conflicts`.
+  authoritative set rather than sets derived from outcome shapes. The
+  authoritative set is the one the planner actually decided, not a raw
+  input the caller precomputed: sidecar uninstall's gates passed a matrix
+  review using the caller's `preserved_conflicts`, but a later review (O3)
+  showed that set also held absent and removed units and could block
+  uninstall for good. The fix used the planner's own `kept_conflicts`.
 - [LEARN:verification] Run `verify.py phase` and closeout step 4 in the
   foreground. In the background, this session's own `stop-session-log-check`
   hook can append to `.claude/session_logs/hooks-errors.log` when a turn
