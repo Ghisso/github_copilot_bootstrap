@@ -42,6 +42,15 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   real Python 3.9.0. Orchestrator re-check: 627 validator tests pass, every
   real plan validates, and all five rejection tests fail against the
   `010f08c` validator in a scratch copy.
+- Step 11 part 1 (`documenter`, in parallel with coder A, only for the
+  docs that do not depend on coder A's code): the Termination paragraph
+  in `shared/policies/workflow.instructions.md` states the settled-refresh
+  identity check; README's source-check bullet says full mode checks only
+  `state-sync.sh` while the sidecar source must match its exact allowlist
+  (O14 first bullet); README lines 65 and 659 say "an agent-harness path"
+  and exclude `.gitignore` (O15, Decision 46). `docs/target-mapping.md`
+  restates neither. Checked against the code. Part 2 (boundary rule,
+  uninstall behavior) waits for coder A.
 
 ## [LEARN] Entries
 
