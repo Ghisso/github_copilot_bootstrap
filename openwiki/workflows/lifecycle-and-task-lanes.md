@@ -14,10 +14,12 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-588c1b68a254d094494d64f9
     resource: repo://shared/templates/plan-small.md
-generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
+  - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
+    resource: repo://tests/test_validate_plan_frontmatter.py
+generated: { by: "claude-code", at: "2026-09-26T06:04:25.666Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T00:04:00.096Z
+    at: 2026-09-26T06:04:25.666Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -45,7 +47,7 @@ Any commit on an implementation branch must satisfy the full ceremony, whichever
 - A **small plan** lives at `.claude/plans/<phase_slug>.md` with `type: small-plan`, `parent_plan`, `phase_index`, `status`, and `closeout_session_log`. Statuses add `planned` and `paused`.
 - `status` must occur exactly once. Templates are `shared/templates/plan-big.md` and `plan-small.md`.
 
-`scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one unfinished `-knowledge-refresh` phase and only as the last phase, and the verification lints below. An earlier knowledge-refresh phase whose own small plan is already `complete` or `cancelled` is exempt from that count, but a plan that has any knowledge-refresh phase must still end with one. `check_runtime.py` and the `commit-msg` Git hook both run it.
+`scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one unfinished `-knowledge-refresh` phase and only as the last phase, and the verification lints below. An earlier knowledge-refresh phase is exempt from that count only once it has settled, but a plan that has any knowledge-refresh phase must still end with one. Settled means the big plan's own `name` is not empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, that declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`. `check_runtime.py` and the `commit-msg` Git hook both run it.
 
 Plan-first, as policy text: check `.claude/MEMORY.md` for lessons, clarify ambiguous work, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
 
@@ -131,7 +133,7 @@ Reopening defers the strict terminal gates to the new final phase; it never esca
 
 ## Representative tests
 
-- `tests/test_validate_plan_frontmatter.py` covers every pause and cancellation field, the block-scalar and near-miss marker rejections, and the knowledge-refresh position rule, including a completed or cancelled earlier refresh phase, appending after a finished refresh, and a slug that fails the slug pattern.
+- `tests/test_validate_plan_frontmatter.py` covers every pause and cancellation field, the block-scalar and near-miss marker rejections, and the knowledge-refresh position rule, including a completed or cancelled earlier refresh phase, appending after a finished refresh, a slug that fails the slug pattern, and a sibling that fails the identity check (a symlink, an unrelated `parent_plan`, the wrong `type` or `name`, or an empty big-plan `name`).
 - `tests/test_commit_closeout.py` covers the post-commit phase advance across commit-message sources and its refusals.
 - `tests/test_hook_gates.py` covers the commit and push gate assertions against real temporary repositories.
 

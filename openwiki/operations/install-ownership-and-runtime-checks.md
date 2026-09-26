@@ -14,10 +14,12 @@ sources:
     resource: repo://scripts/update_consumers.py
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
-generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
+  - id: openwiki-source-f48dfb5bc22ec5140aa8b810
+    resource: repo://tests/test_install_bootstrap.py
+generated: { by: "claude-code", at: "2026-09-26T06:04:25.666Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T00:04:00.096Z
+    at: 2026-09-26T06:04:25.666Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -34,7 +36,7 @@ Detection looks for three kinds of evidence:
 
 - Sidecar evidence: anything at the manifest path `ai-bootstrap-sidecar.json` in the Git directory, valid or not and including a dangling symlink, or a sidecar marker block in `info/exclude` (a local, untracked ignore file, separate from the team's tracked `.gitignore`). The exclude file is found through the common Git directory and read only when it is a regular file.
 - Full evidence: `.claude/.git` as a real directory with no index entry at or under `.claude`, `.claude/bootstrap-ownership.env`, or `--allow-self` with this repository as the target. A team `.claude` submodule, whose `.git` is a file, or an embedded repository tracked as a gitlink, is team configuration instead.
-- Team configuration: `git ls-files -z` lists a path under `FULL_INSTALL_ROOT_PATHS` (`.claude`, `.devcontainer`, and the restorable root adapter paths).
+- Team configuration: `git ls-files -z` lists a path under `FULL_INSTALL_ROOT_PATHS` (`.claude`, `.devcontainer`, and the restorable root adapter paths). These are the agent-harness paths. A tracked `.gitignore` is not one of them, so a repository that tracks only code and `.gitignore` gets the fresh full-install default.
 
 Detection runs Git with `LC_ALL=C`, so its error text is in English. A Git failure other than "not a git repository", such as a dubious-ownership error, aborts detection in every mode with Git's message and a `git config --global --add safe.directory` remedy, instead of silently falling through to a full install. An unbalanced sidecar marker block in `info/exclude` aborts detection the same way.
 
@@ -53,11 +55,11 @@ The table shows the result for each case, in the order the function checks it.
 | no `--mode` | team configuration only | refuse, offering `--mode full` or `--mode sidecar` |
 | no `--mode` | nothing | full install (fresh default) |
 
-Every refusal is a `SystemExit` that names the evidence found and the way forward. When the tracked paths include `.devcontainer/state-sync.sh`, the team-configuration refusal adds that the target looks like a fresh clone of a full consumer and says to run `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`. A target that is not a Git repository, or a target folder that does not exist, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table, each refusal message, the submodule and gitlink cases, the dubious-ownership abort, and the dangling manifest symlink.
+Every refusal is a `SystemExit` that names the evidence found and the way forward. The `--mode full` refusal on a sidecar consumer offers three ways forward: run without `--mode full` to keep the overlay, run `--uninstall` to remove it first, or ask whoever manages the sidecar to remove it. When the tracked paths include `.devcontainer/state-sync.sh`, the team-configuration refusal adds that the target looks like a fresh clone of a full consumer and says to run `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`. A target that is not a Git repository, or a target folder that does not exist, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table, each refusal message, the submodule and gitlink cases, the dubious-ownership abort, and the dangling manifest symlink.
 
 After detection, `main` picks the source: `--source` when given, otherwise `dist/multi-agent/` for a full install or `dist/sidecar/` for a sidecar install. `require_source_exists` refuses a missing source; a missing default source says to run `uv run python scripts/generate_targets.py --all`, and a missing explicit `--source` names that path. A sidecar target then gets `validate_install_roots` with `allow_self=False` and no `--allow-self` hint, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`), and a hand-off to `install_sidecar`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
 
-`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full` and any full evidence, prints `no sidecar found; nothing to do` and exits 0 when there is no sidecar evidence, and otherwise hands the target to `uninstall_sidecar`. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
+`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full` and any full evidence. When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0. Otherwise it hands the target to `uninstall_sidecar`. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
 
 ## The ownership model
 
@@ -111,7 +113,7 @@ flowchart TD
 6. `copy_generated_tree` copies `dist/multi-agent/` over the target. It logs `preserve consumer state`, `preserve tracked authoring adapter`, and `preserve third-party skill`, and `remove obsolete generated file` for bootstrap-owned files the new generation no longer produces. Pruning walks only `.claude/` and the restorable root paths.
 7. Project name and Python version are substituted into the installed instructions.
 8. `populate_bootstrap_root` mirrors the root adapters into `.claude/bootstrap-root/` so the Git-backed checkout carries them.
-9. `merge_gitignore` writes or refreshes an idempotent block between `# BEGIN multi-agent bootstrap generated/private AI content` and its `# END` marker; runtime scripts are made executable; `configure_git_hooks_path` sets `core.hooksPath` to `.claude/hooks/git-hooks`; tracked paths that should be ignored are reported with the exact `git rm --cached` command.
+9. `merge_gitignore` writes or refreshes an idempotent block between `# BEGIN multi-agent bootstrap generated/private AI content` and its `# END` marker; runtime scripts are made executable; `configure_git_hooks_path` sets `core.hooksPath` to `.claude/hooks/git-hooks`; tracked paths that should be ignored are reported with the exact `git rm --cached` command. That check runs after most of the writes, so `warn_tracked_paths` turns a Git failure into the warning `could not check for tracked generated paths: <error>` instead of stopping the install.
 10. `sync_state_after_install` runs `state-sync.sh` to make the `bootstrap: install/update <timestamp>` nested commit and, unless `--local-only`, publish it.
 11. A reminder that Codex for VS Code may require renewed approval of the content-bound `.codex/hooks.json`. The installer never approves hooks itself.
 
@@ -152,7 +154,7 @@ On success it prints `PASS` lines for optional binaries found, the Semble launch
 
 ## Representative tests
 
-- `tests/test_install_bootstrap.py` covers mode detection and every refusal (including a team `.claude` submodule, a dubious-ownership Git error, a non-UTF-8 or non-regular `info/exclude`, a dangling manifest symlink, and a sidecar tree passed to full mode), the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption.
+- `tests/test_install_bootstrap.py` covers mode detection and every refusal (including a team `.claude` submodule, a dubious-ownership Git error, a non-UTF-8 or non-regular `info/exclude`, a dangling manifest symlink, a sidecar tree passed to full mode, and the `--uninstall` hint in the `--mode full` refusal), the full-install default for a repository that tracks only code and `.gitignore`, the tracked-path warning on a Git failure, the takeover check (unproved content, a private mirror, symlinked evidence, marker-claimed bundles ignored while unmarked same-shaped directories still conflict), consumer-state preservation across reinstall, and the marker-gated third-party preservation and drift exemption.
 - `tests/test_sidecar_update.py` covers batch updates that mix full and sidecar consumers and continue past a refused target.
 - `tests/test_check_runtime.py` covers the plan-frontmatter delegation and every shape of the Bash 3.2 array-expansion rule.
 

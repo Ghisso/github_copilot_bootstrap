@@ -5,7 +5,7 @@ description: The four places the bootstrap lives in (authoring shared/, generate
 tags: [architecture, layout, generation, validation, dist, ai-state, consumer]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T00:04:00.096Z
+    at: 2026-09-26T06:04:25.666Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore

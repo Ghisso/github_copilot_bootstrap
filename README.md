@@ -510,7 +510,7 @@ an edited copy out of the way, together with the fix in each case:
 | Category | Cause | Meaning | Remedy |
 | --- | --- | --- | --- |
 | `SKIPPED` | Team-tracked path | A file inside a sidecar unit is tracked by the team. | The repository tracks that path; the sidecar already skips that skill at every root. To get the skill back, the team would need to stop tracking the path. |
-| `SKIPPED` | Skill name taken | A skill name is taken by non-sidecar content the sidecar can see, tracked or not: an entry with that name at a write root (`.claude/skills/`, `.agents/skills/`), an entry with that name in a read-only skill folder (`.github/skills/`, `.agent/skills/`, `.codex/skills/`), a case variant of the name in any of those folders when Git's `core.ignorecase` is true, or another skill's `SKILL.md` frontmatter `name:` field declaring it. A symlinked folder counts the same as a real one. | The repository already has that folder and skill name; the sidecar skips that skill at every root. This does not mean the colliding content is tracked — only that it exists. |
+| `SKIPPED` | Skill name taken | A skill name is taken by non-sidecar content the sidecar can see, tracked or not: an entry with that name at a write root (`.claude/skills/`, `.agents/skills/`), an entry with that name in a read-only skill folder (`.github/skills/`, `.agent/skills/`, `.codex/skills/`), a case variant of the name in any of those folders when Git's `core.ignorecase` is true, or another skill's `SKILL.md` frontmatter `name:` field declaring it. A symlinked folder counts the same as a real one, unless it resolves into a write root — that kind of symlink is only a mirror of the write root (the common `.github/skills -> ../.claude/skills` layout) and is never itself a collision. | The repository already has that folder and skill name; the sidecar skips that skill at every root. This does not mean the colliding content is tracked — only that it exists. |
 | `SKIPPED` | Foreign file in the way | An untracked file is in a path the sidecar wants to use, but the manifest does not own it. | The sidecar will not replace that path; rename or remove the file only if you do not need it. |
 | `RETAINED` | Team took over a sidecar unit | The team started tracking a file inside a unit the sidecar used to own; the sidecar deleted its own copies that matched what it wrote, but left behind untracked files it did not recognize. | Move the file out of the folder, or commit it with `git add -f`. It stays hidden until then, and a pull can overwrite it. |
 | `RETAINED` | Unrecognized line in the sidecar's exclude block | A line sits between `# BEGIN ai-bootstrap sidecar` and `# END ai-bootstrap sidecar` in `.git/info/exclude` that the sidecar does not recognize as one of its own unit or retained-file lines. | The sidecar does not recognize `<line>` in its own exclude block and keeps it; move it outside the block to keep it, or delete it if you do not need it. |
@@ -537,8 +537,13 @@ removed outright. A copy you hand-edited is moved instead, into
 that destination already exists — an earlier preserve landed the same
 bytes — the edited copy stays where it is instead of being moved, and the
 run reports a conflict so it never overwrites the existing preserved copy.
-To recover a preserved copy, copy it out of the Git directory; the sidecar
-never empties `ai-bootstrap-sidecar-preserved/` on its own.
+While that conflict is open, the skill's other `SKIPPED`/"Skill name taken"
+rows change their remedy: instead of "the sidecar skips `<skill>` at every
+root", they read "`<skill>` is kept in place until its edited-copy conflict
+is resolved, not skipped at every root" — the conflicting copy is still
+there, so the skill is not fully gone. To recover a preserved copy, copy it
+out of the Git directory; the sidecar never empties
+`ai-bootstrap-sidecar-preserved/` on its own.
 
 **Uninstall.** Remove the sidecar overlay with the same installer:
 

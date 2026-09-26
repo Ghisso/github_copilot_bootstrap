@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:31b5a7e5926e2a02ee06fab6a1297d1c9658c2e1f21043833265d7dd05b2e59f",
+  "pageVersion": "sha256:df55cd1fe14b94057a461fa6c72fb2a0cd03e313eaeaf5320a58565a4a3988a8",
   "claims": [
     {
       "id": "claim_b0158374af164219ad80eee5f9baed11",
@@ -14,14 +14,14 @@
     },
     {
       "id": "claim_cb4863e28d3a4d8ebde9fa1b229e75d4",
-      "statement": "Before any write, the sidecar aborts with 'sidecar-install: ABORT:' and a remedy, returning 1, when an install source does not match the exact sidecar source set, Git is older than 2.31, the target is not a Git repository, not its worktree's top level, or a linked worktree, the Git directory is on another filesystem, the manifest, staging, preserved-copy, or info/exclude path is a symlink or the wrong type or info/ is a symlink, the manifest is invalid, a nested repository or submodule or a non-folder ancestor sits at a skill folder or bridge parent, or the exclude markers are unbalanced.",
+      "statement": "Before any write, the sidecar aborts with 'sidecar-install: ABORT:' and a remedy, returning 1, when an install source does not match the exact sidecar source set, Git is older than 2.31, the target is not a Git repository, not its worktree's top level, or a linked worktree, the Git directory is on another filesystem, the manifest, staging, preserved-copy, or info/exclude path is a symlink or the wrong type or info/ is a symlink, the manifest is invalid, a nested repository or submodule or a non-folder ancestor sits at or above a skill write root or bridge parent, or the exclude markers are unbalanced.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2591-L2730",
+          "resource": "repo://scripts/sidecar_overlay.py#L3077-L3216",
           "version": "repo-lines-v1:sha256:3beeb1094c98e34cc69c1a85966c90cbc1acca609ee4a5868862f70ce39171ec:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJkMGU3MzdlNmVjZDVlZjZkMmM3NmYyMWExM2E4MzQyMGQ1MGI3MWUwNDg2NWYzYzhlY2JjM2JhMDE4ZWNmNWY1IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJmZDk5ZWJiY2Q3MWQxOWNlN2IwMDU5YzkyM2Q2YjZkMjgxODYwM2E1NjNkMDQ2N2M3MzM0Y2ZjZmM3NTc1YzMyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlMThlZTAyMDdiYThlZmIzMzllNjVlZWJkMzAxMzlkOWQ5OTUzMmQ5NWRmZmQ3NjJhN2I1NjRiZGRmMzc1YTFjIn0"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2744-L2762",
+          "resource": "repo://scripts/sidecar_overlay.py#L3230-L3248",
           "version": "repo-lines-v1:sha256:95ff15b0c35b77eb1c9b871609ce90f48a1234acfcc31046f4b5bc22ba2d5a3b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0M2QwOGY2ZTE1NmNkOWNhMmE0ODcxNDEwMzQwOWMzYzI1ZTY5MDVjOWJkNDhmYzZhYzk2OTBhZWQ0OGM4ZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM0MjllNjkwZWE0MWY2ZmQ2YmFlZGU3MjdmNDJmY2Y3ZWIxMTY3N2NhOWJiNzU4YjAyZTdhNjBkODY5ZjBhMDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkNDg3MDA1MmUyMjU2ODE1ODE3MGZmNGY4OGM1ZTBmMDdmYTIwM2VjOWQwNmJhYzM1YWY3MmY3MGMyMTMzY2EifQ"
         }
       ]
@@ -31,11 +31,11 @@
       "statement": "The planner aborts with no actions when a symlinked ancestor sits above a required unit, and manifest validation rejects any unit or retained path that is absolute, contains '..' or a backslash, or is not a bridge path or a path under a current or retired sidecar write root.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1177-L1182",
-          "version": "repo-lines-v1:sha256:d71677eae44761fb044101dc0be8ea0ef27fd8f2e6dc4eba39b6e9df5ff0244d:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmYzMzE5MDhkNzdiNmM0MjczYjY5MzY5ZDM0OTRmZmZlYWQxMjZjMDBiMzg2NTUwZGM1NTUzYjQ2ZTA5NjcwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiYTQ3Yzg4MTQ1MDMwOWRmODJlODgwYjZjZGNhYmM4NGI0MDUwYzY5ZTcyMjQ4N2MzMWJjNTg0NWNhZTE0YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOThlYmFiZjk1ZDIyOWZmMjM5MjM2ZDcwMWYyYjFkOWU0ZThlYzNkZGQ2NDgwNDlkY2Y1ZTA4Y2VkYTE2ZDhlMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzJiZGE2OTYwZjc5NjAxYjUyZjg4ZTc0MTI2MzFiMmJmZWZiOTk3MmU1YjAzOGY2NWFmYWY2ZWNiNjY0NjM4OCJ9"
+          "resource": "repo://scripts/sidecar_overlay.py#L1332-L1337",
+          "version": "repo-lines-v1:sha256:d71677eae44761fb044101dc0be8ea0ef27fd8f2e6dc4eba39b6e9df5ff0244d:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmYzMzE5MDhkNzdiNmM0MjczYjY5MzY5ZDM0OTRmZmZlYWQxMjZjMDBiMzg2NTUwZGM1NTUzYjQ2ZTA5NjcwZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDJiYTQ3Yzg4MTQ1MDMwOWRmODJlODgwYjZjZGNhYmM4NGI0MDUwYzY5ZTcyMjQ4N2MzMWJjNTg0NWNhZTE0YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODEzOWVmZDRkMzYyZmQ1MDE1MjUzYTEyNjc2YzExMjYyYTA2ZWQ1ZWUzZGEwNWQzMDMxZmE1NjY2NGY1YjY1MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDg3MzJlOGMzY2JiNDI0ZmIyYzZkZWY5M2Y1YmI2ZGJjZTYwZDRiZGM1Y2Q2NTEyMThhMTVhMjRhYmQ5MzEwZiJ9"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L226-L253",
+          "resource": "repo://scripts/sidecar_overlay.py#L235-L262",
           "version": "repo-lines-v1:sha256:0ca3bfba48bfe3b07509571021f313add0c2185e204605859af730a7a5b58a07:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU4NTRjZDJjMTZiODYxNTE4ZTliOGY0Zjg2NjdiMTg0MzJlNzhjZTRiYTA3ZDY2ZTBkNTJkZGQxZmIyZWY0NjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM1ZDNlNjM4YjdlMmM3YmNmOTZjN2EwNmZjMjc1MzY5YTRhMjY1ZDhkODRmMzM1Njg0ZTY1YTc3ZjY3NzJmNTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg3OTU2NGM3MGZjZGY4NTNkYWNkZTU3ZWZiNjVlMjU1YjRmMTlkMmFlOWNiOWVhZTUwZDNjOTExMzUyNjY2NDQifQ"
         }
       ]
@@ -45,50 +45,50 @@
       "statement": "A unit's hash is SHA-256 over its files sorted by relative path, each record framed as the file-system-encoded path bytes (identical to UTF-8 for legal names), a NUL byte, the file's SHA-256 hex digest, and a newline.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L162-L179",
+          "resource": "repo://scripts/sidecar_overlay.py#L171-L188",
           "version": "repo-lines-v1:sha256:6f6e3a5ea1cc5cc3b5ebc70dfbaa0a0c3b6826ec167ae9a3b9b5ef82a79c9cd0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxN2ZhMGZmMzJlMGEzN2RhZWZkYjJlMjA1ZDNjMmI4YTAyNWE1M2EzZDUwZWI1ZTI2ODlkZTE5MzU0NGM1ZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0MGExODU1YWFhZjY5ZDk1M2FhNzFhMGMxYzQ5MmU0YzBlOWJlYmQ5ZDE5MGIwZDA3MWE0ZjJiYjMyYjQ2ZjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE4MDY3N2QxM2VjMzUwYzQxYTJiM2EyMmFkNTc0ODhkMzFjMTFlZjUwZGU4YTBlMTIzOTgwY2QwZjMxYjNhZDIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkY2MyMTY0YzllYTUyNmUwYzI5NDAzOWQxNTAyNzJhNDVhZGI3NmIxZGEyMDkzNjNhZjlkOGY3MzM1NzBhNzIifQ"
         }
       ]
     },
     {
       "id": "claim_50262203ef2a41b6bafe99494c7eeb6b",
-      "statement": "_classify_unit treats a tracked unit as a team takeover when the manifest records it or the exclude block lists it and as team-owned otherwise; an absent unit is installed when wanted or has its record dropped; a unit matching its record is removed, unchanged, or updated; a unit matching the wanted content is adopted when it is listed or recorded; a recorded unit that differs is locally modified; a listed unit with no record is an unfinished sidecar copy kept with its line; anything else is foreign.",
+      "statement": "_classify_unit gives a unit that is itself a gitlink the gitlink outcome; otherwise it treats a tracked unit as a team takeover when the manifest records it or the exclude block lists it and as team-owned otherwise; an absent unit is installed when wanted or has its record dropped; a complete unit matching its record is removed, unchanged, or updated; a complete unit matching the wanted content is adopted when it is listed or recorded; a recorded unit that differs or is incomplete is locally modified; a listed unit with no record is an unfinished sidecar copy kept with its line; anything else is foreign.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L859-L975",
-          "version": "repo-lines-v1:sha256:2367869b5a8a6ebd6c3f7ef8b01a4cdc1bbb6a2900341fe90369052e1ce1c77b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTE3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJjOThjZTIwMDlkNjJlZDY5N2E2ZWUyMjAyMGZkYTUzYTE4MWNjZTk3NzBmMWE5YzFlZGNlMGJhMjRiMDY2MGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJjYjEyNzg2ZjdkM2ZiMDg0YTgwMDI1OGMzMDI5YWU1OTA2YjUzMTk4ZjJkZDBkZWE3MjllODE3MzJkMWI0NDBjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YjhkYmNiMWQzNGY1NzZjZjFmYzM2MWE4MjBkNzRiODBkY2VhMzY5M2FlZTdlMmExOGRkMmE4Y2Q5MTBhNDJkIn0"
+          "resource": "repo://scripts/sidecar_overlay.py#L992-L1125",
+          "version": "repo-lines-v1:sha256:2ee1b705d8da7135f36d2e859e169e440f6e7aecb3eb9f2b1750e62aaa7ffecd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM0LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJjOThjZTIwMDlkNjJlZDY5N2E2ZWUyMjAyMGZkYTUzYTE4MWNjZTk3NzBmMWE5YzFlZGNlMGJhMjRiMDY2MGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJjYjEyNzg2ZjdkM2ZiMDg0YTgwMDI1OGMzMDI5YWU1OTA2YjUzMTk4ZjJkZDBkZWE3MjllODE3MzJkMWI0NDBjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiI4Y2M0YTdkMWNjNzk2YWJhM2U0NjcyMzMyN2Y1MTdlOWY4MTE5ODJkMjUwZjA3MDI5ODZlNGI1NzY0YWQ5NTg5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YjhkYmNiMWQzNGY1NzZjZjFmYzM2MWE4MjBkNzRiODBkY2VhMzY5M2FlZTdlMmExOGRkMmE4Y2Q5MTBhNDJkIn0"
         }
       ]
     },
     {
       "id": "claim_6e3a6593ca0043c5927b6336e46454b4",
-      "statement": "A skill is taken when a write-root unit for it is team-owned, a team takeover, or foreign, or when a read-only folder entry, a case variant under core.ignorecase, or a non-sidecar SKILL.md frontmatter name claims it; each taken skill's units are converted through an allowlist so an install becomes nothing, an unchanged, updated, or adopted copy becomes a removal, and a locally modified or unfinished copy becomes a preserve, and every taking path is reported.",
+      "statement": "A skill is taken when a write-root unit for it is team-owned, a team takeover, a gitlink, or foreign, or when a read-only folder entry, a case variant under core.ignorecase, or a non-sidecar SKILL.md frontmatter name claims it; each taken skill's units are converted through an allowlist so an install becomes nothing, an unchanged, updated, or adopted copy becomes a removal, and a locally modified or unfinished copy becomes a preserve, and every taking path is reported.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L113-L136",
-          "version": "repo-lines-v1:sha256:3a36aa7b42adc0a9ca9e40eda277338aea7cf463ea7d49914c4c19f3d523a3a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3YzIxYWQ4YjczY2NiZDRlMzdlODk1ZTM4MzQyMGY3NGU3NzY3OWU3ZDY3ZDdjNjk1Y2I1MmE1OGJjMDZhZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA4ODUzZTg3MDgyZmFlYzc1MTExZmFhNjExOTI4Y2YwYjU5OGYxMjZkNTM2MWRkNGZmNDRjZmUwNWE5NWI2MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmOTU5NjQ2ODQ3ZjMwMGZmYjkyMzVkYWJhODA4NTM0MTZkN2I0MGIwMjcxMDBmM2MzMDhiZGUzMGQ5NmRkMDkifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L113-L137",
+          "version": "repo-lines-v1:sha256:94cffcc2f16e18486799a2c7960adb35bcb56e605e32791657e87f68330096c8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI3YzIxYWQ4YjczY2NiZDRlMzdlODk1ZTM4MzQyMGY3NGU3NzY3OWU3ZDY3ZDdjNjk1Y2I1MmE1OGJjMDZhZmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA4ODUzZTg3MDgyZmFlYzc1MTExZmFhNjExOTI4Y2YwYjU5OGYxMjZkNTM2MWRkNGZmNDRjZmUwNWE5NWI2MjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmOTU5NjQ2ODQ3ZjMwMGZmYjkyMzVkYWJhODA4NTM0MTZkN2I0MGIwMjcxMDBmM2MzMDhiZGUzMGQ5NmRkMDkifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1193-L1246",
-          "version": "repo-lines-v1:sha256:838ce0626ed877de01086772968a88e12cbf0003089ac7909deb9ab52c0debc3:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxMDNlZmM2M2ViYTI0NmZhZjMzYTdjMjRjNmUwNzEzYWUxNjI1YmIwYzczM2QzNTRjNjIxYTMzMDZlZjJiZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExYjVjNTIyNzAyOTg3OWVjZGZhNWI1NzJhNTAzMDMzMjg1YTFkOWM1MDQ2MWQ1NjQ2OGFiN2ZjMjFjZmI4OWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0NmIxYjEyNzU4ZWEyNTgyZWU3ODFkZDIxMWU1NjRkNDJmMGI1YTU0NjZlMmY1MzFlNWE4NDkzNmZhNTlmOGEifQ"
-        },
-        {
-          "resource": "repo://scripts/sidecar_overlay.py#L983-L1026",
+          "resource": "repo://scripts/sidecar_overlay.py#L1133-L1176",
           "version": "repo-lines-v1:sha256:be1c6a290c0d0b0b1b47f4b6cb7c7cf97976fca47dc08add0a786d35e336109c:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhkMWY0OGEyZmI5ODFjMWZlYmUyNzIwZjA3N2FjODMyN2NkODU5ZTg4MmQyZWRjOTAyMTJlMzEyYTg1MWY1MzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZmZmVlZmVmOTZhMzFjNDIxMzcyZWY1NWNkMmI2NDVjZmVhMzU3NDhmNmMxMDI2ODQxNWRjNzhkYTZiZTcxOTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRiNGZkNjVjM2VhZjNiYzgxNTViZTY4NzA3YWMxNWQwZTE0NTY5MjRjMzk0ZTlkM2FmNzcxMDZkNTk2N2YxZGYifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1374-L1439",
+          "version": "repo-lines-v1:sha256:c17a78eb2bd2b817a0d4cf08210e36af1a737b53f83e29b00ea251d0a89ec538:eyJzZWxlY3RlZExpbmVDb3VudCI6NjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxMDNlZmM2M2ViYTI0NmZhZjMzYTdjMjRjNmUwNzEzYWUxNjI1YmIwYzczM2QzNTRjNjIxYTMzMDZlZjJiZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExYjVjNTIyNzAyOTg3OWVjZGZhNWI1NzJhNTAzMDMzMjg1YTFkOWM1MDQ2MWQ1NjQ2OGFiN2ZjMjFjZmI4OWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmNGExMTk3YzhjMWViYTZiMDhiZWYzNmNlODIxNWY1NjYyYTExMmFhYThkMzJjZDVkYTExMzdiOWZhZGFkN2UifQ"
         }
       ]
     },
     {
       "id": "claim_6161e0bcaea641a1aa641f9bebd4213c",
-      "statement": "In a team takeover the planner drops the unit record, deletes untracked files whose bytes match the record or the wanted content, retains other ignored untracked files with a RETAINED report and an exact-path exclude line unless gitignore cannot express the name, and leaves visible untracked files alone; a retained file's entry is dropped once it is deleted or tracked, and a file line in the block keeps hiding its file without a manifest.",
+      "statement": "In a team takeover the planner drops the unit record, deletes untracked files whose bytes match the record or the wanted content, retains other ignored untracked files and untracked symlinks (which carry no hash and are never deleted) with a RETAINED report and an exact-path exclude line unless gitignore cannot express the name, and leaves visible untracked entries alone; a retained entry is dropped once it is deleted or tracked, and a file line in the block keeps hiding its file without a manifest.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1248-L1292",
-          "version": "repo-lines-v1:sha256:69949783d440c24dafbf87c860887833eade43f22e177b87a2de8468a4010982:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzMGQxOTBmZjA1MzkwMTQ4OThjODU2NDMwN2FiM2JlOTYxMjBlZDIzODUxM2I5MjBlM2VkYTA2YmRmYmFjZTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxOTUyNjgyYTM3YTJjZTE5MTk5ZjQyMTVmZTNkZTEyYzlkZWYyODEzYjgxNjlhYzViNTQwNDJmMTNmOWU5YzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwZTEzOGVkOGQ5MmFiOTliMzhmMGZkMTViNmFmY2UyMmE3NGE5ZGQ0Y2Q3MzdiMzE2YTljMDIyYzc3OTZkYTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiMmZkM2ZiNTM0ZGRiNjYzYzY4Y2IxYzBkNmFiNDU1N2NmYzg1MGYwZDk5MmFjMWNjZTkzNDJmZTU0MTE3NjMifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L1459-L1524",
+          "version": "repo-lines-v1:sha256:800ce9d5ea92cf1ff524152e4112b51a4b320dffcade85476790b8b4176a6b01:eyJzZWxlY3RlZExpbmVDb3VudCI6NjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzMGQxOTBmZjA1MzkwMTQ4OThjODU2NDMwN2FiM2JlOTYxMjBlZDIzODUxM2I5MjBlM2VkYTA2YmRmYmFjZTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxOTUyNjgyYTM3YTJjZTE5MTk5ZjQyMTVmZTNkZTEyYzlkZWYyODEzYjgxNjlhYzViNTQwNDJmMTNmOWU5YzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjM2RkZjFmYTM5YmMwYTlkMDRhZDMwNmEwYWE4OGIyNmI3OGUwNDA2Yjk5MTM3YjczODg3MTNkNTQ3NzRmMTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNiMmZkM2ZiNTM0ZGRiNjYzYzY4Y2IxYzBkNmFiNDU1N2NmYzg1MGYwZDk5MmFjMWNjZTkzNDJmZTU0MTE3NjMifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L797-L856",
-          "version": "repo-lines-v1:sha256:4e5a341dbea5c5f0216acea5e72d3d5bc16abe2f96025ad379959b9098fe5651:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmOWZkYTBmNDQ4YzFmNmU5MDlhZDc1YTBlNDkyOGVjOGM4ZjQ3ODhmNDNjMDQwNjg4OTYxZmJiNGNhMzNiZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyODMxMjNmNjhkYzYzOTIyMDZjN2EyYTNiNzZmMTMzNzhmOWYwNWYxOWYyNDA0MDA0NTk5MzY2M2U4OTk4ZjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkYzU3YzgzMWZiNjc4NzMyNzY2YWQ1MDcyMWMxYzY2YjRkZGViYWU5OGZhN2U1YWMxZTkwZmZmODI2YzNmNGEifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L925-L989",
+          "version": "repo-lines-v1:sha256:de5f1728f88305ce2eeac4b6605a2b68558655f6fbb015219077f552f95e3476:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdmOWZkYTBmNDQ4YzFmNmU5MDlhZDc1YTBlNDkyOGVjOGM4ZjQ3ODhmNDNjMDQwNjg4OTYxZmJiNGNhMzNiZjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYyODMxMjNmNjhkYzYzOTIyMDZjN2EyYTNiNzZmMTMzNzhmOWYwNWYxOWYyNDA0MDA0NTk5MzY2M2U4OTk4ZjQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRkYzU3YzgzMWZiNjc4NzMyNzY2YWQ1MDcyMWMxYzY2YjRkZGViYWU5OGZhN2U1YWMxZTkwZmZmODI2YzNmNGEifQ"
         }
       ]
     },
@@ -97,22 +97,26 @@
       "statement": "Exclude lines are anchored with a leading slash and escape backslash, '*', '?', '[', a leading '!' or '#', and trailing spaces, leaving non-ASCII text as raw bytes; a unit line has no trailing slash.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L511-L539",
+          "resource": "repo://scripts/sidecar_overlay.py#L583-L611",
           "version": "repo-lines-v1:sha256:005012066aeb0bab9ac19fc33416010c35082e19010d542e6968938970238fc9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZDYwNDhiMzUzMmYyZDAzMjY4OWQ3YzI3OTExYjIzMmU2YmU2MWJhYzg4NjgxNTE2YzJkODUyOGJkODMwYjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlNWVkMjFlMDdhODU3MjMyYzIyNjM4ZTBhOTQyOWQ0YmIzYzYzZmJmOTg2ODA2NWZiZjFiNzMwM2RmNzAxNjcifQ"
         }
       ]
     },
     {
       "id": "claim_64b768752cf24b209e9c01ade14eb9c9",
-      "statement": "run_ignore_gate passes only when git check-ignore --stdin -z prints exactly the set of paths that must stay ignored, with each skill unit gated as '<unit>/' so directory-only rules apply; on failure git check-ignore -v -n -z --stdin names each failing path with its winning rule; a dry run points a one-shot core.excludesFile at a temporary file instead of touching info/exclude.",
+      "statement": "run_ignore_gate passes only when git check-ignore --stdin -z prints exactly the gate paths the planner returned, where a skill unit is spelled '<unit>/' only when it is a real folder or absent and '<unit>' when it exists as a symlink or another non-folder; a Git exit other than 0 or 1 raises GitCheckIgnoreError; on failure git check-ignore -v -n -z --stdin explains only the paths that are not ignored; a dry run points a one-shot core.excludesFile at a temporary file instead of touching info/exclude.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2155-L2187",
-          "version": "repo-lines-v1:sha256:ffc39a6ba362168374b97e245d045df920c4d5cd6760b685db24378b2b9bc57c:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkZTAwZGY3M2Y2MzdmZDEzMGExOTgyOGQ2NDM0ZDE2NzEzMzMxNjE5ZjM4OTY3MjFkOGRiOTRjYTZmMWNiYmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkYjA4NzBlZGQ3M2VmNThmMzFiZDQ5NjBlYjI0Njk0ZmQ2Y2UyMjAyYmMxMTIxNzI3N2E2M2VhNmY3ZWNhMjYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5ZWZkOWUxNzJlNTE2NDhjYzY1N2RiZWEwNDYxM2ZiNzc5M2Q2ZjZjYmViOTIyZjE2YWVkYTZmZDRhMTlmNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2637-L2658",
+          "version": "repo-lines-v1:sha256:80c73787634a2a83d4832e3984da3ad18553ec3583e6a058f68ffd7f87f85090:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMGI3N2E5MzA2NmVmODU0MWM3YmNlZWQxZDVlNzNkYTBhNDk1ZDAwZmQwNDM0MmFkOWI0MTUzZTRlNjI1YzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhY2JjMjU0NDU0OWNmOTY4OGUzZjIwNjhhNmFjY2Y3YWEzMmMzOGQ2YjFkMDRhYTY1Y2IzM2ZiMTU2ZTE1N2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5ZWZkOWUxNzJlNTE2NDhjYzY1N2RiZWEwNDYxM2ZiNzc5M2Q2ZjZjYmViOTIyZjE2YWVkYTZmZDRhMTlmNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2202-L2289",
-          "version": "repo-lines-v1:sha256:4b10d7de22afadf4418122cfd7f15cae2e6fb249179d2da135d248c52f61eadd:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNmNzJlMTgyMzE4NjQ1MWZkOWE0ZGQxZGFlNzk3Njk2ZWNlMjQ1OGZlMDVmYmJiMDUzODU2YTRiOGFjNWM4ZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwYjZkOTI4M2NhMmZhNDczYWMxMTNhNDZhYWViOTU2NTQ4Y2I5Y2M2NThiZDBiNDJlY2UxNDU1NTUxZDMwNjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExOTEzNzljMDE2Mzg1YjU4N2I3MWJhYThkYzg4ZjU0NGIyN2NmZTdkZmQ4YjRhMjhjZTdhNTQ1NmUyNmZkZWMifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2702-L2778",
+          "version": "repo-lines-v1:sha256:8f37e8f19ad63641d49fb32c3802a164972abf286ecccfe40bfdb8a898c86f36:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBlZjA4Mzg4OTA4MjE2YTkzZGU5OWEzMzIyZjI5Y2MyMjRkNzFmOTI3MDgyZThhZGExZGJkM2ZmMjI1ZDM5ZTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwYjZkOTI4M2NhMmZhNDczYWMxMTNhNDZhYWViOTU2NTQ4Y2I5Y2M2NThiZDBiNDJlY2UxNDU1NTUxZDMwNjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVlNWJjNzlmMDFhYTAxN2VlMTAyZGY5ZGMxODMxOGZiYmI4MGY1YTU1MGRhMzVlMjY0ZDM3ODNiM2MwZDU2MDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjExOTEzNzljMDE2Mzg1YjU4N2I3MWJhYThkYzg4ZjU0NGIyN2NmZTdkZmQ4YjRhMjhjZTdhNTQ1NmUyNmZkZWMifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3486-L3528",
+          "version": "repo-lines-v1:sha256:13e2ae5863cffffc9c36de59d05e4979b93a4705817af09ddf2d987bc51513fe:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1OTRmYjQ2YTQxNjZkZTk1MTBhNTIwYTM4ZTU1MjhkMWJhNWI5ZmI4ZGE4ZTJiMjNjZDg0MWYyMDBjMzhkNDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjNWUxNDg3OWJkMjYxZTNlNzljNWMwMjg0N2YyNGJmNmYxYmZmMDUwZjE5ZmUzOTYxOWQwMWI1NjQ5NDNiNmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmE0YzhjZjM1ZGU3NzI2OTA2Mzg0NGU5YThmNGEwYTkzZGUwYTc3NzRlY2UwMThhZTdhODk4Mzc3NmYzYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkNzQwNTM0NmNmNjZjOTJhYzAyNjgyOTU0ZTUxODg0ODBmZmYzZDA2MTYxNDI1OWI0ODczNmY4Y2E3YmYwY2YifQ"
         }
       ]
     },
@@ -121,12 +125,12 @@
       "statement": "A real run writes the exclude block, runs the gate and restores the previous exclude file on failure, empties staging, applies unit actions including preserves, writes the final exclude lines, writes the manifest last through a temporary file and os.replace, and writes the exclude file and manifest only when their bytes change.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2141-L2153",
-          "version": "repo-lines-v1:sha256:213fc533cd2a70dc5ea09ed97d9f5732ff9b8b09387081b32272d5f0fa3f1721:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmZTljNDM4MzVhZWU2OGIxYzZlMjA2MzQ0YzlmNWY3NmEzNDViNjJkOGRmNmU2ZjUzOTVjZmMyY2M2NThhYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjODY3ZjRhZTVjNzUzNGQ2NTllMDdmYmQ5YjFmYWRiODM2NjM0MGViNTFlNzM0NmZiMmU4MDE5YzFlN2FlMTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc2ZDZhMTRhMDA0NjQ1NGZiMGI3N2E3NjJmMmUwNmQzZDEzMzQ0M2IzNjE1ZTZhZWY1ZmNmOTBjMGJmZDFhNWUifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2623-L2635",
+          "version": "repo-lines-v1:sha256:213fc533cd2a70dc5ea09ed97d9f5732ff9b8b09387081b32272d5f0fa3f1721:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmZTljNDM4MzVhZWU2OGIxYzZlMjA2MzQ0YzlmNWY3NmEzNDViNjJkOGRmNmU2ZjUzOTVjZmMyY2M2NThhYjEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNjODY3ZjRhZTVjNzUzNGQ2NTllMDdmYmQ5YjFmYWRiODM2NjM0MGViNTFlNzM0NmZiMmU4MDE5YzFlN2FlMTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0YzQ5NmEwZTY2Mzg5OTNmMDEwYzJiZTlhYmQyOGFmYTgzMjFlNGI2ODQ3NmUzNGE5NDUzN2VlOWQ4NjU5OTUifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2511-L2570",
-          "version": "repo-lines-v1:sha256:57ca35320dd4b907fc390fa80d2ce3696111b2e03bb7314e49d79673250d2195:eyJzZWxlY3RlZExpbmVDb3VudCI6NjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0ZTUyYzMzOGFmYjY5NjFhNWIyMzZlYjg2ZTkwZWNlOWU4MTRiZDI2ZmY2ZTZhMTU0M2ViN2U5MzY4NTkzNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA1NzIyYjhjNGYyODMxYTA4YTZmZjE2OGQxNjUxMTRiNmZkYmFjZjk4NDIxNTM2NjI3NzY5M2JkY2IzYmQwMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2992-L3056",
+          "version": "repo-lines-v1:sha256:58fcd0618b0df1fc5f7c6d6bbc0ccd12bd40ce080d4ae92846ddc12f9f2c7087:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc0ZTUyYzMzOGFmYjY5NjFhNWIyMzZlYjg2ZTkwZWNlOWU4MTRiZDI2ZmY2ZTZhMTU0M2ViN2U5MzY4NTkzNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA1NzIyYjhjNGYyODMxYTA4YTZmZjE2OGQxNjUxMTRiNmZkYmFjZjk4NDIxNTM2NjI3NzY5M2JkY2IzYmQwMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwY2UzZjI0YWI0N2MyZjVhOWQzMzdmMzc3ZWQ4NTczZmE1NjU4NDA3NjQwMmYxYWYwNTRhM2RlZDYxOTQ2MmYifQ"
         }
       ]
     },
@@ -135,7 +139,7 @@
       "statement": "_place_unit builds the new unit in staging, moves any existing copy into staging, and swaps the new copy into place with one os.replace, so an interrupted run leaves each unit old, new, or absent; removal moves the unit into staging.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2323-L2353",
+          "resource": "repo://scripts/sidecar_overlay.py#L2812-L2842",
           "version": "repo-lines-v1:sha256:72133bd9e3018094c762574697a1fb823d954e55e570e116f345f4830afb74a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxNjYzOGZjZGUyNmFhZGJiMWNlZDE0Y2M5YmU4ZDkyZTg2YzY0ZjI2Y2Q3YzM0MDgxMzZhMDUyZjgwM2M4ODQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1YTVjOWVhMDIyNTFiNzY2ZTdkMjRkODgzNjZhYTBkOTViYjBmNjc4MTMxOTM3OTJlNTQxNTc1MjcyNGFkMzgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkMDcxZmZkNDI4NjFlNWZjNDQ4ZTc3MjZhZmMzMTBhMmYyM2I2MDU3MWNmNTM2Y2VlMGQ0NWZkNTJmYTllZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRmZmU3ZmE5NTM0OTkyNzdhM2JlOGIyNWFkYzVlOWM5OWY4ZmFlOTczZmU3YjcwMDc1NzQ0NTVkNDgzOGYzZjMifQ"
         }
       ]
@@ -145,8 +149,8 @@
       "statement": "Dry-run runs the gate on the candidate block, prints each action as 'would ...', writes nothing, and states that its gate is an approximation because Git ranks info/exclude above core.excludesFile.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2484-L2508",
-          "version": "repo-lines-v1:sha256:05e514f57bb7cb107677497ea85f12ccc821f0e628115627a10cf73b56b81ce1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjZDBhNzQyZGM0OGQ0ZjE4NmI0OTJkMjgyMmJhYjQ5NTE4Y2JmNWI2N2I1ZDkzYzE2ZTU2Y2E3NjZjODg4YzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2NDcxOTNmNGZhOTFjNjJjNmFjYjYzOWRhZDIzZjBlODJmZTY5YjFhMzJlZTJhZjEwMGY5MTIyNGYxNmIyZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmM2MzYmQxZjllMGRkMjczZmNlZmU5YjZlYzRiYmIzNTY3MGM0MmIzODgwYTg3NWUzYzI4M2I1YmEyNGFkMWMifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2960-L2989",
+          "version": "repo-lines-v1:sha256:56673f20d4615b9bfb1d673982d8c5507880df1525fd23e90ea1dcbdf2863734:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNjZDBhNzQyZGM0OGQ0ZjE4NmI0OTJkMjgyMmJhYjQ5NTE4Y2JmNWI2N2I1ZDkzYzE2ZTU2Y2E3NjZjODg4YzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI2NDcxOTNmNGZhOTFjNjJjNmFjYjYzOWRhZDIzZjBlODJmZTY5YjFhMzJlZTJhZjEwMGY5MTIyNGYxNmIyZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZmM2MzYmQxZjllMGRkMjczZmNlZmU5YjZlYzRiYmIzNTY3MGM0MmIzODgwYTg3NWUzYzI4M2I1YmEyNGFkMWMifQ"
         }
       ]
     },
@@ -155,12 +159,12 @@
       "statement": "The report prints installed, updated, removed, adopted, unchanged, and preserved counts, then one line per removed, deleted, or preserved path, then one SKIPPED, RETAINED, or PRESERVED line per path with its remedy; per-path skips do not change an install's exit code.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2421-L2460",
-          "version": "repo-lines-v1:sha256:f28ec79d777c6b02eaf195d9d027f009384e44b4b354c06c4d08e32b2726c7cf:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjNTgxNGZkODNjMDY3MTY1Yjk3OGViYjhmY2NkNzRjMzg3NGI3YjNkZjc4YTg1NmNjYzE4NThmYjRmY2E5OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI1NDBmNWYyZDJmNGEwNDIxNjc1NzFlODE5NTRhNzVjYzQ5ZTFkYTMwOWJkNWI5OTAxOWY2YzFiOGEwYmNhOTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI2Y2VkNzNmNTVkNzA1M2E1MDNjMTRkOWJkY2FhOTNmNTQ0ZjFjOTUzMTUyNzMyZTIzNTNiZTJmMDUxNTUwYzQifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2897-L2934",
+          "version": "repo-lines-v1:sha256:3afc82d9849cd783d280662ce80eaa12842f97ccee36451e0e6b9ceb838e1e44:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjNTgxNGZkODNjMDY3MTY1Yjk3OGViYjhmY2NkNzRjMzg3NGI3YjNkZjc4YTg1NmNjYzE4NThmYjRmY2E5OTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUzNDUzYWIyN2IyYmI0ZjI3MWY5Y2U0MDA1ZWU3NjQxZTIyNzYxNTAyMDUxMzk0MWQyNzVhN2Q1ZDFiOTE1M2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZkOTUwMmRkNjg2NTYzOTIxODFhZWVkOGY0M2ZjMTdlMDBiNmIzMmQzZjA3YTk3ZjQ4MzY1NWZkYWU2ODMwN2EiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0NWRlNDBhZmEzZjIzYzRlN2Y3M2IxNDcyZmNhYzFiNzZhYjdhMmVhNWMyMTIwMzgyMDkyMGM2M2NhZGNiNDcifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L664-L786",
-          "version": "repo-lines-v1:sha256:a29ddcd4c1efd884722e6a8cb71981c77b34795f086ce12d4391dbf6a5f4bcb0:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI0NzJhZDIwZjhlYzhhM2U4ODFiZTk3NjcwYzI0MzZkMmI4MTZkNTgwYWJjZGU3NjBmYjAzMWY1MzE5ZTAzMjZiIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJmNjlhMTM5NzVjMjU2ZWM4MzIwZTIwMTYwODNjOTZkZjYzN2NhM2QzNWJlYmRlMjMxNGJlZTNhNDcxMWI1NmNhIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJjMDIyZTZjNTI4OTRmYmFlN2MzM2U3ZmZiYTQxZGIyMWNjMTg0MjhlNDNiMWYxZDYzOTNlNzA5Njg3MmEzMGIxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI4OTk3NDdkNWFlYThjMzg0ODRmYjk3ODU0NjU1OWUyY2VhMjBmM2IyNWI0YjRlOTVhMWYwNjdkZjcxNmRhMzkzIn0"
+          "resource": "repo://scripts/sidecar_overlay.py#L764-L906",
+          "version": "repo-lines-v1:sha256:ca0003cb0dffff09a927e6532d86d1b6380de367c4d2bd811b65ee305f0766ab:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI0NzJhZDIwZjhlYzhhM2U4ODFiZTk3NjcwYzI0MzZkMmI4MTZkNTgwYWJjZGU3NjBmYjAzMWY1MzE5ZTAzMjZiIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJjMDIyZTZjNTI4OTRmYmFlN2MzM2U3ZmZiYTQxZGIyMWNjMTg0MjhlNDNiMWYxZDYzOTNlNzA5Njg3MmEzMGIxIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI5YjhkYmNiMWQzNGY1NzZjZjFmYzM2MWE4MjBkNzRiODBkY2VhMzY5M2FlZTdlMmExOGRkMmE4Y2Q5MTBhNDJkIn0"
         }
       ]
     },
@@ -179,16 +183,16 @@
       "statement": "Crash recovery is tested by faults injected after the exclude write, in the middle of a unit swap, and before the manifest write, plus after units are removed during uninstall, each followed by a rerun that converges.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1456-L1474",
-          "version": "repo-lines-v1:sha256:14f0ea83fa660ace5b3bbd76f2ae2a2c446e0d8f15d33fc1e33bc76ee8fa10aa:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0NGU3YTAxODY3MmI5MGIxODllNzkwZWYyYjU3YzFmMjU4MzA1MzBjZGFhM2U5ZTU0ZDU0MTU4ZDBjYjIzYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0NGFmOGQ1NDlkNjkwN2JhOWY5NWMwOWI2MmJlYzQwYmUwNzAzNTA3MmZmMjcwMWMzZDg0MDM4ZGU3Nzc3MzAifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L1704-L1730",
+          "version": "repo-lines-v1:sha256:dd8481b535f81f7099b67d479da4f1a4835b2ce497498dc305c9f7955e7056d4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI0NGU3YTAxODY3MmI5MGIxODllNzkwZWYyYjU3YzFmMjU4MzA1MzBjZGFhM2U5ZTU0ZDU0MTU4ZDBjYjIzYzkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE0NGFmOGQ1NDlkNjkwN2JhOWY5NWMwOWI2MmJlYzQwYmUwNzAzNTA3MmZmMjcwMWMzZDg0MDM4ZGU3Nzc3MzAifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_install.py#L690-L780",
+          "resource": "repo://tests/test_sidecar_install.py#L697-L787",
           "version": "repo-lines-v1:sha256:f7b58e3c3289cc1133da5e084fb2cf2500e142b25a8cc1aef6cf825dd92ffce5:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFjMjAxOWI4MjY0MzcyN2VjNjk4YzMyZWJiODZiZGJmNmZiZjJiNjJhZmIxY2VjYjZjMjdjNzBmOWU0ZDM0ZmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYwMzBmNzIwM2JlNjA1NWQ3ZmM4YWY4MjY0ZjUyNDdiY2Y5MDNkZTcxMzQxODQ4NmJhNDRmNTU0YzVhMWViM2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5NmFkOWJiMmExZTk2NjVkNWE5MjljMDQwNDc3YmUzMzg4NzFlNzAyYmIwMjdlZDY0ZDM3MjVkNmEyMGJjZDMifQ"
         },
         {
-          "resource": "repo://tests/test_sidecar_uninstall.py#L562-L615",
-          "version": "repo-lines-v1:sha256:2a4c3662af6d6f05bb80f17d9e86e6643ac7f88f365e7a520facf8ce503fe321:eyJzZWxlY3RlZExpbmVDb3VudCI6NTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2NzAyOWU4ZDhkY2Q4NGI0ZTIzYTFiMGJlZWJiODQxMDE1OWNmMWE3MDI3YTA4M2FjNmU5OTY4NTE3YmE3YTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5OTdjNTRiYTgzN2M4MzU5NjcyN2E4MDdiZjY3Yjk2ZDI5YmZmZmJkZmMwM2QyYjE2NDcxNTE0MTRmNTI5ZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQyMzViZjU1MDMwNzM3NTAwNTdkZWJiM2RiYjc0NmZhMzcxZjdiOTQzYjUyYjI1YzQzNTg4NDBmNWZjOWI0OTkifQ"
+          "resource": "repo://tests/test_sidecar_uninstall.py#L905-L951",
+          "version": "repo-lines-v1:sha256:5b5e2835aaaa8f6e5f75f5bb3845348fbdde87e6e48ab09cb6b4302953cf8763:eyJzZWxlY3RlZExpbmVDb3VudCI6NDcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY2NzAyOWU4ZDhkY2Q4NGI0ZTIzYTFiMGJlZWJiODQxMDE1OWNmMWE3MDI3YTA4M2FjNmU5OTY4NTE3YmE3YTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1N2MxODA4NmM5YmE1ZmE2YWU2MzM5YWFiZTRjZjUyOTFhNTM0NDJhZTU0NTIyM2ExZmVhZWQ5ZjkyY2ZkODIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5OTdjNTRiYTgzN2M4MzU5NjcyN2E4MDdiZjY3Yjk2ZDI5YmZmZmJkZmMwM2QyYjE2NDcxNTE0MTRmNTI5ZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         }
       ]
     },
@@ -197,11 +201,11 @@
       "statement": "Sidecar mode supports only the main worktree; the main worktree's info/exclude lines also hide sidecar paths in linked worktrees, background-session worktrees get no sidecar files unless listed in git.worktreeIncludeFiles or .worktreeinclude, and info/exclude is not a security boundary.",
       "evidence": [
         {
-          "resource": "repo://README.md#L610-L628",
-          "version": "repo-lines-v1:sha256:cc66b00e4d68683ac5e699b89bff278a2a93e7cd513ff5045ebab7cd2aa53746:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0OWE2NzRmYjUyZjBmOTUxNGQwZDY1MzRhYzc1MGQzYjk4ZDc5OWM0YTNlZmEyMTliOTgyOWU0NGIxMjdjMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMTQ0OTlhMjYxYWEyNDdiNTUwNDhjNDVmZGY4NTQzZWY0YjZkOTM1NjI0Mjk1ZGQzYWM0NWZkZTQwYzM0NzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA0ZjU2OWQ4OTFjZWY3NWY2MWZmM2ZjNWRjOWYyZDE0MTlkMmViOWQ5ZDZmZmFjZmZmYzM0OTVkNjlkM2JlZTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2Njc3ZjY5OWE4MTI2NjZlNWQ1OTQwMGUyNmZmZjRjNzAyZTUyZjYxMDY1Zjk2OTNkMWQ0OGNiNmRkMTVjZDMifQ"
+          "resource": "repo://README.md#L636-L655",
+          "version": "repo-lines-v1:sha256:28227a8f9444a29ee5f3c8895de45d06a8e2642f7d8493d842dc61084527cbba:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0OWE2NzRmYjUyZjBmOTUxNGQwZDY1MzRhYzc1MGQzYjk4ZDc5OWM0YTNlZmEyMTliOTgyOWU0NGIxMjdjMzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmZjQwZDJlNzZjM2QwNzBkMDhjYmMxYTA5OGY3OWMyNjU0MzdjMjU5OGFiMWMxZjZhNWExODhlMjAwOTk5ZGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA0ZjU2OWQ4OTFjZWY3NWY2MWZmM2ZjNWRjOWYyZDE0MTlkMmViOWQ5ZDZmZmFjZmZmYzM0OTVkNjlkM2JlZTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ2Njc3ZjY5OWE4MTI2NjZlNWQ1OTQwMGUyNmZmZjRjNzAyZTUyZjYxMDY1Zjk2OTNkMWQ0OGNiNmRkMTVjZDMifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2619-L2625",
+          "resource": "repo://scripts/sidecar_overlay.py#L3105-L3111",
           "version": "repo-lines-v1:sha256:37c849ebabeada5bd1054dd4e2882cbc8dcdb8463311dea42d0b783f62f11ff5:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjdjOWEzMGQ2MGYzY2Q3MWQxOGE0NDM1YmU3NmY3Zjk1ZTVlM2RkYmFmMzE5YjBiNDc0YmI4OWNmNDkyYWQxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkwOWE1M2E2MThkMDI4ZTFkMzAwMGMwYTdhYmNlZWNiZTVmYjM3ZjRlNTExZWZlNDY2NDNmYWQ2ZTY2ODcyZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmU1NGQwZjY1OGViOTM2MGU3OWUzZDNhNmYzNjNjZWE2NGRlOGVmN2YzYjhhZDc1NjIzOWIzNjM4YWQ4NDg0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzUxZDgwYjQzZTA3YjRkYzU0MTljM2I2ZmFkOWJmYjQ0ZWJiZGE0MzM3MWVhMmJiMTI5YzgxZmNmOTMyMzc2MSJ9"
         }
       ]
@@ -211,12 +215,12 @@
       "statement": "Sidecar ownership comes from the Git index: every index entry at or under a unit path, including skip-worktree, gitlink, and symlink entries and files deleted from disk, makes the unit tracked, compared case-insensitively and reported in the on-disk casing when core.ignorecase is true.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1709-L1750",
+          "resource": "repo://scripts/sidecar_overlay.py#L2021-L2062",
           "version": "repo-lines-v1:sha256:a696448fbc85ba0b4e4a969b0a3fe8e5a31d013ec47d41ecd07983d778dab7bb:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjNzNjYzY0M2ZhMzQ0OTc5M2UzNTkzZTM5ZWUzMDY0OTQ5YjY0NzhiMjNiNGQ2NTc0ZGFmMTY3NjliOTQ0MjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI4M2RkY2FmNDlkMjc2N2U3NTA0YjY0MWM3ZDcyN2QxZjc4MDg1OWIzMDRhNjUxNWU3ZjA2NzQ4MjBjMDMxYzAifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1774-L1816",
-          "version": "repo-lines-v1:sha256:e6b7d6627c077730bfc495a2fd9e05f9d5d1adb497f9710c06f8f3bbcf061811:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3YWQ2NDRiZTlkNDNlZDY3MTg3NTAxYWFjZWE4NDg0NDUxOGE5ZmM5ZTcwOTdmMWMxYjUxMGRlZDQyNjdmMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3OWQ1ZmZkNzdhMjYzOTA3NjQ1ZmJjZjI1NGMzZGNiNmRlZDY0MzkxOGRkYmM5OWQxZmQ0ZjNjZGEyOGExYjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1NDQ3MzFjZGE3MDc5ZTg3ZjA2NmVjNWFmZjk3YTFjYWM5OGIxNDEyMDlkODVlM2JhNTI0NjJjMGUwM2FlMTYifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2096-L2138",
+          "version": "repo-lines-v1:sha256:e6b7d6627c077730bfc495a2fd9e05f9d5d1adb497f9710c06f8f3bbcf061811:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3YWQ2NDRiZTlkNDNlZDY3MTg3NTAxYWFjZWE4NDg0NDUxOGE5ZmM5ZTcwOTdmMWMxYjUxMGRlZDQyNjdmMmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY3OWQ1ZmZkNzdhMjYzOTA3NjQ1ZmJjZjI1NGMzZGNiNmRlZDY0MzkxOGRkYmM5OWQxZmQ0ZjNjZGEyOGExYjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU0NGVhMGE4YTNjY2E1NTY0M2M2MjMyOTE4Y2U2N2UwYjAwMzIzOWY0NGM0YTdjODZiYzEzNTg5Mjg3YmMyMDUifQ"
         }
       ]
     },
@@ -225,16 +229,16 @@
       "statement": "parse_exclude_block sorts the sidecar block's lines into unit lines, file lines, and unrecognized lines, and the planner keeps every unrecognized line in the block and reports it once per run; the markers must form exactly one BEGIN line followed by one END line or the run refuses.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1326-L1332",
-          "version": "repo-lines-v1:sha256:febcb4e3f8ca8101539c12f1a5c4f80406b5fb6f98ad40624d03e24c3cc48461:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmRkYzlkYTkxNTFmNDdlZGZiYTg1M2QwNzhlYzg4ZDgxMzM5NDgzY2I5NjFiNmQwMWY5NzcwMmI1MzJmZWQ2YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmQ5ZGJkZDY2ZDEwY2U0ZjI2YmU3MGNlYjA5ZWJkZjBlZjA1ODk2ODViYTQ4OGNjMjNkYzYwZTBiZjAwYTBkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDA0ZmI1M2NmYmVmYWEyMGVjNzRiNzU0M2IwZWFjOTk5MGE0YjU2NjIyMjJmZmIxZTBiNDk5ZTc0YjhjMDEzOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWY0NTMxNDY2NmFlMDM0NjM4NTBiY2JlNTMxZWUxNWU0ZTc2NWM2NTBkNjhjMGY4NDlmNzViNDkzYzllY2UyMSJ9"
+          "resource": "repo://scripts/sidecar_overlay.py#L1570-L1577",
+          "version": "repo-lines-v1:sha256:c9820c8865c231a855ddb02c4090497581f1478e8fc7ba212fd0aa17022a85c9:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmRkYzlkYTkxNTFmNDdlZGZiYTg1M2QwNzhlYzg4ZDgxMzM5NDgzY2I5NjFiNmQwMWY5NzcwMmI1MzJmZWQ2YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmQ5ZGJkZDY2ZDEwY2U0ZjI2YmU3MGNlYjA5ZWJkZjBlZjA1ODk2ODViYTQ4OGNjMjNkYzYwZTBiZjAwYTBkYSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmI3YjljNzU3NzRkMjUxYzM3Zjc2NjNlZjRjYTU5ZDFkNGZiYmUyM2NjZWQxYTBhYWNjNTI1ZTkzNWE4ZWQwNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWY0NTMxNDY2NmFlMDM0NjM4NTBiY2JlNTMxZWUxNWU0ZTc2NWM2NTBkNjhjMGY4NDlmNzViNDkzYzllY2UyMSJ9"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2039-L2070",
+          "resource": "repo://scripts/sidecar_overlay.py#L2521-L2552",
           "version": "repo-lines-v1:sha256:9d59700828eee69e304c53f5f19743155301345e59a2ef9a123958f6fb076e3d:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFhZWE4MmE0ZDk3OThlMzAwZjI3OTM4YzljNjYzZTljZjNhNzY1MTVmZDViMjZkMGM1OTM2YWZiYzk0YmZiOWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFlOTdkNmFjYmFkMGJlODBkMThhMDc5NzM4Mjg2YjY0MDQ5NGY0YzBlN2UzOWFhODNkZjFmZjUwM2UxMWQ0NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkMzJmYmQ2YTViMzc4ZDZmNGYxOTVmYWY4ZTRmZjZjYWViNjBiNjc1YjA4ODI3YjBlMjIzYTVjNDQzN2EwNDcifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L593-L643",
-          "version": "repo-lines-v1:sha256:15a59c36cbeb2615b6e96149b7b413d2f50fac4a2598f35743fa84673d37b811:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhZDc1N2E1NmRiOTdjNjhkYWJmMmY4MDUzNDg3MmMyYzJlZWY5ZmUzZjA0YWM3YzlhODI5YjY0ZjAyZGUzNzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MmY3NmMzZjJmNTgzZjZhMDZmMTgyNWZlNmIxYTBlZmU4ODM2ZGFmZTZhZTU0MmU0YzE5ZDNmNTI4MWNlZjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjEzOTMwYTIzNDViZTUxNTViYjk1YTEwYTMxOWUxYWIwMWEyYTFlN2MwMDVhNzliMzhhNWFiYzgxMjUwZjY4OGMifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L692-L736",
+          "version": "repo-lines-v1:sha256:04d19a00e019d83c795f31f0c03186983cbe46f081774a30cd59be6984f701ba:eyJzZWxlY3RlZExpbmVDb3VudCI6NDUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhZDc1N2E1NmRiOTdjNjhkYWJmMmY4MDUzNDg3MmMyYzJlZWY5ZmUzZjA0YWM3YzlhODI5YjY0ZjAyZGUzNzMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIyNjlmZmVlY2I5YjYzZDBmZWVlZThhZWJlYzAxYmE4NjQwZTgwNzQ0NDBkN2FlNzE0ZmJjNzk1YzlkZjg5NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
         }
       ]
     },
@@ -243,50 +247,272 @@
       "statement": "A taken skill's edited or unfinished copy is moved with os.replace to <git dir>/ai-bootstrap-sidecar-preserved/<unit path with / replaced by __>--<content hash>, one level deep; when that destination already exists the unit stays in place with its record and line and the report names a conflict.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1034-L1086",
+          "resource": "repo://scripts/sidecar_overlay.py#L1184-L1236",
           "version": "repo-lines-v1:sha256:b10a44baeba0e7ab6a556f83dfa7ccbfe7a01d63d287e985f30668d9bc403f76:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU4ZjM2N2RjNzEwMjRlNmY4MjYyZGE3ZTA5NTg4OTViMDVjZDg2NDMxYmU1YWVkYzZlMDFkMTUwODUxOWViYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVmZWY1ZmU0ZDgyNjhiOTEyZjBlMTEyYWQzMzA0NDUyNTg0NDBhYTAzYTIxYTgyYjM5NDUyYWZkYzg0ZTU2ZGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhlYmFjYmRmYjFmMjU1ZDc4ZDI3MjhjYTk2MDI1MDNiZGExN2VlMGJhZDY0Mzg3YTJiMjgzNzI4MzY1NTY2ODQifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L182-L188",
+          "resource": "repo://scripts/sidecar_overlay.py#L191-L197",
           "version": "repo-lines-v1:sha256:43be8a4c41e7fb346f365046128a46febbd3ba75cd6a5f7311ebe6b0c085cd20:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UxMTc2YjA2ZmFmMjcxOTkzMGIzOTc2MGU2NTM4M2Q2YjgyODc2N2M5Mzg4ZTcxNThmMTA4YTY5M2IxZjIxMyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTNiYjdjMDAyNzEzMmI0MjdmYWFkM2IzMWE0NDRiMzk3MWEzZTNiYzE5MjU5NjJjZjBmZjVhNDk0YTBlY2E3NCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDI1MTMzNzA4ZjgyZTZiYThjMGEyNjQxNjIzMGY0OTgxMDU4MzY1MjFjZWE2YzU0ZGMzN2QxOWRhYTE3MTBhOSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWI4ZGJjYjFkMzRmNTc2Y2YxZmMzNjFhODIwZDc0YjgwZGNlYTM2OTNhZWU3ZTJhMThkZDJhOGNkOTEwYTQyZCJ9"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2364-L2371",
+          "resource": "repo://scripts/sidecar_overlay.py#L2853-L2860",
           "version": "repo-lines-v1:sha256:c1a58596867ca2f344b6975d39de9de9d688a522b9f5375555889a28551c7434:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDc3MmUwMzljZDhiOWNlYjk4YjUxNDU3YWNmNzg2MDI5OTQ5MDYwMWQ1ZWI5ZjU1YTcxODA5OGU0YTE3NzJmNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDQ5MWU0MjEzNjI1ZTc2YTgzNzNiNmE3ZGUwZjU3YzE2ODg2ODc4Y2UzODUyNjMyOGZjY2YzODMzNDIwMDNkMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNWU0MjgyZWM3MTg4N2ZlMWQyZjNmYTFiN2U1MTQwYzE3OGIyNTk1OGJhYTI0MDcxZWFiMDc4ZGJiMTZmZmQwMyJ9"
         }
       ]
     },
     {
       "id": "claim_5571a8d8b5d34ad8b15348a426a808dd",
-      "statement": "uninstall_sidecar runs the shared preflight and the planner with an empty wanted set and every skill and bridge taken, removes units matching their record, preserves edited or unfinished copies, un-hides retained files, writes unrecognized block lines back as plain lines, removes the block, deletes the manifest, and removes the staging folder; with no manifest and no block it reports nothing to do.",
+      "statement": "uninstall_sidecar runs the shared preflight; with no manifest and no block it prints the preserved-copy folder when that folder holds anything and reports nothing to do; otherwise it snapshots every well-known unit at current and retired write roots plus every current and retired bridge and plans with an empty wanted set, where every classified unit is taken, so matching units are removed, edited or unfinished copies are preserved, and retained files are un-hidden.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2944-L3027",
-          "version": "repo-lines-v1:sha256:c1b374c15972a0ee2ed18e2e8e5b4c30d6600e68d83466868bde86548f2a1366:eyJzZWxlY3RlZExpbmVDb3VudCI6ODQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjNTE3ODQ1MzBjNWE5YTE2YjIxNmY1MjMyOGRiNTM4MmQ5Mzg0YzY3YTE1ZjYyMGIxM2FjMmJmMDcyY2ZmNjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcyMDgzNzU0MjMyNTQyYTg0Y2RhMWI3NTRjN2RhMDdhMDJjMDU5OGEwMTEyYjQ5YzI4NGU4YzFlMTdmNGZmY2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA1NzIyYjhjNGYyODMxYTA4YTZmZjE2OGQxNjUxMTRiNmZkYmFjZjk4NDIxNTM2NjI3NzY5M2JkY2IzYmQwMjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRjNjIyMWU5YjU5ZjFhZTE4ZGFhMDkzZDIwZjc1YjQ3MTY3YjVhNWJmMjVkYTc3OGRhMGQ0MjkwYzZjNTgwMjEifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L1319-L1331",
+          "version": "repo-lines-v1:sha256:181b410ea952feaffc573f11444a6ee538dd5c32eca5d41dccc458a4c053b286:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwZGI0ZGM3YTBkMDNmNDVkM2Q2ZTNjZTAxNjFhZDE4OTYwMzExNzk3OGQyNWZjMTMwNTgyZDIwNzIyMGEyNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAyZjhjNTAxNWEyYmYxN2UyYzEzMGNmNDViZDY4Y2Q2ZTFlNjk2Mjg2ODdlOTk5MmE1MThmZWNhNjgyY2Y5MGUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkZGMxYWZhMGRmM2IyOTE1YzkxMWMyYTBhOGFlMWVhNmJmYWQ4ZDlmMWVjNTRiOTdlZmEwYmZhODIxNGVmODgifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L3030-L3150",
-          "version": "repo-lines-v1:sha256:510345aac1d5d560c7342b1ac570e4cc1934ecf64a0e4703d533f730a66fb656:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIxLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI1MjRkYzAxYmE1ZjEzMDk2OTIxYzQ4YTNlM2RmZWFjOTllNTMyZTlmZjllOGRhNjZhYmUyNTY5ZjA0MzhhMmYxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJkMGIyZGQ5NDM0NWE3ZWUyZjcxZmVlNWU4OTI5ZjBhMjFjZjBjMjU4NTFlZjM1OWIxZTk0NGY2ZTc5ZWQwOTQ5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
+          "resource": "repo://scripts/sidecar_overlay.py#L1406-L1417",
+          "version": "repo-lines-v1:sha256:6cacc34ce9bb729c90876ef8ed463bbdd0feef7508afb04deee5b71210fccb94:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjEwZGI0ZGM3YTBkMDNmNDVkM2Q2ZTNjZTAxNjFhZDE4OTYwMzExNzk3OGQyNWZjMTMwNTgyZDIwNzIyMGEyNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0OTNiYTUwNjhjNTFhNjMzMTg3Y2ViNGQ4YjZmMGNkODhlNGFkY2NmNjgyZTFmMDc3NDNhZjYxZDhlYTJiODgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlZjk2NGY2MGZlZjA1ZmFjNGU1OGE3NjdkOGVlYjc0YWRiMWFhY2ZjZTBhNDU3YzBjZWQ2ODk0NDZjOWI4MmEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3507-L3639",
+          "version": "repo-lines-v1:sha256:fed066f5fb1dab7c6881652e5e34af53fd971d1001bd4d1cebed3caf04c1bf92:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMzLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI1MjRkYzAxYmE1ZjEzMDk2OTIxYzQ4YTNlM2RmZWFjOTllNTMyZTlmZjllOGRhNjZhYmUyNTY5ZjA0MzhhMmYxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIzMGMxZjE4OGYxNDJlZDdhODI0NjgwYjIwNzE3MmM1NTE5YmM2MTRhNDhmZGE3Y2YxNjdlZGI4ZGRmNzk5NTZjIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJkMGIyZGQ5NDM0NWE3ZWUyZjcxZmVlNWU4OTI5ZjBhMjFjZjBjMjU4NTFlZjM1OWIxZTk0NGY2ZTc5ZWQwOTQ5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py#L528-L560",
+          "version": "repo-lines-v1:sha256:6e976c018ef382d0981caaca73d2a1779131d96b37e871984c6b08891cb7fb76:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1ZjA1ZDYyZjVkZDE4YWMyNmI4Y2UwNmE4MWUwZWQ0M2IyOWY2Mzk1ZGMzMWIyZWYzYzc4Y2ZjNGM3YTExZjAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5ZjQzOWVhNzgzMzY2MWQ4ZWI1OGM0MGJhMzQwYTEzOWVjNmRjYzIwOGI3YzU2NWMwNGZkNjczM2Y3ZTMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcwOWM0ZWYxNTZmMDQ5M2E2ZjVmMTc2YTU1ZDk4N2EyOTM5N2M5ODc2OGNmMTA2NGEyOGU1NGE4OTBhODU5NzYifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py#L678-L734",
+          "version": "repo-lines-v1:sha256:fc836bd00a9d725a38222978b11ced4c86921a89e73a50219a24c7e11b87660a:eyJzZWxlY3RlZExpbmVDb3VudCI6NTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJiM2Y3NTY4MmFlMmRkMjFmM2M3YTkzMWUzYjRiOTkyNzY3MjdmM2E2ZmI1YWUyMzE3MWU2YmRlZTZhYmMyM2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5ZjQzOWVhNzgzMzY2MWQ4ZWI1OGM0MGJhMzQwYTEzOWVjNmRjYzIwOGI3YzU2NWMwNGZkNjczM2Y3ZTMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRiOTg4MTRiNDE0MmZlMmQwMDFjZDA1NWMwZjc0OGUyMjdjYWQ2YzAyZGJkNzhlMWRjYjI4OWIxY2EyZTdkNGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNmOWY2YjVjMGJkNjU2MDU3OTc2NzY5M2E1OWZkZWNmZDQzNDcwNTk5NGQzYjM2M2JlOWVhZjUzMTJhM2NmYzIifQ"
         }
       ]
     },
     {
       "id": "claim_3bf7bc1f8e9b4fc897e0638683383aa8",
-      "statement": "An uninstall with a preserve conflict keeps the conflicting unit, its line, and the block, rewrites the manifest to the kept units, and exits 1, after proving with the ignore gate before any action and again after the block rewrite that every kept unit is still hidden, restoring the exclude file when the second check fails.",
+      "statement": "Uninstall follows the install's write order: it writes the write-phase block (skipped when there is no block and no line to write), gates only the paths the final block keeps (empty unless a preserve conflict keeps a unit) and restores the exclude file on failure, applies actions through the shared _apply_actions, then either removes the block, writing unrecognized lines back as plain lines, and deletes the manifest and staging folder, or, when kept_conflicts is non-empty, writes the final block and a manifest of only the kept units' records and exits 1.",
       "evidence": [
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2857-L2905",
-          "version": "repo-lines-v1:sha256:35b3f9c72cf8a5d1198e08841b7a243ce3aa8a99ee3ee2fb7b6ef6d143b7f520:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxZDJmMjczYmM2MGJiZmVkMjBiYzM3YTM3ZjhiYzYyZDAzNmVjNTQ4MmZlZTZlZGY1OWE2OTk1OTBlMDJjM2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMxOWZiNjczYzYyY2JmMzdiOWM1ZmIxYzM1YzlhOWE0Zjk2MTRlOTk1M2U4MzVkZGE5MDU3Zjg3MWU3ZGRmNzAifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L1418-L1439",
+          "version": "repo-lines-v1:sha256:c83d5fbf292e82839daef8816a87733d5ba5320d499ef47c8593d17b56f55cb9:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYwZDhjMGQ5MjkyZjVkNTkwY2RmOTJkYTc1YWEzNzk1YzFlZGExZTcyY2IwYzEyOTNmNmZkNzRkNWZiNDgxNmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE3Y2U4NzliYjAzYzI0YzgwODk4OTExMzAyMzZlNTA2OWFmMTFhMWRlZGIxNDU1MDlmNzMzNGZmZmUzYjdiYzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJmNGExMTk3YzhjMWViYTZiMDhiZWYzNmNlODIxNWY1NjYyYTExMmFhYThkMzJjZDVkYTExMzdiOWZhZGFkN2UifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L2961-L3012",
-          "version": "repo-lines-v1:sha256:c1dae73f1b24e421499d313424ac41849886980e56b8c1435327c0757d5ca789:eyJzZWxlY3RlZExpbmVDb3VudCI6NTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1NGZkMTU0NzE2NDJhN2QyOTdiOWViODlmNmNmMzJiMTFlYmE3MDYwZDc1OGJjODY3ZTBmMTEyNzVmN2ViMjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRhNzczMzcwMmMwYWJhODdjYjM2YjNkYTUwNzdjNWE5Njg0MWQwYWM0YTJjYjA5OTM1MjhhOGM1OGFlMmFiNTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg1YzM5ZTFhY2FkZTBjZjE5OTM1ZTlmYTI5ZGRmM2NjNDZmZTVhMTYzNzc0NTQxNGM0NTU4NDc1MTliYjM3ZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNlODU0YjBhMTQ1M2FiZWIwM2Y1NGRiNjdhMDFmYmQ4NzBlMmYxOGMxNmE4YTcxN2ZjOTg4MjYyMzNiN2FlOGIifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L3405-L3504",
+          "version": "repo-lines-v1:sha256:cb3e18812f1a6ca640cc37bf75978bd4f6d8c98e9a08d56c9b83037f75d77d07:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI1YzUxNzg0NTMwYzVhOWExNmIyMTZmNTIzMjhkYjUzODJkOTM4NGM2N2ExNWY2MjBiMTNhYzJiZjA3MmNmZjYwIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI3MjA4Mzc1NDIzMjU0MmE4NGNkYTFiNzU0YzdkYTA3YTAyYzA1OThhMDExMmI0OWMyODRlOGMxZTE3ZjRmZmNiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIwNTcyMmI4YzRmMjgzMWEwOGE2ZmYxNjhkMTY1MTE0YjZmZGJhY2Y5ODQyMTUzNjYyNzc2OTNiZGNiM2JkMDIwIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiI0YzYyMjFlOWI1OWYxYWUxOGRhYTA5M2QyMGY3NWI0NzE2N2I1YTViZjI1ZGE3NzhkYTBkNDI5MGM2YzU4MDIxIn0"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py#L338-L396",
+          "version": "repo-lines-v1:sha256:77bcf93c0f85497bb66205b9cc92a3cfaa517093310cbdecf3de7b4df6e2f6fe:eyJzZWxlY3RlZExpbmVDb3VudCI6NTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNlODRiY2VjMmUxMmQxNTViMmJjYWI3M2IxZWMxODI5MDYyODNiYTU4NThjODk5ZjViY2VjNjk4YTljOGU0NTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlMTA0ZDkzN2RiMmEyMmQ3NTdiMmU2NWM4YzRkYzVlMGY4NWNiMjIwODI4Njk0YjU0ODgzMzFiM2NmYjY0MGIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY1ZmJhMmQxYmViYmZmNmFkYTdjZDE2ODVhYjYxMTE0M2JmZmFkNDk3NTFhNmFhMGZkMjEyMTE3YjhkMzgwZmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEyZDk0YjQxMmJhYzA5ZTUzNzRkYmZhODAwZTU4ZDg4NTI2YTM4Y2IzZTM3NTRhZGE3YmE1ZDE0NTE1MTM1ZDYifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_uninstall.py#L800-L823",
+          "version": "repo-lines-v1:sha256:bc12d774ceb80d5919d8a77471b01a7bca53a44770afa681c1d8b9067195e6a7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkwYzUxZDJjM2ZhNzMxMmZmNGQ3YzU0NjcwMDcwNzU1NjgyMGY2ODU2NmIwYzAwZTE4NGU3ZWIxMWE2MjExOGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5ZjQzOWVhNzgzMzY2MWQ4ZWI1OGM0MGJhMzQwYTEzOWVjNmRjYzIwOGI3YzU2NWMwNGZkNjczM2Y3ZTMzNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNkYjQzNzkxN2RmMzViOGYwMjhmMGIyZGI3ZTdhNGQyOWUwM2YxYmFkYTFkYTcyODE5NWMwYjBiMWI3MmRhM2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkMTZkNDNjNjcwZjdmYjhlNTFlZjExMzEwYjc1YzkyY2I1MjdkYWI5ZTg1NjM5NTJjYTExMTc1MTRlOWMzNmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9071252f35af4cc1ac92c5b675f26668",
+      "statement": "A recorded or listed unit that holds a .git entry whose parent folder is not a gitlink makes the planner abort before any write with the nested-repository message, while an unrecorded, unlisted unit with such an entry is classified foreign so its skill is taken and nothing inside it is touched; gathering stops below any .git entry.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1339-L1363",
+          "version": "repo-lines-v1:sha256:667fd40f44ac61d9f692701ee1dd035ce590f2981a5ac6948cf825214b1ee3c7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmYjBmYTM2Yjg1ZmZlMWRjZTA4NGYxN2IzMWI4NWJjYzVhNzkxOGVmY2JkMDY1YTkyNDBkZTYzZTE1YWZhOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImU5ODBjYjI5YjJhMTgyZTk3ZGIwNjBkNGFlNmQzNzRiZmYxNzE2M2Q0NTMyNjBmYmUyNGVjNGU4NzhkM2MyMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcyYmRhNjk2MGY3OTYwMWI1MmY4OGU3NDEyNjMxYjJiZmVmYjk5NzJlNWIwMzhmNjVhZmFmNmVjYjY2NDYzODgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2265-L2272",
+          "version": "repo-lines-v1:sha256:3d0e75bcf050a211039ae942f72b8d446ccaa47d5ccc2b87c59eb9fd68ddcec1:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDA4MjY4OWY3YjJlNjMwYTBkYTc0ODE1MjIwMGU0ZGIzMWRlZGMxMGJiZWVmMjZmMTk1ZTlkZDdiZWIyNzcxZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2JhZDllN2RmYzJlYmU5YTIxNzRhYmQzODNkMWMyNjdiYWM1NWNhYjk4NzhlZjhiNjZiYjRiZGMzMTAxOWEzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDY5ZjllMDg1YjE0ZGQ5ODU0NGE1NDIyZTQ5ZjNhM2M2NGJjNDFjNzBjZjI0NjU1ZWQyMjNkOGY2YTNlYjhlMyJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L2956-L3019",
+          "version": "repo-lines-v1:sha256:a5b9a2fb08ee034c015e196ff2f52ff9bbb164eea69fbdfd70ec7c3ef1187a08:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc4ZDYzM2I2MGM3Y2FlMGQxM2Y4ZDdhMjc4OGY2Y2E0NmVkODIyM2Y4OWU3ZDFlNzBlMjFjMWM3YWJmZTQ5NTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwZGI4YmY0MjRiNTMyMjBiNWYwMjBhMGI0ZGExYTMxODQyZDJjMjE1MmU4Y2Y3YjJlMGE5YzRjMGYwY2Q5ZmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjExOGJjZjQ2OWE5ZjI5MWM1OGI5NmQ5OTgyNGJiYjEyYjAyMDk1YjdiYmM0Yjk3Mjk3YzJhODBhMDM0ZDA0NDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZjhjMTUwOGQ0YTU5YzM2NmUxMzAwN2UyN2FhMWM1YWYzYWM5OGRiNDIxMWU1YjU5MGQ3YmMwZDcxODc3YWUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_47a9170ecb0949b599e179221fb970d2",
+      "statement": "A unit that is itself a gitlink gets the gitlink outcome: any record is dropped, no file action is planned, the report says the sidecar never touches files inside a submodule, and the skill is taken; gathering never recurses below any gitlink, so nothing inside a submodule is hashed or sent to git check-ignore.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1000-L1009",
+          "version": "repo-lines-v1:sha256:d87e9daf784a5e30d302d94525f4b042272b4379c093bbd16c158adddc16a249:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2ODdiOThkNzM2ZDU1Y2M3NDVkZTRkNWQzOGZjNDI3NDQ5Y2FhZDJmMDVlODRhOWRlZjVjZGVjY2I1MjA3YjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwZWI0MDIzYzhlZmY2YjljYmY3YjM3MTRmYWEwYzM2MjI1ZTI2YzcwZTQ4NjAxOGE2MzkwMDEwYzdkZDAzMGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3NGM5OGQzMGIxNTg3MmM3M2JkYzZiNTViMDdhMWY1NGYyNzUzYjRmMDgyMjQyMTUxYzBjZGMxZDhkNmFjODIifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2252-L2259",
+          "version": "repo-lines-v1:sha256:586ed37345de2677f561f5f0d576c1dc7151dd3f7bc5d4a6ae1693f3684bb7d4:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjkzNjYyM2NiMTI2ZGYyNmIxNzYxN2NiMWUxYzhlNTU4YjFmNmMwNzA2MWFlYzMyNzRmZGYwNmUwNjg2ZGY1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWQ4YTllOWMzMjUyODIwYzY1YTgxNjUyMGI4ZGI0OTMyMjgwODQ5ZWM4YzdkMmViNjI3MmFmZGZlYmUwNTljMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDVkMGFiMTQ4NDQ5ZWJkNDBkMzI3Y2Q0ZDc1OGZmMjQ2ODM0ZTkyYTdmY2IxZDI0OGIyOWEwMWNhNmI4ODQ3NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzEwY2YwOWM0OWQ5MWFlYmZiYTFlODg0MjUzMmRlN2E5ZWRkNDQyYmE1YzczODYwYjdlYWFhMGM3YWEwZGNhNiJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L774-L788",
+          "version": "repo-lines-v1:sha256:465a5eecf47a28780771bf49089ede09fb985f87eb15b88752b5b3dc262c4891:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljMzc0YmYzOTIxMDg0M2M5YzEwYjg3ZDZjZDk2NzVkOGVhYTc4Yjc4MzA1ZjhhMmQxNTVlNzZhOWExM2Y3YzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYzZGUxNzY3YTI0YWY4MmIwMTlmYjFjNDkyZWIxYjc1ZTVkYWZhYjc0OTczMDJmZTUwOTUyMDBjODM4MjI5NmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNhNjU4ZDI4OGFlOWZhOTYyNDBkNjIxYjVlYzFlYTRlNWZlMDY3ZjY5OWYwYzFhMzUzNGM0MmI0NTg0NDI4NWIifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L2924-L2953",
+          "version": "repo-lines-v1:sha256:7417cee99d961c6c82515d3c1a778956919d34d012211506938d5eb0e9bb3935:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ3MDU2ZWIyNDA4ZjAzZWQzMDljMjhiZTI1MDJkOWY2YjUxNDRkYmRkMWM5YWNhMWFkYjM0NTA3NDk1MDY4Y2QiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NTBiMzNlN2FlMGYzMjY0MTlhYmQwYjcxMDY4M2VjNmFlZDUyNTliYmQxMjFmMTRkMjQ2NGZlMGJlNDkxOTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzMjU2MzY3YzZiYjQ4MWI2YTI2OGQyMTFlYmE4MTE2N2JhOWU5NDY3NmRhNGNkMzJlZDdiMTY2YWE5ZGQyYmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYxNzhjNTgzYWFjYzJlNDkxZWMxYTQ4MjU2NzEzNjc5YzYyZGZiMDdiNTg3MTY2MTk4MjE1YTU3YjQwMTUyZDUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_c0cb226122c8418ba2b7b2b855c1c2e4",
+      "statement": "A retained or listed file line that falls under a gitlink nested inside a unit is dropped and reported as now visible, whatever the owning unit's own outcome that run.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1478-L1485",
+          "version": "repo-lines-v1:sha256:897bdd69d2135fad3cde276f0d899b1f8a74a17f62b6f6e3e19af3c8c2c09ded:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOGVmNzljZDMyNWNhMGE1YTIyNDIwM2RkMWY2NTM4OTBjZGI4MmM2ZTAwMWE1NDU0YWMxMWI3YTg0YmU4MzZlZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZjZhZDA1MmM0NGI5NTNmMGQ4MzI4NmEyZGRkZWMyMTg1ZTdmMTg5ZGIwZTRmNTAyYzZmMDZmMzQ3NTg0NTRhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiM2QyMzRmMDI5NWVmOWJjNjU0ODMyNDU5M2MyOTliNWE5MzA4OWY1ZGJiZDBkOWMwOWJkNmVjNWZiOTlhMzA0OSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiN2QyOWM0Zjk0YzZmZWRkZTYwNGE1YzQ2YTNhZDFkYjJkYTVkOGY4MWFlZmY0MTRhZjE4NmY4NmY1ZjI3YTE4YyJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3088-L3151",
+          "version": "repo-lines-v1:sha256:5766b2fc90ffb176860552645ad7e4835a6e17a635162fe606a57f11a4699659:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMjFmOGVkYTE0YzBmYjQ0MDRlMzM3NzliN2JlODE0ODYxMTBjMmZmZWIwMTYyMWQxODVmNWRlNjIwNDczYTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjhkODVmZjA4NjM1NjI2ZGU0N2I3MzAxMjIwNDQ2ZjQzMTdhYjc5ZTc4NDdlYTc0MzdkZTdkNTE2NjI5NzFiZWQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8b527ecda1684dd79a8db218e4901778",
+      "statement": "A unit holding a symlink, named pipe, socket, device, empty subfolder, or unreadable subfolder is incomplete and never matches its record or the wanted content, so it is kept as locally modified, unfinished, or foreign, or preserved whole for a taken skill, and is never removed as an unchanged copy; a symlink inside a unit no longer aborts the run.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1046-L1052",
+          "version": "repo-lines-v1:sha256:642b82467197373ec84a9352e3e85fbc2bc7d69c8d7a75f3ab34dc29966eecaa:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZTE2YjM1MjU1NWE1NDE0YWZkZDgzMzRlN2FjNTRhMmZjYTkxODdlMWRkNTNmZWEzODBiNjI5NGVjMDJlOWI0NiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOWFmNzc1MjYyMzlkZDBkNTEwMDM5OWRjMWNlMDA5MjUwZDJiZTQ3MWYwMmY0MDUzY2JmMmY5NTY3MzdmY2VlOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTY2MWI0NTBmY2QyMjdkN2QzYTBkNzcxYmJlYWRhZmExOWNhYWJlY2JkOGM4YWIwM2M4NDQ5N2QzODkyMzY1MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzAxYmEwYWFjZDYxYWQ4MmI0ODNjYzAzYmQwZDgyZTc3NzhlODQxZjJjODM3YzQxZWJjNDc5NmExMmZlYTQxZiJ9"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2260-L2285",
+          "version": "repo-lines-v1:sha256:ee8c0cd4632c648316b3e15910ea7c6c82e2fc06cb7b5c9c1f4a71b685309c40:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgwOGZhMWI5NGEzOWNhMjk2ODcwZjM5Yzc0Njc4YjNiYWVjNjc0OTcyZmRjNjJjZTM3NzRhNjA2OWU0OTdjYmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU3YTVlYmM1NWQwYTU4ODI2OGIxNzM3NzFhYmZlZWZlOTEzYzdjOWY4MzhjMmEwOWI1MDYzZTFjZTUwNjk2YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQzYzU3MTFlYTI5YzU4ZTdkMTVkMzdkODhiNjA3YTg2YWVlNDU1OTI0OTQ0NzEwNzZlNzg5YmM0YzJkNDM2ZjMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdkYThmMTExMjRmM2U5Y2YyZDJmMmU5YTAyZDQxY2M1ZWE3NTdkZjIzYzNkNmYzMDFhNmVkZDVmOWQ5M2JmNDcifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3201-L3228",
+          "version": "repo-lines-v1:sha256:d61fd2a375f193e400922a37e861579987419b6fe564e56a55bb5aab3d5a151d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzNWNhNzQ4NTRjZWZlYzBlYmQxNDNiMzBiZWJhZDk4NjJiZmIzYzAyMGZhMGE3ZDVhYWE4ODg0ZWUwOWQzMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMzRjNjc3ZDAwNDZjODU0MWM0YjM5NDQ3ZTE1MGQ4YTlkMDlkMzVmYjcwYjIwNTQ1ZTkyYjQ3YTA1MTU4YzQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU5YmM3OTFkYjFjNmI4ZmUwZTI5N2UwODNiZDg1Y2ZjYTEwNGUyZDdjMDM2Y2M4ZDUzNjI5MTBmZjRmYjM2NWIifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3305-L3321",
+          "version": "repo-lines-v1:sha256:a396b1ed3a1abc2cd25767c2570b95501b3a57f32da91c0387c0fdb074971926:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiNDMwOGJmNDVlYWQxNmU4OTMxNjBlOTAwZDU5NDk2ZjZjMTk0ZDMwMGNlZmU0Mjc4NTU4MTI3ZjVmMGFmNzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUxYjhmMTgzNDQ3ZGMxYTc3M2MxZThlOGM4NWExODgyYjAzOWRmMmI2ZDQzM2JhZjI2ZDdhNWY1OTg0YTJhMzMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkMDEyOGEyM2JlYTI3NDE4MGVmN2JlM2M1ZmQxZmU4ZDMzM2VlNzI5NDUxOWZiMTIwZDFkZjExN2Y2ODgzMGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjMyNjJmYzgwZmVmMmI3ZjNjZGZkYzNkNzM3NWE4MjJkZTM3NzA4NTUyYjgxYmQzNjI2NmU0NjFkYTU4Mzk4ZWEifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_110de42cbde8473daf7a4f7d3f612025",
+      "statement": "_enumerate_read_entries is the one path-identity rule for folder names and frontmatter names: a read root is listed through its own symlink unless that symlink resolves into a write root, a symlink entry that resolves into a write root is an alias that never takes a skill, and every other entry, including a case variant or a differently named folder at a write root, is listed by its own name.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2383-L2420",
+          "version": "repo-lines-v1:sha256:175c4b4ed8f36edb0875dc38e69b3a102750778b289b99dbc4be8ac4a98b4699:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgzYWJlNjc1NTc3ZGNkNWM2ZWM5OTlhNWUwYjcxNGQyNmI5M2VjOGZiMmFkZTcxODIyZTE4OWQ5MGM2NGM5NTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ZGRkZWY2NmE5NDJiNjVkNmY0MDBiYTJiZTE2ODlhNzY5ZWUyODQ5ZTI5ODkyNjIzNzNlZDI1OWQwNDRhYzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUwYjIxYmY4OTVmYWUyZDczOTIwZDkzMTc4Y2ZkNTg0MWNkZjhmOTUyNDUxNmM4YTU2NTg0MzZhNGFjNDhmM2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRkYWY2YjU4M2U4NWY4MWE0MjEwYmQ5MTE3YjRhNzNlMWVjNjVhMzU5NjBmNDdhNWU3N2IyOGQwN2JhNzJhZTUifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2423-L2441",
+          "version": "repo-lines-v1:sha256:f5196f65c67317c7586cb223a2274517f47df155eb56934bdd3bf5d21b36817f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2Njk2YmY3NDNiOGUxY2RkZjBlYzJjMmEyZjY5ZTYxNDgwZjkxMGRhNTZkNTAzYmM1NjFiMGYxZmJjMWFkYmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM5Yjg3NTY2ODEwZmU3YTA1ODA4YmRkNDc1Y2RhNDNkNzcyZWMxYzU3YjE2MWEyNmRhYmY1Zjk5YmI5ZWVlNWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY2ODI4NTc2MTRmZTZlNjcyY2Y5Mjc5NDJlYTg3YTg4ZjRlMTAwMTZiMTc3OGYwNmE2MjlkZTM5NDg0ODVmMmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImRiOGNmZjViNzRjNDhhZjg1ZjQxMTE2NjJlMGNjODI0NDI5MGRjYzQxMjI4YTA4M2JjZGEwOTBiNTYyNDg1YzkifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2483-L2518",
+          "version": "repo-lines-v1:sha256:65c8c94ca8b55da01be792fd739cf6ec55ed2e8a5a003aedf5c3cc9f912de137:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmMzM3MTA4ZTQ4Y2FjZDU2YWI2MGNhYTk4YTcyYTc2N2Q2NmQzMTRlN2Y1NzE3MGU2MjAxNTU2YTJmMmE2Y2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwZGZhOWMxOWU5NzhhNGE4YjY0MDUyZDg5OTdjYTdiMjgyZDZhZTI1N2RhZWJhZTM2YjVlY2IyYzBkMzM0N2QiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA0YzBlODYyNDA2ZDczODY0YzBkOWQ0NjI0ODdjYzRkMmZmMmI3NWNmMTAxZGM5YmEwMDM5NWZlY2U3MDc4ZmUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L1657-L1702",
+          "version": "repo-lines-v1:sha256:8b930904fa0449dfc0dff256f6667b7206a6dc70f787a0191c8284b9a01e4281:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIxYmI1MjI3NWNhOWUzNDlkOTcxOWY3NzA1MDEyNzFhOGU3MTEwOTI0YjY4MGJjZjY3MGQ5YzI1ODMyYmFmOTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ1MTk1NTZkNjMxOWE2OTg3N2U1NTI0NzFjOGFmYzFiZDE0NTFkYzA3MGQxMmNiYWNlODAwZDJiNzM4OTcyMzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhN2JmOTcyZmJjMTg0OWIwZWRiMjNhYzA3ZDc3NGNmZTg5ZDdiNDhkMjhkNWNjNjNhMzg5NTA5YzIzYzc2YzEifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L1749-L1776",
+          "version": "repo-lines-v1:sha256:ce99db949d6dacfd196fec8a019ad8823876be41cf2dac65416650dc9c9505f5:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI5YzMwNTVmMmQ3NDRmNGFjZDEwYWEzZDE0MjQzNWNlN2YyNWM5N2QyZmZiMzlkMTljOTc5MzczMzQ0NjYyMzEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQzOWQ4YWM0ZGI0ZDgwOGYyYWY2NWQ5MGNiYjk2OTFmODljN2MzYTM2ZTVmZDk4ZmI2YWMyYTUyMzdlNTFkNDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d06d3bc7c20e477cb4ffe11bb4516a60",
+      "statement": "Every exclude-block reader and writer splits on newline only, as Git does, ignoring one trailing carriage return when comparing, so a retained name containing a form feed, vertical tab, or U+2028 stays one pattern line instead of producing a raw pattern that hides unrelated files.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L665-L689",
+          "version": "repo-lines-v1:sha256:ab137f8025446782040b0b38be0fe2592c145710472550c36a7fcf17aeb5a777:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxZmQwZmY4YWNjYWFhZDE4YWQ4ZTBkM2UzZTQzZjFlMDU0NDU4YzliY2NjODRmODk0ZWJjOTVlNjNlMmFhYjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjMGIzNmFmZGU0Y2NlNDQxNDYxYzZiNzQwMTFiZmFkNjI5NGUyZDZkZjcyZTM3ZDJiNmI1ZmE3MzRhNTFjMDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc1MmY3NmMzZjJmNTgzZjZhMDZmMTgyNWZlNmIxYTBlZmU4ODM2ZGFmZTZhZTU0MmU0YzE5ZDNmNTI4MWNlZjciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0MjRkNTc4ZDY1ZWJlOWE3MDIwM2M4ZWJhOWRhZWNhYjY1Yzc3MjMzZmZiNzY2N2VlODY4NzkwZDI1YmZhOTUifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L2630-L2665",
+          "version": "repo-lines-v1:sha256:93d10eaf1b9fd41fc7ab7490270e3348b4609955aae7d9ce714eb0240de512cb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA3MDkwNTc1OGFkNTIxYTcxYzAzMTk1ZTk4YWY5YmM0MjZlMjk5ZWRhNWFhZDcyZTcwZGE5NjE0ZWI0ZmY3MTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRmMzFhOGIyNGZlN2JjZWJiYTYxOWI0OGEyYjllNzAxYTFhZTg3NTNlODgwZDUxNjAzZGI3NWIxMzhlNTU0NTQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4MTljMTAwY2NmMWVlNDQxYTMxZTczNjgxMWZjY2VkOGM2MTZkMWMyNjkyMzY2ZjAzMGIzZmRmNjY1MDgxZGQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg5NDQwNDFiYzgyYmIyNTZlYWJkYTM2YjE3ZDA4ZmRjNTkxNzUxYmFjNGYxN2UwYWRiZjcxOTQ0NDIzZWU4ZjQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_93d99e472aea49ea82bec8636a5b6a55",
+      "statement": "required_snapshot_units also includes the owning unit of every file line in the exclude block, so a retained file of a skill a later profile dropped keeps hiding after a lost manifest and uninstall reports it as now visible.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L546-L575",
+          "version": "repo-lines-v1:sha256:9a5dd77316144bd28c8533efc9cb85b4cac2c91a32873323f965aa6f55fd2463:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1MTQzM2ZmNTMxZTcwZmMwYWIwYmI5YzA4MzA4MDE1NzE4YTkxNjkwZDA1Zjg5MmJmNjhlNjYwZGVhYWUzMmYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYTEzOTU2ZjFhYTE4M2NhZWY0OTc2NmRmZTYzNjE0ZGNlOWY1OWNjZGNmNjQ3ZjQyNWEzN2E4MDNlMGNmZTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE5MDZiZWIzMDc1NzQyODY5ZTFmYTlkMDgzMDZhNTUwNWU3MWMxZmU0YjU3NzBlZmJkOWYzYTk1NzM5NTMxZjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3399-L3447",
+          "version": "repo-lines-v1:sha256:c87bbc2ac644733d42d1c34605dfa6541ca2d07815a0ed5305e465ee3667a8af:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5NmRlMTRmNjVkYjgwZjE4NmU4ZmVmODc0NDJiZGE0ZmJjOWZjOGQ1ODJhODRjMjNlM2FjZmZiMTA4YTNiNWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJjYWY3YmZiZTVlM2RiNWMyYjQxNDdkZTgwOGIwNTU5NjRiYjA4Mzc5Nzg5ZTQ1YTBhMmMzMmYyYTlkNjdlZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjliOGRiY2IxZDM0ZjU3NmNmMWZjMzYxYTgyMGQ3NGI4MGRjZWEzNjkzYWVlN2UyYTE4ZGQyYThjZDkxMGE0MmQifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_65f68729c5b24b2c9bec72869830dfa3",
+      "statement": "A git check-ignore exit other than 0 or 1 while gathering unit snapshots raises GitCheckIgnoreError and aborts the run with Git's message before any write, and the same error during the ignore gate restores the exclude file before aborting.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L2063-L2088",
+          "version": "repo-lines-v1:sha256:2b9cba1e31a7403ae8cc9b34b4ee177ddc38bafb43845ea1a5743b43179e43d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg3YTBkNDdiOTljNTYzODliM2ZlYTQyYzgxZDBiNTgzNTY1ZDg1ZjljY2Q0MDk0OGUwZTlkMTdkYTI2NzZjMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgyNDZmNzkwNzEzOTI3YzljMTNkNzM0MjczYTBjZTdkYzhlMThmYjg5MzBiYjcwOTBiZjhmMTI3Y2FkNzllN2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI3NjM4YTdiNmExYWM4MWMxYTExYzI2ZDNkZmUyZGJhZGNhNGQxYmU2ZWQxODBlYzMxZjcwZGFlMDAxMTIxODQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJjOWI2MzgyMWU4MTA5YWFiZTgzYzJjZTBhNzJkYzliM2IzZWM5MjZjNjgzZDViODMzM2UxYjIxNDA4NzcxOTgifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3019-L3028",
+          "version": "repo-lines-v1:sha256:397b18f9f7800293a8db655791c764ff9ddb0b85b1738aaa2f8d803385ff26d3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkYTVjNjZlMTdiMTQ1Mzk3ODM0YjhjODU0ZGM0MTkzZTIxMjUxODBhODk5NmExNGMzMTg4MzMyNmIyZWZiY2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZmQyZmU1YmYyZjQzZDA1ODA1ZGRkMzk2MWVhMmIyMzRkNWYxZjk2MTdhOGQ0YTMzYzIwOGEyMDFhZWJjMDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImViODBhOGM1NWFmMmUxOWNhYzQ0MzZhZjhlZGY5NzgzYzQyM2Y0NjVlM2YyM2RiM2ZiZWY5OTE2ZjAyMGJjNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0ZjEyZjdhMjMxZmU0OWRmNzc0MGYyNTI5YTU5MjRlNjJmY2Y2ZjRlYTNlYTg1NzBkZGEyMWNkNjk1ZjJkMTQifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3274-L3279",
+          "version": "repo-lines-v1:sha256:e13296c280afacc8e721a317c4c870ec09049d78fdcc96b03d3e64894f8e0314:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYWRhNWM2NmUxN2IxNDUzOTc4MzRiOGM4NTRkYzQxOTNlMjEyNTE4MGE4OTk2YTE0YzMxODgzMzI2YjJlZmJjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmQ0NzAzOThhYTE0NmM4MTM3YjVlNzkxZmQxMzJiZDg3YzMyOGU3M2Y1ODc1NWUxMDY5ZTI5MTlkNjIwOWY5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDRiNzA2MmJiYWQ3YmFmMTQzNDMxZTQwOTllNmU4MTY1NzhhY2Y4ZGVkYmY2NTNjZTVmNzE0NDcyYjU2OTM4ZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZGViZDI5ZmViZGYyMzkzNGY2ZTBjZDM5OWFhMDczMDg4N2RhM2ZhYmFiOTk0ZTQ0Mjc1MmMwZjVmN2QzNWNlYyJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3154-L3180",
+          "version": "repo-lines-v1:sha256:fbc9d8a3f4c878455257a6b2967e2a6a2d26a4d446967cf976842fc9b7f50cd7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3ZWVkNjkzOGY5ZjU0NTc3MjllNmM5NmUxOGZkMDIyMWVhYTU4YmQ2MjAwNGM0NzQxZjEwMmE5M2IzMDg0ZTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNiMjFkNzhhNzE2MjAwZTIzNzllMGIxMzViYWY4OTMzOWNmODliMjgzMTU0NDExNDBjOGFkMDVjZTVhNzNlOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmE0YzhjZjM1ZGU3NzI2OTA2Mzg0NGU5YThmNGEwYTkzZGUwYTc3NzRlY2UwMThhZTdhODk4Mzc3NmYzYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0M2FjNGZhYjkwM2Q1N2Q5MWJhZWRlN2JhYjc1NjJjN2QyNmZkMWFkYzZjNDNlNGUwODk3MzRjNzYwMDAwMjYifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_131dd44e43eb49a09b26f1263fd5aca1",
+      "statement": "While a preserve conflict keeps a taken skill's edited copy in place, that skill's other taking paths are reported as keeping the skill until the edited-copy conflict is resolved, not as skipped at every root.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1441-L1457",
+          "version": "repo-lines-v1:sha256:856b441fece6b96a4216270882e6d1b25c25e7d1e314e9d71eae4a0d0db00db1:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2ZjUxZTAxOTk0ZjJiYjM4NGRkMTAxNjM2ODFjZGMwNjYzOGJmOTcwZGYyOGU5OGZjM2ZiNTBiNGU0NWI2MjkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFkZDI0NDU4MmI2ZmIwM2QyM2I4NDE1YWJlY2QzNDZiMGM5ZjQ2NmI2Zjc1MmIwNjgxODljZTdlOWEyZGMzNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUwZTEzOGVkOGQ5MmFiOTliMzhmMGZkMTViNmFmY2UyMmE3NGE5ZGQ0Y2Q3MzdiMzE2YTljMDIyYzc3OTZkYTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM0NmIxYjEyNzU4ZWEyNTgyZWU3ODFkZDIxMWU1NjRkNDJmMGI1YTU0NjZlMmY1MzFlNWE4NDkzNmZhNTlmOGEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L795-L803",
+          "version": "repo-lines-v1:sha256:717eaee8f6c981b1a991593cd462535f6fc7676d685a0c48e2357f8b64d85c02:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDM4MmFkN2VlY2E4NjQxY2EzNzQ2MDMyNzcyNTZiODRkMTVmNmMwZGUwZTE2YmQ0YjdmMzMyNzg4MTZkNmUyMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzBjMWYxODhmMTQyZWQ3YTgyNDY4MGIyMDcxNzJjNTUxOWJjNjE0YTQ4ZmRhN2NmMTY3ZWRiOGRkZjc5OTU2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjY5NmMwNDdmN2IzZDNlM2ZkNzc5NWVmNzc2YWJlNGFiYmNiMzQxZTZkNWQ1ZDEyNjM3ZDRmZGMxNTQ0NDRlZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzY5ODYwNjcyZmJiZWNlMjkzNmY1MzhmZGVmYWRjNGJmOGM2MjZiMjQ4MWE4YjQ2MmZjODRiYjUyMGI1ZmJhOCJ9"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3579-L3617",
+          "version": "repo-lines-v1:sha256:ba088043a3d0890061539fc356ec441feff7e9970e1609bd77ad21355075910f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRmMzFmMTdjYTFkNDg2ZWJkODJhNGI4N2Q3ZGZmZmI2MWIzZmM5MWU5NGExZTNiYzBhOWRmODEyNWMxYTY4OTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjN2ZhOTg1ODU5YjJlOWFjNWM4NTA3YWM5ZGQ1MzgwMDhjZGU4Mjc2OWU1YzllZWQwY2Q3NmI5NGYxNzc3MTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZmUxMTk0ZjUyMGZmNzhjOGYwNWE1OGRhMjYzYzYzMGUzNjgzYjM3YzdiZTJlNjRmZmIzZjE5ZDhmZTA3ZWEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI3MzdhMDQ3ZTM5Zjc4Y2UxOWJhYTc3NmFiMDg3MjM5Y2NhMDM1MTJlMTQ4ODJlY2M3NDU5NjdiNTEyODdkNmMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6d094c81ecbe42b3a80b867e8bd8ec9f",
+      "statement": "Uninstall prints 'preserved copies are in <folder>; the sidecar never empties this folder' whenever the preserved-copy folder holds anything, including on its 'nothing to do' path.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1735-L1753",
+          "version": "repo-lines-v1:sha256:8af6c4342a8ffa35d42fdfdb736a324cc0ca34a2a618a1fb61f77f17ed6349fc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjMGQwYTM0NzcxY2U5NDBmMTM1MmMxZjU0YjY5MTUxM2ZlOTM0YzBlZTUwNGEwZTU3MWM3MDc1ZDIyMjg2YTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU5MDlhNTNhNjE4ZDAyOGUxZDMwMDBjMGE3YWJjZWVjYmU1ZmIzN2Y0ZTUxMWVmZTQ2NjQzZmFkNmU2Njg3MmYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRkNWExNGUzOGIxM2I1MzM4YTMzZGY5YzQ3MmVjMDM1ZjBiNzliMTkwZDY5ZTU3ZDdlYWVlOGU5YjQ4ZDM4YjAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5MjI2ZDQ1YmJhOTQxZWY2MzY4OGM3ZTg4OWM3NTZkNDhjOWU4OWFmMzg1OTY5ZTNhNmY2OTcwNjAzMWQ5ODEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3539-L3548",
+          "version": "repo-lines-v1:sha256:ba6b8a0c3c4d282d36a431b09a9f9e65c1e956d442715a109519528b190dfabc:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJiZDY2MmQwNjIzYTFiNTczOThiMzkzYmIwMGZiM2ZjZDY0ZTNhMTgyZWEwODc0MzliYjQzODU5YmY5MGI2N2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVhMTY4MDljMDc1ZGIzMDllMDliYmM5YWI3ZWZlZTY5ZWZiNWY0MTliZDRkODkzMGQwMzgwNjYwMmRkMDJmZDQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjcyODAyNWE3YTNmYjM0MDA0ZWI1YWQwYThhZGQ3YWE5ODM0YzQzZjA0MTVhZTAyMTNiNjMwY2ZhYmFmYzdmODUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI1MzdhNWQ5MTY2MzhkNzVmZmNkYTY0YTYwMGI4NDg5MDAzYWI1NGI1OWE4ZDg1MTc0MzE2ZmYxZGE3ZmE5OGEifQ"
+        },
+        {
+          "resource": "repo://tests/test_sidecar_install.py#L3620-L3643",
+          "version": "repo-lines-v1:sha256:77db1a50d3fc31bc99da0be5ccec280adca2aa97c9b29e9844cc79a4e7873ea2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNiMDZhODZmZDY2ZTgxMGE5ZDk0OGEzMjMwMzBmODQ4NTlmMzNjMGI1YjMxYjg2M2NjMWQzYTQ4NmI1ZWYzMzIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE3ZmM5YmFjYmY5YjM0OWU4ZjcyZmQzZjY5ODJjNWQ2MjZkOTdkYzY2YTQxYTk0MjBiMTcwNGJjYThhNzBjNTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlZGZmNjc3OGZjMjg0YjQwOTc2OWU3ZGQ2MThhMTljM2M5NDczMzgwNjY4OTg2M2I2N2U4N2Q3MGJkZGE1NTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzNzU5NDM5ZjJhMTk2ZTM5MDI1Y2NjMjk2MjFhMGQ4ODUwNWU2M2M5MGJmZDQ1MjM5YmE3MmEwZTUwN2QwYjkifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_d2908bf7d6fe4932a5f9bf2b91d2e1e7",
+      "statement": "After snapshots are built, the device check also runs on every existing skill unit folder and aborts before any write when one is on a different filesystem than the target.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1919-L1938",
+          "version": "repo-lines-v1:sha256:5e9eb2e936bca974ef83f1f66776c3f7fdd245303baa68ba74d546681c38c5c2:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIxNTE5Yjk5ZWJhNzI5ZjZkMWIyOGVjNzUyMjBiM2EzNWQzNDczZWJjNzc3YWZkNDEyMzNjODJhYTJiMTM0OGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxYjNlNzExOGU2MjU3MzAyNWE2MDZkZWE1YjdjNzliNTI3MWJiYmIwNTRlODk5M2YxM2EzYjZlOTRmY2NmMGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkNmJhOTRkMTJiOTBlM2FmOTA3N2Q5YmIxNDk5ODBmMWQzYzg2MDY5NzYyYjA0M2Q5ZDhlZjMwNTQ4ZWQ3OTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJmNDdhYmEyNjJhNTg0M2YyODkxMjlmMzgxNGIzZDY1YWJjNjU4YWFmZWFkN2Q4MjdlNDkzMGU0NGQwNWViYmMifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L3280-L3282",
+          "version": "repo-lines-v1:sha256:debd29febdf23934f6e0cd399aa0730887da3fabab994e442752c0f5f7d35cec:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMTMzM2U5Y2ExODZiYmRmY2Q4MzkzZmNhODUzZjZkMzZiYjA2ZWY4ZjU2ODg0YTU0OWM5N2QwYjE4ODE0OGNmNSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZDAxOTAyMjk5N2FlZDg3MTkxNDRmNDA1ZGE4MzliZjYwZTViMTY0MzkxNDJlNzQwYTEwN2ZkZjIwZGFiYTViMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNmUyNTE3Y2QzZmQ2OTk5NjVkNDliZWNlZjk4ZmNiMzdhZTVmZWQ1YTc0OTU0ZmQ0M2FhNjU1NWFiYzFjOTE2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiM2FiZWRmNmE3M2JkM2NkYmEwYTczMDdlNDlhNmNmMTMzNjliN2UzYmE1NjRmYWVmOGU4ZjA0ODIyYjZmOTMyZCJ9"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-26T00:04:00.096Z"
+    "at": "2026-09-26T06:04:25.666Z"
   }
 }
