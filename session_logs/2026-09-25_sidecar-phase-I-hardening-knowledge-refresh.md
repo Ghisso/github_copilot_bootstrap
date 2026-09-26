@@ -75,6 +75,14 @@ documentation, memory, and LEARN audit.
   `.claude/session_logs/hooks-errors.log`, which the session's own hooks
   can write to while tests run; the rerun passed.
 - VERIFY and REVIEW (full profile set) started.
+- `verify.py phase` (run in the background) reported 2097 passed and 1
+  error. The error was the conftest leak guard on the live
+  `.claude/session_logs/hooks-errors.log`: this session's own
+  `stop-session-log-check` hook appended a warning at 2026-09-26T00:22:23Z,
+  while the test session was running, as the orchestrator's turn ended.
+  This is environmental, not a code failure. `verify.py phase` is rerun in
+  the foreground after the reviewer finishes, so no hook writes during the
+  test run.
 
 ## Stale-claims surfaces checked
 
