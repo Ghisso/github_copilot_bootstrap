@@ -51,6 +51,43 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   and exclude `.gitignore` (O15, Decision 46). `docs/target-mapping.md`
   restates neither. Checked against the code. Part 2 (boundary rule,
   uninstall behavior) waits for coder A.
+- Coder A run 1 (steps 1-5) landed in `scripts/sidecar_overlay.py` and
+  `tests/test_sidecar_install.py`:
+  - Step 1: `_split_exclude_text` (split on `\n`, compare without one
+    trailing `\r`, write original bytes) in every exclude parser and
+    writer.
+  - Step 2: `_gather_unit` stops at a gitlink or a nested `.git` entry
+    (`UnitSnapshot.is_gitlink`, `nested_repo_relpath`); a new `gitlink`
+    outcome with a "never touches files inside a submodule" remedy; a
+    planner `nested_repo` abort for a recorded or listed unit; the
+    `_unit_device_violations` check on every existing unit folder;
+    `GitCheckIgnoreError` when `check-ignore` exits outside 0 and 1.
+  - Step 3: `UnitSnapshot.incomplete` and `kind`; an incomplete unit never
+    matches a hash; `_team_takeover` retains untracked symlinks; the
+    retained carry-forward loop also keeps retained symlinks.
+  - Step 4: `required_snapshot_units(..., listed_files)`.
+  - Step 5: `PlanResult.gate_paths_write` and `gate_paths_final`,
+    `_gate_spelling` by snapshot kind, `_ALL_SKILL_WRITE_ROOTS` in
+    `_gate_spelling` and `_skill_name`, and `run_ignore_gate` fails closed
+    and explains only `expected - ignored`.
+  - 20 new tests: 17 fail on `010f08c`, and 3 are named guards (a
+    personal clone, a real submodule, a team skill with its own
+    submodule). The uninstall wiring of `gate_paths_final` is left for
+    step 6.
+  - Deviation accepted: the existing gitlink test now asserts the Decision
+    37 submodule wording.
+  - Full suite 2122 passed; the one failure (`test_validate_targets`) was
+    stale `dist/`, which the orchestrator then regenerated.
+- Orchestrator re-check: no exclude reader or writer uses `splitlines`;
+  the remaining calls parse frontmatter and legacy records. 12 sampled new
+  tests run against the `010f08c` code (with a shim for the new exception
+  name): 11 fail on behavior assertions (a deleted pipe, an edited unit
+  reported unchanged, a decoy hidden by a raw pattern), and the
+  personal-clone guard passes.
+- Open point sent back with steps 6-9: Decision 37 also covers a gitlink
+  below a unit (a listed file line under `<unit>/vendor` after `vendor`
+  becomes a submodule must be dropped and reported, never sent to
+  `check-ignore`).
 
 ## [LEARN] Entries
 
