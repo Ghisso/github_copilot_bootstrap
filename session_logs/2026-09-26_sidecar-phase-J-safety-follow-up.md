@@ -197,8 +197,34 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   unit already had the same exposure) and outside Decision 37, which
   scopes the unit device check to folders. Recorded under Next Steps, not
   a Phase J finding.
+- Part B fixes landed: the `_fault_point` docstring now states that
+  uninstall never passes `after_exclude_write`; that at
+  `after_units_removed` the write-phase block is on disk and its gate
+  passed; and that `before_manifest_write` follows the final block. New
+  test `test_edited_unit_at_a_retired_write_root_is_preserved_on_uninstall`
+  fails on `010f08c`: the old uninstall reported "has local edits and the
+  sidecar no longer ships ..." and left the edited copy live. So the cell
+  the reviewer had traced only by reading hid a real R2 variant at a
+  retired root; the step 6 code already fixed it. Orchestrator re-check:
+  the test fails against the `010f08c` copy and passes now. Full suite
+  2143 passed. Part B re-review asked for.
 
 ## [LEARN] Entries
+
+- [LEARN:review] A matrix cell that a reviewer traces "by reading, same
+  code path, low risk" still needs a real test. The sidecar uninstall
+  matrix passed review with an edited unit at a retired write root traced
+  only by reading; the cheap test written afterwards failed on the old
+  code, a real R2 variant. When a matrix review lists untested cells, ask
+  for a test per cell instead of accepting the same-path argument. Added
+  to MEMORY.
+- [LEARN:testing] To prove a new test fails on an older commit without
+  touching the working tree, export that commit with `git archive` into a
+  scratch folder (a small Python script, since the file guard refuses
+  `tar -x` in shell chains), copy in the generated `dist/` and the new
+  test files, and define a stand-in for any new name the test file
+  imports (here `GitCheckIgnoreError`); otherwise collection fails with an
+  `ImportError` before any test runs. Added to MEMORY.
 
 ## Verification
 
