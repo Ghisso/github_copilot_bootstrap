@@ -3,7 +3,7 @@ name: 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 11
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase K — Sidecar Follow-up Knowledge Refresh

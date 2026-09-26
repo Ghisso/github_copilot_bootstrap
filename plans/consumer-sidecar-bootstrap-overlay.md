@@ -17,7 +17,7 @@ phases:
   - 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
   - 2026-09-26_phase-J-sidecar-safety-follow-up
   - 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
-current_phase: 2026-09-26_phase-J-sidecar-safety-follow-up
+current_phase: 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
