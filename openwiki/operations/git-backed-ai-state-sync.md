@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-09-25T07:11:38.676Z" }
+generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-25T07:11:38.676Z
+    at: 2026-09-26T00:04:00.096Z
 ---
 
 # Git-backed AI-state sync
@@ -28,7 +28,7 @@ Source, tests, and the policies under `shared/policies/` outrank this page.
 
 In every full-install consumer, `.claude/` is a plain, self-contained Git repository with its own `.git/` directory on one branch named `ai-state`. It tracks the installed bootstrap files and the mutable AI state: `MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, and `quality_reports/**`. The outer repository ignores `.claude/` entirely, so `git branch` and `git log` at the root never show `ai-state`. Inspect it with `git -C .claude <command>`.
 
-A sidecar install (`--mode sidecar`) has none of this. The installer hands a sidecar target to `install_sidecar` before any full-install step, so no nested repository, `ai-state` branch, or state sync is created; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
+A sidecar install (`--mode sidecar`) has none of this. The installer hands a sidecar target to `install_sidecar`, and `--uninstall` to `uninstall_sidecar`, before any full-install step, so no nested repository, `ai-state` branch, or state sync is created or touched; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
 
 ## Two kinds of commit
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:00835c44b114f4394b77219c63174f261318b89e670a22da4d0dc86374e353c1",
+  "pageVersion": "sha256:45bc2e54ceb4e58d8c7ad288cf7d07392c55e3a829c06f0d4921e37560be7951",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -166,17 +166,35 @@
     },
     {
       "id": "claim_b832f30a18ae4be09dada4285ca8f8ae",
-      "statement": "The sidecar validator rejects any dist/sidecar/ file outside the allowlisted skill, LICENSE, and bridge paths, any bootstrap-only path or MCP tool reference, any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, and a bridge without its client's frontmatter; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
+      "statement": "The sidecar validator rejects any dist/sidecar/ file outside the allowlisted skill, LICENSE, and bridge paths, a tree that does not match the exact sidecar source set, any bootstrap-only path or MCP tool reference, any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, and a bridge without its client's frontmatter; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8612-L8736",
-          "version": "repo-lines-v1:sha256:32375825cda89c38f664faa8484a4e7682013142119f42fe1c6bb86399e1a0f2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTI1LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIxNzZlMGUxMGI5NTgxMWE1N2Y3M2QwOGM0ZjBiZmQ1OWQ4NGUwY2NkNzE4ZmI5ZTBlMzQxM2VlMzA5Yzc0ZGM2IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhOThiMDYzZDliNDdlNjUzNzk2MjU1NzJjY2UxOTc2NjlkNTc2N2UxMmMxOGJlMDc1NjUyYjhjZDk4MWNlOGQ1IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJjODBkZjk2MGJjYjAyMjE1YmZkMzY0YzRjYWRmNjM1MDg1YTNiZTVkNDhjMWQ4ZTIxMWNlMTY0N2U3N2JkNzFhIn0"
+          "resource": "repo://scripts/validate_targets.py#L8599-L8745",
+          "version": "repo-lines-v1:sha256:ba2d4026c71e20700d17854ef91c2ebf3489e10e3943550c95d68b8387dc8ef9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQ3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIzNzdiMGEzNTIyYWI0ZDk0MmI5NjY5NTE5OWEyM2FmZjU4MmNiNmRkODQyMTk4NTM2YmU5Zjk5Y2NiYmU5OGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxMDMwMjUzNTQ1M2M1MGZmYWUwN2ZlOTc5Yzg0ZDFmNDQ3NzVjMzVjNTQxODdhMzZlMDMyNjM3MWY1OTAwNDYyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJiYTMxMzY3ZGVjNWViYTg2YzQzNDYxM2RmYTlhMjIyNTVmM2FhNzQxZWY3OWJlMzEwMGMxZmJlYTU0YmQ2ZDE1In0"
+        }
+      ]
+    },
+    {
+      "id": "claim_b06140691920498ca4a9e5fa0f853ad1",
+      "statement": "The sidecar source contract is one exact set built from the live profile constants (every SIDECAR_SKILLS skill's SKILL.md at each write root, a LICENSE in ponytail and ponytail-review at each root, and every bridge), and both validate_targets.py and the sidecar installer's source check compare a tree against it, reporting each missing and each unexpected path.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/runtime_ownership.py#L152-L193",
+          "version": "repo-lines-v1:sha256:9cb4c4b3cc41ddb412f61cdff8288e3299214c35b3b966768201625257449659:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlZjFkMWI5NTgxYjRiYTA5M2VlOTZlYzg1NzA5ZDVkNGNiODNjN2FiZTRkNjVjOWIyMzg1YTZjOWUyNjJiNmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxYjNlNzExOGU2MjU3MzAyNWE2MDZkZWE1YjdjNzliNTI3MWJiYmIwNTRlODk5M2YxM2EzYjZlOTRmY2NmMGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmMTQyMGI0Y2YyNGFkM2E2Y2JkNWE0YTZlMjdlZjg2NDc3YmI0NWExNjAxYjExODY1N2I1ZGQ4ZjllMGQ2NjEifQ"
+        },
+        {
+          "resource": "repo://scripts/sidecar_overlay.py#L1675-L1687",
+          "version": "repo-lines-v1:sha256:496e9ab98c50c8d4e639c20286f5cc895a823122aa0ae6049e399005776a085e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkOGMyZjZhNDNmYWU5MWQ1ZjU1YWVkOWNiODEyZDg4NDA2ZjMxNDgyYWFlM2EwMzQyNGQ0MTZmODc0NGFiZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1OWI3ZmU0YTQ5ZmQ4MWI1NDBhNWM2MzZjNjJmZTNkYWQ2ZjgyNDAyMzQzZDdjNjBkNGFkMDI0NThjOThlZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExNjUyZjRlZTRjOWFkZjUyZDBjMDgyN2Q4MDU5YjBkMGM3OGMwNGMwOWEzMTlkZGEwOTFjNjA0ZGU0YzE5ZGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3Mzk2ZmUzMjk5ZjYzMWFlODVlODU0MTBhNTQzMWQ1Y2MxNDVmMzBkMjg5YmRkNjBmZjMwM2QyYjllODVmZjMifQ"
+        },
+        {
+          "resource": "repo://scripts/validate_targets.py#L8682-L8702",
+          "version": "repo-lines-v1:sha256:1dbcbed05b881f465e465a74518d1f0cf07e754c5ac666e874c111f57943a9bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYzdhMWViZjE5Yjg0Nzc5ODRjYTk4NDI4NWQwZDAxNmU2NjMyNDI4ZDdmYTZlZTI2OWQyMmIxMTVjNDVmN2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxMTc4NzhjYTE4YzkzMzQyNWFhMmM2Y2VlNjIxYjQ5NmE4ODBiMWYzNTJlMDNkMThlZWIzN2IxYjEwNTRmNTkifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-25T07:11:38.676Z"
+    "at": "2026-09-26T00:04:00.096Z"
   }
 }

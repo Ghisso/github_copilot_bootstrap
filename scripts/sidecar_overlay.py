@@ -1674,11 +1674,12 @@ def _unwritable_paths_for_actions(
 
 def _sidecar_source_violations(source: Path) -> tuple[str, ...]:
     """Return every way ``source`` fails the exact sidecar source contract
-    (Decision 31; S13, S14, L2): a file outside the shared allowlist, an
-    empty source, or a skill shipped at one write root only. Shares its
-    logic with the generated-target validator (``sidecar_source_violations``
-    in ``runtime_ownership.py``), so a crafted tree gets the same verdict
-    from both."""
+    (Decision 31; S13, S14, L2): a plain set comparison of every file found
+    in ``source`` against ``sidecar_source_exact_allowlist()``, so a missing
+    or extra path of any kind is reported. Shares its logic with the
+    generated-target validator (``sidecar_source_violations`` in
+    ``runtime_ownership.py``), so a crafted tree gets the same verdict from
+    both."""
     present = frozenset(
         file_path.relative_to(source).as_posix()
         for file_path in sorted(source.rglob("*"))

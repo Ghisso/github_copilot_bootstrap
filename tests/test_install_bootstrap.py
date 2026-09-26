@@ -2193,8 +2193,10 @@ def test_detect_mode_sidecar_mode_aborts_in_linked_worktree(tmp_path: Path) -> N
     worktree = tmp_path / "linked-worktree"
     added = _git(target, "worktree", "add", "-q", str(worktree), "-b", "linked")
     assert added.returncode == 0, added.stderr
-    with pytest.raises(SystemExit, match="linked worktree"):
+    with pytest.raises(SystemExit, match="linked worktree") as exc_info:
         detect_install_mode(worktree, "sidecar", False)
+    assert "shared by every worktree" in str(exc_info.value)
+    assert "main worktree checkout" in str(exc_info.value)
 
 
 def test_detect_mode_allow_self_with_repo_root_counts_as_full_evidence(

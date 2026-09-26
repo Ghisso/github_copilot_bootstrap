@@ -624,8 +624,9 @@ this project's existing Copilot claim.
   file, if you want them to survive.
 - `.git/info/exclude` is a convenience, not a security boundary. A team
   `.gitignore` rule can win over it and expose a sidecar path; the installer
-  proves every path is actually ignored before writing anything, but that
-  proof does not stop the team from changing their own ignore rules later.
+  proves every path is actually ignored before any sidecar file is written,
+  but that proof does not stop the team from changing their own ignore rules
+  later.
 
 ### What a full install changes in a team repository
 

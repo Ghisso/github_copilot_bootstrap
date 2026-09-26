@@ -67,7 +67,8 @@ Cover, at minimum:
 - the two install modes: mode detection and its refusals in
   `scripts/install_bootstrap.py`, the sidecar planner and apply step in
   `scripts/sidecar_overlay.py` (manifest, `info/exclude` block, ignore
-  gate, atomic moves), and batch updates in `scripts/update_consumers.py`,
+  gate, atomic moves, team precedence, the preserved-copy folder, and
+  `--uninstall`), and batch updates in `scripts/update_consumers.py`,
   which finish every target and report failures at the end;
 - the Git-backed AI-state sync described above
   (`shared/hooks/scripts/state-sync.sh`);

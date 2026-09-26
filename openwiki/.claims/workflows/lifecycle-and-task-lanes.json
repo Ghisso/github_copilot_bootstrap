@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:6fe5a3714161cb9a85b373e0af7c916a730d317366dd9fcfd373ea9b8913d4e1",
+  "pageVersion": "sha256:46d60ae0ceb92b6355de3909dc330251320116df291810ec8e3fe7abebfa70a4",
   "claims": [
     {
       "id": "claim_f49518af7629414a92868ab695c5bf80",
@@ -34,15 +34,15 @@
     },
     {
       "id": "claim_124207df8bfc4e30a99d48868c2c9643",
-      "statement": "Big-plan statuses are planning, in-progress, complete, and cancelled; small-plan statuses add planned and paused; validate_plan_frontmatter.py enforces these sets, the exact pause and cancellation fields, and that at most one -knowledge-refresh phase exists and only as the last phase.",
+      "statement": "Big-plan statuses are planning, in-progress, complete, and cancelled; small-plan statuses add planned and paused; validate_plan_frontmatter.py enforces these sets, the exact pause and cancellation fields, and that at most one unfinished -knowledge-refresh phase exists and only as the last phase, exempting an earlier refresh phase whose own small plan is complete or cancelled while still requiring a plan with any refresh phase to end with one.",
       "evidence": [
         {
           "resource": "repo://scripts/validate_plan_frontmatter.py#L23-L57",
-          "version": "repo-lines-v1:sha256:f3b9c63c9979668a2f4fab42ff40f63363d8036d19c830e55d8e7c93ab98d132:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NzMwZmMzMGViYzI4NGRjMTExMTMzNjEzM2IzMjM2YjAxMmVkY2ZjZDc2NzYwY2NjYzI3MmZhYzUwNmZmYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwMjljZWFkNmI3OWE0MTBhYjIzODYyZTAxNDcwMzc1Yzc0NTZiZTQ4ODI4ODBlZTk5MDRjZDNmZWQyZjUwNWMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjOWNmNzhjZjEyYWQ5ZDQ5NzQ2OThlNDAxNGFlZWRjMjNiOTA3NmFkYWVkODViMTVhYmUzZGI1ZjgxZDk5Y2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE1NmY4MDE3NGFkNTRmNzQ1ZTk5ZWFhNzA3MjU5OTBiZDQ3NTJjYTIyZTA5NWMzZTk2MDgxYThkYTg3Nzk0NjMifQ"
+          "version": "repo-lines-v1:sha256:5761aba1759ea15a4721df29f1615852fd8f200823891b2520b2b6a8437c8970:eyJzZWxlY3RlZExpbmVDb3VudCI6MzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0NzMwZmMzMGViYzI4NGRjMTExMTMzNjEzM2IzMjM2YjAxMmVkY2ZjZDc2NzYwY2NjYzI3MmZhYzUwNmZmYTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlhZWU4YTBjYmE1MTIzMWE1MGFlZTljNGM0OGVjMjI2ZDY0MWVkNjQ5NzlkNDk5NDRhZGU0MDZmMWE5NzA1YzEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVjOWNmNzhjZjEyYWQ5ZDQ5NzQ2OThlNDAxNGFlZWRjMjNiOTA3NmFkYWVkODViMTVhYmUzZGI1ZjgxZDk5Y2UiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE3ZTQ3YTY4ZGQ4ZjU2YmEyMzIxOTM4ZmViNjE0NjRlNTFjOWZiMzQwNThmNjJiMjJiYTI2MDMzOGM3ODM5NmMifQ"
         },
         {
-          "resource": "repo://scripts/validate_plan_frontmatter.py#L280-L297",
-          "version": "repo-lines-v1:sha256:3e33db3caeabe0d4c38f07290ada7c95f83fdd5d27772669268c683e1bd5c63c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjMzdlYzY2YzMxYzUzMzEzMGYzMjRkZjk5NDZkZjM3OTY4NDY4MTEyN2MzNDg5NmM3NzdlZjQ0NTJkMDYzZTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzOTUyMGI5NTU4ZmE1OTJhNjA3ODYzYjUxMTE3Mjc2ZWZjNzMzYmU4MmNlYTRhNDgyZTg0NmVmYTBhOGExYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZlNjU3YzdmNGIyZTUxNDJkNjZhMGRkM2ZjNjQ1NDRlZjFhZGRjMzRmN2JhNjM2OGMyYjY3MmRjNmM4ZjhiNDYifQ"
+          "resource": "repo://scripts/validate_plan_frontmatter.py#L286-L343",
+          "version": "repo-lines-v1:sha256:002f9bd6226b802fbac6a9b84c35f69a3409039efc94b1df74ec26fcc0461111:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkOWYxOTliYWMxY2MwMTJiYmIwYTFkN2ExODk5ZDJjY2YwYmJmMjk4YTVhYjRjYzZiYTEyYjNiMTMyODc0MTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYzOTUyMGI5NTU4ZmE1OTJhNjA3ODYzYjUxMTE3Mjc2ZWZjNzMzYmU4MmNlYTRhNDgyZTg0NmVmYTBhOGExYTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg4MjNlYTUyYjJhYTUzZGZlYTRjOGIxYWYzZWRlMDM0NDgxM2YxMmZiMDhjYzQ5Yjg3OTljYjEzOThiMTgzNTQifQ"
         },
         {
           "resource": "repo://shared/templates/plan-small.md#L1-L20",
@@ -123,12 +123,12 @@
       "statement": "cancelled requires cancelled_at, a single-line prose cancelled_reason, and a cancelled_evidence artifact containing **Status:** CANCELLED; a cancelled phase needs no commit, findings, or closeout log, a cancelled big plan cannot start a branch, and commit-count checks count completed phases only.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_plan_frontmatter.py#L155-L224",
+          "resource": "repo://scripts/validate_plan_frontmatter.py#L161-L230",
           "version": "repo-lines-v1:sha256:7a3d1ffcc3b93c35e5dea276b78b91be963dc3fdc93334f20fd8e7cb7c6fc92f:eyJzZWxlY3RlZExpbmVDb3VudCI6NzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxZGJjYzg2MDRjNzNkMTE5MDZiYWU3ZGNkNWMwN2IyNzk1NTExYWZkNTgzZTgxNjBjODZlYzU4N2Y2MTE4OWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY0NGE3ODFjZTA4MTZkMDYxZjNkMDNkYmY0MjE3ZjczZWYyZmZlYzIwZGNhMDEzODNjZjNkNmNkODFlYWRlNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ4ZDYzYTc1NmJlNzYzOTBkNzRmOTc2YjE3Y2M4NjIzNmRkNWE4NTBmZjkyOTYxZGYzZDRkMjM4MmExMjM5OTcifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L104-L125",
-          "version": "repo-lines-v1:sha256:d904816a087e8532a0a5550caccb1e5486920bfe9df03df6d935a5469e4eaa26:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhNjNlYjQxZmI5MjJlMTEwMjZmOTgxNTAxNzkyMTI3NzY0ZGViNjExYmNhZjMzNjIwMzFhNWM5ZDk2MWNjZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxMDIwYWJjN2NmOWEyYTViYTZmZWIwNTIxMGQyNWE0M2UzMDk2MDlhODVjNGJjMmYyZWMxZjdmYzU4ZjdlOTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjdlYjgwNDc3NzIxZDgxZWY2OTBiZjEzOGE5NWIxMDE5M2VkOGFhZTUwM2VjNzczN2E1NjNjYWVhNTI0NDgwYmMifQ"
+          "resource": "repo://shared/policies/workflow.instructions.md#L104-L123",
+          "version": "repo-lines-v1:sha256:879cd2661f15208016df9610f6fd4ff8066f2cd31b5a1c34c2b75a8d33a8cec7:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRhNjNlYjQxZmI5MjJlMTEwMjZmOTgxNTAxNzkyMTI3NzY0ZGViNjExYmNhZjMzNjIwMzFhNWM5ZDk2MWNjZTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxMDIwYWJjN2NmOWEyYTViYTZmZWIwNTIxMGQyNWE0M2UzMDk2MDlhODVjNGJjMmYyZWMxZjdmYzU4ZjdlOTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5MzA3NzA0ZGRkZDQ0YzE3YmZlNDA2YjJhZWZkZWEwNGEyZWJiMWVkNWViNWRhZjU5NmI2YzRlY2M4ZmY3NTEifQ"
         }
       ]
     },
@@ -155,10 +155,20 @@
           "version": "repo-lines-v1:sha256:38628c9073a511ceac23da66481f34384b67fdf7a1194c61253b58d8e054e585:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMWU0MmMwZjI3YTYwOTJiZDM5MzE5ZjY3NjA4Y2NkMmU5N2IzNTZiMDZiOWQyM2JmMjVjZGJlODM2MjI1NmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyODFmY2U1YzZkZGVmYWMyZDdiOGI1MThkODIwOTdhNmQ4YmJjMmVkZWM3NWU2ZTI1YWM0MjQ4Mzk2MjdkZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2Mjg4ZmEwNjJjOWMyYTlmM2ZlNGM5NWUzMmYxMTk0MDRkMTRmOWU3ZWI0NWFiNTQzZmNlNDgxOTc0YTM0Y2EifQ"
         }
       ]
+    },
+    {
+      "id": "claim_4b07a067a7ca4ce5b27dca32675dd741",
+      "statement": "The workflow policy defines a numbered procedure for reopening a completed big plan while its implementation branch is unmerged: draft the new phases as planned, append one new -knowledge-refresh phase when the plan already has one, set the big plan in-progress with current_phase on the first new phase, never edit or re-persist a completed phase's plan, log, findings, or receipts, and meet the same strict terminal gates in the new final phase.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L124-L154",
+          "version": "repo-lines-v1:sha256:f8a029869d52a0ae2cdf3fcd5c880ce5e84bcd36d97349bf2624eb360aa4ef3b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2ODJiOGRkOGY0ZGZlZWQ5YzgxYTQ4ZTMyM2NmNjcyZTQwOWJhZmYyNmU5NjZiZDk4ZjkyOGY2MTZjM2U4YzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTYxM2MxNGEyYmI3MGRhZjI3ZWM3N2ExNWQzM2RhMzc3YjMxNTRlNTNiMTUwMzVlZWE0NjBmNzdiNWZmNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhYTE5ODdhNGU3ZjRiNTk4ZDYwNjAxNTY4OTUyZjAxMmM4ZDU1MjExMzYxNjkyOWE5NDk1Yjk2MDBiNmY0ZTMifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T05:37:12.382Z"
+    "at": "2026-09-26T00:04:00.096Z"
   }
 }

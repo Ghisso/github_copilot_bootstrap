@@ -1364,9 +1364,11 @@ def detect_install_mode(
         if _is_linked_worktree(target):
             raise SystemExit(
                 "Refusing --mode sidecar in a linked worktree: "
-                f"{target} has its own Git directory, separate from the main "
-                "worktree's shared one. Run the installer from the main worktree "
-                "checkout instead."
+                f"{target} is a linked worktree. The sidecar's info/exclude "
+                "block is shared by every worktree of this repository, while "
+                "its manifest is per worktree, so a sidecar installed here "
+                "could hide or expose another worktree's files. Run the "
+                "installer from the main worktree checkout instead."
             )
         return "sidecar"
 

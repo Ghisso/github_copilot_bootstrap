@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:d5706f50d2d6153b39883ddfcc2065ddffe48fda739b91e06a34be4c32134ee9",
+  "pageVersion": "sha256:12ed7ed17a4eae2e1db7e7b77fa75e763829ea47e87a6030656bd76483571cd5",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
@@ -162,17 +162,17 @@
     },
     {
       "id": "claim_a815423ad1a149d0a35524d028b07cf5",
-      "statement": "The installer dispatches a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install creates no nested .claude repository, ai-state branch, or state sync.",
+      "statement": "The installer dispatches --uninstall to uninstall_sidecar and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install or uninstall creates or touches no nested .claude repository, ai-state branch, or state sync.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1300-L1313",
-          "version": "repo-lines-v1:sha256:c45d8f031335ddaf0ad34b0943355acdd5b16154f7c44788eacc5c1b6f87066c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcxOWRmYzg5MTBmZjBiNDIzMWNiMWM5OGQ1ZjNmMzVmOTVlOWY0YjQ3MGRkOGU4MzA2ZGZmZTMyMjIzZDBlMmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjlkYjQ5OGYyY2VmMzJjMDc0MjcxMGVlYjk4YmNjOGE3YmUwNjRkYjRiN2UxYTg0Y2U2ZjkwMmRhMWNlMTdiNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc0YmUyZWExMTA1NWY4ZGQ3MzQ1M2I0ZGMwMTMyOTNkMGQyNmY0NmQ4ZmRlZWNkZjM0NmYwN2E3Yzg2N2I1ZmMifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1461-L1488",
+          "version": "repo-lines-v1:sha256:0048cedd3395cff8f7cec71aca00bef9722d7001a1c6d9d07b476fd8ff63f3da:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJiN2VlNGQ5YTZlNGFiN2Y4ZWEzM2ViZjU4ZTYxYWQzNzBiN2RkNmQ1NzhjY2RmOWIyNWQxZDVlYTNkODViZDkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdmODY2NzI0Zjk4ZmRkNDBmNzY2YWNkMzA1YjUxM2U1ZDZhY2NjZjVkYWM2MTIzNzRjNTNjMDljZDRlNjA5NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFlNjdkODkyOGYwZDIzNWJkZjQyMzk3N2M4ZTE2Y2U5YTI4MjRlMTMzZDk3ZjU5NjM1MWM2NTRmZGJjYjc0NjgifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-25T07:11:38.676Z"
+    "at": "2026-09-26T00:04:00.096Z"
   }
 }

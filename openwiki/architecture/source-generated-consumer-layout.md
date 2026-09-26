@@ -5,7 +5,7 @@ description: The four places the bootstrap lives in (authoring shared/, generate
 tags: [architecture, layout, generation, validation, dist, ai-state, consumer]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-25T07:11:38.676Z
+    at: 2026-09-26T00:04:00.096Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -19,11 +19,13 @@ sources:
     resource: repo://scripts/generate_targets.py
   - id: openwiki-source-cae9260f89e696dbf3ed5310
     resource: repo://scripts/runtime_ownership.py
+  - id: openwiki-source-472dd9a20a81e8f5a312971f
+    resource: repo://scripts/sidecar_overlay.py
   - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-2b53bea07579a982c3a0a847
     resource: repo://shared/mcp/servers.json
-generated: { by: "claude-code", at: "2026-09-25T07:11:38.676Z" }
+generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -103,7 +105,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 - the task-lane contract and the Codex model contract;
 - agents, MCP and hook wiring, the Antigravity manifest and skills, the Context Mode tool surface;
 - skills and paths;
-- the sidecar target and its adversarial cases: only allowlisted skill, `LICENSE`, and bridge paths; no bootstrap-only path, `mcp__`, or `ctx_` reference; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; each bridge with its client's frontmatter;
+- the sidecar target and its adversarial cases: only allowlisted skill, `LICENSE`, and bridge paths; the exact source set, with nothing missing and nothing extra; no bootstrap-only path, `mcp__`, or `ctx_` reference; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; each bridge with its client's frontmatter;
 - coverage of every `dist/multi-agent/` file by `FULL_INSTALL_ROOT_PATHS`, the list the installer uses to recognize a team-owned repository, with its adversarial cases;
 - docs parity (which owns the skill-library integrity rules);
 - memory security authority and routing-table parity;
@@ -112,8 +114,9 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 - devcontainer and installer, state sync, installer commit failure, local-only state sync;
 - determinism, then the presence of hook-gate regression tests.
 
-Two rules are worth knowing on their own:
+Three rules are worth knowing on their own:
 
+- The sidecar source contract is one exact set, built from the live profile constants in `scripts/runtime_ownership.py`: each skill's `SKILL.md` at both write roots, a `LICENSE` in `ponytail/` and `ponytail-review/` at both roots, and every bridge. The validator and the sidecar installer's `--source` check both compare a tree against that set and report each missing and each unexpected path, so a half-rendered `dist/sidecar/` fails both instead of silently uninstalling the missing skills.
 - `validate_determinism` regenerates the target into a temporary directory and requires it to byte-match the current `dist/`. Any hand edit to generated output fails validation on the next run.
 - Many gates run real subprocesses in temporary repositories (installer, state sync, receipt chains). That is why the validator is slow and why it is a required item in every phase's verification block rather than a unit test.
 

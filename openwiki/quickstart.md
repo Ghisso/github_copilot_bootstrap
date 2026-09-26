@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-25T07:11:38.676Z" }
+generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-25T07:11:38.676Z
+    at: 2026-09-26T00:04:00.096Z
 ---
 
 # Quickstart: where to look for what
@@ -46,12 +46,12 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | I want to... | Read | Then open |
 | --- | --- | --- |
 | understand what lives where and why `dist/` and `.claude/` are ignored | [Source, generated output, consumer repo, and nested AI state](/openwiki/architecture/source-generated-consumer-layout.md) | `README.md`, `scripts/generate_targets.py` |
-| classify a request, start a phase, or close one out | [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md) | `shared/policies/workflow.instructions.md`, `shared/templates/plan-small.md` |
+| classify a request, start a phase, close one out, or reopen a completed big plan | [Task lanes and the enforced lifecycle](/openwiki/workflows/lifecycle-and-task-lanes.md) | `shared/policies/workflow.instructions.md`, `shared/templates/plan-small.md` |
 | understand why a commit, push, or PR was denied | [Deterministic verification](/openwiki/operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
 | add or change an agent, a review profile, or a skill | [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
 | add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
 | choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
-| add a personal overlay to a team-owned repository, or act on a `SKIPPED` or `RETAINED` report | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
+| add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
 | understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
 | understand the Context Mode pin, tool filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs` |
 | refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.py` |
