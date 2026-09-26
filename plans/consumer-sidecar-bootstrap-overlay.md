@@ -1,7 +1,7 @@
 ---
 name: consumer-sidecar-bootstrap-overlay
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-sidecar-bootstrap-overlay_implementation
 started_at: 2026-09-25T03:07:56Z
@@ -15,7 +15,9 @@ phases:
   - 2026-09-25_phase-G-sidecar-ownership-and-precedence
   - 2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall
   - 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
-current_phase: 
+  - 2026-09-26_phase-J-sidecar-safety-follow-up
+  - 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
+current_phase: 2026-09-26_phase-J-sidecar-safety-follow-up
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
@@ -72,8 +74,9 @@ generated provider surfaces, consumer update behavior, and safety boundaries.
   `uv run python scripts/install_bootstrap.py TARGET --mode sidecar`.
 - Keep full-install behavior unchanged for full consumers and for explicit
   `--mode full`. Without `--mode`, the installer now refuses a target that
-  carries sidecar evidence, or that tracks a path the full install writes and
-  has no bootstrap evidence (Decision 18).
+  carries sidecar evidence, or that tracks an agent-harness path (a path
+  under `FULL_INSTALL_ROOT_PATHS`) and has no bootstrap evidence (Decisions
+  18 and 46).
 - Project an allowlisted skill set into `.claude/skills/<skill>/` and
   `.agents/skills/<skill>/`, plus one bridge file per client where Phase A
   proves an additive native mechanism. Vendored skills keep their license
@@ -194,6 +197,33 @@ folded into Decisions 24-31 and 34 and into Phases F-H.
 | 35 | Hidden files and pulls | State plainly in user docs and in the relevant remedies that a pull or checkout overwrites a hidden (ignored) file without warning, so personal edits must not live in sidecar files. No code change. | S8, already accepted in Devil's Advocate point 11 but never stated to users. |
 | 36 | Messages and docs | Every refusal and remedy names the evidence, what was written (normally nothing), and a safe next step that never asks the person to change tracked team content. README and docs replace the manual removal steps with `--uninstall`, keep a safe manual fallback, and correct the claims listed in S16 and S17. Generated OpenWiki pages are corrected only by Phase I's refresh. | S15-S17 and design item 4. |
 
+Decisions 37-47 come from two independent reviews of the completed Phases
+A-I at `010f08c` on 2026-09-26:
+[hardening re-review](../quality_reports/2026-09-26_consumer-sidecar-bootstrap-overlay-review.md)
+(findings R1-R5) and
+[Opus re-review](../quality_reports/2026-09-26_consumer-sidecar-bootstrap-overlay-review-2.md)
+(findings O1-O19; its mapping table links the two reports). Both kept the
+architecture and failed the branch on safety grounds. User decisions on
+2026-09-26: fix within this big plan as Phase J with a new final refresh
+Phase K. Decision 37 withdraws the Phase H deviation that limited Decision
+28 to the write roots and bridge parents. Where Decisions 37-47 conflict
+with earlier decisions or design text, the later decisions win; the design
+text has been updated to match.
+
+| # | Topic | Decision | Why |
+| --- | --- | --- | --- |
+| 37 | Unit-level repository boundary | Decision 28 applies at every required unit too: desired, recorded, listed, and, during uninstall, every well-known unit. A unit folder that holds a `.git` entry at any depth, and is not a gitlink in the outer index, aborts the run before any write with the nested-repository message. A unit that is a gitlink in the outer index is team-owned: its skill is taken, and the sidecar plans no file action inside it (no delete, move, or write); it only drops its own record and line and reports any sidecar file left inside the submodule. | R1 and O1: uninstall deleted a team submodule's `LICENSE`, and a disk-only nested repository at a unit was moved, `.git` included, into the preserved folder. Refusing a gitlink unit would block every team that vendors a skill as a submodule; skipping it with no file action is safe. |
+| 38 | Complete snapshots | A unit folder that holds any entry the unit hash cannot represent (a symlink, named pipe, socket, device, or an empty subfolder) never matches its record or the desired content: it is locally modified when recorded, unfinished when listed, and foreign otherwise. A taken skill's such unit is preserved intact with `os.replace`. A team takeover never deletes such an entry. A symlink inside a unit no longer aborts the run; a symlinked ancestor of a unit still does (non-goal). | R4 and the O17 special-file bullet: a person's named pipe was deleted with a unit whose files matched the record. O9: a symlink inside a tracked team skill aborted every run, although Decision 25 puts the tracked check before any symlink check. |
+| 39 | Uninstall on the install's write order | During uninstall every classified unit is taken, including dropped skills and retired roots or bridges. Uninstall writes the write-phase block, runs one ignore gate, applies actions through the same apply step as the install, and then either removes the block (writing unrecognized lines back as plain lines) when no unit is kept, or writes the final block when a preserve conflict keeps a unit. The planner reports the units it kept because of a conflict (`kept_conflicts`); exit 1 and the kept manifest depend only on that set. The conflict-only gates and the separate uninstall apply step are removed. | R2, O2, O3, O18. One write order for install and uninstall. The install's argument that the write-phase gate also covers the final block (lines are only dropped for paths that are gone) then holds for uninstall too, and the raw preserve-destination set can no longer block an uninstall. |
+| 40 | The gate covers every line the block keeps | The ignore gate checks every unit and file path that the write-phase block lists, not only manifest records and actions, so an unfinished or locally modified unit or a retained file that a rule exposes fails the gate instead of being reported as hidden. A gate failure names only the paths that are not ignored. | O11, and O10 (round 2's S15 bullet 1, still open). |
+| 41 | One path-identity rule for collision sources | Folder names, case variants, and frontmatter names come from one enumerator over the read folders. A read-only folder is listed through its symlink unless it resolves into a write root. An entry that resolves into a write root is an alias to a sidecar projection and never takes a skill. Write roots are listed directly, so a case variant or a differently named folder there is seen. | R3, O6, O7, O8: the frontmatter scan missed a collision behind a symlinked folder and invented one through a per-entry alias, and a case variant at a write root was never seen (S12 at write roots). |
+| 42 | Git line splitting | Every exclude-block parser and writer splits on `\n` only, as Git does, and ignores one trailing `\r` when comparing. `str.splitlines()` is never used for `info/exclude`. | O5: a retained name with a form feed produced a raw `src` pattern that hid team files. |
+| 43 | Retained files of dropped skills | The owning unit of every file line in the block is snapshotted, so a retained file of a dropped skill keeps hiding on install and is reported as now visible on uninstall. | O4. |
+| 44 | Accurate reports | A taken skill whose edited copy stays because of a preserve conflict is reported as kept until the conflict is resolved, never as skipped at every root. Uninstall prints the preserved-copy folder's path whenever it holds anything. The `--mode full` sidecar refusal mentions `--uninstall`. The full install's tracked-path warning never aborts a run after its writes. | O12, O16, O17. |
+| 45 | Settled refresh identity | An earlier knowledge-refresh phase counts as settled only when its sibling file is a regular file (not a symlink) that declares `type: small-plan`, `name` equal to the phase slug, `parent_plan` equal to the big plan's `name`, and `status: complete` or `cancelled`. | R5. The validator ships to consumers and runs under the commit gate with the system `python3` (3.9). |
+| 46 | Agent-harness wording | "A path the full install writes" means a path under `FULL_INSTALL_ROOT_PATHS`, the agent harness, not `.gitignore`. A plain full install into a repository that tracks only code and `.gitignore` stays allowed, and the docs say "an agent-harness path". | O15. Refusing on `.gitignore` would block a plain install into almost every repository. |
+| 47 | Tests through real gathering | Each finding in the two 2026-09-26 reports gets a real-Git regression test through `install_sidecar`, `uninstall_sidecar`, or the installer CLI, not only a pure-planner test. The precedence property test's fixtures produce real `adopt` and `unchanged` outcomes. | O13, O19, and the MEMORY lesson that planner-injection tests cannot catch gathering defects. |
+
 ## Design Overview
 
 ### Consumer layout after a sidecar install
@@ -276,7 +306,10 @@ Preflight aborts, before any write, with a non-zero exit when:
   path, or `..`;
 - any existing ancestor of a planned path inside the worktree is a symlink,
   tracked or not (non-goal). A symlink at a unit path itself does not abort:
-  a tracked one is team-owned, and an untracked one is foreign (Decision 25);
+  a tracked one is team-owned, and an untracked one is foreign (Decision 25).
+  A symlink inside a unit does not abort either (Decision 38);
+- a unit folder holds a `.git` entry at any depth and is not a gitlink in the
+  outer index (Decision 37);
 - the manifest, staging, preserved, or `info/exclude` path, or `info/`, is a
   symlink or has the wrong type, or the exclude file's sidecar markers are
   unbalanced or repeated (Decision 26);
@@ -285,16 +318,20 @@ Preflight aborts, before any write, with a non-zero exit when:
   device, or is not writable where a move happens (Decision 28);
 - the source is incomplete or holds a file outside the sidecar allowlist
   (Decision 31);
-- after the exclude block is written, the ignore gate fails (Decisions 17
-  and 30). The installer restores the previous exclude file and names each
-  failing path with the rule that `git check-ignore -v -z` shows winning.
+- after the exclude block is written, the ignore gate fails (Decisions 17,
+  30, and 40). The installer restores the previous exclude file and names
+  each path that is not ignored with the rule that `git check-ignore -v -z`
+  shows winning.
 
 Before classifying units, the planner decides which skills are taken
 (Decision 22). "Tracked" below means the index has an entry at or under the
 unit path, whether or not it exists on disk (Decision 25). "Listed" means the
 sidecar's own exclude block has the unit's line (Decision 23). Every listed
 unit is classified, even with no record and no desired content. An existing
-unit folder that holds no files and is not tracked counts as absent.
+unit folder that holds no files and is not tracked counts as absent. A unit
+folder that holds an entry the unit hash cannot represent never matches its
+record or the desired content (Decision 38). A unit that is a gitlink in the
+outer index gets no file action at all (Decision 37).
 
 Each unit is then classified. The first matching row wins:
 
@@ -400,6 +437,9 @@ pre-existing team files                     : byte-identical after install, upda
 hooks                                       : no hook file copied, no core.hooksPath change, no provider hook config change
 ownership                                   : never inferred from a filename or a location; it needs a matching record or the sidecar's own exclude line
 precedence                                  : a taken skill never produces install, update, unchanged, or adopt
+other repositories                          : no run deletes, moves, or writes anything inside a nested repository or submodule
+unrepresented entries                       : an entry the unit hash cannot represent is never deleted; its unit is kept or
+                                               preserved intact (Decision 38)
 second run from the same bootstrap commit   : no file changes, including the manifest and the exclude file
 written paths                               : only the sidecar namespace, the exclude block, and the Git-directory manifest,
                                                staging folder, and preserved folder
@@ -445,6 +485,8 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-25_phase-G-sidecar-ownership-and-precedence` — decide taken skills first, prove ownership by record or exclude line, read ownership from the index, preserve edited copies, and gate folders with a trailing slash (Decisions 22-25, 30, 32).
 - [x] `2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall` — harden mode detection and preflight, make paths bytes-safe, require complete sources, add `--uninstall`, and correct messages and docs (Decisions 26-29, 31, 33-36).
 - [x] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
+- [ ] `2026-09-26_phase-J-sidecar-safety-follow-up` — unit-level repository boundaries, complete snapshots, uninstall on the install's write order, one path-identity rule, Git line splitting, accurate reports, the settled-refresh identity check, and corrected docs (Decisions 37-47).
+- [ ] `2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase J.
 
 Phase F must land before any other outer commit on this branch: once
 Phases F-I are listed, the installed validator rejects two knowledge-refresh
@@ -517,9 +559,9 @@ the host where the clients are installed.
 Required review profiles: Phases B-E use `code`, `architecture`, `security`,
 `tests`, and `ponytail`, plus `documentation` where documentation changes.
 Phase A changes one evidence document and uses `documentation`,
-`architecture`, and `security`. Phases F-H use `code`, `architecture`,
-`security`, `tests`, `ponytail`, and `documentation`. Phase I uses the same
-full set, as Phase E did, because every multi-file diff is
+`architecture`, and `security`. Phases F-H and J use `code`, `architecture`,
+`security`, `tests`, `ponytail`, and `documentation`. Phases I and K use the
+same full set, as Phase E did, because every multi-file diff is
 control-plane/high-risk (`shared/policies/workspace.instructions.md`).
 
 ## Done Criteria
@@ -537,7 +579,7 @@ control-plane/high-risk (`shared/policies/workspace.instructions.md`).
   `native-run`.
 - Mode detection follows the table above. In particular, a plain
   `install_bootstrap.py TARGET` never takes over a sidecar consumer or an
-  unbootstrapped repository that tracks a path the full install writes.
+  unbootstrapped repository that tracks an agent-harness path (Decision 46).
 - Full install and full updates are otherwise unchanged:
   `tests/test_install_bootstrap.py` passes, and its only expectation change
   is `--mode full` in
@@ -559,7 +601,17 @@ control-plane/high-risk (`shared/policies/workspace.instructions.md`).
   Nothing is deferred: L1-L4 and the uninstall command are in scope.
 - A taken skill never keeps, installs, adopts, or updates a sidecar copy at
   any root, in any recovery path, and an edited copy of a taken skill ends up
-  in the preserved folder.
+  in the preserved folder. The one exception is a preserve conflict (the
+  destination already exists): the edited copy stays and is reported as kept
+  until the conflict is resolved (Decisions 24 and 44).
+- Every confirmed finding in the two 2026-09-26 review reports has a
+  real-Git regression test that failed before its fix, or a documented
+  disposition (Decision 47).
+- No run deletes, moves, or writes anything inside a nested repository or
+  submodule, and no run deletes an entry the unit hash cannot represent.
+- `--uninstall` works after a profile change, never exits 1 except for a
+  unit it actually kept because of a preserve conflict, and never exposes a
+  sidecar file.
 - No run exposes a sidecar file or one of the person's own ignored files in
   `git status`, except the documented block-deletion recovery, uninstall's
   retained files, and a reported retained name that gitignore cannot express.
@@ -569,14 +621,16 @@ control-plane/high-risk (`shared/policies/workspace.instructions.md`).
 - `--uninstall` removes only unmodified sidecar files and sidecar metadata,
   preserves edited copies, and is idempotent.
 - The final knowledge refresh and stale-claims audit are complete, and they
-  ran after the last code change (Phase I).
+  ran after the last code change (Phase K).
 
 ## Completion Evidence
 
 Phase E, `2026-09-24_phase-E-sidecar-knowledge-refresh`, was the final phase
-until the plan was reopened on 2026-09-25 (Decision 21); its closeout evidence
-stays as it is. The final phase listed under `phases:` is now
-`2026-09-25_phase-I-sidecar-hardening-knowledge-refresh`. It runs the documentation,
+until the plan was reopened on 2026-09-25 (Decision 21), and Phase I,
+`2026-09-25_phase-I-sidecar-hardening-knowledge-refresh`, was the final phase
+until it was reopened again on 2026-09-26; their closeout evidence stays as
+it is. The final phase listed under `phases:` is now
+`2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh`. It runs the documentation,
 memory, and LEARN audit. It sweeps every live-advice surface for claims this
 plan invalidated, corrects or supersedes each one, leaves dated records
 unchanged, and records the audited surfaces and each outcome under
