@@ -88,6 +88,48 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   below a unit (a listed file line under `<unit>/vendor` after `vendor`
   becomes a submodule must be dropped and reported, never sent to
   `check-ignore`).
+- Coder A run 2 (steps 6-9 and the open point) landed; it also touched
+  `scripts/install_bootstrap.py`, `tests/test_sidecar_uninstall.py`,
+  `tests/test_sidecar_overlay.py`, and `tests/test_install_bootstrap.py`:
+  - Step 2 open point: `UnitSnapshot.gitlink_child_relpaths`; a listed
+    file line under a gitlink below a unit is dropped and reported first,
+    whatever the unit's outcome.
+  - Step 6: `PlanResult.kept_conflicts` (taken units that are locally
+    modified or unfinished and whose preserve destination exists); during
+    uninstall `taken_units` is every classified unit and the required set
+    uses `_ALL_SKILL_WRITE_ROOTS` and `_ALL_BRIDGES`. Uninstall apply and
+    dry run follow the install's order: the write-phase block (skipped when
+    there is nothing to write), one gate over `gate_paths_final`, the
+    shared `_apply_actions` (with an assert that nothing is installed,
+    updated, or adopted), then a branch on `kept_conflicts` only. The two
+    conflict-only gates, `_apply_uninstall_actions`, and the now-dead
+    `_write_raw_paths` are removed; the fault-point names are unchanged.
+  - Step 7: `_read_only_taken_conflict_remedy` for a taken skill with a
+    kept conflict; `_report_preserved_folder_if_nonempty` on every
+    uninstall path, including both "nothing to do" paths; the `--mode
+    full` refusal mentions `--uninstall`; `warn_tracked_paths` turns
+    `GitDetectionError` into a warning; the named-pipe test uses a plain
+    `subprocess.run(..., timeout=30)`.
+  - Step 8: `_enumerate_read_entries` is the one enumerator for folder
+    names and frontmatter names. Root cause of O6: `_reflects_a_write_root`
+    matched every ordinary entry inside a write root.
+  - Step 9: the property test's `unchanged` and `adopt` fixtures now
+    produce those outcomes. Mutation check: with `"adopt"` added to
+    `_ALLOWED_TAKEN_OUTCOMES`, the property test failed on its assertion
+    (`AssertionError: assert ['adopt'] not in (['install'], ['unchanged'],
+    ['update'], ['adopt'])`, the `adopt` case), not on an exception; after
+    the revert, all 97 planner tests pass.
+  - Tests: 17 fail on `010f08c`, and 5 are named guards (two retired
+    bridges, a team negation added after install, a symlink unit
+    uninstall, and the O15 code-plus-`.gitignore` repository).
+  - Full suite: 2141 passed. Ruff, mypy, and `verify.py fast` pass.
+- Orchestrator re-check: 17 sampled round-2 tests run against `010f08c`;
+  14 fail on behavior assertions, and the 3 guards among them pass.
+- Orchestrator finding (MINOR, sent back to coder A before review): the
+  preserved-folder message says "from an earlier run" even after the same
+  uninstall run preserved a copy.
+- Step 11 part 2 sent to `documenter`. REVIEW part A (steps 1-5, 8, 9;
+  all six profiles) started in parallel; the wording fix is outside it.
 
 ## [LEARN] Entries
 
