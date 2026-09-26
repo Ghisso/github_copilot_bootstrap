@@ -62,9 +62,12 @@ installer looks for full-install evidence and sidecar evidence on the
 target and picks whichever mode that evidence points to; when it finds
 neither, it still defaults to a full install, exactly as before. The one
 thing that changed: running the plain installer with no `--mode` on a
-repository that already tracks a path the full install writes, and that
-carries no bootstrap or sidecar evidence, now refuses instead of silently
-taking that path over. It tells you to pass one of the two flags explicitly
+repository that already tracks an agent-harness path — one of the paths a
+full install writes, such as `.claude`, `.devcontainer`, `CLAUDE.md`, or a
+Copilot surface file, but not `.gitignore` — and that carries no bootstrap
+or sidecar evidence, now refuses instead of silently taking that path over.
+A repository that tracks only code and `.gitignore` still gets a plain full
+install. The installer tells you to pass one of the two flags explicitly
 (see [Behavior changes](#behavior-changes-you-should-know-about) below).
 
 ### Full Install
@@ -484,9 +487,12 @@ and it stays that way.
 
 Every sidecar file is kept out of the team's Git state through a marked
 block in the local, untracked `.git/info/exclude` (not the tracked
-`.gitignore`). The installer writes that block first, then proves every
-path it is about to write is actually ignored, before it writes any sidecar
-file. If that proof fails, it restores `.git/info/exclude` to its exact
+`.gitignore`). The installer writes that block first, then proves that
+every path the finished exclude block would list — not only the files it
+is about to write this run, but also an unfinished or locally modified unit
+and any retained file a team rule might expose — is actually ignored,
+before it writes any sidecar file. If that proof fails, it restores
+`.git/info/exclude` to its exact
 original bytes, writes no sidecar file at all, and exits 1 with a remedy —
 so a failed run still touches the exclude file transiently, but leaves your
 worktree and Git state exactly as it found them. An ownership
@@ -562,15 +568,30 @@ whether to track or delete it.
 
 If the target carries no sidecar evidence at all, `--uninstall` prints "no
 sidecar found; nothing to do" and exits 0 — running it again after a clean
-uninstall is safe.
+uninstall is safe. Whenever `ai-bootstrap-sidecar-preserved/` holds
+anything, `--uninstall` also prints where that folder is, even on this "no
+sidecar found" path and even when there is otherwise nothing to do — so an
+edited copy from an earlier run is never silent about where it landed.
 
-A preserve conflict (an edited copy would move to a path in
-`ai-bootstrap-sidecar-preserved/` that an earlier preserve already filled)
-is the one case where uninstall does not finish: it keeps that one unit and
-its exclude line in place, keeps the block, rewrites the manifest to hold
-only the units it kept, reports the conflict, and exits 1. Move or rename
-the conflicting file under `ai-bootstrap-sidecar-preserved/` and rerun
+Uninstall's own preflight checks run first, the same target-only checks the
+install uses; each refusal names its own cause (for example, an
+unbalanced `# BEGIN`/`# END` marker pair, or a linked worktree). Past
+preflight, a preserve conflict — an edited copy would move to a path in
+`ai-bootstrap-sidecar-preserved/` that an earlier preserve already filled —
+is the only reason `--uninstall` exits 1: it keeps that one unit and its
+exclude line in place, keeps the block, rewrites the manifest to hold only
+the units it kept, reports the conflict, and exits 1. Move or rename the
+conflicting file under `ai-bootstrap-sidecar-preserved/` and rerun
 `--uninstall` to finish the job.
+
+A team ignore rule that would otherwise expose a sidecar path never blocks
+uninstall: uninstall checks only the exclude lines it is actually keeping,
+not every line a team rule might expose, so a team's own `.gitignore`
+change cannot stop it from finishing.
+
+Uninstall still works after a later bootstrap version drops a skill
+entirely: if your copy of that skill had local edits, uninstall preserves
+it the same way an ordinary update would, instead of leaving it exposed.
 
 `--uninstall` refuses with `--mode full`, and it refuses on a target that
 has full-install evidence: it only ever removes a sidecar overlay, never a
@@ -656,7 +677,9 @@ harness.
 ### Behavior changes you should know about
 
 - **A plain install can now refuse.** With no `--mode`, the installer now
-  aborts on a repository that already tracks a path the full install writes
+  aborts on a repository that already tracks an agent-harness path — a path
+  under `.claude`, `.devcontainer`, a root adapter file such as `CLAUDE.md`
+  or `AGENTS.md`, or a Copilot surface file, but never `.gitignore` alone —
   and carries no bootstrap or sidecar evidence yet. Pass `--mode full` to
   keep today's takeover, or `--mode sidecar` for the overlay. This includes a
   fresh clone of a repository that a full install already manages, whose
@@ -675,12 +698,31 @@ harness.
   guessing.** A "dubious ownership" error, for example, aborts in every mode
   with Git's own message and a remedy (`git config --global --add
   safe.directory <path>`), rather than being read as "no evidence found".
-- **Nested repositories, submodules, symlinked skill folders, bad filesystem
-  shapes, and unwritable folders are refused before any write.** Sidecar
-  mode checks every path it plans to touch — a skill unit, a write root, a
-  bridge's parent folder — against the repository boundary and the
-  filesystem first, and refuses, naming the offending path, if any of it
-  does not fit.
+- **Nested repositories, submodules, a symlinked ancestor of a skill folder,
+  bad filesystem shapes, and unwritable folders are refused before any
+  write.** Sidecar mode checks every path it plans to touch — a skill unit,
+  a write root, a bridge's parent folder — against the repository boundary
+  and the filesystem first, and refuses, naming the offending path, if any
+  of it does not fit. A symlink inside a skill folder, rather than as one of
+  its ancestors, does not abort the run; the folder is treated as
+  incomplete instead (see the next bullet).
+- **A skill folder that holds a symlink, named pipe, socket, device, or
+  empty subfolder is incomplete, not unchanged.** An empty leftover folder
+  with nothing else in it counts as absent, and the sidecar reinstalls it.
+  Otherwise a skill folder holding one of these entries never matches its
+  recorded content: it is treated as locally modified when the sidecar
+  already owns it, unfinished when it is only listed, or foreign otherwise —
+  and it is never deleted as if it matched what the sidecar would install.
+- **A skill folder's own nested repository is handled by ownership, not by a
+  blanket refusal.** A nested `.git` inside a skill folder that the sidecar
+  recorded or listed stops the run before any write, naming the folder. A
+  personal clone the sidecar never recorded or listed is skipped as
+  foreign instead, and nothing inside it is touched. A skill folder that is
+  itself a team submodule (a gitlink entry in the Git index) is team-owned
+  and never touched. In every case, no path inside any submodule — including
+  one nested below a skill folder — is hidden, checked, or changed by the
+  sidecar. The write-root and bridge-parent boundary checks above are
+  unchanged.
 - **Unbalanced markers in `.git/info/exclude` are refused, not repaired.**
   If the sidecar's own `# BEGIN`/`# END` lines are missing one of the pair,
   doubled, or out of order, the run stops before writing anything and names
@@ -689,11 +731,12 @@ harness.
   hidden.** A retained file whose name has an embedded newline or a
   trailing carriage return never gets an exclude line; it stays visible and
   is reported instead.
-- **The generated source must be complete and exact.** Both
-  `dist/multi-agent/` and `dist/sidecar/` are checked against one exact
-  allowlist before install; a source missing a file, or carrying an extra
-  one, is refused. Full mode also refuses a source that lacks
-  `.claude/hooks/scripts/state-sync.sh`.
+- **The generated source must be complete and exact.** Full mode only
+  requires that its source (`dist/multi-agent/`) include
+  `.claude/hooks/scripts/state-sync.sh`; a source missing that file is
+  refused. Sidecar mode is stricter: its source (`dist/sidecar/`) must match
+  one exact allowlist, with no file missing and no extra file present, or
+  the install is refused.
 - **Inherited Git environment variables are ignored.** Before it runs any
   Git command, the installer clears `GIT_DIR`, `GIT_WORK_TREE`,
   `GIT_INDEX_FILE`, and Git's other repository-local environment variables

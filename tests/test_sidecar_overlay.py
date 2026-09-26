@@ -909,11 +909,16 @@ def test_frontmatter_declared_name_takes_the_skill_everywhere():
 def test_taken_skill_never_produces_a_disallowed_outcome(outcome_kind):
     # Decision 22: an allowlist of outcomes cannot miss a future kind, unlike
     # the old enumerated conversion that let "adopt" escape (R1).
+    # O13: the fixture's content must actually reach the row it names, or
+    # the property test silently checks a different row (adopt used to
+    # produce "unfinished" here, and unchanged used to produce "update").
     if outcome_kind == "install":
         other_snapshot = snapshot(exists=False)
         manifest = None
     elif outcome_kind == "unchanged":
-        content = {"SKILL.md": b"same"}
+        # Record and disk both equal the desired content ("new"): a real
+        # "unchanged" row requires current_hash == record.hash == desired.hash.
+        content = {"SKILL.md": b"new"}
         other_snapshot = snapshot(content)
         manifest = manifest_with(units={OTHER_UNIT: recorded(content)})
     elif outcome_kind == "update":
@@ -921,7 +926,10 @@ def test_taken_skill_never_produces_a_disallowed_outcome(outcome_kind):
         other_snapshot = snapshot(old_content)
         manifest = manifest_with(units={OTHER_UNIT: recorded(old_content)})
     else:  # adopt
-        content = {"SKILL.md": b"reborn"}
+        # Disk equals the desired content ("new") with no record but a
+        # listed line: a real "adopt" row requires current_hash ==
+        # desired.hash, proven by the exclude line alone.
+        content = {"SKILL.md": b"new"}
         other_snapshot = snapshot(content)
         manifest = None
 

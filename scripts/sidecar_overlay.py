@@ -118,6 +118,7 @@ _ALLOWED_TAKEN_OUTCOMES = frozenset(
     {
         "team_owned",
         "team_takeover",
+        "gitlink",
         "foreign",
         "noop",
         "drop_record",
@@ -138,6 +139,14 @@ _TAKEN_OUTCOME_CONVERSION = {
 
 class ManifestError(ValueError):
     """The sidecar manifest is unreadable, malformed, or names an unsafe path."""
+
+
+class GitCheckIgnoreError(RuntimeError):
+    """``git check-ignore`` exited with a code other than 0 (something
+    matched) or 1 (nothing matched) -- for example 128 for a path inside a
+    submodule (Decision 37, 40) -- so its output cannot be trusted as a
+    partial ignore set. The caller must abort with Git's own message rather
+    than silently treating the missing paths as not ignored."""
 
 
 class ExcludeMarkerError(ValueError):
@@ -259,6 +268,16 @@ def _owning_unit(path: str) -> str | None:
             skill = path[len(prefix) :].split("/", 1)[0]
             return f"{write_root}/{skill}"
     return None
+
+
+def _under_a_gitlink_child(relpath: str, gitlink_children: AbstractSet[str]) -> bool:
+    """Return whether a unit-relative path sits at or under one of the
+    unit's own gitlink children (Decision 37): nothing at or under any
+    gitlink index entry, anywhere in the index, keeps a file line -- not
+    only when the unit itself is the gitlink."""
+    return relpath in gitlink_children or any(
+        relpath.startswith(f"{child}/") for child in gitlink_children
+    )
 
 
 def _parse_manifest_unit(unit_path: str, record: object) -> ManifestUnit:
@@ -418,15 +437,32 @@ class UnitSnapshot:
     ``tracked_files`` is every Git index path at or under the unit
     (Decision 25), relative to the unit itself (the file's own name for a
     bridge; the sentinel ``""`` when the unit path itself is a non-directory
-    index entry such as a gitlink), whether or not it currently exists on
-    disk. It therefore is not a subset of ``file_hashes``: a deleted tracked
-    file stays in ``tracked_files`` but never appears in ``file_hashes``.
-    ``file_hashes`` covers every file present at the unit path on disk,
-    relative to the unit itself (tracked and untracked alike). ``symlinked``
-    means an ancestor directory of the unit is a symlink (always an abort);
-    a symlink at the unit path itself is not ancestor-symlinked and is
-    instead classified as team-owned (tracked) or foreign (untracked).
-    ``ignored_files`` is a relative-path subset of ``file_hashes``.
+    index entry such as a gitlink or a tracked symlink), whether or not it
+    currently exists on disk. It therefore is not a subset of
+    ``file_hashes``: a deleted tracked file stays in ``tracked_files`` but
+    never appears in ``file_hashes``. ``file_hashes`` covers every regular
+    file present at the unit path on disk, relative to the unit itself
+    (tracked and untracked alike), excluding anything at or under a gitlink
+    index entry or a nested ``.git`` entry (Decision 37). ``symlinked`` means
+    an ancestor directory of the unit is a symlink (always an abort); a
+    symlink at the unit path itself is not ancestor-symlinked and is instead
+    classified as team-owned (tracked) or foreign (untracked). ``is_gitlink``
+    means the unit path itself is a gitlink index entry (mode ``160000``): a
+    submodule the sidecar never touches (Decision 37), regardless of
+    ``tracked_files``' sentinel shape, which a tracked symlink shares.
+    ``nested_repo_relpath`` is the unit-relative path of the first ``.git``
+    entry found at any depth whose parent folder is not itself a gitlink --
+    a disk-only nested repository (Decision 37) -- or ``None``. ``incomplete``
+    means the unit holds a symlink, named pipe, socket, device, empty
+    subfolder, or unreadable subfolder (Decision 38): it never matches its
+    record or the desired content. ``kind`` is the unit path's own
+    filesystem shape: ``"folder"`` (or absent), ``"symlink"``, or ``"other"``
+    (Decision 40's gate spelling). ``gitlink_child_relpaths`` is every
+    immediate gitlink found inside the unit (unit-relative), used to
+    recognize a stale retained or listed path that now falls under one
+    (Decision 37): such a path is dropped and reported as now visible, even
+    while the unit itself keeps some other outcome this run. ``ignored_files``
+    is a relative-path subset of ``file_hashes``.
     """
 
     exists: bool = False
@@ -434,10 +470,25 @@ class UnitSnapshot:
     tracked_files: frozenset[str] = frozenset()
     file_hashes: Mapping[str, str] = field(default_factory=dict)
     ignored_files: frozenset[str] = frozenset()
+    symlink_relpaths: frozenset[str] = frozenset()
+    is_gitlink: bool = False
+    nested_repo_relpath: str | None = None
+    incomplete: bool = False
+    kind: Literal["folder", "symlink", "other"] = "folder"
+    gitlink_child_relpaths: frozenset[str] = frozenset()
 
     @property
     def untracked_files(self) -> frozenset[str]:
         return frozenset(self.file_hashes) - self.tracked_files
+
+    @property
+    def untracked_symlinks(self) -> frozenset[str]:
+        """Untracked symlinks found inside the unit (Decision 38): they carry
+        no hash, so they are handled separately from ``untracked_files``, the
+        same way ``_team_takeover`` treats an untracked file that matches
+        nothing -- retained with its own line when ignored, left alone when
+        visible, never deleted."""
+        return frozenset(self.symlink_relpaths) - self.tracked_files
 
 
 @dataclass(frozen=True)
@@ -476,22 +527,39 @@ class PlanResult:
     next_manifest: Manifest | None = None
     exclude_lines_write: tuple[str, ...] = ()
     exclude_lines_final: tuple[str, ...] = ()
+    gate_paths_write: tuple[str, ...] = ()
+    """Decision 40: every path (gate-spelled) the write-phase block lists --
+    unfinished and locally modified units, retained files, and takeover
+    deletions included, unrecognized lines never included. Install and
+    update gate exactly this set."""
+    gate_paths_final: tuple[str, ...] = ()
+    """Decision 40: every path (gate-spelled) the final block keeps. Used by
+    uninstall, which gates only the paths whose lines survive (Decision 39)."""
+    kept_conflicts: frozenset[str] = frozenset()
+    """Decision 39: the taken units this run actually kept in place because
+    their preserve destination already exists -- a strict subset of the
+    caller's own, deliberately over-broad ``preserved_conflicts`` input.
+    Uninstall's exit code and kept manifest depend only on this set, never
+    on the raw input (O3)."""
 
 
 def required_snapshot_units(
     desired_units: Mapping[str, DesiredUnit],
     manifest: Manifest | None,
     excluded_units: AbstractSet[str] = frozenset(),
+    listed_files: AbstractSet[str] = frozenset(),
 ) -> frozenset[str]:
     """Return every unit path the caller must snapshot for this run.
 
     This is the union of the desired units, the manifest's recorded units,
-    the owning unit of every ``retained`` file, and every unit the sidecar's
-    own exclude block lists (``excluded_units``, Decision 23), so a skill
-    dropped from the profile or a unit whose record was already dropped by
-    a team takeover -- or a unit whose record was lost with the manifest --
-    is still classified and cleaned up correctly instead of silently
-    un-hidden.
+    the owning unit of every ``retained`` file, the owning unit of every
+    file-level line the sidecar's own exclude block lists (``listed_files``,
+    Decision 23 and 43: a listed retained file can outlive both its unit's
+    manifest record and the manifest itself), and every unit the block lists
+    at the unit level (``excluded_units``, Decision 23), so a skill dropped
+    from the profile or a unit whose record was already dropped by a team
+    takeover -- or a unit whose record was lost with the manifest -- is
+    still classified and cleaned up correctly instead of silently un-hidden.
     """
     units: set[str] = set(desired_units) | set(excluded_units)
     if manifest is not None:
@@ -500,6 +568,10 @@ def required_snapshot_units(
             owner = _owning_unit(path)
             if owner is not None:
                 units.add(owner)
+    for path in listed_files:
+        owner = _owning_unit(path)
+        if owner is not None:
+            units.add(owner)
     return frozenset(units)
 
 
@@ -590,6 +662,33 @@ class ExcludeBlockContents:
     (Decision 34, S18: uninstall's own "is a sidecar present" definition)."""
 
 
+def _split_exclude_text(text: str, *, keepends: bool = False) -> list[str]:
+    """Split exclude-file text into lines the way Git reads ``info/exclude``:
+    only ``\\n`` ends a line (Decision 42; O5). ``str.splitlines()`` also
+    breaks on ``\\f``, ``\\v``, ``\\x1c``-``\\x1e``, U+0085, U+2028, and
+    U+2029, none of which Git treats as a line boundary; splitting on one of
+    those inside an escaped retained-file line turns one pattern into two,
+    and the extra, unanchored one can hide unrelated team files (O5).
+
+    With ``keepends=False`` (the default), a lone trailing carriage return is
+    also stripped from each line, matching Git's own CRLF tolerance, so a
+    caller can compare a line to known content. With ``keepends=True`` every
+    original byte -- including any carriage return -- is kept, and each line
+    but a genuinely final, terminator-less one keeps its own trailing
+    ``\\n``, so a caller rebuilding the file around the sidecar's own block
+    stays byte-for-byte faithful outside it.
+    """
+    if not keepends:
+        return [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
+    if text == "":
+        return []
+    parts = text.split("\n")
+    lines = [f"{part}\n" for part in parts[:-1]]
+    if parts[-1]:
+        lines.append(parts[-1])
+    return lines
+
+
 def parse_exclude_block(text: str) -> ExcludeBlockContents:
     """Parse the sidecar's own exclude block into unit lines, file lines,
     and everything else.
@@ -603,14 +702,15 @@ def parse_exclude_block(text: str) -> ExcludeBlockContents:
     understand. Raises ``ExcludeMarkerError`` when the markers are
     unbalanced or repeated (Decision 26).
     """
-    markers = _find_exclude_markers(text.splitlines())
+    lines = _split_exclude_text(text)
+    markers = _find_exclude_markers(lines)
     if markers is None:
         return ExcludeBlockContents()
     begin, end = markers
     listed_units: set[str] = set()
     listed_files: set[str] = set()
     unrecognized: list[str] = []
-    for line in text.splitlines()[begin + 1 : end]:
+    for line in lines[begin + 1 : end]:
         path = unescape_exact_path(line)
         if path is not None and escape_exact_path(path) == line:
             try:
@@ -642,7 +742,7 @@ def parse_exclude_block(text: str) -> ExcludeBlockContents:
 
 
 def _skill_name(unit_path: str) -> str | None:
-    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+    for write_root in _ALL_SKILL_WRITE_ROOTS:
         prefix = f"{write_root}/"
         if unit_path.startswith(prefix):
             return unit_path[len(prefix) :]
@@ -671,8 +771,36 @@ def _team_owned_remedy(
     return f"the repository tracks `{tracked_path}`; the sidecar skips `{skill}` at every root"
 
 
+def _gitlink_remedy(unit_path: str) -> str:
+    """Decision 37: a unit that is itself a gitlink is team-owned, but the
+    wording must say plainly that the sidecar never looks inside a
+    submodule -- the ordinary team-owned wording implies the sidecar checked
+    the tracked content, which it deliberately never does here."""
+    skill = _skill_name(unit_path)
+    if skill is None:
+        return (
+            f"`{unit_path}` is a submodule; the sidecar never touches files "
+            "inside a submodule and does not install this bridge"
+        )
+    return (
+        f"`{unit_path}` is a submodule; the sidecar never touches files "
+        f"inside a submodule and skips `{skill}` at every root"
+    )
+
+
 def _read_only_taken_remedy(path: str, skill: str) -> str:
     return f"the repository has `{path}`; the sidecar skips `{skill}` at every root"
+
+
+def _read_only_taken_conflict_remedy(path: str, skill: str) -> str:
+    """Decision 44/O12: while a preserve conflict keeps one of the skill's
+    own edited copies in place, this taking path is reported as keeping the
+    skill until that conflict is resolved, never as skipping it everywhere
+    -- the copy the conflict kept is still there."""
+    return (
+        f"the repository has `{path}`; `{skill}` is kept in place until its "
+        "edited-copy conflict is resolved, not skipped at every root"
+    )
 
 
 def _locally_modified_remedy(path: str, *, skill_still_shipped: bool) -> str:
@@ -827,11 +955,16 @@ def _team_takeover(
         )
     ]
     retained_here: set[str] = set()
-    for relpath in sorted(snapshot.untracked_files):
+    untracked_entries = sorted(snapshot.untracked_files | snapshot.untracked_symlinks)
+    for relpath in untracked_entries:
         full_path = f"{unit_path}/{relpath}"
-        current_hash = snapshot.file_hashes[relpath]
-        if record_files.get(relpath) == current_hash or (
-            desired_files.get(relpath) == current_hash
+        # Decision 38: an untracked symlink carries no hash, so it can never
+        # match the record or the desired content -- it is treated like an
+        # untracked file that matches nothing, never deleted.
+        current_hash = snapshot.file_hashes.get(relpath)
+        if current_hash is not None and (
+            record_files.get(relpath) == current_hash
+            or desired_files.get(relpath) == current_hash
         ):
             actions.append(Action("team_takeover_delete", unit_path, full_path))
         elif relpath in snapshot.ignored_files and uninstall:
@@ -864,6 +997,17 @@ def _classify_unit(
     excluded_units: AbstractSet[str],
     uninstall: bool = False,
 ) -> _UnitOutcome:
+    if snapshot.is_gitlink:
+        # Decision 37: the unit itself is a gitlink. The outer exclude file
+        # does not apply inside a submodule, so no check-ignore call and no
+        # file action ever touches anything inside it -- unlike an ordinary
+        # team takeover, which inspects untracked files one by one.
+        actions = [Action("drop_record", unit_path)] if record is not None else []
+        report = Report("SKIPPED", unit_path, _gitlink_remedy(unit_path))
+        return _UnitOutcome(
+            "gitlink", None, actions, [report], frozenset(), False, False
+        )
+
     if snapshot.tracked_files:
         if record is not None or unit_path in excluded_units:
             # Tracked, and either recorded or merely listed (Decision 23):
@@ -899,8 +1043,13 @@ def _classify_unit(
             )
         return _UnitOutcome("noop", None, [], [], frozenset(), False, False)
 
+    # Decision 38: an incomplete unit (a symlink, named pipe, socket, device,
+    # empty subfolder, or unreadable subfolder anywhere inside it) can never
+    # be represented by a hash, so it never matches its record or the
+    # desired content; skip straight to the locally-modified/unfinished/
+    # foreign fallback below instead of a false "unchanged" or "remove".
     current_hash = compute_unit_hash(snapshot.file_hashes)
-    if record is not None and current_hash == record.hash:
+    if not snapshot.incomplete and record is not None and current_hash == record.hash:
         if desired is None:
             return _UnitOutcome(
                 "remove",
@@ -934,7 +1083,8 @@ def _classify_unit(
         )
 
     if (
-        desired is not None
+        not snapshot.incomplete
+        and desired is not None
         and current_hash == desired.hash
         and (unit_path in excluded_units or record is not None)
     ):
@@ -1163,16 +1313,21 @@ def plan_sidecar_reconciliation(
     declared_skill_names = declared_skill_names or {}
     preserved_destinations = preserved_destinations or {}
 
-    required = required_snapshot_units(desired_units, manifest, excluded_units)
+    required = required_snapshot_units(
+        desired_units, manifest, excluded_units, listed_files
+    )
     if uninstall:
+        # Decision 39: every well-known unit is included, including a
+        # retired write root or a retired bridge, so it is classified and
+        # cleaned up even with no manifest record and no exclude line left.
         required = (
             required
             | frozenset(
                 f"{write_root}/{skill}"
-                for write_root in SIDECAR_SKILL_WRITE_ROOTS
+                for write_root in _ALL_SKILL_WRITE_ROOTS
                 for skill in SIDECAR_SKILLS
             )
-            | frozenset(SIDECAR_BRIDGES)
+            | frozenset(_ALL_BRIDGES)
         )
     symlinked = sorted(
         unit for unit in required if snapshots.get(unit, UnitSnapshot()).symlinked
@@ -1180,6 +1335,32 @@ def plan_sidecar_reconciliation(
     if symlinked:
         message = "symlinked unit or ancestor: " + ", ".join(symlinked)
         return PlanResult(aborts=(Abort("symlink", message),))
+
+    # Decision 37: a recorded or listed unit holding a disk-only nested
+    # repository (a ".git" entry whose parent is not itself a gitlink)
+    # aborts before any write. A unit that is neither recorded nor listed is
+    # foreign instead (handled by ordinary classification below): its skill
+    # is taken, and nothing inside it is touched.
+    nested_repo_units = sorted(
+        unit
+        for unit in required
+        if snapshots.get(unit, UnitSnapshot()).nested_repo_relpath is not None
+        and (
+            (manifest is not None and unit in manifest.units) or unit in excluded_units
+        )
+    )
+    if nested_repo_units:
+        return PlanResult(
+            aborts=tuple(
+                Abort(
+                    "nested_repo",
+                    _nested_repo_message(
+                        f"{unit}/{snapshots[unit].nested_repo_relpath}"
+                    ),
+                )
+                for unit in nested_repo_units
+            )
+        )
 
     outcomes: dict[str, _UnitOutcome] = {}
     for unit_path in required:
@@ -1201,13 +1382,17 @@ def plan_sidecar_reconciliation(
             if outcome is not None and outcome.kind in (
                 "team_owned",
                 "team_takeover",
+                "gitlink",
                 "foreign",
             ):
                 taken_by_write_root.add(skill)
                 break
 
     taken_skills: set[str] = set(taken_by_write_root)
-    extra_reports: list[Report] = []
+    # Decision 44/O12: the exact wording (plain "skipped everywhere" versus
+    # "kept until the conflict is resolved") depends on kept_conflicts,
+    # computed below, so only the (path, skill) pairs are collected here.
+    extra_taking: list[tuple[str, str]] = []
     for skill in SIDECAR_SKILLS:
         extra_paths = _extra_taking_paths(
             skill, read_list_skill_names, declared_skill_names, ignorecase
@@ -1216,27 +1401,35 @@ def plan_sidecar_reconciliation(
             continue
         taken_skills.add(skill)
         for path in sorted(extra_paths):
-            extra_reports.append(
-                Report("SKIPPED", path, _read_only_taken_remedy(path, skill))
-            )
+            extra_taking.append((path, skill))
 
     if uninstall:
-        # Decision 34: every skill and every bridge is taken, so the exact
-        # same conversion a taken skill's units already get (remove/preserve/
-        # noop) applies uniformly, including to bridges, which the ordinary
-        # taken-skill precedence never touches.
-        taken_skills = set(SIDECAR_SKILLS)
-    taken_units = {
-        f"{write_root}/{skill}"
-        for skill in taken_skills
-        for write_root in SIDECAR_SKILL_WRITE_ROOTS
-    }
-    if uninstall:
-        taken_units |= set(_ALL_BRIDGES)
+        # Decision 39: every classified unit is taken during uninstall,
+        # including a dropped skill, a retired write root, or a retired
+        # bridge -- every unit that reached `outcomes`, not only units under
+        # the current profile's own skills and write roots.
+        taken_units = set(outcomes)
+    else:
+        taken_units = {
+            f"{write_root}/{skill}"
+            for skill in taken_skills
+            for write_root in SIDECAR_SKILL_WRITE_ROOTS
+        }
+    kept_conflicts: set[str] = set()
     for unit_path in taken_units:
         outcome = outcomes.get(unit_path)
         if outcome is None or outcome.kind in _ALLOWED_TAKEN_OUTCOMES:
             continue
+        if (
+            outcome.kind in ("locally_modified", "unfinished")
+            and unit_path in preserved_conflicts
+        ):
+            # Decision 39/O3: the caller's own preserved_conflicts input is
+            # deliberately over-broad (every required unit whose hash-based
+            # destination happens to exist, including absent and
+            # about-to-be-removed ones); kept_conflicts narrows that to the
+            # units that actually hit a conflict while trying to preserve.
+            kept_conflicts.add(unit_path)
         outcomes[unit_path] = _convert_for_taken_skill(
             unit_path,
             outcome,
@@ -1244,6 +1437,24 @@ def plan_sidecar_reconciliation(
             preserved_destinations,
             uninstall=uninstall,
         )
+
+    # Decision 44/O12: while a conflict copy remains, a taken skill's own
+    # other taking paths are reported as kept until it is resolved, never
+    # as skipped at every root -- the Done Criterion is not absolute when
+    # Decision 24 keeps a copy on a conflict.
+    conflicted_skills = {
+        skill for unit_path in kept_conflicts if (skill := _skill_name(unit_path))
+    }
+    extra_reports = [
+        Report(
+            "SKIPPED",
+            path,
+            _read_only_taken_conflict_remedy(path, skill)
+            if skill in conflicted_skills
+            else _read_only_taken_remedy(path, skill),
+        )
+        for path, skill in extra_taking
+    ]
 
     # Carry forward retained files: everything the manifest already tracks,
     # plus every file-level line the exclude block still lists (Decision 23:
@@ -1260,16 +1471,37 @@ def plan_sidecar_reconciliation(
     for path in sorted(retained_candidates):
         owner = _owning_unit(path)
         owner_outcome = outcomes.get(owner) if owner else None
-        if owner_outcome is not None and owner_outcome.kind == "team_takeover":
-            continue
         owner_snapshot = (
             snapshots.get(owner, UnitSnapshot()) if owner else UnitSnapshot()
         )
         relpath = path[len(owner) + 1 :] if owner else path
-        if (
-            relpath in owner_snapshot.tracked_files
-            or relpath not in owner_snapshot.file_hashes
-        ):
+        if _under_a_gitlink_child(relpath, owner_snapshot.gitlink_child_relpaths):
+            # Decision 37: nothing at or under any gitlink index entry keeps
+            # a file line, including a gitlink nested inside the unit (not
+            # only when the whole unit is one); dropped and reported as now
+            # visible regardless of the owning unit's own outcome this run.
+            retained_actions.append(Action("drop_record", owner or path, path))
+            retained_reports.append(Report("RETAINED", path, _now_visible_remedy(path)))
+            continue
+        if owner_outcome is not None and owner_outcome.kind == "team_takeover":
+            continue
+        if owner_outcome is not None and owner_outcome.kind == "gitlink":
+            # Decision 37: the outer exclude file does not apply inside a
+            # submodule, so a stale line from before the unit became a
+            # gitlink is dropped and reported as now visible, never
+            # silently carried forward.
+            retained_actions.append(Action("drop_record", owner or path, path))
+            retained_reports.append(Report("RETAINED", path, _now_visible_remedy(path)))
+            continue
+        # Decision 38: a retained symlink carries no hash, so it never
+        # appears in file_hashes; check symlink_relpaths too, so it is
+        # carried forward while it exists instead of being dropped the
+        # moment its owning unit stops being a fresh team takeover.
+        still_present = (
+            relpath in owner_snapshot.file_hashes
+            or relpath in owner_snapshot.symlink_relpaths
+        )
+        if relpath in owner_snapshot.tracked_files or not still_present:
             retained_actions.append(Action("drop_record", owner or path, path))
             continue
         if uninstall:
@@ -1299,6 +1531,12 @@ def plan_sidecar_reconciliation(
     next_units: dict[str, ManifestUnit] = {}
     exclude_write: set[str] = set()
     exclude_final: set[str] = set()
+    # Decision 40: the gate paths are built next to the exclude lines, from
+    # the same per-unit and per-file knowledge, spelled for the gate instead
+    # of escaped for the exclude file. Unrecognized lines never join this
+    # set (they are not necessarily even valid paths).
+    gate_write: set[str] = set()
+    gate_final: set[str] = set()
     for unit_path, outcome in sorted(outcomes.items()):
         actions.extend(outcome.actions)
         reports.extend(outcome.reports)
@@ -1306,26 +1544,33 @@ def plan_sidecar_reconciliation(
             next_units[unit_path] = outcome.record
         if outcome.line_write:
             exclude_write.add(unit_exclude_line(unit_path))
+            gate_write.add(_gate_spelling(unit_path, snapshots))
         if outcome.line_final:
             exclude_final.add(unit_exclude_line(unit_path))
+            gate_final.add(_gate_spelling(unit_path, snapshots))
         for action in outcome.actions:
             if (
                 action.kind in ("team_takeover_delete", "retain")
                 and action.path is not None
             ):
                 exclude_write.add(escape_exact_path(action.path))
+                gate_write.add(_gate_spelling(action.path, snapshots))
                 if action.kind == "retain":
                     exclude_final.add(escape_exact_path(action.path))
+                    gate_final.add(_gate_spelling(action.path, snapshots))
 
     actions.extend(retained_actions)
     reports.extend(retained_reports)
     for path in retained_line_paths:
         exclude_write.add(escape_exact_path(path))
         exclude_final.add(escape_exact_path(path))
+        gate_write.add(_gate_spelling(path, snapshots))
+        gate_final.add(_gate_spelling(path, snapshots))
 
     # Decision 23 / the big plan's exclude-block rules: keep any line the
     # sidecar does not understand, and report it once, every run, so a run
-    # never un-hides a file through a line it does not recognize.
+    # never un-hides a file through a line it does not recognize. Decision
+    # 40: such a line is never gated.
     for line in sorted(unrecognized_lines):
         exclude_write.add(line)
         exclude_final.add(line)
@@ -1344,6 +1589,9 @@ def plan_sidecar_reconciliation(
         next_manifest=next_manifest,
         exclude_lines_write=tuple(sorted(exclude_write)),
         exclude_lines_final=tuple(sorted(exclude_final)),
+        gate_paths_write=tuple(sorted(gate_write)),
+        gate_paths_final=tuple(sorted(gate_final)),
+        kept_conflicts=frozenset(kept_conflicts),
     )
 
 
@@ -1425,7 +1673,7 @@ def sidecar_evidence(target: Path) -> tuple[str, ...]:
     except OSError:
         exclude_lstat = None
     if exclude_lstat is not None and stat.S_ISREG(exclude_lstat.st_mode):
-        lines = os.fsdecode(exclude.read_bytes()).splitlines()
+        lines = _split_exclude_text(os.fsdecode(exclude.read_bytes()))
         if _find_exclude_markers(lines) is not None:
             evidence.append(f"sidecar block in {exclude}")
     return tuple(evidence)
@@ -1464,16 +1712,45 @@ def _fault_point(name: str) -> None:
     and ``"before_manifest_write"`` (every unit and file action is done and
     the final exclude block is written, but the manifest is not yet).
 
-    Uninstall (Decision 34) reuses ``"before_manifest_write"`` for its own,
-    same-named last step (the manifest is deleted or rewritten there
-    instead of written fresh), and adds ``"after_units_removed"``: every
-    unit has been removed or preserved, but the exclude block still holds
-    its pre-uninstall bytes.
+    Uninstall (Decision 39) shares this same write order but never passes
+    through ``"after_exclude_write"``: it has its own ``"after_units_removed"``,
+    placed after the write-phase block is written and its gate
+    (``gate_paths_final``, over only the lines the final block keeps) has
+    already passed, and after every unit and file action has run. At that
+    point the exclude file holds the write-phase block, not the
+    pre-uninstall bytes -- for example, a retained file's line is already
+    gone, since uninstall never carries one forward -- but a unit this run
+    removes still keeps its own write-phase line, not yet dropped.
+    Uninstall reuses ``"before_manifest_write"`` for its own, same-named
+    last step (the manifest is deleted or rewritten there instead of
+    written fresh), placed after the final exclude block -- with every
+    removed unit's line now dropped -- is already written.
     """
 
 
 def _info(message: str) -> None:
     print(f"sidecar-install: {message}")
+
+
+def _report_preserved_folder_if_nonempty(preserved_root: Path) -> None:
+    """Decision 44/O16: print the preserved-copy folder's path whenever it
+    holds anything, even when there is otherwise nothing to do -- both here
+    and in the CLI's own "no sidecar found" path (``install_bootstrap.py``).
+    A person who never re-checks after an old uninstall must still be able
+    to find an edited copy it kept.
+
+    The wording must stay true from every caller, including the end of a
+    run that just preserved a copy of its own (already reported by its own
+    ``PRESERVED ...`` line): it never claims the folder's contents are from
+    "an earlier run"."""
+    try:
+        has_content = preserved_root.is_dir() and any(preserved_root.iterdir())
+    except OSError:
+        return
+    if has_content:
+        _info(
+            f"preserved copies are in {preserved_root}; the sidecar never empties this folder"
+        )
 
 
 def _abort(evidence: str, remedy: str) -> int:
@@ -1547,6 +1824,18 @@ def _nested_repo_message(relative: str) -> str:
     return (
         f"sidecar mode does not support the nested repository or submodule "
         f"at `{relative}`; nothing was written"
+    )
+
+
+def _plan_abort_remedy(aborts: tuple[Abort, ...]) -> str:
+    """Return the remedy for a planner abort (Decision 37): the nested-
+    repository remedy when any abort is a unit-level nested repository,
+    otherwise the existing symlink remedy."""
+    if any(abort.reason == "nested_repo" for abort in aborts):
+        return _NESTED_REPO_REMEDY
+    return (
+        "sidecar mode does not support a symlinked skill folder or "
+        "projection parent; nothing was written"
     )
 
 
@@ -1624,6 +1913,28 @@ def _filesystem_shape_violations(
             violations.append(f"{display} exists and is not a folder")
         elif info.st_dev != target_device:
             violations.append(f"{display} is on a different filesystem than {target}")
+    return tuple(violations)
+
+
+def _unit_device_violations(
+    target: Path,
+    required_units: AbstractSet[str],
+    snapshots: Mapping[str, UnitSnapshot],
+) -> tuple[str, ...]:
+    """Decision 37: the device check also runs on every existing unit
+    folder, not only the write roots and bridge parents (Decision 28). Only
+    the device is checked here: a unit that exists as a symlink or another
+    non-folder is not a shape violation at the unit level (Decision 25), and
+    is left to its own, already-safe classification."""
+    target_device = _device_id(target)
+    violations: list[str] = []
+    for unit_path in sorted(required_units):
+        snapshot = snapshots.get(unit_path)
+        if snapshot is None or not snapshot.exists or snapshot.kind != "folder":
+            continue
+        info = _lstat_or_none(target / PurePosixPath(unit_path))
+        if info is not None and info.st_dev != target_device:
+            violations.append(f"{unit_path} is on a different filesystem than {target}")
     return tuple(violations)
 
 
@@ -1754,7 +2065,12 @@ def _check_ignore(target: Path, paths: Sequence[str]) -> frozenset[str]:
     currently ignored. Uses ``--stdin -z`` so an unusual name (embedded
     newline, non-ASCII byte) round-trips exactly. Bytes-safe (Decision 29):
     encodes and decodes with ``os.fsencode``/``os.fsdecode``, never strict
-    UTF-8, so a legal but non-UTF-8 Git path never crashes the run."""
+    UTF-8, so a legal but non-UTF-8 Git path never crashes the run.
+
+    Raises ``GitCheckIgnoreError`` when Git exits with anything other than 0
+    (something matched) or 1 (nothing matched) -- for example 128 for a path
+    inside a submodule (Decision 37, 40) -- instead of silently treating the
+    unreported paths as not ignored."""
     if not paths:
         return frozenset()
     payload = os.fsencode("\0".join(paths) + "\0")
@@ -1764,6 +2080,11 @@ def _check_ignore(target: Path, paths: Sequence[str]) -> frozenset[str]:
         capture_output=True,
         check=False,
     )
+    if result.returncode not in (0, 1):
+        stderr = os.fsdecode(result.stderr).strip()
+        raise GitCheckIgnoreError(
+            stderr or f"git check-ignore exited {result.returncode}"
+        )
     return frozenset(os.fsdecode(part) for part in result.stdout.split(b"\0") if part)
 
 
@@ -1815,47 +2136,164 @@ def _unit_index_relpaths(
     return frozenset(relpaths)
 
 
-def _gather_unit(target: Path, unit_path: str) -> tuple[bool, bool, dict[str, str]]:
-    """Return ``(exists, ancestor_symlinked, {relpath: sha256})`` for one
-    unit from the worktree alone. The caller adds index-derived
-    ``tracked_files`` separately (Decision 25).
+@dataclass(frozen=True)
+class _GatherResult:
+    """Everything ``_gather_unit`` learns from the worktree alone for one
+    unit; ``_build_snapshots`` adds index-derived ``tracked_files`` and
+    ``ignored_files`` (Decision 25) to turn this into a ``UnitSnapshot``."""
+
+    exists: bool
+    ancestor_symlinked: bool
+    file_hashes: dict[str, str]
+    symlink_relpaths: frozenset[str]
+    incomplete: bool
+    kind: Literal["folder", "symlink", "other"]
+    nested_repo_relpath: str | None
+    is_gitlink: bool = False
+    gitlink_child_relpaths: frozenset[str] = frozenset()
+
+
+def _gather_unit(
+    target: Path, unit_path: str, gitlinks: AbstractSet[str] = frozenset()
+) -> _GatherResult:
+    """Walk one unit on disk (Decisions 25, 37, 38).
 
     ``relpath`` matches ``load_desired_units``'s convention: the file's own
     name for a bridge, or its path relative to the skill directory. A skill
-    folder that holds only subfolders -- no file, symlink, pipe, or socket
-    at any depth -- counts as absent: an empty leftover folder is not a
-    reason to skip reinstalling a skill.
+    folder that holds no non-folder entry at any depth and no unreadable
+    subfolder counts as absent: an empty leftover folder is not a reason to
+    skip reinstalling a skill. Otherwise a symlink, named pipe, socket,
+    device, empty subfolder, or unreadable subfolder anywhere inside makes
+    the unit ``incomplete`` (Decision 38). Nothing at or under a gitlink
+    index entry, and nothing under a nested ``.git`` entry, is ever hashed
+    (Decision 37); neither is followed. The walk never follows a symlinked
+    directory either, so a symlink cycle can never make it loop.
     """
     ancestor_symlinked = _is_symlinked_ancestor(target, unit_path)
     full_path = target / PurePosixPath(unit_path)
+
     if unit_path in _ALL_BRIDGES:
-        if full_path.is_symlink() or not full_path.is_file():
-            exists = full_path.exists() or full_path.is_symlink()
-            return exists, ancestor_symlinked, {}
-        name = PurePosixPath(unit_path).name
-        return (
-            True,
-            ancestor_symlinked,
-            {name: compute_file_hash(full_path.read_bytes())},
-        )
-    if full_path.is_symlink() or not full_path.is_dir():
-        exists = full_path.exists() or full_path.is_symlink()
-        return exists, ancestor_symlinked, {}
-    files: dict[str, str] = {}
-    has_content = False
-    inner_symlinked = False
-    for entry in sorted(full_path.rglob("*")):
-        if entry.is_symlink():
-            has_content = True
-            inner_symlinked = True
-        elif entry.is_file():
-            has_content = True
-            files[entry.relative_to(full_path).as_posix()] = compute_file_hash(
-                entry.read_bytes()
+        if full_path.is_symlink():
+            return _GatherResult(
+                True, ancestor_symlinked, {}, frozenset(), False, "symlink", None
             )
-        elif not entry.is_dir():
-            has_content = True  # a pipe, socket, or other special file
-    return has_content, ancestor_symlinked or inner_symlinked, files
+        if full_path.is_file():
+            name = PurePosixPath(unit_path).name
+            return _GatherResult(
+                True,
+                ancestor_symlinked,
+                {name: compute_file_hash(full_path.read_bytes())},
+                frozenset(),
+                False,
+                "other",
+                None,
+            )
+        return _GatherResult(
+            full_path.exists(),
+            ancestor_symlinked,
+            {},
+            frozenset(),
+            False,
+            "folder",
+            None,
+        )
+
+    if unit_path in gitlinks:
+        # Decision 37: the unit itself is a gitlink. Every checked-out file
+        # belongs to the submodule, not the sidecar; never recurse into it.
+        exists = full_path.exists() or full_path.is_symlink()
+        return _GatherResult(
+            exists, ancestor_symlinked, {}, frozenset(), False, "other", None, True
+        )
+
+    if full_path.is_symlink():
+        return _GatherResult(
+            True, ancestor_symlinked, {}, frozenset(), False, "symlink", None
+        )
+    if not full_path.is_dir():
+        exists = full_path.exists()
+        # Decision 40: "<unit>/" is only for a real folder or an absent
+        # unit; an existing non-folder (a plain file, FIFO, socket, or
+        # device) is gated as "<unit>", not "<unit>/".
+        return _GatherResult(
+            exists,
+            ancestor_symlinked,
+            {},
+            frozenset(),
+            False,
+            "other" if exists else "folder",
+            None,
+        )
+
+    files: dict[str, str] = {}
+    symlinks: set[str] = set()
+    gitlink_children: set[str] = set()
+    has_non_folder = False
+    has_unreadable = False
+    has_empty_subfolder = False
+    has_special = False
+    nested_repo_relpath: str | None = None
+
+    def walk(dir_path: Path, dir_relpath: str, dir_full_relpath: str) -> None:
+        nonlocal has_non_folder, has_unreadable, has_empty_subfolder
+        nonlocal has_special, nested_repo_relpath
+        try:
+            entries = sorted(os.scandir(dir_path), key=lambda entry: entry.name)
+        except OSError:
+            has_unreadable = True
+            return
+        if not entries:
+            if dir_relpath:  # never the unit root itself
+                has_empty_subfolder = True
+            return
+        for entry in entries:
+            relpath = f"{dir_relpath}/{entry.name}" if dir_relpath else entry.name
+            full_relpath = f"{dir_full_relpath}/{entry.name}"
+            if full_relpath in gitlinks:
+                # Decision 37: never recurse below a gitlink, so its own
+                # checked-out content is never hashed, gated, or actioned.
+                # Recorded so a stale retained/listed line that now falls
+                # under it can be dropped and reported, not silently kept.
+                has_non_folder = True
+                gitlink_children.add(relpath)
+                continue
+            if entry.is_symlink():
+                has_non_folder = True
+                has_special = True
+                symlinks.add(relpath)
+                continue
+            if entry.name == ".git":
+                # Every ".git" this walk can still reach has a parent that is
+                # not itself a gitlink (one was skipped above already), so it
+                # is always a disk-only nested repository (Decision 37).
+                has_non_folder = True
+                if nested_repo_relpath is None:
+                    nested_repo_relpath = relpath
+                continue
+            if entry.is_file():
+                has_non_folder = True
+                files[relpath] = compute_file_hash(Path(entry.path).read_bytes())
+            elif entry.is_dir():
+                walk(Path(entry.path), relpath, full_relpath)
+            else:
+                has_non_folder = True
+                has_special = True  # a named pipe, socket, or device
+
+    walk(full_path, "", unit_path)
+
+    has_content = has_non_folder or has_unreadable
+    incomplete = has_special or has_empty_subfolder or has_unreadable
+    return _GatherResult(
+        has_content,
+        ancestor_symlinked,
+        files,
+        frozenset(symlinks),
+        incomplete,
+        "folder",
+        nested_repo_relpath,
+        False,
+        frozenset(gitlink_children),
+    )
 
 
 def _build_snapshots(
@@ -1863,44 +2301,56 @@ def _build_snapshots(
     required_units: AbstractSet[str],
     tracked: AbstractSet[str],
     ignorecase: bool = False,
+    gitlinks: AbstractSet[str] = frozenset(),
 ) -> dict[str, UnitSnapshot]:
     """Snapshot every required unit with one batched ``check-ignore`` call.
 
     ``tracked_files`` comes from the Git index (``tracked``), independent of
-    disk presence (Decision 25); ``file_hashes`` still comes from the
-    worktree alone.
+    disk presence (Decision 25); ``file_hashes`` and ``symlink_relpaths``
+    still come from the worktree alone. Raises ``GitCheckIgnoreError`` when
+    ``check-ignore`` fails fatally (Decision 37, 40); the caller must abort
+    rather than plan from a partial ignore set.
     """
-    raw = {unit_path: _gather_unit(target, unit_path) for unit_path in required_units}
+    raw = {
+        unit_path: _gather_unit(target, unit_path, gitlinks)
+        for unit_path in required_units
+    }
     tracked_by_unit: dict[str, frozenset[str]] = {
         unit_path: _unit_index_relpaths(
-            unit_path, tracked, ignorecase, frozenset(raw[unit_path][2])
+            unit_path, tracked, ignorecase, frozenset(raw[unit_path].file_hashes)
         )
         for unit_path in required_units
     }
     candidates: list[str] = []
-    for unit_path, (_exists, _symlinked, file_hashes) in raw.items():
+    for unit_path, result in raw.items():
         unit_tracked = tracked_by_unit[unit_path]
         candidates.extend(
             _full_relpath(unit_path, relpath)
-            for relpath in file_hashes
+            for relpath in (*result.file_hashes, *result.symlink_relpaths)
             if relpath not in unit_tracked
         )
     ignored_now = _check_ignore(target, candidates)
     snapshots: dict[str, UnitSnapshot] = {}
-    for unit_path, (exists, symlinked, file_hashes) in raw.items():
+    for unit_path, result in raw.items():
         unit_tracked = tracked_by_unit[unit_path]
         unit_ignored = frozenset(
             relpath
-            for relpath in file_hashes
+            for relpath in (*result.file_hashes, *result.symlink_relpaths)
             if relpath not in unit_tracked
             and _full_relpath(unit_path, relpath) in ignored_now
         )
         snapshots[unit_path] = UnitSnapshot(
-            exists=exists,
-            symlinked=symlinked,
+            exists=result.exists,
+            symlinked=result.ancestor_symlinked,
             tracked_files=unit_tracked,
-            file_hashes=file_hashes,
+            file_hashes=result.file_hashes,
             ignored_files=unit_ignored,
+            symlink_relpaths=result.symlink_relpaths,
+            is_gitlink=result.is_gitlink,
+            nested_repo_relpath=result.nested_repo_relpath,
+            incomplete=result.incomplete,
+            kind=result.kind,
+            gitlink_child_relpaths=result.gitlink_child_relpaths,
         )
     return snapshots
 
@@ -1930,27 +2380,57 @@ def _reflects_a_write_root(target: Path, path: Path) -> bool:
     return False
 
 
+def _enumerate_read_entries(target: Path) -> dict[str, dict[str, Path]]:
+    """One path-identity rule for every folder-name and frontmatter-name
+    collision source (Decision 41), shared by ``_read_list_skill_names``
+    and ``_declared_skill_names``.
+
+    For each read-list root: the root itself is listed through its own
+    symlink (``Path.iterdir()`` already follows it) unless the root's own
+    symlink resolves into a write root, in which case it contributes
+    nothing (it only ever mirrors a write root, the common ``.github/skills
+    -> ../.claude/skills`` layout). Within it, a symlink entry -- in any
+    read folder, including a write root -- that resolves into a write root
+    is an alias to a sidecar projection and is skipped: it never takes a
+    skill. Every other entry (a plain folder, or a symlink to somewhere
+    else, including a broken one) is listed by its own name, whether or not
+    it sits inside a write root itself.
+
+    Returns ``{root: {entry_name: entry_path}}`` for every real, non-alias
+    entry found on disk.
+    """
+    entries: dict[str, dict[str, Path]] = {}
+    for root in SIDECAR_SKILL_READ_ROOTS:
+        root_path = target / PurePosixPath(root)
+        root_entries: dict[str, Path] = {}
+        if root_path.is_dir() and not (
+            root_path.is_symlink() and _reflects_a_write_root(target, root_path)
+        ):
+            try:
+                children = list(root_path.iterdir())
+            except OSError:
+                children = []
+            for entry in children:
+                if not (entry.is_dir() or entry.is_symlink()):
+                    continue
+                if entry.is_symlink() and _reflects_a_write_root(target, entry):
+                    continue
+                root_entries[entry.name] = entry
+        entries[root] = root_entries
+    return entries
+
+
 def _read_list_skill_names(
     target: Path, index_paths: AbstractSet[str]
 ) -> dict[str, frozenset[str]]:
     """Return the skill directory names present in each read-list folder,
-    from the index and the disk together (Decision 25).
-
-    Lists a symlinked read folder through its link, unless the link
-    resolves into a write root, and skips any entry that itself resolves
-    into a write root (Decision 22).
+    from the index and the disk together (Decision 25), using the shared
+    read-entry enumerator (Decision 41) for the disk side.
     """
+    read_entries = _enumerate_read_entries(target)
     names: dict[str, frozenset[str]] = {}
     for root in SIDECAR_SKILL_READ_ROOTS:
-        root_path = target / PurePosixPath(root)
-        disk_names: set[str] = set()
-        if root_path.is_dir() and not _reflects_a_write_root(target, root_path):
-            for entry in root_path.iterdir():
-                if not (entry.is_dir() or entry.is_symlink()):
-                    continue
-                if _reflects_a_write_root(target, entry):
-                    continue
-                disk_names.add(entry.name)
+        disk_names = set(read_entries.get(root, {}))
         prefix = f"{root}/"
         index_names = {
             path[len(prefix) :].split("/", 1)[0]
@@ -2002,7 +2482,10 @@ def _parse_frontmatter_name(data: bytes) -> str | None:
 
 def _declared_skill_names(target: Path) -> dict[str, frozenset[str]]:
     """Return skill name -> every read-list path whose ``SKILL.md``
-    frontmatter ``name:`` declares it (Decision 22, L3). Opens only a
+    frontmatter ``name:`` declares it (Decision 22, L3), using the shared
+    read-entry enumerator (Decision 41): a symlinked read-only root is
+    scanned through its link exactly like the folder-name scan, and a
+    per-entry alias into a write root is skipped the same way. Opens only a
     regular file (``lstat``-checked) and reads at most 4 KB.
 
     Every declaring path is kept, including the sidecar's own write-root
@@ -2013,12 +2496,10 @@ def _declared_skill_names(target: Path) -> dict[str, frozenset[str]]:
     paths from the result, the same way it already does for the read-list
     name and case-variant checks.
     """
+    read_entries = _enumerate_read_entries(target)
     declared: dict[str, set[str]] = {}
     for root in sorted(SIDECAR_SKILL_READ_ROOTS):
-        root_path = target / PurePosixPath(root)
-        if not root_path.is_dir() or root_path.is_symlink():
-            continue
-        for entry in sorted(root_path.iterdir()):
+        for name, entry in sorted(read_entries.get(root, {}).items()):
             skill_md = entry / "SKILL.md"
             try:
                 info = skill_md.lstat()
@@ -2031,9 +2512,9 @@ def _declared_skill_names(target: Path) -> dict[str, frozenset[str]]:
                     data = handle.read(_FRONTMATTER_MAX_BYTES)
             except OSError:
                 continue
-            name = _parse_frontmatter_name(data)
-            if name:
-                declared.setdefault(name, set()).add(f"{root}/{entry.name}")
+            declared_name = _parse_frontmatter_name(data)
+            if declared_name:
+                declared.setdefault(declared_name, set()).add(f"{root}/{name}")
     return {name: frozenset(paths) for name, paths in declared.items()}
 
 
@@ -2094,7 +2575,7 @@ def _replace_exclude_block(original_text: str, lines: Sequence[str]) -> str:
     ``lines``. Preserves every byte (including line endings) outside the
     ``BEGIN``/``END`` markers."""
     block_text = "\n".join([SIDECAR_EXCLUDE_BEGIN, *lines, SIDECAR_EXCLUDE_END]) + "\n"
-    file_lines = original_text.splitlines(keepends=True)
+    file_lines = _split_exclude_text(original_text, keepends=True)
     begin_index: int | None = None
     end_index: int | None = None
     for index, line in enumerate(file_lines):
@@ -2121,7 +2602,7 @@ def _remove_exclude_block(original_text: str, replacement_lines: Sequence[str]) 
     byte outside the block, the same way ``_replace_exclude_block`` does.
     Returns ``original_text`` unchanged when there is no block to remove.
     """
-    file_lines = original_text.splitlines(keepends=True)
+    file_lines = _split_exclude_text(original_text, keepends=True)
     begin_index: int | None = None
     end_index: int | None = None
     for index, line in enumerate(file_lines):
@@ -2153,39 +2634,28 @@ def _atomic_write(path: Path, data: bytes) -> None:
         raise
 
 
-def _gate_spelling(path: str) -> str:
-    """Return the ignore-gate spelling for one path (Decision 30): a skill
-    unit is gated as a folder, ``<unit>/``, so a team rule ending in ``/``
-    still applies before the folder exists. Bridges and individual files are
-    gated as themselves."""
+def _gate_spelling(
+    path: str, snapshots: Mapping[str, UnitSnapshot] | None = None
+) -> str:
+    """Return the ignore-gate spelling for one path (Decision 30, 40): a
+    skill unit that is a real folder, or absent, is gated as a folder,
+    ``<unit>/``, so a team rule ending in ``/`` still applies before the
+    folder exists; a unit that exists as a symlink or any other non-folder
+    is gated as ``<unit>``, because Git refuses a trailing slash on a
+    symlink. With no snapshot available, every unit is spelled as a folder
+    (the pre-Decision-40 default). Bridges and individual files are gated as
+    themselves. Uses ``_ALL_SKILL_WRITE_ROOTS`` so a retired root is still
+    spelled correctly."""
     if path in _ALL_BRIDGES:
         return path
-    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+    for write_root in _ALL_SKILL_WRITE_ROOTS:
         prefix = f"{write_root}/"
         if path.startswith(prefix) and "/" not in path[len(prefix) :]:
+            snapshot = (snapshots or {}).get(path)
+            if snapshot is not None and snapshot.kind != "folder":
+                return path
             return f"{path}/"
     return path
-
-
-def _write_raw_paths(plan_result: PlanResult) -> frozenset[str]:
-    """Return the gate spelling of every path the write-phase exclude block
-    must hide, reconstructed from the plan's public actions and next
-    manifest (Decision 30: skill units are gated as folders)."""
-    paths: set[str] = set()
-    if plan_result.next_manifest is not None:
-        paths.update(plan_result.next_manifest.units)
-        paths.update(plan_result.next_manifest.retained)
-    paths.update(
-        action.unit
-        for action in plan_result.actions
-        if action.kind in ("remove", "preserve")
-    )
-    paths.update(
-        action.path
-        for action in plan_result.actions
-        if action.kind == "team_takeover_delete" and action.path is not None
-    )
-    return frozenset(_gate_spelling(path) for path in paths)
 
 
 # --------------------------------------------------------------------------
@@ -2245,6 +2715,12 @@ def run_ignore_gate(
     touching ``info/exclude``. Passes only when ``git check-ignore --stdin
     -z`` reports exactly the input set, byte for byte: plain ``--stdin``
     exits 0 as soon as one path is ignored, which is not enough.
+
+    Raises ``GitCheckIgnoreError`` when either ``check-ignore`` call exits
+    with anything other than 0 (something matched) or 1 (nothing matched),
+    for example 128 for a path inside a submodule (Decision 40); the caller
+    must restore the exclude file and abort with Git's own message rather
+    than plan from a partial or misleading result.
     """
     if not must_be_ignored:
         return True, ()
@@ -2268,6 +2744,11 @@ def run_ignore_gate(
             capture_output=True,
             check=False,
         )
+        if result.returncode not in (0, 1):
+            raise GitCheckIgnoreError(
+                os.fsdecode(result.stderr).strip()
+                or f"git check-ignore exited {result.returncode}"
+            )
         ignored = frozenset(
             os.fsdecode(part) for part in result.stdout.split(b"\0") if part
         )
@@ -2284,7 +2765,14 @@ def run_ignore_gate(
             capture_output=True,
             check=False,
         )
-        return False, _parse_check_ignore_verbose(verbose.stdout, expected)
+        if verbose.returncode not in (0, 1):
+            raise GitCheckIgnoreError(
+                os.fsdecode(verbose.stderr).strip()
+                or f"git check-ignore exited {verbose.returncode}"
+            )
+        # O10: only the paths that are not already ignored are explained, so
+        # a correctly ignored path never dilutes the failure list.
+        return False, _parse_check_ignore_verbose(verbose.stdout, expected - ignored)
     finally:
         if temp_excludes_file is not None:
             temp_excludes_file.unlink(missing_ok=True)
@@ -2377,6 +2865,14 @@ def _empty_staging(staging: Path) -> None:
     staging.mkdir(parents=True, exist_ok=True)
 
 
+_NO_UNINSTALL_SOURCE = Path("/nonexistent-uninstall-source")
+"""Decision 39: uninstall reuses ``_apply_actions`` but has no source tree of
+its own. An empty desired set can never produce "install", "update", or
+"adopt" (those rows all require desired content), so this path is never
+actually read; ``uninstall_sidecar`` asserts that before calling
+``_apply_actions``, and a missing source here is deliberate, not a bug."""
+
+
 def _apply_actions(
     target: Path,
     source: Path,
@@ -2396,27 +2892,6 @@ def _apply_actions(
         # "adopt", "unchanged", "retain", and "drop_record" touch no file:
         # the content already matches, the file already sits where it
         # belongs, or only the manifest record changes.
-
-
-def _apply_uninstall_actions(
-    target: Path,
-    staging: Path,
-    plan_result: PlanResult,
-    preserved_destinations: Mapping[str, Path],
-) -> None:
-    """Apply an uninstall plan's unit-level actions (Decision 34). An empty
-    desired set can never produce "install", "update", or "adopt" -- those
-    rows all require desired content -- so only remove, preserve, and
-    team_takeover_delete can appear; this never needs a source tree to copy
-    from, unlike ``_apply_actions``."""
-    for action in plan_result.actions:
-        if action.kind == "remove":
-            _remove_unit(target, staging, action.unit)
-        elif action.kind == "team_takeover_delete":
-            _delete_file(target, action.path)
-        elif action.kind == "preserve":
-            _preserve_unit(target, preserved_destinations[action.unit], action.unit)
-        # "retain" and "drop_record" touch no file.
 
 
 def _count_actions(plan_result: PlanResult) -> dict[str, int]:
@@ -2494,10 +2969,15 @@ def _install_sidecar_dry_run(
     candidate_text = _replace_exclude_block(
         original_text, plan_result.exclude_lines_write
     )
-    write_paths = sorted(_write_raw_paths(plan_result))
-    passed, failing = run_ignore_gate(
-        target, write_paths, os.fsencode(candidate_text), dry_run=True
-    )
+    try:
+        passed, failing = run_ignore_gate(
+            target,
+            plan_result.gate_paths_write,
+            os.fsencode(candidate_text),
+            dry_run=True,
+        )
+    except GitCheckIgnoreError as exc:
+        return _abort(str(exc), _ignore_gate_remedy())
     if not passed:
         return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
     _describe_dry_run_actions(plan_result, preserved_destinations)
@@ -2536,8 +3016,13 @@ def _install_sidecar_apply(
     if write_bytes != (original_exclude_bytes or b""):
         _atomic_write(exclude_path, write_bytes)
 
-    write_paths = sorted(_write_raw_paths(plan_result))
-    passed, failing = run_ignore_gate(target, write_paths, write_bytes, dry_run=False)
+    try:
+        passed, failing = run_ignore_gate(
+            target, plan_result.gate_paths_write, write_bytes, dry_run=False
+        )
+    except GitCheckIgnoreError as exc:
+        _restore_exclude(exclude_path, original_exclude_bytes)
+        return _abort(str(exc), _ignore_gate_remedy())
     if not passed:
         _restore_exclude(exclude_path, original_exclude_bytes)
         return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
@@ -2773,17 +3258,28 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
     tracked = preflight.tracked
     ignorecase = preflight.ignorecase
     exclude_block = preflight.exclude_block
+    gitlinks = frozenset(
+        path for mode, path in preflight.index_entries if mode == "160000"
+    )
 
     desired_units = load_desired_units(source)
     required_units = required_snapshot_units(
-        desired_units, manifest, exclude_block.listed_units
+        desired_units, manifest, exclude_block.listed_units, exclude_block.listed_files
     )
     read_list_skill_names = _read_list_skill_names(target, tracked)
     declared_skill_names = _declared_skill_names(target)
     # Every listed unit is already part of required_units (it was folded in
     # above), so this is exactly the set the exclude block currently lists.
     excluded_units = exclude_block.listed_units
-    snapshots = _build_snapshots(target, required_units, tracked, ignorecase)
+    try:
+        snapshots = _build_snapshots(
+            target, required_units, tracked, ignorecase, gitlinks
+        )
+    except GitCheckIgnoreError as exc:
+        return _abort(str(exc), "resolve the git check-ignore failure, then rerun")
+    unit_shape_violations = _unit_device_violations(target, required_units, snapshots)
+    if unit_shape_violations:
+        return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
     preserved_destinations = {
         unit_path: preserved_root
@@ -2817,11 +3313,7 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
         message = "; ".join(
             f"{abort.reason}: {abort.message}" for abort in plan_result.aborts
         )
-        return _abort(
-            message,
-            "sidecar mode does not support a symlinked skill folder or "
-            "projection parent; nothing was written",
-        )
+        return _abort(message, _plan_abort_remedy(plan_result.aborts))
 
     unwritable = _unwritable_paths_for_actions(target, plan_result.actions)
     if unwritable:
@@ -2855,53 +3347,16 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
 # --------------------------------------------------------------------------
 
 
-def _uninstall_conflict_pre_write_gate(
-    target: Path,
-    plan_result: PlanResult,
-    preserved_conflicts: AbstractSet[str],
-    original_bytes: bytes | None,
-) -> tuple[bool, tuple[tuple[str, str], ...]]:
-    """Decision 17: before touching anything, re-prove that every unit this
-    run leaves untouched -- every conflicting kept unit, whatever its
-    outcome shape (recorded, unfinished, or a bridge), and every unit still
-    mid-removal, since nothing has moved yet -- is still actually hidden by
-    the exclude file exactly as it already stands, not merely assumed
-    correct from an earlier run.
-
-    ``preserved_conflicts`` is checked directly, not read back from
-    ``plan_result``: an unfinished conflicting unit converts to an outcome
-    with no action and no manifest record (Decision 23: it has no record to
-    begin with), so ``_write_raw_paths`` alone would silently miss it.
-    ``dry_run=False``: checks the real, as-yet-unwritten file directly,
-    which is correct in a real run (nothing has been written yet either)
-    and in a dry run (nothing ever is).
-    """
-    must_be_ignored = _write_raw_paths(plan_result) | {
-        _gate_spelling(unit) for unit in preserved_conflicts
-    }
-    return run_ignore_gate(
-        target, sorted(must_be_ignored), original_bytes or b"", dry_run=False
-    )
-
-
-def _uninstall_conflict_post_rewrite_gate(
-    target: Path,
-    preserved_conflicts: AbstractSet[str],
-    candidate_bytes: bytes,
-    *,
-    dry_run: bool,
-) -> tuple[bool, tuple[tuple[str, str], ...]]:
-    """Decision 17: after computing the rewritten block, re-prove it still
-    hides every conflicting kept unit -- the rewrite only ever drops the
-    removed units' lines, but this proves that rather than assumes it.
-
-    Built from ``preserved_conflicts`` directly, for the same reason as
-    ``_uninstall_conflict_pre_write_gate``: ``plan_result.next_manifest.units``
-    only holds units with a manifest record, which an unfinished conflicting
-    unit never has.
-    """
-    kept_paths = sorted(_gate_spelling(unit) for unit in preserved_conflicts)
-    return run_ignore_gate(target, kept_paths, candidate_bytes, dry_run=dry_run)
+def _uninstall_write_phase_text(
+    original_text: str, plan_result: PlanResult, has_block: bool
+) -> str:
+    """Decision 39 item 1: skip the write-phase rewrite entirely when there
+    is no existing block and no line to write -- otherwise
+    ``_replace_exclude_block`` would create a needless empty block where
+    none existed."""
+    if has_block or plan_result.exclude_lines_write:
+        return _replace_exclude_block(original_text, plan_result.exclude_lines_write)
+    return original_text
 
 
 def _uninstall_sidecar_dry_run(
@@ -2909,30 +3364,35 @@ def _uninstall_sidecar_dry_run(
     plan_result: PlanResult,
     exclude_path: Path,
     preserved_destinations: Mapping[str, str],
-    preserved_conflicts: AbstractSet[str],
+    has_block: bool,
+    preserved_root: Path,
 ) -> int:
-    if preserved_conflicts:
-        original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
-        passed, failing = _uninstall_conflict_pre_write_gate(
-            target, plan_result, preserved_conflicts, original_bytes
+    """Decision 39: the same write order as install -- write the write-phase
+    block, then gate exactly the paths whose lines the final block keeps
+    (``gate_paths_final``, Decision 40). That set is empty whenever
+    ``kept_conflicts`` is empty, so the gate trivially passes and nothing
+    below depends on branching over the raw ``preserved_conflicts`` input.
+    """
+    original_text = (
+        os.fsdecode(exclude_path.read_bytes()) if exclude_path.is_file() else ""
+    )
+    candidate_text = _uninstall_write_phase_text(original_text, plan_result, has_block)
+    try:
+        passed, failing = run_ignore_gate(
+            target,
+            plan_result.gate_paths_final,
+            os.fsencode(candidate_text),
+            dry_run=True,
         )
-        if not passed:
-            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
-
-        original_text = os.fsdecode(original_bytes) if original_bytes else ""
-        final_text = _replace_exclude_block(
-            original_text, plan_result.exclude_lines_final
-        )
-        final_bytes = os.fsencode(final_text)
-        passed, failing = _uninstall_conflict_post_rewrite_gate(
-            target, preserved_conflicts, final_bytes, dry_run=True
-        )
-        if not passed:
-            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+    except GitCheckIgnoreError as exc:
+        return _abort(str(exc), _ignore_gate_remedy())
+    if not passed:
+        return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
 
     _describe_dry_run_actions(plan_result, preserved_destinations)
     _print_report(plan_result, preserved_destinations)
-    if preserved_conflicts:
+    _report_preserved_folder_if_nonempty(preserved_root)
+    if plan_result.kept_conflicts:
         _info(
             "a preserve conflict would keep at least one unit in place; a "
             "real run would exit 1 and rewrite the manifest to hold only "
@@ -2950,76 +3410,92 @@ def _uninstall_sidecar_apply(
     staging: Path,
     preserved_destinations: Mapping[str, Path],
     unrecognized_lines: Sequence[str],
-    preserved_conflicts: AbstractSet[str],
+    has_block: bool,
+    preserved_root: Path,
 ) -> int:
-    next_manifest = plan_result.next_manifest
-    if next_manifest is None:
-        return _abort(
-            "internal error: the plan has no next manifest to write",
-            "rerun the sidecar uninstall",
-        )
+    """Decision 39: uninstall on the install's write order, sharing the same
+    apply step and gate rule (Decision 40). Steps below match the small
+    plan's numbered rebuild exactly."""
+    assert not any(
+        action.kind in ("install", "update", "adopt") for action in plan_result.actions
+    ), "uninstall must never plan install, update, or adopt"
 
     original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
-    if preserved_conflicts:
-        passed, failing = _uninstall_conflict_pre_write_gate(
-            target, plan_result, preserved_conflicts, original_bytes
-        )
-        if not passed:
-            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+    original_text = os.fsdecode(original_bytes) if original_bytes else ""
 
-    # Decision 34's order: move or remove every unit first (units that are
-    # merely kept in place on a preserve conflict are untouched here), only
-    # then touch the block, then the manifest, then empty staging.
+    # 1. Write the write-phase block (skipped when there is nothing to write).
+    write_text = _uninstall_write_phase_text(original_text, plan_result, has_block)
+    write_bytes = os.fsencode(write_text)
+    if write_bytes != (original_bytes or b""):
+        _atomic_write(exclude_path, write_bytes)
+
+    # 2. Gate the uninstall gate paths (Decision 40); empty when
+    # kept_conflicts is empty. Restore the exclude file on failure.
+    try:
+        passed, failing = run_ignore_gate(
+            target, plan_result.gate_paths_final, write_bytes, dry_run=False
+        )
+    except GitCheckIgnoreError as exc:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(str(exc), _ignore_gate_remedy())
+    if not passed:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+    # 3. Empty staging and apply actions through the same step install uses.
+    # Uninstall never plans install/update/adopt (asserted above), so the
+    # source tree is never actually read.
     _empty_staging(staging)
-    _apply_uninstall_actions(target, staging, plan_result, preserved_destinations)
+    _apply_actions(
+        target, _NO_UNINSTALL_SOURCE, staging, plan_result, preserved_destinations
+    )
 
     _fault_point("after_units_removed")
 
-    original_text = os.fsdecode(original_bytes) if original_bytes else ""
-    if preserved_conflicts:
+    kept_conflicts = plan_result.kept_conflicts
+    if kept_conflicts:
         # The one exception to Decision 9: a preserve conflict means the
-        # uninstall did not finish, so the block survives -- rewritten the
-        # same way an ordinary run rewrites it -- instead of being removed.
-        final_text = _replace_exclude_block(
-            original_text, plan_result.exclude_lines_final
-        )
+        # uninstall did not finish, so the block survives with its final
+        # (still fully computed) lines, instead of being removed.
+        final_text = _replace_exclude_block(write_text, plan_result.exclude_lines_final)
     else:
-        final_text = _remove_exclude_block(original_text, unrecognized_lines)
+        final_text = _remove_exclude_block(write_text, unrecognized_lines)
     final_bytes = os.fsencode(final_text)
-    if final_bytes != (original_bytes or b""):
+    if final_bytes != write_bytes:
         _atomic_write(exclude_path, final_bytes)
-
-    if preserved_conflicts:
-        passed, failing = _uninstall_conflict_post_rewrite_gate(
-            target, preserved_conflicts, final_bytes, dry_run=False
-        )
-        if not passed:
-            _restore_exclude(exclude_path, original_bytes)
-            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
 
     _fault_point("before_manifest_write")
 
-    if preserved_conflicts:
+    # 4. When kept_conflicts is empty, remove the block, delete the
+    # manifest, and remove the staging folder entirely. Otherwise the final
+    # block and a manifest holding only the kept units' records survive,
+    # staging is only emptied, and the run exits 1.
+    next_manifest = plan_result.next_manifest
+    if kept_conflicts:
+        if next_manifest is None:
+            return _abort(
+                "internal error: the plan has no next manifest to write",
+                "rerun the sidecar uninstall",
+            )
         manifest_bytes = serialize_manifest(next_manifest)
         current_manifest_bytes = (
             manifest_path.read_bytes() if manifest_path.is_file() else None
         )
         if manifest_bytes != current_manifest_bytes:
             _atomic_write(manifest_path, manifest_bytes)
+        _empty_staging(staging)
         exit_code = 1
     else:
         if manifest_path.is_file() or manifest_path.is_symlink():
             manifest_path.unlink()
+        if staging.exists() and not staging.is_symlink():
+            shutil.rmtree(staging)
         exit_code = 0
 
-    # Decision 34's own last step: remove the staging folder entirely
-    # (unlike install/update, which only empty it -- an uninstall promises
-    # no sidecar file, block, manifest, or staging folder remains).
-    if staging.exists() and not staging.is_symlink():
-        shutil.rmtree(staging)
     _print_report(
         plan_result, {unit: str(path) for unit, path in preserved_destinations.items()}
     )
+    _report_preserved_folder_if_nonempty(preserved_root)
     if exit_code == 1:
         _info(
             "a preserve conflict kept at least one unit in place; resolve "
@@ -3067,19 +3543,33 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
         # unrecognized lines. Anything narrower here leaves a dead end
         # where detection sends --uninstall a target it then refuses to
         # touch.
+        _report_preserved_folder_if_nonempty(preserved_root)
         _info("no sidecar found; nothing to do")
         return 0
 
     required_units = (
-        required_snapshot_units({}, manifest, exclude_block.listed_units)
+        required_snapshot_units(
+            {}, manifest, exclude_block.listed_units, exclude_block.listed_files
+        )
         | frozenset(
             f"{write_root}/{skill}"
-            for write_root in SIDECAR_SKILL_WRITE_ROOTS
+            for write_root in _ALL_SKILL_WRITE_ROOTS
             for skill in SIDECAR_SKILLS
         )
-        | frozenset(SIDECAR_BRIDGES)
+        | frozenset(_ALL_BRIDGES)
     )
-    snapshots = _build_snapshots(target, required_units, tracked, ignorecase)
+    gitlinks = frozenset(
+        path for mode, path in preflight.index_entries if mode == "160000"
+    )
+    try:
+        snapshots = _build_snapshots(
+            target, required_units, tracked, ignorecase, gitlinks
+        )
+    except GitCheckIgnoreError as exc:
+        return _abort(str(exc), "resolve the git check-ignore failure, then rerun")
+    unit_shape_violations = _unit_device_violations(target, required_units, snapshots)
+    if unit_shape_violations:
+        return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
     preserved_destinations = {
         unit_path: preserved_root
@@ -3113,11 +3603,7 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
         message = "; ".join(
             f"{abort.reason}: {abort.message}" for abort in plan_result.aborts
         )
-        return _abort(
-            message,
-            "sidecar mode does not support a symlinked skill folder or "
-            "projection parent; nothing was written",
-        )
+        return _abort(message, _plan_abort_remedy(plan_result.aborts))
 
     unwritable = _unwritable_paths_for_actions(target, plan_result.actions)
     if unwritable:
@@ -3137,7 +3623,8 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
             plan_result,
             exclude_path,
             display_destinations,
-            preserved_conflicts,
+            exclude_block.has_block,
+            preserved_root,
         )
     return _uninstall_sidecar_apply(
         target,
@@ -3147,5 +3634,6 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
         staging,
         preserved_destinations,
         exclude_block.unrecognized_lines,
-        preserved_conflicts,
+        exclude_block.has_block,
+        preserved_root,
     )

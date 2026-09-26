@@ -8,7 +8,6 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -28,6 +27,7 @@ from install_bootstrap import (  # noqa: E402
     substitute_python_version,
     validate_agents_takeover,
     validate_install_roots,
+    warn_tracked_paths,
 )
 from runtime_ownership import (  # noqa: E402
     SIDECAR_MANIFEST_NAME,
@@ -2122,6 +2122,23 @@ def test_detect_mode_team_config_aborts_offering_both_modes(tmp_path: Path) -> N
     assert "state-sync.sh setup" not in message
 
 
+def test_detect_mode_repo_tracking_only_code_and_gitignore_defaults_to_full(
+    tmp_path: Path,
+) -> None:
+    """Guard (O15/Decision 46): "an agent-harness path" means a path under
+    FULL_INSTALL_ROOT_PATHS, not .gitignore. A repository that tracks only
+    ordinary code and its own .gitignore must still get a plain, no-mode
+    full install, not a team-config refusal. Already correct on 010f08c;
+    FULL_INSTALL_ROOT_PATHS never included .gitignore."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (target / ".gitignore").write_text("*.log\n", encoding="utf-8")
+    _commit_tracked_paths(target, "add code and gitignore")
+
+    assert detect_install_mode(target, None, False) == "full"
+
+
 def test_detect_mode_team_config_devcontainer_only_aborts(tmp_path: Path) -> None:
     target = tmp_path / "consumer"
     _init_repo(target)
@@ -2159,11 +2176,14 @@ def test_detect_mode_sidecar_mode_aborts_on_full_evidence(tmp_path: Path) -> Non
 
 
 def test_detect_mode_full_mode_aborts_on_sidecar_evidence(tmp_path: Path) -> None:
+    """O17: the refusal must mention --uninstall as a way forward, not only
+    "run without --mode full" or "ask whoever manages the sidecar"."""
     target = tmp_path / "consumer"
     _init_repo(target)
     _write_sidecar_manifest(target)
-    with pytest.raises(SystemExit, match="already has sidecar evidence"):
+    with pytest.raises(SystemExit, match="already has sidecar evidence") as exc_info:
         detect_install_mode(target, "full", False)
+    assert "--uninstall" in str(exc_info.value)
 
 
 def test_detect_mode_full_mode_ignores_team_config(tmp_path: Path) -> None:
@@ -2434,6 +2454,11 @@ def test_full_install_works_with_every_info_exclude_shape(
 
 
 def test_full_install_works_with_a_named_pipe_at_info_exclude(tmp_path: Path) -> None:
+    """O17: the old ``ThreadPoolExecutor``-wrapped deadline cannot actually
+    fire -- the context manager's own shutdown waits for the hung thread
+    regardless of ``future.result(timeout=...)``. A subprocess with its own
+    ``timeout=`` is a real, enforced deadline, and never opens the pipe in
+    this test process."""
     target = tmp_path / "consumer"
     _init_repo(target)
     exclude_path = target / ".git" / "info" / "exclude"
@@ -2442,23 +2467,49 @@ def test_full_install_works_with_a_named_pipe_at_info_exclude(tmp_path: Path) ->
         exclude_path.unlink()
     os.mkfifo(exclude_path)
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(
-            subprocess.run,
-            [
-                sys.executable,
-                str(INSTALLER),
-                str(target),
-                "--mode",
-                "full",
-                "--local-only",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        result = future.result(timeout=30)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_warn_tracked_paths_turns_a_git_failure_into_a_warning(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """O17: ``tracked_generated_paths`` can raise ``GitDetectionError`` for a
+    Git failure other than "not a git repository" (Decision 27).
+    ``warn_tracked_paths`` runs after most of the full install's own writes,
+    so that must become a warning, never a crash mid-install. Fails on
+    010f08c."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    real_run = subprocess.run
+
+    def fake_run(args, *a, **kw):
+        if len(args) >= 3 and args[0] == "git" and "ls-files" in args:
+            return subprocess.CompletedProcess(
+                args, 128, stdout=b"", stderr=b"fatal: injected ls-files failure\n"
+            )
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(install_bootstrap.subprocess, "run", fake_run)
+
+    warn_tracked_paths(target, (".claude",))
+
+    err = capsys.readouterr().err
+    assert "injected ls-files failure" in err
+    assert "WARNING" in err
 
 
 def test_quote_path_false_with_non_utf8_tracked_name_gives_team_config_refusal(

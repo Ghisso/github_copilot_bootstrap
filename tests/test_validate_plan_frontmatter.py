@@ -1,5 +1,6 @@
 """Tests for plan frontmatter validation."""
 
+import os
 from pathlib import Path
 import sys
 
@@ -654,7 +655,13 @@ def test_accepts_a_settled_knowledge_refresh_phase_before_the_last_phase(
 ) -> None:
     """Reopening after a completed refresh keeps that phase where it is."""
     (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
-        "---\nstatus: complete\n---\n\n# Plan\n", encoding="utf-8"
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
     )
     plan = write_plan(
         tmp_path / "big.md",
@@ -679,7 +686,13 @@ def test_rejects_appending_a_phase_after_a_settled_knowledge_refresh_phase(
 ) -> None:
     """A settled refresh phase does not license a further phase after it."""
     (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
-        "---\nstatus: complete\n---\n\n# Plan\n", encoding="utf-8"
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
     )
     plan = write_plan(
         tmp_path / "big.md",
@@ -777,7 +790,13 @@ def test_accepts_a_cancelled_knowledge_refresh_phase_before_the_last_phase(
 ) -> None:
     """A cancelled refresh phase is exempt from the count too."""
     (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
-        "---\nstatus: cancelled\n---\n\n# Plan\n", encoding="utf-8"
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: cancelled\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
     )
     plan = write_plan(
         tmp_path / "big.md",
@@ -813,19 +832,214 @@ phases:
   - 2026-08-11_phase-B-knowledge-refresh
 """,
     )
-    original_is_file = Path.is_file
+    original_lstat = Path.lstat
     original_parse_frontmatter = validator.parse_frontmatter
 
-    def guarded_is_file(self: Path) -> bool:
+    def guarded_lstat(self: Path) -> os.stat_result:
         assert "escape" not in self.name, f"must not stat {self}"
-        return original_is_file(self)
+        return original_lstat(self)
 
     def guarded_parse_frontmatter(path: Path) -> dict[str, object]:
         assert "escape" not in path.name, f"must not read {path}"
         return original_parse_frontmatter(path)
 
-    monkeypatch.setattr(Path, "is_file", guarded_is_file)
+    monkeypatch.setattr(Path, "lstat", guarded_lstat)
     monkeypatch.setattr(validator, "parse_frontmatter", guarded_parse_frontmatter)
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+# Each of the following five cases pairs an otherwise-``status: complete``
+# sibling with exactly one broken identity field, using the same two-refresh
+# `phases` shape as `test_rejects_an_unsettled_mid_list_knowledge_refresh_phase`
+# above. That shape isolates the identity check: on 010f08c, a sibling whose
+# `status` alone reads `complete` is exempted, `unsettled_refresh_phases`
+# drops to a single (last-phase) entry, and no "at most one" error is
+# raised. After Decision 45's fix, each broken sibling stays unsettled and
+# the error reappears, so every case below fails on 010f08c before the fix.
+def test_rejects_a_symlinked_settled_refresh_sibling(
+    tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """A symlinked sibling is never settled, even one that points at an
+    otherwise-valid complete small plan: an `lstat` identity check rejects
+    it before its frontmatter is ever read (Decision 45, R5).
+
+    fails on 010f08c: yes -- the old helper used `Path.is_file()`, which
+    follows a symlink to wherever it points.
+    """
+    outside = tmp_path_factory.mktemp("outside-plans")
+    target = outside / "target.md"
+    target.write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").symlink_to(target)
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_an_unrelated_parent_plan(
+    tmp_path: Path,
+) -> None:
+    """A sibling whose `parent_plan` names a different big plan is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `parent_plan`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: unrelated-plan\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_the_wrong_type(
+    tmp_path: Path,
+) -> None:
+    """A sibling that does not declare itself a small plan is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `type`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: big-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_sibling_with_the_wrong_name(
+    tmp_path: Path,
+) -> None:
+    """A sibling whose own `name` does not match the phase slug is never settled.
+
+    fails on 010f08c: yes -- the old helper never read `name`.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: some-other-plan-name\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: example
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
+
+    assert any(
+        "at most one knowledge-refresh phase is allowed" in error
+        for error in validation_errors(plan)
+    )
+
+
+def test_rejects_a_settled_refresh_phase_when_the_big_plan_name_is_empty(
+    tmp_path: Path,
+) -> None:
+    """An earlier refresh phase can never settle when the big plan's own
+    `name` is empty, even against a sibling that otherwise matches exactly.
+
+    fails on 010f08c: yes -- the old helper took no big-plan name at all.
+    """
+    (tmp_path / "2026-08-11_phase-A-knowledge-refresh.md").write_text(
+        "---\n"
+        "name: 2026-08-11_phase-A-knowledge-refresh\n"
+        "type: small-plan\n"
+        "parent_plan: example\n"
+        "status: complete\n"
+        "---\n\n# Plan\n",
+        encoding="utf-8",
+    )
+    plan = write_plan(
+        tmp_path / "big.md",
+        """
+name: ""
+type: big-plan
+status: planning
+originating_branch: dev
+implementation_branch: example_implementation
+phases:
+  - 2026-08-11_phase-A-knowledge-refresh
+  - 2026-08-11_phase-B-knowledge-refresh
+""",
+    )
 
     assert any(
         "at most one knowledge-refresh phase is allowed" in error

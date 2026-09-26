@@ -10,6 +10,8 @@ intercept (see ``docs/sidecar-provider-contract.md``).
 
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +26,7 @@ import sidecar_overlay as sidecar_overlay_module  # noqa: E402
 from sidecar_overlay import (  # noqa: E402
     compute_file_hash,
     compute_unit_hash,
+    escape_exact_path,
     install_sidecar,
     preserved_unit_slug,
     uninstall_sidecar,
@@ -39,6 +42,7 @@ from sidecar_test_helpers import (  # noqa: E402
     _raise_at,
     _read_manifest,
     _status,
+    patch_sidecar_skills,
 )
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
@@ -155,6 +159,14 @@ def test_edited_copy_is_preserved_on_uninstall(
     out = capsys.readouterr().out
     assert f"PRESERVED .claude/skills/ponytail -> {preserved_entries[0]}" in out
     assert "uninstalled" in out
+    # The same run's own preserve must never be described as "an earlier
+    # run": the folder-report wording is neutral and true here too.
+    preserved_root = _preserved_root(repo)
+    assert (
+        f"preserved copies are in {preserved_root}; the sidecar never empties "
+        "this folder" in out
+    )
+    assert "an earlier run" not in out
 
 
 def test_edited_bridge_is_preserved_as_a_file_on_uninstall(
@@ -505,6 +517,337 @@ def test_bridge_preserve_conflict_is_checked_by_the_gate(repo: Path) -> None:
     exclude_text = _exclude_path(repo).read_text(encoding="utf-8")
     assert "ai-bootstrap-sidecar.md\n" in exclude_text
     assert _is_ignored(repo, ".claude/rules/ai-bootstrap-sidecar.md")
+
+
+# --------------------------------------------------------------------------
+# Phase J step 6: uninstall on the install's write order (Decision 39;
+# R2, O2, O3, O18)
+# --------------------------------------------------------------------------
+
+
+def test_uninstall_after_profile_drops_a_skill_preserves_the_edited_copy(
+    repo: Path, monkeypatch
+) -> None:
+    """R2/O2: uninstall used to mark only current-profile skill names as
+    taken, so a retired manifest unit missed the preserve/remove conversion
+    entirely -- it stayed a plain locally-modified skip, never preserved,
+    never dropped from the manifest. Fails on 010f08c."""
+    assert install_sidecar(repo, SOURCE) == 0
+    edited = repo / ".claude" / "skills" / "humanize" / "SKILL.md"
+    edited.write_text(
+        edited.read_text(encoding="utf-8") + "\nEDITED\n", encoding="utf-8"
+    )
+    edited_bytes = edited.read_bytes()
+
+    # Version 2 drops humanize from the profile.
+    patch_sidecar_skills(
+        monkeypatch, ("debug-investigator", "ponytail", "ponytail-review")
+    )
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    assert not (repo / ".claude" / "skills" / "humanize").exists()
+    assert not (repo / ".agents" / "skills" / "humanize").exists()
+    preserved_root = _preserved_root(repo)
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    preserved_dir = entries[0]
+    assert preserved_dir.name.startswith(".claude__skills__humanize--")
+    assert (preserved_dir / "SKILL.md").read_bytes() == edited_bytes
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert _status(repo) == ""
+
+
+def test_retired_bridge_and_retired_write_root_unit_removed_on_uninstall(
+    repo: Path, monkeypatch
+) -> None:
+    """Guard: a retired bridge and a unit under a retired write root, both
+    from an older manifest, are still taken during uninstall and removed
+    when their content still matches the record. A "remove" outcome needs
+    no taken-skill conversion at all (Decision 22's allowlist already lets
+    it through), so this already worked on 010f08c; it guards the mechanism
+    against the Decision 39 rebuild. ``_ALL_BRIDGES`` and
+    ``_ALL_SKILL_WRITE_ROOTS`` are computed at import time, so the test
+    patches the module's own bound names."""
+    assert install_sidecar(repo, SOURCE) == 0
+    retired_bridge = ".claude/rules/retired-sidecar-bridge.md"
+    retired_write_root = ".claude/old-skills"
+    retired_unit = f"{retired_write_root}/ponytail"
+    monkeypatch.setattr(
+        sidecar_overlay_module,
+        "_ALL_BRIDGES",
+        sidecar_overlay_module._ALL_BRIDGES | frozenset({retired_bridge}),
+    )
+    monkeypatch.setattr(
+        sidecar_overlay_module,
+        "_ALL_SKILL_WRITE_ROOTS",
+        sidecar_overlay_module._ALL_SKILL_WRITE_ROOTS + (retired_write_root,),
+    )
+
+    bridge_path = repo / retired_bridge
+    bridge_path.parent.mkdir(parents=True, exist_ok=True)
+    bridge_content = b"a bridge the sidecar no longer ships\n"
+    bridge_path.write_bytes(bridge_content)
+    bridge_hash = compute_file_hash(bridge_content)
+
+    retired_unit_dir = repo / retired_write_root / "ponytail"
+    retired_unit_dir.mkdir(parents=True)
+    skill_content = b"content under a retired write root\n"
+    (retired_unit_dir / "SKILL.md").write_bytes(skill_content)
+    skill_hash = compute_file_hash(skill_content)
+
+    manifest = _read_manifest(repo)
+    manifest["units"][retired_bridge] = {
+        "files": {"retired-sidecar-bridge.md": bridge_hash},
+        "hash": compute_unit_hash({"retired-sidecar-bridge.md": bridge_hash}),
+    }
+    manifest["units"][retired_unit] = {
+        "files": {"SKILL.md": skill_hash},
+        "hash": compute_unit_hash({"SKILL.md": skill_hash}),
+    }
+    _manifest_path(repo).write_text(json.dumps(manifest), encoding="utf-8")
+    exclude_path = _exclude_path(repo)
+    exclude_text = exclude_path.read_text(encoding="utf-8")
+    new_lines = "\n".join(
+        [escape_exact_path(retired_bridge), escape_exact_path(retired_unit)]
+    )
+    marker = "# END ai-bootstrap sidecar"
+    exclude_path.write_text(
+        exclude_text.replace(marker, f"{new_lines}\n{marker}"), encoding="utf-8"
+    )
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    assert not bridge_path.exists()
+    assert not retired_unit_dir.exists()
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert _status(repo) == ""
+
+
+def test_retired_bridge_edited_is_preserved_as_a_file_on_uninstall(
+    repo: Path, monkeypatch
+) -> None:
+    """Guard: a retired bridge from an older manifest whose content no
+    longer matches its record is preserved as a file, not silently kept or
+    deleted. Uninstall already unioned ``taken_units`` with the full
+    ``_ALL_BRIDGES`` set (current and retired) on 010f08c, so a bridge
+    specifically -- unlike a retired skill under a write root -- was already
+    taken there; this guards it against the Decision 39 rebuild."""
+    assert install_sidecar(repo, SOURCE) == 0
+    retired_bridge = ".claude/rules/retired-sidecar-bridge.md"
+    monkeypatch.setattr(
+        sidecar_overlay_module,
+        "_ALL_BRIDGES",
+        sidecar_overlay_module._ALL_BRIDGES | frozenset({retired_bridge}),
+    )
+    bridge_path = repo / retired_bridge
+    bridge_path.parent.mkdir(parents=True, exist_ok=True)
+    original_content = b"a bridge the sidecar no longer ships\n"
+    file_hash = compute_file_hash(original_content)
+    unit_hash = compute_unit_hash({"retired-sidecar-bridge.md": file_hash})
+    manifest = _read_manifest(repo)
+    manifest["units"][retired_bridge] = {
+        "files": {"retired-sidecar-bridge.md": file_hash},
+        "hash": unit_hash,
+    }
+    _manifest_path(repo).write_text(json.dumps(manifest), encoding="utf-8")
+    exclude_path = _exclude_path(repo)
+    exclude_text = exclude_path.read_text(encoding="utf-8")
+    line = escape_exact_path(retired_bridge)
+    marker = "# END ai-bootstrap sidecar"
+    exclude_path.write_text(
+        exclude_text.replace(marker, f"{line}\n{marker}"), encoding="utf-8"
+    )
+    edited_content = b"a person edited this retired bridge\n"
+    bridge_path.write_bytes(edited_content)
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    assert not bridge_path.exists()
+    preserved_root = _preserved_root(repo)
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    assert entries[0].read_bytes() == edited_content
+
+
+def test_edited_unit_at_a_retired_write_root_is_preserved_on_uninstall(
+    repo: Path, monkeypatch
+) -> None:
+    """Decision 39: an edited unit under a retired write root, recorded by
+    an older manifest, is still taken during uninstall and preserved (not
+    silently kept or deleted) when its content no longer matches the
+    record. ``_ALL_SKILL_WRITE_ROOTS`` is computed at import time, so the
+    test patches the module's own bound name, as
+    ``test_retired_bridge_and_retired_write_root_unit_removed_on_uninstall``
+    does. Fails on 010f08c."""
+    assert install_sidecar(repo, SOURCE) == 0
+    retired_write_root = ".claude/old-skills"
+    retired_unit = f"{retired_write_root}/ponytail"
+    monkeypatch.setattr(
+        sidecar_overlay_module,
+        "_ALL_SKILL_WRITE_ROOTS",
+        sidecar_overlay_module._ALL_SKILL_WRITE_ROOTS + (retired_write_root,),
+    )
+
+    retired_unit_dir = repo / retired_write_root / "ponytail"
+    retired_unit_dir.mkdir(parents=True)
+    original_content = b"content under a retired write root\n"
+    original_hash = compute_file_hash(original_content)
+
+    manifest = _read_manifest(repo)
+    manifest["units"][retired_unit] = {
+        "files": {"SKILL.md": original_hash},
+        "hash": compute_unit_hash({"SKILL.md": original_hash}),
+    }
+    _manifest_path(repo).write_text(json.dumps(manifest), encoding="utf-8")
+    exclude_path = _exclude_path(repo)
+    exclude_text = exclude_path.read_text(encoding="utf-8")
+    marker = "# END ai-bootstrap sidecar"
+    exclude_path.write_text(
+        exclude_text.replace(marker, f"{escape_exact_path(retired_unit)}\n{marker}"),
+        encoding="utf-8",
+    )
+    edited_content = b"a person edited this retired-write-root unit\n"
+    (retired_unit_dir / "SKILL.md").write_bytes(edited_content)
+
+    status_before = _status(repo)
+    dry_exit = uninstall_sidecar(repo, dry_run=True)
+    assert dry_exit == 0
+    assert _status(repo) == status_before
+    assert (retired_unit_dir / "SKILL.md").read_bytes() == edited_content
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    assert not retired_unit_dir.exists()
+    preserved_root = _preserved_root(repo)
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    assert (entries[0] / "SKILL.md").read_bytes() == edited_content
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert _status(repo) == ""
+
+
+def test_o3_scenario_a_lost_manifest_uninstall_reinstall_uninstall_again(
+    repo: Path,
+) -> None:
+    """O3 (a): ``preserved_conflicts`` was computed over every required unit
+    whose hash-based destination happened to exist, including units that
+    are only being removed. After a lost manifest is uninstalled (preserving
+    every listed copy) and the sidecar is reinstalled, the freshly installed
+    units hash-match their own now-stale preserved copies from the first
+    uninstall, so a second uninstall used to fail its gate on all of them and
+    leave the block, manifest, and staging behind. Fails on 010f08c."""
+    assert install_sidecar(repo, SOURCE) == 0
+    _manifest_path(repo).unlink()  # simulate a crash / lost manifest
+
+    exit_code_1 = uninstall_sidecar(repo)
+    assert exit_code_1 == 0
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    preserved_root = _preserved_root(repo)
+    assert len(list(preserved_root.iterdir())) == 10
+
+    assert install_sidecar(repo, SOURCE) == 0
+
+    exit_code_2 = uninstall_sidecar(repo)
+
+    assert exit_code_2 == 0
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert not _staging_path(repo).exists()
+    assert _status(repo) == ""
+
+
+def test_o3_scenario_b_absent_unit_with_a_stale_preserve_never_blocks_uninstall(
+    repo: Path, tmp_path: Path
+) -> None:
+    """O3 (b): a unit symlink is preserved once because its skill is taken
+    elsewhere (Decision 24), leaving a preserved copy at the empty-content
+    hash's slug. The unit then stays absent while the rest of the sidecar
+    is still installed; every subsequent uninstall used to fail its gate on
+    that stale, irrelevant conflict, 3 of 3 times. Fails on 010f08c."""
+    assert install_sidecar(repo, SOURCE) == 0
+    unit_dir = repo / ".claude" / "skills" / "ponytail"
+    shutil.rmtree(unit_dir)
+    personal = tmp_path / "personal-ponytail"
+    personal.mkdir()
+    (personal / "SKILL.md").write_text("personal\n", encoding="utf-8")
+    unit_dir.symlink_to(personal, target_is_directory=True)
+
+    # Take ponytail's skill elsewhere so a regular install preserves the
+    # symlink (Decision 24) instead of merely reporting it as modified.
+    _write(repo / ".github" / "skills" / "ponytail" / "SKILL.md", "team elsewhere\n")
+    assert install_sidecar(repo, SOURCE) == 0
+    preserved_root = _preserved_root(repo)
+    assert any(entry.is_symlink() for entry in preserved_root.iterdir())
+    assert not unit_dir.exists()
+
+    for _ in range(3):
+        exit_code = uninstall_sidecar(repo)
+        assert exit_code == 0
+        assert (
+            install_sidecar(repo, SOURCE) == 0
+        )  # restore evidence for the next attempt
+
+
+def test_team_negation_added_after_install_fails_install_but_uninstall_is_clean(
+    repo: Path,
+) -> None:
+    """Guard: a team rule that exposes a sidecar path must fail install's
+    gate (Decision 40 covers install/update in full) but must never block
+    uninstall, since uninstall gates only the paths whose lines survive
+    (Decision 39). Already passes on 010f08c: with no preserve conflict,
+    old uninstall never ran its conflict-only gate at all, so a plain
+    "remove" was never checked against a negation either way; this guards
+    the same outcome under the Decision 39 rebuild, which does gate every
+    run through ``gate_paths_final``."""
+    assert install_sidecar(repo, SOURCE) == 0
+    gitignore = repo / ".gitignore"
+    gitignore.write_text("!/.claude/skills/humanize\n", encoding="utf-8")
+    _commit(repo, "team un-ignores humanize", ".gitignore")
+
+    assert install_sidecar(repo, SOURCE) != 0
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert _status(repo) == ""
+
+
+def test_installed_unit_replaced_by_a_symlink_uninstall_preserves_it(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Guard: an installed unit replaced by a personal symlink is preserved
+    (not deleted) on uninstall, with no gate failure. Already worked on
+    010f08c for a first-time, conflict-free preserve (its symlink-aware
+    ``_gate_spelling`` fix is Phase J step 5, already covered there); this
+    guards the same outcome under the Decision 39 write-order rebuild."""
+    assert install_sidecar(repo, SOURCE) == 0
+    unit_dir = repo / ".claude" / "skills" / "ponytail"
+    shutil.rmtree(unit_dir)
+    personal = tmp_path / "personal-ponytail"
+    personal.mkdir()
+    (personal / "SKILL.md").write_text("personal\n", encoding="utf-8")
+    unit_dir.symlink_to(personal, target_is_directory=True)
+
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    preserved_root = _preserved_root(repo)
+    entries = list(preserved_root.iterdir())
+    assert any(entry.is_symlink() for entry in entries)
+    assert not unit_dir.exists()
+    assert not _manifest_path(repo).is_file()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
 
 
 # --------------------------------------------------------------------------

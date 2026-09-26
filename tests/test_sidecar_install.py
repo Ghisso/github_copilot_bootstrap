@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -34,7 +35,13 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import install_bootstrap  # noqa: E402
 import sidecar_overlay as sidecar_overlay_module  # noqa: E402
-from sidecar_overlay import escape_exact_path, git_path, install_sidecar  # noqa: E402
+from sidecar_overlay import (  # noqa: E402
+    GitCheckIgnoreError,
+    escape_exact_path,
+    git_path,
+    install_sidecar,
+    uninstall_sidecar,
+)
 from sidecar_test_helpers import (  # noqa: E402
     _absolute_git_dir,
     _commit,
@@ -929,6 +936,9 @@ def test_only_one_tracked_file_deleted_leaves_empty_folder_still_team_owned(
 def test_gitlink_at_skill_path_with_no_folder_is_team_owned(
     team_repo: Path, capsys
 ) -> None:
+    """Decision 37: a gitlink unit is team-owned, but the report must say
+    the sidecar never touches files inside a submodule, not the ordinary
+    team-owned wording (which implies the sidecar inspected the content)."""
     fake_commit = "a" * 40
     cacheinfo = _git(
         team_repo,
@@ -946,7 +956,7 @@ def test_gitlink_at_skill_path_with_no_folder_is_team_owned(
     assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
     assert not (team_repo / ".agents" / "skills" / "ponytail").exists()
     out = capsys.readouterr().out
-    assert "the repository tracks" in out
+    assert "is a submodule; the sidecar never touches files inside a submodule" in out
     _second_run_and_dry_run_are_stable(team_repo)
 
 
@@ -1636,6 +1646,134 @@ def test_github_skills_symlinked_to_claude_skills_never_alternates_over_three_ru
         assert exit_code == 0
         assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
         assert (team_repo / ".agents" / "skills" / "ponytail").is_dir()
+
+
+# --------------------------------------------------------------------------
+# Phase J step 8: one path-identity rule for collision sources (Decision 41;
+# R3, O6, O7, O8)
+# --------------------------------------------------------------------------
+
+
+def test_r3_case1_symlinked_root_frontmatter_declares_a_different_folder_name(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """R3 case 1: the frontmatter scan used to skip every symlinked read
+    root outright, missing a collision behind one entirely, unlike the
+    folder-name scan (which already follows it). Fails on 010f08c."""
+    elsewhere = tmp_path / "team-skills-elsewhere"
+    (elsewhere / "team-humanize").mkdir(parents=True)
+    (elsewhere / "team-humanize" / "SKILL.md").write_text(
+        "---\nname: humanize\n---\nTEAM-VIA-SYMLINKED-ROOT\n", encoding="utf-8"
+    )
+    root_path = team_repo / ".github" / "skills"
+    root_path.parent.mkdir(parents=True, exist_ok=True)
+    if root_path.exists() or root_path.is_symlink():
+        shutil.rmtree(root_path)
+    root_path.symlink_to(elsewhere, target_is_directory=True)
+
+    for _ in range(3):
+        exit_code = install_sidecar(team_repo, SOURCE)
+        assert exit_code == 0
+        assert not (team_repo / ".claude" / "skills" / "humanize").exists()
+        assert not (team_repo / ".agents" / "skills" / "humanize").exists()
+        assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+
+
+def test_r3_case2_o7_per_entry_symlink_into_a_write_root_never_takes_its_own_skill(
+    team_repo: Path,
+) -> None:
+    """R3 case 2 / O7: a per-entry symlink inside a read-only root that
+    resolves into the sidecar's own write root used to be followed by the
+    frontmatter scan (declaring the skill's own name) without the folder-
+    name scan's alias exclusion, alternately removing and reinstalling both
+    real copies every run. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    alias = team_repo / ".github" / "skills" / "ponytail"
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    alias.symlink_to(
+        Path("..") / ".." / ".claude" / "skills" / "ponytail", target_is_directory=True
+    )
+
+    for _ in range(3):
+        exit_code = install_sidecar(team_repo, SOURCE)
+        assert exit_code == 0
+        assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+        assert (team_repo / ".agents" / "skills" / "ponytail").is_dir()
+        assert alias.is_symlink()
+
+
+def test_write_root_alias_to_another_write_root_never_dangles(
+    team_repo: Path,
+) -> None:
+    """Decision 41: a symlink entry inside a write root itself that resolves
+    into another write root is an alias too, not only one inside a
+    read-only root. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    alias = team_repo / ".claude" / "skills" / "pt"
+    alias.symlink_to(
+        Path("..") / ".." / ".agents" / "skills" / "ponytail", target_is_directory=True
+    )
+
+    for _ in range(3):
+        exit_code = install_sidecar(team_repo, SOURCE)
+        assert exit_code == 0
+        assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+        assert (team_repo / ".agents" / "skills" / "ponytail").is_dir()
+        assert alias.is_symlink()
+
+
+def test_o8_symlinked_read_only_root_frontmatter_declares_a_different_folder_name(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """O8: a symlinked read-only root's frontmatter declaration under a
+    differently named folder must still take the skill. Fails on 010f08c."""
+    elsewhere = tmp_path / "shared-skills"
+    (elsewhere / "team-review").mkdir(parents=True)
+    (elsewhere / "team-review" / "SKILL.md").write_text(
+        "---\nname: ponytail-review\n---\nTEAM-VIA-SYMLINKED-ROOT\n", encoding="utf-8"
+    )
+    root_path = team_repo / ".codex" / "skills"
+    root_path.parent.mkdir(parents=True, exist_ok=True)
+    if root_path.exists() or root_path.is_symlink():
+        shutil.rmtree(root_path)
+    root_path.symlink_to(elsewhere, target_is_directory=True)
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert not (team_repo / ".claude" / "skills" / "ponytail-review").exists()
+    assert not (team_repo / ".agents" / "skills" / "ponytail-review").exists()
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+
+
+def test_o6_ignorecase_case_variant_folder_at_a_write_root_takes_the_skill(
+    team_repo: Path, capsys
+) -> None:
+    """O6: ``_reflects_a_write_root`` was true for any ordinary entry
+    physically inside a write root (a write root is always its own
+    ancestor), so disk names at write roots were always empty; a personal
+    case-variant folder there was never seen. Fails on 010f08c."""
+    config = _git(team_repo, "config", "core.ignorecase", "true")
+    assert config.returncode == 0, config.stderr
+    variant_dir = team_repo / ".claude" / "skills" / "Ponytail"
+    variant_dir.mkdir(parents=True, exist_ok=True)
+    (variant_dir / "SKILL.md").write_text(
+        "a personal case-variant folder\n", encoding="utf-8"
+    )
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+    assert not (team_repo / ".agents" / "skills" / "ponytail").exists()
+    out = capsys.readouterr().out
+    assert "SKIPPED .claude/skills/Ponytail" in out
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert "Ponytail" not in exclude_text
+    assert "?? .claude/skills/Ponytail/" in _status(team_repo)
+    assert (variant_dir / "SKILL.md").read_text(encoding="utf-8") == (
+        "a personal case-variant folder\n"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -2484,6 +2622,49 @@ def test_retained_name_with_trailing_cr_never_gets_a_raw_pattern_line(
     assert "cannot be hidden" in out
 
 
+@pytest.mark.parametrize(
+    "control_char",
+    ["\f", "\v", " "],
+    ids=("form-feed", "vertical-tab", "line-separator"),
+)
+def test_retained_name_with_a_git_ignored_line_boundary_stays_one_line(
+    team_repo: Path, control_char: str
+) -> None:
+    """O5/Decision 42: str.splitlines() also breaks on \\f, \\v, and U+2028,
+    none of which Git treats as a line boundary in info/exclude. Splitting a
+    retained file's escaped exclude line on one of those turns it into two
+    lines; the second, unanchored fragment then hides an unrelated untracked
+    file anywhere in the repository. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_name = f"weird{control_char}name.txt"
+    (unit_dir / weird_name).write_bytes(b"kept by a person\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    decoy = team_repo / "name.txt"
+    decoy.write_bytes(b"unrelated team file\n")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert "name.txt" in _status(team_repo)
+    manifest = _read_manifest(team_repo)
+    weird_path = f".claude/skills/ponytail/{weird_name}"
+    assert weird_path in manifest["retained"]
+    assert _is_ignored(team_repo, weird_path)
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert exclude_text.count(escape_exact_path(weird_path)) == 1
+
+    status_before = _status(team_repo)
+    assert install_sidecar(team_repo, SOURCE, dry_run=True) == 0
+    assert _status(team_repo) == status_before
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(team_repo) == status_before
+
+
 def test_unexpressible_name_gate_catches_a_forced_raw_pattern_line(
     team_repo: Path, monkeypatch
 ) -> None:
@@ -2577,6 +2758,7 @@ def _add_submodule(target: Path, relative: str, tmp_path: Path) -> Path:
         "protocol.file.allow=always",
         "submodule",
         "add",
+        "-f",
         "-q",
         str(source),
         relative,
@@ -2720,6 +2902,771 @@ def test_different_st_dev_via_monkeypatched_lstat_is_refused(
     assert exit_code != 0
     assert "different filesystem" in err
     assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+# --------------------------------------------------------------------------
+# Phase J step 2: unit-level repository boundaries (Decision 37; R1, O1)
+# --------------------------------------------------------------------------
+
+
+def _run_uninstall_capturing_stderr(
+    team_repo: Path, dry_run: bool = False
+) -> tuple[int, str]:
+    import contextlib
+    import io
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        exit_code = uninstall_sidecar(team_repo, dry_run=dry_run)
+    return exit_code, buffer.getvalue()
+
+
+def test_previously_owned_unit_turned_gitlink_is_never_touched(
+    team_repo: Path,
+) -> None:
+    """R1/O1: uninstall used to delete a team submodule's tracked files
+    (LICENSE) after a previously sidecar-owned unit became a gitlink, and
+    reported it as an ordinary team-owned skip. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    _init_repo(unit_dir)
+    _commit(unit_dir, "nested repository content")
+    nested_status_before = _status(unit_dir)
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team embeds ponytail as a gitlink")
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(unit_dir) == nested_status_before
+    assert install_sidecar(team_repo, SOURCE) == 0  # update rerun
+    assert _status(unit_dir) == nested_status_before
+    assert install_sidecar(team_repo, SOURCE, dry_run=True) == 0
+    assert _status(unit_dir) == nested_status_before
+
+    assert uninstall_sidecar(team_repo, dry_run=True) == 0
+    assert _status(unit_dir) == nested_status_before
+    exit_code = uninstall_sidecar(team_repo)
+
+    assert exit_code == 0
+    assert (unit_dir / "SKILL.md").is_file()
+    assert (unit_dir / "LICENSE").is_file()
+    assert _status(unit_dir) == nested_status_before
+
+
+def test_disk_only_nested_repo_at_recorded_unit_aborts_every_mode(
+    team_repo: Path,
+) -> None:
+    """R1/O1: a disk-only nested repository at a unit the sidecar already
+    owns must abort before any write in every mode, not be silently moved
+    into the preserved folder. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    _init_repo(unit_dir)
+    _commit(unit_dir, "nested repository content")
+    nested_status_before = _status(unit_dir)
+    outer_status_before = _status(team_repo)
+    manifest_before = _read_manifest(team_repo)
+
+    for dry_run in (True, False):
+        exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+        assert exit_code != 0
+        assert "nested repository or submodule" in err
+        assert "nothing was written" in err
+        assert _status(unit_dir) == nested_status_before
+        assert _status(team_repo) == outer_status_before
+        assert _read_manifest(team_repo) == manifest_before
+
+    for dry_run in (True, False):
+        exit_code, err = _run_uninstall_capturing_stderr(team_repo, dry_run=dry_run)
+        assert exit_code != 0
+        assert "nested repository or submodule" in err
+        assert "nothing was written" in err
+        assert _status(unit_dir) == nested_status_before
+        assert _status(team_repo) == outer_status_before
+        assert _read_manifest(team_repo) == manifest_before
+
+
+def test_personal_clone_never_owned_is_skipped_as_foreign(team_repo: Path) -> None:
+    """Guard: a personal nested clone at a unit the sidecar never recorded
+    or listed is foreign; its skill is skipped everywhere, the other units
+    still install, and nothing inside the clone changes. A second run and a
+    dry run must both agree that nothing changes further."""
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    _nested_clone(unit_dir)
+    clone_status_before = _status(unit_dir)
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert not (team_repo / ".agents" / "skills" / "ponytail").exists()
+    assert _status(unit_dir) == clone_status_before
+    assert (team_repo / ".claude" / "skills" / "humanize").is_dir()
+    manifest = _read_manifest(team_repo)
+    assert ".claude/skills/ponytail" not in manifest["units"]
+
+    status_before = _status(team_repo)
+    exclude_before = _exclude_path(team_repo).read_bytes()
+    assert install_sidecar(team_repo, SOURCE, dry_run=True) == 0
+    assert _status(team_repo) == status_before
+    assert _exclude_path(team_repo).read_bytes() == exclude_before
+    assert _read_manifest(team_repo) == manifest
+    assert _status(unit_dir) == clone_status_before
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(team_repo) == status_before
+    assert _exclude_path(team_repo).read_bytes() == exclude_before
+    assert _read_manifest(team_repo) == manifest
+    assert _status(unit_dir) == clone_status_before
+
+
+def test_real_submodule_at_recorded_unit_installs_and_uninstalls_cleanly(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """Guard: a real `git submodule add` at a previously owned unit must not
+    produce a false ignore-gate failure, and uninstall must delete nothing
+    inside it. Already passes on 010f08c (a fatal check-ignore error inside
+    the submodule is silently swallowed there rather than raised, which
+    happens to leave this specific scenario's exit codes and files
+    unaffected); `test_fatal_check_ignore_error_aborts_naming_gits_message`
+    is the real regression test for that swallowed error."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    shutil.rmtree(unit_dir)
+    _add_submodule(team_repo, ".claude/skills/ponytail", tmp_path)
+    nested_status_before = _status(unit_dir)
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert _status(unit_dir) == nested_status_before
+    assert install_sidecar(team_repo, SOURCE, dry_run=True) == 0
+    assert _status(unit_dir) == nested_status_before
+
+    exit_code = uninstall_sidecar(team_repo)
+
+    assert exit_code == 0
+    assert (unit_dir / "settings.json").is_file()
+    assert _status(unit_dir) == nested_status_before
+
+
+def test_team_skill_with_its_own_submodule_one_level_down(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """Guard: a tracked team skill folder that holds its own submodule must
+    not abort and must never gain a bogus exclude line for a path inside the
+    submodule. Already passes on 010f08c for this specific layout (Git's own
+    check-ignore fatal error for a submodule path is silently swallowed
+    there, and happens to leave this outcome unaffected); this guards the
+    structural fix (Decision 37) against regressing it."""
+    team_content = "---\nname: ponytail\n---\nTEAM-OWNED-PONYTAIL\n"
+    _write(team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md", team_content)
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team owns ponytail")
+    _add_submodule(team_repo, ".claude/skills/ponytail/vendor", tmp_path)
+    vendor_dir = team_repo / ".claude" / "skills" / "ponytail" / "vendor"
+    vendor_status_before = _status(vendor_dir)
+
+    for dry_run in (True, False):
+        assert install_sidecar(team_repo, SOURCE, dry_run=dry_run) == 0
+        assert _status(vendor_dir) == vendor_status_before
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert "vendor" not in exclude_text
+
+    for dry_run in (True, False):
+        assert uninstall_sidecar(team_repo, dry_run=dry_run) == 0
+        assert _status(vendor_dir) == vendor_status_before
+    assert (vendor_dir / "settings.json").is_file()
+    assert (
+        team_repo.joinpath(".claude", "skills", "ponytail", "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        == team_content
+    )
+
+
+def test_gitlink_below_a_unit_drops_a_stale_retained_line_and_reports_it(
+    team_repo: Path, tmp_path: Path, capsys
+) -> None:
+    """Decision 37: nothing at or under any gitlink index entry keeps a file
+    line, including a gitlink nested inside a unit -- not only when the
+    whole unit is one. A stale retained line that now falls under it must
+    be dropped and reported, never sent to check-ignore (which exits 128 for
+    a path inside a submodule)."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    vendor_dir = unit_dir / "vendor"
+    vendor_dir.mkdir()
+    (vendor_dir / "notes.txt").write_bytes(b"kept by a person\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    manifest = _read_manifest(team_repo)
+    assert manifest["retained"] == [".claude/skills/ponytail/vendor/notes.txt"]
+    assert _is_ignored(team_repo, ".claude/skills/ponytail/vendor/notes.txt")
+
+    # vendor becomes a real submodule whose own tracked content happens to
+    # collide in name with the stale retained file; a bug that tries to
+    # re-hide "notes.txt" would send a path inside the submodule to
+    # check-ignore, which exits 128 ("is in submodule").
+    shutil.rmtree(vendor_dir)
+    submodule_source = tmp_path / "vendor-submodule-source"
+    _init_repo(submodule_source)
+    _write(submodule_source / "notes.txt", "submodule content, different bytes\n")
+    _commit(submodule_source, "submodule content")
+    add = _git(
+        team_repo,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "-f",
+        "-q",
+        str(submodule_source),
+        ".claude/skills/ponytail/vendor",
+    )
+    assert add.returncode == 0, add.stderr
+    _commit(team_repo, "add vendor submodule")
+    vendor_status_before = _status(vendor_dir)
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    manifest_after = _read_manifest(team_repo)
+    assert manifest_after["retained"] == []
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert "notes.txt" not in exclude_text
+    out = capsys.readouterr().out
+    assert "RETAINED .claude/skills/ponytail/vendor/notes.txt" in out
+    assert "now visible" in out
+    assert (vendor_dir / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "submodule content, different bytes\n"
+    assert _status(vendor_dir) == vendor_status_before
+
+    status_before = _status(team_repo)
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(team_repo) == status_before
+
+
+def test_fatal_check_ignore_error_aborts_naming_gits_message(
+    team_repo: Path, monkeypatch
+) -> None:
+    """A `check-ignore` exit other than 0 or 1 (for example 128) must abort
+    naming Git's message, never be treated as a partial ignore set. Uses a
+    rerun of an already-installed unit so gathering has real untracked-file
+    candidates to check (a fresh install has none yet)."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    manifest_before = _read_manifest(team_repo)
+    status_before = _status(team_repo)
+    real_run = subprocess.run
+
+    def fake_run(args, *a, **kw):
+        if len(args) >= 3 and args[0] == "git" and "check-ignore" in args:
+            return subprocess.CompletedProcess(
+                args, 128, stdout=b"", stderr=b"fatal: injected check-ignore failure\n"
+            )
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(sidecar_overlay_module.subprocess, "run", fake_run)
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code != 0
+    assert "injected check-ignore failure" in err
+    assert _status(team_repo) == status_before
+    assert _read_manifest(team_repo) == manifest_before
+
+
+def test_check_ignore_raises_on_fatal_exit_code(monkeypatch) -> None:
+    """Guard/unit-level: ``_check_ignore`` itself raises ``GitCheckIgnoreError``
+    on a Git exit code other than 0 or 1, instead of returning a partial set."""
+
+    def fake_run(args, *a, **kw):
+        return subprocess.CompletedProcess(args, 128, stdout=b"", stderr=b"fatal: x\n")
+
+    monkeypatch.setattr(sidecar_overlay_module.subprocess, "run", fake_run)
+
+    with pytest.raises(GitCheckIgnoreError, match="fatal: x"):
+        sidecar_overlay_module._check_ignore(Path("."), ["a"])
+
+
+# --------------------------------------------------------------------------
+# Phase J step 3: complete snapshots (Decision 38; R4, O9, O17 special-file)
+# --------------------------------------------------------------------------
+
+
+def test_named_pipe_in_installed_unit_uninstall_preserves_it_intact(
+    team_repo: Path,
+) -> None:
+    """R4/O17: a personal FIFO inside an otherwise-matching installed unit
+    used to be silently deleted along with the rest of the unit on
+    uninstall. Fails on 010f08c. Runs the CLI in a subprocess with a
+    timeout so the test process never opens the pipe."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    pipe_path = team_repo / ".claude" / "skills" / "ponytail" / "personal-channel"
+    os.mkfifo(pipe_path)
+    preserved_root = git_path(team_repo, "ai-bootstrap-sidecar-preserved")
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo), "--uninstall"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    preserved_dir = entries[0]
+    assert stat.S_ISFIFO((preserved_dir / "personal-channel").stat().st_mode)
+    assert (preserved_dir / "SKILL.md").is_file()
+    assert (preserved_dir / "LICENSE").is_file()
+
+
+def test_named_pipe_in_installed_unit_then_update_keeps_it_locally_modified(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """R4/O17 variant: a personal FIFO must also block a plain hash-match
+    update from silently replacing the unit; it stays locally modified
+    instead. Fails on 010f08c. Runs the CLI in a subprocess with a timeout
+    so the test process never opens the pipe."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    pipe_path = team_repo / ".claude" / "skills" / "ponytail" / "personal-channel"
+    os.mkfifo(pipe_path)
+    mutated_source = tmp_path / "mutated-source"
+    shutil.copytree(SOURCE, mutated_source)
+    mutated_file = mutated_source / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    mutated_file.write_text(
+        mutated_file.read_text(encoding="utf-8") + "\nmutated upstream\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(team_repo),
+            "--mode",
+            "sidecar",
+            "--source",
+            str(mutated_source),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "has local edits" in result.stdout
+    assert stat.S_ISFIFO(pipe_path.stat().st_mode)
+    content = (team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "mutated upstream" not in content
+
+
+def test_unix_socket_in_installed_unit_uninstall_preserves_it_intact(
+    team_repo: Path,
+) -> None:
+    """R4/O17: a Unix socket behaves the same as a named pipe. Fails on
+    010f08c. Runs the CLI in a subprocess with a timeout; the socket is
+    only bound (never connected or accepted), which never blocks."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    socket_path = team_repo / ".claude" / "skills" / "ponytail" / "personal.sock"
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(str(socket_path))
+    finally:
+        sock.close()
+    preserved_root = git_path(team_repo, "ai-bootstrap-sidecar-preserved")
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo), "--uninstall"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    preserved_dir = entries[0]
+    assert stat.S_ISSOCK((preserved_dir / "personal.sock").stat().st_mode)
+
+
+def test_empty_subfolder_added_to_installed_unit_is_locally_modified(
+    team_repo: Path, capsys
+) -> None:
+    """Decision 38: an empty subfolder makes an otherwise-matching unit
+    locally modified rather than staying "unchanged". Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    empty_dir = team_repo / ".claude" / "skills" / "ponytail" / "empty"
+    empty_dir.mkdir()
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert empty_dir.is_dir()
+    manifest = _read_manifest(team_repo)
+    assert ".claude/skills/ponytail" in manifest["units"]
+    out = capsys.readouterr().out
+    assert "has local edits" in out
+
+
+def test_team_tracked_skill_with_a_symlink_is_team_owned_others_install(
+    team_repo: Path,
+) -> None:
+    """O9: Decision 25 says a tracked unit is team-owned before any symlink
+    check; a symlink inside it must never abort the whole run. Fails on
+    010f08c (the old inner-symlink abort ran first)."""
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    unit_dir.mkdir(parents=True)
+    _write(unit_dir / "SKILL.md", "---\nname: ponytail\n---\nTEAM\n")
+    (unit_dir / "mylink").symlink_to("SKILL.md")
+    _commit(team_repo, "team owns ponytail with a symlink", ".claude/skills/ponytail")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert (team_repo / ".claude" / "skills" / "humanize").is_dir()
+    assert (unit_dir / "mylink").is_symlink()
+
+
+def test_untracked_owned_unit_with_inner_symlink_is_locally_modified_no_abort(
+    team_repo: Path, capsys
+) -> None:
+    """Decision 38: an inner symlink inside a unit must never abort the
+    whole run; only a symlinked ancestor still does. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    (team_repo / ".claude" / "skills" / "ponytail" / "mylink").symlink_to("SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert (team_repo / ".claude" / "skills" / "ponytail" / "mylink").is_symlink()
+    out = capsys.readouterr().out
+    assert "has local edits" in out
+    manifest = _read_manifest(team_repo)
+    assert ".claude/skills/ponytail" in manifest["units"]
+
+
+def test_symlink_persists_through_team_takeover_then_uninstall_reports_it_visible(
+    team_repo: Path, capsys
+) -> None:
+    """Decision 38: an untracked symlink inside a taken-over unit is
+    retained with its own line while it exists, stable over a second run,
+    and reported as now visible on uninstall. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    (unit_dir / "mylink").symlink_to("SKILL.md")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+    assert exit_code == 0
+    assert (unit_dir / "mylink").is_symlink()
+    assert _is_ignored(team_repo, ".claude/skills/ponytail/mylink")
+    out = capsys.readouterr().out
+    assert "RETAINED .claude/skills/ponytail/mylink" in out
+
+    status_before = _status(team_repo)
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(team_repo) == status_before
+    assert (unit_dir / "mylink").is_symlink()
+
+    uninstall_exit = uninstall_sidecar(team_repo)
+
+    assert uninstall_exit == 0
+    assert (unit_dir / "mylink").is_symlink()
+    assert not _is_ignored(team_repo, ".claude/skills/ponytail/mylink")
+    assert ".claude/skills/ponytail/mylink" in _status(team_repo)
+
+
+# --------------------------------------------------------------------------
+# Phase J step 4: retained files of dropped skills (Decision 43; O4)
+# --------------------------------------------------------------------------
+
+
+def test_retained_file_of_a_later_dropped_skill_stays_hidden_after_lost_manifest(
+    team_repo: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """O4: a listed retained file of a skill the sidecar later stops
+    shipping used to be silently un-hidden once its manifest record (and
+    then the whole manifest) was gone, because ``required_snapshot_units``
+    never snapshotted its owning unit. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    notes = team_repo / ".claude" / "skills" / "humanize" / "notes.md"
+    notes.write_bytes(b"kept by a person\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/humanize/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes humanize SKILL.md")
+    assert install_sidecar(team_repo, SOURCE) == 0
+    manifest = _read_manifest(team_repo)
+    assert manifest["retained"] == [".claude/skills/humanize/notes.md"]
+    assert _is_ignored(team_repo, ".claude/skills/humanize/notes.md")
+
+    # Version 2 drops humanize from the profile.
+    reduced_source = tmp_path / "reduced-source"
+    shutil.copytree(SOURCE, reduced_source)
+    for write_root in (".claude/skills", ".agents/skills"):
+        shutil.rmtree(reduced_source / write_root / "humanize")
+    patch_sidecar_skills(
+        monkeypatch, ("debug-investigator", "ponytail", "ponytail-review")
+    )
+
+    # The invalid-manifest remedy: move the manifest aside and rerun.
+    manifest_path = _manifest_path(team_repo)
+    manifest_path.rename(manifest_path.with_name(manifest_path.name + ".bak"))
+
+    exit_code = install_sidecar(team_repo, reduced_source)
+
+    assert exit_code == 0
+    assert notes.is_file()
+    assert _is_ignored(team_repo, ".claude/skills/humanize/notes.md")
+    assert ".claude/skills/humanize/notes.md" not in _status(team_repo)
+    out = capsys.readouterr().out
+    assert "RETAINED .claude/skills/humanize/notes.md" in out
+
+    uninstall_exit = uninstall_sidecar(team_repo)
+
+    assert uninstall_exit == 0
+    assert notes.is_file()
+    assert not _is_ignored(team_repo, ".claude/skills/humanize/notes.md")
+    assert ".claude/skills/humanize/notes.md" in _status(team_repo)
+    uninstall_out = capsys.readouterr().out
+    assert "RETAINED .claude/skills/humanize/notes.md" in uninstall_out
+    assert "now visible" in uninstall_out
+
+
+# --------------------------------------------------------------------------
+# Phase J step 5: planner gate paths (Decision 40; O10, O11)
+# --------------------------------------------------------------------------
+
+
+def test_team_negation_exposes_an_unfinished_unit_aborts_and_restores(
+    team_repo: Path,
+) -> None:
+    """O11: the gate used to build its path set only from manifest records
+    and actions, so an unfinished unit (listed, no record, content not
+    matching desired) was never checked -- a team negation could expose it
+    while the run still reported "stays hidden". Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    skill_md = team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    skill_md.write_text(
+        skill_md.read_text(encoding="utf-8") + "\nEDIT\n", encoding="utf-8"
+    )
+    _manifest_path(team_repo).unlink()
+
+    gitignore = team_repo / ".gitignore"
+    _write(
+        gitignore, gitignore.read_text(encoding="utf-8") + "!/.claude/skills/ponytail\n"
+    )
+    _commit(team_repo, "team un-ignores ponytail", ".gitignore")
+    status_before = _status(team_repo)
+    exclude_before = _exclude_path(team_repo).read_bytes()
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code != 0
+    assert "ABORT" in err
+    assert not _manifest_path(team_repo).exists()
+    assert _exclude_path(team_repo).read_bytes() == exclude_before
+    assert _status(team_repo) == status_before
+
+
+def test_team_negation_of_one_skill_names_only_that_path_in_the_failure(
+    team_repo: Path,
+) -> None:
+    """O10: ``run_ignore_gate`` used to pass the whole expected set to the
+    verbose explainer, so a single team negation produced a failure message
+    naming every correctly ignored sidecar path too, not just the exposed
+    one. Fails on 010f08c."""
+    gitignore = team_repo / ".gitignore"
+    _write(
+        gitignore, gitignore.read_text(encoding="utf-8") + "!/.claude/skills/humanize\n"
+    )
+    _commit(team_repo, "team un-ignores only humanize", ".gitignore")
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code != 0
+    assert ".claude/skills/humanize/" in err
+    for other in ("ponytail", "ponytail-review", "debug-investigator"):
+        assert f"{other}/" not in err
+    assert ".agents/skills/humanize/" not in err
+
+
+def test_installed_unit_replaced_by_a_symlink_installs_clean_no_gate_failure(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    """A symlink unit gated with a trailing slash makes Git exit 128
+    ("beyond a symbolic link"), which used to fail the gate outright.
+    Decision 40: a non-folder unit is gated without the trailing slash.
+    Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    shutil.rmtree(unit_dir)
+    personal_folder = tmp_path / "personal-ponytail"
+    personal_folder.mkdir()
+    (personal_folder / "SKILL.md").write_text("personal\n", encoding="utf-8")
+    unit_dir.symlink_to(personal_folder, target_is_directory=True)
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code == 0
+    assert err == ""
+    assert unit_dir.is_symlink()
+    assert _is_ignored(team_repo, ".claude/skills/ponytail")
+
+
+def test_installed_unit_replaced_by_a_plain_file_is_locally_modified_and_preserved(
+    team_repo: Path, capsys
+) -> None:
+    """Guard: a plain regular file at an installed unit path is already
+    kept as locally modified on install, preserved intact on uninstall, and
+    skipped as foreign before any install -- confirmed on 010f08c. Guards
+    the MINOR fix that gates such a unit as `<unit>`, never `<unit>/`
+    (Decision 40): a plain file is neither a real folder nor absent."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "humanize"
+    shutil.rmtree(unit_dir)
+    content = b"a personal file where a folder used to be\n"
+    unit_dir.write_bytes(content)
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code == 0
+    assert err == ""
+    assert unit_dir.is_file()
+    assert unit_dir.read_bytes() == content
+    assert _is_ignored(team_repo, ".claude/skills/humanize")
+    out = capsys.readouterr().out
+    assert "has local edits" in out
+
+    status_before = _status(team_repo)
+    assert install_sidecar(team_repo, SOURCE, dry_run=True) == 0
+    assert _status(team_repo) == status_before
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert _status(team_repo) == status_before
+    assert unit_dir.read_bytes() == content
+
+    exit_code = uninstall_sidecar(team_repo)
+
+    assert exit_code == 0
+    preserved_root = git_path(team_repo, "ai-bootstrap-sidecar-preserved")
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    assert entries[0].read_bytes() == content
+    assert not unit_dir.exists()
+    assert ".claude/skills/humanize" not in _status(team_repo)
+
+
+# --------------------------------------------------------------------------
+# Phase J step 7: accurate reports and the NITs (Decisions 44, 46; O12,
+# O15, O16, O17)
+# --------------------------------------------------------------------------
+
+
+def test_taken_skill_with_a_conflict_copy_reports_kept_not_skipped(
+    team_repo: Path, capsys
+) -> None:
+    """O12: while a conflict copy remains, a taken skill's other taking
+    paths must report it as kept until the conflict is resolved, never as
+    skipped at every root -- the edited copy the conflict kept is still
+    there. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    edited = team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    edited.write_text(
+        edited.read_text(encoding="utf-8") + "\nEDITED\n", encoding="utf-8"
+    )
+
+    unit_dir = edited.parent
+    file_hashes = {
+        p.relative_to(unit_dir).as_posix(): sidecar_overlay_module.compute_file_hash(
+            p.read_bytes()
+        )
+        for p in sorted(unit_dir.rglob("*"))
+        if p.is_file()
+    }
+    content_hash = sidecar_overlay_module.compute_unit_hash(file_hashes)
+    slug = sidecar_overlay_module.preserved_unit_slug(
+        ".claude/skills/ponytail", content_hash
+    )
+    conflicting = git_path(team_repo, "ai-bootstrap-sidecar-preserved") / slug
+    conflicting.mkdir(parents=True)
+
+    _write(
+        team_repo / ".github" / "skills" / "ponytail" / "SKILL.md", "team elsewhere\n"
+    )
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "kept in place until its edited-copy conflict is resolved" in out
+    assert "skips `ponytail` at every root" not in out
+    assert edited.exists()
+
+
+def test_uninstall_nothing_to_do_prints_preserved_folder_path(
+    team_repo: Path, capsys
+) -> None:
+    """O16: uninstall's own "no sidecar found; nothing to do" path must
+    still print the preserved-copy folder's path whenever it holds
+    anything. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    exit_code_1 = uninstall_sidecar(team_repo)
+    assert exit_code_1 == 0
+    preserved_root = git_path(team_repo, "ai-bootstrap-sidecar-preserved")
+    # This fixture's install/uninstall never has a conflict, so make a
+    # leftover preserved entry by hand to prove the "nothing to do" path
+    # still reports it.
+    leftover = preserved_root / "leftover-from-an-earlier-run"
+    leftover.mkdir(parents=True)
+    (leftover / "notes.txt").write_text("kept\n", encoding="utf-8")
+    capsys.readouterr()
+
+    exit_code_2 = uninstall_sidecar(team_repo)
+
+    assert exit_code_2 == 0
+    out = capsys.readouterr().out
+    assert "no sidecar found; nothing to do" in out
+    assert str(preserved_root) in out
+
+
+def test_cli_uninstall_nothing_to_do_prints_preserved_folder_path(
+    team_repo: Path,
+) -> None:
+    """O16: the CLI's own "no sidecar found; nothing to do" path
+    (install_bootstrap.py) must also print the preserved-copy folder's path
+    whenever it holds anything. Fails on 010f08c."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert uninstall_sidecar(team_repo) == 0
+    preserved_root = git_path(team_repo, "ai-bootstrap-sidecar-preserved")
+    leftover = preserved_root / "leftover-from-an-earlier-run"
+    leftover.mkdir(parents=True)
+    (leftover / "notes.txt").write_text("kept\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo), "--uninstall"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "no sidecar found; nothing to do" in result.stdout
+    assert str(preserved_root) in result.stdout
 
 
 # --------------------------------------------------------------------------

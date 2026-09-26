@@ -29,6 +29,7 @@ from runtime_ownership import (
     FULL_INSTALL_ROOT_PATHS,
     GIT_REPO_LOCAL_ENV_VARS,
     RESTORABLE_ROOT_PATHS,
+    SIDECAR_PRESERVED_NAME,
     STATE_DIR_OWNED_README_PATHS,
     active_ignore_patterns,
     bootstrap_root_paths,
@@ -42,6 +43,8 @@ from sidecar_overlay import (
     ExcludeMarkerError,
     _c_locale_env,
     _read_index_entries,
+    _report_preserved_folder_if_nonempty,
+    git_path,
     install_sidecar,
     rev_parse,
     sidecar_evidence,
@@ -1238,7 +1241,17 @@ def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str
 
 
 def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
-    tracked = tracked_generated_paths(target, patterns)
+    """Warn about tracked generated paths (Decision 44; O17). Called after
+    most of the full install's own writes, so a Git failure here must never
+    abort the run: ``tracked_generated_paths`` can raise ``GitDetectionError``
+    for a Git failure other than "not a git repository" (Decision 27), and
+    that becomes a warning instead of a crash mid-way through an otherwise
+    finished install."""
+    try:
+        tracked = tracked_generated_paths(target, patterns)
+    except GitDetectionError as exc:
+        warn(f"could not check for tracked generated paths: {exc}")
+        return
     if not tracked:
         return
     unique_roots = sorted(
@@ -1380,7 +1393,8 @@ def detect_install_mode(
                 "The sidecar's info/exclude block is shared by every worktree of "
                 "this repository, so this can be true even from a linked worktree "
                 "or a subdirectory. Run without --mode full to keep the sidecar "
-                "overlay, or ask whoever manages the sidecar to remove it first."
+                "overlay, run --uninstall to remove it first, or ask whoever "
+                "manages the sidecar to remove it."
             )
         return "full"
 
@@ -1455,6 +1469,12 @@ def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
         )
     sidecar_ev = _sidecar_evidence(target)
     if not sidecar_ev:
+        try:
+            preserved_root = git_path(target, SIDECAR_PRESERVED_NAME)
+        except (subprocess.CalledProcessError, OSError):
+            preserved_root = None
+        if preserved_root is not None:
+            _report_preserved_folder_if_nonempty(preserved_root)
         info("no sidecar found; nothing to do")
         return 0
     return uninstall_sidecar(target, dry_run=args.dry_run)
