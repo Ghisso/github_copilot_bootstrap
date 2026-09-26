@@ -130,6 +130,10 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   uninstall run preserved a copy.
 - Step 11 part 2 sent to `documenter`. REVIEW part A (steps 1-5, 8, 9;
   all six profiles) started in parallel; the wording fix is outside it.
+- Wording fix landed: "preserved copies are in {preserved_root}; the
+  sidecar never empties this folder". `test_edited_copy_is_preserved_on_uninstall`
+  asserts it for a run that preserves its own copy, and that "an earlier
+  run" never appears.
 
 ## [LEARN] Entries
 
