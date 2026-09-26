@@ -26,17 +26,17 @@ rules"):
   ``.github/instructions/ai-bootstrap-sidecar.instructions.md``).
 * A unit's **hash** is a SHA-256 digest over its files. The exact framing,
   used by both ``compute_unit_hash`` and the manifest it feeds, is: for each
-  file, sorted by its POSIX path relative to the unit, hash the UTF-8 relative
-  path, a NUL byte, the file's own SHA-256 hex digest (ASCII), and a newline;
-  concatenate those records in sorted order and hash the result. The NUL
-  cannot appear in a POSIX relative path and the digest is a fixed-width hex
-  string, so no relative path or digest can be crafted to collide across the
-  framing boundary.
+  file, sorted by its POSIX path relative to the unit, hash the relative
+  path (``os.fsencode``, Decision 29: byte-identical to UTF-8 for every
+  legal name), a NUL byte, the file's own SHA-256 hex digest (ASCII), and a
+  newline; concatenate those records in sorted order and hash the result.
+  The NUL cannot appear in a POSIX relative path and the digest is a
+  fixed-width hex string, so no relative path or digest can be crafted to
+  collide across the framing boundary.
 * A **manifest** records, per unit, its per-file hashes and its unit hash,
   plus the paths of any ``retained`` files (Decision 16, paths only: no
   decision reads a stored hash for them, since a retained file's ledger
-  entry is recomputed from the live snapshot on every run) and a diagnostic
-  ``bootstrap_commit`` that no decision in this module reads.
+  entry is recomputed from the live snapshot on every run).
 
 Preflight checks the planner can decide from data alone are a symlinked unit
 (or a symlinked ancestor) and manifest schema/namespace problems
@@ -75,6 +75,7 @@ from runtime_ownership import (
     SIDECAR_SKILLS,
     SIDECAR_STAGING_NAME,
 )
+from runtime_ownership import sidecar_source_violations as _shared_source_violations
 
 KNOWN_SCHEMA_VERSION = 1
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -82,6 +83,19 @@ _READ_ONLY_ROOTS = tuple(
     root for root in SIDECAR_SKILL_READ_ROOTS if root not in SIDECAR_SKILL_WRITE_ROOTS
 )
 _ESCAPE_CHARS = frozenset("\\*?[")
+
+# Every write root and bridge-parent folder (Decision 28): the structural
+# boundary and filesystem-shape preflight checks these, rather than every
+# individual skill unit. A unit path that does not exist yet always resolves
+# to one of these through the nearest-existing-ancestor walk, so this is
+# equivalent for every currently required test scenario at a fraction of the
+# Git calls.
+# ponytail: a unit that already exists on disk as its own nested clone,
+# without its write root also being one, is not covered; extend this set to
+# every required unit path if that scenario needs the same abort.
+_SIDECAR_STRUCTURAL_PATHS: frozenset[str] = frozenset(
+    SIDECAR_SKILL_WRITE_ROOTS
+) | frozenset(str(PurePosixPath(bridge).parent) for bridge in SIDECAR_BRIDGES)
 
 ActionKind = Literal[
     "install",
@@ -126,6 +140,15 @@ class ManifestError(ValueError):
     """The sidecar manifest is unreadable, malformed, or names an unsafe path."""
 
 
+class ExcludeMarkerError(ValueError):
+    """The sidecar's own exclude-block markers are missing a partner,
+    duplicated, or out of order (Decision 26; S7). Raised by
+    ``_find_exclude_markers``, shared by mode detection (``sidecar_evidence``)
+    and the sidecar's own preflight (``_read_exclude_block``), so both abort
+    the same way before any write instead of silently erasing the person's
+    own ignore lines."""
+
+
 # --------------------------------------------------------------------------
 # Hashing
 # --------------------------------------------------------------------------
@@ -145,7 +168,11 @@ def compute_unit_hash(files: Mapping[str, str]) -> str:
     """
     hasher = hashlib.sha256()
     for relpath in sorted(files):
-        hasher.update(relpath.encode("utf-8"))
+        # os.fsencode, not .encode("utf-8") (Decision 29): byte-identical to
+        # UTF-8 for every legal name, so existing hashes are unchanged, but
+        # it never raises on a relative path holding a surrogate-escaped
+        # non-UTF-8 byte from a Git query decoded with os.fsdecode.
+        hasher.update(os.fsencode(relpath))
         hasher.update(b"\0")
         hasher.update(files[relpath].encode("ascii"))
         hasher.update(b"\n")
@@ -184,7 +211,6 @@ class Manifest:
     """
 
     schema_version: int
-    bootstrap_commit: str
     units: Mapping[str, ManifestUnit]
     retained: frozenset[str]
 
@@ -280,9 +306,9 @@ def parse_manifest(text: str) -> Manifest:
     if schema_version != KNOWN_SCHEMA_VERSION:
         raise ManifestError(f"unknown schema_version: {schema_version!r}")
 
-    bootstrap_commit = raw.get("bootstrap_commit", "")
-    if not isinstance(bootstrap_commit, str):
-        raise ManifestError("bootstrap_commit must be a string")
+    # bootstrap_commit (Decision 33, R6): no longer written, but an old
+    # manifest that still carries it must keep parsing; the key is simply
+    # ignored on read.
 
     units_raw = raw.get("units", {})
     if not isinstance(units_raw, dict):
@@ -306,7 +332,6 @@ def parse_manifest(text: str) -> Manifest:
 
     return Manifest(
         schema_version=schema_version,
-        bootstrap_commit=bootstrap_commit,
         units=units,
         retained=frozenset(retained),
     )
@@ -320,7 +345,6 @@ def serialize_manifest(manifest: Manifest) -> bytes:
     """
     payload = {
         "schema_version": manifest.schema_version,
-        "bootstrap_commit": manifest.bootstrap_commit,
         "units": {
             unit_path: {"files": dict(record.files), "hash": record.hash}
             for unit_path, record in manifest.units.items()
@@ -558,6 +582,12 @@ class ExcludeBlockContents:
     listed_units: frozenset[str] = frozenset()
     listed_files: frozenset[str] = frozenset()
     unrecognized_lines: tuple[str, ...] = ()
+    has_block: bool = False
+    """Whether a balanced BEGIN/END pair is present at all -- true even for
+    an entirely empty block, or one that holds only unrecognized lines.
+    ``listed_units``/``listed_files``/``unrecognized_lines`` being all empty
+    cannot tell "no block" apart from "an empty block"; this field can
+    (Decision 34, S18: uninstall's own "is a sidecar present" definition)."""
 
 
 def parse_exclude_block(text: str) -> ExcludeBlockContents:
@@ -570,12 +600,17 @@ def parse_exclude_block(text: str) -> ExcludeBlockContents:
     file line is one whose unescaped path passes ``_validate_retained_path``
     and re-escapes to the same line. Any other line is kept and reported
     once, so a run never un-hides a file through a line it does not
-    understand.
+    understand. Raises ``ExcludeMarkerError`` when the markers are
+    unbalanced or repeated (Decision 26).
     """
+    markers = _find_exclude_markers(text.splitlines())
+    if markers is None:
+        return ExcludeBlockContents()
+    begin, end = markers
     listed_units: set[str] = set()
     listed_files: set[str] = set()
     unrecognized: list[str] = []
-    for line in _extract_sidecar_block_lines(text):
+    for line in text.splitlines()[begin + 1 : end]:
         path = unescape_exact_path(line)
         if path is not None and escape_exact_path(path) == line:
             try:
@@ -597,6 +632,7 @@ def parse_exclude_block(text: str) -> ExcludeBlockContents:
         listed_units=frozenset(listed_units),
         listed_files=frozenset(listed_files),
         unrecognized_lines=tuple(unrecognized),
+        has_block=True,
     )
 
 
@@ -682,6 +718,28 @@ def _retained_remedy(path: str) -> str:
     )
 
 
+def _can_express_in_gitignore(relative_path: str) -> bool:
+    """Return whether ``relative_path`` can get its own exact-match
+    gitignore line (Decision 29). gitignore reads patterns line by line and
+    strips one trailing carriage return, so a name that itself contains a
+    newline anywhere, or ends in a carriage return, can never be expressed:
+    such a name must never get a line, even transiently during the gate."""
+    return "\n" not in relative_path and not relative_path.endswith("\r")
+
+
+def _unexpressible_retained_remedy(path: str) -> str:
+    return (
+        f"`{path}` cannot be hidden: its name contains a newline or ends "
+        "with a carriage return, which gitignore cannot match. It stays "
+        "visible in `git status`; rename it without those characters if "
+        "you want it hidden"
+    )
+
+
+def _now_visible_remedy(path: str) -> str:
+    return f"`{path}` is no longer hidden; it is now visible to `git add -A`"
+
+
 def _unrecognized_line_remedy(line: str) -> str:
     return (
         f"the sidecar does not recognize `{line}` in its own exclude block "
@@ -698,7 +756,21 @@ def _preserved_remedy(unit_path: str) -> str:
     )
 
 
-def _preserve_conflict_remedy(unit_path: str, preserved_path: str) -> str:
+def _preserve_conflict_remedy(
+    unit_path: str, preserved_path: str, *, unfinished: bool = False
+) -> str:
+    if unfinished:
+        # An unfinished sidecar copy has no manifest record to begin with
+        # (Decision 23): its own exclude-block line is its only ownership
+        # proof, so say that plainly instead of the "local edits" wording
+        # that fits a locally modified, recorded unit.
+        return (
+            f"`{unit_path}` is an unfinished sidecar copy the sidecar cannot "
+            f"verify, and a preserved copy already sits at `{preserved_path}`; "
+            f"the sidecar keeps `{unit_path}` in place, still hidden by its own "
+            "exclude line (it has no manifest record). Resolve the two copies "
+            "by hand, then rerun"
+        )
     return (
         f"`{unit_path}` has local edits, and a preserved copy already sits at "
         f"`{preserved_path}`; the sidecar keeps `{unit_path}` in place. "
@@ -727,6 +799,7 @@ def _team_takeover(
     snapshot: UnitSnapshot,
     record: ManifestUnit | None,
     desired: DesiredUnit | None,
+    uninstall: bool = False,
 ) -> _UnitOutcome:
     """Classify a tracked unit as a team takeover (Decision 16, 23, 25).
 
@@ -735,6 +808,11 @@ def _team_takeover(
     (Decision 23): a crash during an update can leave a stale record while
     the swap already landed the new bytes, and a unit that is merely listed
     (no record yet) has only the desired content as its ownership reference.
+
+    ``uninstall`` (Decision 34): a file that would otherwise be retained
+    (kept hidden) instead gets no line at all and the "now visible" report,
+    the same as every other already-retained file during an uninstall --
+    even when this run is the very first one to see this team takeover.
     """
     record_files = record.files if record is not None else {}
     desired_files = desired.files if desired is not None else {}
@@ -756,10 +834,21 @@ def _team_takeover(
             desired_files.get(relpath) == current_hash
         ):
             actions.append(Action("team_takeover_delete", unit_path, full_path))
-        elif relpath in snapshot.ignored_files:
+        elif relpath in snapshot.ignored_files and uninstall:
+            reports.append(
+                Report("RETAINED", full_path, _now_visible_remedy(full_path))
+            )
+        elif relpath in snapshot.ignored_files and _can_express_in_gitignore(full_path):
             actions.append(Action("retain", unit_path, full_path))
             retained_here.add(full_path)
             reports.append(Report("RETAINED", full_path, _retained_remedy(full_path)))
+        elif relpath in snapshot.ignored_files:
+            # Decision 29: gitignore cannot express this name (a newline or
+            # a trailing carriage return), so it never gets a line and stays
+            # visible instead of being silently un-hidden later.
+            reports.append(
+                Report("RETAINED", full_path, _unexpressible_retained_remedy(full_path))
+            )
         # else: a visible untracked file that does not match the record is
         # left alone: no action, no record, no line.
     return _UnitOutcome(
@@ -773,13 +862,14 @@ def _classify_unit(
     record: ManifestUnit | None,
     desired: DesiredUnit | None,
     excluded_units: AbstractSet[str],
+    uninstall: bool = False,
 ) -> _UnitOutcome:
     if snapshot.tracked_files:
         if record is not None or unit_path in excluded_units:
             # Tracked, and either recorded or merely listed (Decision 23):
             # team takeover either way. A listed-only unit uses the desired
             # content as its ownership reference.
-            return _team_takeover(unit_path, snapshot, record, desired)
+            return _team_takeover(unit_path, snapshot, record, desired, uninstall)
         report = Report(
             "SKIPPED", unit_path, _team_owned_remedy(unit_path, snapshot.tracked_files)
         )
@@ -936,16 +1026,23 @@ def _extra_taking_paths(
     return frozenset(paths)
 
 
+def _preserved_uninstall_remedy(unit_path: str) -> str:
+    skill = _skill_name(unit_path) or unit_path
+    return f"the sidecar was uninstalled, so your edited copy of `{skill}` was moved out of the client folders"
+
+
 def _convert_for_taken_skill(
     unit_path: str,
     outcome: _UnitOutcome,
     preserved_conflicts: AbstractSet[str],
     preserved_destinations: Mapping[str, str],
+    uninstall: bool = False,
 ) -> _UnitOutcome:
     """Convert one taken skill's unit outcome to an allowed one (Decisions
-    22 and 24). Looks the target up in an allowlist, not an enumerated
-    switch, so a future outcome kind fails loudly instead of silently
-    escaping team precedence the way ``adopt`` once did (R1)."""
+    22 and 24; uninstall reuses this for every skill and bridge, Decision
+    34). Looks the target up in an allowlist, not an enumerated switch, so a
+    future outcome kind fails loudly instead of silently escaping team
+    precedence the way ``adopt`` once did (R1)."""
     target = _TAKEN_OUTCOME_CONVERSION[outcome.kind]
     if target == "noop":
         return _UnitOutcome("noop", None, [], [], frozenset(), False, False)
@@ -957,7 +1054,11 @@ def _convert_for_taken_skill(
         destination = preserved_destinations.get(unit_path, "")
         if unit_path in preserved_conflicts:
             report = Report(
-                "SKIPPED", unit_path, _preserve_conflict_remedy(unit_path, destination)
+                "SKIPPED",
+                unit_path,
+                _preserve_conflict_remedy(
+                    unit_path, destination, unfinished=outcome.kind == "unfinished"
+                ),
             )
             return _UnitOutcome(
                 outcome.kind,
@@ -968,7 +1069,12 @@ def _convert_for_taken_skill(
                 outcome.line_write,
                 outcome.line_final,
             )
-        report = Report("PRESERVED", unit_path, _preserved_remedy(unit_path))
+        remedy = (
+            _preserved_uninstall_remedy(unit_path)
+            if uninstall
+            else _preserved_remedy(unit_path)
+        )
+        report = Report("PRESERVED", unit_path, remedy)
         return _UnitOutcome(
             "preserve",
             None,
@@ -996,7 +1102,7 @@ def plan_sidecar_reconciliation(
     ignorecase: bool = False,
     preserved_conflicts: AbstractSet[str] = frozenset(),
     preserved_destinations: Mapping[str, str] | None = None,
-    bootstrap_commit: str = "",
+    uninstall: bool = False,
 ) -> PlanResult:
     """Plan one sidecar reconciliation run. Performs no I/O.
 
@@ -1040,8 +1146,15 @@ def plan_sidecar_reconciliation(
             24: the caller precomputes this so dry-run matches a real run).
         preserved_destinations: Unit path -> the display string for its
             preserved-copy destination, real or candidate.
-        bootstrap_commit: A diagnostic value carried into the next manifest.
-            No decision here reads it back.
+        uninstall: Reconcile toward removing the sidecar entirely (Decision
+            34; the small plan's step 9), with an empty ``desired_units``.
+            Every skill and every bridge is treated as taken, so every unit
+            converts to remove (unchanged/update/adopt), preserve (locally
+            modified/unfinished), or noop (install), exactly like a taken
+            skill's units already do; every carried-forward retained file
+            loses its record and its line instead of being re-hidden, so it
+            becomes visible; and every well-known unit is included even
+            with no record, no exclude line, and nothing on disk.
 
     Returns:
         A ``PlanResult``. When ``aborts`` is non-empty, every other field is
@@ -1051,6 +1164,16 @@ def plan_sidecar_reconciliation(
     preserved_destinations = preserved_destinations or {}
 
     required = required_snapshot_units(desired_units, manifest, excluded_units)
+    if uninstall:
+        required = (
+            required
+            | frozenset(
+                f"{write_root}/{skill}"
+                for write_root in SIDECAR_SKILL_WRITE_ROOTS
+                for skill in SIDECAR_SKILLS
+            )
+            | frozenset(SIDECAR_BRIDGES)
+        )
     symlinked = sorted(
         unit for unit in required if snapshots.get(unit, UnitSnapshot()).symlinked
     )
@@ -1064,7 +1187,7 @@ def plan_sidecar_reconciliation(
         record = manifest.units.get(unit_path) if manifest is not None else None
         desired = desired_units.get(unit_path)
         outcomes[unit_path] = _classify_unit(
-            unit_path, snapshot, record, desired, excluded_units
+            unit_path, snapshot, record, desired, excluded_units, uninstall
         )
 
     # One precedence decision per skill (Decision 22): a skill is taken by
@@ -1097,15 +1220,30 @@ def plan_sidecar_reconciliation(
                 Report("SKIPPED", path, _read_only_taken_remedy(path, skill))
             )
 
-    for skill in taken_skills:
-        for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-            unit_path = f"{write_root}/{skill}"
-            outcome = outcomes.get(unit_path)
-            if outcome is None or outcome.kind in _ALLOWED_TAKEN_OUTCOMES:
-                continue
-            outcomes[unit_path] = _convert_for_taken_skill(
-                unit_path, outcome, preserved_conflicts, preserved_destinations
-            )
+    if uninstall:
+        # Decision 34: every skill and every bridge is taken, so the exact
+        # same conversion a taken skill's units already get (remove/preserve/
+        # noop) applies uniformly, including to bridges, which the ordinary
+        # taken-skill precedence never touches.
+        taken_skills = set(SIDECAR_SKILLS)
+    taken_units = {
+        f"{write_root}/{skill}"
+        for skill in taken_skills
+        for write_root in SIDECAR_SKILL_WRITE_ROOTS
+    }
+    if uninstall:
+        taken_units |= set(_ALL_BRIDGES)
+    for unit_path in taken_units:
+        outcome = outcomes.get(unit_path)
+        if outcome is None or outcome.kind in _ALLOWED_TAKEN_OUTCOMES:
+            continue
+        outcomes[unit_path] = _convert_for_taken_skill(
+            unit_path,
+            outcome,
+            preserved_conflicts,
+            preserved_destinations,
+            uninstall=uninstall,
+        )
 
     # Carry forward retained files: everything the manifest already tracks,
     # plus every file-level line the exclude block still lists (Decision 23:
@@ -1133,6 +1271,21 @@ def plan_sidecar_reconciliation(
             or relpath not in owner_snapshot.file_hashes
         ):
             retained_actions.append(Action("drop_record", owner or path, path))
+            continue
+        if uninstall:
+            # Decision 34: uninstall un-hides every retained file instead of
+            # re-hiding it, regardless of whether its name could be
+            # expressed as a line in the first place.
+            retained_actions.append(Action("drop_record", owner or path, path))
+            retained_reports.append(Report("RETAINED", path, _now_visible_remedy(path)))
+            continue
+        if not _can_express_in_gitignore(path):
+            # Decision 29: never write a line for this name; it stays
+            # visible and is reported every run instead of being dropped
+            # from the manifest's retained set into a false "not ours".
+            retained_reports.append(
+                Report("RETAINED", path, _unexpressible_retained_remedy(path))
+            )
             continue
         next_retained.add(path)
         retained_line_paths.add(path)
@@ -1180,7 +1333,6 @@ def plan_sidecar_reconciliation(
 
     next_manifest = Manifest(
         schema_version=KNOWN_SCHEMA_VERSION,
-        bootstrap_commit=bootstrap_commit,
         units=next_units,
         retained=frozenset(next_retained),
     )
@@ -1198,57 +1350,106 @@ def plan_sidecar_reconciliation(
 # --- Git queries shared by mode detection and the apply step -----------------
 
 
+def _c_locale_env() -> dict[str, str]:
+    """Return a copy of the process environment with ``LC_ALL=C`` (Decision
+    27), so Git's own error messages are in English regardless of the
+    person's locale. Every caller that classifies Git's stderr text (for
+    example "not a git repository") needs this, or the classification
+    silently stops matching under a non-English locale."""
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    return env
+
+
+def _git_rev_parse_or_raise(target: Path, *args: str) -> str:
+    """Run ``git rev-parse --path-format=absolute <args>`` and return its
+    one line of output, raising ``CalledProcessError`` (with ``stderr``
+    populated) on failure, with ``LC_ALL=C`` so a caller can classify that
+    failure (Decision 27). Shared by ``git_path`` and by
+    ``sidecar_evidence``'s own Git-directory and common-directory lookups,
+    so both use exactly one implementation of "run this rev-parse and raise
+    like a caller can classify"."""
+    result = subprocess.run(
+        ["git", "-C", str(target), "rev-parse", "--path-format=absolute", *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=_c_locale_env(),
+    )
+    return result.stdout.removesuffix("\n")
+
+
 def git_path(target: Path, name: str) -> Path:
     """Return the absolute path of a Git-directory file of ``target``.
 
     ``--path-format=absolute`` matters: plain ``--git-path`` prints a relative
     path in the main worktree. ``info/exclude`` resolves to the common Git
-    directory, shared by every worktree; the manifest is per worktree.
+    directory, shared by every worktree; the manifest is per worktree. Read
+    only, for reporting: never a detection or a write path (Decision 26
+    moved the manifest, staging, and preserved paths off this function, and
+    Decision 27/the orchestrator finding moved sidecar_evidence's own
+    manifest/exclude lookups off it too, since ``--git-path`` resolves
+    symlinks in the path -- exactly the thing both of those checks exist to
+    catch).
     """
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(target),
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-path",
-            name,
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return Path(result.stdout.removesuffix("\n"))
+    return Path(_git_rev_parse_or_raise(target, "--git-path", name))
 
 
 def sidecar_evidence(target: Path) -> tuple[str, ...]:
     """Describe the sidecar evidence in ``target``, or return ``()``.
 
-    Evidence is a manifest file at the Git-directory path, valid or not, or
-    the sidecar marker block in ``info/exclude``.
+    Evidence is a manifest file at the Git-directory path, valid or not
+    (including a dangling symlink), or the sidecar marker block in
+    ``info/exclude``. Both paths are built directly from ``--git-dir`` and
+    ``--path-format=absolute --git-common-dir`` (never through
+    ``git_path()``'s ``--git-path``, which resolves a symlink at the final
+    path component before printing it -- the orchestrator finding: that
+    silently hid a dangling manifest symlink, and silently read a symlinked
+    ``info/exclude`` through the link, instead of treating it by its own
+    type). ``info/exclude`` is checked with ``lstat`` and never opened
+    unless it is a regular file (Decision 27): a non-regular one (folder,
+    pipe, symlink) is simply not sidecar evidence -- sidecar preflight
+    refuses it (Decision 26). Raises ``ExcludeMarkerError`` when a regular
+    ``info/exclude`` carries unbalanced or repeated sidecar markers
+    (Decision 26; S7); the caller must abort detection in every mode.
     """
     evidence = []
-    manifest = git_path(target, SIDECAR_MANIFEST_NAME)
-    if manifest.exists() or manifest.is_symlink():
+    git_dir = Path(_git_rev_parse_or_raise(target, "--git-dir"))
+    manifest = git_dir / SIDECAR_MANIFEST_NAME
+    if os.path.lexists(manifest):
         evidence.append(f"sidecar manifest {manifest}")
-    exclude = git_path(target, "info/exclude")
+    git_common_dir = Path(_git_rev_parse_or_raise(target, "--git-common-dir"))
+    exclude = git_common_dir / "info" / "exclude"
     try:
-        lines = exclude.read_text(encoding="utf-8").splitlines()
-    except (FileNotFoundError, NotADirectoryError):
-        lines = []
-    if SIDECAR_EXCLUDE_BEGIN in lines:
-        evidence.append(f"sidecar block in {exclude}")
+        exclude_lstat = os.lstat(exclude)
+    except OSError:
+        exclude_lstat = None
+    if exclude_lstat is not None and stat.S_ISREG(exclude_lstat.st_mode):
+        lines = os.fsdecode(exclude.read_bytes()).splitlines()
+        if _find_exclude_markers(lines) is not None:
+            evidence.append(f"sidecar block in {exclude}")
     return tuple(evidence)
 
 
 _GIT_VERSION_RE = re.compile(r"git version (\d+)\.(\d+)(?:\.(\d+))?")
 _MIN_GIT_VERSION = (2, 31, 0)
 
-_INVALID_MANIFEST_REMEDY = (
-    "move the manifest aside and rerun with --mode sidecar. Units that the "
-    "exclude block lists and that match current content are adopted. Any "
-    "other sidecar file is reported as foreign and stops being ignored."
+
+def _invalid_manifest_remedy(manifest_path: Path) -> str:
+    """The big plan's exact remedy text (Decision 36; S16): a listed unit
+    that does not match current content stays hidden and reported, it is
+    never exposed as foreign, so this must not warn people it will vanish."""
+    return (
+        f"move `{manifest_path}` aside and rerun with --mode sidecar. Units "
+        "that the exclude block lists are recovered: matching units are "
+        "adopted, and any other listed unit is kept hidden and reported. "
+        "Keep the old manifest until the report looks right."
+    )
+
+
+_EXCLUDE_MARKER_REMEDY = (
+    "fix info/exclude by hand: the sidecar's own BEGIN/END markers must "
+    "appear exactly once each, with BEGIN before END, then rerun"
 )
 
 
@@ -1262,6 +1463,12 @@ def _fault_point(name: str) -> None:
     already moved into staging, but the new copy has not replaced it yet),
     and ``"before_manifest_write"`` (every unit and file action is done and
     the final exclude block is written, but the manifest is not yet).
+
+    Uninstall (Decision 34) reuses ``"before_manifest_write"`` for its own,
+    same-named last step (the manifest is deleted or rewritten there
+    instead of written fresh), and adds ``"after_units_removed"``: every
+    unit has been removed or preserved, but the exclude block still holds
+    its pre-uninstall bytes.
     """
 
 
@@ -1312,30 +1519,172 @@ def _device_id(path: Path) -> int:
     return os.stat(path).st_dev
 
 
-def _is_sidecar_unit_file(relative: str) -> bool:
-    """Return whether a source-relative file path belongs to the sidecar."""
-    if relative in SIDECAR_BRIDGES:
-        return True
-    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-        prefix = f"{write_root}/"
-        if relative.startswith(prefix):
-            skill, _, rest = relative[len(prefix) :].partition("/")
-            if skill in SIDECAR_SKILLS and rest:
-                return True
-    return False
+def _lstat_or_none(path: Path) -> os.stat_result | None:
+    """Return ``os.lstat(path)``, or ``None`` when it does not exist. Uses
+    the plain ``os`` function, not ``Path.lstat``, so a test can monkeypatch
+    ``os.lstat`` to fake a path's type or device (Decision 26, 28)."""
+    try:
+        return os.lstat(path)
+    except OSError:
+        return None
+
+
+def _nearest_existing_ancestor(target: Path, relative: str) -> Path:
+    """Return the nearest existing ancestor of ``target/relative``: the path
+    itself if it exists (a symlink counts), otherwise the first existing
+    parent found by walking upward. Always terminates at ``target``, which
+    the caller has already confirmed exists (Decision 28)."""
+    current = target / PurePosixPath(relative)
+    while current != target and _lstat_or_none(current) is None:
+        current = current.parent
+    return current
+
+
+_NESTED_REPO_REMEDY = "move or remove the nested repository or submodule, then rerun"
+
+
+def _nested_repo_message(relative: str) -> str:
+    return (
+        f"sidecar mode does not support the nested repository or submodule "
+        f"at `{relative}`; nothing was written"
+    )
+
+
+def _repository_boundary_violations(
+    target: Path,
+    planned_relatives: AbstractSet[str],
+    index_entries: Sequence[tuple[str, str]],
+) -> tuple[str, ...]:
+    """Decision 28: abort before any write when a planned path's nearest
+    existing ancestor belongs to another Git repository -- a nested clone,
+    proven by ``git rev-parse --show-toplevel`` reporting a different
+    toplevel, or an unpopulated submodule, proven by a gitlink (mode
+    ``160000``) at or above the path in the outer index (Phase G's index
+    reader, reused here rather than a second one)."""
+    violations: list[str] = []
+    target_resolved = target.resolve()
+    for relative in sorted(planned_relatives):
+        parts = PurePosixPath(relative).parts
+        ancestor_relatives = {
+            "/".join(parts[:index]) for index in range(1, len(parts) + 1)
+        }
+        gitlinked = next(
+            (
+                path
+                for mode, path in index_entries
+                if mode == "160000" and path in ancestor_relatives
+            ),
+            None,
+        )
+        if gitlinked is not None:
+            violations.append(_nested_repo_message(gitlinked))
+            continue
+        ancestor = _nearest_existing_ancestor(target, relative)
+        if ancestor == target:
+            continue
+        info = _lstat_or_none(ancestor)
+        if info is None or not stat.S_ISDIR(info.st_mode):
+            continue  # a different check (filesystem shape) reports this
+        toplevel = rev_parse(ancestor, "--show-toplevel")
+        if toplevel is not None and Path(toplevel).resolve() != target_resolved:
+            violations.append(
+                _nested_repo_message(ancestor.relative_to(target).as_posix())
+            )
+    return tuple(violations)
+
+
+def _symlinked_projection_parent_message(relative: str) -> str:
+    return (
+        f"sidecar mode does not support a symlinked skill folder or "
+        f"projection parent at `{relative}`; nothing was written"
+    )
+
+
+def _filesystem_shape_violations(
+    target: Path, planned_relatives: AbstractSet[str]
+) -> tuple[str, ...]:
+    """Decision 28: abort before any write when an existing ancestor of a
+    planned path is not a real folder, or sits on a different device than
+    ``target``. A symlinked ancestor (Decision 36; S16) gets its own message
+    naming it as a symlinked projection parent, not a generic shape error --
+    and never tells the person to replace tracked team content."""
+    violations: list[str] = []
+    target_device = _device_id(target)
+    for relative in sorted(planned_relatives):
+        ancestor = _nearest_existing_ancestor(target, relative)
+        if ancestor == target:
+            continue
+        info = _lstat_or_none(ancestor)
+        if info is None:
+            continue
+        display = ancestor.relative_to(target).as_posix()
+        if stat.S_ISLNK(info.st_mode):
+            violations.append(_symlinked_projection_parent_message(display))
+        elif not stat.S_ISDIR(info.st_mode):
+            violations.append(f"{display} exists and is not a folder")
+        elif info.st_dev != target_device:
+            violations.append(f"{display} is on a different filesystem than {target}")
+    return tuple(violations)
+
+
+def _iter_dirs_under(base: Path) -> list[Path]:
+    """Return ``base`` and every folder inside it, for a writability sweep
+    before a destructive move, replace, or removal (Decision 28). Returns
+    ``[]`` when ``base`` is not a real, unlinked folder."""
+    if base.is_symlink() or not base.is_dir():
+        return []
+    dirs = [base]
+    dirs.extend(
+        entry
+        for entry in sorted(base.rglob("*"))
+        if entry.is_dir() and not entry.is_symlink()
+    )
+    return dirs
+
+
+def _unwritable_paths_for_actions(
+    target: Path, actions: Sequence[Action]
+) -> tuple[Path, ...]:
+    """Decision 28: every folder a planned action must move, replace, or
+    empty needs write access -- the parent of every unit that moves, every
+    unit folder that itself moves, and every folder inside a unit that is
+    removed, replaced, or later emptied from staging. Checked with
+    ``os.access`` before any write.
+
+    A unit's parent that does not exist yet (a fresh install under a write
+    root nobody has created on this run) is not itself checked: ``mkdir``
+    creates it later, so its nearest *existing* ancestor is what must be
+    writable instead.
+    """
+    check: set[Path] = set()
+    for action in actions:
+        if action.kind not in ("install", "update", "remove", "preserve"):
+            continue
+        parent_relative = str(PurePosixPath(action.unit).parent)
+        parent = (
+            target
+            if parent_relative == "."
+            else _nearest_existing_ancestor(target, parent_relative)
+        )
+        check.add(parent)
+        if action.kind in ("update", "remove", "preserve"):
+            check.update(_iter_dirs_under(target / PurePosixPath(action.unit)))
+    return tuple(sorted(path for path in check if not os.access(path, os.W_OK)))
 
 
 def _sidecar_source_violations(source: Path) -> tuple[str, ...]:
-    """Return every file under ``source`` outside the sidecar namespace."""
-    return tuple(
-        relative
-        for relative in (
-            file_path.relative_to(source).as_posix()
-            for file_path in sorted(source.rglob("*"))
-            if file_path.is_file()
-        )
-        if not _is_sidecar_unit_file(relative)
+    """Return every way ``source`` fails the exact sidecar source contract
+    (Decision 31; S13, S14, L2): a file outside the shared allowlist, an
+    empty source, or a skill shipped at one write root only. Shares its
+    logic with the generated-target validator (``sidecar_source_violations``
+    in ``runtime_ownership.py``), so a crafted tree gets the same verdict
+    from both."""
+    present = frozenset(
+        file_path.relative_to(source).as_posix()
+        for file_path in sorted(source.rglob("*"))
+        if file_path.is_file()
     )
+    return _shared_source_violations(present)
 
 
 def _is_symlinked_ancestor(target: Path, relative: str) -> bool:
@@ -1369,6 +1718,7 @@ def _read_index_entries(target: Path) -> tuple[tuple[str, str], ...]:
         ["git", "-C", str(target), "ls-files", "-s", "-z"],
         capture_output=True,
         check=True,
+        env=_c_locale_env(),
     )
     entries: list[tuple[str, str]] = []
     for part in result.stdout.split(b"\0"):
@@ -1401,19 +1751,19 @@ def _ignorecase(target: Path) -> bool:
 def _check_ignore(target: Path, paths: Sequence[str]) -> frozenset[str]:
     """Return the subset of ``paths`` that ``git check-ignore`` reports as
     currently ignored. Uses ``--stdin -z`` so an unusual name (embedded
-    newline, non-ASCII byte) round-trips exactly."""
+    newline, non-ASCII byte) round-trips exactly. Bytes-safe (Decision 29):
+    encodes and decodes with ``os.fsencode``/``os.fsdecode``, never strict
+    UTF-8, so a legal but non-UTF-8 Git path never crashes the run."""
     if not paths:
         return frozenset()
-    payload = ("\0".join(paths) + "\0").encode("utf-8")
+    payload = os.fsencode("\0".join(paths) + "\0")
     result = subprocess.run(
         ["git", "-C", str(target), "check-ignore", "--stdin", "-z"],
         input=payload,
         capture_output=True,
         check=False,
     )
-    return frozenset(
-        part.decode("utf-8") for part in result.stdout.split(b"\0") if part
-    )
+    return frozenset(os.fsdecode(part) for part in result.stdout.split(b"\0") if part)
 
 
 def _full_relpath(unit_path: str, relpath: str) -> str:
@@ -1686,23 +2036,51 @@ def _declared_skill_names(target: Path) -> dict[str, frozenset[str]]:
     return {name: frozenset(paths) for name, paths in declared.items()}
 
 
-def _extract_sidecar_block_lines(text: str) -> list[str]:
-    lines = text.splitlines()
-    try:
-        begin = lines.index(SIDECAR_EXCLUDE_BEGIN)
-        end = lines.index(SIDECAR_EXCLUDE_END, begin + 1)
-    except ValueError:
-        return []
-    return lines[begin + 1 : end]
+def _find_exclude_markers(lines: Sequence[str]) -> tuple[int, int] | None:
+    """Return the 0-based ``(begin_index, end_index)`` of the sidecar's own
+    BEGIN/END markers in ``lines``, or ``None`` when neither marker line is
+    present at all (the ordinary "no sidecar block yet" case).
+
+    Raises ``ExcludeMarkerError``, naming every marker line found (1-based),
+    for anything else: an orphan BEGIN, an END with no earlier BEGIN, two
+    blocks, or a repeated BEGIN or END (Decision 26; S7). Shared by mode
+    detection (``sidecar_evidence``) and the sidecar's own preflight
+    (``_read_exclude_block``), so both refuse the same malformed block
+    before any write instead of one of them silently erasing the person's
+    own ignore lines.
+    """
+    begins = [
+        index for index, line in enumerate(lines) if line == SIDECAR_EXCLUDE_BEGIN
+    ]
+    ends = [index for index, line in enumerate(lines) if line == SIDECAR_EXCLUDE_END]
+    if not begins and not ends:
+        return None
+    if len(begins) == 1 and len(ends) == 1 and begins[0] < ends[0]:
+        return begins[0], ends[0]
+    found = sorted(
+        [(index + 1, "BEGIN") for index in begins]
+        + [(index + 1, "END") for index in ends]
+    )
+    detail = ", ".join(f"{kind} at line {line}" for line, kind in found)
+    raise ExcludeMarkerError(
+        f"the sidecar's exclude-block markers in info/exclude are unbalanced "
+        f"or repeated: {detail}"
+    )
 
 
 def _read_exclude_block(exclude_path: Path) -> ExcludeBlockContents:
-    """Read and parse the sidecar's own exclude block (Decision 23)."""
+    """Read and parse the sidecar's own exclude block (Decision 23).
+
+    Reads bytes and decodes with ``os.fsdecode`` (Decision 29), so a
+    non-UTF-8 byte in an existing personal ignore line never crashes the
+    run. Raises ``ExcludeMarkerError`` when the markers are unbalanced or
+    repeated (Decision 26); the caller must check for that before any write.
+    """
     try:
-        text = exclude_path.read_text(encoding="utf-8")
+        data = exclude_path.read_bytes()
     except (FileNotFoundError, NotADirectoryError, OSError):
         return ExcludeBlockContents()
-    return parse_exclude_block(text)
+    return parse_exclude_block(os.fsdecode(data))
 
 
 # --------------------------------------------------------------------------
@@ -1731,6 +2109,33 @@ def _replace_exclude_block(original_text: str, lines: Sequence[str]) -> str:
         return before + block_text + after
     separator = "" if not original_text or original_text.endswith("\n") else "\n"
     return f"{original_text}{separator}{block_text}"
+
+
+def _remove_exclude_block(original_text: str, replacement_lines: Sequence[str]) -> str:
+    """Return ``original_text`` with the sidecar's own BEGIN/END markers and
+    everything between them removed entirely, and ``replacement_lines``
+    written back as plain lines at that same position (Decision 34; the
+    small plan's uninstall step): a line the sidecar never understood must
+    survive the block's own markers, not vanish with them. Preserves every
+    byte outside the block, the same way ``_replace_exclude_block`` does.
+    Returns ``original_text`` unchanged when there is no block to remove.
+    """
+    file_lines = original_text.splitlines(keepends=True)
+    begin_index: int | None = None
+    end_index: int | None = None
+    for index, line in enumerate(file_lines):
+        stripped = line.rstrip("\r\n")
+        if begin_index is None and stripped == SIDECAR_EXCLUDE_BEGIN:
+            begin_index = index
+        elif begin_index is not None and stripped == SIDECAR_EXCLUDE_END:
+            end_index = index
+            break
+    if begin_index is None or end_index is None:
+        return original_text
+    before = "".join(file_lines[:begin_index])
+    after = "".join(file_lines[end_index + 1 :])
+    replacement_text = "\n".join(replacement_lines) + "\n" if replacement_lines else ""
+    return before + replacement_text + after
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
@@ -1787,15 +2192,38 @@ def _write_raw_paths(plan_result: PlanResult) -> frozenset[str]:
 # --------------------------------------------------------------------------
 
 
+_NO_MATCHING_RULE = (
+    "no matching rule (visible); a rule ending in `/` in a .gitignore file or "
+    "in info/exclude may be un-ignoring the folder (Git cannot name a "
+    "directory-only rule for a path that does not exist yet)"
+)
+
+
 def _parse_check_ignore_verbose(
-    output: str, expected: AbstractSet[str]
+    output: bytes, expected: AbstractSet[str]
 ) -> tuple[tuple[str, str], ...]:
+    """Parse ``git check-ignore -v -n -z --stdin``'s output: each requested
+    path is one NUL-separated ``source, linenum, pattern, pathname`` record
+    (verified in scratch against Git 2.43), so a legal but non-UTF-8 or
+    embedded-newline path never breaks the split the way a line-oriented
+    parse would (Decision 29). All three of ``source``/``linenum``/``pattern``
+    come back empty for a directory-only rule matched against a path that
+    does not exist on disk yet (Decision 36; S15, S16)."""
+    fields = output.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields = fields[:-1]
     failing: list[tuple[str, str]] = []
-    for line in output.splitlines():
-        prefix, sep, pathname = line.rpartition("\t")
-        if not sep or pathname not in expected:
+    for index in range(0, len(fields) - 3, 4):
+        source, linenum, pattern, raw_pathname = fields[index : index + 4]
+        pathname = os.fsdecode(raw_pathname)
+        if pathname not in expected:
             continue
-        rule = prefix if prefix.strip(":") else "no matching rule (visible)"
+        if source or linenum or pattern:
+            rule = (
+                f"{os.fsdecode(source)}:{os.fsdecode(linenum)}:{os.fsdecode(pattern)}"
+            )
+        else:
+            rule = _NO_MATCHING_RULE
         failing.append((pathname, rule))
     return tuple(failing)
 
@@ -1832,7 +2260,7 @@ def run_ignore_gate(
         temp_excludes_file = Path(handle.name)
         git_prefix = [*git_prefix, "-c", f"core.excludesFile={temp_excludes_file}"]
     try:
-        payload = ("\0".join(must_be_ignored) + "\0").encode("utf-8")
+        payload = os.fsencode("\0".join(must_be_ignored) + "\0")
         result = subprocess.run(
             [*git_prefix, "check-ignore", "--stdin", "-z"],
             input=payload,
@@ -1840,15 +2268,19 @@ def run_ignore_gate(
             check=False,
         )
         ignored = frozenset(
-            part.decode("utf-8") for part in result.stdout.split(b"\0") if part
+            os.fsdecode(part) for part in result.stdout.split(b"\0") if part
         )
         expected = frozenset(must_be_ignored)
         if ignored == expected:
             return True, ()
+        # -z only makes sense with --stdin (git's own restriction), and the
+        # explanatory fields must be bytes-safe too (Decision 29), so this
+        # pipes the same NUL-separated payload instead of passing paths as
+        # argv.
         verbose = subprocess.run(
-            [*git_prefix, "check-ignore", "-v", "-n", "--", *must_be_ignored],
+            [*git_prefix, "check-ignore", "-v", "-n", "-z", "--stdin"],
+            input=payload,
             capture_output=True,
-            text=True,
             check=False,
         )
         return False, _parse_check_ignore_verbose(verbose.stdout, expected)
@@ -1866,9 +2298,9 @@ def _restore_exclude(exclude_path: Path, original_bytes: bytes | None) -> None:
 
 def _ignore_gate_remedy() -> str:
     return (
-        "a team .gitignore rule is un-ignoring a sidecar path (for example a "
-        "negation like `!.claude/skills/**`); fix the team .gitignore, or "
-        "rerun once it changes"
+        "a .gitignore rule is un-ignoring a sidecar path (for example a "
+        "negation like `!.claude/skills/**`); ask the team to change the "
+        "rule, or remove your own negation from info/exclude, then rerun"
     )
 
 
@@ -1965,6 +2397,27 @@ def _apply_actions(
         # belongs, or only the manifest record changes.
 
 
+def _apply_uninstall_actions(
+    target: Path,
+    staging: Path,
+    plan_result: PlanResult,
+    preserved_destinations: Mapping[str, Path],
+) -> None:
+    """Apply an uninstall plan's unit-level actions (Decision 34). An empty
+    desired set can never produce "install", "update", or "adopt" -- those
+    rows all require desired content -- so only remove, preserve, and
+    team_takeover_delete can appear; this never needs a source tree to copy
+    from, unlike ``_apply_actions``."""
+    for action in plan_result.actions:
+        if action.kind == "remove":
+            _remove_unit(target, staging, action.unit)
+        elif action.kind == "team_takeover_delete":
+            _delete_file(target, action.path)
+        elif action.kind == "preserve":
+            _preserve_unit(target, preserved_destinations[action.unit], action.unit)
+        # "retain" and "drop_record" touch no file.
+
+
 def _count_actions(plan_result: PlanResult) -> dict[str, int]:
     counts = {
         "install": 0,
@@ -2035,14 +2488,14 @@ def _install_sidecar_dry_run(
     preserved_destinations: Mapping[str, str],
 ) -> int:
     original_text = (
-        exclude_path.read_text(encoding="utf-8") if exclude_path.is_file() else ""
+        os.fsdecode(exclude_path.read_bytes()) if exclude_path.is_file() else ""
     )
     candidate_text = _replace_exclude_block(
         original_text, plan_result.exclude_lines_write
     )
     write_paths = sorted(_write_raw_paths(plan_result))
     passed, failing = run_ignore_gate(
-        target, write_paths, candidate_text.encode("utf-8"), dry_run=True
+        target, write_paths, os.fsencode(candidate_text), dry_run=True
     )
     if not passed:
         return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
@@ -2061,6 +2514,7 @@ def _install_sidecar_apply(
     plan_result: PlanResult,
     exclude_path: Path,
     manifest_path: Path,
+    staging: Path,
     preserved_destinations: Mapping[str, Path],
 ) -> int:
     next_manifest = plan_result.next_manifest
@@ -2074,10 +2528,10 @@ def _install_sidecar_apply(
         exclude_path.read_bytes() if exclude_path.is_file() else None
     )
     write_text = _replace_exclude_block(
-        original_exclude_bytes.decode("utf-8") if original_exclude_bytes else "",
+        os.fsdecode(original_exclude_bytes) if original_exclude_bytes else "",
         plan_result.exclude_lines_write,
     )
-    write_bytes = write_text.encode("utf-8")
+    write_bytes = os.fsencode(write_text)
     if write_bytes != (original_exclude_bytes or b""):
         _atomic_write(exclude_path, write_bytes)
 
@@ -2089,12 +2543,11 @@ def _install_sidecar_apply(
 
     _fault_point("after_exclude_write")
 
-    staging = git_path(target, SIDECAR_STAGING_NAME)
     _empty_staging(staging)
     _apply_actions(target, source, staging, plan_result, preserved_destinations)
 
     final_text = _replace_exclude_block(write_text, plan_result.exclude_lines_final)
-    final_bytes = final_text.encode("utf-8")
+    final_bytes = os.fsencode(final_text)
     if final_bytes != write_bytes:
         _atomic_write(exclude_path, final_bytes)
 
@@ -2117,35 +2570,31 @@ def _install_sidecar_apply(
     return 0
 
 
-def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int:
-    """Reconcile the sidecar overlay in ``target`` from ``source``.
+@dataclass(frozen=True)
+class _TargetPreflight:
+    """Everything ``install_sidecar`` and ``uninstall_sidecar`` both gather
+    about ``target`` alone, before either one even looks at a source tree or
+    an empty desired set."""
 
-    Returns the process exit code: 0 on success, including per-path skips;
-    non-zero when preflight aborts before any write. Implements the big
-    plan's "Reconciliation rules" exactly
-    (``.claude/plans/consumer-sidecar-bootstrap-overlay.md``): every
-    preflight check runs, in order, before any write; the planner
-    (``plan_sidecar_reconciliation``) decides every action; this function
-    only gathers Git state, writes in the required order, and reports.
+    git_dir_path: Path
+    manifest_path: Path
+    staging: Path
+    exclude_path: Path
+    preserved_root: Path
+    manifest: Manifest | None
+    index_entries: tuple[tuple[str, str], ...]
+    tracked: frozenset[str]
+    ignorecase: bool
+    exclude_block: ExcludeBlockContents
+
+
+def _run_target_preflight(target: Path) -> _TargetPreflight | int:
+    """Run every preflight check that depends only on ``target`` (Decision
+    26, 27, 28; Phase H steps 3, 4, 6), shared by ``install_sidecar`` and
+    ``uninstall_sidecar``. Returns the gathered state, or an already-printed
+    non-zero exit code (from ``_abort``) when a check fails -- the caller
+    must return that code immediately and write nothing.
     """
-    target = target.resolve()
-    source = source.resolve()
-
-    if not source.is_dir():
-        return _abort(
-            f"{source} does not exist",
-            "point --source at a generated sidecar tree, for example dist/sidecar",
-        )
-    violations = _sidecar_source_violations(source)
-    if violations:
-        shown = ", ".join(violations[:5])
-        more = "" if len(violations) <= 5 else f" (+{len(violations) - 5} more)"
-        return _abort(
-            f"{source} is not a sidecar tree: {shown}{more}",
-            "pass a source built by generate_targets.py --all (dist/sidecar), "
-            "not a full-install tree such as dist/multi-agent",
-        )
-
     version = _git_version()
     if version is None or version < _MIN_GIT_VERSION:
         return _abort(
@@ -2184,7 +2633,59 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
             "Git directory or the worktree onto the same filesystem",
         )
 
-    manifest_path = git_path(target, SIDECAR_MANIFEST_NAME)
+    # Every Git-directory path below is built directly from the
+    # already-verified --absolute-git-dir, never through git_path()'s
+    # --git-path: that resolves symlinks in the path, which would hide
+    # exactly the symlink these checks exist to catch (Decision 26; S6).
+    # Checked with lstat and never opened, so a named pipe is refused, not
+    # read, and a dangling symlink is still caught as a symlink.
+    manifest_path = git_dir_path / SIDECAR_MANIFEST_NAME
+    manifest_info = _lstat_or_none(manifest_path)
+    if manifest_info is not None and (
+        stat.S_ISLNK(manifest_info.st_mode) or not stat.S_ISREG(manifest_info.st_mode)
+    ):
+        return _abort(
+            f"{manifest_path} is a symlink or not a regular file",
+            f"replace {manifest_path} with a regular file, or remove it, then rerun",
+        )
+
+    staging = git_dir_path / SIDECAR_STAGING_NAME
+    staging_info = _lstat_or_none(staging)
+    if staging_info is not None and (
+        stat.S_ISLNK(staging_info.st_mode) or not stat.S_ISDIR(staging_info.st_mode)
+    ):
+        return _abort(
+            f"{staging} is a symlink or not a folder",
+            f"replace {staging} with a regular folder, or remove it, then rerun",
+        )
+
+    info_dir = git_dir_path / "info"
+    if info_dir.is_symlink():
+        return _abort(
+            f"{info_dir} is a symlink",
+            f"replace the symlink at {info_dir} with a regular folder, then rerun",
+        )
+
+    exclude_path = info_dir / "exclude"
+    exclude_info = _lstat_or_none(exclude_path)
+    if exclude_info is not None and (
+        stat.S_ISLNK(exclude_info.st_mode) or not stat.S_ISREG(exclude_info.st_mode)
+    ):
+        return _abort(
+            f"{exclude_path} is a symlink or not a regular file",
+            f"replace {exclude_path} with a regular file, or remove it, then rerun",
+        )
+
+    preserved_root = git_dir_path / SIDECAR_PRESERVED_NAME
+    preserved_info = _lstat_or_none(preserved_root)
+    if preserved_info is not None and (
+        stat.S_ISLNK(preserved_info.st_mode) or not stat.S_ISDIR(preserved_info.st_mode)
+    ):
+        return _abort(
+            f"{preserved_root} is a symlink or not a folder",
+            f"replace {preserved_root} with a regular folder, or remove it, then rerun",
+        )
+
     manifest: Manifest | None = None
     if manifest_path.is_file():
         try:
@@ -2192,36 +2693,87 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
         except (ManifestError, OSError, UnicodeDecodeError) as exc:
             return _abort(
                 f"invalid sidecar manifest at {manifest_path}: {exc}",
-                _INVALID_MANIFEST_REMEDY,
+                _invalid_manifest_remedy(manifest_path),
             )
 
-    # Built directly from the already-verified --git-dir, not through
-    # git_path()/--git-path: git resolves a symlinked info/exclude to its
-    # target before printing it, which would hide exactly the symlink this
-    # check exists to catch.
-    exclude_path = git_dir_path / "info" / "exclude"
-    if exclude_path.is_symlink():
-        return _abort(
-            f"{exclude_path} is a symlink",
-            f"replace the symlink at {exclude_path} with a regular file, then rerun",
-        )
-
-    # Same reasoning as the exclude-file check above: built from the
-    # already-verified --git-dir, never from git_path() (Decision 24).
-    preserved_root = git_dir_path / SIDECAR_PRESERVED_NAME
-    if preserved_root.is_symlink() or (
-        preserved_root.exists() and not preserved_root.is_dir()
-    ):
-        return _abort(
-            f"{preserved_root} is a symlink or not a folder",
-            f"replace {preserved_root} with a regular folder, or remove it, then rerun",
-        )
-
-    desired_units = load_desired_units(source)
     index_entries = _read_index_entries(target)
     tracked = frozenset(path for _mode, path in index_entries)
+
+    # Decision 28: repository boundary and filesystem shape, before any
+    # other Git-state gathering or write.
+    boundary_violations = _repository_boundary_violations(
+        target, _SIDECAR_STRUCTURAL_PATHS, index_entries
+    )
+    if boundary_violations:
+        return _abort(boundary_violations[0], _NESTED_REPO_REMEDY)
+    shape_violations = _filesystem_shape_violations(target, _SIDECAR_STRUCTURAL_PATHS)
+    if shape_violations:
+        return _abort(shape_violations[0], "fix the filesystem shape, then rerun")
+
     ignorecase = _ignorecase(target)
-    exclude_block = _read_exclude_block(exclude_path)
+    try:
+        exclude_block = _read_exclude_block(exclude_path)
+    except ExcludeMarkerError as exc:
+        return _abort(str(exc), _EXCLUDE_MARKER_REMEDY)
+
+    return _TargetPreflight(
+        git_dir_path=git_dir_path,
+        manifest_path=manifest_path,
+        staging=staging,
+        exclude_path=exclude_path,
+        preserved_root=preserved_root,
+        manifest=manifest,
+        index_entries=index_entries,
+        tracked=tracked,
+        ignorecase=ignorecase,
+        exclude_block=exclude_block,
+    )
+
+
+def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int:
+    """Reconcile the sidecar overlay in ``target`` from ``source``.
+
+    Returns the process exit code: 0 on success, including per-path skips;
+    non-zero when preflight aborts before any write. Implements the big
+    plan's "Reconciliation rules" exactly
+    (``.claude/plans/consumer-sidecar-bootstrap-overlay.md``): every
+    preflight check runs, in order, before any write; the planner
+    (``plan_sidecar_reconciliation``) decides every action; this function
+    only gathers Git state, writes in the required order, and reports.
+    """
+    target = target.resolve()
+    source = source.resolve()
+
+    if not source.is_dir():
+        return _abort(
+            f"{source} does not exist",
+            "if this is the default sidecar source, run `uv run python "
+            "scripts/generate_targets.py --all` to build it; if you passed "
+            f"--source, check that {source} is the path you meant",
+        )
+    violations = _sidecar_source_violations(source)
+    if violations:
+        shown = ", ".join(violations[:5])
+        more = "" if len(violations) <= 5 else f" (+{len(violations) - 5} more)"
+        return _abort(
+            f"{source} is not a sidecar tree: {shown}{more}",
+            "pass a source built by generate_targets.py --all (dist/sidecar), "
+            "not a full-install tree such as dist/multi-agent",
+        )
+
+    preflight = _run_target_preflight(target)
+    if isinstance(preflight, int):
+        return preflight
+    manifest_path = preflight.manifest_path
+    staging = preflight.staging
+    exclude_path = preflight.exclude_path
+    preserved_root = preflight.preserved_root
+    manifest = preflight.manifest
+    tracked = preflight.tracked
+    ignorecase = preflight.ignorecase
+    exclude_block = preflight.exclude_block
+
+    desired_units = load_desired_units(source)
     required_units = required_snapshot_units(
         desired_units, manifest, exclude_block.listed_units
     )
@@ -2266,8 +2818,17 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
         )
         return _abort(
             message,
-            "replace the symlinked path (or its symlinked ancestor directory) "
-            "with a regular directory, then rerun",
+            "sidecar mode does not support a symlinked skill folder or "
+            "projection parent; nothing was written",
+        )
+
+    unwritable = _unwritable_paths_for_actions(target, plan_result.actions)
+    if unwritable:
+        shown = ", ".join(str(path) for path in unwritable[:5])
+        return _abort(
+            f"not writable: {shown}",
+            "fix folder permissions (the sidecar needs write access to move "
+            "or remove these folders), then rerun",
         )
 
     if dry_run:
@@ -2283,5 +2844,307 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
         plan_result,
         exclude_path,
         manifest_path,
+        staging,
         preserved_destinations,
+    )
+
+
+# --------------------------------------------------------------------------
+# Uninstall (Decision 34; the small plan's step 9)
+# --------------------------------------------------------------------------
+
+
+def _uninstall_conflict_pre_write_gate(
+    target: Path,
+    plan_result: PlanResult,
+    preserved_conflicts: AbstractSet[str],
+    original_bytes: bytes | None,
+) -> tuple[bool, tuple[tuple[str, str], ...]]:
+    """Decision 17: before touching anything, re-prove that every unit this
+    run leaves untouched -- every conflicting kept unit, whatever its
+    outcome shape (recorded, unfinished, or a bridge), and every unit still
+    mid-removal, since nothing has moved yet -- is still actually hidden by
+    the exclude file exactly as it already stands, not merely assumed
+    correct from an earlier run.
+
+    ``preserved_conflicts`` is checked directly, not read back from
+    ``plan_result``: an unfinished conflicting unit converts to an outcome
+    with no action and no manifest record (Decision 23: it has no record to
+    begin with), so ``_write_raw_paths`` alone would silently miss it.
+    ``dry_run=False``: checks the real, as-yet-unwritten file directly,
+    which is correct in a real run (nothing has been written yet either)
+    and in a dry run (nothing ever is).
+    """
+    must_be_ignored = _write_raw_paths(plan_result) | {
+        _gate_spelling(unit) for unit in preserved_conflicts
+    }
+    return run_ignore_gate(
+        target, sorted(must_be_ignored), original_bytes or b"", dry_run=False
+    )
+
+
+def _uninstall_conflict_post_rewrite_gate(
+    target: Path,
+    preserved_conflicts: AbstractSet[str],
+    candidate_bytes: bytes,
+    *,
+    dry_run: bool,
+) -> tuple[bool, tuple[tuple[str, str], ...]]:
+    """Decision 17: after computing the rewritten block, re-prove it still
+    hides every conflicting kept unit -- the rewrite only ever drops the
+    removed units' lines, but this proves that rather than assumes it.
+
+    Built from ``preserved_conflicts`` directly, for the same reason as
+    ``_uninstall_conflict_pre_write_gate``: ``plan_result.next_manifest.units``
+    only holds units with a manifest record, which an unfinished conflicting
+    unit never has.
+    """
+    kept_paths = sorted(_gate_spelling(unit) for unit in preserved_conflicts)
+    return run_ignore_gate(target, kept_paths, candidate_bytes, dry_run=dry_run)
+
+
+def _uninstall_sidecar_dry_run(
+    target: Path,
+    plan_result: PlanResult,
+    exclude_path: Path,
+    preserved_destinations: Mapping[str, str],
+    preserved_conflicts: AbstractSet[str],
+) -> int:
+    if preserved_conflicts:
+        original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
+        passed, failing = _uninstall_conflict_pre_write_gate(
+            target, plan_result, preserved_conflicts, original_bytes
+        )
+        if not passed:
+            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+        original_text = os.fsdecode(original_bytes) if original_bytes else ""
+        final_text = _replace_exclude_block(
+            original_text, plan_result.exclude_lines_final
+        )
+        final_bytes = os.fsencode(final_text)
+        passed, failing = _uninstall_conflict_post_rewrite_gate(
+            target, preserved_conflicts, final_bytes, dry_run=True
+        )
+        if not passed:
+            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+    _describe_dry_run_actions(plan_result, preserved_destinations)
+    _print_report(plan_result, preserved_destinations)
+    if preserved_conflicts:
+        _info(
+            "a preserve conflict would keep at least one unit in place; a "
+            "real run would exit 1 and rewrite the manifest to hold only "
+            "the kept units"
+        )
+        return 1
+    return 0
+
+
+def _uninstall_sidecar_apply(
+    target: Path,
+    plan_result: PlanResult,
+    exclude_path: Path,
+    manifest_path: Path,
+    staging: Path,
+    preserved_destinations: Mapping[str, Path],
+    unrecognized_lines: Sequence[str],
+    preserved_conflicts: AbstractSet[str],
+) -> int:
+    next_manifest = plan_result.next_manifest
+    if next_manifest is None:
+        return _abort(
+            "internal error: the plan has no next manifest to write",
+            "rerun the sidecar uninstall",
+        )
+
+    original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
+    if preserved_conflicts:
+        passed, failing = _uninstall_conflict_pre_write_gate(
+            target, plan_result, preserved_conflicts, original_bytes
+        )
+        if not passed:
+            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+    # Decision 34's order: move or remove every unit first (units that are
+    # merely kept in place on a preserve conflict are untouched here), only
+    # then touch the block, then the manifest, then empty staging.
+    _empty_staging(staging)
+    _apply_uninstall_actions(target, staging, plan_result, preserved_destinations)
+
+    _fault_point("after_units_removed")
+
+    original_text = os.fsdecode(original_bytes) if original_bytes else ""
+    if preserved_conflicts:
+        # The one exception to Decision 9: a preserve conflict means the
+        # uninstall did not finish, so the block survives -- rewritten the
+        # same way an ordinary run rewrites it -- instead of being removed.
+        final_text = _replace_exclude_block(
+            original_text, plan_result.exclude_lines_final
+        )
+    else:
+        final_text = _remove_exclude_block(original_text, unrecognized_lines)
+    final_bytes = os.fsencode(final_text)
+    if final_bytes != (original_bytes or b""):
+        _atomic_write(exclude_path, final_bytes)
+
+    if preserved_conflicts:
+        passed, failing = _uninstall_conflict_post_rewrite_gate(
+            target, preserved_conflicts, final_bytes, dry_run=False
+        )
+        if not passed:
+            _restore_exclude(exclude_path, original_bytes)
+            return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+    _fault_point("before_manifest_write")
+
+    if preserved_conflicts:
+        manifest_bytes = serialize_manifest(next_manifest)
+        current_manifest_bytes = (
+            manifest_path.read_bytes() if manifest_path.is_file() else None
+        )
+        if manifest_bytes != current_manifest_bytes:
+            _atomic_write(manifest_path, manifest_bytes)
+        exit_code = 1
+    else:
+        if manifest_path.is_file() or manifest_path.is_symlink():
+            manifest_path.unlink()
+        exit_code = 0
+
+    # Decision 34's own last step: remove the staging folder entirely
+    # (unlike install/update, which only empty it -- an uninstall promises
+    # no sidecar file, block, manifest, or staging folder remains).
+    if staging.exists() and not staging.is_symlink():
+        shutil.rmtree(staging)
+    _print_report(
+        plan_result, {unit: str(path) for unit, path in preserved_destinations.items()}
+    )
+    if exit_code == 1:
+        _info(
+            "a preserve conflict kept at least one unit in place; resolve "
+            "it by hand, then rerun --uninstall"
+        )
+    return exit_code
+
+
+def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
+    """Remove the sidecar overlay from ``target`` entirely (Decision 34; the
+    small plan's step 9).
+
+    Reconciles Phase G's planner (``plan_sidecar_reconciliation``) against
+    an empty desired set, with ``uninstall=True`` so every sidecar skill and
+    bridge is treated as taken: a unit whose content matches its record is
+    removed; a locally modified or unfinished unit -- including a bridge --
+    is preserved (Decision 24); team and foreign content is never touched;
+    every retained file loses its line and becomes visible, reported as now
+    visible to ``git add -A``; a block line the sidecar never understood
+    survives as a plain line where the block was. Runs through the same
+    target-only preflight as ``install_sidecar`` (steps 3, 4, 6).
+
+    Returns 0 on a clean uninstall, including when there was nothing to do;
+    1 when a preserve conflict kept a unit in place -- the one exception to
+    Decision 9, because the uninstall did not finish.
+    """
+    target = target.resolve()
+
+    preflight = _run_target_preflight(target)
+    if isinstance(preflight, int):
+        return preflight
+    manifest_path = preflight.manifest_path
+    staging = preflight.staging
+    exclude_path = preflight.exclude_path
+    preserved_root = preflight.preserved_root
+    manifest = preflight.manifest
+    tracked = preflight.tracked
+    ignorecase = preflight.ignorecase
+    exclude_block = preflight.exclude_block
+
+    if manifest is None and not exclude_block.has_block:
+        # The same "is a sidecar present" definition sidecar_evidence uses
+        # for detection (Decision 27; S18): a manifest, or any balanced
+        # block at all -- even an empty one, or one that holds only
+        # unrecognized lines. Anything narrower here leaves a dead end
+        # where detection sends --uninstall a target it then refuses to
+        # touch.
+        _info("no sidecar found; nothing to do")
+        return 0
+
+    required_units = (
+        required_snapshot_units({}, manifest, exclude_block.listed_units)
+        | frozenset(
+            f"{write_root}/{skill}"
+            for write_root in SIDECAR_SKILL_WRITE_ROOTS
+            for skill in SIDECAR_SKILLS
+        )
+        | frozenset(SIDECAR_BRIDGES)
+    )
+    snapshots = _build_snapshots(target, required_units, tracked, ignorecase)
+
+    preserved_destinations = {
+        unit_path: preserved_root
+        / preserved_unit_slug(
+            unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+        )
+        for unit_path in required_units
+    }
+    preserved_conflicts = frozenset(
+        unit_path
+        for unit_path, destination in preserved_destinations.items()
+        if destination.exists() or destination.is_symlink()
+    )
+
+    plan_result = plan_sidecar_reconciliation(
+        desired_units={},
+        manifest=manifest,
+        excluded_units=exclude_block.listed_units,
+        read_list_skill_names={},
+        snapshots=snapshots,
+        listed_files=exclude_block.listed_files,
+        unrecognized_lines=frozenset(exclude_block.unrecognized_lines),
+        ignorecase=ignorecase,
+        preserved_conflicts=preserved_conflicts,
+        preserved_destinations={
+            unit: str(path) for unit, path in preserved_destinations.items()
+        },
+        uninstall=True,
+    )
+    if plan_result.aborts:
+        message = "; ".join(
+            f"{abort.reason}: {abort.message}" for abort in plan_result.aborts
+        )
+        return _abort(
+            message,
+            "sidecar mode does not support a symlinked skill folder or "
+            "projection parent; nothing was written",
+        )
+
+    unwritable = _unwritable_paths_for_actions(target, plan_result.actions)
+    if unwritable:
+        shown = ", ".join(str(path) for path in unwritable[:5])
+        return _abort(
+            f"not writable: {shown}",
+            "fix folder permissions (the sidecar needs write access to move "
+            "or remove these folders), then rerun",
+        )
+
+    display_destinations = {
+        unit: str(path) for unit, path in preserved_destinations.items()
+    }
+    if dry_run:
+        return _uninstall_sidecar_dry_run(
+            target,
+            plan_result,
+            exclude_path,
+            display_destinations,
+            preserved_conflicts,
+        )
+    return _uninstall_sidecar_apply(
+        target,
+        plan_result,
+        exclude_path,
+        manifest_path,
+        staging,
+        preserved_destinations,
+        exclude_block.unrecognized_lines,
+        preserved_conflicts,
     )

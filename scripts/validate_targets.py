@@ -48,6 +48,7 @@ from runtime_ownership import (
     bootstrap_root_paths,
     render_restore_script,
 )
+from runtime_ownership import sidecar_source_violations as _shared_sidecar_violations
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = REPO_ROOT / "dist"
@@ -8681,12 +8682,21 @@ def sidecar_bridge_errors(target_root: Path) -> list[str]:
 def sidecar_target_errors(target_root: Path) -> list[str]:
     """Return every self-containment and allowlist violation in a sidecar tree."""
     errors: list[str] = []
+    present: set[str] = set()
     for path in text_files(target_root):
         relative_path = PurePosixPath(path.relative_to(target_root).as_posix())
+        present.add(str(relative_path))
         if not sidecar_allowed_relative_path(relative_path):
             errors.append(f"sidecar target has a disallowed path: {relative_path}")
             continue
         errors.extend(sidecar_text_errors(relative_path, read(path)))
+    # Decision 31 (S13, S14, L2): the same completeness/symmetry contract
+    # the installer's own --source check runs, so a crafted tree gets the
+    # same verdict from both.
+    errors.extend(
+        f"sidecar target is incomplete: {violation}"
+        for violation in _shared_sidecar_violations(present)
+    )
     errors.extend(sidecar_license_errors(target_root))
     errors.extend(sidecar_bridge_errors(target_root))
     return errors
@@ -8859,6 +8869,17 @@ def validate_sidecar_target_cases(errors: list[str]) -> None:
             errors,
         )
         write(claude_bridge, original_claude_bridge)
+
+        # Decision 31 (S13, L2): a skill shipped at one write root only is
+        # an incomplete source, not a smaller-but-valid one.
+        agents_ponytail = good_root / ".agents" / "skills" / "ponytail"
+        shutil.rmtree(agents_ponytail)
+        check(
+            any("incomplete" in error for error in sidecar_target_errors(good_root)),
+            "a skill missing from one write root must be rejected as incomplete",
+            errors,
+        )
+        shutil.copytree(good_root / ".claude" / "skills" / "ponytail", agents_ponytail)
 
         check(
             not sidecar_target_errors(good_root),

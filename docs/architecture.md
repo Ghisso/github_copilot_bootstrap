@@ -66,6 +66,18 @@ Overlay](target-mapping.md#sidecar-overlay) for what it installs and how it
 updates, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
 for the per-client evidence behind it.
 
+`dist/sidecar/` is not merely internally consistent — it must be exact.
+`scripts/runtime_ownership.py`'s `sidecar_source_exact_allowlist` names the
+only paths a valid sidecar source may contain: every `SIDECAR_SKILLS`
+skill's `SKILL.md` at both write roots, the vendored `ponytail` and
+`ponytail-review` `LICENSE` files at both write roots, and both entries in
+`SIDECAR_BRIDGES`. `scripts/validate_targets.py` and
+`scripts/install_bootstrap.py` both call `sidecar_source_violations` against
+that same allowlist, so a tree missing a file, or carrying an extra one —
+for example a skill rendered at only one of the two write roots — is
+refused by both the generated-target validator and the installer itself,
+never silently accepted as a smaller-but-valid profile.
+
 ### Skill Library Validation Contract
 
 `scripts/validate_targets.py`'s `validate_docs_parity` function is the single

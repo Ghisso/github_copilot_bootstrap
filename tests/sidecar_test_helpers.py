@@ -15,7 +15,6 @@ import subprocess
 from pathlib import Path
 
 from runtime_ownership import SIDECAR_MANIFEST_NAME
-from sidecar_overlay import git_path
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -64,12 +63,28 @@ def _status(root: Path) -> str:
     return result.stdout
 
 
+def _absolute_git_dir(root: Path) -> Path:
+    """Return ``root``'s absolute Git directory, built the same way
+    ``install_sidecar`` itself does (Decision 26; Phase H step 3): never
+    through ``git_path()``/``--git-path``, which resolves a symlinked
+    component before printing it. Reused by every test that needs the real,
+    unresolved location of the manifest, staging, preserved, or exclude
+    path."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--absolute-git-dir"],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return Path(result.stdout.strip())
+
+
 def _exclude_path(root: Path) -> Path:
-    return git_path(root, "info/exclude")
+    return _absolute_git_dir(root) / "info" / "exclude"
 
 
 def _manifest_path(root: Path) -> Path:
-    return git_path(root, SIDECAR_MANIFEST_NAME)
+    return _absolute_git_dir(root) / SIDECAR_MANIFEST_NAME
 
 
 def _read_manifest(root: Path) -> dict:
@@ -86,3 +101,48 @@ def _raise_at(name: str):
             raise RuntimeError(f"injected fault at {point}")
 
     return _fault_point
+
+
+def patch_sidecar_skills(monkeypatch, skills: tuple[str, ...]) -> None:
+    """Monkeypatch ``SIDECAR_SKILLS`` everywhere it was bound as a
+    module-level name at import time (``runtime_ownership`` itself, and
+    ``sidecar_overlay``'s own separately-imported copy), so a test can
+    install a reduced or different skill profile across synthetic
+    "bootstrap versions" without weakening the real exact-source
+    completeness check (Decision 31). That check always reads whatever
+    ``SIDECAR_SKILLS`` currently is in each module, not a value captured
+    once, so patching only one module's copy would leave the other
+    checking against the real, unpatched profile.
+    """
+    import runtime_ownership
+    import sidecar_overlay
+
+    patched = tuple(skills)
+    monkeypatch.setattr(runtime_ownership, "SIDECAR_SKILLS", patched)
+    monkeypatch.setattr(sidecar_overlay, "SIDECAR_SKILLS", patched)
+
+
+def install_sidecar_with_profile(
+    target: Path, source: Path, monkeypatch, *, dry_run: bool = False
+) -> int:
+    """Call ``install_sidecar`` after patching ``SIDECAR_SKILLS`` (via
+    ``patch_sidecar_skills``) to exactly the skill folder names ``source``
+    ships at its ``.claude/skills`` write root.
+
+    A synthetic fixture source built for a cross-version reconciliation test
+    only ever needs to be complete relative to its own declared profile, not
+    the real one; reading that profile straight from the tree means every
+    caller keeps its own "which skills does this version ship" knowledge in
+    exactly one place -- the fixture it already built -- instead of a second,
+    separately maintained list.
+    """
+    from sidecar_overlay import install_sidecar
+
+    skills_root = source / ".claude" / "skills"
+    skills = (
+        tuple(sorted(entry.name for entry in skills_root.iterdir() if entry.is_dir()))
+        if skills_root.is_dir()
+        else ()
+    )
+    patch_sidecar_skills(monkeypatch, skills)
+    return install_sidecar(target, source, dry_run=dry_run)

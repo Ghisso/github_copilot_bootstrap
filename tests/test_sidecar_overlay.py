@@ -29,11 +29,14 @@ from sidecar_overlay import (  # noqa: E402
     Action,
     DesiredUnit,
     ExcludeBlockContents,
+    ExcludeMarkerError,
     Manifest,
     ManifestError,
     ManifestUnit,
     Report,
     UnitSnapshot,
+    _can_express_in_gitignore,
+    _find_exclude_markers,
     _parse_frontmatter_name,
     _unit_index_relpaths,
     compute_file_hash,
@@ -78,7 +81,6 @@ def manifest_with(
 ) -> Manifest:
     return Manifest(
         schema_version=1,
-        bootstrap_commit="deadbeef",
         units=units or {},
         retained=frozenset(retained or ()),
     )
@@ -179,11 +181,34 @@ def test_parse_manifest_roundtrip_is_deterministic():
     assert parsed == original
     assert serialize_manifest(parsed) == serialize_manifest(original)
     assert serialize_manifest(original).endswith(b"\n")
-    # sorted keys: "bootstrap_commit" before "retained" before "schema_version" before "units"
+    # sorted keys: "retained" before "schema_version" before "units"
     payload = json.loads(text)
     assert list(json.dumps(payload, sort_keys=True)) == list(
         json.dumps(payload, sort_keys=True)
     )
+
+
+def test_serialize_manifest_has_no_bootstrap_commit_key():
+    # Decision 33, R6: a newly written manifest never carries the retired
+    # diagnostic field.
+    payload = json.loads(
+        serialize_manifest(manifest_with(units={UNIT: recorded({"SKILL.md": b"hi"})}))
+    )
+    assert "bootstrap_commit" not in payload
+
+
+def test_parse_manifest_accepts_and_ignores_an_old_bootstrap_commit_key():
+    # Decision 33, R6: an old manifest that still carries the retired field
+    # must keep parsing; the key is simply ignored on read.
+    body = {
+        "schema_version": 1,
+        "bootstrap_commit": "deadbeef",
+        "units": {UNIT: {"files": {"SKILL.md": "a" * 64}, "hash": "b" * 64}},
+        "retained": [],
+    }
+    parsed = parse_manifest(json.dumps(body))
+    assert UNIT in parsed.units
+    assert not hasattr(parsed, "bootstrap_commit")
 
 
 def test_parse_manifest_rejects_invalid_json():
@@ -1376,3 +1401,139 @@ def test_parse_exclude_block_unrecognized_line_reaches_the_planner_via_real_text
     )
     assert "notes.txt" in result.exclude_lines_write
     assert "notes.txt" in result.exclude_lines_final
+
+
+# --------------------------------------------------------------------------
+# Phase H step 4: require balanced exclude markers (Decision 26; S7)
+# --------------------------------------------------------------------------
+
+
+def test_find_exclude_markers_returns_none_with_no_markers():
+    assert _find_exclude_markers(["a.env.personal", "b.txt"]) is None
+
+
+def test_find_exclude_markers_accepts_one_balanced_block():
+    lines = [
+        "before",
+        "# BEGIN ai-bootstrap sidecar",
+        "x",
+        "# END ai-bootstrap sidecar",
+        "after",
+    ]
+    assert _find_exclude_markers(lines) == (1, 3)
+
+
+def test_find_exclude_markers_rejects_orphan_begin():
+    with pytest.raises(ExcludeMarkerError, match="line 1"):
+        _find_exclude_markers(["# BEGIN ai-bootstrap sidecar", ".env.personal"])
+
+
+def test_find_exclude_markers_rejects_end_before_begin():
+    with pytest.raises(ExcludeMarkerError):
+        _find_exclude_markers(
+            [
+                ".env.personal",
+                "# END ai-bootstrap sidecar",
+                "# BEGIN ai-bootstrap sidecar",
+            ]
+        )
+
+
+def test_find_exclude_markers_rejects_two_blocks():
+    with pytest.raises(ExcludeMarkerError):
+        _find_exclude_markers(
+            [
+                "# BEGIN ai-bootstrap sidecar",
+                "x",
+                "# END ai-bootstrap sidecar",
+                "# BEGIN ai-bootstrap sidecar",
+                "y",
+                "# END ai-bootstrap sidecar",
+            ]
+        )
+
+
+def test_find_exclude_markers_rejects_repeated_begin():
+    with pytest.raises(ExcludeMarkerError):
+        _find_exclude_markers(
+            [
+                "# BEGIN ai-bootstrap sidecar",
+                "# BEGIN ai-bootstrap sidecar",
+                "x",
+                "# END ai-bootstrap sidecar",
+            ]
+        )
+
+
+def test_parse_exclude_block_propagates_marker_error():
+    text = "\n".join(["# BEGIN ai-bootstrap sidecar", "notes.txt"])
+    with pytest.raises(ExcludeMarkerError):
+        parse_exclude_block(text)
+
+
+def test_find_exclude_markers_accepts_crlf_block():
+    text = "before\r\n# BEGIN ai-bootstrap sidecar\r\n/x\r\n# END ai-bootstrap sidecar\r\nafter\r\n"
+    lines = text.splitlines()
+    assert _find_exclude_markers(lines) == (1, 3)
+    parsed = parse_exclude_block(text)
+    assert parsed.has_block is True
+    assert parsed.listed_units == frozenset()
+    # "/x" is anchored but "x" is not a valid unit or retained path shape,
+    # so it is kept as an unrecognized line, not silently dropped.
+    assert parsed.unrecognized_lines == ("/x",)
+
+
+# --------------------------------------------------------------------------
+# Phase H step 5: bytes-safe retained names (Decision 29; R5, S15)
+# --------------------------------------------------------------------------
+
+
+def test_can_express_in_gitignore_rejects_embedded_newline_and_trailing_cr():
+    assert _can_express_in_gitignore("plain/name.txt") is True
+    assert _can_express_in_gitignore("weird\nname.txt") is False
+    assert _can_express_in_gitignore("weird-name.txt\r") is False
+
+
+def test_team_takeover_never_retains_an_unexpressible_name():
+    unit = UNIT
+    snap = snapshot(
+        {"SKILL.md": b"hi", "weird\nname.txt": b"extra"},
+        tracked={"SKILL.md"},
+        ignored=frozenset({"weird\nname.txt"}),
+    )
+    result = plan(
+        desired_units={unit: desired({"SKILL.md": b"hi"})},
+        manifest=manifest_with(units={unit: recorded({"SKILL.md": b"hi"})}),
+        snapshots={unit: snap},
+    )
+    # The unexpressible name never gets a raw pattern line...
+    for line in result.exclude_lines_write + result.exclude_lines_final:
+        assert "weird" not in line
+    # ...and it is still reported so a person learns it stays visible.
+    assert any(
+        r.path == f"{unit}/weird\nname.txt" and "cannot be hidden" in r.remedy
+        for r in result.reports
+    )
+
+
+def test_manifest_retained_unexpressible_name_never_gets_a_line():
+    unit = UNIT
+    weird_path = f"{unit}/trailing-cr.txt\r"
+    snap = snapshot(
+        {"SKILL.md": b"hi", "trailing-cr.txt\r": b"extra"},
+        tracked=frozenset(),
+        ignored=frozenset({"trailing-cr.txt\r"}),
+    )
+    result = plan(
+        desired_units={unit: desired({"SKILL.md": b"hi"})},
+        manifest=manifest_with(
+            units={unit: recorded({"SKILL.md": b"hi"})}, retained={weird_path}
+        ),
+        snapshots={unit: snap},
+    )
+    for line in result.exclude_lines_write + result.exclude_lines_final:
+        assert "trailing-cr" not in line
+    assert any(
+        r.path == weird_path and "cannot be hidden" in r.remedy for r in result.reports
+    )
+    assert weird_path not in result.next_manifest.retained

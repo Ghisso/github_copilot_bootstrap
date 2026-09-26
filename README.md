@@ -57,12 +57,15 @@ repository you own outright. **Sidecar install** (`--mode sidecar`) adds a
 small, private, per-clone overlay — a few skills and one short always-on rule
 per client — inside a repository whose agent harness a team already owns.
 Use it when you want your own coding-agent skills active in a team
-repository without changing anything the team tracks. Neither mode is
-detected by guessing. Running the plain installer with no `--mode` on a
+repository without changing anything the team tracks. With no `--mode`, the
+installer looks for full-install evidence and sidecar evidence on the
+target and picks whichever mode that evidence points to; when it finds
+neither, it still defaults to a full install, exactly as before. The one
+thing that changed: running the plain installer with no `--mode` on a
 repository that already tracks a path the full install writes, and that
-carries no bootstrap or sidecar evidence, now refuses. It tells you to pass
-one of the two flags explicitly (see
-[Behavior changes](#behavior-changes-you-should-know-about) below).
+carries no bootstrap or sidecar evidence, now refuses instead of silently
+taking that path over. It tells you to pass one of the two flags explicitly
+(see [Behavior changes](#behavior-changes-you-should-know-about) below).
 
 ### Full Install
 
@@ -452,9 +455,13 @@ uv run python scripts/install_bootstrap.py /path/to/team-repo --mode sidecar
 
 Run it from the main worktree checkout. Sidecar mode aborts in a linked
 worktree — a worktree that Git created with `git worktree add`, or that VS
-Code or the Codex app creates for a background session — because a linked
-worktree has its own Git directory, separate from the shared one the sidecar
-writes its manifest into.
+Code or the Codex app creates for a background session. The reason is not
+where the manifest lives: `.git/info/exclude` is shared by every worktree of
+one repository, but the sidecar's ownership manifest is specific to whichever
+Git directory it runs against. Trimming the shared exclude block from a
+linked worktree could expose paths that the main worktree's own manifest
+still owns, so sidecar mode refuses there and asks you to run it from the
+main worktree instead.
 
 **What it installs**, at two write roots, `.claude/skills/` and
 `.agents/skills/`:
@@ -477,7 +484,12 @@ and it stays that way.
 
 Every sidecar file is kept out of the team's Git state through a marked
 block in the local, untracked `.git/info/exclude` (not the tracked
-`.gitignore`), proven ignored before anything is written. An ownership
+`.gitignore`). The installer writes that block first, then proves every
+path it is about to write is actually ignored, before it writes any sidecar
+file. If that proof fails, it restores `.git/info/exclude` to its exact
+original bytes, writes no sidecar file at all, and exits 1 with a remedy —
+so a failed run still touches the exclude file transiently, but leaves your
+worktree and Git state exactly as it found them. An ownership
 manifest, `ai-bootstrap-sidecar.json`, and a staging folder,
 `ai-bootstrap-sidecar-staging/`, live inside the Git directory itself
 (`git rev-parse --git-dir`), where neither can be tracked or committed.
@@ -522,23 +534,65 @@ run reports a conflict so it never overwrites the existing preserved copy.
 To recover a preserved copy, copy it out of the Git directory; the sidecar
 never empties `ai-bootstrap-sidecar-preserved/` on its own.
 
-**Manual removal.** There is no uninstall command. To remove the sidecar by
-hand:
+**Uninstall.** Remove the sidecar overlay with the same installer:
 
-1. Read `ai-bootstrap-sidecar.json`, inside the Git directory, for the exact
-   paths it owns.
-2. Delete every one of those paths.
-3. Delete the marked `# BEGIN ai-bootstrap sidecar` / `# END ai-bootstrap
-   sidecar` block from `.git/info/exclude`.
-4. Delete the manifest file and the `ai-bootstrap-sidecar-staging/` folder,
-   both inside the Git directory.
+```bash
+uv run python scripts/install_bootstrap.py /path/to/team-repo --uninstall
+```
+
+`--mode sidecar` is optional here: with no `--mode` at all, `--uninstall`
+also works once detection finds sidecar evidence on the target. `--dry-run`
+previews the same removal without writing anything.
+
+Uninstall removes every sidecar file whose content still matches the
+manifest, the `# BEGIN ai-bootstrap sidecar` / `# END ai-bootstrap sidecar`
+block, the manifest itself, and the staging folder. It never deletes
+`<git dir>/ai-bootstrap-sidecar-preserved/`: that folder holds your edited
+copies (see **Preserved copies** above), and the sidecar leaves it alone on
+every run, including uninstall — delete it yourself only when you actually
+want to throw those edits away. Team-tracked and other foreign content is
+never touched. A line inside the exclude block that the sidecar never
+recognized as its own is not dropped: once the block is removed, that line
+is written back as a plain line where the block used to be, and reported.
+
+Removing the block also removes every `RETAINED` line, so any file that was
+hidden only because the sidecar was retaining it becomes visible to `git
+status` and `git add -A`; each one is reported by path so you can decide
+whether to track or delete it.
+
+If the target carries no sidecar evidence at all, `--uninstall` prints "no
+sidecar found; nothing to do" and exits 0 — running it again after a clean
+uninstall is safe.
+
+A preserve conflict (an edited copy would move to a path in
+`ai-bootstrap-sidecar-preserved/` that an earlier preserve already filled)
+is the one case where uninstall does not finish: it keeps that one unit and
+its exclude line in place, keeps the block, rewrites the manifest to hold
+only the units it kept, reports the conflict, and exits 1. Move or rename
+the conflicting file under `ai-bootstrap-sidecar-preserved/` and rerun
+`--uninstall` to finish the job.
+
+`--uninstall` refuses with `--mode full`, and it refuses on a target that
+has full-install evidence: it only ever removes a sidecar overlay, never a
+full install.
+
+**Manual fallback**, if you cannot run the installer: read
+`ai-bootstrap-sidecar.json` inside the Git directory for the exact paths it
+owns. Skip any of those paths that `git ls-files` already lists — the team
+has taken that one over, and it is no longer yours to delete. Delete only
+the files whose content hash still matches the manifest record, and never
+delete a file the manifest marks `retained`. Move any file you have
+hand-edited out of the sidecar folders first, so the edit survives, then
+delete the `# BEGIN ai-bootstrap sidecar` / `# END ai-bootstrap sidecar`
+block last. Leave `<git dir>/ai-bootstrap-sidecar-preserved/` alone — it
+holds preserved edits from earlier runs — and delete it only on purpose.
 
 **Switching modes manually.** There is no automatic migration. To move from
-sidecar to full, remove the sidecar by hand as above, then run the installer
-with `--mode full`. To move from full to sidecar, you would need to remove
-the full install's `.claude/`, root adapters, and devcontainer changes by
-hand first — in practice, choose the right mode before your first install
-instead.
+sidecar to full, remove the sidecar with `--uninstall` as above, then run
+the installer with `--mode full`. To move from full to sidecar, you would
+need to remove the full install's `.claude/`, root adapters, and
+devcontainer changes by hand first — in practice, choose the right mode
+before your first install instead.
 
 **Client support.** Claude Code, Codex, and Copilot in VS Code (both the
 Local agent and Agent Host sessions) are verified with a real client run
@@ -611,6 +665,40 @@ harness.
   worktree; see Limits above.
 - **A batch update no longer stops at the first failure.** See [Updating
   Sidecar Consumers](#updating-sidecar-consumers) below.
+- **A team `.claude` submodule or embedded repository is team config, not a
+  full install.** A submodule's `.git` file, or an outer-index entry that
+  tracks `.claude` as a nested repository, no longer counts as full-install
+  evidence; a plain install refuses it as already-tracked team content
+  instead of treating it as this bootstrap's own nested AI-state repository.
+- **A Git error other than "not a git repository" stops detection instead of
+  guessing.** A "dubious ownership" error, for example, aborts in every mode
+  with Git's own message and a remedy (`git config --global --add
+  safe.directory <path>`), rather than being read as "no evidence found".
+- **Nested repositories, submodules, symlinked skill folders, bad filesystem
+  shapes, and unwritable folders are refused before any write.** Sidecar
+  mode checks every path it plans to touch — a skill unit, a write root, a
+  bridge's parent folder — against the repository boundary and the
+  filesystem first, and refuses, naming the offending path, if any of it
+  does not fit.
+- **Unbalanced markers in `.git/info/exclude` are refused, not repaired.**
+  If the sidecar's own `# BEGIN`/`# END` lines are missing one of the pair,
+  doubled, or out of order, the run stops before writing anything and names
+  the line numbers so you can fix them by hand.
+- **A file name that `.gitignore` syntax cannot express is reported, not
+  hidden.** A retained file whose name has an embedded newline or a
+  trailing carriage return never gets an exclude line; it stays visible and
+  is reported instead.
+- **The generated source must be complete and exact.** Both
+  `dist/multi-agent/` and `dist/sidecar/` are checked against one exact
+  allowlist before install; a source missing a file, or carrying an extra
+  one, is refused. Full mode also refuses a source that lacks
+  `.claude/hooks/scripts/state-sync.sh`.
+- **Inherited Git environment variables are ignored.** Before it runs any
+  Git command, the installer clears `GIT_DIR`, `GIT_WORK_TREE`,
+  `GIT_INDEX_FILE`, and Git's other repository-local environment variables
+  from its own process, so a variable left exported by a wrapper script or
+  an earlier `git -C` call can no longer redirect it to the wrong
+  repository.
 
 ### Updating Sidecar Consumers
 

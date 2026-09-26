@@ -27,6 +27,7 @@ from typing import Literal
 from runtime_ownership import (
     COPILOT_SURFACE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
+    GIT_REPO_LOCAL_ENV_VARS,
     RESTORABLE_ROOT_PATHS,
     STATE_DIR_OWNED_README_PATHS,
     active_ignore_patterns,
@@ -37,7 +38,15 @@ from runtime_ownership import (
     is_third_party_skill_dir,
     restore_manifest,
 )
-from sidecar_overlay import install_sidecar, rev_parse, sidecar_evidence
+from sidecar_overlay import (
+    ExcludeMarkerError,
+    _c_locale_env,
+    _read_index_entries,
+    install_sidecar,
+    rev_parse,
+    sidecar_evidence,
+    uninstall_sidecar,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +57,21 @@ IGNORE_BLOCK_START = "# BEGIN multi-agent bootstrap generated/private AI content
 IGNORE_BLOCK_END = "# END multi-agent bootstrap generated/private AI content"
 LEGACY_ANTIGRAVITY_KEY = "BOOTSTRAP_ANTIGRAVITY_PATH"
 LEGACY_ANTIGRAVITY_ALLOWLIST = Path(".claude/antigravity-ownership.env")
+
+
+def scrub_inherited_git_environment() -> None:
+    """Remove Git's repository-local environment variables from this
+    process's own environment (Decision 27; S10), before any detection or
+    Git call.
+
+    An exported one of these -- ``GIT_DIR`` left set by a wrapper script or
+    a previous ``git -C`` invocation is the common case -- silently points
+    every Git call this process makes at a different repository, in either
+    mode: queries would read the wrong repository's state, and a full
+    install would write there too.
+    """
+    for name in GIT_REPO_LOCAL_ENV_VARS:
+        os.environ.pop(name, None)
 
 
 # GitHub Copilot cloud agents read the agent/hook/instruction surface only from
@@ -110,6 +134,16 @@ def parse_args() -> argparse.Namespace:
         help="Permit the bootstrap repository to refresh its own dogfood overlay, "
         "where the generated source lives inside the target. Every other "
         "overlapping-root case stays rejected.",
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove the sidecar overlay: units whose content matches its record "
+        "are removed, a locally modified or unfinished unit is preserved instead "
+        "of deleted, and team or foreign content is never touched. Only valid "
+        "for a sidecar target (explicit --mode sidecar, or no --mode when "
+        "detection finds sidecar evidence); refused with --mode full or full "
+        "evidence.",
     )
     return parser.parse_args()
 
@@ -649,7 +683,11 @@ def persisted_install_mode(target: Path) -> bool | None:
 
 
 def validate_install_roots(
-    source: Path, target: Path, allow_self: bool = False
+    source: Path,
+    target: Path,
+    allow_self: bool = False,
+    *,
+    suggest_allow_self: bool = True,
 ) -> None:
     """Reject overlapping source and target trees before installer side effects.
 
@@ -658,7 +696,10 @@ def validate_install_roots(
     the target. That case is safe because removal only walks ``target/.claude``
     and ``RESTORABLE_ROOT_PATHS``, so the source under ``dist/`` is never a
     removal candidate. Installing a tree over itself, or into a directory under
-    the source, stays rejected either way.
+    the source, stays rejected either way. ``suggest_allow_self`` is ``False``
+    for a sidecar target (Decision 13, 36): sidecar mode always passes
+    ``allow_self=False`` regardless of the flag, so the option genuinely has
+    no effect there and must not be suggested (S16).
     """
     if allow_self and source != target and source.is_relative_to(target):
         if target != REPO_ROOT:
@@ -674,12 +715,48 @@ def validate_install_roots(
     ):
         hint = (
             ""
-            if allow_self
+            if allow_self or not suggest_allow_self
             else " Pass --allow-self to refresh the bootstrap repository's own overlay."
         )
         raise SystemExit(
             "Generated source and target repository must be separate, non-overlapping directories: "
             f"source={source}; target={target}.{hint}"
+        )
+
+
+def require_source_exists(source: Path, *, explicit: bool) -> None:
+    """Abort with a message that fits how ``source`` was chosen (Decision
+    36; S16). A missing default source (the person passed no ``--source``)
+    says to regenerate it; a missing explicit ``--source`` names that path,
+    since regenerating would not create the path the person actually gave.
+    """
+    if source.is_dir():
+        return
+    if explicit:
+        raise SystemExit(f"Generated source does not exist: {source}")
+    raise SystemExit(
+        f"Generated source does not exist: {source}. Run "
+        "`uv run python scripts/generate_targets.py --all` to build it, then rerun."
+    )
+
+
+def require_full_source_complete(source: Path) -> None:
+    """Refuse a full-mode source that lacks the state-sync helper (Decision
+    31; S14): without it, a full install writes the ``.gitignore`` block,
+    ``bootstrap-ownership.env``, and a dangling ``core.hooksPath`` and then
+    fails deep inside ``sync_state_after_install`` instead of before any
+    write. Also catches ``--source dist/sidecar`` in full mode, which is
+    missing this file by construction (Decision 31, L2). Runs after
+    ``validate_install_roots`` and ``validate_agents_takeover`` so their
+    existing refusal messages keep their order and wording.
+    """
+    state_sync = source / ".claude" / "hooks" / "scripts" / "state-sync.sh"
+    if not state_sync.is_file():
+        raise SystemExit(
+            f"Full-mode source is incomplete: missing {state_sync}. Pass a "
+            "source built by `uv run python scripts/generate_targets.py "
+            "--all` (dist/multi-agent), not a sidecar tree such as "
+            "dist/sidecar."
         )
 
 
@@ -1124,16 +1201,40 @@ def migrate_pre_existing_state(
         )
 
 
+class GitDetectionError(RuntimeError):
+    """A Git failure during mode detection other than "not a git repository"
+    (Decision 27): the caller must abort detection in every mode, quoting
+    this message and a remedy, instead of reading it as "no evidence"."""
+
+
+def _detection_abort_message(target: Path, stderr: str) -> str:
+    return (
+        f"Refusing to detect an install mode: git failed on {target}: "
+        f"{stderr}. If this is a dubious-ownership message, run "
+        f"`git config --global --add safe.directory {target}`, then rerun."
+    )
+
+
 def tracked_generated_paths(target: Path, patterns: tuple[str, ...]) -> list[str]:
+    """Return every tracked path under ``patterns``, bytes-safe (Decision
+    29). Returns an empty list only for "not a git repository" (Decision 27)
+    or a missing ``target`` folder; raises ``GitDetectionError`` on any
+    other Git failure, so a caller doing mode detection can tell the two
+    apart instead of reading every failure as "no evidence"."""
+    if not target.is_dir():
+        return []
     result = subprocess.run(
-        ["git", "-C", str(target), "ls-files", "--", *patterns],
-        text=True,
+        ["git", "-C", str(target), "ls-files", "-z", "--", *patterns],
         capture_output=True,
         check=False,
+        env=_c_locale_env(),
     )
     if result.returncode != 0:
-        return []
-    return [line for line in result.stdout.splitlines() if line.strip()]
+        stderr = result.stderr.decode("utf-8", "replace")
+        if "not a git repository" in stderr:
+            return []
+        raise GitDetectionError(stderr.strip())
+    return [os.fsdecode(part) for part in result.stdout.split(b"\0") if part]
 
 
 def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
@@ -1159,14 +1260,36 @@ def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
 
 
 def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
-    """Full-install evidence per the mode table. Reads only ``target``: two
-    plain path checks under ``.claude``, plus ``--allow-self`` naming this
-    repository itself as the target. Neither path check requires ``target``
-    to be a Git repository."""
+    """Full-install evidence per the mode table (Decision 27). ``.claude/.git``
+    counts only when it is a directory (checked with ``lstat``, so a
+    submodule's ``.git`` file never counts) and the outer index has no entry
+    at or under ``.claude`` (Phase G's index reader, reused here: a team
+    submodule or an embedded repository tracked as a gitlink is team config
+    instead, not full evidence)."""
     evidence: list[str] = []
     nested_git = target / ".claude" / ".git"
-    if nested_git.exists():
-        evidence.append(f"nested AI-state repository {nested_git}")
+    try:
+        nested_is_dir = stat.S_ISDIR(os.lstat(nested_git).st_mode)
+    except OSError:
+        nested_is_dir = False
+    if nested_is_dir:
+        claude_tracked = False
+        if target.is_dir():
+            try:
+                entries = _read_index_entries(target)
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or b"").decode("utf-8", "replace")
+                if "not a git repository" not in stderr:
+                    raise SystemExit(
+                        _detection_abort_message(target, stderr.strip())
+                    ) from exc
+                entries = ()
+            claude_tracked = any(
+                path == ".claude" or path.startswith(".claude/")
+                for _mode, path in entries
+            )
+        if not claude_tracked:
+            evidence.append(f"nested AI-state repository {nested_git}")
     ownership_env = target / ".claude" / "bootstrap-ownership.env"
     if ownership_env.exists():
         evidence.append(f"full-install manifest {ownership_env}")
@@ -1176,21 +1299,33 @@ def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
 
 
 def _sidecar_evidence(target: Path) -> tuple[str, ...]:
-    """Sidecar evidence per the mode table. A target that is not a Git
-    repository (or has no commits) has no Git-directory evidence to read, so
-    ``sidecar_evidence``'s underlying ``git rev-parse`` failure is read back
-    as "no evidence" rather than a crash."""
+    """Sidecar evidence per the mode table. A missing ``target`` folder has
+    no Git-directory evidence to read (Decision 27). A Git failure other
+    than "not a git repository" aborts detection in every mode instead of
+    being read as "no evidence" (S2); unbalanced or repeated exclude-block
+    markers (Decision 26; S7) do the same."""
+    if not target.is_dir():
+        return ()
     try:
         return sidecar_evidence(target)
-    except subprocess.CalledProcessError:
-        return ()
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr or ""
+        if "not a git repository" in stderr:
+            return ()
+        raise SystemExit(_detection_abort_message(target, stderr.strip())) from exc
+    except ExcludeMarkerError as exc:
+        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
 
 
 def _team_config_evidence(target: Path) -> tuple[str, ...]:
     """Tracked paths under ``FULL_INSTALL_ROOT_PATHS``. Empty when ``target``
-    is not a Git repository (or has no commits): ``git ls-files`` then finds
-    nothing tracked, which is exactly the "no team config" reading."""
-    return tuple(tracked_generated_paths(target, FULL_INSTALL_ROOT_PATHS))
+    is not a Git repository: ``git ls-files`` then finds nothing tracked,
+    which is exactly the "no team config" reading. Any other Git failure
+    aborts detection in every mode (Decision 27)."""
+    try:
+        return tuple(tracked_generated_paths(target, FULL_INSTALL_ROOT_PATHS))
+    except GitDetectionError as exc:
+        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
 
 
 def _is_linked_worktree(target: Path) -> bool:
@@ -1240,8 +1375,10 @@ def detect_install_mode(
             raise SystemExit(
                 "Refusing --mode full: "
                 f"{target} already has sidecar evidence ({'; '.join(sidecar_ev)}). "
-                "Remove that sidecar evidence manually first, or run without --mode "
-                "full to keep the sidecar overlay."
+                "The sidecar's info/exclude block is shared by every worktree of "
+                "this repository, so this can be true even from a linked worktree "
+                "or a subdirectory. Run without --mode full to keep the sidecar "
+                "overlay, or ask whoever manages the sidecar to remove it first."
             )
         return "full"
 
@@ -1297,24 +1434,58 @@ def warn_full_only_options_ignored(args: argparse.Namespace) -> None:
         warn("sidecar install ignores full-only option(s): " + ", ".join(ignored))
 
 
+def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
+    """``--uninstall`` (Decision 34; the small plan's step 9). Never goes
+    through ``detect_install_mode``: it needs its own rule, not the mode
+    table's ("no --mode" auto-detect team-config refusal never applies to
+    --uninstall), and it needs no ``--source`` at all."""
+    if args.mode == "full":
+        raise SystemExit(
+            "Refusing --uninstall with --mode full: --uninstall only removes "
+            "a sidecar overlay, never a full install."
+        )
+    full_ev = _full_install_evidence(target, args.allow_self)
+    if full_ev:
+        raise SystemExit(
+            "Refusing --uninstall: "
+            f"{target} has full-install evidence ({'; '.join(full_ev)}). "
+            "--uninstall only removes a sidecar overlay."
+        )
+    sidecar_ev = _sidecar_evidence(target)
+    if not sidecar_ev:
+        info("no sidecar found; nothing to do")
+        return 0
+    return uninstall_sidecar(target, dry_run=args.dry_run)
+
+
 def main() -> int:
+    scrub_inherited_git_environment()
     args = parse_args()
     target = args.target_repo.expanduser().resolve()
+
+    if args.uninstall:
+        return _run_uninstall(target, args)
+
     mode = detect_install_mode(target, args.mode, args.allow_self)
+    source_is_explicit = args.source is not None
     source = (
         args.source.expanduser().resolve()
-        if args.source is not None
+        if source_is_explicit
         else (DEFAULT_SOURCE if mode == "full" else DEFAULT_SIDECAR_SOURCE)
     )
+    require_source_exists(source, explicit=source_is_explicit)
 
     if mode == "sidecar":
-        validate_install_roots(source, target, allow_self=False)
+        validate_install_roots(
+            source, target, allow_self=False, suggest_allow_self=False
+        )
         warn_full_only_options_ignored(args)
         return install_sidecar(target, source, dry_run=args.dry_run)
 
     state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     validate_install_roots(source, target, args.allow_self)
     validate_agents_takeover(source, target)
+    require_full_source_complete(source)
     persisted_mode = persisted_install_mode(target)
     commit_copilot_surface = (
         args.commit_copilot_surface

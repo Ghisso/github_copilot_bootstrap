@@ -90,10 +90,12 @@ Copilot files are native adapters; agent wrappers preserve Copilot frontmatter a
 `dist/sidecar/` is a second generated target: a narrow, per-clone developer
 overlay that `scripts/install_bootstrap.py --mode sidecar` installs inside a
 repository whose agent harness a team already owns, without changing any
-tracked file. See [README.md's Personal Sidecar
-Install](../README.md#personal-sidecar-install) for install and update
-instructions, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
-for the native-run evidence behind every row below.
+tracked file. The same installer, with `--uninstall`, removes the overlay
+again. See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install) for install, update, and
+uninstall instructions, and
+[docs/sidecar-provider-contract.md](sidecar-provider-contract.md) for the
+native-run evidence behind every row below.
 
 | Projection | Path(s) | Client(s) that read it |
 | --- | --- | --- |
@@ -110,14 +112,18 @@ sidecar v1). The manifest, staging folder, and preserved-copy folder that
 track sidecar ownership live inside the Git directory
 (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`, and
 `ai-bootstrap-sidecar-preserved/`), never in the worktree, so none of them can
-be tracked. The manifest and staging folder are resolved with
-`git rev-parse --git-path ...`; the preserved-copy folder is instead built
-from the already-verified `git rev-parse --git-dir` value, because
-`--git-path` would resolve a symlinked path before printing it. The preserved
-folder holds
-an edited sidecar copy that a taken skill name displaced; see
+be tracked. All three paths — manifest, staging folder, and preserved-copy
+folder — are built from the same already-verified `git rev-parse
+--path-format=absolute --git-dir` value, never through `git rev-parse
+--git-path`: `--git-path` resolves a symlink in the path before printing it,
+which would hide exactly the symlinked Git-directory case the sidecar's own
+preflight checks exist to catch. The preserved folder holds an edited
+sidecar copy that a taken skill name displaced; see
 [README.md's Personal Sidecar Install](../README.md#personal-sidecar-install)
-for its naming and recovery.
+for its naming and recovery, and its [Uninstall
+section](../README.md#personal-sidecar-install) for `--uninstall`, which
+removes the manifest and staging folder but leaves the preserved folder in
+place.
 
 See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for how each

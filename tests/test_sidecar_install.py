@@ -16,8 +16,11 @@ skills, two write roots, two bridges), real, and already self-contained
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -29,9 +32,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import install_bootstrap  # noqa: E402
 import sidecar_overlay as sidecar_overlay_module  # noqa: E402
 from sidecar_overlay import escape_exact_path, git_path, install_sidecar  # noqa: E402
 from sidecar_test_helpers import (  # noqa: E402
+    _absolute_git_dir,
     _commit,
     _commit_staged,
     _exclude_path,
@@ -41,6 +46,7 @@ from sidecar_test_helpers import (  # noqa: E402
     _raise_at,
     _read_manifest,
     _status,
+    patch_sidecar_skills,
 )
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
@@ -200,7 +206,7 @@ def test_invalid_manifest_aborts_with_remedy(team_repo: Path, capsys) -> None:
     exit_code = install_sidecar(team_repo, SOURCE)
     assert exit_code != 0
     err = capsys.readouterr().err
-    assert "move the manifest aside" in err
+    assert "aside and rerun with --mode sidecar" in err
     assert "adopted" in err
 
 
@@ -802,7 +808,7 @@ def test_cli_invalid_manifest_with_no_mode_aborts_with_remedy(team_repo: Path) -
     )
 
     assert result.returncode != 0
-    assert "move the manifest aside" in result.stderr
+    assert "aside and rerun with --mode sidecar" in result.stderr
 
 
 def test_cli_sidecar_evidence_with_no_mode_takes_sidecar_path(team_repo: Path) -> None:
@@ -1502,7 +1508,7 @@ def test_ignorecase_true_with_real_case_variant_folder_takes_ponytail_end_to_end
 
 
 def test_real_run_prints_exact_lines_for_remove_delete_and_preserve(
-    team_repo: Path, tmp_path: Path, capsys
+    team_repo: Path, tmp_path: Path, monkeypatch, capsys
 ) -> None:
     assert install_sidecar(team_repo, SOURCE) == 0
 
@@ -1526,10 +1532,15 @@ def test_real_run_prints_exact_lines_for_remove_delete_and_preserve(
     _commit_staged(team_repo, "team owns humanize")
 
     # remove: build a reduced source that no longer ships debug-investigator.
+    # Decision 31's exact-source check now compares against the current
+    # SIDECAR_SKILLS constant, so a source that intentionally drops a skill
+    # needs that constant patched to match (patch_sidecar_skills), not a
+    # weaker check.
     reduced_source = tmp_path / "reduced-source"
     shutil.copytree(SOURCE, reduced_source)
     for write_root in (".claude/skills", ".agents/skills"):
         shutil.rmtree(reduced_source / write_root / "debug-investigator")
+    patch_sidecar_skills(monkeypatch, ("humanize", "ponytail", "ponytail-review"))
 
     exit_code = install_sidecar(team_repo, reduced_source)
 
@@ -1968,3 +1979,1006 @@ def test_unrecognized_garbage_line_survives_and_is_reported(
     assert exit_code_2 == 0
     assert _exclude_path(team_repo).read_bytes() == exclude_after_first_run
     assert _status(team_repo) == status_before
+
+
+# --------------------------------------------------------------------------
+# Phase H step 1: drop inherited Git repository-local environment variables
+# --------------------------------------------------------------------------
+
+
+def _build_other_repo(root: Path) -> Path:
+    other = root / "other-repo"
+    _init_repo(other)
+    _write(other / "README.md", "other repo\n")
+    _commit(other, "init other repo")
+    return other
+
+
+def test_exported_git_dir_pointing_elsewhere_is_scrubbed(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    other = _build_other_repo(tmp_path)
+    other_status_before = _status(other)
+
+    env = os.environ.copy()
+    env["GIT_DIR"] = str(other / ".git")
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _manifest_path(team_repo).is_file()
+    assert "/.claude/skills/ponytail\n" in _exclude_path(team_repo).read_text(
+        encoding="utf-8"
+    )
+    assert not _manifest_path(other).exists()
+    other_exclude = other / ".git" / "info" / "exclude"
+    other_exclude_text = (
+        other_exclude.read_text(encoding="utf-8") if other_exclude.is_file() else ""
+    )
+    assert "ai-bootstrap sidecar" not in other_exclude_text
+    assert _status(other) == other_status_before
+
+
+def test_exported_git_index_file_is_scrubbed(team_repo: Path, tmp_path: Path) -> None:
+    # A stray GIT_INDEX_FILE, left unscrubbed, makes every ls-files query see
+    # an empty index: the team's tracked ponytail is then misread as
+    # untracked "foreign" content instead of "team_owned" -- both skip
+    # installing it, but only the correct read names it as tracked.
+    team_content = "---\nname: ponytail\n---\nTEAM-OWNED-PONYTAIL\n"
+    _write(team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md", team_content)
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team owns ponytail")
+
+    stray_index = tmp_path / "stray-index"
+    env = os.environ.copy()
+    env["GIT_INDEX_FILE"] = str(stray_index)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (team_repo / ".claude" / "skills" / "ponytail" / "SKILL.md").read_text(
+        encoding="utf-8"
+    ) == team_content
+    assert "the repository tracks" in result.stdout
+    assert "will not replace" not in result.stdout
+    assert not stray_index.exists()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 3: validate Git-directory metadata before any write
+# --------------------------------------------------------------------------
+
+
+# Reuse the shared Git-dir path builder (sidecar_test_helpers._absolute_git_dir),
+# the same one install_sidecar itself uses, so a symlink test never gets
+# fooled by a resolved path.
+_git_dir_path = _absolute_git_dir
+
+
+def _run_capturing_stderr(
+    team_repo: Path, dry_run: bool = False, source: Path = SOURCE
+) -> tuple[int, str]:
+    import contextlib
+    import io
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        exit_code = install_sidecar(team_repo, source, dry_run=dry_run)
+    return exit_code, buffer.getvalue()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_manifest_as_a_folder_aborts_before_any_write(
+    team_repo: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    manifest_path = git_dir / "ai-bootstrap-sidecar.json"
+    manifest_path.mkdir()
+    staging = git_dir / "ai-bootstrap-sidecar-staging"
+    status_before = _status(team_repo)
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(manifest_path) in err
+    assert _status(team_repo) == status_before
+    assert not staging.exists()
+    assert manifest_path.is_dir()
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_manifest_as_dangling_symlink_aborts_before_any_write(
+    team_repo: Path, tmp_path: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    manifest_path = git_dir / "ai-bootstrap-sidecar.json"
+    manifest_path.symlink_to(tmp_path / "does-not-exist-target")
+    status_before = _status(team_repo)
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(manifest_path) in err
+    assert "regular file" in err
+    assert _status(team_repo) == status_before
+    assert manifest_path.is_symlink()
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_manifest_as_symlink_to_a_file_aborts_before_any_write(
+    team_repo: Path, tmp_path: Path, dry_run: bool
+) -> None:
+    real_file = tmp_path / "elsewhere.json"
+    real_file.write_text("{}", encoding="utf-8")
+    git_dir = _git_dir_path(team_repo)
+    manifest_path = git_dir / "ai-bootstrap-sidecar.json"
+    manifest_path.symlink_to(real_file)
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(manifest_path) in err
+    assert real_file.read_text(encoding="utf-8") == "{}"
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_manifest_as_named_pipe_aborts_before_any_write(
+    team_repo: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    manifest_path = git_dir / "ai-bootstrap-sidecar.json"
+    os.mkfifo(manifest_path)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(install_sidecar, team_repo, SOURCE, dry_run=dry_run)
+        exit_code = future.result(timeout=15)
+
+    assert exit_code != 0
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_staging_as_a_regular_file_aborts_before_any_write(
+    team_repo: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    staging = git_dir / "ai-bootstrap-sidecar-staging"
+    staging.write_text("not a folder\n", encoding="utf-8")
+    before_bytes = staging.read_bytes()
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(staging) in err
+    assert staging.read_bytes() == before_bytes
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_staging_as_symlink_to_a_folder_holding_a_tracked_file_aborts(
+    team_repo: Path, tmp_path: Path, dry_run: bool
+) -> None:
+    linked_folder = tmp_path / "shared-elsewhere"
+    linked_folder.mkdir()
+    tracked_sentinel = linked_folder / "important.txt"
+    tracked_sentinel.write_text("do not touch\n", encoding="utf-8")
+    git_dir = _git_dir_path(team_repo)
+    staging = git_dir / "ai-bootstrap-sidecar-staging"
+    staging.symlink_to(linked_folder, target_is_directory=True)
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(staging) in err
+    assert tracked_sentinel.read_text(encoding="utf-8") == "do not touch\n"
+    assert sorted(p.name for p in linked_folder.iterdir()) == ["important.txt"]
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_info_as_a_symlink_to_a_shared_folder_aborts(
+    team_repo: Path, tmp_path: Path, dry_run: bool
+) -> None:
+    shared_info = tmp_path / "shared-info"
+    shared_info.mkdir()
+    (shared_info / "exclude").write_text("*.log\n", encoding="utf-8")
+    git_dir = _git_dir_path(team_repo)
+    info_dir = git_dir / "info"
+    shutil.rmtree(info_dir)
+    info_dir.symlink_to(shared_info, target_is_directory=True)
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(info_dir) in err
+    assert (shared_info / "exclude").read_text(encoding="utf-8") == "*.log\n"
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_info_exclude_as_a_folder_aborts_before_any_write(
+    team_repo: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    exclude_path = git_dir / "info" / "exclude"
+    if exclude_path.is_file():
+        exclude_path.unlink()
+    exclude_path.mkdir()
+
+    exit_code, err = _run_capturing_stderr(team_repo, dry_run=dry_run)
+
+    assert exit_code != 0
+    assert str(exclude_path) in err
+    assert exclude_path.is_dir()
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_info_exclude_as_a_named_pipe_aborts_before_any_write(
+    team_repo: Path, dry_run: bool
+) -> None:
+    git_dir = _git_dir_path(team_repo)
+    exclude_path = git_dir / "info" / "exclude"
+    if exclude_path.is_file():
+        exclude_path.unlink()
+    os.mkfifo(exclude_path)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(install_sidecar, team_repo, SOURCE, dry_run=dry_run)
+        exit_code = future.result(timeout=15)
+
+    assert exit_code != 0
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+def test_linked_worktree_of_a_sidecar_main_worktree_still_refused(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    linked = tmp_path / "linked-worktree"
+    added = _git(team_repo, "worktree", "add", "-q", str(linked), "-b", "linked-branch")
+    assert added.returncode == 0, added.stderr
+
+    # With no --mode, the shared exclude block is detected as sidecar
+    # evidence from the linked worktree too (Decision 15), so detection
+    # picks "sidecar" without aborting; install_sidecar's own existing
+    # linked-worktree preflight is what refuses it.
+    result_plain = subprocess.run(
+        [sys.executable, str(INSTALLER), str(linked)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result_plain.returncode != 0
+    assert "linked worktree" in result_plain.stderr
+
+    result_full = subprocess.run(
+        [sys.executable, str(INSTALLER), str(linked), "--mode", "full"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result_full.returncode != 0
+    assert "sidecar evidence" in result_full.stderr
+    assert not (linked / ".claude" / ".git").exists()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 4: require balanced exclude markers (Decision 26; S7)
+# --------------------------------------------------------------------------
+
+BEGIN_MARKER = "# BEGIN ai-bootstrap sidecar"
+END_MARKER = "# END ai-bootstrap sidecar"
+
+
+def _write_raw_exclude(team_repo: Path, text: str) -> None:
+    exclude_path = _git_dir_path(team_repo) / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    exclude_path.write_text(text, encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "broken_text",
+    [
+        f"{BEGIN_MARKER}\n.env.other\n",
+        f"{END_MARKER}\n{BEGIN_MARKER}\n.env.other\n",
+        f"{BEGIN_MARKER}\nx\n{END_MARKER}\n{BEGIN_MARKER}\ny\n{END_MARKER}\n",
+        f"{BEGIN_MARKER}\n{BEGIN_MARKER}\nx\n{END_MARKER}\n",
+    ],
+    ids=("orphan-begin", "end-before-begin", "two-blocks", "repeated-begin"),
+)
+def test_unbalanced_exclude_markers_abort_before_any_write(
+    team_repo: Path, broken_text: str
+) -> None:
+    personal_line = ".env.personal\n"
+    text = personal_line + broken_text
+    _write_raw_exclude(team_repo, text)
+    exclude_path = _git_dir_path(team_repo) / "info" / "exclude"
+    before_bytes = exclude_path.read_bytes()
+    status_before = _status(team_repo)
+
+    dry_exit, _ = _run_capturing_stderr(team_repo, dry_run=True)
+    assert dry_exit != 0
+    assert exclude_path.read_bytes() == before_bytes
+    assert _status(team_repo) == status_before
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+    assert exit_code != 0
+    assert "line" in err
+    assert exclude_path.read_bytes() == before_bytes
+    assert _status(team_repo) == status_before
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+    # The person's own line, byte-identical, no matter which shape broke.
+    assert exclude_path.read_bytes().startswith(personal_line.encode("utf-8"))
+
+
+def test_unbalanced_exclude_markers_also_abort_mode_detection(team_repo: Path) -> None:
+    _write_raw_exclude(team_repo, f"{BEGIN_MARKER}\n.env.other\n")
+    status_before = _status(team_repo)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(team_repo)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "unbalanced" in result.stderr
+    assert _status(team_repo) == status_before
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+def test_normal_block_with_crlf_line_endings_still_works(team_repo: Path) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    exclude_path = _exclude_path(team_repo)
+    text = exclude_path.read_text(encoding="utf-8")
+    crlf_text = text.replace("\n", "\r\n")
+    exclude_path.write_bytes(crlf_text.encode("utf-8"))
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 5: bytes-safe paths (Decision 29; R5, S15)
+# --------------------------------------------------------------------------
+
+# os.fsdecode/os.fsencode round-trip: this str holds a surrogate-escaped
+# byte 0xff, an illegal standalone UTF-8 byte on a POSIX filesystem.
+BAD_BYTE_NAME = os.fsdecode(b"bad-\xff.txt")
+
+
+def test_unrelated_staged_non_utf8_filename_installs_fine(team_repo: Path) -> None:
+    bad_path = team_repo / BAD_BYTE_NAME
+    bad_path.write_bytes(b"not utf-8 on purpose\n")
+    add = _git(team_repo, "add", "-A")
+    assert add.returncode == 0, add.stderr
+    status_before = _status(team_repo)
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+    assert _status(team_repo) == status_before
+    assert bad_path.read_bytes() == b"not utf-8 on purpose\n"
+
+
+def test_non_utf8_file_inside_owned_unit_is_kept_hidden_and_stable(
+    team_repo: Path,
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_file = unit_dir / BAD_BYTE_NAME
+    weird_file.write_bytes(b"personal notes\n")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert weird_file.read_bytes() == b"personal notes\n"
+    status = _status(team_repo)
+    assert ".claude/skills/ponytail" not in status
+
+    # Stable rerun: no oscillation, no crash.
+    status_before_2 = _status(team_repo)
+    assert install_sidecar(team_repo, SOURCE) == 0
+    assert weird_file.read_bytes() == b"personal notes\n"
+    assert _status(team_repo) == status_before_2
+
+
+def test_retained_non_utf8_file_after_takeover_gets_a_raw_bytes_line(
+    team_repo: Path,
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_file = unit_dir / BAD_BYTE_NAME
+    weird_file.write_bytes(b"kept by a person\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert weird_file.read_bytes() == b"kept by a person\n"
+    exclude_bytes = _exclude_path(team_repo).read_bytes()
+    assert b"bad-\xff.txt" in exclude_bytes
+    manifest = _read_manifest(team_repo)
+    expected_retained = f".claude/skills/ponytail/{BAD_BYTE_NAME}"
+    assert any(
+        os.fsencode(path) == os.fsencode(expected_retained)
+        for path in manifest["retained"]
+    )
+    assert _is_ignored(team_repo, f".claude/skills/ponytail/{BAD_BYTE_NAME}")
+
+
+def test_latin1_personal_exclude_line_preserved_byte_for_byte(team_repo: Path) -> None:
+    exclude_path = _git_dir_path(team_repo) / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    latin1_line = "café-notes.txt".encode("latin-1")
+    before = exclude_path.read_bytes() if exclude_path.is_file() else b""
+    separator = b"" if not before or before.endswith(b"\n") else b"\n"
+    exclude_path.write_bytes(before + separator + latin1_line + b"\n")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    assert latin1_line in _exclude_path(team_repo).read_bytes()
+
+
+def test_retained_name_with_embedded_newline_never_gets_a_raw_pattern_line(
+    team_repo: Path, capsys
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_name = "weird\nname.txt"
+    (unit_dir / weird_name).write_bytes(b"kept\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert "weird" not in exclude_text
+    out = capsys.readouterr().out
+    assert "cannot be hidden" in out
+
+
+def test_retained_name_with_trailing_cr_never_gets_a_raw_pattern_line(
+    team_repo: Path, capsys
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_name = "trailing-cr.txt\r"
+    (unit_dir / weird_name).write_bytes(b"kept\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code == 0
+    exclude_text = _exclude_path(team_repo).read_text(encoding="utf-8")
+    assert "trailing-cr" not in exclude_text
+    out = capsys.readouterr().out
+    assert "cannot be hidden" in out
+
+
+def test_unexpressible_name_gate_catches_a_forced_raw_pattern_line(
+    team_repo: Path, monkeypatch
+) -> None:
+    """Defense in depth (S15): even if a future bug bypassed the guard and
+    forced a raw pattern line for an unexpressible name, the write-time
+    ignore gate still refuses rather than silently mis-hiding it."""
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_can_express_in_gitignore", lambda _: True
+    )
+    unit_dir = team_repo / ".claude" / "skills" / "ponytail"
+    weird_name = "weird\nname.txt"
+
+    assert install_sidecar(team_repo, SOURCE) == 0
+    (unit_dir / weird_name).write_bytes(b"kept\n")
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code != 0
+
+
+def test_fixed_fixture_unit_hash_equals_pre_change_value():
+    # Pinned before this phase's os.fsencode change (Decision 29): for any
+    # legal name, os.fsencode is byte-identical to str.encode("utf-8"), so a
+    # unit hash computed the old way (plain .encode("utf-8")) must still
+    # match compute_unit_hash's new result for a fixed, real fixture.
+    file_hash = sidecar_overlay_module.compute_file_hash(b"hello\n")
+    files = {"SKILL.md": file_hash}
+    old_algorithm = hashlib.sha256(
+        "SKILL.md".encode("utf-8") + b"\0" + file_hash.encode("ascii") + b"\n"
+    ).hexdigest()
+    assert sidecar_overlay_module.compute_unit_hash(files) == old_algorithm
+
+
+# --------------------------------------------------------------------------
+# Phase H step 6: repository boundaries and filesystem shape (Decision 28)
+# --------------------------------------------------------------------------
+
+
+def _nested_clone(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    _init_repo(path)
+    _write(path / "README.md", "nested clone\n")
+    _commit(path, "nested clone content")
+
+
+@pytest.fixture
+def bare_repo(tmp_path: Path) -> Path:
+    root = tmp_path / "bare-repo"
+    _init_repo(root)
+    return root
+
+
+def test_nested_clone_at_claude_skills_is_refused(bare_repo: Path) -> None:
+    nested = bare_repo / ".claude" / "skills"
+    _nested_clone(nested)
+    status_before = _status(nested)
+
+    exit_code, err = _run_capturing_stderr(bare_repo)
+
+    assert exit_code != 0
+    assert "nested repository or submodule" in err
+    assert "nothing was written" in err
+    assert _status(nested) == status_before
+    assert not _manifest_path(bare_repo).exists()
+
+
+def test_nested_clone_at_agents_with_no_skills_yet_is_refused(bare_repo: Path) -> None:
+    nested = bare_repo / ".agents"
+    _nested_clone(nested)
+    status_before = _status(nested)
+
+    exit_code, err = _run_capturing_stderr(bare_repo)
+
+    assert exit_code != 0
+    assert "nested repository or submodule" in err
+    assert _status(nested) == status_before
+    assert not _manifest_path(bare_repo).exists()
+
+
+def _add_submodule(target: Path, relative: str, tmp_path: Path) -> Path:
+    source = tmp_path / f"{relative.replace('/', '_')}-submodule-source"
+    _init_repo(source)
+    _write(source / "settings.json", '{"team": true}\n')
+    _commit(source, "submodule content")
+    add = _git(
+        target,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "-q",
+        str(source),
+        relative,
+    )
+    assert add.returncode == 0, add.stderr
+    _commit(target, f"add {relative} submodule")
+    return source
+
+
+def test_submodule_at_a_write_root_is_refused(bare_repo: Path, tmp_path: Path) -> None:
+    _add_submodule(bare_repo, ".claude/skills", tmp_path)
+    status_before = _status(bare_repo / ".claude" / "skills")
+
+    exit_code, err = _run_capturing_stderr(bare_repo)
+
+    assert exit_code != 0
+    assert "nested repository or submodule" in err
+    assert _status(bare_repo / ".claude" / "skills") == status_before
+    assert not _manifest_path(bare_repo).exists()
+
+
+def test_submodule_at_claude_with_no_skills_inside_is_refused(
+    bare_repo: Path, tmp_path: Path
+) -> None:
+    _add_submodule(bare_repo, ".claude", tmp_path)
+    status_before = _status(bare_repo / ".claude")
+
+    exit_code, err = _run_capturing_stderr(bare_repo)
+
+    assert exit_code != 0
+    assert "nested repository or submodule" in err
+    assert "sidecar mode does not support" in err
+    # Not the .gitignore remedy (S5): a submodule needs the new message, not
+    # a suggestion to change a team ignore rule.
+    assert ".gitignore" not in err
+    assert _status(bare_repo / ".claude") == status_before
+    assert not _manifest_path(bare_repo).exists()
+
+
+def test_regular_file_at_agents_is_refused(bare_repo: Path) -> None:
+    (bare_repo / ".agents").write_text("not a folder\n", encoding="utf-8")
+    before_bytes = (bare_repo / ".agents").read_bytes()
+
+    exit_code, err = _run_capturing_stderr(bare_repo)
+
+    assert exit_code != 0
+    assert (bare_repo / ".agents").read_bytes() == before_bytes
+    assert not _manifest_path(bare_repo).exists()
+
+
+def test_read_only_unit_folder_during_an_update_is_refused(team_repo: Path) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    unit_dir = team_repo / ".claude" / "skills" / "humanize"
+    mutated_source = team_repo.parent / "mutated-source"
+    shutil.copytree(SOURCE, mutated_source)
+    mutated_file = mutated_source / ".claude" / "skills" / "humanize" / "SKILL.md"
+    mutated_file.write_text(
+        mutated_file.read_text(encoding="utf-8") + "\nmutated\n", encoding="utf-8"
+    )
+    mode_before = unit_dir.stat().st_mode
+    unit_dir.chmod(0o555)
+    try:
+        exit_code, err = _run_capturing_stderr(team_repo, source=mutated_source)
+        assert exit_code != 0
+        assert "not writable" in err
+        assert (
+            not (unit_dir / "SKILL.md")
+            .read_text(encoding="utf-8")
+            .endswith("mutated\n")
+        )
+    finally:
+        unit_dir.chmod(mode_before)
+        shutil.rmtree(mutated_source)
+
+
+def test_unit_with_a_read_only_subfolder_during_a_remove_is_refused(
+    team_repo: Path, monkeypatch
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    reduced_source = team_repo.parent / "reduced-source"
+    shutil.copytree(SOURCE, reduced_source)
+    for write_root in (".claude/skills", ".agents/skills"):
+        shutil.rmtree(reduced_source / write_root / "debug-investigator")
+    patch_sidecar_skills(monkeypatch, ("humanize", "ponytail", "ponytail-review"))
+    unit_dir = team_repo / ".claude" / "skills" / "debug-investigator"
+    subfolder = unit_dir / "sub"
+    subfolder.mkdir()
+    (subfolder / "note.txt").write_text("x\n", encoding="utf-8")
+
+    # Hand-craft the manifest record to match this exact on-disk content
+    # (Decision 32: a recorded unit outside the current desired shape still
+    # goes through the normal remove row), so the "remove" row -- not
+    # "locally modified" -- is what plans to sweep the read-only subfolder.
+    file_hashes = {
+        p.relative_to(unit_dir).as_posix(): sidecar_overlay_module.compute_file_hash(
+            p.read_bytes()
+        )
+        for p in sorted(unit_dir.rglob("*"))
+        if p.is_file()
+    }
+    unit_hash = sidecar_overlay_module.compute_unit_hash(file_hashes)
+    manifest = _read_manifest(team_repo)
+    manifest["units"][".claude/skills/debug-investigator"] = {
+        "files": file_hashes,
+        "hash": unit_hash,
+    }
+    _manifest_path(team_repo).write_text(json.dumps(manifest), encoding="utf-8")
+
+    mode_before = subfolder.stat().st_mode
+    subfolder.chmod(0o555)
+    try:
+        exit_code, err = _run_capturing_stderr(team_repo, source=reduced_source)
+        assert exit_code != 0
+        assert "not writable" in err
+        assert (unit_dir / "SKILL.md").exists()
+    finally:
+        subfolder.chmod(mode_before)
+        shutil.rmtree(reduced_source)
+
+
+def test_different_st_dev_via_monkeypatched_lstat_is_refused(
+    team_repo: Path, monkeypatch
+) -> None:
+    real_lstat = os.lstat
+    # Resolved once, with the real lstat, before patching: the fake must
+    # never call anything that could recurse back into itself.
+    write_root_str = str((team_repo / ".claude" / "skills").resolve())
+
+    def fake_lstat(path, *args, **kwargs):
+        result = real_lstat(path, *args, **kwargs)
+        if os.fspath(path) == write_root_str:
+            fields = list(result)
+            fields[stat.ST_DEV] = result.st_dev + 1
+            return os.stat_result(fields)
+        return result
+
+    monkeypatch.setattr(os, "lstat", fake_lstat)
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code != 0
+    assert "different filesystem" in err
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 7: require complete, exact sources (Decision 31; S13, S14, L2)
+# --------------------------------------------------------------------------
+
+
+def test_empty_source_is_refused_and_removes_nothing(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    status_before = _status(team_repo)
+    empty_source = tmp_path / "empty-source"
+    empty_source.mkdir()
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=empty_source)
+
+    assert exit_code != 0
+    assert "missing" in err
+    assert _status(team_repo) == status_before
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+
+
+def test_source_with_only_claude_folder_is_refused(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    status_before = _status(team_repo)
+    partial_source = tmp_path / "partial-source"
+    shutil.copytree(SOURCE / ".claude", partial_source / ".claude")
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=partial_source)
+
+    assert exit_code != 0
+    assert "missing" in err or "incomplete" in err
+    assert _status(team_repo) == status_before
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+    assert (team_repo / ".agents" / "skills" / "ponytail").is_dir()
+
+
+def test_source_with_an_extra_file_is_refused(team_repo: Path, tmp_path: Path) -> None:
+    crafted = tmp_path / "crafted-source"
+    shutil.copytree(SOURCE, crafted)
+    (crafted / ".claude" / "skills" / "ponytail" / "extra.md").write_text(
+        "stray\n", encoding="utf-8"
+    )
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=crafted)
+
+    assert exit_code != 0
+    assert "extra.md" in err or "unexpected" in err
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+def test_crafted_tree_gets_the_same_verdict_from_validator_and_installer(
+    tmp_path: Path,
+) -> None:
+    import validate_targets
+
+    crafted = tmp_path / "crafted-source"
+    shutil.copytree(SOURCE, crafted)
+    shutil.rmtree(crafted / ".agents" / "skills" / "ponytail")
+
+    installer_violations = sidecar_overlay_module._sidecar_source_violations(crafted)
+    validator_errors = validate_targets.sidecar_target_errors(crafted)
+
+    assert installer_violations
+    assert any("incomplete" in error for error in validator_errors)
+    # Both flag the exact same missing skill, not merely "something is wrong".
+    assert any("ponytail" in violation for violation in installer_violations)
+    assert any("ponytail" in error for error in validator_errors)
+
+
+def test_source_with_only_two_of_four_skills_is_refused_and_removes_nothing(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    # Decision 31, full enforcement: a source that is internally symmetric
+    # (both write roots agree) but simply thinner than the real profile must
+    # still be refused -- not silently accepted as "a smaller profile".
+    assert install_sidecar(team_repo, SOURCE) == 0
+    status_before = _status(team_repo)
+    reduced = tmp_path / "reduced-two-of-four"
+    shutil.copytree(SOURCE, reduced)
+    for write_root in (".claude/skills", ".agents/skills"):
+        shutil.rmtree(reduced / write_root / "debug-investigator")
+        shutil.rmtree(reduced / write_root / "humanize")
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=reduced)
+
+    assert exit_code != 0
+    assert "missing" in err
+    assert _status(team_repo) == status_before
+    assert (team_repo / ".claude" / "skills" / "ponytail").is_dir()
+    assert (team_repo / ".claude" / "skills" / "humanize").is_dir()
+    assert (team_repo / ".claude" / "skills" / "debug-investigator").is_dir()
+
+
+def test_source_missing_a_bridge_is_refused(team_repo: Path, tmp_path: Path) -> None:
+    crafted = tmp_path / "missing-bridge-source"
+    shutil.copytree(SOURCE, crafted)
+    (
+        crafted / ".github" / "instructions" / "ai-bootstrap-sidecar.instructions.md"
+    ).unlink()
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=crafted)
+
+    assert exit_code != 0
+    assert "missing" in err
+    assert "ai-bootstrap-sidecar.instructions.md" in err
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+def test_source_missing_a_ponytail_license_is_refused(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    crafted = tmp_path / "missing-license-source"
+    shutil.copytree(SOURCE, crafted)
+    (crafted / ".agents" / "skills" / "ponytail-review" / "LICENSE").unlink()
+
+    exit_code, err = _run_capturing_stderr(team_repo, source=crafted)
+
+    assert exit_code != 0
+    assert "missing" in err
+    assert ".agents/skills/ponytail-review/LICENSE" in err
+    assert not (team_repo / ".claude" / "skills" / "ponytail").exists()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 10: correct preflight and installer messages (Decision 36)
+# --------------------------------------------------------------------------
+
+
+def test_directory_only_negation_names_the_explanation_not_a_blank_rule(
+    team_repo: Path, capsys
+) -> None:
+    gitignore = team_repo / ".gitignore"
+    _write(gitignore, gitignore.read_text(encoding="utf-8") + "!.claude/skills/*/\n")
+    _commit(team_repo, "team un-ignores sidecar skill folders", ".gitignore")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "directory-only" in err or "un-ignoring the folder" in err
+    assert "does not exist yet" in err
+
+
+def test_ignore_gate_remedy_never_tells_person_to_edit_team_gitignore(
+    team_repo: Path, capsys
+) -> None:
+    gitignore = team_repo / ".gitignore"
+    _write(gitignore, gitignore.read_text(encoding="utf-8") + "!.claude/skills/**\n")
+    _commit(team_repo, "team un-ignores .claude/skills", ".gitignore")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "ask the team to change" in err
+    assert "remove your own negation from info/exclude" in err
+    assert "fix the team .gitignore" not in err
+
+
+def test_invalid_manifest_remedy_matches_the_big_plans_text(
+    team_repo: Path, capsys
+) -> None:
+    _manifest_path(team_repo).write_text("{not valid json", encoding="utf-8")
+
+    exit_code = install_sidecar(team_repo, SOURCE)
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "any other listed unit is kept hidden and reported" in err
+    assert "reported as foreign" not in err
+
+
+def test_sidecar_source_overlap_error_never_suggests_allow_self(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "nested"
+    target.mkdir(parents=True)
+    _init_repo(target)
+    source_inside_target = target / "dist" / "sidecar"
+    shutil.copytree(SOURCE, source_inside_target)
+
+    with pytest.raises(SystemExit) as error:
+        install_bootstrap.validate_install_roots(
+            source_inside_target, target, allow_self=False, suggest_allow_self=False
+        )
+    assert "--allow-self" not in str(error.value)
+
+
+def test_linked_worktree_full_mode_message_names_evidence_not_a_manual_fix(
+    team_repo: Path, tmp_path: Path
+) -> None:
+    assert install_sidecar(team_repo, SOURCE) == 0
+    linked = tmp_path / "linked-worktree"
+    added = _git(team_repo, "worktree", "add", "-q", str(linked), "-b", "linked-branch")
+    assert added.returncode == 0, added.stderr
+
+    result_full = subprocess.run(
+        [sys.executable, str(INSTALLER), str(linked), "--mode", "full"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result_full.returncode != 0
+    assert "sidecar evidence" in result_full.stderr
+    assert "shared by every worktree" in result_full.stderr
+    assert "Remove that sidecar evidence manually" not in result_full.stderr
+
+
+def test_missing_explicit_source_names_that_path(team_repo: Path) -> None:
+    missing = team_repo / "does-not-exist-source"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(team_repo),
+            "--mode",
+            "sidecar",
+            "--source",
+            str(missing),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert str(missing) in result.stderr
+    assert "generate_targets.py --all" not in result.stderr
+
+
+def test_missing_default_source_says_to_run_generate_targets(tmp_path: Path) -> None:
+    fake_default = tmp_path / "does-not-exist-default-sidecar-source"
+
+    with pytest.raises(SystemExit) as error:
+        install_bootstrap.require_source_exists(fake_default, explicit=False)
+    message = str(error.value)
+    assert str(fake_default) in message
+    assert "generate_targets.py --all" in message
+
+    with pytest.raises(SystemExit) as error_explicit:
+        install_bootstrap.require_source_exists(fake_default, explicit=True)
+    assert "generate_targets.py --all" not in str(error_explicit.value)
+
+
+def test_symlinked_ancestor_abort_says_sidecar_mode_does_not_support_it(
+    team_repo: Path,
+) -> None:
+    shutil.rmtree(team_repo / ".agents" / "skills")
+    (team_repo / ".agents" / "skills").symlink_to(
+        team_repo / ".claude" / "skills", target_is_directory=True
+    )
+
+    exit_code, err = _run_capturing_stderr(team_repo)
+
+    assert exit_code != 0
+    assert "sidecar mode does not support" in err
+    assert "nothing was written" in err
+    assert "replace tracked team content" not in err
