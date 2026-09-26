@@ -32,6 +32,16 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   files. Step 11 goes to `documenter` after the code lands. Each coder got
   every scenario listed under its steps, the before/after rule on
   `010f08c`, and the real-Git test rule.
+- Coder B (step 10) landed: `_knowledge_refresh_phase_settled` takes the
+  big plan's `name` and requires a non-empty name, an `lstat` regular file,
+  `type: small-plan`, a matching `name` and `parent_plan`, and a settled
+  status; the docstring and module comment state the same rule. The three
+  Phase F fixtures are now valid small plans, the slug guard test follows
+  `lstat`, and there are five new rejection tests (symlink, unrelated
+  parent, wrong type, wrong name, empty big-plan name). It ran under a
+  real Python 3.9.0. Orchestrator re-check: 627 validator tests pass, every
+  real plan validates, and all five rejection tests fail against the
+  `010f08c` validator in a scratch copy.
 
 ## [LEARN] Entries
 

@@ -318,7 +318,7 @@ Test rules for every step (Decision 47):
     property test fail on its assertion, not on an exception. Restore it,
     and record the result in the session log.
 
-- [ ] **10. Settled refresh identity (Decision 45; R5).**
+- [x] **10. Settled refresh identity (Decision 45; R5).**
   - **Owner:** `coder` (a separate run; disjoint files)
   - `_knowledge_refresh_phase_settled` also takes the big plan's `name`,
     which must be non-empty. A sibling counts only when all of these hold:
