@@ -175,6 +175,20 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   readers: `_gate_spelling` (intended) and `_unit_device_violations`,
   which now skips a plain-file unit. Part A re-review asked for, including
   that second effect.
+- Review round 1, part B: PASS with one MINOR (`code`, reproduced): the
+  `_fault_point` docstring says the exclude block still holds its
+  pre-uninstall bytes at `after_units_removed`, but the rebuilt uninstall
+  writes the write-phase block first. The matrix traced every unit kind
+  (current and retired roots and bridges, symlink, team, gitlink), every
+  state, preserve destinations, ignore states (a team rule on a removed
+  unit, a person's negation on a kept unit), real and dry runs, both fault
+  points, and lost manifests. It confirmed the only exit-1 sources are
+  `kept_conflicts` and named preflight aborts, the kept manifest holds
+  only kept records, and a rerun with nothing to write leaves the exclude
+  file alone. Every README claim checked was accurate. Sent back to coder
+  A: the docstring fix, plus one cheap test the reviewer noted was
+  missing (an edited skill at a retired write root, preserved on
+  uninstall).
 
 ## [LEARN] Entries
 
