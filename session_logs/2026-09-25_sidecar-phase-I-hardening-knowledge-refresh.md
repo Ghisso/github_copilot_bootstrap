@@ -62,6 +62,19 @@ documentation, memory, and LEARN audit.
   - The linked-worktree refusal message in `detect_install_mode` gives the
     old reason ("its own Git directory, separate from the main worktree's
     shared one").
+- Steps 3-4, audit by `documenter`: `README.md` and the
+  `_sidecar_source_violations` docstring were corrected, every other
+  surface is current, and no MEMORY entry needs correcting (full list under
+  "Stale-claims surfaces checked").
+- A code correction the audit exposed: the `--mode sidecar`
+  linked-worktree refusal in `detect_install_mode` now gives the real
+  reason (Decision 15: the shared `info/exclude` versus the per-worktree
+  manifest). `test_detect_mode_sidecar_mode_aborts_in_linked_worktree`
+  asserts the new wording. `coder` results: 94 installer tests pass, and
+  ruff and mypy pass. One run hit the conftest leak guard on the live
+  `.claude/session_logs/hooks-errors.log`, which the session's own hooks
+  can write to while tests run; the rerun passed.
+- VERIFY and REVIEW (full profile set) started.
 
 ## Stale-claims surfaces checked
 
