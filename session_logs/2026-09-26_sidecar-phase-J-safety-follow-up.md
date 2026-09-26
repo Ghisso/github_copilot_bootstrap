@@ -167,6 +167,14 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   are cheap and sent to coder A: return `"other"` for an existing
   non-directory (matching the plan), with a real-Git test, and add the
   missing checks to the personal-clone test.
+- Both fixes landed: `_gather_unit` returns `"other"` for an existing
+  non-directory unit; new guard test
+  `test_installed_unit_replaced_by_a_plain_file_is_locally_modified_and_preserved`
+  (passes on `010f08c` too, as expected); the personal-clone test now has
+  dry-run and second-run checks. 325 focused tests pass. `kind` has two
+  readers: `_gate_spelling` (intended) and `_unit_device_violations`,
+  which now skips a plain-file unit. Part A re-review asked for, including
+  that second effect.
 
 ## [LEARN] Entries
 
