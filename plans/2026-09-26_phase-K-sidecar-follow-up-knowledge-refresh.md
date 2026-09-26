@@ -32,12 +32,18 @@ Add no implementation scope unless the audit exposes a concrete defect.
 
 Known stale generated content after Phase J:
 
-- `openwiki/operations/sidecar-overlay.md`: its preflight item 7 and
-  classification text describe structural-only boundary checks. Its
-  uninstall section describes the removed conflict-only gates. Its report
-  table says "skips at every root" for a conflict copy.
+- `openwiki/operations/sidecar-overlay.md`:
+  - its preflight item 7 and classification text describe structural-only
+    boundary checks, not the unit-level rule (a recorded or listed nested
+    repository is refused, a personal clone is foreign, a gitlink is
+    never touched);
+  - its gate text lacks the symlink-unit spelling and the uninstall rule
+    (only kept lines are gated);
+  - its uninstall section describes the removed conflict-only gates;
+  - its report table says "skips at every root" for a conflict copy.
 - `openwiki/workflows/lifecycle-and-task-lanes.md`: its knowledge-refresh
-  exemption needs the new sibling identity rule.
+  exemption needs the new sibling identity rule, which Phase J also writes
+  into the Termination paragraph of `shared/policies/workflow.instructions.md`.
 - `openwiki/operations/install-ownership-and-runtime-checks.md`: the
   `--mode full` refusal text and the tracked-path warning.
 
