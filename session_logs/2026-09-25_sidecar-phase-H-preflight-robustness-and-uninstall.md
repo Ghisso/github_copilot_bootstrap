@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26
 **Plan:** `.claude/plans/2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -209,7 +209,24 @@ documentation pass (big plan Decisions 26-29, 31, 33-36).
 
 ## Verification
 
-Required items are pasted at closeout step 4.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS        0.6s  uv run python scripts/generate_targets.py --all
+PASS       69.8s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_install_bootstrap.py -q --tb=short
+PASS       57.0s  uv run python scripts/validate_targets.py
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`: PASS (ruff, mypy, full pytest,
+freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`). The findings fixed during the fix loops were:
+part A round 2, one MINOR; part B round 1, one CRITICAL and one MAJOR;
+the orchestrator's detection finding; part B round 2, one CRITICAL;
+round 3, one CRITICAL and one MINOR. All are recorded in the Work Log.
 
 - optional 1: NOT RUN — the Phase A fixture is the operator's own folder outside the repository, which this session does not write to. The same check is automated: `test_clean_install_then_uninstall_restores_status_and_removes_everything` installs into a real temporary Git repository, uninstalls, and asserts that `git status --porcelain --untracked-files=all` matches the state before the install and that no block, manifest, staging folder, or sidecar file remains.
 
