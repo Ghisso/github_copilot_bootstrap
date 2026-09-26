@@ -65,6 +65,61 @@ documentation, memory, and LEARN audit.
 
 ## Stale-claims surfaces checked
 
+Audit by `documenter` against the current code, plus the OpenWiki refresh
+above. Dated records (archived plans, closed session logs, `docs/2026-*`,
+and the two 2026-09-25 review reports) were left unchanged.
+
+- `openwiki/**`: refreshed through OpenWiki's own tools (six pages; every
+  stale or unresolved claim revised). Not hand-edited.
+- `openwiki/INSTRUCTIONS.md` (the human-authored brief): corrected. The
+  sidecar coverage item now names team precedence, the preserved-copy
+  folder, and `--uninstall`.
+- `README.md`: corrected. The "Limits" bullet said the installer proves
+  every path ignored "before writing anything"; it now says "before any
+  sidecar file is written". The rest of "Personal Sidecar Install"
+  (uninstall, limits, behavior changes) matches the code.
+- `scripts/sidecar_overlay.py` docstrings: corrected. The
+  `_sidecar_source_violations` docstring described the old, weaker check;
+  it now describes the exact-set comparison. The module docstring and the
+  `compute_unit_hash` docstring already describe `os.fsencode`: unchanged.
+- `scripts/install_bootstrap.py` module docstring, `--help` text, and
+  `detect_install_mode`: unchanged apart from the `--mode sidecar`
+  linked-worktree refusal message, which gave the old reason. That message
+  is being corrected with a test (see Work Log).
+- `scripts/update_consumers.py` docstring and `--help`: unchanged; they
+  match the batch behavior.
+- `docs/architecture.md`: unchanged; its exact-allowlist text matches
+  `runtime_ownership.py`.
+- `docs/target-mapping.md`: unchanged; uninstall, the preserved folder,
+  and the taken-skill rules are current.
+- `docs/runtime-checks.md`: unchanged; the knowledge-refresh row matches
+  the validator's exemption.
+- `docs/smoke-tests.md`: unchanged; no sidecar, uninstall, or reopening
+  claims.
+- `docs/sidecar-provider-contract.md`: unchanged; it is Phase A's dated
+  native-run evidence and still matches the shipped skills and bridges.
+- `shared/policies/workflow.instructions.md`: unchanged; the reopening
+  procedure and the Termination text match the validator.
+- Other `shared/policies/*`: unchanged; no sidecar, precedence, or
+  reopening claims.
+- `shared/skills/safe-consumer-bootstrap-refresh/SKILL.md`,
+  `shared/skills/plan-decomposition/SKILL.md`, and
+  `shared/skills/knowledge-refresh/SKILL.md`: unchanged. They point to the
+  canonical rules rather than restating them.
+- `shared/templates/plan-big.md` and `shared/templates/plan-small.md`:
+  unchanged; they point to the canonical rule.
+- `shared/agents/documenter/prompt.md`, `shared/agents/orchestrator/prompt.md`,
+  and `shared/agents/planner/prompt.md`: unchanged; they point to the
+  canonical policy.
+- `.claude/instructions/project-context.instructions.md`: unchanged; the
+  installer and updater descriptions are current.
+- Root guidance `AGENTS.md` and `CLAUDE.md`: unchanged; they have no claim
+  that Phases F-H invalidated.
+- `.claude/MEMORY.md`: unchanged by the audit. No entry describes the old
+  collision loop, manual removal, `bootstrap_commit`, or "no commits"
+  detection as current. The sidecar entries record native-run evidence and
+  the Phase G and H lessons, and they are accurate.
+
 ## [LEARN] Entries
 
 ## Verification
