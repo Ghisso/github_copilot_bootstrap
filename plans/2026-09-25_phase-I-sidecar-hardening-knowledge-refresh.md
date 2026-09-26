@@ -3,7 +3,8 @@ name: 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 9
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-25_sidecar-phase-I-hardening-knowledge-refresh.md
 ---
 
 # Small Plan: Phase I — Sidecar Hardening Knowledge Refresh
@@ -35,7 +36,7 @@ in `openwiki/operations/install-ownership-and-runtime-checks.md`.
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki.**
+- [x] **1. Refresh OpenWiki.**
   - **Owner:** `documenter`
   - Follow `.claude/skills/knowledge-refresh/SKILL.md`: call OpenWiki's own
     MCP tools with `mode: "update"`. Never run an init, and never create a
@@ -48,7 +49,7 @@ in `openwiki/operations/install-ownership-and-runtime-checks.md`.
     revise, or retract. Revise or retract the two known claims above
     against the Phase G and H code.
 
-- [ ] **2. Review the generated diff.**
+- [x] **2. Review the generated diff.**
   - **Owner:** `documenter`
   - Treat generated pages as descriptive context, not policy. Source, tests,
     and policies stay authoritative.
@@ -58,7 +59,7 @@ in `openwiki/operations/install-ownership-and-runtime-checks.md`.
     refusals, and no longer gives manual removal steps that delete personal
     files.
 
-- [ ] **3. Audit stale claims.**
+- [x] **3. Audit stale claims.**
   - **Owner:** `documenter`
   - Surfaces: `README.md`, `docs/architecture.md`, `docs/target-mapping.md`,
     `docs/runtime-checks.md`, `docs/smoke-tests.md`,
@@ -87,14 +88,14 @@ in `openwiki/operations/install-ownership-and-runtime-checks.md`.
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked` in the closeout session log.
 
-- [ ] **4. Record reusable lessons only.**
+- [x] **4. Record reusable lessons only.**
   - **Owner:** `documenter`
   - Run LEARN for reusable implementation knowledge. Correct or remove any
     MEMORY entry that Phases F-H made wrong, for example the sidecar entries
     that describe the old collision loop or manual removal. Do not store
     transient phase details.
 
-- [ ] **5. Complete the final lifecycle checks.**
+- [x] **5. Complete the final lifecycle checks.**
   - **Owner:** `orchestrator`
   - Run verification, review, and closeout as the workflow requires. This is
     the final phase: its closeout meets the strict terminal gates, and the
@@ -137,11 +138,11 @@ phase uses the full set, as Phase E did:
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
