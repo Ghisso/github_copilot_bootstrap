@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26
 **Plan:** `.claude/plans/2026-09-25_phase-I-sidecar-hardening-knowledge-refresh.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -167,7 +167,19 @@ and the two 2026-09-25 review reports) were left unchanged.
 
 ## Verification
 
-Required items are pasted at closeout step 4.
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS       51.6s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`, run in the foreground: PASS
+(ruff, mypy, 2097 tests, freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-25_phase-I-sidecar-hardening-knowledge-refresh.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`).
 
 This plan has no `## Optional Verification` section.
 
