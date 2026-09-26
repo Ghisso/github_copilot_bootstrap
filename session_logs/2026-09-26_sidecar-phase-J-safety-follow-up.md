@@ -189,6 +189,14 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   A: the docstring fix, plus one cheap test the reviewer noted was
   missing (an edited skill at a retired write root, preserved on
   uninstall).
+- Part A re-review (the plain-file `kind` change and the two tests): PASS,
+  no findings; both earlier MINOR findings are fixed. On the device check:
+  a non-folder unit mounted from another filesystem would make the
+  preserve `os.replace` fail with an unhandled `OSError` mid-apply instead
+  of a preflight refusal. The reviewer judged it pre-existing (a symlink
+  unit already had the same exposure) and outside Decision 37, which
+  scopes the unit device check to folders. Recorded under Next Steps, not
+  a Phase J finding.
 
 ## [LEARN] Entries
 
@@ -198,3 +206,9 @@ settled-refresh identity check, and corrected docs (big plan Decisions
 
 - Next: Phase K (`2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh`),
   activated by this phase's commit.
+- Known limit, pre-existing and outside Decision 37: a skill unit that is
+  a mount point from another filesystem and is not a real folder (a
+  symlink, or a bind-mounted file) is not refused in preflight. If it must
+  be preserved, `os.replace` raises an unhandled `OSError` mid-apply. A
+  later hardening could turn an `OSError` from `_place_unit`,
+  `_remove_unit`, or `_preserve_unit` into a clean abort.
