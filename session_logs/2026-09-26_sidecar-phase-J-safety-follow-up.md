@@ -150,6 +150,23 @@ settled-refresh identity check, and corrected docs (big plan Decisions
 - `verify.py phase --format text` PASS (2141 tests).
 - REVIEW part B (steps 6, 7, 10, 11; all six profiles, with an exhaustive
   matrix over the uninstall conflict path) started.
+- Review round 1, part A: PASS with no CRITICAL or MAJOR findings. It
+  refuted three candidates by experiment (a trailing-slash query on a
+  regular file or FIFO exits 0; the empty-input split asymmetry reaches
+  no caller; the U+2028 fixture is correct) and hand-checked the property
+  test's fixtures. Two MINOR findings:
+  - (`tests`) `test_personal_clone_never_owned_is_skipped_as_foreign`
+    lacks the second-run and dry-run checks; the reviewer's repro shows
+    the code is already stable there.
+  - (`documentation`) `_gather_unit` labels an existing plain file at a
+    unit path `kind="folder"`, although the docstring and Decision 40
+    say `"other"`.
+  Orchestrator repro (scratch, real Git): a plain file at a unit path is
+  kept as locally modified on install, preserved on uninstall, and
+  skipped as foreign before any install, so no data is lost. Both fixes
+  are cheap and sent to coder A: return `"other"` for an existing
+  non-directory (matching the plan), with a real-Git test, and add the
+  missing checks to the personal-clone test.
 
 ## [LEARN] Entries
 
