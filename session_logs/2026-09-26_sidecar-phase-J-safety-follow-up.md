@@ -134,6 +134,22 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   sidecar never empties this folder". `test_edited_copy_is_preserved_on_uninstall`
   asserts it for a run that preserves its own copy, and that "an earlier
   run" never appears.
+- Step 11 part 2 (`documenter`) landed in `README.md`:
+  - The old one-line boundary bullet is split three ways: the boundary
+    checks (a symlinked ancestor aborts, and an inner symlink makes the
+    folder incomplete); incomplete units; and unit-level nested
+    repositories and submodules.
+  - The Uninstall text gains: the preserved-folder path on every run
+    (including "nothing to do"); preflight refusals first, then a preserve
+    conflict as the only exit 1; a team rule never blocks uninstall;
+    uninstall after a dropped skill preserves the edited copy.
+  - The ignore-gate sentence now covers every path the block lists.
+  - `docs/target-mapping.md` checked and unchanged.
+- `generate_targets.py --all`, then the self-install (nested commit
+  `f20a5dd`; no tracked outer file changed); `check_runtime.py` passes.
+- `verify.py phase --format text` PASS (2141 tests).
+- REVIEW part B (steps 6, 7, 10, 11; all six profiles, with an exhaustive
+  matrix over the uninstall conflict path) started.
 
 ## [LEARN] Entries
 
