@@ -276,10 +276,14 @@ big plan fails validation if more than one phase carries the
 `-knowledge-refresh` suffix, or if one exists but is not the last phase.
 Reopening a completed big plan (see "Reopening a completed big plan" under
 Branch Lifecycle) does not defeat this rule: the validator exempts an
-earlier, non-final knowledge-refresh phase from that count once its own
-small plan has already settled as `complete` or `cancelled`, so a finished
-refresh phase stays where it is and the rule still requires the reopened
-plan to end with one new knowledge-refresh phase.
+earlier, non-final knowledge-refresh phase from that count once it confirms
+the phase has settled, so a finished refresh phase stays where it is and the
+rule still requires the reopened plan to end with one new knowledge-refresh
+phase. Settled means the big plan's own `name` is non-empty, and the
+sibling small-plan file next to it (named after the phase slug) is a
+regular file, not a symlink, whose frontmatter declares `type: small-plan`,
+a `name` equal to the phase slug, a `parent_plan` equal to the big plan's
+`name`, and `status: complete` or `status: cancelled`.
 
 **Shape.** Small, and only this: refresh through
 `.claude/skills/knowledge-refresh/SKILL.md`, inspect the generated

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import stat
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -52,8 +53,11 @@ PHASE_SLUG_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # most one, and only as the last phase, is what makes the rule's termination
 # condition deterministic rather than a convention the planner could forget.
 # An earlier knowledge-refresh phase is exempt from that count once its own
-# small plan has already settled as `complete` or `cancelled` - the shape
-# left behind when a completed big plan is reopened.
+# small plan has settled its identity: a regular file (never a symlink) at
+# the expected sibling path, declaring `type: small-plan`, a `name` equal to
+# the phase slug, a `parent_plan` equal to the big plan's own non-empty
+# `name`, and `status: complete` or `cancelled` - the shape left behind when
+# a completed big plan is reopened.
 KNOWLEDGE_REFRESH_PHASE_SUFFIX = "-knowledge-refresh"
 # See the canonical Verification Evidence Contract rule in
 # shared/policies/workflow.instructions.md. Only a live small plan (never a
@@ -283,31 +287,52 @@ def validate_pause(path: Path, data: dict[str, Any], errors: list[str]) -> None:
         errors.append(f"{path}: pause_session_log must contain **Status:** PAUSED")
 
 
-def _knowledge_refresh_phase_settled(path: Path, phase: str, last_phase: str) -> bool:
+def _knowledge_refresh_phase_settled(
+    path: Path, phase: str, last_phase: str, big_plan_name: str
+) -> bool:
     """Return whether an earlier knowledge-refresh phase no longer counts.
 
-    Settled means the phase is not the plan's last entry and its own small
-    plan - matched only when the phase name passes the existing slug
-    pattern, so this never reads a file outside the plans folder - parses
-    with ``status: complete`` or ``status: cancelled``. A missing,
-    unreadable, or differently-statused small plan fails closed: unsettled.
+    Settled means the phase is not the plan's last entry, the big plan's own
+    ``name`` is non-empty, the phase name passes the existing slug pattern
+    (so the sibling path is always built inside the plans folder), and the
+    sibling at that path is a regular file - never a symlink, which is
+    rejected by an ``lstat`` identity check rather than ``Path.is_file()``,
+    which follows symlinks and would happily read through one that points
+    anywhere on disk. Being inside the plans folder is not enough on its
+    own: the sibling's frontmatter must also declare ``type: small-plan``, a
+    ``name`` equal to the phase slug, and a ``parent_plan`` equal to the big
+    plan's own ``name``, with ``status: complete`` or ``status: cancelled``.
+    A missing, unreadable, symlinked, misidentified, or differently-statused
+    small plan - or an empty big-plan ``name`` - fails closed: unsettled.
     """
     if phase == last_phase:
+        return False
+    if not big_plan_name:
         return False
     if not PHASE_SLUG_PATTERN.fullmatch(phase):
         return False
     sibling = path.parent / f"{phase}.md"
     try:
-        if not sibling.is_file():
-            return False
-        status = parse_frontmatter(sibling).get("status")
+        mode = sibling.lstat().st_mode
+    except OSError:
+        return False
+    if not stat.S_ISREG(mode):
+        return False
+    try:
+        data = parse_frontmatter(sibling)
     except (OSError, UnicodeError):
         return False
-    return status in ("complete", "cancelled")
+    if str(data.get("type", "")) != "small-plan":
+        return False
+    if str(data.get("name", "")) != phase:
+        return False
+    if str(data.get("parent_plan", "")) != big_plan_name:
+        return False
+    return data.get("status") in ("complete", "cancelled")
 
 
 def validate_knowledge_refresh_phase_position(
-    path: Path, phases: list[str], errors: list[str]
+    path: Path, phases: list[str], big_plan_name: str, errors: list[str]
 ) -> None:
     """A knowledge-refresh phase must be unique and last, so it cannot recur.
 
@@ -321,7 +346,7 @@ def validate_knowledge_refresh_phase_position(
         phase
         for phase in phases
         if phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX)
-        and not _knowledge_refresh_phase_settled(path, phase, last_phase)
+        and not _knowledge_refresh_phase_settled(path, phase, last_phase, big_plan_name)
     ]
     if len(unsettled_refresh_phases) > 1:
         errors.append(
@@ -369,7 +394,9 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
         errors.append(f"{path}: phases must be a non-empty list")
         return
     if all(isinstance(phase, str) for phase in data["phases"]):
-        validate_knowledge_refresh_phase_position(path, data["phases"], errors)
+        validate_knowledge_refresh_phase_position(
+            path, data["phases"], str(data.get("name", "")), errors
+        )
     body = path.read_text(encoding="utf-8").split("---\n", 2)
     if len(body) != 3:
         return
