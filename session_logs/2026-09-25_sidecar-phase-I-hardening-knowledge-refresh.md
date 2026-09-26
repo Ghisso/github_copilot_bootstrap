@@ -83,6 +83,16 @@ documentation, memory, and LEARN audit.
   This is environmental, not a code failure. `verify.py phase` is rerun in
   the foreground after the reviewer finishes, so no hook writes during the
   test run.
+- REVIEW (`documentation`, `code`, `architecture`, `security`, `tests`,
+  `ponytail`): PASS with no findings. Every refreshed page was
+  cross-checked against the code: the sidecar preflight order, the
+  classification table, team precedence, write order and fault points; the
+  install detection table and sequence; and the lifecycle exemption and
+  reopening summary. The reviewer also checked the style contract (the one
+  em-dash is inside a quoted exact string), claim evidence (including the
+  two known stale claims), the message change and its test, the docstring,
+  the README bullet, the absent `openwiki/.run.json`, and the unchanged
+  root adapters.
 
 ## Stale-claims surfaces checked
 
@@ -143,8 +153,36 @@ and the two 2026-09-25 review reports) were left unchanged.
 
 ## [LEARN] Entries
 
+- [LEARN:verification] Run `verify.py phase`, and closeout step 4, in the
+  foreground. A background run lets this session's own
+  `stop-session-log-check` hook append to
+  `.claude/session_logs/hooks-errors.log` when a turn ends mid-run. The
+  conftest leak guard then reports one error on an otherwise passing suite.
+  Added to MEMORY.
+- [LEARN:documentation] An OpenWiki update does not flag a current claim
+  whose evidence line range moved while the cited text still exists
+  elsewhere. When rewriting a page, inspect its full claim set
+  (`openwiki_inspect_page_claims`) and revise such claims too; two did so on
+  the sidecar page.
+
 ## Verification
+
+Required items are pasted at closeout step 4.
+
+This plan has no `## Optional Verification` section.
 
 ## Documentation
 
+Updated in this phase: six OpenWiki pages (through OpenWiki's tools) and
+the brief `openwiki/INSTRUCTIONS.md`; the README "Limits" bullet; the
+`_sidecar_source_violations` docstring; and the `--mode sidecar`
+linked-worktree refusal message with its test. The standing final-phase
+audit is recorded under `## Stale-claims surfaces checked`.
+
 ## Open Questions / Next Steps
+
+- Every phase of the reopened big plan is complete after this commit, and
+  the post-commit hook marks the big plan `complete`. A PR to `dev` is
+  opened only when the user asks.
+- Antigravity remains unverified for the sidecar; a later native run could
+  add its rules-file bridge.

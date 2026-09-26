@@ -1275,3 +1275,8 @@
   authoritative set rather than sets derived from outcome shapes. Sidecar
   uninstall's preserve-conflict path took three failing rounds; the matrix
   review passed on its first run once the gates used `preserved_conflicts`.
+- [LEARN:verification] Run `verify.py phase` and closeout step 4 in the
+  foreground. In the background, this session's own `stop-session-log-check`
+  hook can append to `.claude/session_logs/hooks-errors.log` when a turn
+  ends mid-run, and the conftest leak guard then reports one error on an
+  otherwise passing suite.
