@@ -1295,3 +1295,15 @@
   `tar -x` in shell chains), copy in the generated `dist/` and the new test
   files, and define a stand-in for any new name the test file imports.
   Otherwise collection fails with an `ImportError` before any test runs.
+- [LEARN:tooling] Do not let another agent edit tracked files while an
+  OpenWiki run is open. A parallel docs audit changed `README.md` mid-run,
+  so `openwiki_finish` returned `complete` with `sourceChanged: true` and
+  recorded `status: interrupted` at the old base in `.last-update.json`. A
+  second `update` run with an empty plan settled it at the new head. Run
+  the audit after `openwiki_finish`, or rerun the refresh afterwards.
+- [LEARN:documentation] OpenWiki flags a claim only when its cited text
+  changes, so a range that drifted because an earlier phase inserted text
+  above it stays unflagged. Five lifecycle-page claims had pointed at the
+  wrong section since Phase F. On every page a refresh rewrites, map each
+  cited range from the recorded base (`.last-update.json` `gitHead`) to
+  the current file (a `difflib` script works) and check the text there.

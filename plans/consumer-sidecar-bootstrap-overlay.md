@@ -489,7 +489,7 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-25_phase-H-sidecar-preflight-robustness-and-uninstall` — harden mode detection and preflight, make paths bytes-safe, require complete sources, add `--uninstall`, and correct messages and docs (Decisions 26-29, 31, 33-36).
 - [x] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
 - [x] `2026-09-26_phase-J-sidecar-safety-follow-up` — unit-level repository boundaries, complete snapshots, uninstall on the install's write order, one path-identity rule, Git line splitting, accurate reports, the settled-refresh identity check, and corrected docs (Decisions 37-47).
-- [ ] `2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase J.
+- [x] `2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase J.
 
 Phase F must land before any other outer commit on this branch: once
 Phases F-I are listed, the installed validator rejects two knowledge-refresh

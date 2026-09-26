@@ -67,8 +67,31 @@ knowledge-refresh phase.
   review lesson named `preserved_conflicts` as the authoritative set, which
   O3 showed was too broad. Corrected to say the authoritative set is the
   one the planner decided (`kept_conflicts`).
+- Early run of the required items: `validate_targets.py` PASS, plan
+  validation PASS, `verify.py fast` PASS.
+- REVIEW (one `reviewer`, all six profiles): PASS with no findings. It
+  spot-checked 26 claim ranges across the four claim files (all match),
+  confirmed the named tests exist, checked the audit edits and the MEMORY
+  correction against O3, and swept extra surfaces (docs, templates, the
+  `knowledge-refresh` skill, project context, and module docstrings) with
+  no contradiction of Decisions 37-47. No em-dash was added to the pages.
+- CLOSEOUT started.
 
 ## [LEARN] Entries
+
+- [LEARN:tooling] Do not let another agent edit tracked files while an
+  OpenWiki run is open. The parallel audit changed `README.md` mid-run, so
+  `openwiki_finish` returned `complete` with `sourceChanged: true` and
+  recorded `status: interrupted` at the old base. A second `update` run
+  with an empty plan settled it at `7d294ca`. Added to MEMORY.
+- [LEARN:documentation] OpenWiki flags a claim only when its cited text
+  changes, so a range that drifted because an earlier phase inserted text
+  above it stays unflagged: five lifecycle-page claims had pointed at the
+  wrong section since Phase F. Map every cited range on a rewritten page
+  from the recorded base to the current file and check the text there.
+  Added to MEMORY.
+- MEMORY correction (not a new lesson): the Phase H review lesson now names
+  the planner's `kept_conflicts` as the authoritative set (O3).
 
 ## Verification
 
@@ -103,4 +126,25 @@ dropped skills, report wording, the settled-refresh identity rule, and the
 Dated records were left unchanged: archived plans, closed session logs,
 `docs/2026-*`, and the four review reports.
 
+## Documentation
+
+Updated in this phase:
+
+- `openwiki/**`: four pages refreshed through OpenWiki's own tools
+  (`sidecar-overlay`, `install-ownership-and-runtime-checks`,
+  `lifecycle-and-task-lanes`, `source-generated-consumer-layout`), plus
+  OpenWiki's own index, manifest, claim files, and `.last-update.json`.
+- `README.md`: the "Skill name taken" symlink rule and the kept-conflict
+  remedy under "Preserved copies".
+- `docs/runtime-checks.md`: the settled-refresh row.
+
 ## Open Questions / Next Steps
+
+- This is the big plan's last phase. The post-commit hook marks the big
+  plan `complete` after this commit. The user owns the PR to `dev` and the
+  merge.
+- Known limits: Antigravity is still unverified for the sidecar (no client
+  was available for a native run). A skill unit that is a mount point from
+  another filesystem and not a real folder is not refused in preflight;
+  preserving it would fail mid-apply with an unhandled `OSError` (recorded
+  in the Phase J log as a possible later hardening).

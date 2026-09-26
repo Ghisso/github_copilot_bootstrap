@@ -3,7 +3,8 @@ name: 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 11
-status: in-progress
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-26_sidecar-phase-K-follow-up-knowledge-refresh.md
 ---
 
 # Small Plan: Phase K — Sidecar Follow-up Knowledge Refresh
@@ -57,7 +58,7 @@ Known stale generated content after Phase J:
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki.**
+- [x] **1. Refresh OpenWiki.**
   - **Owner:** `orchestrator`. Only the main session has the `openwiki` MCP
     tools (MEMORY lesson from Phase E).
   - Follow `.claude/skills/knowledge-refresh/SKILL.md`: call OpenWiki's own
@@ -70,7 +71,7 @@ Known stale generated content after Phase J:
     For each page being rewritten, inspect its full claim set, and revise
     current claims whose line ranges moved (MEMORY lesson from Phase I).
 
-- [ ] **2. Review the generated diff.**
+- [x] **2. Review the generated diff.**
   - **Owner:** `orchestrator`
   - Never hand-edit a generated page outside the page loop. Never stage
     `openwiki/.run.json`. Confirm that `AGENTS.md` and `CLAUDE.md` are
@@ -83,7 +84,7 @@ Known stale generated content after Phase J:
     - the one path-identity rule;
     - the conflict reports.
 
-- [ ] **3. Audit stale claims.**
+- [x] **3. Audit stale claims.**
   - **Owner:** `documenter`
   - Surfaces: `README.md`, `docs/architecture.md`, `docs/target-mapping.md`,
     `docs/runtime-checks.md`, `docs/smoke-tests.md`,
@@ -115,12 +116,12 @@ Known stale generated content after Phase J:
   - Record every surface and its outcome under
     `## Stale-claims surfaces checked` in the closeout session log.
 
-- [ ] **4. Record reusable lessons only.**
+- [x] **4. Record reusable lessons only.**
   - **Owner:** `orchestrator`
   - Correct or remove any MEMORY entry that Phase J made wrong. Do not store
     transient phase details.
 
-- [ ] **5. Complete the final lifecycle checks.**
+- [x] **5. Complete the final lifecycle checks.**
   - **Owner:** `orchestrator`
   - Run verification, review, and closeout as the workflow requires, with
     `verify.py phase` and closeout step 4 in the foreground. This is the
@@ -162,11 +163,11 @@ phase uses the full set, as Phases E and I did:
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
