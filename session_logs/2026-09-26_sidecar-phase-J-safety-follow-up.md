@@ -25,6 +25,13 @@ settled-refresh identity check, and corrected docs (big plan Decisions
 - Material-impact check: the plan was drafted against HEAD `010f08c`, and
   nothing has landed since. No change to scope.
 - Phase J set to `in-progress`; nested state checkpointed.
+- IMPLEMENT, split three ways. Coder A takes steps 1-5 in
+  `scripts/sidecar_overlay.py` first. The same coder then gets steps 6-9,
+  so the first half can be checked before uninstall is rebuilt on it.
+  Coder B takes step 10 (the plan validator) in parallel, on disjoint
+  files. Step 11 goes to `documenter` after the code lands. Each coder got
+  every scenario listed under its steps, the before/after rule on
+  `010f08c`, and the real-Git test rule.
 
 ## [LEARN] Entries
 
