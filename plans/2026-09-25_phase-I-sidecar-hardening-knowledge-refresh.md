@@ -3,7 +3,7 @@ name: 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 9
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase I — Sidecar Hardening Knowledge Refresh
