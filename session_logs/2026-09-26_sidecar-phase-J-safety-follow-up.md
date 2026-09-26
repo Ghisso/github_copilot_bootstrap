@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26
 **Plan:** `.claude/plans/2026-09-26_phase-J-sidecar-safety-follow-up.md`
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -236,6 +236,28 @@ settled-refresh identity check, and corrected docs (big plan Decisions
   `ImportError` before any test runs. Added to MEMORY.
 
 ## Verification
+
+Required items (`verify closeout --format text` summary lines):
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       73.5s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_install_bootstrap.py tests/test_validate_plan_frontmatter.py tests/test_check_runtime.py -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS       53.3s  uv run python scripts/validate_targets.py
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+```
+
+`verify.py phase --format json --persist`: PASS (ruff, mypy, full pytest
+with 2143 passed, freshness, generated runtime). Findings report:
+`.claude/quality_reports/findings-2026-09-26_phase-J-sidecar-safety-follow-up.json`
+(surviving findings only: 0 critical, 0 major, 0 minor;
+`ponytail_reviewed=true`). The plan has no optional verification items.
+Findings fixed during the fix loops, all recorded in the Work Log: the
+orchestrator's preserved-folder wording MINOR; part A round 1, two MINOR
+(the personal-clone test checks and the plain-file `kind`); part B round
+1, one MINOR (the `_fault_point` docstring), plus the retired-root test
+the reviewer noted as missing.
 
 ## Documentation
 
