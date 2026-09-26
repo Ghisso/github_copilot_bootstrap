@@ -3,7 +3,7 @@ name: 2026-09-26_phase-J-sidecar-safety-follow-up
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 10
-status: planned
+status: in-progress
 ---
 
 # Small Plan: Phase J — Sidecar Safety Follow-up
