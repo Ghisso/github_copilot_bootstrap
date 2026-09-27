@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27
 **Plan:** `.claude/plans/2026-09-27_phase-B-workflow-profile-implementation.md`
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -187,7 +187,23 @@ clone of a real consumer.
 
 ## Verification
 
-(pending)
+Optional items: none (the plan has no `## Optional Verification` section).
+
+`verify.py phase --format json --persist`: PASS (Ruff, mypy, pytest
+full suite, freshness, provenance, generated runtime). Findings
+report: 0 critical, 0 major, 0 minor, six profiles, `dirty: false`.
+
+Required items from `verify.py closeout --format text`:
+
+```text
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS      144.8s  uv run pytest tests/test_validate_targets.py tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_install_bootstrap.py tests/test_sidecar_workflow_scenario.py -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS       60.6s  uv run python scripts/validate_targets.py
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+```
 
 ## Documentation
 
