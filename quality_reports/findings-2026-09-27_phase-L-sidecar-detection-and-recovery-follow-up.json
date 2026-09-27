@@ -2,7 +2,7 @@
   "counts": {
     "critical": 0,
     "major": 0,
-    "minor": 0
+    "minor": 1
   },
   "profiles_reviewed": [
     "architecture",
@@ -12,8 +12,18 @@
     "security",
     "tests"
   ],
-  "findings": [],
-  "generated_at": "2026-09-27T04:33:40Z",
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "COMMAND_TIMEOUT_SECONDS=480 vs VERIFICATION_ITEM_TIMEOUT_SECONDS=600 leaves a 120 s margin for a required item that is itself verify.py phase (was 420 s)",
+      "file": "shared/scripts/verify.py",
+      "line": 72,
+      "profile": "architecture",
+      "disposition": "accepted",
+      "reason": "This repository's suite plus lint and type time is about 230 s, well under 600 s; consumer suites are smaller; the comment above the constant names the constraint; re-tune both constants together when the suite approaches 400 s."
+    }
+  ],
+  "generated_at": "2026-09-27T04:52:47Z",
   "branch": "consumer-sidecar-bootstrap-overlay_implementation",
   "head_sha": "f6f36c8cafa28336527fad989a34ddc04ef45f2b",
   "base_ref": "dev",
@@ -21,7 +31,7 @@
   "phase": "2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up",
   "target": ".",
   "dirty": false,
-  "content_hash": "2d65bfe6556ab89c031e68800ad0f11f94c2c498",
+  "content_hash": "687f46cf2a828d5057956bcb2359ebf23a75d1dd",
   "changed_files": [
     "AGENTS.md",
     "README.md",
@@ -54,6 +64,7 @@
     "scripts/validate_plan_frontmatter.py",
     "scripts/validate_targets.py",
     "shared/policies/workflow.instructions.md",
+    "shared/scripts/verify.py",
     "shared/sidecar/bridge.md",
     "tests/sidecar_test_helpers.py",
     "tests/test_install_bootstrap.py",

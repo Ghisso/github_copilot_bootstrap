@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27
 **Plan:** `.claude/plans/2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up.md`
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -152,8 +152,23 @@ real-Git regression test per behavior finding, then harden the write path.
 ## Verification
 
 Optional items: none (the plan has no `## Optional Verification` section).
-The required items' summary lines from `verify.py closeout --format text`
-follow.
+
+`verify.py phase --format json --persist`: PASS (Ruff, mypy, pytest 2225
+passed, freshness, provenance, generated runtime). Findings report:
+0 critical, 0 major, 1 minor (accepted, reason recorded), six profiles,
+`dirty: false`.
+
+Required items from `verify.py closeout --format text`:
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       88.6s  uv run pytest tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_install_bootstrap.py tests/test_check_runtime.py -q --tb=short
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS       60.1s  uv run python scripts/validate_targets.py
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+```
 
 ## Documentation
 
