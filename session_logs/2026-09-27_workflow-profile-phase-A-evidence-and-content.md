@@ -103,6 +103,20 @@ the state seeds under `shared/sidecar/workflow/`.
   Antigravity unverified (no client). Frozen coverage: Claude Code gets
   agents, rules, review profiles, templates, skills, and state; Copilot
   gets the instructions file and skills; Codex gets skills and state.
+- REVIEW round 1 (`reviewer`, `documentation`, `architecture`,
+  `security`): FAIL. Two CRITICAL: the agent supplements left the
+  canonical `## Retrieval` and `## Communication Style` sections in place,
+  which name Context Mode, Semble, and `.claude/instructions/` paths the
+  profile does not ship; and the orchestrator's `## Quality Gates` and the
+  reviewer's Review Flow step 5 were not replaced, so the merged prompts
+  would still say a receipt blocks a commit. Two MAJOR: `documentation`
+  and `learn` were eligible although their text names OpenWiki and
+  `.claude/instructions/`; the state READMEs and `workflow.md` did not
+  disclose the `git clean -x` risk and `--backup-state`. One MINOR: the
+  planner supplement's opening sentence mischaracterized the section it
+  replaces. The evidence section, the tables, the tier labels, and every
+  `.claude/` path were found consistent. All five sent back to the same
+  `documenter` in the FIX LOOP.
 
 ## [LEARN] Entries
 
