@@ -3,7 +3,7 @@ name: 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 12
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
@@ -236,7 +236,8 @@ Test rules for every step (Decision 47 applies unchanged):
     when it re-escapes byte for byte, so nothing else changes.
   - Flip `test_manifest_rejects_a_retained_path_with_a_backslash` to
     assert acceptance.
-  - Tests (parametrized over `back\slash`, `end\`, `a b\ c `): install,
+  - Tests (parametrized over `back\slash`, `end\`, and a name with an
+    escaped space and a trailing space): install,
     create the file, team `git add -f` the unit's `SKILL.md`, rerun twice
     (exit 0, hidden, status unchanged, exclude and manifest bytes stable),
     dry run agrees; uninstall reports the file as now visible and status
