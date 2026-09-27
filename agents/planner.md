@@ -4,6 +4,7 @@ description: "Planning specialist for implementation work. Produces phased plans
 tools: Agent, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, WebFetch, WebSearch
 model: opus
 effort: xhigh
+agents: []
 ---
 
 # Planner Agent

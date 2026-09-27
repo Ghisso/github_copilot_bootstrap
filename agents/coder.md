@@ -4,6 +4,7 @@ description: "Implementation specialist for Python AI engineering tasks. Applies
 tools: Edit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, WebFetch, WebSearch
 model: sonnet
 effort: xhigh
+user-invocable: false
 ---
 
 # Coder Agent

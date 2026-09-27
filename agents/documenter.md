@@ -4,6 +4,7 @@ description: "Documentation update agent. Reads git diff, identifies changed pub
 tools: Edit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
 model: sonnet
 effort: medium
+user-invocable: false
 ---
 
 # Documenter Agent

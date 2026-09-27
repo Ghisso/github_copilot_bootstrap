@@ -101,6 +101,29 @@ clone of a real consumer.
   mypy clean.
 - Step 9 documentation delegated to `documenter`; the scenario test (step
   8) written by the orchestrator from the proven run script.
+- Step 9 done by `documenter`: README (Profiles table and commands, what
+  the workflow profile adds, the relaxed loop with a diagram, the state
+  folder rules and the `git clean -x` risk, profile switching, the report
+  table rows for state, the uninstall paragraphs), `docs/target-mapping.md`
+  (the two profile trees, seven unit rows, manifest schema 2), and
+  `docs/architecture.md` (one paragraph). Every quoted message verified
+  against the code by the documenter.
+- Step 8, `tests/test_sidecar_workflow_scenario.py` (orchestrator): the
+  life-cycle test (dry run, install with team-taken agent and skill, state
+  seeded, personal edits survive a rerun and a deleted seed is re-added,
+  switch down and up, backup, uninstall keeps, second uninstall no-op,
+  purge, reinstall reseeds), a tracked path under the namespace aborting
+  before any write, and `git clean -fdx` losing the state while the backup
+  survives and a reinstall reseeds. It exposed two more defects, fixed:
+  the empty-folder cleanup list lacked `.claude/agents`,
+  `.claude/review-profiles`, and `.claude/templates` and ran only on
+  uninstall (now also at the end of an install, so a profile switch leaves
+  no empty folder); and `state_backup_slug` named the destination by a
+  per-second timestamp, so a backup and an uninstall in the same second
+  collided and read as a preserve conflict (now the slug appends `-2`,
+  `-3`, ... while the name exists). The three tests run in about two
+  seconds. Focused suites: 693 passed; ruff, format, mypy clean;
+  `validate_targets.py` PASS.
 
 ## [LEARN] Entries
 

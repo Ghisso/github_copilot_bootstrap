@@ -121,6 +121,113 @@ SIDECAR_EXCLUDE_END = "# END ai-bootstrap sidecar"
 SIDECAR_RETIRED_SKILL_WRITE_ROOTS: tuple[str, ...] = ()
 SIDECAR_RETIRED_BRIDGES: tuple[str, ...] = ()
 
+# Sidecar profiles (big plan sidecar-workflow-profile, Decisions 1, 2, 7, 8,
+# and 9). ``skills`` is today's overlay; ``workflow`` adds the relaxed
+# workflow: agents, rules, review profiles, templates, more skills, and one
+# namespaced state folder. Client coverage and the roots come from the
+# native runs frozen in docs/sidecar-provider-contract.md, "Workflow profile
+# evidence": Claude Code discovers ignored agents and rules; Copilot gets the
+# instructions file on the skills-profile bridge evidence; Codex gets skills
+# and state only; no ``.github/agents`` or ``.codex/agents`` unit ships.
+SIDECAR_PROFILES = ("skills", "workflow")
+SIDECAR_DEFAULT_PROFILE = "skills"
+# The 24 public skills whose text names nothing the profile does not ship;
+# shared/sidecar/workflow/skills.txt records why the others are denied.
+SIDECAR_WORKFLOW_SKILLS = (
+    "add-dependency",
+    "caveman",
+    "caveman-compress",
+    "concept-to-image",
+    "csv-driven-integration-tests",
+    "data-analysis",
+    "debug-investigator",
+    "devils-advocate",
+    "draw-io",
+    "gradio-streamlit",
+    "html-presentation",
+    "humanize",
+    "hydra-config",
+    "literature-review",
+    "md-to-pdf",
+    "pdf",
+    "pipeline-patterns",
+    "ponytail",
+    "ponytail-review",
+    "prompt-lab",
+    "rag-auditor",
+    "research-critique",
+    "review-api",
+    "text-to-sql-safety",
+)
+SIDECAR_PROFILE_SKILLS: dict[str, tuple[str, ...]] = {
+    "skills": SIDECAR_SKILLS,
+    "workflow": SIDECAR_WORKFLOW_SKILLS,
+}
+SIDECAR_WORKFLOW_AGENTS = ("orchestrator", "planner", "coder", "reviewer", "documenter")
+SIDECAR_WORKFLOW_RULES = ("workflow", "reporting", "tool-routing")
+SIDECAR_WORKFLOW_REVIEW_PROFILES = (
+    "api",
+    "architecture",
+    "code",
+    "config",
+    "documentation",
+    "domain",
+    "performance",
+    "ponytail",
+    "security",
+    "tests",
+)
+SIDECAR_WORKFLOW_TEMPLATES = (
+    "plan-big.md",
+    "plan-small.md",
+    "session-log.md",
+    "quality-report.md",
+)
+# Single-file units per profile: every file the profile installs outside a
+# skill folder and the state folder. The generator renders each with the
+# frontmatter its client needs; the installer treats each as an opaque unit
+# like a bridge (Decision 9).
+SIDECAR_PROFILE_FILE_UNITS: dict[str, tuple[str, ...]] = {
+    "skills": tuple(SIDECAR_BRIDGES),
+    "workflow": (
+        *(f".claude/rules/ai-bootstrap-{rule}.md" for rule in SIDECAR_WORKFLOW_RULES),
+        ".github/instructions/ai-bootstrap-workflow.instructions.md",
+        *(f".claude/agents/{agent}.md" for agent in SIDECAR_WORKFLOW_AGENTS),
+        *(
+            f".claude/review-profiles/{profile}.md"
+            for profile in SIDECAR_WORKFLOW_REVIEW_PROFILES
+        ),
+        *(f".claude/templates/{template}" for template in SIDECAR_WORKFLOW_TEMPLATES),
+    ),
+}
+# The one namespaced state folder (Decision 2): seeded once, never compared
+# or updated, kept by --uninstall, hidden by one exclude line.
+SIDECAR_STATE_ROOT = ".claude/ai-bootstrap"
+SIDECAR_STATE_SEED_FILES = (
+    "MEMORY.md",
+    "explorations/README.md",
+    "plans/README.md",
+    "quality_reports/README.md",
+    "session_logs/README.md",
+)
+SIDECAR_PROFILE_STATE_ROOT: dict[str, str | None] = {
+    "skills": None,
+    "workflow": SIDECAR_STATE_ROOT,
+}
+# Every folder a supported client reads single-file units from, including
+# folders the profile never writes, so a team file of the same name there
+# takes the sidecar's unit (Decision 9, frozen read roots).
+SIDECAR_FILE_UNIT_READ_ROOTS = (
+    ".claude/agents",
+    ".github/agents",
+    ".codex/agents",
+    ".agents/agents",
+    ".claude/rules",
+    ".github/instructions",
+    ".claude/review-profiles",
+    ".claude/templates",
+)
+
 # Git's own repository-local environment variables (the exact list
 # ``git rev-parse --local-env-vars`` prints on Git 2.43), plus ``GIT_NAMESPACE``
 # (not included in that list, but equally repository-local). An exported one
@@ -149,29 +256,46 @@ GIT_REPO_LOCAL_ENV_VARS: tuple[str, ...] = (
 )
 
 
-def sidecar_source_exact_allowlist() -> frozenset[str]:
+def sidecar_source_exact_allowlist(
+    profile: str = SIDECAR_DEFAULT_PROFILE,
+) -> frozenset[str]:
     """Return the exact set of relative POSIX paths a valid sidecar source
-    must contain (Decision 31): every current ``SIDECAR_SKILLS`` skill's
-    ``SKILL.md`` at every write root, ``LICENSE`` in the ``ponytail`` and
-    ``ponytail-review`` folders (only when the current profile still ships
-    them) at every write root, and every bridge in ``SIDECAR_BRIDGES``.
+    must contain (Decision 31): every skill of ``profile`` as ``SKILL.md`` at
+    every write root, ``LICENSE`` in the ``ponytail`` and ``ponytail-review``
+    folders (only when the profile still ships them) at every write root,
+    every single-file unit of the profile, and, when the profile has a state
+    folder, every state seed file under it.
 
     Reads the profile constants fresh on every call (module globals, not
     captured at import time), so a test that monkeypatches ``SIDECAR_SKILLS``
     (in every module that imported it) gets a matching exact allowlist
-    without weakening this function for real installs.
+    without weakening this function for real installs. The ``skills`` profile
+    reads ``SIDECAR_SKILLS`` and ``SIDECAR_BRIDGES`` directly for that reason.
     """
+    if profile not in SIDECAR_PROFILES:
+        raise ValueError(f"unknown sidecar profile: {profile!r}")
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    file_units = (
+        tuple(SIDECAR_BRIDGES)
+        if profile == "skills"
+        else SIDECAR_PROFILE_FILE_UNITS[profile]
+    )
     expected: set[str] = set()
     for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-        for skill in SIDECAR_SKILLS:
+        for skill in skills:
             expected.add(f"{write_root}/{skill}/SKILL.md")
             if skill in ("ponytail", "ponytail-review"):
                 expected.add(f"{write_root}/{skill}/LICENSE")
-    expected.update(SIDECAR_BRIDGES)
+    expected.update(file_units)
+    state_root = SIDECAR_PROFILE_STATE_ROOT[profile]
+    if state_root is not None:
+        expected.update(f"{state_root}/{seed}" for seed in SIDECAR_STATE_SEED_FILES)
     return frozenset(expected)
 
 
-def sidecar_source_violations(present: AbstractSet[str]) -> tuple[str, ...]:
+def sidecar_source_violations(
+    present: AbstractSet[str], profile: str = SIDECAR_DEFAULT_PROFILE
+) -> tuple[str, ...]:
     """Return every way a candidate sidecar source tree fails the exact
     source contract (Decision 31; S13, S14, L2).
 
@@ -185,10 +309,22 @@ def sidecar_source_violations(present: AbstractSet[str]) -> tuple[str, ...]:
     both write roots, or no bridges at all) is refused, not silently
     accepted as a smaller-but-valid profile.
     """
-    expected = sidecar_source_exact_allowlist()
+    expected = sidecar_source_exact_allowlist(profile)
     violations = [f"missing {path}" for path in sorted(expected - set(present))]
+    # A shipped skill is copied whole (references, helper scripts), so any
+    # file inside a shipped skill folder is allowed; only SKILL.md and the
+    # licenses are required. Everything outside a shipped skill folder must
+    # match the exact set.
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    skill_prefixes = tuple(
+        f"{write_root}/{skill}/"
+        for write_root in SIDECAR_SKILL_WRITE_ROOTS
+        for skill in skills
+    )
     violations.extend(
-        f"unexpected path: {path}" for path in sorted(set(present) - expected)
+        f"unexpected path: {path}"
+        for path in sorted(set(present) - expected)
+        if not path.startswith(skill_prefixes)
     )
     return tuple(violations)
 

@@ -2,6 +2,12 @@
 name: orchestrator
 description: "Main-thread workflow orchestrator for complex implementation tasks. Delegates planning, coding, review, and verification to specialists, and owns the lifecycle ceremony (branch, commit, PR, memory, and session-log writes) itself. Not itself a delegatable subagent."
 tools: Agent, Edit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode
+agents:
+  - planner
+  - coder
+  - reviewer
+  - documenter
+disable-model-invocation: true
 ---
 
 # Orchestrator Agent
