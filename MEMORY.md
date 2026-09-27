@@ -1333,3 +1333,10 @@
   it to 480 s). When a phase adds many real-Git tests, time `uv run
   pytest tests/ -q` on an idle machine before closeout and compare it with
   the constant in `shared/scripts/verify.py`.
+- [LEARN:documentation] Before submitting an OpenWiki page, map the cited
+  ranges of every file the page cites, not only the file that carries the
+  flagged claim. In sidecar Phase M the first page's flagged claim was in
+  the validator, so only that file was mapped, and a re-cited
+  `sidecar_overlay.py` range on the same claim stayed stale after the page
+  job closed. One scratch script per page, over all cited files, from the
+  page's recorded base, catches this in one pass.

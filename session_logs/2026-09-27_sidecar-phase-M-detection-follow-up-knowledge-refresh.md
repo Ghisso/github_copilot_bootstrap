@@ -60,22 +60,78 @@ knowledge-refresh phase.
 - Step 3, the stale-claims audit, delegated to `documenter` after
   `openwiki_finish`, with the surfaces and topics from the small plan.
 
+- Step 3 result: `documenter` made no edits. Every surface already
+  reflected Phase L, whose own documentation step and review had checked
+  the quoted messages against the final code; the audit re-verified each
+  quote and the remaining surfaces directly against
+  `scripts/install_bootstrap.py`, `scripts/sidecar_overlay.py`,
+  `scripts/validate_targets.py`, and `shared/scripts/verify.py`.
+- Step 4: no MEMORY entry was wrong after Phase L. One lesson added (below).
+- Required items pre-checked on the refreshed tree: `validate_targets.py`
+  PASS, `validate_plan_frontmatter.py` PASS, `verify.py fast` PASS.
+
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:documentation] Before submitting an OpenWiki page, map the cited
+  ranges of every file the page cites, not only the file that carries the
+  flagged claim; a re-cited range in another file can stay stale after the
+  page job closes. Added to MEMORY.
 
 ## Verification
 
-(pending)
+Optional items: none (the plan has no `## Optional Verification` section).
+The required items' summary lines from `verify.py closeout --format text`
+follow.
 
 ## Stale-claims surfaces checked
 
-(pending)
+Audited by `documenter` against the code at `883edf0` after
+`openwiki_finish`, then checked by the orchestrator. Topics: full-install
+evidence when `.claude` is tracked in any form, the fresh-default
+refusals, `--uninstall` target checks and option warnings, the marker
+remedy and the `git`-missing message, tracked entries under a bridge path,
+precedence for dropped skills, frontmatter parsing and alias by identity,
+backslash retained names and user-line order, the pending ownership
+record, file modes, `fsync`, the writability preflight, the filesystem
+abort and the lock, report wording, empty-folder cleanup, uninstall exit-1
+cases, the forbidden text tokens, and the 480-second verifier budget.
+
+| Surface | Outcome |
+| --- | --- |
+| `README.md` | unchanged, accurate: every Phase L message quoted word for word (verified against the code) |
+| `docs/architecture.md` | unchanged, accurate: restates nothing Phase L changed |
+| `docs/target-mapping.md` | unchanged, accurate: the `.json.next` and `.lock` descriptions match the code |
+| `docs/runtime-checks.md` | unchanged, accurate |
+| `docs/smoke-tests.md` | unchanged, accurate |
+| `docs/sidecar-provider-contract.md` | unchanged; dated client evidence untouched by Phase L |
+| `shared/policies/*.instructions.md` | not applicable: none restates a Phase L behavior or the command budget |
+| `shared/skills/` (`knowledge-refresh`, `plan-decomposition`, `safe-consumer-bootstrap-refresh`, `commit`, `setup-project`) | not applicable: no behavior claim from this plan |
+| `shared/templates/plan-big.md`, `plan-small.md` | not applicable |
+| `shared/agents/` prompts | not applicable: only the OpenWiki `.claims` sidecar is mentioned |
+| docstrings and `--help` of `install_bootstrap.py`, `update_consumers.py`, `sidecar_overlay.py` | unchanged, accurate |
+| `.claude/instructions/project-context.instructions.md` | unchanged, accurate |
+| `CLAUDE.md`, `AGENTS.md` | unchanged, accurate (generated adapters) |
+| `.claude/MEMORY.md` | unchanged, accurate: the verifier-budget lesson already states the 180 to 480 change; one new lesson added by the orchestrator |
+| `openwiki/**` | refreshed through OpenWiki's tools: six pages, as the Work Log lists |
+
+Dated records were left unchanged: archived plans, closed session logs,
+`docs/2026-*`, and the five review reports.
 
 ## Documentation
 
-(pending)
+No human-authored documentation needed a change in this phase; the
+generated `openwiki/` pages were refreshed through OpenWiki's own tools.
 
 ## Open Questions / Next Steps
 
-(pending)
+- This is the big plan's last phase. The post-commit hook marks the big
+  plan `complete` after this commit. The user owns the PR to `dev` and the
+  merge.
+- Next refresh: re-anchor the one drifted `sidecar_overlay.py` range noted
+  in the Work Log on the source-and-layout page.
+- Known limits carried forward: Antigravity is still unverified for the
+  sidecar; a skill unit that is a cross-filesystem mount point and not a
+  real folder is not refused in preflight (since Phase L a failed preserve
+  ends in a clean `ABORT: filesystem error at <path>` and a rerun
+  converges); `tests/test_validate_targets.py::test_validate_targets`
+  alone takes about 57 s of the suite.
