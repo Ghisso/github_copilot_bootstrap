@@ -3,8 +3,8 @@ name: 2026-09-27_phase-B-workflow-profile-implementation
 type: small-plan
 parent_plan: sidecar-workflow-profile
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-27_workflow-profile-phase-B-implementation.md
 ---
 
 # Small Plan: Phase B — Workflow Profile Implementation
@@ -67,7 +67,7 @@ every scenario runs a second time and asserts nothing changes, and a dry
 run predicts the same result. Coders working in parallel run `ruff format`
 only on their own files.
 
-- [ ] **1. Profile constants.**
+- [x] **1. Profile constants.**
   - **Owner:** `coder`
   - `SIDECAR_PROFILES = ("skills", "workflow")`; per profile: skills (the
     four, or every public skill minus `shared/sidecar/workflow/skills.txt`,
@@ -79,7 +79,7 @@ only on their own files.
     takes the profile. Today's constants keep their names as the `skills`
     profile.
 
-- [ ] **2. Rendering.**
+- [x] **2. Rendering.**
   - **Owner:** `coder`
   - `generate` renders `dist/sidecar/skills/` and `dist/sidecar/workflow/`;
     the `skills` output is byte-identical to today's `dist/sidecar/`
@@ -98,7 +98,7 @@ only on their own files.
     state which in the closeout log. Phase A's Copilot result means no
     `.github/agents` unit ships; `.github/agents` is a read root only.
 
-- [ ] **3. Validator per profile.**
+- [x] **3. Validator per profile.**
   - **Owner:** `coder`
   - `sidecar_allowed_relative_path(path, profile)`,
     `sidecar_text_errors(path, text, profile)`,
@@ -109,7 +109,7 @@ only on their own files.
     a missing unit, an extra unit, a rule without the `ai-bootstrap-`
     prefix, an agent text naming a receipt. Determinism for both profiles.
 
-- [ ] **4. Profile in the manifest and the CLI.**
+- [x] **4. Profile in the manifest and the CLI.**
   - **Owner:** `coder`
   - Manifest `schema_version` 2 adds `profile`; a version-1 manifest
     parses as `skills`. `--profile` defaults to the manifest's profile,
@@ -119,7 +119,7 @@ only on their own files.
     the profile; switch both ways; a version-1 manifest upgrades in place
     with no unit change.
 
-- [ ] **5. Single-file units at the new roots.**
+- [x] **5. Single-file units at the new roots.**
   - **Owner:** `coder`
   - Agents, rules, review profiles, and templates are single-file units
     like bridges. `_skill_name` becomes `_unit_name(unit_path)` (file stem
@@ -131,7 +131,7 @@ only on their own files.
     takes the rule; a team `.claude/settings.json` next to everything is
     never touched; every skills-profile test passes unchanged.
 
-- [ ] **6. State units.**
+- [x] **6. State units.**
   - **Owner:** `coder`
   - The state unit is `.claude/ai-bootstrap/`. Install seeds it when
     absent and adds a missing seed file when the folder exists, never
@@ -147,7 +147,7 @@ only on their own files.
     purge moves; backup copies; `git clean -fdx` then install reseeds and
     the backup survives; a tracked file under the namespace aborts.
 
-- [ ] **7. Uninstall, dry run, reports, and the updater.**
+- [x] **7. Uninstall, dry run, reports, and the updater.**
   - **Owner:** `coder`
   - Uninstall takes every well-known unit of every profile. Dry run
     predicts each action. Reports name the unit kind ("agent", "rule",
@@ -157,7 +157,7 @@ only on their own files.
     with a preserved edited agent, and a batch with a `skills` consumer, a
     `workflow` consumer, and a full consumer.
 
-- [ ] **8. End-to-end scenario test.**
+- [x] **8. End-to-end scenario test.**
   - **Owner:** `coder`
   - `tests/test_sidecar_workflow_scenario.py`: a team repository from a
     fixture with a tracked `.claude/settings.json`, a tracked team skill,
@@ -169,7 +169,7 @@ only on their own files.
     state; `--uninstall --purge-state` moves it; reinstall reseeds. Every
     step runs `--dry-run` first and asserts parity. Under 60 seconds.
 
-- [ ] **9. Documentation and the manual run.**
+- [x] **9. Documentation and the manual run.**
   - **Owner:** `documenter` for the docs; `orchestrator` for the run
   - README sidecar section: profiles, what the workflow profile ships per
     client, the state folder rules, `--purge-state`, `--backup-state`, the
@@ -237,11 +237,11 @@ closeout and compare it with `COMMAND_TIMEOUT_SECONDS` in
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

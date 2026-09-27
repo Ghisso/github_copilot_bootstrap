@@ -155,6 +155,14 @@ clone of a real consumer.
   Three tests added (client-shaped team agents, backup dry run, unit name);
   README documents both behavior changes. Focused suites 699 passed; ruff,
   format, mypy clean; `validate_targets.py` PASS.
+- REVIEW round 2 (same reviewer, same six profiles, fix-only diff
+  `phase-B-review-fixes.diff` plus the refreshed full artifact): CLEAN,
+  every fix confirmed against the live source, no new finding. The
+  reviewer noted that `_entry_id` reads `reviewer.old.md` as `reviewer`
+  too; that only ever keeps the sidecar from installing its own copy, the
+  safe direction.
+- CLOSEOUT: steps 1 and 2 done (docs, small plan complete, big plan tick,
+  LEARN entries in this log and MEMORY), then the numbered sequence.
 
 ## [LEARN] Entries
 
