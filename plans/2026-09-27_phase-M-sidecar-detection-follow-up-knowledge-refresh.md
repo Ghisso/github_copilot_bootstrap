@@ -3,7 +3,7 @@ name: 2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 13
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

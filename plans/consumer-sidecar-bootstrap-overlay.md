@@ -19,7 +19,7 @@ phases:
   - 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
   - 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
   - 2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh
-current_phase: 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
+current_phase: 2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
