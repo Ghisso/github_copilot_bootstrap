@@ -112,15 +112,20 @@ run only past that gate.
     Semble, Context Mode, or OpenWiki. `instructions.md`: the same
     content condensed for the single Copilot instructions file.
 
-- [ ] **7. Agent supplements.**
+- [ ] **7. Agent workflow prompts (Decision 6 as amended 2026-09-27).**
   - **Owner:** `documenter`
-  - One `workflow-supplement.md` per shipped agent, replacing the
-    lifecycle sections of the canonical prompt: the orchestrator runs the
-    relaxed loop and delegates; the planner writes plans with the
-    templates and never creates branches; the coder implements and runs
-    the project's own checks; the reviewer writes a Markdown report with
-    severity sections, no JSON; the documenter changes only paths. Each
-    lists the paths it uses under `.claude/ai-bootstrap/`.
+  - One complete `workflow-prompt.md` per shipped agent, self-contained
+    and never merged with the canonical prompt: the orchestrator runs the
+    relaxed loop and delegates and never gates; the planner writes plans
+    with the two templates and never creates branches; the coder
+    implements and runs the project's own checks; the reviewer writes a
+    Markdown report with severity sections to the quality-reports folder,
+    no JSON; the documenter updates docs and the state folder. Each names
+    only the profile's rule files, the templates, the state paths, and
+    skills the profile ships, and carries no reference to the full
+    install. A first draft as a supplement replacing canonical sections
+    was abandoned after two review rounds kept finding dangling
+    references.
 
 - [ ] **8. Skill denylist and state seeds.**
   - **Owner:** `documenter`, checked by the orchestrator

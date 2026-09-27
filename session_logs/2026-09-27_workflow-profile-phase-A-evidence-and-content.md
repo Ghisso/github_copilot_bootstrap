@@ -133,6 +133,25 @@ the state seeds under `shared/sidecar/workflow/`.
   `create-feature`) and were denied for the same reason, leaving 24
   eligible skills. Phase B may rescue any denied skill whose only problem
   is a path or verifier mention through a profile text replacement.
+- REVIEW round 2 (fresh `reviewer`, same three profiles): the five
+  round-1 findings confirmed fixed; FAIL again with six CRITICAL of one
+  kind, references the supplements left in place to denied skills
+  (`code-style`, `create-feature`, `bentoml-service`, `documentation`)
+  and to `.claude/instructions/` files (the reporting policy and the
+  routing table in the orchestrator, planner, and reviewer prompts); one
+  MAJOR: the evidence section had no explicit gate-result statement; one
+  MINOR: the coder's control-plane route bullet.
+- Decision (orchestrator, material-impact check): a supplement that
+  replaces a closed list of canonical sections cannot be made complete,
+  because the canonical prompts name full-install files and skills in
+  many places. Big plan Decision 6 amended: each agent gets a complete,
+  self-contained `workflow-prompt.md`, never merged with the canonical
+  prompt, naming only the profile's rules, templates, state paths, and
+  the 24 shipped skills; the validator will reject any other reference.
+  Small plan step 7 updated to match. The MAJOR was fixed by adding
+  `### Decision gate result, 2026-09-27` to the evidence section. The
+  MINOR disappears with the rewrite. Rewrite delegated to the same
+  `documenter`.
 
 ## [LEARN] Entries
 
