@@ -88,6 +88,15 @@ knowledge-refresh phase.
   "Verification Defaults" section (`L1100-L1122`). `openwiki_finish`
   returned `complete`; the guard restored the adapters after both
   `openwiki_begin` calls.
+- REVIEW round 2 (`reviewer`, `documentation` and `architecture`, on the
+  delta since round 1): PASS, no findings; both round-1 findings and the
+  re-anchored range confirmed against the files. Required items after the
+  second run: `validate_targets.py` PASS, `validate_plan_frontmatter.py`
+  PASS, `verify.py fast` PASS. Findings persisted with all six reviewed
+  profiles across the two rounds and an empty surviving list.
+- CLOSEOUT step 1: no human-authored documentation changed in this phase
+  (the audit found nothing stale). Step 2: small plan `complete`, every
+  box ticked, Phase M ticked in the big plan, lessons recorded.
 
 ## [LEARN] Entries
 
