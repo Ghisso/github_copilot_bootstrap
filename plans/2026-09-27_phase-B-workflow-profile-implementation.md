@@ -3,7 +3,7 @@ name: 2026-09-27_phase-B-workflow-profile-implementation
 type: small-plan
 parent_plan: sidecar-workflow-profile
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
