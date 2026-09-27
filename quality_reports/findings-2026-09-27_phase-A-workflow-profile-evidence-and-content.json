@@ -1,0 +1,40 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "documentation",
+    "security"
+  ],
+  "findings": [],
+  "generated_at": "2026-09-27T11:41:39Z",
+  "branch": "sidecar-workflow-profile_implementation",
+  "head_sha": "094f1f0c11d85e2454f645328d2e51e209a73c5f",
+  "base_ref": "dev",
+  "merge_base_sha": "094f1f0c11d85e2454f645328d2e51e209a73c5f",
+  "phase": "2026-09-27_phase-A-workflow-profile-evidence-and-content",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "aecc8d1b4714b028175f28dde648c2d9c6cbd1bb",
+  "changed_files": [
+    "docs/sidecar-provider-contract.md",
+    "shared/agents/coder/workflow-prompt.md",
+    "shared/agents/documenter/workflow-prompt.md",
+    "shared/agents/orchestrator/workflow-prompt.md",
+    "shared/agents/planner/workflow-prompt.md",
+    "shared/agents/reviewer/workflow-prompt.md",
+    "shared/sidecar/workflow/instructions.md",
+    "shared/sidecar/workflow/rules/reporting.md",
+    "shared/sidecar/workflow/rules/tool-routing.md",
+    "shared/sidecar/workflow/rules/workflow.md",
+    "shared/sidecar/workflow/skills.txt",
+    "shared/sidecar/workflow/state/MEMORY.md",
+    "shared/sidecar/workflow/state/explorations/README.md",
+    "shared/sidecar/workflow/state/plans/README.md",
+    "shared/sidecar/workflow/state/quality_reports/README.md",
+    "shared/sidecar/workflow/state/session_logs/README.md"
+  ]
+}

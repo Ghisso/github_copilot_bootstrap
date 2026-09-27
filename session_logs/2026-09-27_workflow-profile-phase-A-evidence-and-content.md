@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27
 **Plan:** `.claude/plans/2026-09-27_phase-A-workflow-profile-evidence-and-content.md`
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -165,7 +165,14 @@ the state seeds under `shared/sidecar/workflow/`.
   and receipt lines, so Phase B authors relaxed variants or leaves them
   unshipped.
 
-- Findings persisted with the three reviewed profiles and an empty
+- CLOSEOUT step 4, first attempt: every required item PASS and the
+  closeout dry run PASS, but the findings report carried
+  `ponytail_reviewed=false`, and the commit gate's `diff_requires_ponytail`
+  rule requires a Ponytail review for any diff of more than one file (the
+  documentation exemption covers a single file only). A `ponytail`-only
+  review round was added, the small plan's Review Profiles updated, and
+  step 4 repeated.
+- Findings persisted with the four reviewed profiles and an empty
   surviving list (the round-3 MINOR was fixed, not accepted).
 
 ## [LEARN] Entries
@@ -194,8 +201,17 @@ the state seeds under `shared/sidecar/workflow/`.
   Copilot was skipped by the user and recorded `unverified`; Antigravity
   is not installed and recorded `unverified`.
 
-The required items' summary lines from `verify.py closeout --format text`
-follow.
+`verify.py phase --format json --persist`: PASS. Findings report: 0
+critical, 0 major, 0 minor, three profiles, `dirty: false`.
+
+Required items from `verify.py closeout --format text`:
+
+```text
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS       50.1s  uv run python scripts/validate_targets.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+```
 
 ## Documentation
 

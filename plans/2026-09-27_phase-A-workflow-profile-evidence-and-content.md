@@ -168,6 +168,8 @@ uv run python .claude/scripts/verify.py fast --format json
 - `documentation`
 - `architecture`
 - `security`
+- `ponytail` — added at closeout: the commit gate requires it for any
+  diff of more than one file, and this phase touches 16
 
 ## Closeout Checklist
 

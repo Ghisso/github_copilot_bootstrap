@@ -224,8 +224,9 @@ uv run python scripts/check_runtime.py
 Each small plan lists its own focused tests. Required review profiles:
 Phase B uses `code`, `architecture`, `security`, `tests`, `ponytail`, and
 `documentation`. Phase A changes documents and authored content only and
-uses `documentation`, `architecture`, and `security`. Phase C uses the
-full set, as every knowledge-refresh phase has.
+uses `documentation`, `architecture`, and `security`, plus `ponytail`
+because the commit gate requires it for any diff of more than one file.
+Phase C uses the full set, as every knowledge-refresh phase has.
 
 ## Done Criteria
 
