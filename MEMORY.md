@@ -1357,3 +1357,18 @@
   the `system`/`init` event still works; pass `--model` with an older
   model such as `claude-haiku-4-5-20251001` for a native probe instead
   of updating the person's install.
+- [LEARN:workflow] A "same name takes the unit" rule across client folders
+  compares identities, not file names: one agent is `reviewer.md`,
+  `reviewer.agent.md`, `reviewer.toml`, or the folder `reviewer/agent.md`
+  depending on the client. Reduce an entry to its name up to the first
+  dot before comparing, and test each client shape (workflow profile
+  Phase B review).
+- [LEARN:workflow] Check a new standalone CLI action against every global
+  flag's help text, `--dry-run` first; an early-return dispatcher branch
+  is where such a flag gets lost (`--backup-state`, Phase B review).
+- [LEARN:workflow] A coder's open findings go in its report and the
+  session log, never in a code docstring; the orchestrator closes them and
+  the docstring turns stale (Phase B review).
+- [LEARN:tooling] A preserved-copy name built from a per-second timestamp
+  collides when two actions run in the same second; append a counter while
+  the name exists (`state_backup_slug`, Phase B).

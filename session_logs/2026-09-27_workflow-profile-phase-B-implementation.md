@@ -130,10 +130,52 @@ clone of a real consumer.
   `--profile`. The six tests run in about seven seconds. Focused suites:
   693 passed before the last three; ruff, format, mypy clean;
   `validate_targets.py` PASS.
+- VERIFY: `check_runtime.py` all PASS after the self-install
+  (`install_bootstrap.py . --allow-self --local-only`), plan frontmatter
+  valid, outer `git status` unchanged by the self-install, full suite 2257
+  passed in 215 s wall (budget 480 s), `verify.py fast` PASS.
+- REVIEW round 1 (`reviewer`, profiles code, architecture, security,
+  tests, ponytail, documentation; artifact `phase-B-wp.diff`, 4293 lines):
+  NOT CLEAN, 4 MAJOR and 3 MINOR. Fixed by the orchestrator: (1) the
+  cross-folder agent precedence compared literal file names, so a team's
+  `.github/agents/<id>.agent.md`, `.codex/agents/<id>.toml`, or
+  `.agents/agents/<id>/agent.md` never took the sidecar's agent -- now an
+  entry's identity is its name up to the first dot (`_entry_id`), the
+  precedence helpers take a `key`, and the agent reader lists folders too;
+  (2) `--backup-state` ignored `--dry-run` -- now it prints `would back up`
+  and writes nothing; (3) a stale validator docstring claimed the workflow
+  fixture assertion still failed -- rewritten; (4) `_read_list_agent_names`
+  duplicated `_enumerate_read_entries` -- the enumerator now takes roots,
+  write roots, and a files flag, and the agent reader calls it; (5) the
+  `.claude/instructions/` token was listed twice; (6)
+  `SIDECAR_WORKFLOW_RELAXED_TEMPLATES` always equalled the set it was
+  compared with, so the constant and the dead fallback branch were removed;
+  (7) `_unit_name` used `.stem`, which left `ai-bootstrap-workflow.instructions`
+  for the Copilot instructions unit -- now the name up to the first dot.
+  Three tests added (client-shaped team agents, backup dry run, unit name);
+  README documents both behavior changes. Focused suites 699 passed; ruff,
+  format, mypy clean; `validate_targets.py` PASS.
 
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:workflow] A "same name takes the unit" rule across client folders
+  must compare identities, not file names: one agent is `reviewer.md` for
+  Claude Code, `reviewer.agent.md` for Copilot, `reviewer.toml` for Codex,
+  and the folder `reviewer/agent.md` for Antigravity. Reduce every entry
+  to its name up to the first dot before comparing, and test each client
+  shape, not only the write root. Added to MEMORY.
+- [LEARN:workflow] A standalone CLI action added beside the existing ones
+  (`--backup-state`) must be checked against every global flag's help
+  text, `--dry-run` first; the dispatcher branch that returns early is
+  where such a flag gets lost. Added to MEMORY.
+- [LEARN:workflow] During a fan-out, a coder's open findings belong in its
+  report and the session log, never in a code docstring ("the first
+  assertion currently fails ..."): the orchestrator closes them and the
+  docstring turns stale and misleading. Added to MEMORY.
+- [LEARN:tooling] A preserved-copy name built from a per-second timestamp
+  collides when two actions run in the same second (a backup then an
+  uninstall in a test); append a counter while the name exists. Added to
+  MEMORY.
 
 ## Verification
 
@@ -141,8 +183,20 @@ clone of a real consumer.
 
 ## Documentation
 
-(pending)
+`README.md` (Profiles table and commands, what the workflow profile adds,
+the relaxed loop, the state folder rules and the `git clean -x` risk,
+profile switching, the report rows for state and the kind-worded rows,
+the uninstall paragraphs; after review, the client-shaped agent precedence
+and `--backup-state --dry-run`), `docs/target-mapping.md` (the two profile
+trees, seven unit rows, manifest schema 2), and `docs/architecture.md`
+(one paragraph) by `documenter`, checked against the code. `openwiki/`
+untouched; Phase C refreshes it.
 
 ## Open Questions / Next Steps
 
-(pending)
+- Phase C: OpenWiki refresh, the stale-claims audit over README, docs, and
+  the provider contract, and the final-phase closeout.
+- Copilot and Codex never get the workflow agents (no config-free way to
+  discover an agent from an ignored file); the frozen coverage table in
+  `docs/sidecar-provider-contract.md` records this. Revisit only if a
+  client adds such a way.
