@@ -105,6 +105,26 @@ real-Git regression test per behavior finding, then harden the write path.
   more than the lint and type time, regenerate `dist/`, and self-install.
   This is a control-plane change, so the phase returns to VERIFY and
   REVIEW before closeout restarts at step 2.
+- VERIFY after step 15: ruff, ruff format, mypy clean;
+  `tests/test_verify.py` and `tests/test_check_runtime.py` 314 passed;
+  `verify.py phase --format text`: `phase: PASS`,
+  `VFY-PYTEST-001: PASS - pytest completed (2225 passed in 197.78s)`,
+  `VFY-GEN-001: PASS - generated verifier runtime matches source`.
+- REVIEW round 3 (`reviewer`, `code`, `architecture`, `security`,
+  `tests`, `ponytail`, on the step 15 delta): PASS, two MINOR. (1) The new
+  comment said 2,300 tests; corrected to 2,225 (comment-only edit,
+  regenerated and self-installed; ruff clean). (2) The margin between
+  `COMMAND_TIMEOUT_SECONDS = 480` and `VERIFICATION_ITEM_TIMEOUT_SECONDS =
+  600` shrank from 420 s to 120 s for a required item that is itself
+  `verify.py phase`. Disposition: accepted. Reason: this repository's
+  suite plus lint and type time is about 230 s, well under 600 s; consumer
+  suites are smaller; the comment names the constraint; re-tune both
+  constants together when the suite approaches 400 s. The reviewer
+  confirmed no test pins the constant, the schema fixtures are historical
+  data, and no test is warranted for a constant change.
+- Slowest tests (`--durations`): `tests/test_validate_targets.py::test_validate_targets`
+  57 s alone; the next five are 2.6-7 s. A future phase could split or
+  cache that one test; out of scope here.
 
 ## [LEARN] Entries
 
