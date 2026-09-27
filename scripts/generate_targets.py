@@ -15,8 +15,17 @@ from typing import Any
 
 from runtime_ownership import (
     SIDECAR_BRIDGES,
+    SIDECAR_DEFAULT_PROFILE,
+    SIDECAR_PROFILE_SKILLS,
+    SIDECAR_PROFILES,
     SIDECAR_SKILL_WRITE_ROOTS,
     SIDECAR_SKILLS,
+    SIDECAR_STATE_ROOT,
+    SIDECAR_STATE_SEED_FILES,
+    SIDECAR_WORKFLOW_AGENTS,
+    SIDECAR_WORKFLOW_REVIEW_PROFILES,
+    SIDECAR_WORKFLOW_RULES,
+    SIDECAR_WORKFLOW_TEMPLATES,
     render_restore_script,
     restore_manifest,
 )
@@ -178,6 +187,29 @@ SIDECAR_TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (
         "Return findings to the coder",
         "Return findings to whoever changes the diff",
+    ),
+)
+
+# Rewrites the workflow profile's review profiles and its two plan templates
+# from the full install's un-namespaced state folders to the profile's one
+# namespaced state root (big plan Decision 2; small plan Phase B step 2).
+# Every other workflow unit (rules, instructions, agent prompts, state seeds)
+# is authored under shared/sidecar/workflow/ already naming the right path,
+# so only these two unit kinds need the rewrite.
+SIDECAR_WORKFLOW_PATH_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    (".claude/plans/", ".claude/ai-bootstrap/plans/"),
+    (".claude/session_logs/", ".claude/ai-bootstrap/session_logs/"),
+    (".claude/quality_reports/", ".claude/ai-bootstrap/quality_reports/"),
+    (".claude/MEMORY.md", ".claude/ai-bootstrap/MEMORY.md"),
+    (".claude/explorations/", ".claude/ai-bootstrap/explorations/"),
+    # The profile's own rule file stands in for the full install's policy.
+    (
+        ".claude/instructions/workspace.instructions.md",
+        ".claude/rules/ai-bootstrap-workflow.md",
+    ),
+    (
+        ".claude/instructions/workflow.instructions.md",
+        ".claude/rules/ai-bootstrap-workflow.md",
     ),
 )
 
@@ -1611,32 +1643,77 @@ def render_github_agent_adapter(
     return "\n".join(frontmatter_lines) + "\n\n" + body
 
 
+def claude_agent_frontmatter(agent: dict[str, Any]) -> list[str]:
+    """Build one agent's Claude Code subagent frontmatter lines: name,
+    description, tools, model/effort tiering, delegation, and visibility.
+
+    Shared by the full install's canonical agent (`render_claude_agents`) and
+    the sidecar workflow profile's agent, which renders the same frontmatter
+    around the profile's own `workflow-prompt.md` body instead of the
+    canonical `prompt.md` (big plan Decision 6).
+    """
+    target_name = canonical_agent_name(agent["id"])
+    tools = render_claude_tools(agent.get("capabilities", []))
+    frontmatter = [
+        "---",
+        f"name: {target_name}",
+        f"description: {json.dumps(transform_agent_text(agent['description'], 'claude-code'))}",
+    ]
+    if tools:
+        frontmatter.append(f"tools: {tools}")
+    # Per-agent model/effort tiering lives in agent.yaml model_intent under the
+    # "claude-code" key as an object; a legacy "target-native" string emits
+    # nothing (inherit). "inherit" values are omitted so the agent follows the
+    # session. Haiku agents must not carry effort (Haiku has no effort level).
+    intent = agent.get("model_intent", {}).get("claude-code")
+    if isinstance(intent, dict):
+        model = intent.get("model")
+        effort = intent.get("effort")
+        if model and model != "inherit":
+            frontmatter.append(f"model: {model}")
+        if effort and effort != "inherit":
+            frontmatter.append(f"effort: {effort}")
+    delegates = agent.get("delegates", [])
+    if delegates:
+        frontmatter.append("agents:")
+        frontmatter.extend(f"  - {delegate}" for delegate in delegates)
+    elif "delegate" in agent.get("capabilities", []):
+        frontmatter.append("agents: []")
+    if agent.get("visibility") == "hidden":
+        frontmatter.append("user-invocable: false")
+    if agent["id"] == "orchestrator":
+        frontmatter.append("disable-model-invocation: true")
+    frontmatter.append("---")
+    return frontmatter
+
+
+def sidecar_agent_frontmatter(agent: dict[str, Any]) -> list[str]:
+    """Build a workflow-profile agent's frontmatter: the full install's
+    `claude_agent_frontmatter` with every `mcp__*` tool grant removed, because
+    the sidecar ships no MCP configuration (big plan Non-Goals and Decision
+    11's `mcp__` token). Everything else stays identical, so the agent keeps
+    its name, description, model tiering, delegates, and visibility."""
+    lines: list[str] = []
+    for line in claude_agent_frontmatter(agent):
+        if line.startswith("tools: "):
+            tools = [
+                tool.strip()
+                for tool in line[len("tools: ") :].split(",")
+                if tool.strip() and not tool.strip().startswith("mcp__")
+            ]
+            if not tools:
+                continue
+            line = "tools: " + ", ".join(tools)
+        lines.append(line)
+    return lines
+
+
 def render_claude_agents(target_root: Path) -> None:
     for agent, agent_dir in shared_agents("claude-code"):
         target_name = canonical_agent_name(agent["id"])
         body = (agent_dir / "prompt.md").read_text(encoding="utf-8")
         body = transform_agent_text(body, "claude-code")
-        tools = render_claude_tools(agent.get("capabilities", []))
-        frontmatter = [
-            "---",
-            f"name: {target_name}",
-            f"description: {json.dumps(transform_agent_text(agent['description'], 'claude-code'))}",
-        ]
-        if tools:
-            frontmatter.append(f"tools: {tools}")
-        # Per-agent model/effort tiering lives in agent.yaml model_intent under the
-        # "claude-code" key as an object; a legacy "target-native" string emits
-        # nothing (inherit). "inherit" values are omitted so the agent follows the
-        # session. Haiku agents must not carry effort (Haiku has no effort level).
-        intent = agent.get("model_intent", {}).get("claude-code")
-        if isinstance(intent, dict):
-            model = intent.get("model")
-            effort = intent.get("effort")
-            if model and model != "inherit":
-                frontmatter.append(f"model: {model}")
-            if effort and effort != "inherit":
-                frontmatter.append(f"effort: {effort}")
-        frontmatter.append("---")
+        frontmatter = claude_agent_frontmatter(agent)
         write_text(
             target_root / ".claude" / "agents" / f"{target_name}.md",
             "\n".join(frontmatter) + "\n\n" + body.strip() + "\n",
@@ -1768,30 +1845,117 @@ def render_multi_agent(target_root: Path) -> None:
     render_antigravity(target_root)
 
 
-def render_sidecar(target_root: Path) -> None:
-    """Render the sidecar overlay: allowlisted skills, licenses, and bridges.
+def apply_sidecar_workflow_path_replacements(text: str) -> str:
+    for old, new in SIDECAR_WORKFLOW_PATH_REPLACEMENTS:
+        text = text.replace(old, new)
+    return text
 
-    Big plan Decisions 2-5 and 19: a private, per-clone overlay projected into
+
+def render_sidecar_workflow_units(target_root: Path) -> None:
+    """Render the workflow profile's single-file units and state seeds.
+
+    The relaxed rules and the Copilot instructions file come from
+    `shared/sidecar/workflow/` verbatim (the instructions file gains the
+    `applyTo: "**"` frontmatter Copilot needs). Each shipped agent renders
+    with the full install's own Claude frontmatter (`claude_agent_frontmatter`)
+    around its `workflow-prompt.md` body, never the canonical `prompt.md`
+    (Decision 6). The review profiles and the two plan templates are rewritten
+    to the namespaced state root; the other two templates ship the relaxed
+    variants authored for this profile. The state seeds are copied as-is
+    (Decision 2-3: seeded once by the installer, never compared here).
+    """
+    workflow_root = REPO_ROOT / "shared" / "sidecar" / "workflow"
+    for rule in SIDECAR_WORKFLOW_RULES:
+        write_text(
+            target_root / ".claude" / "rules" / f"ai-bootstrap-{rule}.md",
+            (workflow_root / "rules" / f"{rule}.md").read_text(encoding="utf-8"),
+        )
+    instructions_body = (workflow_root / "instructions.md").read_text(encoding="utf-8")
+    write_text(
+        target_root
+        / ".github"
+        / "instructions"
+        / "ai-bootstrap-workflow.instructions.md",
+        f'---\napplyTo: "**"\n---\n\n{instructions_body}',
+    )
+    agents_by_id = {
+        agent["id"]: (agent, agent_dir)
+        for agent, agent_dir in shared_agents("claude-code")
+    }
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        agent, agent_dir = agents_by_id[agent_id]
+        body = transform_agent_text(
+            (agent_dir / "workflow-prompt.md").read_text(encoding="utf-8"),
+            "claude-code",
+        )
+        frontmatter = sidecar_agent_frontmatter(agent)
+        write_text(
+            target_root / ".claude" / "agents" / f"{agent_id}.md",
+            "\n".join(frontmatter) + "\n\n" + body.strip() + "\n",
+        )
+    for name in SIDECAR_WORKFLOW_REVIEW_PROFILES:
+        text = (REPO_ROOT / "shared" / "review-profiles" / f"{name}.md").read_text(
+            encoding="utf-8"
+        )
+        write_text(
+            target_root / ".claude" / "review-profiles" / f"{name}.md",
+            apply_sidecar_workflow_path_replacements(text),
+        )
+    for template_name in SIDECAR_WORKFLOW_TEMPLATES:
+        # Every template ships from the relaxed set under
+        # shared/sidecar/workflow/templates/ (Decision 6; small plan step 2):
+        # the canonical ones name the verifier, receipts, and checkpoints.
+        text = (workflow_root / "templates" / template_name).read_text(encoding="utf-8")
+        write_text(
+            target_root / ".claude" / "templates" / template_name,
+            apply_sidecar_workflow_path_replacements(text),
+        )
+    for seed in SIDECAR_STATE_SEED_FILES:
+        write_text(
+            target_root / SIDECAR_STATE_ROOT / seed,
+            (workflow_root / "state" / seed).read_text(encoding="utf-8"),
+        )
+
+
+def render_sidecar(target_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE) -> None:
+    """Render one sidecar profile overlay: allowlisted skills, licenses, and
+    the profile's own single-file units and state.
+
+    Big plan Decisions 2-9 and 19: a private, per-clone overlay projected into
     every write root, self-contained (no bootstrap-only reference survives),
     and carrying its vendored MIT notices.
     """
-    bridge_body = (REPO_ROOT / "shared" / "sidecar" / "bridge.md").read_text(
-        encoding="utf-8"
-    )
+    if profile not in SIDECAR_PROFILES:
+        raise ValueError(f"unknown sidecar profile: {profile!r}")
+    # SIDECAR_SKILLS is read directly (not through SIDECAR_PROFILE_SKILLS) for
+    # the "skills" branch so a test that monkeypatches it in place still
+    # reaches this call, matching the same precaution
+    # runtime_ownership.sidecar_source_exact_allowlist documents and takes.
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
     for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-        for skill in SIDECAR_SKILLS:
+        for skill in skills:
             destination = target_root / write_root / skill
             copy_tree(REPO_ROOT / "shared" / "skills" / skill, destination)
             skill_file = destination / "SKILL.md"
             text = skill_file.read_text(encoding="utf-8")
             for old, new in SIDECAR_TEXT_REPLACEMENTS:
                 text = text.replace(old, new)
+            if profile != "skills":
+                # A skill example may name a full-install state path; the
+                # workflow profile keeps its state under one namespace.
+                text = apply_sidecar_workflow_path_replacements(text)
             skill_file.write_text(text, encoding="utf-8")
             if skill in {"ponytail", "ponytail-review"}:
                 copy_file(
                     REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE",
                     destination / "LICENSE",
                 )
+    if profile != "skills":
+        render_sidecar_workflow_units(target_root)
+        return
+    bridge_body = (REPO_ROOT / "shared" / "sidecar" / "bridge.md").read_text(
+        encoding="utf-8"
+    )
     for bridge_path, frontmatter in SIDECAR_BRIDGES.items():
         rendered = (
             f"---\n{frontmatter}\n---\n\n{bridge_body}" if frontmatter else bridge_body
@@ -1805,7 +1969,11 @@ def generate(targets: list[str], output_root: Path) -> None:
         if target == "multi-agent":
             render_multi_agent(target_root)
         elif target == "sidecar":
-            render_sidecar(target_root)
+            # Every sidecar profile renders side by side under one root:
+            # dist/sidecar/skills/ and dist/sidecar/workflow/ (small plan
+            # Phase B step 2; the old dist/sidecar/ root layout is gone).
+            for profile in SIDECAR_PROFILES:
+                render_sidecar(target_root / profile, profile)
         else:
             raise ValueError(f"unknown target: {target}")
         strip_quarantine(target_root)

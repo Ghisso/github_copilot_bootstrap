@@ -48,7 +48,7 @@ from sidecar_test_helpers import (  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 UPDATER = REPO_ROOT / "scripts" / "update_consumers.py"
-SOURCE = REPO_ROOT / "dist" / "sidecar"
+SOURCE = REPO_ROOT / "dist" / "sidecar" / "skills"
 
 
 def _write(path: Path, content: str) -> None:

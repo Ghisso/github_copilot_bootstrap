@@ -54,16 +54,23 @@ The full-install output is `dist/multi-agent/`.
 It includes a trackable `.devcontainer/` GPU sandbox plus the `.claude/` shared basis for skills, instructions, review profiles, canonical agent bodies, prompts, memory, plans, explorations, session logs, quality reports, templates, third-party notices, and hook scripts — `.claude/` is itself a nested git repository (branch `ai-state`; see "Git-Backed State Sync" below). Native files outside `.claude/` are thin adapters or runtime config for GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity. `.vscode/tasks.json` provides VS Code-native AI state sync that works independently of any AI tool session.
 
 A second generated target, `dist/sidecar/`, sits beside `dist/multi-agent/`.
-It renders the fixed, four-skill sidecar profile from `scripts/runtime_ownership.py`'s
-`SIDECAR_SKILLS`, plus the two client bridges, with the bootstrap's own
-remaining self-references rewritten so a sidecar file never names a path the
-sidecar does not install. `scripts/install_bootstrap.py --mode sidecar`
-copies from this target instead of `dist/multi-agent/`, into a repository
-whose agent harness a team, not this bootstrap, owns. See [README.md's
+It renders one tree per sidecar profile — `dist/sidecar/skills/`, the
+fixed, four-skill profile from `scripts/runtime_ownership.py`'s
+`SIDECAR_SKILLS` plus the two client bridges, and `dist/sidecar/workflow/`,
+which adds every eligible public skill, the orchestrator/planner/coder/
+reviewer/documenter agents, a relaxed rule set, review profiles, templates,
+and a namespaced state-folder seed — with the bootstrap's own remaining
+self-references rewritten so a sidecar file never names a path the sidecar
+does not install. `scripts/install_bootstrap.py --mode sidecar --profile
+{skills,workflow}` copies from the matching tree instead of
+`dist/multi-agent/`, into a repository whose agent harness a team, not this
+bootstrap, owns; the workflow profile ships no hook, no `settings.json`, and
+no receipt-driven lifecycle, only a rule set that describes a relaxed loop
+the agents follow without any gate enforcing it. See [README.md's
 Personal Sidecar Install](../README.md#personal-sidecar-install) and
 [docs/target-mapping.md's Sidecar
-Overlay](target-mapping.md#sidecar-overlay) for what it installs and how it
-updates, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
+Overlay](target-mapping.md#sidecar-overlay) for what each profile installs
+and how it updates, and [docs/sidecar-provider-contract.md](sidecar-provider-contract.md)
 for the per-client evidence behind it.
 
 `dist/sidecar/` is not merely internally consistent — it must be exact.

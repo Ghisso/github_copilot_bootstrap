@@ -29,7 +29,9 @@ from runtime_ownership import (
     FULL_INSTALL_ROOT_PATHS,
     GIT_REPO_LOCAL_ENV_VARS,
     RESTORABLE_ROOT_PATHS,
+    SIDECAR_DEFAULT_PROFILE,
     SIDECAR_PRESERVED_NAME,
+    SIDECAR_PROFILES,
     STATE_DIR_OWNED_README_PATHS,
     active_ignore_patterns,
     bootstrap_root_paths,
@@ -45,8 +47,10 @@ from sidecar_overlay import (
     _c_locale_env,
     _read_index_entries,
     _report_preserved_folder_if_nonempty,
+    backup_sidecar_state,
     git_path,
     install_sidecar,
+    read_sidecar_profile,
     rev_parse,
     sidecar_evidence,
     uninstall_sidecar,
@@ -55,8 +59,17 @@ from sidecar_overlay import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = REPO_ROOT / "dist" / "multi-agent"
-DEFAULT_SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar"
 InstallMode = Literal["full", "sidecar"]
+
+
+def default_sidecar_source(profile: str) -> Path:
+    """Return the default sidecar source tree for ``profile`` (Decision 1):
+    ``dist/sidecar/<profile>/``. Replaces the old constant
+    ``DEFAULT_SIDECAR_SOURCE`` (a single ``dist/sidecar/`` path), since the
+    default now depends on which profile a run installs."""
+    return REPO_ROOT / "dist" / "sidecar" / profile
+
+
 IGNORE_BLOCK_START = "# BEGIN multi-agent bootstrap generated/private AI content"
 IGNORE_BLOCK_END = "# END multi-agent bootstrap generated/private AI content"
 LEGACY_ANTIGRAVITY_KEY = "BOOTSTRAP_ANTIGRAVITY_PATH"
@@ -104,8 +117,18 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Generated bootstrap source directory. Defaults to dist/multi-agent "
-        "for a full install or dist/sidecar for a sidecar install, once the mode "
-        "is known.",
+        "for a full install or dist/sidecar/<profile> for a sidecar install, once "
+        "the mode (and profile) is known.",
+    )
+    parser.add_argument(
+        "--profile",
+        choices=SIDECAR_PROFILES,
+        default=None,
+        help="Sidecar profile: 'skills' (today's four skills and two bridges) or "
+        "'workflow' (adds the relaxed workflow: more skills, agents, rules, "
+        "review profiles, templates, and a namespaced state folder). Only "
+        "used in sidecar mode; ignored by --uninstall and full mode. Defaults "
+        "to an existing manifest's own recorded profile, else 'skills'.",
     )
     parser.add_argument(
         "--state-remote",
@@ -147,7 +170,23 @@ def parse_args() -> argparse.Namespace:
         "of deleted, and team or foreign content is never touched. Only valid "
         "for a sidecar target (explicit --mode sidecar, or no --mode when "
         "detection finds sidecar evidence); refused with --mode full or full "
-        "evidence.",
+        "evidence. The namespaced state folder (.claude/ai-bootstrap) is kept "
+        "and hidden by default; pass --purge-state to remove it too.",
+    )
+    parser.add_argument(
+        "--purge-state",
+        action="store_true",
+        help="With --uninstall, move the namespaced state folder "
+        "(.claude/ai-bootstrap) into the preserved-copy folder and stop "
+        "hiding it, instead of the default: kept in place, still hidden. "
+        "Ignored without --uninstall.",
+    )
+    parser.add_argument(
+        "--backup-state",
+        action="store_true",
+        help="Copy the namespaced state folder (.claude/ai-bootstrap) into "
+        "the preserved-copy folder and change nothing else: a standalone "
+        "action, taking priority over --uninstall and every install option.",
     )
     return parser.parse_args()
 
@@ -1500,7 +1539,11 @@ def warn_full_only_options_ignored(
     ``--uninstall`` never reads it either, so it is named. ``--allow-self``
     still changes ``--uninstall``'s own full-evidence check (Decision 18),
     so it is only named for a sidecar install, never for ``--uninstall``.
-    ``--dry-run`` works normally in both and is never named.
+    ``--dry-run`` works normally in both and is never named. ``--profile``
+    is never read by ``--uninstall`` (it removes every profile's units
+    regardless), so it is named there; a sidecar install reads it, so it is
+    never named there. ``--purge-state`` is only read by ``--uninstall``, so
+    it is named for a plain sidecar install.
     """
     ignored: list[str] = []
     if uninstall and args.source is not None:
@@ -1517,6 +1560,10 @@ def warn_full_only_options_ignored(
         ignored.append("--local-only")
     if not uninstall and args.allow_self:
         ignored.append("--allow-self")
+    if uninstall and args.profile is not None:
+        ignored.append("--profile")
+    if not uninstall and args.purge_state:
+        ignored.append("--purge-state")
     if ignored:
         action = "--uninstall" if uninstall else "sidecar install"
         warn(f"{action} ignores full-only option(s): " + ", ".join(ignored))
@@ -1559,13 +1606,38 @@ def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
             _report_preserved_folder_if_nonempty(preserved_root)
         info("no sidecar found; nothing to do")
         return 0
-    return uninstall_sidecar(target, dry_run=args.dry_run)
+    return uninstall_sidecar(target, dry_run=args.dry_run, purge_state=args.purge_state)
+
+
+def _run_backup_state(target: Path, dry_run: bool) -> int:
+    """``--backup-state``: a standalone action, independent of install and
+    uninstall (Decision 3; the small plan's step 6). ``--dry-run`` reports
+    the copy without making it, like every other action here."""
+    if not target.is_dir():
+        raise SystemExit(f"Refusing --backup-state: {target} is not a directory.")
+    try:
+        return backup_sidecar_state(target, dry_run=dry_run)
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr or ""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", "replace")
+        if "not a git repository" in stderr:
+            raise SystemExit(
+                f"Refusing --backup-state: {target} is not a Git repository."
+            ) from exc
+        raise
 
 
 def main() -> int:
     scrub_inherited_git_environment()
     args = parse_args()
     target = args.target_repo.expanduser().resolve()
+
+    # --backup-state is a standalone action (Decision 3): it takes priority
+    # over --uninstall and every install option, and needs no mode detection
+    # at all -- it only ever touches the namespaced state folder.
+    if args.backup_state:
+        return _run_backup_state(target, args.dry_run)
 
     try:
         if args.uninstall:
@@ -1577,12 +1649,25 @@ def main() -> int:
         raise SystemExit(
             "git not found on PATH: install Git or add it to PATH, then rerun."
         ) from exc
+
     source_is_explicit = args.source is not None
-    source = (
-        args.source.expanduser().resolve()
-        if source_is_explicit
-        else (DEFAULT_SOURCE if mode == "full" else DEFAULT_SIDECAR_SOURCE)
-    )
+    if mode == "sidecar":
+        profile = (
+            args.profile or read_sidecar_profile(target) or SIDECAR_DEFAULT_PROFILE
+        )
+        source = (
+            args.source.expanduser().resolve()
+            if source_is_explicit
+            else default_sidecar_source(profile)
+        )
+    else:
+        if args.profile is not None:
+            warn("full install ignores --profile")
+        if args.purge_state:
+            warn("full install ignores --purge-state")
+        source = (
+            args.source.expanduser().resolve() if source_is_explicit else DEFAULT_SOURCE
+        )
     require_source_exists(source, explicit=source_is_explicit)
 
     if mode == "sidecar":
@@ -1590,7 +1675,7 @@ def main() -> int:
             source, target, allow_self=False, suggest_allow_self=False
         )
         warn_full_only_options_ignored(args)
-        return install_sidecar(target, source, dry_run=args.dry_run)
+        return install_sidecar(target, source, dry_run=args.dry_run, profile=profile)
 
     state_remote = args.state_remote or os.environ.get("AI_STATE_REMOTE")
     validate_install_roots(source, target, args.allow_self)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -9,7 +10,7 @@ import subprocess
 import sys
 import tomllib
 from copy import deepcopy
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
@@ -23,6 +24,8 @@ import generate_targets as target_generator  # noqa: E402
 from generate_targets import (  # noqa: E402
     CODEX_AGENT_INSTRUCTIONS_DELIMITER,
     OPENWIKI_BEGIN_MATCHER,
+    claude_agent_frontmatter,
+    sidecar_agent_frontmatter,
     load_shared_agents,
     parse_policy,
     render_claude_rule_adapter,
@@ -34,14 +37,27 @@ from generate_targets import (  # noqa: E402
     render_antigravity,
     render_github_instruction_adapter,
     render_root_guidance,
+    render_sidecar,
     shared_agents,
     shared_policies,
     transform_agent_text,
     transform_target_paths,
 )
+from runtime_ownership import (  # noqa: E402
+    SIDECAR_PROFILE_SKILLS,
+    SIDECAR_PROFILES,
+    SIDECAR_STATE_ROOT,
+    SIDECAR_STATE_SEED_FILES,
+    SIDECAR_WORKFLOW_AGENTS,
+    SIDECAR_WORKFLOW_REVIEW_PROFILES,
+    SIDECAR_WORKFLOW_RULES,
+    SIDECAR_WORKFLOW_TEMPLATES,
+    sidecar_source_exact_allowlist,
+)
 from validate_targets import (  # noqa: E402
     CODEX_CODER_ESCALATION,
     compare_dirs,
+    dirs_match,
     CODEX_ESCALATION_CHAIN,
     CODEX_AGENT_MODEL_INTENTS,
     CODEX_ROLE_MODEL_INTENTS,
@@ -72,6 +88,10 @@ from validate_targets import (  # noqa: E402
     readme_agent_contract_errors,
     reviewer_diff_evidence_contract_errors,
     root_guidance_errors,
+    sidecar_allowed_relative_path,
+    sidecar_forbidden_text_tokens,
+    sidecar_target_errors,
+    sidecar_text_errors,
     tool_routing_recommendation_errors,
     documenter_humanize_errors,
     execution_defaults_policy_errors,
@@ -2940,3 +2960,336 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
     assert skill_path.is_file()
     frontmatter = skill_path.read_text(encoding="utf-8")
     assert "\nvisibility: public" in f"\n{frontmatter}"
+
+
+# --- Sidecar workflow profile (small plan Phase B steps 2-3) ---------------
+
+# Captured by hashing dist/sidecar/ produced by this repository's own
+# render_sidecar(target_root) -- the single-profile signature, immediately
+# before it gained a `profile` parameter and the `dist/sidecar/skills/` vs.
+# `dist/sidecar/workflow/` split. Acceptance Criteria: "dist/sidecar/skills/
+# equals today's dist/sidecar/ byte for byte."
+SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
+    "05eace56227ab6b0cc9678c2b34b06403be9b302a61aa16fbd1ce687a0d27396"
+)
+
+
+def _sha256_manifest_hash(root: Path) -> str:
+    """Hash every file under `root` by relative path and content, so the
+    digest changes if any file's path or bytes change."""
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def test_sidecar_skills_profile_output_matches_pre_workflow_profile_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Guard: render_sidecar's "skills" branch must still produce the exact
+    bytes today's single-profile render_sidecar(target_root) produced."""
+    render_sidecar(tmp_path, "skills")
+    assert _sha256_manifest_hash(tmp_path) == SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256
+
+
+def test_sidecar_workflow_skill_set_equals_public_skills_minus_the_denylist() -> None:
+    """Guard: SIDECAR_WORKFLOW_SKILLS (frozen in runtime_ownership.py) must
+    stay exactly the public skills minus shared/sidecar/workflow/skills.txt
+    (big plan Decision 8)."""
+    denylist_path = REPO_ROOT / "shared" / "sidecar" / "workflow" / "skills.txt"
+    denylist = {
+        line.split(":", 1)[0].strip()
+        for line in denylist_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+    public_skills = set()
+    for skill_dir in (REPO_ROOT / "shared" / "skills").iterdir():
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        if re.search(
+            r"^visibility:\s*public\s*$",
+            skill_md.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        ):
+            public_skills.add(skill_dir.name)
+    expected = sorted(public_skills - denylist)
+    assert list(SIDECAR_PROFILE_SKILLS["workflow"]) == expected
+
+
+def test_render_sidecar_workflow_profile_ships_every_frozen_unit(
+    tmp_path: Path,
+) -> None:
+    """New behavior: before this change, `render_sidecar` took only one
+    argument, so `render_sidecar(tmp_path, "workflow")` raised
+    `TypeError: render_sidecar() takes 1 positional argument but 2 were
+    given` -- the failing-first evidence for every test below that passes a
+    profile to `render_sidecar`. Checks every frozen unit is present; it does
+    not assert no other file exists, because several shipped skills carry
+    files beyond SKILL.md/LICENSE that the frozen
+    sidecar_source_exact_allowlist() does not yet list (reported, not fixed
+    here; see the coder's handback report)."""
+    render_sidecar(tmp_path, "workflow")
+    present = {
+        path.relative_to(tmp_path).as_posix()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+    expected = sidecar_source_exact_allowlist("workflow")
+    missing = expected - present
+    assert not missing, f"missing workflow units: {sorted(missing)}"
+
+
+def test_render_sidecar_workflow_profile_ships_no_copilot_or_codex_agent_units(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the workflow profile's agent write root is Claude
+    Code's `.claude/agents/` only (Decision 7: Codex discovery unverified;
+    Copilot agents dropped until a native run exists)."""
+    render_sidecar(tmp_path, "workflow")
+    assert not (tmp_path / ".github" / "agents").exists()
+    assert not (tmp_path / ".codex" / "agents").exists()
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        assert (tmp_path / ".claude" / "agents" / f"{agent_id}.md").is_file()
+
+
+def test_render_sidecar_workflow_agents_reuse_the_full_installs_claude_frontmatter(
+    tmp_path: Path,
+) -> None:
+    """New behavior: each workflow agent's frontmatter must be exactly
+    `sidecar_agent_frontmatter(agent)`: the full install's
+    `claude_agent_frontmatter` minus every `mcp__*` tool grant, because the
+    sidecar ships no MCP configuration (Decision 6 and the `mcp__` token)."""
+    render_sidecar(tmp_path, "workflow")
+    agents_by_id = {agent["id"]: agent for agent, _dir in shared_agents("claude-code")}
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        text = (tmp_path / ".claude" / "agents" / f"{agent_id}.md").read_text(
+            encoding="utf-8"
+        )
+        expected_frontmatter = "\n".join(
+            sidecar_agent_frontmatter(agents_by_id[agent_id])
+        )
+        assert text.startswith(expected_frontmatter + "\n\n")
+        assert "mcp__" not in expected_frontmatter
+        full_frontmatter = "\n".join(claude_agent_frontmatter(agents_by_id[agent_id]))
+        assert "mcp__" in full_frontmatter, "the full install still grants MCP tools"
+
+
+def test_render_sidecar_workflow_agents_use_the_workflow_prompt_not_the_canonical_one(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the body must come from workflow-prompt.md, never
+    prompt.md (Decision 6)."""
+    render_sidecar(tmp_path, "workflow")
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        agent_dir = REPO_ROOT / "shared" / "agents" / agent_id
+        canonical_body = (agent_dir / "prompt.md").read_text(encoding="utf-8")
+        workflow_body = (agent_dir / "workflow-prompt.md").read_text(encoding="utf-8")
+        rendered = (tmp_path / ".claude" / "agents" / f"{agent_id}.md").read_text(
+            encoding="utf-8"
+        )
+        assert workflow_body.strip() in rendered
+        assert canonical_body.strip() not in rendered
+
+
+def test_render_sidecar_workflow_rules_and_instructions_are_self_contained(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the profile's own authored rules and Copilot
+    instructions file (authored fresh for this profile under
+    shared/sidecar/workflow/) carry the frontmatter Decision 5 requires and
+    zero forbidden-token references."""
+    render_sidecar(tmp_path, "workflow")
+    for rule in SIDECAR_WORKFLOW_RULES:
+        text = (tmp_path / ".claude" / "rules" / f"ai-bootstrap-{rule}.md").read_text(
+            encoding="utf-8"
+        )
+        assert not text.startswith("---\n")
+        assert sidecar_text_errors(PurePosixPath("rule"), text, "workflow") == []
+    instructions_text = (
+        tmp_path / ".github" / "instructions" / "ai-bootstrap-workflow.instructions.md"
+    ).read_text(encoding="utf-8")
+    assert instructions_text.startswith('---\napplyTo: "**"\n---\n\n')
+    assert (
+        sidecar_text_errors(
+            PurePosixPath("instructions"), instructions_text, "workflow"
+        )
+        == []
+    )
+
+
+def test_render_sidecar_workflow_agent_bodies_are_self_contained(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the body of each shipped agent (workflow-prompt.md,
+    excluding the reused full-install frontmatter, which legitimately grants
+    `mcp__` tools -- see the coder's handback report) carries zero
+    forbidden-token references."""
+    render_sidecar(tmp_path, "workflow")
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        body = (
+            REPO_ROOT / "shared" / "agents" / agent_id / "workflow-prompt.md"
+        ).read_text(encoding="utf-8")
+        assert sidecar_text_errors(PurePosixPath("agent"), body, "workflow") == []
+
+
+def test_render_sidecar_workflow_review_profiles_and_templates_are_shipped(
+    tmp_path: Path,
+) -> None:
+    """New behavior: the ten review profiles and the four templates all
+    render; the two relaxed templates come from
+    shared/sidecar/workflow/templates/, not shared/templates/."""
+    render_sidecar(tmp_path, "workflow")
+    for name in SIDECAR_WORKFLOW_REVIEW_PROFILES:
+        assert (tmp_path / ".claude" / "review-profiles" / f"{name}.md").is_file()
+    for template_name in SIDECAR_WORKFLOW_TEMPLATES:
+        assert (tmp_path / ".claude" / "templates" / template_name).is_file()
+    session_log = (tmp_path / ".claude" / "templates" / "session-log.md").read_text(
+        encoding="utf-8"
+    )
+    canonical_session_log = (
+        REPO_ROOT / "shared" / "templates" / "session-log.md"
+    ).read_text(encoding="utf-8")
+    relaxed_session_log = (
+        REPO_ROOT / "shared" / "sidecar" / "workflow" / "templates" / "session-log.md"
+    ).read_text(encoding="utf-8")
+    assert session_log == relaxed_session_log
+    assert session_log != canonical_session_log
+
+
+def test_apply_sidecar_workflow_path_replacements_rewrites_the_five_state_paths() -> (
+    None
+):
+    """New behavior: the review profiles' and the two plan templates' own
+    text rewrite (Decision 2) turns each full-install state path into its
+    namespaced equivalent."""
+    text = (
+        "See .claude/plans/, .claude/session_logs/, .claude/quality_reports/, "
+        ".claude/MEMORY.md, and .claude/explorations/."
+    )
+    rewritten = target_generator.apply_sidecar_workflow_path_replacements(text)
+    assert rewritten == (
+        "See .claude/ai-bootstrap/plans/, .claude/ai-bootstrap/session_logs/, "
+        ".claude/ai-bootstrap/quality_reports/, .claude/ai-bootstrap/MEMORY.md, "
+        "and .claude/ai-bootstrap/explorations/."
+    )
+
+
+def test_render_sidecar_workflow_state_seeds_are_present(tmp_path: Path) -> None:
+    """New behavior: every state seed is copied under the one namespaced
+    state root, unmodified (Decision 2-3: seeded once by the installer,
+    never compared here)."""
+    render_sidecar(tmp_path, "workflow")
+    for seed in SIDECAR_STATE_SEED_FILES:
+        seed_path = tmp_path / SIDECAR_STATE_ROOT / seed
+        assert seed_path.is_file()
+        source_path = REPO_ROOT / "shared" / "sidecar" / "workflow" / "state" / seed
+        assert seed_path.read_text(encoding="utf-8") == source_path.read_text(
+            encoding="utf-8"
+        )
+
+
+def test_sidecar_generation_is_deterministic_for_both_profiles(tmp_path: Path) -> None:
+    """New behavior: rendering the same profile twice produces byte-identical
+    trees (a crash-convergence/idempotence precondition)."""
+    for profile in SIDECAR_PROFILES:
+        first = tmp_path / f"{profile}-1"
+        second = tmp_path / f"{profile}-2"
+        render_sidecar(first, profile)
+        render_sidecar(second, profile)
+        assert dirs_match(first, second)
+
+
+def test_sidecar_allowed_relative_path_differs_by_profile() -> None:
+    """New behavior: a workflow-only unit is disallowed for the skills
+    profile, a shared skill is allowed for both, and a rule missing the
+    ai-bootstrap- prefix is disallowed for workflow."""
+    workflow_agent = PurePosixPath(".claude/agents/coder.md")
+    assert sidecar_allowed_relative_path(workflow_agent, "workflow")
+    assert not sidecar_allowed_relative_path(workflow_agent, "skills")
+
+    shared_skill = PurePosixPath(".claude/skills/debug-investigator/SKILL.md")
+    assert sidecar_allowed_relative_path(shared_skill, "skills")
+    assert sidecar_allowed_relative_path(shared_skill, "workflow")
+
+    rule_without_prefix = PurePosixPath(".claude/rules/workflow.md")
+    assert not sidecar_allowed_relative_path(rule_without_prefix, "workflow")
+
+
+def test_sidecar_forbidden_text_tokens_differ_by_profile() -> None:
+    """New behavior: MEMORY.md and .claude/review-profiles/ are legitimate,
+    profile-shipped references for workflow (Decision 2, 9) but stay
+    forbidden for skills; the tokens Decision 11 adds for workflow stay out
+    of the skills list; every other token both profiles still forbid."""
+    skills_tokens = sidecar_forbidden_text_tokens("skills")
+    workflow_tokens = sidecar_forbidden_text_tokens("workflow")
+    assert "MEMORY.md" in skills_tokens
+    assert "MEMORY.md" not in workflow_tokens
+    assert ".claude/review-profiles/" in skills_tokens
+    assert ".claude/review-profiles/" not in workflow_tokens
+    for token in ("settings.json", "core.hooksPath", "ai-state", "state-sync"):
+        assert token in workflow_tokens
+        assert token not in skills_tokens
+    for token in (".claude/instructions/", "verify.py", "mcp__", "openwiki"):
+        assert token in skills_tokens
+        assert token in workflow_tokens
+
+
+def test_sidecar_target_errors_rejects_a_workflow_rule_without_the_prefix(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: a rule file without the
+    ai-bootstrap- prefix): a stray copy under the profile's own bootstrap-
+    only-free name must be rejected as a disallowed path."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "rules" / "workflow.md").write_text(
+        "stray\n", encoding="utf-8"
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "disallowed path" in error and "workflow.md" in error for error in errors
+    )
+
+
+def test_sidecar_target_errors_rejects_a_missing_workflow_unit(tmp_path: Path) -> None:
+    """New behavior (adversarial case: a missing unit): deleting a shipped
+    review profile must be rejected as incomplete."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "review-profiles" / "tests.md").unlink()
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "incomplete" in error and "missing" in error and "tests.md" in error
+        for error in errors
+    )
+
+
+def test_sidecar_target_errors_rejects_an_extra_workflow_unit(tmp_path: Path) -> None:
+    """New behavior (adversarial case: an extra unit): a 6th agent file not
+    among SIDECAR_WORKFLOW_AGENTS must be rejected as disallowed and
+    unexpected."""
+    render_sidecar(tmp_path, "workflow")
+    (tmp_path / ".claude" / "agents" / "extra.md").write_text(
+        "stray\n", encoding="utf-8"
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any("disallowed path" in error and "extra.md" in error for error in errors)
+
+
+def test_sidecar_target_errors_rejects_an_agent_naming_verify_py(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: an agent text naming a receipt or
+    verify.py): a forbidden-token leak in an agent file must be rejected."""
+    render_sidecar(tmp_path, "workflow")
+    agent_path = tmp_path / ".claude" / "agents" / "coder.md"
+    agent_path.write_text(
+        agent_path.read_text(encoding="utf-8")
+        + "\nRun `uv run python .claude/scripts/verify.py`.\n",
+        encoding="utf-8",
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any("still references" in error for error in errors)

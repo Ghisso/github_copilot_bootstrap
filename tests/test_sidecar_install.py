@@ -58,7 +58,7 @@ from sidecar_test_helpers import (  # noqa: E402
 )
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
-SOURCE = REPO_ROOT / "dist" / "sidecar"
+SOURCE = REPO_ROOT / "dist" / "sidecar" / "skills"
 BAD_SOURCE = REPO_ROOT / "dist" / "multi-agent"
 
 
@@ -3769,11 +3769,11 @@ def test_source_with_only_claude_folder_is_refused(
 
 
 def test_source_with_an_extra_file_is_refused(team_repo: Path, tmp_path: Path) -> None:
+    """A file outside every shipped skill folder is refused; a file inside a
+    shipped skill folder is allowed, because a skill is copied whole."""
     crafted = tmp_path / "crafted-source"
     shutil.copytree(SOURCE, crafted)
-    (crafted / ".claude" / "skills" / "ponytail" / "extra.md").write_text(
-        "stray\n", encoding="utf-8"
-    )
+    (crafted / ".claude" / "extra.md").write_text("stray\n", encoding="utf-8")
 
     exit_code, err = _run_capturing_stderr(team_repo, source=crafted)
 

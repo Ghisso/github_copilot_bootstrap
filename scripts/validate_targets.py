@@ -31,6 +31,7 @@ from generate_targets import (
     SUPPORTED_AGENT_TARGETS,
     antigravity_hook_command,
     render_antigravity_default_agent_contract,
+    sidecar_agent_frontmatter,
     codex_agent_metadata_header,
     codex_agent_prompt_body,
     shared_agents,
@@ -42,11 +43,19 @@ from runtime_ownership import (
     CONSUMER_STATE_PATHS,
     FULL_INSTALL_ROOT_PATHS,
     SIDECAR_BRIDGES,
+    SIDECAR_DEFAULT_PROFILE,
+    SIDECAR_PROFILE_SKILLS,
+    SIDECAR_PROFILES,
     SIDECAR_SKILL_WRITE_ROOTS,
     SIDECAR_SKILLS,
+    SIDECAR_WORKFLOW_AGENTS,
+    SIDECAR_WORKFLOW_RULES,
     STATE_DIR_OWNED_README_PATHS,
     bootstrap_root_paths,
     render_restore_script,
+)
+from runtime_ownership import (
+    sidecar_source_exact_allowlist as _shared_sidecar_allowlist,
 )
 from runtime_ownership import sidecar_source_violations as _shared_sidecar_violations
 
@@ -8593,10 +8602,10 @@ def validate_antigravity_manifest_and_skills(errors: list[str]) -> None:
     )
 
 
-# Bootstrap-only paths and tool references the sidecar must never mention: a
-# unit the sidecar does not install, or an MCP tool no sidecar hook exposes
-# (big plan, Decision 4; small plan Phase B step 4).
-SIDECAR_FORBIDDEN_TEXT_TOKENS = (
+# Bootstrap-only paths and tool references a sidecar profile must never
+# mention: a unit that profile does not install, or an MCP tool no sidecar
+# hook exposes (big plan, Decision 4 and 11; small plan Phase B steps 1, 3).
+SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS = (
     ".claude/instructions/",
     ".claude/scripts/",
     ".claude/agents/",
@@ -8613,29 +8622,71 @@ SIDECAR_FORBIDDEN_TEXT_TOKENS = (
     "MEMORY.md",
     "openwiki",
 )
+# The workflow profile ships `.claude/review-profiles/` itself, so a shipped
+# agent naming that real, installed path (to tell itself where to find a
+# review profile) is not a leftover full-install reference; dropping the
+# token keeps the check meaningful instead of rejecting correct content.
+# `MEMORY.md` is dropped for the same reason: the profile's own memory file
+# is `.claude/ai-bootstrap/MEMORY.md`. Every other token still names
+# something the profile never ships. Six tokens are added for ceremony this
+# profile deliberately drops (Decision 4) or for the namespaced state paths
+# `.claude/plans/` and `.claude/session_logs/` do not already cover.
+SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS = tuple(
+    token
+    for token in SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS
+    if token not in {"MEMORY.md", ".claude/review-profiles/"}
+) + (
+    "settings.json",
+    "core.hooksPath",
+    "ai-state",
+    "state-sync",
+    ".claude/quality_reports/",
+    ".claude/explorations/",
+)
+SIDECAR_FORBIDDEN_TEXT_TOKENS_BY_PROFILE: dict[str, tuple[str, ...]] = {
+    "skills": SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS,
+    "workflow": SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS,
+}
+# Kept for any external caller of the pre-profile name; identical value.
+SIDECAR_FORBIDDEN_TEXT_TOKENS = SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS
 
 
-def sidecar_allowed_relative_path(relative_path: PurePosixPath) -> bool:
-    """Return whether a sidecar-tree path is one of the units it installs."""
-    parts = relative_path.parts
-    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-        root_parts = PurePosixPath(write_root).parts
-        depth = len(root_parts)
-        if parts[:depth] != root_parts or len(parts) <= depth:
-            continue
-        skill, *remainder = parts[depth:]
-        if skill not in SIDECAR_SKILLS:
-            return False
-        if remainder == ["SKILL.md"]:
-            return True
-        return remainder == ["LICENSE"] and skill in {"ponytail", "ponytail-review"}
-    return str(relative_path) in SIDECAR_BRIDGES
+def sidecar_forbidden_text_tokens(
+    profile: str = SIDECAR_DEFAULT_PROFILE,
+) -> tuple[str, ...]:
+    """Return the forbidden-text-token list for one sidecar profile."""
+    return SIDECAR_FORBIDDEN_TEXT_TOKENS_BY_PROFILE[profile]
 
 
-def sidecar_text_errors(relative_path: PurePosixPath, text: str) -> list[str]:
+def sidecar_allowed_relative_path(
+    relative_path: PurePosixPath, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> bool:
+    """Return whether a sidecar-tree path is one of the units `profile` installs.
+
+    Delegates to the shared exact allowlist (`runtime_ownership`) so this
+    validator and the installer's own `--source` check agree on exactly the
+    same set (Decision 31). A file inside a shipped skill folder is allowed
+    as well, because a skill is copied whole (references, helper scripts).
+    """
+    path = str(relative_path)
+    if path in _shared_sidecar_allowlist(profile):
+        return True
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    return path.startswith(
+        tuple(
+            f"{write_root}/{skill}/"
+            for write_root in SIDECAR_SKILL_WRITE_ROOTS
+            for skill in skills
+        )
+    )
+
+
+def sidecar_text_errors(
+    relative_path: PurePosixPath, text: str, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> list[str]:
     """Reject a leftover bootstrap-only reference in one sidecar file's text."""
     errors: list[str] = []
-    for token in SIDECAR_FORBIDDEN_TEXT_TOKENS:
+    for token in sidecar_forbidden_text_tokens(profile):
         if token in text:
             errors.append(f"{relative_path} still references {token!r}")
     for old, _new in SIDECAR_TEXT_REPLACEMENTS:
@@ -8644,20 +8695,27 @@ def sidecar_text_errors(relative_path: PurePosixPath, text: str) -> list[str]:
     return errors
 
 
-def sidecar_license_errors(target_root: Path) -> list[str]:
+def sidecar_license_errors(
+    target_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> list[str]:
     """Require the vendored MIT notice and the humanize credit at every root."""
     errors: list[str] = []
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
     upstream_license = (
         REPO_ROOT / "shared" / "third_party" / "ponytail" / "LICENSE"
     ).read_bytes()
     for write_root in SIDECAR_SKILL_WRITE_ROOTS:
         for skill in ("ponytail", "ponytail-review"):
+            if skill not in skills:
+                continue
             license_path = target_root / write_root / skill / "LICENSE"
             if (
                 not license_path.is_file()
                 or license_path.read_bytes() != upstream_license
             ):
                 errors.append(f"missing or mismatched sidecar LICENSE: {license_path}")
+        if "humanize" not in skills:
+            continue
         humanize_skill = target_root / write_root / "humanize" / "SKILL.md"
         if humanize_skill.is_file() and SIDECAR_HUMANIZE_CREDIT not in read(
             humanize_skill
@@ -8684,26 +8742,71 @@ def sidecar_bridge_errors(target_root: Path) -> list[str]:
     return errors
 
 
-def sidecar_target_errors(target_root: Path) -> list[str]:
+def sidecar_workflow_unit_frontmatter_errors(target_root: Path) -> list[str]:
+    """Require each workflow single-file unit to carry exactly the
+    frontmatter its client needs (Decision 5: rules carry none, the
+    instructions file carries `applyTo: "**"`; Decision 6: an agent carries
+    the exact frontmatter `claude_agent_frontmatter` builds for it, never a
+    hand-authored variant)."""
+    errors: list[str] = []
+    for rule in SIDECAR_WORKFLOW_RULES:
+        path = target_root / ".claude" / "rules" / f"ai-bootstrap-{rule}.md"
+        if path.is_file() and read(path).startswith("---\n"):
+            errors.append(f"sidecar workflow rule must not carry frontmatter: {path}")
+    instructions_path = (
+        target_root
+        / ".github"
+        / "instructions"
+        / "ai-bootstrap-workflow.instructions.md"
+    )
+    if instructions_path.is_file() and not read(instructions_path).startswith(
+        '---\napplyTo: "**"\n---\n\n'
+    ):
+        errors.append(
+            "sidecar workflow instructions file missing its applyTo frontmatter: "
+            f"{instructions_path}"
+        )
+    agents_by_id = {agent["id"]: agent for agent, _dir in shared_agents("claude-code")}
+    for agent_id in SIDECAR_WORKFLOW_AGENTS:
+        path = target_root / ".claude" / "agents" / f"{agent_id}.md"
+        if not path.is_file():
+            continue
+        expected_frontmatter = "\n".join(
+            sidecar_agent_frontmatter(agents_by_id[agent_id])
+        )
+        if not read(path).startswith(expected_frontmatter + "\n\n"):
+            errors.append(
+                "sidecar workflow agent frontmatter must match the sidecar "
+                f"builder (the full install's minus MCP tool grants): {path}"
+            )
+    return errors
+
+
+def sidecar_target_errors(
+    target_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> list[str]:
     """Return every self-containment and allowlist violation in a sidecar tree."""
     errors: list[str] = []
     present: set[str] = set()
     for path in text_files(target_root):
         relative_path = PurePosixPath(path.relative_to(target_root).as_posix())
         present.add(str(relative_path))
-        if not sidecar_allowed_relative_path(relative_path):
+        if not sidecar_allowed_relative_path(relative_path, profile):
             errors.append(f"sidecar target has a disallowed path: {relative_path}")
             continue
-        errors.extend(sidecar_text_errors(relative_path, read(path)))
+        errors.extend(sidecar_text_errors(relative_path, read(path), profile))
     # Decision 31 (S13, S14, L2): the same completeness/symmetry contract
     # the installer's own --source check runs, so a crafted tree gets the
     # same verdict from both.
     errors.extend(
         f"sidecar target is incomplete: {violation}"
-        for violation in _shared_sidecar_violations(present)
+        for violation in _shared_sidecar_violations(present, profile)
     )
-    errors.extend(sidecar_license_errors(target_root))
-    errors.extend(sidecar_bridge_errors(target_root))
+    errors.extend(sidecar_license_errors(target_root, profile))
+    if profile == "skills":
+        errors.extend(sidecar_bridge_errors(target_root))
+    else:
+        errors.extend(sidecar_workflow_unit_frontmatter_errors(target_root))
     return errors
 
 
@@ -8729,7 +8832,9 @@ def full_install_root_coverage_errors(target_root: Path) -> list[str]:
 
 
 def generate_sidecar_fixture(output_root: Path) -> Path:
-    """Generate a real sidecar tree into a scratch root for self-tests."""
+    """Generate a real sidecar tree (both profiles) into a scratch root for
+    self-tests. Returns the `sidecar` root; each profile lives at
+    `<returned>/<profile>` (Decision 1: every profile renders together)."""
     result = subprocess.run(
         [
             sys.executable,
@@ -8750,147 +8855,243 @@ def generate_sidecar_fixture(output_root: Path) -> Path:
 
 
 def validate_sidecar_target(errors: list[str]) -> None:
-    """Validate the real generated `dist/sidecar/` overlay."""
-    target_root = DIST_ROOT / "sidecar"
-    if not target_root.exists():
+    """Validate the real generated `dist/sidecar/<profile>/` overlays."""
+    sidecar_root = DIST_ROOT / "sidecar"
+    if not sidecar_root.exists():
         errors.append("missing generated target: sidecar")
         return
-    errors.extend(sidecar_target_errors(target_root))
+    for profile in SIDECAR_PROFILES:
+        target_root = sidecar_root / profile
+        if not target_root.exists():
+            errors.append(f"missing generated sidecar profile: {profile}")
+            continue
+        errors.extend(sidecar_target_errors(target_root, profile))
+
+
+def _sidecar_skills_profile_cases(good_root: Path, errors: list[str]) -> None:
+    """Prove the skills profile's self-containment rules reject their own
+    violation (guard: unchanged behavior from before the workflow profile)."""
+    check(
+        not sidecar_target_errors(good_root, "skills"),
+        f"a freshly generated skills sidecar target must pass: "
+        f"{sidecar_target_errors(good_root, 'skills')}",
+        errors,
+    )
+
+    # Inside a shipped skill folder any file is allowed (a skill is copied
+    # whole), so the stray file sits outside every skill folder.
+    stray = good_root / ".claude" / "extra.md"
+    write(stray, "stray file\n")
+    check(
+        any(
+            "disallowed path" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a file outside the sidecar allowlist must be rejected",
+        errors,
+    )
+    stray.unlink()
+
+    skill_md = good_root / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    original_skill = read(skill_md)
+    write(
+        skill_md,
+        original_skill
+        + "\nSee `.claude/instructions/code-standards.instructions.md`.\n",
+    )
+    check(
+        any(
+            "still references" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a leftover bootstrap-only path reference must be rejected",
+        errors,
+    )
+    write(skill_md, original_skill + "\nCall `mcp__semble__search` for this.\n")
+    check(
+        any(
+            "still references" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "an MCP tool reference must be rejected",
+        errors,
+    )
+    write(
+        skill_md,
+        original_skill
+        + "\nthe workflow's final Ponytail diff review remains mandatory.\n",
+    )
+    check(
+        any(
+            "replaced phrase" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a leftover SIDECAR_TEXT_REPLACEMENTS phrase must be rejected",
+        errors,
+    )
+    write(skill_md, original_skill)
+
+    license_path = good_root / ".claude" / "skills" / "ponytail" / "LICENSE"
+    original_license = license_path.read_bytes()
+    license_path.write_bytes(b"not the upstream license\n")
+    check(
+        any("LICENSE" in error for error in sidecar_target_errors(good_root, "skills")),
+        "a mismatched ponytail LICENSE must be rejected",
+        errors,
+    )
+    license_path.unlink()
+    check(
+        any("LICENSE" in error for error in sidecar_target_errors(good_root, "skills")),
+        "a missing ponytail LICENSE must be rejected",
+        errors,
+    )
+    license_path.write_bytes(original_license)
+
+    humanize_md = good_root / ".claude" / "skills" / "humanize" / "SKILL.md"
+    original_humanize = read(humanize_md)
+    write(humanize_md, original_humanize.replace(SIDECAR_HUMANIZE_CREDIT, ""))
+    check(
+        any(
+            "credit line" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a humanize skill missing its credit line must be rejected",
+        errors,
+    )
+    write(humanize_md, original_humanize)
+
+    github_bridge = (
+        good_root / ".github" / "instructions" / "ai-bootstrap-sidecar.instructions.md"
+    )
+    original_github_bridge = read(github_bridge)
+    write(github_bridge, original_github_bridge.split("\n\n", 1)[-1])
+    check(
+        any(
+            "missing its frontmatter" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a Copilot bridge missing its frontmatter must be rejected",
+        errors,
+    )
+    write(github_bridge, original_github_bridge)
+
+    claude_bridge = good_root / ".claude" / "rules" / "ai-bootstrap-sidecar.md"
+    original_claude_bridge = read(claude_bridge)
+    write(claude_bridge, "---\nsomething: true\n---\n\n" + original_claude_bridge)
+    check(
+        any(
+            "must not carry frontmatter" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a Claude bridge that adds frontmatter must be rejected",
+        errors,
+    )
+    write(claude_bridge, original_claude_bridge)
+
+    # Decision 31 (S13, L2): a skill shipped at one write root only is
+    # an incomplete source, not a smaller-but-valid one.
+    agents_ponytail = good_root / ".agents" / "skills" / "ponytail"
+    shutil.rmtree(agents_ponytail)
+    check(
+        any(
+            "incomplete" in error
+            for error in sidecar_target_errors(good_root, "skills")
+        ),
+        "a skill missing from one write root must be rejected as incomplete",
+        errors,
+    )
+    shutil.copytree(good_root / ".claude" / "skills" / "ponytail", agents_ponytail)
+
+    check(
+        not sidecar_target_errors(good_root, "skills"),
+        "sidecar target must be restored to a clean state after every case",
+        errors,
+    )
+
+
+def _sidecar_workflow_profile_cases(good_root: Path, errors: list[str]) -> None:
+    """Prove the workflow profile's self-containment rules reject their own
+    violation: a disallowed path, a leaked forbidden token, a missing unit,
+    an extra unit, a rule file without the `ai-bootstrap-` prefix, and an
+    agent naming a receipt or `verify.py` (small plan Phase B step 3).
+
+    The first assertion holds because the generator rewrites the two
+    `.claude/instructions/` policy paths in every workflow-profile file
+    (skills included), ships the four templates from
+    `shared/sidecar/workflow/templates/`, and because
+    `runtime_ownership.sidecar_source_violations()` allows a shipped skill's
+    files beyond `SKILL.md`/`LICENSE` (`caveman-compress`, `draw-io`,
+    `md-to-pdf`, and `csv-driven-integration-tests` carry such files).
+    """
+    check(
+        not sidecar_target_errors(good_root, "workflow"),
+        f"a freshly generated workflow sidecar target must pass: "
+        f"{sidecar_target_errors(good_root, 'workflow')}",
+        errors,
+    )
+
+    stray = good_root / ".claude" / "agents" / "extra.md"
+    write(stray, "stray file\n")
+    check(
+        any(
+            "disallowed path" in error
+            for error in sidecar_target_errors(good_root, "workflow")
+        ),
+        "a workflow file outside the allowlist (an extra unit) must be rejected",
+        errors,
+    )
+    stray.unlink()
+
+    original_rule = read(good_root / ".claude" / "rules" / "ai-bootstrap-workflow.md")
+    unprefixed_rule = good_root / ".claude" / "rules" / "workflow.md"
+    write(unprefixed_rule, original_rule)
+    check(
+        any(
+            "disallowed path" in error
+            for error in sidecar_target_errors(good_root, "workflow")
+        ),
+        "a rule file without the ai-bootstrap- prefix must be rejected",
+        errors,
+    )
+    unprefixed_rule.unlink()
+
+    agent_path = good_root / ".claude" / "agents" / "coder.md"
+    original_agent = read(agent_path)
+    write(
+        agent_path,
+        original_agent + "\nRun `uv run python .claude/scripts/verify.py`.\n",
+    )
+    check(
+        any(
+            "still references" in error
+            for error in sidecar_target_errors(good_root, "workflow")
+        ),
+        "an agent naming verify.py must be rejected",
+        errors,
+    )
+    write(agent_path, original_agent)
+
+    review_profile_path = good_root / ".claude" / "review-profiles" / "tests.md"
+    original_review_profile = read(review_profile_path)
+    review_profile_path.unlink()
+    check(
+        any(
+            "incomplete" in error and "missing" in error
+            for error in sidecar_target_errors(good_root, "workflow")
+        ),
+        "a missing workflow unit must be rejected as incomplete",
+        errors,
+    )
+    write(review_profile_path, original_review_profile)
 
 
 def validate_sidecar_target_cases(errors: list[str]) -> None:
-    """Prove each sidecar self-containment rule rejects its own violation."""
+    """Prove each sidecar profile's self-containment rules reject their own
+    violation (Decision 1: both profiles render from one fixture)."""
     with tempfile.TemporaryDirectory() as temp_dir_name:
-        good_root = generate_sidecar_fixture(Path(temp_dir_name))
-        check(
-            not sidecar_target_errors(good_root),
-            f"a freshly generated sidecar target must pass: "
-            f"{sidecar_target_errors(good_root)}",
-            errors,
-        )
-
-        stray = good_root / ".claude" / "skills" / "ponytail" / "extra.md"
-        write(stray, "stray file\n")
-        check(
-            any(
-                "disallowed path" in error for error in sidecar_target_errors(good_root)
-            ),
-            "a file outside the sidecar allowlist must be rejected",
-            errors,
-        )
-        stray.unlink()
-
-        skill_md = good_root / ".claude" / "skills" / "ponytail" / "SKILL.md"
-        original_skill = read(skill_md)
-        write(
-            skill_md,
-            original_skill
-            + "\nSee `.claude/instructions/code-standards.instructions.md`.\n",
-        )
-        check(
-            any(
-                "still references" in error
-                for error in sidecar_target_errors(good_root)
-            ),
-            "a leftover bootstrap-only path reference must be rejected",
-            errors,
-        )
-        write(skill_md, original_skill + "\nCall `mcp__semble__search` for this.\n")
-        check(
-            any(
-                "still references" in error
-                for error in sidecar_target_errors(good_root)
-            ),
-            "an MCP tool reference must be rejected",
-            errors,
-        )
-        write(
-            skill_md,
-            original_skill
-            + "\nthe workflow's final Ponytail diff review remains mandatory.\n",
-        )
-        check(
-            any(
-                "replaced phrase" in error for error in sidecar_target_errors(good_root)
-            ),
-            "a leftover SIDECAR_TEXT_REPLACEMENTS phrase must be rejected",
-            errors,
-        )
-        write(skill_md, original_skill)
-
-        license_path = good_root / ".claude" / "skills" / "ponytail" / "LICENSE"
-        original_license = license_path.read_bytes()
-        license_path.write_bytes(b"not the upstream license\n")
-        check(
-            any("LICENSE" in error for error in sidecar_target_errors(good_root)),
-            "a mismatched ponytail LICENSE must be rejected",
-            errors,
-        )
-        license_path.unlink()
-        check(
-            any("LICENSE" in error for error in sidecar_target_errors(good_root)),
-            "a missing ponytail LICENSE must be rejected",
-            errors,
-        )
-        license_path.write_bytes(original_license)
-
-        humanize_md = good_root / ".claude" / "skills" / "humanize" / "SKILL.md"
-        original_humanize = read(humanize_md)
-        write(humanize_md, original_humanize.replace(SIDECAR_HUMANIZE_CREDIT, ""))
-        check(
-            any("credit line" in error for error in sidecar_target_errors(good_root)),
-            "a humanize skill missing its credit line must be rejected",
-            errors,
-        )
-        write(humanize_md, original_humanize)
-
-        github_bridge = (
-            good_root
-            / ".github"
-            / "instructions"
-            / "ai-bootstrap-sidecar.instructions.md"
-        )
-        original_github_bridge = read(github_bridge)
-        write(github_bridge, original_github_bridge.split("\n\n", 1)[-1])
-        check(
-            any(
-                "missing its frontmatter" in error
-                for error in sidecar_target_errors(good_root)
-            ),
-            "a Copilot bridge missing its frontmatter must be rejected",
-            errors,
-        )
-        write(github_bridge, original_github_bridge)
-
-        claude_bridge = good_root / ".claude" / "rules" / "ai-bootstrap-sidecar.md"
-        original_claude_bridge = read(claude_bridge)
-        write(claude_bridge, "---\nsomething: true\n---\n\n" + original_claude_bridge)
-        check(
-            any(
-                "must not carry frontmatter" in error
-                for error in sidecar_target_errors(good_root)
-            ),
-            "a Claude bridge that adds frontmatter must be rejected",
-            errors,
-        )
-        write(claude_bridge, original_claude_bridge)
-
-        # Decision 31 (S13, L2): a skill shipped at one write root only is
-        # an incomplete source, not a smaller-but-valid one.
-        agents_ponytail = good_root / ".agents" / "skills" / "ponytail"
-        shutil.rmtree(agents_ponytail)
-        check(
-            any("incomplete" in error for error in sidecar_target_errors(good_root)),
-            "a skill missing from one write root must be rejected as incomplete",
-            errors,
-        )
-        shutil.copytree(good_root / ".claude" / "skills" / "ponytail", agents_ponytail)
-
-        check(
-            not sidecar_target_errors(good_root),
-            "sidecar target must be restored to a clean state after every case",
-            errors,
-        )
+        sidecar_root = generate_sidecar_fixture(Path(temp_dir_name))
+        _sidecar_skills_profile_cases(sidecar_root / "skills", errors)
+        _sidecar_workflow_profile_cases(sidecar_root / "workflow", errors)
 
 
 def full_install_root_coverage_cases(errors: list[str]) -> None:
