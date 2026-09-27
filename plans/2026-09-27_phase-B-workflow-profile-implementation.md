@@ -89,7 +89,14 @@ only on their own files.
     existing provider adapters; `.claude/rules/ai-bootstrap-*.md`; the
     Copilot instructions file with `applyTo: "**"`; review profiles and
     templates with the path rewrite to `.claude/ai-bootstrap/`; the state
-    seeds.
+    seeds. Agents render from `shared/agents/<id>/workflow-prompt.md`
+    (Decision 6 as amended) with only the client adapter's frontmatter.
+    The templates shipped are `plan-big.md` and `plan-small.md`; the
+    canonical `session-log.md` and `quality-report.md` name the verifier
+    and receipt lines, so either author relaxed variants under
+    `shared/sidecar/workflow/templates/` or leave them unshipped, and
+    state which in the closeout log. Phase A's Copilot result means no
+    `.github/agents` unit ships; `.github/agents` is a read root only.
 
 - [ ] **3. Validator per profile.**
   - **Owner:** `coder`

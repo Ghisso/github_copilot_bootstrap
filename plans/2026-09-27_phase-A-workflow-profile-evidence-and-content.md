@@ -3,8 +3,8 @@ name: 2026-09-27_phase-A-workflow-profile-evidence-and-content
 type: small-plan
 parent_plan: sidecar-workflow-profile
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-27_workflow-profile-phase-A-evidence-and-content.md
 ---
 
 # Small Plan: Phase A — Workflow Profile Evidence and Relaxed Content
@@ -46,7 +46,7 @@ run only past that gate.
 
 ## Steps
 
-- [ ] **1. Documented starting point.**
+- [x] **1. Documented starting point.**
   - **Owner:** `documenter`
   - For Claude Code, Codex, Copilot in VS Code, and Antigravity, cite the
     vendor page and the date checked for: where custom agents are
@@ -58,7 +58,7 @@ run only past that gate.
     `applyTo: "**"` loads; and whether being Git-ignored changes any of
     it. Record each answer at the `documented` or `source` tier.
 
-- [ ] **2. Fixture recipe.**
+- [x] **2. Fixture recipe.**
   - **Owner:** `documenter`
   - A throwaway repository that tracks `.claude/settings.json` (with an
     unrelated setting), `.claude/skills/team-skill/SKILL.md`,
@@ -73,20 +73,20 @@ run only past that gate.
     `git status --porcelain --untracked-files=all` must be empty after
     placement.
 
-- [ ] **3. Native runs.**
+- [x] **3. Native runs.**
   - **Owner:** `orchestrator` (the clients run on the host)
   - For each installed client: does the probe agent appear and answer; do
     both rule tokens appear; does the instructions token appear; does the
     team agent still work. Record client version and date. A client not
     installed is recorded as unverified.
 
-- [ ] **4. Frozen matrix and the gate.**
+- [x] **4. Frozen matrix and the gate.**
   - **Owner:** `documenter`, confirmed by the orchestrator
   - The matrix per client and unit kind (`native-run`, `documented`,
     `unverified`); the frozen write roots, read roots, and client coverage
     in one table that Phase B copies into constants; the gate result.
 
-- [ ] **5. The relaxed workflow rule.**
+- [x] **5. The relaxed workflow rule.**
   - **Owner:** `documenter`
   - `workflow.md`, under 120 lines: read `.claude/ai-bootstrap/MEMORY.md`
     before non-trivial work; for a task spanning several files or
@@ -103,7 +103,7 @@ run only past that gate.
     repository, `verify.py`, `record_findings`, MCP servers, Context Mode,
     or OpenWiki.
 
-- [ ] **6. Reporting and tool-routing rules, and the Copilot body.**
+- [x] **6. Reporting and tool-routing rules, and the Copilot body.**
   - **Owner:** `documenter`
   - `reporting.md`: the plain-language policy from
     `shared/policies/agent-reporting.instructions.md` without hook
@@ -112,7 +112,7 @@ run only past that gate.
     Semble, Context Mode, or OpenWiki. `instructions.md`: the same
     content condensed for the single Copilot instructions file.
 
-- [ ] **7. Agent workflow prompts (Decision 6 as amended 2026-09-27).**
+- [x] **7. Agent workflow prompts (Decision 6 as amended 2026-09-27).**
   - **Owner:** `documenter`
   - One complete `workflow-prompt.md` per shipped agent, self-contained
     and never merged with the canonical prompt: the orchestrator runs the
@@ -127,7 +127,7 @@ run only past that gate.
     was abandoned after two review rounds kept finding dangling
     references.
 
-- [ ] **8. Skill denylist and state seeds.**
+- [x] **8. Skill denylist and state seeds.**
   - **Owner:** `documenter`, checked by the orchestrator
   - Walk every `visibility: public` skill; deny each that needs the full
     install (`commit`, `context-status`, `knowledge-refresh`,
@@ -174,11 +174,11 @@ uv run python .claude/scripts/verify.py fast --format json
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

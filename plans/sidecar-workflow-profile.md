@@ -177,7 +177,7 @@ the templates; the reviewer writes its report under
 
 ## Phases
 
-- [ ] `2026-09-27_phase-A-workflow-profile-evidence-and-content` — record per client, from documentation and native runs against a fixture with a team-tracked `.claude/`, whether ignored agent files, several rules files, and an instructions file load; freeze the profile's write roots, read roots, and client coverage; then author the relaxed instruction set, the agent supplements, the skill denylist, and the state seeds under `shared/sidecar/workflow/`. No code.
+- [x] `2026-09-27_phase-A-workflow-profile-evidence-and-content` — record per client, from documentation and native runs against a fixture with a team-tracked `.claude/`, whether ignored agent files, several rules files, and an instructions file load; freeze the profile's write roots, read roots, and client coverage; then author the relaxed instruction set, the agent supplements, the skill denylist, and the state seeds under `shared/sidecar/workflow/`. No code.
 - [ ] `2026-09-27_phase-B-workflow-profile-implementation` — profile constants, `dist/sidecar/workflow/` rendering with `dist/sidecar/skills/` byte-identical to today, the validator per profile, `--profile` and the manifest field, the new unit kinds and their precedence, the state folder with `--purge-state` and `--backup-state`, profile switching, the updater's reuse, README and docs, the end-to-end scenario test, and a manual run against a clone of a real consumer.
 - [ ] `2026-09-27_phase-C-workflow-profile-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit.
 

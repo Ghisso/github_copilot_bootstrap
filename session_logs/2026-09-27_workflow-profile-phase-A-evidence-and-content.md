@@ -152,19 +152,66 @@ the state seeds under `shared/sidecar/workflow/`.
   `### Decision gate result, 2026-09-27` to the evidence section. The
   MINOR disappears with the rewrite. Rewrite delegated to the same
   `documenter`.
+- Rewrite done: five `workflow-prompt.md` files (46 to 58 lines each),
+  the supplements deleted. Orchestrator token check: 15 authored files
+  clean, 24 eligible skills clean, every `.claude/` path in the allowed
+  set; `validate_targets.py` PASS.
+- REVIEW round 3 (fresh `reviewer`, same three profiles): PASS with one
+  MINOR, the documenter prompt alone did not point at the tool-routing
+  rule; fixed by the orchestrator with one sentence. The reviewer
+  re-derived the eligible set (24) and spot-checked four denylist reasons
+  against the skills' text. Note carried to Phase B's plan: the canonical
+  `session-log.md` and `quality-report.md` templates name the verifier
+  and receipt lines, so Phase B authors relaxed variants or leaves them
+  unshipped.
+
+- Findings persisted with the three reviewed profiles and an empty
+  surviving list (the round-3 MINOR was fixed, not accepted).
 
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:architecture] When adapting the canonical agent prompts for a
+  reduced profile, write a complete prompt per role; a supplement that
+  replaces a closed list of sections keeps missing cross-references
+  (skill tiers, reporting pointers, routing tables, quality gates). Added
+  to MEMORY.
+- [LEARN:tooling] The file-protection hook rejects any Bash command whose
+  text names a protected path pattern, even inside a grep regex; put such
+  checks in a script file and run it with a plain command. Added to
+  MEMORY.
+- [LEARN:tooling] An older installed `claude` CLI can refuse the default
+  model while its init event still works; pass `--model` with an older
+  model for a native probe instead of updating the person's install.
+  Added to MEMORY.
 
 ## Verification
 
-(pending)
+- optional 1: PASS — the native client runs of step 3 happened on this
+  host on 2026-09-27: Claude Code 2.1.226 (`claude -p`,
+  `--model claude-haiku-4-5-20251001`) and Codex CLI 0.147.0
+  (`codex exec`); the results are recorded above and in
+  `docs/sidecar-provider-contract.md` under "Workflow profile evidence".
+  Copilot was skipped by the user and recorded `unverified`; Antigravity
+  is not installed and recorded `unverified`.
+
+The required items' summary lines from `verify.py closeout --format text`
+follow.
 
 ## Documentation
 
-(pending)
+`docs/sidecar-provider-contract.md` gained the `## Workflow profile
+evidence` section; the 15 authored files under `shared/sidecar/workflow/`
+and `shared/agents/*/workflow-prompt.md` are the profile's own content.
+README and the other docs change in Phase B, when the profile becomes
+installable. `openwiki/` untouched; Phase C refreshes it.
 
 ## Open Questions / Next Steps
 
-(pending)
+- Next: Phase B (`2026-09-27_phase-B-workflow-profile-implementation`),
+  activated by this phase's commit. Its plan now records: agents render
+  from the complete `workflow-prompt.md` files; `.github/agents` is a read
+  root only; the session-log and quality-report templates need relaxed
+  variants or stay unshipped; denied skills whose only problem is a path
+  or verifier mention may be rescued by a profile text replacement.
+- Copilot agents can be added later by running the recorded fixture
+  against Copilot and filling the matrix rows.

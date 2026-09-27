@@ -1340,3 +1340,20 @@
   `sidecar_overlay.py` range on the same claim stayed stale after the page
   job closed. One scratch script per page, over all cited files, from the
   page's recorded base, catches this in one pass.
+- [LEARN:architecture] When adapting the canonical agent prompts for a
+  reduced profile, write a complete prompt per role instead of a
+  supplement that replaces a closed list of sections. The canonical
+  prompts name full-install files and skills in many places (skill tiers,
+  reporting pointers, routing tables, quality gates), so two review
+  rounds of the supplement approach kept finding dangling references
+  (workflow profile Phase A). A complete prompt is shorter, and one grep
+  over it proves it clean.
+- [LEARN:tooling] The file-protection hook rejects any Bash command whose
+  text names a protected path pattern, even inside a grep regex or a
+  heredoc. Put such checks in a script file under the scratchpad and run
+  it with a plain command.
+- [LEARN:tooling] `claude -p` on an older installed CLI can refuse the
+  default model (`Claude Code 2.1.226 does not support this model`) while
+  the `system`/`init` event still works; pass `--model` with an older
+  model such as `claude-haiku-4-5-20251001` for a native probe instead
+  of updating the person's install.
