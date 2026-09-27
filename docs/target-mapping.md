@@ -97,23 +97,47 @@ uninstall instructions, and
 [docs/sidecar-provider-contract.md](sidecar-provider-contract.md) for the
 native-run evidence behind every row below.
 
+`dist/sidecar/` renders two profile trees, one per `--profile` value:
+`dist/sidecar/skills/` (today's default) and `dist/sidecar/workflow/`.
+`dist/sidecar/skills/` is byte-identical to the pre-profile `dist/sidecar/`
+output. `--profile` selects which tree `install_bootstrap.py` reads from by
+default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
+
 | Projection | Path(s) | Client(s) that read it |
 | --- | --- | --- |
 | Skill write root | `.claude/skills/<skill>/` | Claude Code; Copilot in VS Code (Local agent and Agent Host) |
 | Skill write root | `.agents/skills/<skill>/` | Codex; Copilot in VS Code (Local agent and Agent Host) |
 | Skill read-only check (never written) | `.github/skills/`, `.agent/skills/`, `.codex/skills/` | Scanned only to detect a name collision with team-owned content; the sidecar skips a skill at every write root rather than shadow a skill in one of these folders |
-| Bridge | `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) | Claude Code; also loaded by Copilot's Local agent |
-| Bridge | `.github/instructions/ai-bootstrap-sidecar.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+| Bridge (`skills` profile) | `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) | Claude Code; also loaded by Copilot's Local agent |
+| Bridge (`skills` profile) | `.github/instructions/ai-bootstrap-sidecar.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+| Agent (`workflow` profile) | `.claude/agents/<id>.md` | Claude Code only |
+| Rule (`workflow` profile) | `.claude/rules/ai-bootstrap-*.md` | Claude Code |
+| Instructions (`workflow` profile) | `.github/instructions/ai-bootstrap-workflow.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+| Review profile (`workflow` profile) | `.claude/review-profiles/<name>.md` | Claude Code only |
+| Template (`workflow` profile) | `.claude/templates/plan-big.md`, `plan-small.md` | Claude Code only |
+| State (`workflow` profile) | `.claude/ai-bootstrap/` (`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, `quality_reports/`, each with a README) | Claude Code, Copilot in VS Code, and Codex all read it; it is content, not a discovery mechanism, so every client that opens the file sees it |
 
-The four skills — `debug-investigator`, `humanize`, `ponytail`, and
-`ponytail-review` — are the sidecar's fixed profile. No bridge ships for
-Codex (skill-only by design) or for Google Antigravity (unverified for
-sidecar v1). The manifest, staging folder, preserved-copy folder, pending
+The `skills` profile ships the four skills — `debug-investigator`,
+`humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
+The `workflow` profile ships every eligible public skill (a fixed denylist
+in `scripts/runtime_ownership.py` excludes skills that need the full
+install) plus the agent, rule, instructions, review-profile, template, and
+state rows above. No `.github/agents` or `.codex/agents` file ships in
+either profile: neither Copilot nor Codex has a config-free way to discover
+a custom agent from an ignored file, so those two clients get the workflow
+profile's skills and state folder only, never its agents. No bridge or
+instructions file ships for Codex (skill-only by design) or for Google
+Antigravity (unverified).
+
+The manifest, staging folder, preserved-copy folder, pending
 ownership record, and run lock that track sidecar ownership live inside the
 Git directory (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`,
 `ai-bootstrap-sidecar-preserved/`, `ai-bootstrap-sidecar.json.next`, and
 `ai-bootstrap-sidecar.lock`), never in the worktree, so none of them can be
-tracked. The pending record is written after the ignore proof passes and
+tracked. The manifest is schema version 2 and records `profile`; a
+version-1 manifest (no `profile` field) reads as `skills`.
+
+The pending record is written after the ignore proof passes and
 before any unit moves, and removed once the real manifest lands — extra
 ownership evidence for a rerun after an interrupted run, never an
 instruction on its own. The run lock is held from just after preflight to
@@ -129,6 +153,18 @@ for its naming and recovery, and its [Uninstall
 section](../README.md#personal-sidecar-install) for `--uninstall`, which
 removes the manifest and staging folder but leaves the preserved folder in
 place.
+
+The state unit (`.claude/ai-bootstrap/`, `workflow` profile only) follows
+its own rules, not the ordinary unit rules above: seeded once, from its
+seed files, when the folder is absent; an existing folder only ever gets a
+missing seed file added, never a comparison or an overwrite; kept in place
+and hidden by plain `--uninstall`; moved into the preserved-copy folder and
+un-hidden only by `--uninstall --purge-state`; copied to the preserved-copy
+folder, without uninstalling anything, by the standalone `--backup-state`
+action. See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install), "The state folder", for
+the exact messages each case prints and the `git clean -x` risk it
+mitigates.
 
 See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for how each

@@ -1,11 +1,11 @@
 ---
 type: architecture
 title: Agent roster, prompts, and the skill library
-description: How the bootstrap defines each specialist agent once under shared/agents, renders it into GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity adapters, routes review profiles, and validates the shared skill library.
+description: How the bootstrap defines each specialist agent once under shared/agents, renders it into GitHub Copilot, Claude Code, OpenAI Codex, and Google Antigravity adapters and into the sidecar's workflow profile, routes review profiles, and validates the shared skill library.
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-21T05:37:12.382Z
+    at: 2026-09-27T15:12:48.671Z
 sources:
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
@@ -19,6 +19,8 @@ sources:
     resource: repo://shared/agents/luna_coder/agent.yaml
   - id: openwiki-source-4e810ead2bce9272eff7a8fa
     resource: repo://shared/agents/orchestrator/agent.yaml
+  - id: openwiki-source-869fc2d8dd56f006523bcc67
+    resource: repo://shared/agents/orchestrator/workflow-prompt.md
   - id: openwiki-source-fd43a5fc69056375b46b4386
     resource: repo://shared/agents/reviewer/prompt.md
   - id: openwiki-source-fa7286655feb8d4301c96b64
@@ -33,7 +35,7 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-3f83db488140df5d5a38535a
     resource: repo://shared/templates/skill-template.md
-generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
+generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -55,12 +57,15 @@ flowchart LR
     L --> G[.github/agents/id.agent.md]
     L --> X[.codex/agents/id.toml]
     L --> A[.agents/agents/id/agent.md]
+    W[workflow-prompt.md] --> K[sidecar workflow profile]
+    K --> C
 ```
 
 An agent directory holds two kinds of file:
 
 - `agent.yaml`, which holds JSON metadata despite its name: `id`, `description`, `role_type`, `visibility`, `capabilities`, optional `delegates`, optional `targets`, optional `prompt_base`, and a `model_intent` object.
 - One or more prompt bodies: a canonical `prompt.md`, or a provider supplement named `prompt.openai-codex.md` or `prompt.google-antigravity.md`.
+- For the five canonical agents, a `workflow-prompt.md`: a complete, self-contained relaxed prompt that the sidecar's `workflow` profile ships instead of `prompt.md`. It names no verifier, receipt, checkpoint, or hook, and the target validator checks that with a forbidden-token list. The full install never reads it.
 
 The generator's `load_shared_agents` parses every `agent.yaml`, validates it, requires unique ids, and checks prompt composition before anything renders. That validation is code, not policy: a bad metadata file stops generation.
 
@@ -106,7 +111,8 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 
 ## What each host receives
 
-- **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with `name`, `description`, a `tools` list derived from `capabilities`, and optional `model` and `effort` from `model_intent["claude-code"]`. The body is the canonical prompt with target path rewrites.
+- **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with the frontmatter `claude_agent_frontmatter` builds: `name`, `description`, a `tools` list derived from `capabilities`, optional `model` and `effort` from `model_intent["claude-code"]`, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body is the canonical prompt with target path rewrites.
+- **Sidecar workflow profile.** `render_sidecar_workflow_units` writes the same `.claude/agents/<id>.md` for the five canonical agents into `dist/sidecar/workflow/`, with `sidecar_agent_frontmatter`, which is the Claude Code frontmatter with every `mcp__*` tool grant removed because the sidecar ships no MCP configuration, around the agent's `workflow-prompt.md`. No `.github/agents` or `.codex/agents` file ships in that profile. The [sidecar overlay page](/openwiki/operations/sidecar-overlay.md) covers how those files reach a team-owned repository.
 - **GitHub Copilot.** `render_github_agent_adapter` writes a thin pointer: frontmatter with `name`, `description`, tools, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body tells Copilot to read the canonical `.claude/agents/<name>.md`. An agent not eligible for Claude Code gets a self-contained body instead.
 - **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, a `sandbox_mode` derived from capabilities, and the composed prompt as `developer_instructions`.
 - **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents.

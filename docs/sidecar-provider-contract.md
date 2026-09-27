@@ -598,3 +598,388 @@ One thing changed: the Antigravity bridge does not ship, because Antigravity
 is `unavailable`. The plan already made that bridge conditional ("if
 proven"), so Phases B-D need only a note that the sidecar renders two
 bridges, not three.
+
+## Workflow profile evidence
+
+This section is the evidence record for Phase A of the second sidecar plan,
+`.claude/plans/sidecar-workflow-profile.md`, small plan
+`.claude/plans/2026-09-27_phase-A-workflow-profile-evidence-and-content.md`.
+It answers one further question, for the same four clients, about three new
+unit kinds the workflow profile wants to ship as Git-ignored files inside a
+team-tracked `.claude/`: a custom agent file (Decision 6), several rules
+files at once (Decision 5), and one `applyTo: "**"` instructions file
+(Decision 5). It reuses the evidence tiers defined above. Everything in the
+sections that already exist stays unchanged; this section only adds to them.
+
+### Documented starting point, checked 2026-09-27
+
+| Client | Where a custom agent is discovered | Needs a config entry to discover it? | Do several rules files without `paths`/`applyTo` all load? | Does `applyTo: "**"` load? | Does being Git-ignored change any of this? | Tier | Source |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | `.claude/agents/` (project scope, priority 3 of 5 named locations; discovered by walking up from the working directory) | No. Placing the file is enough; no `settings.json` entry is documented as required for project-scope discovery. | Yes. `.claude/rules/` is scanned recursively for every `.md` file; a rule with no `paths` frontmatter "is loaded at launch with the same priority as `.claude/CLAUDE.md`," with no stated cap on how many such files load. | Not applicable. `applyTo` is a Copilot `.github/instructions/` field; Claude Code reads only `paths` from a rule's frontmatter. | Undocumented for agents and rules specifically. The existing "Documented starting point" section above already found this undocumented for skills too; the earlier native run (Step 4) showed an ignored rule loading, which is evidence, not a documentation claim. | `documented` | `code.claude.com/docs/en/sub-agents`, `code.claude.com/docs/en/memory`, both checked 2026-09-27 |
+| OpenAI Codex | `.codex/agents/<name>.toml`. The agent's `name` field, not the filename, is what Codex uses; only `name`, `description`, and `developer_instructions` are required. | Unresolved by documentation. The page's own worked example ships a `.codex/config.toml` with `[agents]` `max_concurrent_threads_per_session = 6` next to three custom agent `.toml` files, but never states that key is required for the agent files to be recognized — it reads as an optional concurrency limit, not a gate. This repository's own generator (`scripts/generate_targets.py`, `render_codex_config`, lines 989-1048) always writes both `[agents]` and `[features.multi_agent_v2]` unconditionally and comments that this is "the MultiAgent V2 routing shim" kept "until trusted native probes prove removal" — this codebase's own state is that the requirement is still unverified, which matches the silence in the vendor page. | Not applicable. Codex does not read `.claude/rules/` at any documented path. | Not applicable. Codex does not read `.github/instructions/`. | Undocumented; carried over from the existing skills section, not re-tested this cycle. | `documented` for the folder and schema; `source` for the config-entry question (this repository's own generator code, not a vendor claim) | `learn.chatgpt.com/docs/agent-configuration/subagents`, checked 2026-09-27; `scripts/generate_targets.py` lines 989-1048, this repository |
+| GitHub Copilot in VS Code | `.github/agents/` (workspace default). A Claude-format session instead reads `.claude/agents/`, matching Claude Code's own folder. | No stated config entry for the default workspace folder. (`chat.agentFilesLocations` is documented as "deprecated and only used by the Local agent," and only for *extra* locations, not the default one.) | Yes, for a Claude-format session: the same page that documents `.github/instructions` `applyTo` also says "for `.claude/rules` instructions files, use a `paths` property instead of `applyTo`... `paths` accepts an array of glob patterns and defaults to `**` when omitted," so a rules file with no `paths` loads everywhere, the same as Claude Code, and nothing caps how many such files load. | Yes. `applyTo` is documented as "a glob pattern that automatically applies the instructions to matching files, relative to the workspace root. Use `**` to match all files." | Undocumented. | `documented` | `code.visualstudio.com/docs/copilot/customization/custom-agents`, `code.visualstudio.com/docs/copilot/customization/custom-instructions`, both checked 2026-09-27 |
+| Google Antigravity | `.agents/agents/`, per this bootstrap's own generated comment (`scripts/generate_targets.py`, line 1308: "Google Antigravity uses `.agents/agents/`, `.agents/skills/`"). `antigravity.google/docs/agents` returned HTTP 404 today, so no vendor page could be checked for the custom-agent folder; this row is `source`-tier from a local file, not a vendor claim. | Unknown; no vendor page reached. | No, and this is the opposite of Claude Code and Copilot: `antigravity.google/docs/rules` (checked 2026-09-27) states every file in `.agents/rules/` "must start with YAML frontmatter declaring a valid `trigger`," and "if a file... omits frontmatter or specifies an unrecognized `trigger` value... Antigravity silently discards the rule." So a rules file only loads when its frontmatter names a recognized `trigger`, not merely by being present. | Not applicable. Antigravity does not read `.github/instructions/`. | Undocumented for `.agents/rules/`; carried over that Strict mode alone documents respecting `.gitignore`, from the existing skills section above. | `source` for the agent folder (vendor page unreachable); `documented` for the rules-trigger behavior | `antigravity.google/docs/rules`, checked 2026-09-27; agent-folder claim from `scripts/generate_targets.py` line 1308, this repository, not a vendor page |
+
+One vendor claim could not be confirmed: Google Antigravity's dedicated
+custom-agent documentation page could not be reached today
+(`antigravity.google/docs/agents` returned HTTP 404). The `.agents/agents/`
+folder in the table above is this repository's own prior understanding, not
+a vendor-confirmed fact, and stays at the `source` tier until a working page
+is found or a native run shows the folder in use.
+
+### Questions per client
+
+These are the answers for the three new unit kinds, from documentation and
+source code alone, in the style of the existing "Questions Per Client"
+section above. Step 3 (native runs) wins where it differs.
+
+**6. Does a client load a custom agent file that Git ignores through
+`info/exclude`?**
+
+Undocumented for all four clients. No vendor page states an agent-file
+scan skips or includes ignored paths; the existing skills section already
+found the same gap for skill folders, and it stays open here.
+
+**7. Do several rules or instructions files, each hidden by a separate
+`info/exclude` line, all load together, or does only one win?**
+
+- Claude Code: yes for rules — every `.md` file under `.claude/rules/` is
+  scanned, and a file without `paths` loads at `CLAUDE.md` priority; the
+  documentation states no limit on how many such files load at once
+  (`documented`).
+- Copilot in VS Code, Claude-format session: same mechanism, because this
+  session type reads `.claude/rules/` with the same `paths`-defaults-to-`**`
+  rule (`documented`).
+- Copilot in VS Code, Copilot-format session: `.github/instructions/*.instructions.md`
+  files are described as additive within one harness in the existing skills
+  section above; nothing in today's fetch says two `applyTo: "**"` files
+  conflict rather than both firing (`documented` for "additive", not
+  independently re-confirmed for exactly two files this cycle).
+- Codex: not applicable; no bridge or rules mechanism reads
+  `.claude/rules/` or `.github/instructions/`.
+- Antigravity: not applicable in the same way — multiple `.agents/rules/`
+  files with `trigger: always_on` are each independently injected, but a
+  file without a recognized `trigger` is discarded rather than loaded
+  (`documented`).
+
+**8. Does a client's custom-agent schema reject or warn about an extra
+field the bootstrap might ship?**
+
+- Claude Code: undocumented this cycle; the subagent frontmatter fields
+  fetched today (`description`, `tools`, model fields, hook fields) did not
+  include a statement about an unrecognized field.
+- Codex: no. The custom agent file schema names `name`, `description`, and
+  `developer_instructions` as required, and separately allows "other
+  supported `config.toml` keys... such as `model`, `model_reasoning_effort`,
+  `sandbox_mode`, `mcp_servers`, and `skills.config`" — an unsupported key's
+  handling is not stated (`documented` for the allowed-keys list;
+  undocumented for an unsupported one).
+- Copilot in VS Code and Antigravity: not found in today's fetch, carried
+  over as undocumented from the existing skills section's answer to
+  Question 5.
+
+### Fixture recipe
+
+This is a second, separate throwaway repository from the one in "Step 2 —
+the fixture recipe" above. That fixture proves skill and bridge discovery;
+this one proves agent, multi-rule, and instructions discovery, plus the
+Codex config-free case. Keep both fixtures until every native run in the
+next section is complete.
+
+**Run this in your own shell, not through an agent session**, for the same
+reason as the recipe above: this repository's commit-gate hook blocks a
+`git commit` a coding-agent session runs through its own tool calls, even
+in a different, throwaway repository. Save the block to a file and run it
+with `bash`; do not paste it into an interactive shell, because its `set -e`
+and `exit 1` lines would close that shell on the first error.
+
+```bash
+set -euo pipefail
+
+DIR="$HOME/sidecar-workflow-fixture-$(date +%Y%m%d-%H%M%S)"
+if [ -e "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
+  echo "refusing: $DIR already exists and is not empty" >&2
+  exit 1
+fi
+mkdir -p "$DIR" && cd "$DIR" || exit 1
+
+git init -q
+
+TOPLEVEL="$(git rev-parse --show-toplevel)"
+if [ "$(cd "$TOPLEVEL" && pwd -P)" != "$(pwd -P)" ]; then
+  echo "refusing: git toplevel ($TOPLEVEL) does not match \$DIR ($DIR)" >&2
+  exit 1
+fi
+
+# --- team-owned files that will be tracked and committed ----------------------
+mkdir -p .claude/skills/team-skill .claude/agents .claude/rules .github/instructions
+
+cat > .claude/settings.json <<'EOF'
+{
+  "outputStyle": "concise"
+}
+EOF
+
+cat > .claude/skills/team-skill/SKILL.md <<'EOF'
+---
+name: team-skill
+description: Team-owned skill tracked for the workflow-profile fixture.
+---
+If asked to identify yourself, reply exactly: TEAM-SKILL-REPLY
+EOF
+
+cat > .claude/agents/team-agent.md <<'EOF'
+---
+name: team-agent
+description: Team-owned subagent tracked for the workflow-profile fixture. Use it when asked to identify the team agent.
+---
+If invoked, reply exactly: TEAM-AGENT-REPLY
+EOF
+
+cat > .claude/rules/team.md <<'EOF'
+TEAM-RULE-OK
+EOF
+
+cat > .github/instructions/team.instructions.md <<'EOF'
+---
+applyTo: "**"
+---
+TEAM-INSTRUCTIONS-OK
+EOF
+
+mkdir -p src
+cat > src/hello.py <<'EOF'
+def hello() -> str:
+    """Return a fixed greeting for the workflow-profile fixture."""
+    return "hello from the workflow-profile fixture"
+EOF
+
+# --- sidecar-owned files: untracked, must end up Git-ignored -------------------
+mkdir -p .github/agents .codex/agents
+
+cat > .claude/agents/probe-agent.md <<'EOF'
+---
+name: probe-agent
+description: Sidecar probe subagent for the workflow-profile fixture. Use it when asked to identify the probe agent.
+---
+If invoked, reply exactly: WORKFLOW-PROBE-AGENT-OK
+EOF
+
+cat > .claude/rules/ai-bootstrap-a.md <<'EOF'
+WORKFLOW-RULE-A-OK
+EOF
+
+cat > .claude/rules/ai-bootstrap-b.md <<'EOF'
+WORKFLOW-RULE-B-OK
+EOF
+
+cat > .github/agents/probe-agent.agent.md <<'EOF'
+---
+name: probe-agent
+description: Sidecar probe subagent for the workflow-profile fixture. Use it when asked to identify the probe agent.
+---
+If invoked, reply exactly: WORKFLOW-PROBE-AGENT-OK
+EOF
+
+cat > .github/instructions/ai-bootstrap-workflow.instructions.md <<'EOF'
+---
+applyTo: "**"
+---
+WORKFLOW-INSTRUCTIONS-OK
+EOF
+
+cat > .codex/agents/probe-agent.toml <<'EOF'
+name = "probe_agent"
+description = "Sidecar probe subagent for the workflow-profile fixture."
+developer_instructions = "If invoked, reply exactly: WORKFLOW-PROBE-AGENT-OK"
+EOF
+
+# --- hide every sidecar path, and nothing else ---------------------------------
+EXCLUDE_FILE="$(git rev-parse --path-format=absolute --git-path info/exclude)"
+cat >> "$EXCLUDE_FILE" <<'EOF'
+# BEGIN ai-bootstrap sidecar
+/.claude/agents/probe-agent.md
+/.claude/rules/ai-bootstrap-a.md
+/.claude/rules/ai-bootstrap-b.md
+/.github/agents/probe-agent.agent.md
+/.github/instructions/ai-bootstrap-workflow.instructions.md
+/.codex/agents/probe-agent.toml
+# END ai-bootstrap sidecar
+EOF
+
+# --- stage and commit the team files only --------------------------------------
+git add .claude/settings.json .claude/skills/team-skill .claude/agents/team-agent.md \
+        .claude/rules/team.md .github/instructions/team.instructions.md src/hello.py
+git -c user.name=fixture -c user.email=fixture@example.invalid commit -q -m "team fixture"
+
+# --- verify ----------------------------------------------------------------------
+FAILED=0
+for path in \
+  .claude/agents/probe-agent.md \
+  .claude/rules/ai-bootstrap-a.md \
+  .claude/rules/ai-bootstrap-b.md \
+  .github/agents/probe-agent.agent.md \
+  .github/instructions/ai-bootstrap-workflow.instructions.md \
+  .codex/agents/probe-agent.toml
+do
+  if ! git check-ignore -q -- "$path"; then
+    echo "NOT IGNORED: $path" >&2
+    FAILED=1
+  fi
+done
+
+if [ -e .codex/config.toml ]; then
+  echo "NOT EXPECTED: .codex/config.toml exists" >&2
+  FAILED=1
+fi
+
+STATUS="$(git status --porcelain --untracked-files=all)"
+echo "$STATUS"
+if [ -z "$STATUS" ] && [ "$FAILED" -eq 0 ]; then
+  echo "FIXTURE OK"
+else
+  echo "FIXTURE FAILED" >&2
+  exit 1
+fi
+```
+
+After a successful run, `$DIR` holds the fixture repository, with no
+`.codex/config.toml` present anywhere in it, by design: the fixture tests
+whether Codex discovers `.codex/agents/probe-agent.toml` with no config
+file at all. Keep it, next to the skills-profile fixture, until every
+planned native run in the next section is complete.
+
+### Operator checklist
+
+For every client, follow the same conventions as "Step 3 — operator
+checklist" above: use a workspace you trust manually, give explicit
+authorization when a client asks, change no client trust or user setting,
+and store no raw transcript — record only the fields listed below.
+
+For every client, record:
+
+- Whether `probe-agent` is listed as an available agent or subagent, and
+  whether invoking it replies `WORKFLOW-PROBE-AGENT-OK`.
+- Whether both `WORKFLOW-RULE-A-OK` and `WORKFLOW-RULE-B-OK` appear
+  (Claude Code and a Claude-format Copilot session), or whether
+  `WORKFLOW-INSTRUCTIONS-OK` appears (a Copilot-format session).
+- Whether `team-agent` still replies `TEAM-AGENT-REPLY`, `team-skill` still
+  replies `TEAM-SKILL-REPLY`, and `TEAM-RULE-OK` or
+  `TEAM-INSTRUCTIONS-OK` still appears alongside the sidecar markers.
+- The client's version string and today's date.
+
+**Claude Code.** From the fixture root:
+
+```bash
+claude -p "List every subagent you can see, including its source folder, and quote any rule text you have loaded that contains the text WORKFLOW or TEAM." \
+  --output-format stream-json --verbose --no-session-persistence --tools "" --strict-mcp-config
+```
+
+Then, to force an invocation of each named agent directly:
+
+```bash
+claude -p --agent probe-agent "Identify yourself." --output-format stream-json --verbose --no-session-persistence --tools "" --strict-mcp-config
+claude -p --agent team-agent "Identify yourself." --output-format stream-json --verbose --no-session-persistence --tools "" --strict-mcp-config
+```
+
+Read the `system`/`init` event for the listed subagents, and the reply text
+for the marker tokens, the same way Step 4 above reads it for skills.
+
+**OpenAI Codex.** From the fixture root:
+
+```bash
+codex debug prompt-input
+codex exec --json --ephemeral -s read-only "List every custom agent you can see and quote any developer instructions containing the text WORKFLOW or TEAM."
+```
+
+`codex debug prompt-input` prints the model-visible prompt as JSON with no
+model call, which shows whether `probe-agent` and `team-agent` are in the
+agent registry before any reply is trusted. Then, to force an invocation:
+
+```bash
+codex exec --json --ephemeral -s read-only --agent probe_agent "Identify yourself."
+codex exec --json --ephemeral -s read-only --agent team_agent "Identify yourself."
+```
+
+Check the exact current flag name for selecting an agent in the installed
+Codex CLI version's `--help` output before running these, since Codex
+agent-selection flags can change between releases.
+
+**GitHub Copilot in VS Code.**
+
+1. Open the fixture directory as the workspace root.
+2. Open the chat panel, and confirm the session type (Local agent, or
+   Agent Host with the Copilot or Claude harness), the same way Step 3
+   above records it.
+3. Open the Agents dropdown and confirm `probe-agent` and `team-agent`
+   appear; select `probe-agent` and ask it to identify itself; repeat for
+   `team-agent`.
+4. Ask, in the same or a new chat: "Quote any instruction text you have
+   loaded that contains the text WORKFLOW or TEAM."
+5. Use the chat response's **References** panel to see which instruction
+   and agent files were actually sent, the way Step 3 above does for
+   skills.
+6. Record which format the session used (`.github/agents` and
+   `.github/instructions`, or `.claude/agents` and `.claude/rules`), because
+   the documented starting point above found this changes which files load.
+
+**Google Antigravity.** Unavailable on this host: `agy` is not installed
+(carried over from Step 3 above). Record `unavailable` for every workflow
+unit kind unless a run happens on a different machine, in which case follow
+the same `agy --new-project --sandbox` procedure as Step 3 above, once in
+default mode and once in Strict mode, and record the same fields listed at
+the top of this checklist.
+
+### Frozen matrix (native runs, 2026-09-27)
+
+The orchestrator fills this table after running the fixture above against
+each installed client. Until then, every cell reads `pending`.
+
+| Client | Session type | Agent (`probe-agent`) | Rules (`ai-bootstrap-a`/`-b`, or Claude-format Copilot) | Instructions (`ai-bootstrap-workflow`, Copilot-format) | Team unit still works | Client version | Date |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | Print mode (`claude -p`, `--model claude-haiku-4-5-20251001` because 2.1.226 refuses the default model) | `native-run`: the `system`/`init` event lists `probe-agent` beside `team-agent`, and delegation returned the probe token | `native-run`: both ignored rule tokens and the team rule token in one answer | not applicable | `native-run`: team rule and team agent both answered | 2.1.226 | 2026-09-27 |
+| OpenAI Codex | `codex exec --skip-git-repo-check --sandbox read-only`, with and without `-c features.multi_agent_v2=true` | `native-run`, negative: the agent listing answered `NONE` with no `.codex/config.toml`, so `.codex/agents/*.toml` is not discovered config-free | not applicable | not applicable | not applicable (Codex reads only `AGENTS.md`; no instruction token appeared, as expected) | codex-cli 0.147.0 | 2026-09-27 |
+| Copilot in VS Code | Local agent | unverified: the operator could not run Copilot on 2026-09-27 | unverified | not run for the workflow file; the same unit kind (`.github/instructions/*.instructions.md`, `applyTo: "**"`) is `native-run` for the skills-profile bridge in Step 4 above (2026-09-25) | unverified | 1.139.1 host, session not run | 2026-09-27 |
+| Copilot in VS Code | Agent Host, Copilot harness | unverified | not applicable | as above | unverified | not run | 2026-09-27 |
+| Copilot in VS Code | Agent Host, Claude harness | unverified | unverified | not applicable | unverified | not run | 2026-09-27 |
+| Google Antigravity | Default mode | unverified: no client on this host | unverified | not applicable | unverified | not installed | 2026-09-27 |
+| Google Antigravity | Strict mode | unverified: no client on this host | unverified | not applicable | unverified | not installed | 2026-09-27 |
+
+An `unverified` cell is not a support claim. The profile ships a unit kind
+to a client only from a `native-run` cell, so Copilot receives no agent
+file from the workflow profile until this fixture is run against it; the
+Copilot instructions file ships on the 2026-09-25 evidence for its unit
+kind. Rerunning the operator checklist above against Copilot and filling
+these rows is the only step needed to add Copilot agents later.
+
+### Decision gate result, 2026-09-27
+
+The gate passes. Claude Code 2.1.226 loaded both ignored rule files and
+discovered and ran the ignored agent file from a repository whose
+`.claude/` is team-tracked, which is the condition the big plan sets for
+the profile to have a client. The profile therefore ships agents, rules,
+review profiles, templates, skills, and the state folder for Claude Code;
+the instructions file and skills for Copilot in VS Code; and skills and
+the state folder for Codex. Antigravity receives nothing new until a
+native run exists.
+
+**Frozen write roots, read roots, and client coverage** (candidate rows
+from the big plan's Decision 9; each stays a candidate until a native run
+confirms or drops it):
+
+| Write root | Unit kind | Candidate client coverage | Status |
+| --- | --- | --- | --- |
+| `.claude/agents` | agent | Claude Code (`native-run` 2026-09-27); Copilot unverified | frozen write root; joins the read list for collision checks |
+| `.claude/rules` | rules (several files) | Claude Code (`native-run` 2026-09-27); Copilot unverified | frozen write root; joins the read list |
+| `.claude/review-profiles` | single file | not a client-discovery path; read by the agents the profile ships | frozen write root; joins the read list |
+| `.claude/templates` | single file | not a client-discovery path; read by the agents the profile ships | frozen write root; joins the read list |
+| `.github/agents` | agent | none yet: Copilot unverified on 2026-09-27 | not a write root in this profile version; joins the read list so a team agent there still takes the name; add it when the Copilot rows above become `native-run` |
+| `.github/instructions` | instructions | Copilot, on the 2026-09-25 `native-run` for the same unit kind (the skills-profile bridge) | frozen write root (existing bridge parent); ships the workflow instructions file |
+| `.codex/agents` | agent | none | dropped: Codex 0.147.0 discovers no `.codex/agents/*.toml` without a `.codex/config.toml` entry, and the sidecar never writes a file the team may track (Decision 7); Codex gets skills and state only |
+| state folder (`.claude/ai-bootstrap/`) | state | not a client-discovery path; created by the installer, read by the agents the profile ships | frozen; hidden by one exclude line |
+
+Read roots for collision checks, frozen 2026-09-27: every write root above,
+plus today's skill read roots (`.github/skills`, `.agent/skills`,
+`.codex/skills`) for skills, and `.codex/agents` and `.agents/agents` for
+agents, so a team agent at any of those paths takes the sidecar's agent of
+the same name even where the sidecar does not write.

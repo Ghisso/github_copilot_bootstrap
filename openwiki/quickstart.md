@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
+generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T05:32:51.756Z
+    at: 2026-09-27T14:43:37.947Z
 ---
 
 # Quickstart: where to look for what
@@ -33,7 +33,7 @@ This diagram shows how content moves from authoring source to a consumer.
 ```mermaid
 flowchart LR
     S[shared/] -->|generate_targets.py| D[dist/multi-agent/]
-    S -->|generate_targets.py| SC[dist/sidecar/]
+    S -->|generate_targets.py| SC[dist/sidecar/skills and workflow]
     D -->|full install| C[consumer repo]
     C --> N[nested .claude on ai-state]
     SC -->|--mode sidecar| T[team repo overlay]
@@ -52,6 +52,7 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
 | choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](/openwiki/operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
 | add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
+| install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |
 | understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
 | understand the Context Mode pin, tool filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs` |
 | refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.py` |

@@ -24,6 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from runtime_ownership import (  # noqa: E402
     SIDECAR_BRIDGES,
     SIDECAR_SKILL_WRITE_ROOTS,
+    SIDECAR_STATE_ROOT,
 )
 from sidecar_overlay import (  # noqa: E402
     Action,
@@ -222,8 +223,90 @@ def test_parse_manifest_rejects_missing_schema_version():
 
 
 def test_parse_manifest_rejects_unknown_schema_version():
+    # sidecar-workflow-profile Phase B, Decision 1: schema_version 2 is now
+    # a known version (it carries "profile"), so this must use a version
+    # neither parser accepts, not 2 as before.
     with pytest.raises(ManifestError, match="unknown schema_version"):
+        parse_manifest(json.dumps({"schema_version": 3, "units": {}, "retained": []}))
+
+
+def test_parse_manifest_rejects_schema_version_1_with_a_profile_key():
+    with pytest.raises(ManifestError, match="must not carry a profile"):
+        parse_manifest(
+            json.dumps(
+                {"schema_version": 1, "profile": "skills", "units": {}, "retained": []}
+            )
+        )
+
+
+def test_parse_manifest_rejects_schema_version_2_without_a_profile_key():
+    with pytest.raises(ManifestError, match="unknown or missing profile"):
         parse_manifest(json.dumps({"schema_version": 2, "units": {}, "retained": []}))
+
+
+def test_parse_manifest_rejects_schema_version_2_with_an_unknown_profile():
+    with pytest.raises(ManifestError, match="unknown or missing profile"):
+        parse_manifest(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "profile": "not-a-real-profile",
+                    "units": {},
+                    "retained": [],
+                }
+            )
+        )
+
+
+def test_parse_manifest_schema_version_1_defaults_to_skills_profile():
+    parsed = parse_manifest(
+        json.dumps({"schema_version": 1, "units": {}, "retained": []})
+    )
+    assert parsed.profile == "skills"
+
+
+def test_parse_manifest_schema_version_2_reads_its_profile():
+    parsed = parse_manifest(
+        json.dumps(
+            {"schema_version": 2, "profile": "workflow", "units": {}, "retained": []}
+        )
+    )
+    assert parsed.profile == "workflow"
+
+
+def test_serialize_manifest_schema_version_1_omits_profile_key():
+    payload = json.loads(serialize_manifest(manifest_with()))
+    assert "profile" not in payload
+    assert payload["schema_version"] == 1
+
+
+def test_serialize_manifest_schema_version_2_writes_its_profile():
+    manifest = Manifest(
+        schema_version=2, units={}, retained=frozenset(), profile="workflow"
+    )
+    payload = json.loads(serialize_manifest(manifest))
+    assert payload["profile"] == "workflow"
+    assert payload["schema_version"] == 2
+
+
+def test_parse_manifest_version_1_upgrades_in_place_on_the_next_real_run():
+    # sidecar-workflow-profile Phase B, Decision 1: a version-1 manifest
+    # parses as "skills" and is rewritten as version 2, with no unit change,
+    # on the next real run -- exercised through the pure planner here (the
+    # apply step's own write-skip-when-unchanged behavior is covered by the
+    # real-Git install/update tests).
+    old_manifest = manifest_with(units={UNIT: recorded({"SKILL.md": b"hi"})})
+    assert old_manifest.schema_version == 1
+    result = plan(
+        desired_units={UNIT: desired({"SKILL.md": b"hi"})},
+        manifest=old_manifest,
+        snapshots={UNIT: snapshot({"SKILL.md": b"hi"}, tracked=frozenset())},
+    )
+    assert result.next_manifest is not None
+    assert result.next_manifest.schema_version == 2
+    assert result.next_manifest.profile == "skills"
+    assert result.next_manifest.units == old_manifest.units
+    assert kinds(result) == ["unchanged"]
 
 
 def test_parse_manifest_rejects_missing_file_hashes():
@@ -800,7 +883,12 @@ def test_required_snapshot_units_includes_retained_files_owning_unit():
 def test_required_snapshot_units_includes_desired_and_recorded_units():
     manifest = manifest_with(units={OTHER_UNIT: recorded({"SKILL.md": b"x"})})
     required = required_snapshot_units({UNIT: desired({"SKILL.md": b"y"})}, manifest)
-    assert required == {UNIT, OTHER_UNIT}
+    # sidecar-workflow-profile Phase B: every state root is always included
+    # too (Decision 2, 3), regardless of desired_units or the manifest, so a
+    # run in the "skills" profile still sees a state folder a previous
+    # "workflow" install left behind and keeps it hidden instead of
+    # silently un-hiding it.
+    assert required == {UNIT, OTHER_UNIT, SIDECAR_STATE_ROOT}
 
 
 # --------------------------------------------------------------------------

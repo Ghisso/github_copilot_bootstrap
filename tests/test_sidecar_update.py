@@ -55,7 +55,7 @@ from sidecar_test_helpers import (  # noqa: E402
 
 UPDATER = REPO_ROOT / "scripts" / "update_consumers.py"
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
-SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar"
+SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar" / "skills"
 
 
 # --------------------------------------------------------------------------

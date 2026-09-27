@@ -40,7 +40,7 @@ import generate_targets as target_generator  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
-SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar"
+SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar" / "skills"
 LEGACY_SCHEMA_V2_RECEIPT = REPO_ROOT / "tests" / "fixtures" / "schema-v2-receipt.json"
 LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT = (
     REPO_ROOT / "tests" / "fixtures" / "schema-v2-closeout-receipt.json"

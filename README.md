@@ -448,12 +448,25 @@ should not, run the full install there. The full install is a takeover of
 the target repository (see [What a full install changes in a team
 repository](#what-a-full-install-changes-in-a-team-repository) below). This
 bootstrap has no automatic full-to-sidecar or sidecar-to-full migration. The
-sidecar gives you your own copy of four coding-agent skills and one
-always-on rule per supported client, without touching anything the team
-tracks.
+sidecar gives you your own, Git-ignored copy of part of the bootstrap,
+without touching anything the team tracks.
+
+**Profiles.** A sidecar install has one of two profiles:
+
+| Profile | Command | Ships |
+| --- | --- | --- |
+| `skills` (default) | `--mode sidecar` or `--mode sidecar --profile skills` | Four coding-agent skills (`debug-investigator`, `humanize`, `ponytail`, `ponytail-review`) and one always-on rule per supported client. |
+| `workflow` | `--mode sidecar --profile workflow` | Every eligible public skill, the orchestrator/planner/coder/reviewer/documenter agents, a relaxed rule set, review profiles, plan and log templates, and a namespaced state folder — see **What the workflow profile adds** below. |
+
+`--profile` is only read on a sidecar install; it defaults to an existing
+manifest's own recorded profile, else `skills`. `--uninstall` never reads
+`--profile` — it removes whichever profile's units are actually installed.
+The default `--source` follows the profile: `dist/sidecar/skills/` or
+`dist/sidecar/workflow/`.
 
 ```bash
 uv run python scripts/install_bootstrap.py /path/to/team-repo --mode sidecar
+uv run python scripts/install_bootstrap.py /path/to/team-repo --mode sidecar --profile workflow
 ```
 
 Run it from the main worktree checkout. Sidecar mode aborts in a linked
@@ -466,8 +479,8 @@ linked worktree could expose paths that the main worktree's own manifest
 still owns, so sidecar mode refuses there and asks you to run it from the
 main worktree instead.
 
-**What it installs**, at two write roots, `.claude/skills/` and
-`.agents/skills/`:
+**What the `skills` profile installs**, at two write roots, `.claude/skills/`
+and `.agents/skills/`:
 
 - Four skills: `debug-investigator`, `humanize`, `ponytail`, and
   `ponytail-review`. The two vendored Ponytail skills each ship their MIT
@@ -479,11 +492,103 @@ main worktree instead.
   mode to coding tasks and `ponytail-review` on non-trivial diffs, unless the
   team's own guidance says otherwise.
 
-**What it does not install:** hooks, the plan/review/commit lifecycle, a
-nested AI-state git repository, MCP server configuration, a devcontainer, a
-`.gitignore` edit, a `core.hooksPath` change, or custom agents. The sidecar
-is not a smaller copy of the full bootstrap — it is a fixed, narrow overlay,
-and it stays that way.
+**What the `workflow` profile adds**, on top of every eligible skill (every
+public skill except a fixed denylist of skills that need the full install —
+see `docs/sidecar-provider-contract.md`):
+
+- Agents `orchestrator`, `planner`, `coder`, `reviewer`, and `documenter`, at
+  `.claude/agents/<id>.md` for Claude Code.
+- A relaxed rule set at `.claude/rules/ai-bootstrap-*.md` (workflow,
+  reporting, tool-routing) for Claude Code, and one Copilot instructions
+  file, `.github/instructions/ai-bootstrap-workflow.instructions.md`
+  (`applyTo: "**"`).
+- Review profiles at `.claude/review-profiles/<name>.md` and templates
+  (`plan-big.md`, `plan-small.md`) at `.claude/templates/`.
+- A namespaced state folder, `.claude/ai-bootstrap/` — see **The state
+  folder** below.
+
+Client coverage differs by unit kind (native-run evidence in
+`docs/sidecar-provider-contract.md`, "Workflow profile evidence"): Claude
+Code gets everything above; Copilot in VS Code gets the instructions file
+and the skills; Codex gets the skills and the state folder only. No
+`.github/agents` or `.codex/agents` file ships — neither client has a
+config-free way to discover a custom agent from an ignored file. The
+workflow agents carry no `mcp__` tool grants.
+
+A skill is copied whole — its `SKILL.md`, any reference files, and any
+helper scripts — the same way at both profiles.
+
+**What neither profile installs:** hooks, the plan/review/commit lifecycle
+enforcement, a nested AI-state git repository, MCP server configuration, a
+devcontainer, a `.gitignore` edit, a `core.hooksPath` change, or a
+`.claude/settings.json`. The sidecar is not a smaller copy of the full
+bootstrap — it is a fixed, narrow overlay, and it stays that way. The
+workflow profile's rules and templates describe a relaxed loop (below), but
+nothing enforces it: no hook, no receipt, no gate. The repository's own
+guidance, if any, always wins over the sidecar's.
+
+**The relaxed loop** the workflow profile's rule files describe:
+
+```mermaid
+flowchart LR
+    M[read MEMORY.md] --> P{plan helps?}
+    P -->|yes| PL[planner writes a plan]
+    P -->|no| I[implement]
+    PL --> I
+    I --> V[run the project's own checks]
+    V --> R[reviewer on the diff]
+    R --> L[session log and lessons]
+```
+
+Read `.claude/ai-bootstrap/MEMORY.md` first; write a plan under
+`.claude/ai-bootstrap/plans/` when a task spans several files or decisions;
+implement; run the project's own checks; review a non-trivial diff with the
+`reviewer` agent, whose Markdown report goes to
+`.claude/ai-bootstrap/quality_reports/`; log the session and record lessons
+in `.claude/ai-bootstrap/MEMORY.md`. No step blocks a commit.
+
+**The state folder** (`.claude/ai-bootstrap/`, workflow profile only) holds
+`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, and
+`quality_reports/`, each with a README, hidden by one exclude line,
+`/.claude/ai-bootstrap`. It follows its own rules, separate from every other
+sidecar unit:
+
+- **Seeded once.** An absent folder is created from its seed files on
+  install; an existing folder gets any seed file it is missing added, and
+  nothing already there is ever overwritten. In the run summary and a dry
+  run, a fresh state folder counts as one `install` unit, the same as any
+  other unit; the `seeded` count in that summary line only ever counts a
+  seed file added to a folder that already existed.
+- **Never compared or updated.** A later update never hashes, compares, or
+  touches its contents beyond adding a missing seed file — your edited
+  `MEMORY.md`, your plans, and your session logs are yours.
+- **Kept by uninstall.** Plain `--uninstall` keeps the folder and its
+  exclude line in place and prints
+  `RETAINED .claude/ai-bootstrap: kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it`.
+- **Purged only on request.** `--uninstall --purge-state` moves the folder
+  into the preserved-copy folder and drops the exclude line, printing
+  `PRESERVED .claude/ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`.
+  A later reinstall reseeds it from scratch.
+- **Backed up on request.** `--backup-state`, independent of install and
+  uninstall, copies the folder into the same preserved-copy location and
+  changes nothing else, printing
+  `backed up <repo>/.claude/ai-bootstrap -> <repo>/.git/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`,
+  or `no state folder found; nothing to back up` when there is none. With
+  `--dry-run` it prints `would back up ...` instead and copies nothing.
+- **`git clean -x` risk.** `git clean -x` (or `-fdx`) deletes ignored files,
+  including the state folder — this is the one Git command that can destroy
+  your plans, memory, and logs. `--backup-state` is the mitigation this
+  bootstrap offers: it copies the folder into the Git directory, which
+  `git clean` never touches.
+- A tracked path already sitting under `.claude/ai-bootstrap/` aborts the
+  run before any write, the same way any other tracked-path collision does.
+
+**Profile switching.** `--profile skills` on a `workflow` install removes
+the workflow-only units through the ordinary remove-and-preserve rules and
+keeps the state folder in place and hidden. `--profile workflow` on a
+`skills` install adds the missing units. A manifest recording a different
+profile than the one you pass is an ordinary update, not an error, in
+either direction. Switching never touches the state folder.
 
 Every sidecar file is kept out of the team's Git state through a marked
 block in the local, untracked `.git/info/exclude` (not the tracked
@@ -498,7 +603,9 @@ so a failed run still touches the exclude file transiently, but leaves your
 worktree and Git state exactly as it found them. An ownership
 manifest, `ai-bootstrap-sidecar.json`, and a staging folder,
 `ai-bootstrap-sidecar-staging/`, live inside the Git directory itself
-(`git rev-parse --git-dir`), where neither can be tracked or committed.
+(`git rev-parse --git-dir`), where neither can be tracked or committed. The
+manifest is schema version 2 and records `profile`; a manifest an earlier
+version wrote (schema version 1, no `profile` field) reads as `skills`.
 
 Two more files live beside the manifest, inside the Git directory. A
 pending ownership record, `ai-bootstrap-sidecar.json.next`, is written right
@@ -544,6 +651,20 @@ an edited copy out of the way, together with the fix in each case:
 | `RETAINED` | Unrecognized line in the sidecar's exclude block | A line sits between `# BEGIN ai-bootstrap sidecar` and `# END ai-bootstrap sidecar` in `.git/info/exclude` that the sidecar does not recognize as one of its own unit or retained-file lines. Kept in file order, after the sidecar's own sorted lines, so a negation such as `!keep.log` never gets sorted ahead of the `*.log` line above it. | `` the sidecar does not recognize `<line>` in its own exclude block and keeps it ``; move it outside the block to keep it, or delete it if you do not need it. |
 | `RETAINED` | Retained file a team rule still ignores, reported on uninstall | Removing the block un-hides a retained file, but a separate team `.gitignore` rule still matches it. | `` no longer hidden by the sidecar; a team rule still ignores it `` — `git status` will not show it until that team rule changes too. |
 | `PRESERVED` | Skill name taken, and your copy had edits | A skill name became taken (see the row above) while your sidecar copy of that skill had local edits. | Copy the preserved file(s) out of the Git directory if you want to keep them; see **Preserved copies** below. |
+| `RETAINED` | State folder kept on plain `--uninstall` (workflow profile only) | `.claude/ai-bootstrap/` and its exclude line are never removed unless you ask. | `` kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it ``. |
+| `PRESERVED` | State folder moved by `--uninstall --purge-state` (workflow profile only) | The namespaced state folder was moved into the preserved-copy folder and its exclude line dropped. | `` the sidecar was uninstalled with --purge-state, so .claude/ai-bootstrap was moved out of the client folders ``. |
+
+A workflow-profile unit that is one of Decision 9's new single-file kinds —
+an agent, a rule, a review profile, or a template — names its kind word in
+the same rows above: for example, `` the repository tracks `.claude/agents/reviewer.md`; the sidecar skips the agent `reviewer` at every root ``
+for a team-tracked agent file, or `` the repository has `.claude/rules/ai-bootstrap-workflow.md`; the sidecar skips the rule `ai-bootstrap-workflow` at every root ``
+for a taken rule name. An agent's name is also taken by a team agent kept
+the way another client names it: `.github/agents/<id>.agent.md` (Copilot),
+`.codex/agents/<id>.toml` (Codex), or the folder `.agents/agents/<id>/`
+(Google Antigravity); the row then names that path, for example
+`` the repository has `.github/agents/planner.agent.md`; the sidecar skips the agent `planner` at every root ``.
+The original two bridges and every skill keep the plain, un-prefixed
+wording shown in the table.
 
 A locally modified sidecar file (one you hand-edited) is kept, not
 overwritten. Because the file is hidden from Git, a pull or checkout can
@@ -600,9 +721,23 @@ hidden only because the sidecar was retaining it becomes visible to `git
 status` and `git add -A`; each one is reported by path so you can decide
 whether to track or delete it. Uninstall then removes any sidecar parent
 folder it created that is now empty — `.claude/skills`, `.agents/skills`,
-`.claude/rules`, `.github/instructions`, and then `.claude`, `.agents`, and
-`.github` themselves — but never one that still holds anything, including a
-team's own content.
+`.claude/rules`, `.claude/agents`, `.claude/review-profiles`,
+`.claude/templates`, `.github/instructions`, and then `.claude`, `.agents`,
+and `.github` themselves — but never one that still holds anything,
+including a team's own content or, for the workflow profile, the state
+folder (below).
+
+**The state folder on uninstall** (workflow profile only). Plain
+`--uninstall` keeps `.claude/ai-bootstrap/` and its exclude line in place —
+it is your work, not the bootstrap's — and reports
+`` RETAINED .claude/ai-bootstrap: kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it ``.
+`--uninstall --purge-state` moves the folder into the preserved-copy folder,
+the same place an edited skill copy would land, and drops the exclude line:
+`` PRESERVED .claude/ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp> ``.
+A later reinstall reseeds an empty state folder from scratch. `--backup-state`
+copies the folder to the same preserved-copy location without uninstalling
+anything, and works even with no manifest at all — it only ever touches the
+namespaced state folder.
 
 If the target carries no sidecar evidence at all, `--uninstall` prints "no
 sidecar found; nothing to do" and exits 0 — running it again after a clean
@@ -657,10 +792,12 @@ need to remove the full install's `.claude/`, root adapters, and
 devcontainer changes by hand first — in practice, choose the right mode
 before your first install instead.
 
-**Client support.** Claude Code, Codex, and Copilot in VS Code (both the
-Local agent and Agent Host sessions) are verified with a real client run
-(`native-run` evidence in
-[docs/sidecar-provider-contract.md](docs/sidecar-provider-contract.md)).
+**Client support (`skills` profile).** Claude Code, Codex, and Copilot in VS
+Code (both the Local agent and Agent Host sessions) are verified with a real
+client run (`native-run` evidence in
+[docs/sidecar-provider-contract.md](docs/sidecar-provider-contract.md)). See
+**What the `workflow` profile adds** above for that profile's own,
+narrower, per-client coverage.
 Codex is skill-only by design: no client mechanism lets an instruction file
 both stay additive to `AGENTS.md` and load in every session without a
 project-trust config file, so no Codex bridge ships. In a Copilot Local
@@ -803,9 +940,9 @@ harness.
 - **The generated source must be complete and exact.** Full mode only
   requires that its source (`dist/multi-agent/`) include
   `.claude/hooks/scripts/state-sync.sh`; a source missing that file is
-  refused. Sidecar mode is stricter: its source (`dist/sidecar/`) must match
-  one exact allowlist, with no file missing and no extra file present, or
-  the install is refused.
+  refused. Sidecar mode is stricter: its source (`dist/sidecar/<profile>/`)
+  must match the profile's exact allowlist, with no file missing and no extra
+  file outside a shipped skill folder, or the install is refused.
 - **Inherited Git environment variables are ignored.** Before it runs any
   Git command, the installer clears `GIT_DIR`, `GIT_WORK_TREE`,
   `GIT_INDEX_FILE`, and Git's other repository-local environment variables

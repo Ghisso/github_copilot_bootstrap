@@ -9,9 +9,9 @@ bootstrap-controlled file (agents, hooks, instructions, settings, skills,
 templates) is replaced, and the change is committed and pushed on the
 consumer's git-backed ai-state branch (D1/D4 in
 plans/plan-git-state-sync.md). A sidecar consumer instead gets its private,
-per-clone overlay reconciled (`sidecar_overlay.install_sidecar`): only its own
-skill and bridge files change, and no tracked file, hook, or AI-state branch
-is touched (big plan
+per-clone overlay reconciled (`sidecar_overlay.install_sidecar`) in the profile
+its manifest records (no `--profile` is forwarded), and no tracked file, hook,
+or AI-state branch is touched (big plan
 `.claude/plans/consumer-sidecar-bootstrap-overlay.md`, Decision 20). Files
 that exist only in a full consumer repo (MEMORY.md, plans, session_logs,
 quality_reports, etc.) are state, not bootstrap content, so the installer

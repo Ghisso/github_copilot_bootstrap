@@ -1,7 +1,7 @@
 ---
 type: operations
 title: Installing the bootstrap, file ownership, and runtime drift checks
-description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, and what check_runtime.py reports.
+description: How install_bootstrap.py chooses between a full install and a sidecar install and refuses unsafe targets, which sidecar profile and source it picks, how a full install installs and refreshes a consumer, the ownership categories in runtime_ownership.py and what each means on refresh, the marker file that hands a skill directory to a third party, the bootstrap-root mirror, the batch updater that finishes every target and reports failures, and what check_runtime.py reports.
 tags: [install, refresh, ownership, runtime-ownership, check-runtime, drift, bootstrap-root, consumers]
 sources:
   - id: openwiki-source-42e51bf2d8e7ed2f137178e1
@@ -10,27 +10,31 @@ sources:
     resource: repo://scripts/install_bootstrap.py
   - id: openwiki-source-cae9260f89e696dbf3ed5310
     resource: repo://scripts/runtime_ownership.py
+  - id: openwiki-source-472dd9a20a81e8f5a312971f
+    resource: repo://scripts/sidecar_overlay.py
   - id: openwiki-source-c1d529b97e6e15ee64cf946b
     resource: repo://scripts/update_consumers.py
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-f48dfb5bc22ec5140aa8b810
     resource: repo://tests/test_install_bootstrap.py
-generated: { by: "claude-code", at: "2026-09-27T05:02:18.019Z" }
+  - id: openwiki-source-b856c5ae4b7ba9cdb970706a
+    resource: repo://tests/test_sidecar_workflow_scenario.py
+generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T05:02:18.019Z
+    at: 2026-09-27T14:43:37.947Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
 
 Source, tests, and the policies under `shared/policies/` outrank this page.
 
-The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository and never changes a tracked file; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) covers it in full.
+The installer has two modes. A full install copies the generated target into a consumer and refreshes it later without touching what the consumer owns; what it may overwrite, preserve, or prune is decided by one small ownership contract that the installer, the restore script, the verifier, and the validators all share. A sidecar install adds a small personal overlay to a team-owned repository, in one of two profiles (`skills` or `workflow`), and never changes a tracked file; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) covers it in full.
 
 ## Install modes and mode detection
 
-`--mode full` or `--mode sidecar` selects a mode. Without `--mode`, `detect_install_mode` in `scripts/install_bootstrap.py` decides from the target alone, before any write. Before that, `main` removes Git's repository-local environment variables (`GIT_REPO_LOCAL_ENV_VARS` in `scripts/runtime_ownership.py`, such as `GIT_DIR` and `GIT_INDEX_FILE`), so an exported one can never point detection or a later write at another repository.
+`--mode full` or `--mode sidecar` selects a mode. Without `--mode`, `detect_install_mode` in `scripts/install_bootstrap.py` decides from the target alone, before any write. Before that, `main` removes Git's repository-local environment variables (`GIT_REPO_LOCAL_ENV_VARS` in `scripts/runtime_ownership.py`, such as `GIT_DIR` and `GIT_INDEX_FILE`), so an exported one can never point detection or a later write at another repository. One option runs before everything else: `--backup-state` is a standalone action that copies the workflow profile's state folder into the preserved-copy folder (`_run_backup_state`), takes priority over `--uninstall` and every install option, never runs mode detection, and with `--dry-run` only prints `would back up ...`.
 
 Detection looks for three kinds of evidence:
 
@@ -61,9 +65,9 @@ Every refusal is a `SystemExit` that names the evidence found and the way forwar
 
 The two "nothing, but" rows come from `_fresh_default_refusal`, which runs only when no bootstrap evidence exists, so an existing full consumer is never affected. It refuses, in this order, a target that is not `git rev-parse --show-toplevel` of its repository, a linked worktree (its `--git-dir` differs from `--git-common-dir`), a bare repository, and a `.claude` that `os.lstat` reports as a regular file. Each message names the shape and then says `The full install supports only the root of a main worktree`, followed by a remedy: run from the repository root, run from the main worktree checkout, use a repository with a working tree, or let `.claude` become a directory. A target that is not a Git repository, or a target folder that does not exist, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table, each refusal message, the tracked-`.claude` shapes with the ownership file (tracked files, a submodule, a tracked symlink), the four fresh-default shapes in both plain and `--mode full` runs, the dubious-ownership abort, the doubled-marker remedy, the missing-`git` message, and the dangling manifest symlink.
 
-After detection, `main` picks the source: `--source` when given, otherwise `dist/multi-agent/` for a full install or `dist/sidecar/` for a sidecar install. `require_source_exists` refuses a missing source; a missing default source says to run `uv run python scripts/generate_targets.py --all`, and a missing explicit `--source` names that path. A sidecar target then gets `validate_install_roots` with `allow_self=False` and no `--allow-self` hint, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`), and a hand-off to `install_sidecar`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
+After detection, `main` picks the profile and the source. In sidecar mode the profile is `--profile` when given, else the profile an existing manifest records (`read_sidecar_profile`; a version-1 manifest reads as `skills`), else `skills`; the source is `--source` when given, otherwise `dist/sidecar/<profile>/` (`default_sidecar_source`). In full mode the source is `--source` or `dist/multi-agent/`, and `--profile` or `--purge-state` each draw one warning (`full install ignores --profile`, `full install ignores --purge-state`). `require_source_exists` refuses a missing source; a missing default source says to run `uv run python scripts/generate_targets.py --all`, and a missing explicit `--source` names that path. A sidecar target then gets `validate_install_roots` with `allow_self=False` and no `--allow-self` hint, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`, and `--purge-state`, which only `--uninstall` reads), and a hand-off to `install_sidecar(target, source, profile=...)`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
 
-`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full`, a target that is not a directory (`Refusing --uninstall: <target> is not a directory.`, exit 1), and any full evidence. It then warns once about ignored full-only options (`--uninstall ignores full-only option(s): ...`, naming `--source`, `--local-only`, `--state-remote` or `AI_STATE_REMOTE`, and the Copilot surface flags). When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0; a target that Git does not recognize as a repository instead exits 1 with `Refusing --uninstall: <target> is not a Git repository, so it cannot hold a sidecar overlay.` Otherwise it hands the target to `uninstall_sidecar`. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
+`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full`, a target that is not a directory (`Refusing --uninstall: <target> is not a directory.`, exit 1), and any full evidence. It then warns once about ignored full-only options (`--uninstall ignores full-only option(s): ...`, naming `--source`, `--local-only`, `--state-remote` or `AI_STATE_REMOTE`, the Copilot surface flags, and `--profile`, since uninstall removes every profile's units regardless). When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0; a target that Git does not recognize as a repository instead exits 1 with `Refusing --uninstall: <target> is not a Git repository, so it cannot hold a sidecar overlay.` Otherwise it hands the target to `uninstall_sidecar(target, dry_run=..., purge_state=...)`: by default the workflow profile's state folder `.claude/ai-bootstrap/` is kept in place and still hidden, and `--purge-state` moves it into the preserved-copy folder instead. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
 
 ## The ownership model
 
@@ -92,9 +96,9 @@ Ownership keys on a fact only the intended owner produces, not on path shape. `i
 
 ```
 uv run python scripts/install_bootstrap.py <target-repo> [--mode full|sidecar]
-    [--source <generated-tree>] [--state-remote <git-url>]
+    [--profile skills|workflow] [--source <generated-tree>] [--state-remote <git-url>]
     [--commit-copilot-surface] [--local-only] [--dry-run] [--allow-self]
-    [--uninstall]
+    [--uninstall [--purge-state]] [--backup-state]
 ```
 
 This diagram shows the order `main` follows in full mode, after mode detection.
@@ -133,7 +137,7 @@ This repository refreshes its own overlay with `uv run python scripts/install_bo
 
 ## Batch updates
 
-`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer. It passes through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags, but never `--mode` or `--uninstall`, so the installer detects each target's mode and a batch never removes a sidecar. A mixed batch of full and sidecar consumers therefore works, and a sidecar target warns once about the full-only options it ignores. Each full consumer gets the same migration-then-`bootstrap:` commit order.
+`uv run python scripts/update_consumers.py <repo>...` regenerates `dist/` (unless `--skip-regen`) and runs the installer for each consumer. It passes through `--dry-run`, `--local-only`, `--allow-self`, and the Copilot surface flags, but never `--mode`, `--uninstall`, `--profile`, or `--source`, so the installer detects each target's mode, each sidecar consumer keeps the profile its manifest records, and a batch never removes a sidecar. A mixed batch of full, `skills`, and `workflow` consumers therefore works, and a sidecar target warns once about the full-only options it ignores. Each full consumer gets the same migration-then-`bootstrap:` commit order.
 
 A failed target no longer stops the batch:
 
@@ -142,7 +146,7 @@ A failed target no longer stops the batch:
 3. After the last target, each failure prints as `FAILED: <path> (exit <code>)` and the updater exits 1.
 4. `All projects updated.`, or `Preview complete; no projects were updated.` in `--dry-run`, prints only when every target succeeded.
 
-`tests/test_sidecar_update.py` covers refused targets in the middle of a batch, a mixed full and sidecar batch, and option forwarding.
+`tests/test_sidecar_update.py` covers refused targets in the middle of a batch, a mixed full and sidecar batch, and option forwarding; `tests/test_sidecar_workflow_scenario.py` covers a batch with one `skills` and one `workflow` consumer, each updated in its own profile.
 
 ## What `check_runtime.py` reports
 

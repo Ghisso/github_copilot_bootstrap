@@ -58,45 +58,84 @@ import stat
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping, Sequence, Set as AbstractSet
+from collections.abc import Callable, Mapping, Sequence, Set as AbstractSet
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import IO, Literal
 
 from runtime_ownership import (
     SIDECAR_BRIDGES,
+    SIDECAR_DEFAULT_PROFILE,
     SIDECAR_EXCLUDE_BEGIN,
     SIDECAR_EXCLUDE_END,
+    SIDECAR_FILE_UNIT_READ_ROOTS,
     SIDECAR_MANIFEST_NAME,
     SIDECAR_PRESERVED_NAME,
+    SIDECAR_PROFILE_FILE_UNITS,
+    SIDECAR_PROFILE_SKILLS,
+    SIDECAR_PROFILE_STATE_ROOT,
+    SIDECAR_PROFILES,
     SIDECAR_RETIRED_BRIDGES,
     SIDECAR_RETIRED_SKILL_WRITE_ROOTS,
     SIDECAR_SKILL_READ_ROOTS,
     SIDECAR_SKILL_WRITE_ROOTS,
     SIDECAR_SKILLS,
     SIDECAR_STAGING_NAME,
+    SIDECAR_STATE_SEED_FILES,
 )
 from runtime_ownership import sidecar_source_violations as _shared_source_violations
 
-KNOWN_SCHEMA_VERSION = 1
+# Manifest schema (big plan sidecar-workflow-profile, Decision 1): version 1
+# (no ``profile`` key) parses as the ``skills`` profile; version 2 adds
+# ``profile`` and is the only version ever written from here on.
+KNOWN_SCHEMA_VERSIONS = (1, 2)
+CURRENT_SCHEMA_VERSION = 2
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _READ_ONLY_ROOTS = tuple(
     root for root in SIDECAR_SKILL_READ_ROOTS if root not in SIDECAR_SKILL_WRITE_ROOTS
 )
+# Every single-file unit of every profile, plus retired ones (Decision 9):
+# a bridge, rule, agent, review profile, or template all behave like the
+# original two bridges (one write root, one opaque file). The two original
+# bridges are also members of ``SIDECAR_PROFILE_FILE_UNITS["skills"]``, so
+# this already covers them without listing them twice.
+_ALL_BRIDGES: frozenset[str] = frozenset(
+    unit for units in SIDECAR_PROFILE_FILE_UNITS.values() for unit in units
+) | frozenset(SIDECAR_RETIRED_BRIDGES)
+# Every agent read-only root (Decision 9): a client folder a team member
+# could plausibly place a same-named agent in, other than the one write
+# root this profile ships to (``.claude/agents``). No other file-unit kind
+# has more than one folder in ``SIDECAR_FILE_UNIT_READ_ROOTS`` today, so only
+# agents need this extra cross-folder precedence check.
+_AGENT_WRITE_ROOT = ".claude/agents"
+_AGENT_READ_ONLY_ROOTS = tuple(
+    root
+    for root in SIDECAR_FILE_UNIT_READ_ROOTS
+    if PurePosixPath(root).name == "agents" and root != _AGENT_WRITE_ROOT
+)
+# The one namespaced state root every profile that has one shares (Decision
+# 2, 3). A ``frozenset`` even though only one exists today, so a future
+# profile's own state root needs no new plumbing here.
+_ALL_STATE_ROOTS: frozenset[str] = frozenset(
+    root for root in SIDECAR_PROFILE_STATE_ROOT.values() if root is not None
+)
 _ESCAPE_CHARS = frozenset("\\*?[")
 
-# Every write root and bridge-parent folder (Decision 28): the structural
-# boundary and filesystem-shape preflight checks these, rather than every
-# individual skill unit. A unit path that does not exist yet always resolves
-# to one of these through the nearest-existing-ancestor walk, so this is
-# equivalent for every currently required test scenario at a fraction of the
-# Git calls.
+# Every write root and bridge/file-unit-parent folder (Decision 28): the
+# structural boundary and filesystem-shape preflight checks these, rather
+# than every individual skill or file unit. A unit path that does not exist
+# yet always resolves to one of these through the nearest-existing-ancestor
+# walk, so this is equivalent for every currently required test scenario at
+# a fraction of the Git calls.
 # ponytail: a unit that already exists on disk as its own nested clone,
 # without its write root also being one, is not covered; extend this set to
 # every required unit path if that scenario needs the same abort.
-_SIDECAR_STRUCTURAL_PATHS: frozenset[str] = frozenset(
-    SIDECAR_SKILL_WRITE_ROOTS
-) | frozenset(str(PurePosixPath(bridge).parent) for bridge in SIDECAR_BRIDGES)
+_SIDECAR_STRUCTURAL_PATHS: frozenset[str] = (
+    frozenset(SIDECAR_SKILL_WRITE_ROOTS)
+    | frozenset(str(PurePosixPath(bridge).parent) for bridge in _ALL_BRIDGES)
+    | _ALL_STATE_ROOTS
+)
 
 ActionKind = Literal[
     "install",
@@ -108,6 +147,7 @@ ActionKind = Literal[
     "retain",
     "unchanged",
     "preserve",
+    "seed_missing",
 ]
 ReportCategory = Literal["SKIPPED", "RETAINED", "PRESERVED"]
 
@@ -198,6 +238,23 @@ def preserved_unit_slug(unit_path: str, content_hash: str) -> str:
     return f"{unit_path.replace('/', '__')}--{content_hash}"
 
 
+def state_backup_slug(preserved_root: Path) -> str:
+    """Return a free preserved-copy folder name for one state-folder backup
+    or purge (Decision 3): ``state--<UTC timestamp>``, with ``-2``, ``-3``,
+    and so on appended while that name already exists under
+    ``preserved_root``. Never content-hashed like ``preserved_unit_slug``,
+    since the state root is never hashed at all. The suffix keeps a backup
+    and an uninstall in the same second from colliding, which would
+    otherwise read as a preserve conflict and fail the uninstall."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    slug = f"state--{timestamp}"
+    counter = 1
+    while (preserved_root / slug).exists() or (preserved_root / slug).is_symlink():
+        counter += 1
+        slug = f"state--{timestamp}-{counter}"
+    return slug
+
+
 # --------------------------------------------------------------------------
 # Manifest schema
 # --------------------------------------------------------------------------
@@ -213,16 +270,22 @@ class ManifestUnit:
 
 @dataclass(frozen=True)
 class Manifest:
-    """The parsed sidecar manifest (schema_version 1).
+    """The parsed sidecar manifest (schema_version 1 or 2).
 
     ``retained`` holds only the paths of files kept alongside a team-taken
     unit (Decision 16); no hash is stored for them because no decision reads
     one back, and the ledger is recomputed from the live snapshot each run.
+    ``profile`` (schema_version 2; Decision 1) is the sidecar profile this
+    manifest was written for. A version-1 manifest has no ``profile`` key at
+    all and always parses as ``SIDECAR_DEFAULT_PROFILE``; the default here
+    lets every existing direct ``Manifest(...)`` construction (tests, mostly)
+    keep working unchanged.
     """
 
     schema_version: int
     units: Mapping[str, ManifestUnit]
     retained: frozenset[str]
+    profile: str = SIDECAR_DEFAULT_PROFILE
 
 
 # Manifest validation accepts the current write roots and bridges plus any
@@ -230,7 +293,6 @@ class Manifest:
 # still goes through the normal remove row instead of failing schema
 # validation the moment a bridge or write root is retired.
 _ALL_SKILL_WRITE_ROOTS = SIDECAR_SKILL_WRITE_ROOTS + SIDECAR_RETIRED_SKILL_WRITE_ROOTS
-_ALL_BRIDGES = frozenset(SIDECAR_BRIDGES) | frozenset(SIDECAR_RETIRED_BRIDGES)
 
 
 def _unsafe_path_segment(segment: str) -> bool:
@@ -251,7 +313,10 @@ def _validate_unit_path(unit_path: str) -> None:
         raise ManifestError(f"unsafe unit path: {unit_path!r}")
     if any(_unsafe_path_segment(segment) for segment in unit_path.split("/")):
         raise ManifestError(f"unsafe unit path: {unit_path!r}")
-    if unit_path in _ALL_BRIDGES:
+    if unit_path in _ALL_BRIDGES or unit_path in _ALL_STATE_ROOTS:
+        # A state root is a unit too (Decision 3): its exclude line is the
+        # sidecar's own, so a rerun recognizes it instead of keeping it as a
+        # person's line and appending another.
         return
     for write_root in _ALL_SKILL_WRITE_ROOTS:
         prefix = f"{write_root}/"
@@ -333,6 +398,13 @@ def parse_manifest(text: str) -> Manifest:
     ``<write root>/<one safe segment>`` or a fixed bridge path, or a
     ``retained`` path that is not a file nested inside one of those units).
     ``retained`` is a JSON array of paths; it carries no hash.
+
+    Schema version (Decision 1): version 1 must carry no ``profile`` key at
+    all and always parses as ``SIDECAR_DEFAULT_PROFILE`` ("skills"); version
+    2 must carry a ``profile`` key naming one of ``SIDECAR_PROFILES``. Either
+    way the caller always writes version 2 back out on its next real run
+    (``plan_sidecar_reconciliation`` always builds ``CURRENT_SCHEMA_VERSION``),
+    so an old manifest upgrades in place with no unit change.
     """
     try:
         raw = json.loads(text)
@@ -344,8 +416,18 @@ def parse_manifest(text: str) -> Manifest:
     schema_version = raw.get("schema_version")
     if not isinstance(schema_version, int) or isinstance(schema_version, bool):
         raise ManifestError("manifest is missing an integer schema_version")
-    if schema_version != KNOWN_SCHEMA_VERSION:
+    if schema_version not in KNOWN_SCHEMA_VERSIONS:
         raise ManifestError(f"unknown schema_version: {schema_version!r}")
+
+    profile_raw = raw.get("profile")
+    if schema_version == 1:
+        if profile_raw is not None:
+            raise ManifestError("schema_version 1 must not carry a profile")
+        profile = SIDECAR_DEFAULT_PROFILE
+    else:
+        if not isinstance(profile_raw, str) or profile_raw not in SIDECAR_PROFILES:
+            raise ManifestError(f"unknown or missing profile: {profile_raw!r}")
+        profile = profile_raw
 
     # bootstrap_commit (Decision 33, R6): no longer written, but an old
     # manifest that still carries it must keep parsing; the key is simply
@@ -375,6 +457,7 @@ def parse_manifest(text: str) -> Manifest:
         schema_version=schema_version,
         units=units,
         retained=frozenset(retained),
+        profile=profile,
     )
 
 
@@ -384,11 +467,15 @@ def serialize_manifest(manifest: Manifest) -> bytes:
     An unchanged ``Manifest`` always re-serializes to identical bytes, so the
     caller can skip the write when nothing changed. Fails closed: every
     retained path must pass the same rule ``parse_manifest`` enforces, so a
-    run can never write a manifest the next run refuses (N6).
+    run can never write a manifest the next run refuses (N6). A
+    ``schema_version`` 1 manifest never carries a ``profile`` key, matching
+    what ``parse_manifest`` requires of one (Decision 1); every profile this
+    module actually writes uses ``CURRENT_SCHEMA_VERSION`` (2), so this only
+    matters for a manifest a test built by hand.
     """
     for path in manifest.retained:
         _validate_retained_path(path)
-    payload = {
+    payload: dict[str, object] = {
         "schema_version": manifest.schema_version,
         "units": {
             unit_path: {"files": dict(record.files), "hash": record.hash}
@@ -396,6 +483,10 @@ def serialize_manifest(manifest: Manifest) -> bytes:
         },
         "retained": sorted(manifest.retained),
     }
+    if manifest.schema_version != 1:
+        if manifest.profile not in SIDECAR_PROFILES:
+            raise ManifestError(f"unknown sidecar profile: {manifest.profile!r}")
+        payload["profile"] = manifest.profile
     return (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode("utf-8")
 
 
@@ -422,15 +513,35 @@ def _hash_tree(root: Path) -> dict[str, str]:
     }
 
 
-def load_desired_units(source_root: Path) -> dict[str, DesiredUnit]:
-    """Read the desired sidecar units from a generated tree (``dist/sidecar/``).
+def load_desired_units(
+    source_root: Path, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> dict[str, DesiredUnit]:
+    """Read the desired sidecar units from a generated tree
+    (``dist/sidecar/<profile>/``) for ``profile`` (Decision 1, 9, 2).
 
     This is the one allowed reader: it only reads files under ``source_root``
-    and turns them into data. It never writes anything.
+    and turns them into data. It never writes anything. Reads
+    ``SIDECAR_SKILLS``/``SIDECAR_BRIDGES`` fresh for the ``skills`` profile
+    (matching ``sidecar_source_exact_allowlist``'s own reasoning), so a test
+    that monkeypatches those keeps seeing a matching desired set even though
+    ``SIDECAR_PROFILE_SKILLS["skills"]``/``SIDECAR_PROFILE_FILE_UNITS["skills"]``
+    were already built from the real values at import time. When ``profile``
+    has a state root (Decision 2), its seed files are read the same way and
+    returned as one more unit, keyed by the state root itself; the state
+    unit never plays by the ordinary install/update/remove rules (see
+    ``_classify_state_unit``), so its hash here is otherwise unused.
     """
+    if profile not in SIDECAR_PROFILES:
+        raise ValueError(f"unknown sidecar profile: {profile!r}")
+    skills = SIDECAR_SKILLS if profile == "skills" else SIDECAR_PROFILE_SKILLS[profile]
+    file_units = (
+        tuple(SIDECAR_BRIDGES)
+        if profile == "skills"
+        else SIDECAR_PROFILE_FILE_UNITS[profile]
+    )
     units: dict[str, DesiredUnit] = {}
     for write_root in SIDECAR_SKILL_WRITE_ROOTS:
-        for skill in SIDECAR_SKILLS:
+        for skill in skills:
             skill_dir = source_root / write_root / skill
             if not skill_dir.is_dir():
                 continue
@@ -439,15 +550,28 @@ def load_desired_units(source_root: Path) -> dict[str, DesiredUnit]:
                 units[f"{write_root}/{skill}"] = DesiredUnit(
                     files=files, hash=compute_unit_hash(files)
                 )
-    for bridge_path in SIDECAR_BRIDGES:
-        file_path = source_root / bridge_path
+    for file_unit_path in file_units:
+        file_path = source_root / file_unit_path
         if file_path.is_file():
             files = {
-                PurePosixPath(bridge_path).name: compute_file_hash(
+                PurePosixPath(file_unit_path).name: compute_file_hash(
                     file_path.read_bytes()
                 )
             }
-            units[bridge_path] = DesiredUnit(files=files, hash=compute_unit_hash(files))
+            units[file_unit_path] = DesiredUnit(
+                files=files, hash=compute_unit_hash(files)
+            )
+    state_root = SIDECAR_PROFILE_STATE_ROOT[profile]
+    if state_root is not None:
+        seed_files = {
+            seed: compute_file_hash((source_root / state_root / seed).read_bytes())
+            for seed in SIDECAR_STATE_SEED_FILES
+            if (source_root / state_root / seed).is_file()
+        }
+        if seed_files:
+            units[state_root] = DesiredUnit(
+                files=seed_files, hash=compute_unit_hash(seed_files)
+            )
     return units
 
 
@@ -586,8 +710,13 @@ def required_snapshot_units(
     from the profile or a unit whose record was already dropped by a team
     takeover -- or a unit whose record was lost with the manifest -- is
     still classified and cleaned up correctly instead of silently un-hidden.
+
+    Every state root (Decision 2, 3) is always included too, regardless of
+    ``desired_units`` or the manifest: a run in the ``skills`` profile, or an
+    uninstall, must still see a state folder a previous ``workflow`` install
+    left behind, so it can keep it hidden instead of silently un-hiding it.
     """
-    units: set[str] = set(desired_units) | set(excluded_units)
+    units: set[str] = set(desired_units) | set(excluded_units) | set(_ALL_STATE_ROOTS)
     if manifest is not None:
         units.update(manifest.units)
         for path in manifest.retained:
@@ -767,12 +896,91 @@ def parse_exclude_block(text: str) -> ExcludeBlockContents:
 # --------------------------------------------------------------------------
 
 
-def _skill_name(unit_path: str) -> str | None:
+def _skill_write_root_name(unit_path: str) -> str | None:
+    """Return the skill name for a unit path under a skill write root, or
+    ``None`` for anything else (a bridge, a new-profile file unit, or the
+    state root). The skill-only half of ``_unit_name``: use this, not
+    ``_unit_name``, wherever the caller means "is this a skill" rather than
+    "what do I call this unit in a remedy" -- a file unit's own stem must
+    never be treated as a skill name by the skill-precedence machinery."""
     for write_root in _ALL_SKILL_WRITE_ROOTS:
         prefix = f"{write_root}/"
         if unit_path.startswith(prefix):
             return unit_path[len(prefix) :]
     return None
+
+
+def _unit_name(unit_path: str) -> str | None:
+    """Return the unit's own display name: the skill name for a skill unit,
+    or the file stem for a new-profile single-file unit (an agent, rule,
+    review profile, or template; Decision 9). Returns ``None`` for the two
+    original skills-profile bridges, preserving their own "does not install
+    this bridge" wording exactly (they never had a bare name before), and
+    for the state root, which has no comparable name at all -- in practice
+    neither ever reaches a remedy that reads this, since a tracked or
+    gitlinked state root aborts before classification (Decision 3) and the
+    two bridges' own callers already branch on ``None`` first."""
+    skill = _skill_write_root_name(unit_path)
+    if skill is not None:
+        return skill
+    if unit_path in SIDECAR_BRIDGES or unit_path in _ALL_STATE_ROOTS:
+        return None
+    if unit_path in _ALL_BRIDGES:
+        # The part before the first dot, not ``.stem``: the Copilot
+        # instructions unit carries two suffixes
+        # (``ai-bootstrap-workflow.instructions.md``) and its name is
+        # ``ai-bootstrap-workflow``.
+        return _entry_id(PurePosixPath(unit_path).name)
+    return None
+
+
+def _entry_id(entry_name: str) -> str:
+    """Return the identity a client-folder entry carries: its name up to the
+    first dot. One agent is ``reviewer.md`` for Claude Code,
+    ``reviewer.agent.md`` for Copilot, ``reviewer.toml`` for Codex, and the
+    folder ``reviewer/`` for Google Antigravity (Decision 9: a team file of
+    the same name in any agent folder takes the sidecar's unit, whatever
+    that client's own file shape is)."""
+    return entry_name.partition(".")[0]
+
+
+def _same(name: str) -> str:
+    """The identity key: a skill folder's name is its own identity."""
+    return name
+
+
+# Unit-path parent folder name -> the word a remedy names it by (Decision 9's
+# new single-file kinds and the state root). Never applied to a skill or to
+# the two original bridges (``_unit_kind_word`` returns ``None`` for both),
+# so their wording never changes.
+_UNIT_KIND_WORDS: dict[str, str] = {
+    "agents": "agent",
+    "rules": "rule",
+    "instructions": "instructions",
+    "review-profiles": "review profile",
+    "templates": "template",
+}
+
+
+def _unit_kind_word(unit_path: str) -> str | None:
+    """Return the display word for ``unit_path``'s kind, or ``None`` for a
+    skill unit and the two original bridges (Decision 9; the small plan's
+    step 7: reports name the unit kind for every new single-file kind and
+    the state root)."""
+    if unit_path in _ALL_STATE_ROOTS:
+        return "state"
+    if unit_path in SIDECAR_BRIDGES:
+        return None
+    if unit_path in _ALL_BRIDGES:
+        return _UNIT_KIND_WORDS.get(PurePosixPath(unit_path).parent.name)
+    return None
+
+
+def _named(name: str, kind_word: str | None) -> str:
+    """Format one unit's display name for a remedy: backticked alone for a
+    skill or an original bridge, or prefixed with its kind word for one of
+    Decision 9's new single-file kinds or the state root."""
+    return f"the {kind_word} `{name}`" if kind_word else f"`{name}`"
 
 
 def _representative_tracked_path(
@@ -793,16 +1001,17 @@ def _team_owned_remedy(
     *,
     uninstall: bool = False,
 ) -> str:
-    skill = _skill_name(unit_path)
+    name = _unit_name(unit_path)
     tracked_path = _representative_tracked_path(unit_path, tracked_relpaths)
-    if skill is None:
+    if name is None:
         return f"the repository tracks `{tracked_path}`; the sidecar does not install this bridge"
+    display = _named(name, _unit_kind_word(unit_path))
     if uninstall:
         # NIT (step 12f): "skips at every root" describes install/update
         # placement; uninstall has nothing left to place, so it just leaves
         # the team's own path alone.
-        return f"the repository tracks `{tracked_path}`; the sidecar leaves `{skill}` alone"
-    return f"the repository tracks `{tracked_path}`; the sidecar skips `{skill}` at every root"
+        return f"the repository tracks `{tracked_path}`; the sidecar leaves {display} alone"
+    return f"the repository tracks `{tracked_path}`; the sidecar skips {display} at every root"
 
 
 def _gitlink_remedy(unit_path: str, *, uninstall: bool = False) -> str:
@@ -810,35 +1019,40 @@ def _gitlink_remedy(unit_path: str, *, uninstall: bool = False) -> str:
     wording must say plainly that the sidecar never looks inside a
     submodule -- the ordinary team-owned wording implies the sidecar checked
     the tracked content, which it deliberately never does here."""
-    skill = _skill_name(unit_path)
-    if skill is None:
+    name = _unit_name(unit_path)
+    if name is None:
         return (
             f"`{unit_path}` is a submodule; the sidecar never touches files "
             "inside a submodule and does not install this bridge"
         )
+    display = _named(name, _unit_kind_word(unit_path))
     if uninstall:
         # NIT (step 12f): uninstall has nothing left to place at any root.
         return (
             f"`{unit_path}` is a submodule; the sidecar never touches files "
-            f"inside a submodule and leaves `{skill}` alone"
+            f"inside a submodule and leaves {display} alone"
         )
     return (
         f"`{unit_path}` is a submodule; the sidecar never touches files "
-        f"inside a submodule and skips `{skill}` at every root"
+        f"inside a submodule and skips {display} at every root"
     )
 
 
-def _read_only_taken_remedy(path: str, skill: str) -> str:
-    return f"the repository has `{path}`; the sidecar skips `{skill}` at every root"
+def _read_only_taken_remedy(path: str, name: str, kind_word: str | None = None) -> str:
+    display = _named(name, kind_word)
+    return f"the repository has `{path}`; the sidecar skips {display} at every root"
 
 
-def _read_only_taken_conflict_remedy(path: str, skill: str) -> str:
-    """Decision 44/O12: while a preserve conflict keeps one of the skill's
-    own edited copies in place, this taking path is reported as keeping the
-    skill until that conflict is resolved, never as skipping it everywhere
-    -- the copy the conflict kept is still there."""
+def _read_only_taken_conflict_remedy(
+    path: str, name: str, kind_word: str | None = None
+) -> str:
+    """Decision 44/O12: while a preserve conflict keeps one of the unit's
+    own edited copies in place, this taking path is reported as keeping it
+    until that conflict is resolved, never as skipping it everywhere -- the
+    copy the conflict kept is still there."""
+    display = _named(name, kind_word)
     return (
-        f"the repository has `{path}`; `{skill}` is kept in place until its "
+        f"the repository has `{path}`; {display} is kept in place until its "
         "edited-copy conflict is resolved, not skipped at every root"
     )
 
@@ -850,9 +1064,9 @@ def _locally_modified_remedy(path: str, *, skill_still_shipped: bool) -> str:
             "overwrite hidden files without warning. To take the current "
             f"version, copy your edits elsewhere, delete `{path}`, and rerun"
         )
-    skill = _skill_name(path) or path
+    name = _unit_name(path) or path
     return (
-        f"`{path}` has local edits and the sidecar no longer ships `{skill}`; "
+        f"`{path}` has local edits and the sidecar no longer ships `{name}`; "
         f"copy your edits elsewhere, then delete `{path}`"
     )
 
@@ -869,20 +1083,21 @@ def _unfinished_remedy(path: str) -> str:
 
 
 def _foreign_remedy(unit_path: str, *, uninstall: bool = False) -> str:
-    skill = _skill_name(unit_path)
-    if skill is None:
+    name = _unit_name(unit_path)
+    if name is None:
         return (
             f"the sidecar will not replace `{unit_path}`; rename or remove "
             "it only if you do not need it"
         )
+    display = _named(name, _unit_kind_word(unit_path))
     if uninstall:
         # NIT (step 12f): uninstall has nothing left to place at any root.
         return (
-            f"the sidecar will not replace `{unit_path}` and leaves `{skill}` "
+            f"the sidecar will not replace `{unit_path}` and leaves {display} "
             f"alone; rename or remove `{unit_path}` only if you do not need it"
         )
     return (
-        f"the sidecar will not replace `{unit_path}` and skips `{skill}` at "
+        f"the sidecar will not replace `{unit_path}` and skips {display} at "
         f"every root; rename or remove `{unit_path}` only if you do not need it"
     )
 
@@ -933,9 +1148,10 @@ def _unrecognized_line_remedy(line: str) -> str:
 
 
 def _preserved_remedy(unit_path: str) -> str:
-    skill = _skill_name(unit_path) or unit_path
+    name = _unit_name(unit_path)
+    display = _named(name, _unit_kind_word(unit_path)) if name else f"`{unit_path}`"
     return (
-        f"the repository now uses `{skill}`, so your edited copy was moved "
+        f"the repository now uses {display}, so your edited copy was moved "
         "out of the client folders"
     )
 
@@ -1050,6 +1266,83 @@ def _team_takeover(
     )
 
 
+def _state_kept_remedy(unit_path: str) -> str:
+    return f"kept {unit_path} and its exclude line; pass --purge-state to remove it"
+
+
+def _state_purged_remedy(unit_path: str) -> str:
+    return (
+        f"the sidecar was uninstalled with --purge-state, so {unit_path} was "
+        "moved out of the client folders"
+    )
+
+
+def _classify_state_unit(
+    unit_path: str,
+    snapshot: UnitSnapshot,
+    desired: DesiredUnit | None,
+    *,
+    uninstall: bool,
+    purge_state: bool,
+) -> _UnitOutcome:
+    """Classify the namespaced state unit (Decision 2, 3; the big plan's
+    Design Overview, "Unit kinds"). Never hashed or compared against
+    ``desired`` or any record: a missing seed file is added whenever the
+    folder already exists, on every run, but a present file -- whatever its
+    own content -- is never touched, and no per-file or unit hash is ever
+    recorded for it (Decision 6's own state seeding rule).
+
+    Not uninstalling: an absent folder is seeded from scratch (an ordinary
+    ``install`` action, since a fresh source folder holds only the seed
+    files) when the active profile still has a state root, or left alone
+    when it does not; an existing folder gets one ``seed_missing`` action
+    per seed file the profile still ships that is not already there, and
+    keeps its exclude line either way (Decision 10: switching to a profile
+    with no state root must still keep an *existing* folder hidden).
+
+    Uninstalling: kept and hidden by default (Decision 3), reported so the
+    person knows to pass ``--purge-state``; ``purge_state`` instead preserves
+    it like an edited unit's own copy, dropping the line.
+    """
+    if uninstall:
+        if not snapshot.exists:
+            return _UnitOutcome("noop", None, [], [], frozenset(), False, False)
+        if purge_state:
+            # ponytail: unlike an ordinary preserve, this never checks
+            # preserved_conflicts/kept_conflicts -- state_backup_slug()
+            # picks a name that does not exist yet, so a purge can never
+            # collide with an earlier backup, even within the same second.
+            report = Report("PRESERVED", unit_path, _state_purged_remedy(unit_path))
+            return _UnitOutcome(
+                "preserve",
+                None,
+                [Action("preserve", unit_path)],
+                [report],
+                frozenset(),
+                True,
+                False,
+            )
+        report = Report("RETAINED", unit_path, _state_kept_remedy(unit_path))
+        return _UnitOutcome("state_kept", None, [], [report], frozenset(), True, True)
+
+    if not snapshot.exists:
+        if desired is None:
+            return _UnitOutcome("noop", None, [], [], frozenset(), False, False)
+        return _UnitOutcome(
+            "install", None, [Action("install", unit_path)], [], frozenset(), True, True
+        )
+
+    missing = sorted(
+        name
+        for name in (desired.files if desired is not None else {})
+        if name not in snapshot.file_hashes
+    )
+    actions = [
+        Action("seed_missing", unit_path, f"{unit_path}/{name}") for name in missing
+    ]
+    return _UnitOutcome("state_kept", None, actions, [], frozenset(), True, True)
+
+
 def _classify_unit(
     unit_path: str,
     snapshot: UnitSnapshot,
@@ -1058,6 +1351,8 @@ def _classify_unit(
     excluded_units: AbstractSet[str],
     uninstall: bool = False,
     next_record: ManifestUnit | None = None,
+    *,
+    purge_state: bool = False,
 ) -> _UnitOutcome:
     """Classify one unit (the big plan's table, first matching row wins).
 
@@ -1070,7 +1365,20 @@ def _classify_unit(
     false "local edits". It is threaded into ``_team_takeover`` too, so a
     team takeover mid-crash deletes the sidecar's own matching file instead
     of retaining it.
+
+    ``purge_state`` only affects the namespaced state root (Decision 3):
+    every other unit ignores it. The state root dispatches to
+    ``_classify_state_unit`` immediately, before the gitlink and
+    tracked-files checks below: a tracked or gitlinked state root is caught
+    by ``_run_target_preflight``'s own hard abort before any unit is ever
+    classified (Decision 3's "aborts before any write"), so those checks
+    would never fire for it anyway.
     """
+    if unit_path in _ALL_STATE_ROOTS:
+        return _classify_state_unit(
+            unit_path, snapshot, desired, uninstall=uninstall, purge_state=purge_state
+        )
+
     if snapshot.is_gitlink:
         # Decision 37: the unit itself is a gitlink. The outer exclude file
         # does not apply inside a submodule, so no check-ignore call and no
@@ -1243,63 +1551,90 @@ def _classify_unit(
 
 
 def _case_variant_taking_paths(
-    skill: str,
-    read_list_skill_names: Mapping[str, AbstractSet[str]],
+    name: str,
+    read_list_names: Mapping[str, AbstractSet[str]],
     ignorecase: bool,
+    all_roots: Sequence[str] = SIDECAR_SKILL_READ_ROOTS,
+    *,
+    key: Callable[[str], str] = _same,
 ) -> tuple[str, ...]:
     """Return every read-list path whose entry is a case variant of
-    ``skill`` (Decision 22), when ``core.ignorecase`` is true. Covers every
-    read root, including the write roots: a case-variant folder there is a
-    different filesystem entry the sidecar must never touch."""
+    ``name`` (Decision 22), when ``core.ignorecase`` is true. Covers every
+    root of ``all_roots``, including the write root(s): a case-variant entry
+    there is a different filesystem entry the sidecar must never touch.
+    Defaults to the skill roots; the file-unit precedence checks in
+    ``plan_sidecar_reconciliation`` (Decision 9) pass a unit kind's own
+    roots and ``key``, the function that reduces an entry's file name to
+    the identity it is compared by (``_entry_id`` for agents)."""
     if not ignorecase:
         return ()
     paths: list[str] = []
-    for root in SIDECAR_SKILL_READ_ROOTS:
-        for name in sorted(read_list_skill_names.get(root, frozenset())):
-            if name != skill and name.casefold() == skill.casefold():
-                paths.append(f"{root}/{name}")
+    for root in all_roots:
+        for existing in sorted(read_list_names.get(root, frozenset())):
+            existing_id = key(existing)
+            if existing_id != name and existing_id.casefold() == name.casefold():
+                paths.append(f"{root}/{existing}")
     return tuple(paths)
 
 
 def _extra_taking_paths(
-    skill: str,
-    read_list_skill_names: Mapping[str, AbstractSet[str]],
-    declared_skill_names: Mapping[str, AbstractSet[str]],
+    name: str,
+    read_list_names: Mapping[str, AbstractSet[str]],
+    declared_names: Mapping[str, AbstractSet[str]],
     ignorecase: bool,
+    *,
+    read_only_roots: Sequence[str] = _READ_ONLY_ROOTS,
+    all_roots: Sequence[str] = SIDECAR_SKILL_READ_ROOTS,
+    write_roots: Sequence[str] = SIDECAR_SKILL_WRITE_ROOTS,
+    key: Callable[[str], str] = _same,
 ) -> frozenset[str]:
-    """Return every path -- besides the skill's own write-root units, which
-    self-report through their own classification -- that takes ``skill``
-    (Decision 22): an exact name in a read-only folder, a case variant in
-    any read folder, or a non-sidecar ``SKILL.md`` frontmatter declaration.
+    """Return every path -- besides ``name``'s own write-root unit(s), which
+    self-report through their own classification -- that takes it (Decision
+    22, generalized by Decision 9 to every file-unit kind): an exact name in
+    a read-only folder of the same kind, a case variant in any folder of
+    that kind, or (skills only) a non-sidecar ``SKILL.md`` frontmatter
+    declaration.
 
-    ``declared_skill_names`` includes the sidecar's own write-root entries
-    (it declares its own name too); they are removed by the same trailing
-    subtraction that already removes the skill's own write-root units from
+    ``declared_names`` includes the sidecar's own write-root entries (a
+    skill declares its own name too); they are removed by the same trailing
+    subtraction that already removes ``name``'s own write-root units from
     every other source here, so a team or foreign declaration under a
     different folder name is never hidden behind the sidecar's own entry.
+    Every keyword defaults to the skill roots, so an existing skill call
+    site needs no change; an agent unit (the one other kind with more than
+    one read root today) passes its own roots, an empty ``declared_names``,
+    and ``key=_entry_id``, so that ``reviewer.agent.md``, ``reviewer.toml``,
+    and the folder ``reviewer/`` each take the agent ``reviewer``. The paths
+    returned name the entries as they exist on disk or in the index.
     """
     paths: set[str] = set()
-    for root in _READ_ONLY_ROOTS:
-        if skill in read_list_skill_names.get(root, frozenset()):
-            paths.add(f"{root}/{skill}")
-    paths.update(_case_variant_taking_paths(skill, read_list_skill_names, ignorecase))
-    paths.update(declared_skill_names.get(skill, frozenset()))
-    paths -= {f"{write_root}/{skill}" for write_root in SIDECAR_SKILL_WRITE_ROOTS}
+    for root in read_only_roots:
+        for existing in read_list_names.get(root, frozenset()):
+            if key(existing) == name:
+                paths.add(f"{root}/{existing}")
+    paths.update(
+        _case_variant_taking_paths(
+            name, read_list_names, ignorecase, all_roots, key=key
+        )
+    )
+    paths.update(declared_names.get(name, frozenset()))
+    paths -= {f"{write_root}/{name}" for write_root in write_roots}
     return frozenset(paths)
 
 
 def _preserved_uninstall_remedy(unit_path: str, *, unfinished: bool = False) -> str:
-    skill = _skill_name(unit_path) or unit_path
+    name = _unit_name(unit_path)
+    display = _named(name, _unit_kind_word(unit_path)) if name else f"`{unit_path}`"
     if unfinished:
         # N14: no manifest record backs this copy, so it was never "your
         # edited copy" of anything the sidecar shipped -- only its own
         # exclude-block line ever claimed it.
         return (
-            f"the sidecar was uninstalled; `{skill}` was listed by the "
+            f"the sidecar was uninstalled; {display} was listed by the "
             "sidecar's exclude block but never recorded, so it was moved "
             "out of the client folders"
         )
-    return f"the sidecar was uninstalled, so your edited copy of `{skill}` was moved out of the client folders"
+    return f"the sidecar was uninstalled, so your edited copy of {display} was moved out of the client folders"
 
 
 def _convert_for_taken_skill(
@@ -1372,11 +1707,14 @@ def plan_sidecar_reconciliation(
     listed_files: AbstractSet[str] = frozenset(),
     unrecognized_lines: Sequence[str] = (),
     declared_skill_names: Mapping[str, AbstractSet[str]] | None = None,
+    read_list_file_names: Mapping[str, AbstractSet[str]] | None = None,
     ignorecase: bool = False,
     preserved_conflicts: AbstractSet[str] = frozenset(),
     preserved_destinations: Mapping[str, str] | None = None,
     uninstall: bool = False,
+    purge_state: bool = False,
     pending_manifest: Manifest | None = None,
+    profile: str = SIDECAR_DEFAULT_PROFILE,
 ) -> PlanResult:
     """Plan one sidecar reconciliation run. Performs no I/O.
 
@@ -1417,6 +1755,14 @@ def plan_sidecar_reconciliation(
             result, the same way it already does for the other taking-path
             sources, so a team or foreign declaration under a different
             folder name is never hidden behind the sidecar's own entry.
+        read_list_file_names: For every agent folder (Decision 9; the
+            write root and the keys of ``_AGENT_READ_ONLY_ROOTS``), the
+            entry names found there, in each client's own file shape
+            (``reviewer.agent.md``, ``reviewer.toml``, the folder
+            ``reviewer``). Generalizes ``read_list_skill_names`` to the one other
+            file-unit kind with more than one folder of its own; every other
+            kind's precedence is already decided by its own team-owned or
+            foreign classification, since it has only the one write root.
         ignorecase: ``git config --bool core.ignorecase`` (Decision 22, 25).
         preserved_conflicts: Unit paths whose preserved-copy destination
             already exists, so preserving now would overwrite it (Decision
@@ -1431,16 +1777,27 @@ def plan_sidecar_reconciliation(
             skill's units already do; every carried-forward retained file
             loses its record and its line instead of being re-hidden, so it
             becomes visible; and every well-known unit is included even
-            with no record, no exclude line, and nothing on disk.
+            with no record, no exclude line, and nothing on disk. The
+            namespaced state root is the one exception (Decision 3): it is
+            kept and hidden by default, or preserved (moved out, line
+            dropped) when ``purge_state`` is set, never removed outright.
+        purge_state: Only meaningful with ``uninstall`` (Decision 3): move
+            the namespaced state root into the preserved-copy folder and
+            drop its line, instead of the default "kept and hidden".
         pending_manifest: The manifest an interrupted update left at
             ``<manifest>.next`` (N8), or ``None``. Its per-unit records are
             passed to ``_classify_unit`` as extra ownership evidence only.
+        profile: The sidecar profile this run installs (Decision 1). Only
+            used to stamp ``next_manifest.profile``; every other decision
+            here is driven purely by ``desired_units`` (already built for
+            this profile by the caller's own ``load_desired_units`` call).
 
     Returns:
         A ``PlanResult``. When ``aborts`` is non-empty, every other field is
         empty: the caller must not write anything.
     """
     declared_skill_names = declared_skill_names or {}
+    read_list_file_names = read_list_file_names or {}
     preserved_destinations = preserved_destinations or {}
 
     required = required_snapshot_units(
@@ -1501,7 +1858,14 @@ def plan_sidecar_reconciliation(
             pending_manifest.units.get(unit_path) if pending_manifest else None
         )
         outcomes[unit_path] = _classify_unit(
-            unit_path, snapshot, record, desired, excluded_units, uninstall, next_record
+            unit_path,
+            snapshot,
+            record,
+            desired,
+            excluded_units,
+            uninstall,
+            next_record,
+            purge_state=purge_state,
         )
 
     # One precedence decision per skill (Decision 22): a skill is taken by
@@ -1512,7 +1876,7 @@ def plan_sidecar_reconciliation(
     # is decided too, so its edited copy is preserved when the team ships
     # its own version instead of staying hidden next to it.
     decided_skills = set(SIDECAR_SKILLS) | {
-        skill for unit_path in required if (skill := _skill_name(unit_path))
+        skill for unit_path in required if (skill := _skill_write_root_name(unit_path))
     }
     taken_by_write_root: set[str] = set()
     for skill in sorted(decided_skills):
@@ -1530,8 +1894,9 @@ def plan_sidecar_reconciliation(
     taken_skills: set[str] = set(taken_by_write_root)
     # Decision 44/O12: the exact wording (plain "skipped everywhere" versus
     # "kept until the conflict is resolved") depends on kept_conflicts,
-    # computed below, so only the (path, skill) pairs are collected here.
-    extra_taking: list[tuple[str, str]] = []
+    # computed below, so only the (path, name, kind word) triples are
+    # collected here.
+    extra_taking: list[tuple[str, str, str | None]] = []
     for skill in sorted(decided_skills):
         extra_paths = _extra_taking_paths(
             skill, read_list_skill_names, declared_skill_names, ignorecase
@@ -1540,20 +1905,54 @@ def plan_sidecar_reconciliation(
             continue
         taken_skills.add(skill)
         for path in sorted(extra_paths):
-            extra_taking.append((path, skill))
+            extra_taking.append((path, skill, None))
+
+    # The same precedence decision, generalized by Decision 9 to every
+    # file-unit kind with more than one folder of its own: today only an
+    # agent unit (`.claude/agents/<id>.md`) has read-only siblings besides
+    # its one write root. Every other new-profile file-unit kind (rule,
+    # instructions, review profile, template) has exactly one folder, so its
+    # own team-owned/foreign classification above already covers it fully.
+    file_units_taken: set[str] = set()
+    for unit_path in sorted(required):
+        if (
+            unit_path in _ALL_STATE_ROOTS
+            or _skill_write_root_name(unit_path) is not None
+            or str(PurePosixPath(unit_path).parent) != _AGENT_WRITE_ROOT
+        ):
+            continue
+        name = _entry_id(PurePosixPath(unit_path).name)
+        extra_paths = _extra_taking_paths(
+            name,
+            read_list_file_names,
+            {},
+            ignorecase,
+            read_only_roots=_AGENT_READ_ONLY_ROOTS,
+            all_roots=(_AGENT_WRITE_ROOT, *_AGENT_READ_ONLY_ROOTS),
+            write_roots=(_AGENT_WRITE_ROOT,),
+            key=_entry_id,
+        )
+        if not extra_paths:
+            continue
+        file_units_taken.add(unit_path)
+        kind_word = _unit_kind_word(unit_path)
+        for path in sorted(extra_paths):
+            extra_taking.append((path, name, kind_word))
 
     if uninstall:
         # Decision 39: every classified unit is taken during uninstall,
         # including a dropped skill, a retired write root, or a retired
         # bridge -- every unit that reached `outcomes`, not only units under
-        # the current profile's own skills and write roots.
-        taken_units = set(outcomes)
+        # the current profile's own skills and write roots. The state unit is
+        # never taken: uninstall keeps it (Decision 3), so it stays out of the
+        # taken-outcome conversion.
+        taken_units = set(outcomes) - _ALL_STATE_ROOTS
     else:
         taken_units = {
             f"{write_root}/{skill}"
             for skill in taken_skills
             for write_root in _ALL_SKILL_WRITE_ROOTS
-        }
+        } | file_units_taken
     kept_conflicts: set[str] = set()
     for unit_path in taken_units:
         outcome = outcomes.get(unit_path)
@@ -1577,22 +1976,24 @@ def plan_sidecar_reconciliation(
             uninstall=uninstall,
         )
 
-    # Decision 44/O12: while a conflict copy remains, a taken skill's own
+    # Decision 44/O12: while a conflict copy remains, a taken unit's own
     # other taking paths are reported as kept until it is resolved, never
     # as skipped at every root -- the Done Criterion is not absolute when
     # Decision 24 keeps a copy on a conflict.
-    conflicted_skills = {
-        skill for unit_path in kept_conflicts if (skill := _skill_name(unit_path))
+    conflicted_names = {
+        conflict_name
+        for unit_path in kept_conflicts
+        if (conflict_name := _unit_name(unit_path))
     }
     extra_reports = [
         Report(
             "SKIPPED",
             path,
-            _read_only_taken_conflict_remedy(path, skill)
-            if skill in conflicted_skills
-            else _read_only_taken_remedy(path, skill),
+            _read_only_taken_conflict_remedy(path, name, kind_word)
+            if name in conflicted_names
+            else _read_only_taken_remedy(path, name, kind_word),
         )
-        for path, skill in extra_taking
+        for path, name, kind_word in extra_taking
     ]
 
     # Carry forward retained files: everything the manifest already tracks,
@@ -1721,9 +2122,10 @@ def plan_sidecar_reconciliation(
     kept_lines = tuple(unrecognized_lines)
 
     next_manifest = Manifest(
-        schema_version=KNOWN_SCHEMA_VERSION,
+        schema_version=CURRENT_SCHEMA_VERSION,
         units=next_units,
         retained=frozenset(next_retained),
+        profile=profile,
     )
 
     return PlanResult(
@@ -1830,6 +2232,26 @@ def sidecar_evidence(target: Path) -> tuple[str, ...]:
     return tuple(evidence)
 
 
+def read_sidecar_profile(target: Path) -> str | None:
+    """Return the profile an existing sidecar manifest in ``target`` was
+    written for, or ``None`` when there is no manifest, or it fails to
+    parse (Decision 1). The caller falls back to ``SIDECAR_DEFAULT_PROFILE``,
+    exactly like a fresh install with no ``--profile``. Read only, for
+    choosing a CLI default -- ``install_sidecar``'s own preflight parses the
+    manifest again, authoritatively, before any write."""
+    try:
+        git_dir = Path(_git_rev_parse_or_raise(target, "--git-dir"))
+    except subprocess.CalledProcessError:
+        return None
+    manifest_path = git_dir / SIDECAR_MANIFEST_NAME
+    if not manifest_path.is_file():
+        return None
+    try:
+        return parse_manifest(manifest_path.read_text(encoding="utf-8")).profile
+    except (ManifestError, OSError, UnicodeDecodeError):
+        return None
+
+
 _GIT_VERSION_RE = re.compile(r"git version (\d+)\.(\d+)(?:\.(\d+))?")
 _MIN_GIT_VERSION = (2, 31, 0)
 
@@ -1917,6 +2339,9 @@ _EMPTY_SIDECAR_CLEANUP_ORDER = (
     ".claude/skills",
     ".agents/skills",
     ".claude/rules",
+    ".claude/agents",
+    ".claude/review-profiles",
+    ".claude/templates",
     ".github/instructions",
     ".claude",
     ".agents",
@@ -1925,8 +2350,9 @@ _EMPTY_SIDECAR_CLEANUP_ORDER = (
 
 
 def _remove_empty_sidecar_parents(target: Path) -> None:
-    """After a successful uninstall, remove the sidecar's own folders it may
-    have created, but only when each is now completely empty (NIT): a team
+    """After a successful uninstall, or an install that removed units, remove
+    the sidecar's own folders it may have created, but only when each is now
+    completely empty (NIT): a team
     file, another tool's folder, or anything a preserve conflict kept in
     place must never be swept away. ``os.rmdir`` already refuses a
     non-empty or missing folder with ``OSError``, so ignoring it is the
@@ -2176,7 +2602,9 @@ def _unwritable_paths_for_actions(
     if (git_dir / "info").is_dir():
         check.add(git_dir / "info")
     for action in actions:
-        if action.kind == "team_takeover_delete" and action.path is not None:
+        if action.kind in ("team_takeover_delete", "seed_missing") and (
+            action.path is not None
+        ):
             check.add((target / PurePosixPath(action.path)).parent)
             continue
         if action.kind == "preserve":
@@ -2200,12 +2628,14 @@ def _unwritable_paths_for_actions(
     return tuple(sorted(path for path in check if not os.access(path, os.W_OK)))
 
 
-def _sidecar_source_violations(source: Path) -> tuple[str, ...]:
+def _sidecar_source_violations(
+    source: Path, profile: str = SIDECAR_DEFAULT_PROFILE
+) -> tuple[str, ...]:
     """Return every way ``source`` fails the exact sidecar source contract
-    (Decision 31; S13, S14, L2): a plain set comparison of every file found
-    in ``source`` against ``sidecar_source_exact_allowlist()``, so a missing
-    or extra path of any kind is reported. Shares its logic with the
-    generated-target validator (``sidecar_source_violations`` in
+    for ``profile`` (Decision 31; S13, S14, L2): a plain set comparison of
+    every file found in ``source`` against ``sidecar_source_exact_allowlist()``,
+    so a missing or extra path of any kind is reported. Shares its logic
+    with the generated-target validator (``sidecar_source_violations`` in
     ``runtime_ownership.py``), so a crafted tree gets the same verdict from
     both."""
     present = frozenset(
@@ -2213,7 +2643,7 @@ def _sidecar_source_violations(source: Path) -> tuple[str, ...]:
         for file_path in sorted(source.rglob("*"))
         if file_path.is_file()
     )
-    return _shared_source_violations(present)
+    return _shared_source_violations(present, profile)
 
 
 def _is_symlinked_ancestor(target: Path, relative: str) -> bool:
@@ -2595,7 +3025,11 @@ def _resolve_or_none(path: Path) -> Path | None:
         return None
 
 
-def _reflects_a_write_root(target: Path, path: Path) -> bool:
+def _reflects_a_write_root(
+    target: Path,
+    path: Path,
+    write_roots: Sequence[str] = SIDECAR_SKILL_WRITE_ROOTS,
+) -> bool:
     """Return whether ``path`` is an alias into one of the sidecar's own
     write roots: it resolves somewhere other than its own name says
     (``target`` is already resolved, so any difference means a symlink on
@@ -2605,11 +3039,12 @@ def _reflects_a_write_root(target: Path, path: Path) -> bool:
     layout) and is never treated as holding non-sidecar content (Decision
     22): the alternative would alternate install, remove, install every
     run. A write root's own real entries resolve to themselves and are
-    never aliases."""
+    never aliases. ``write_roots`` defaults to the skill write roots; the
+    agent folders pass their own."""
     resolved = _resolve_or_none(path)
     if resolved is None or resolved == path:
         return False
-    for write_root in SIDECAR_SKILL_WRITE_ROOTS:
+    for write_root in write_roots:
         write_real = _resolve_or_none(target / PurePosixPath(write_root))
         if write_real is None:
             continue
@@ -2618,10 +3053,19 @@ def _reflects_a_write_root(target: Path, path: Path) -> bool:
     return False
 
 
-def _enumerate_read_entries(target: Path) -> dict[str, dict[str, Path]]:
+def _enumerate_read_entries(
+    target: Path,
+    roots: Sequence[str] = SIDECAR_SKILL_READ_ROOTS,
+    *,
+    write_roots: Sequence[str] = SIDECAR_SKILL_WRITE_ROOTS,
+    files_too: bool = False,
+) -> dict[str, dict[str, Path]]:
     """One path-identity rule for every folder-name and frontmatter-name
-    collision source (Decision 52), shared by ``_read_list_skill_names``
-    and ``_declared_skill_names``.
+    collision source (Decision 52), shared by ``_read_list_skill_names``,
+    ``_declared_skill_names``, and ``_read_list_agent_names``. The defaults
+    walk the skill roots for folders; the agent reader passes the agent
+    roots and ``files_too=True``, since a client keeps an agent as a file
+    or as a folder (Decision 9).
 
     An entry or root of the read list is an alias -- and contributes
     nothing -- when its resolved path differs from its lexical path (a
@@ -2638,18 +3082,20 @@ def _enumerate_read_entries(target: Path) -> dict[str, dict[str, Path]]:
     entry found on disk.
     """
     entries: dict[str, dict[str, Path]] = {}
-    for root in SIDECAR_SKILL_READ_ROOTS:
+    for root in roots:
         root_path = target / PurePosixPath(root)
         root_entries: dict[str, Path] = {}
-        if root_path.is_dir() and not _reflects_a_write_root(target, root_path):
+        if root_path.is_dir() and not _reflects_a_write_root(
+            target, root_path, write_roots
+        ):
             try:
                 children = list(root_path.iterdir())
             except OSError:
                 children = []
             for entry in children:
-                if not (entry.is_dir() or entry.is_symlink()):
+                if not (files_too or entry.is_dir() or entry.is_symlink()):
                     continue
-                if _reflects_a_write_root(target, entry):
+                if _reflects_a_write_root(target, entry, write_roots):
                     continue
                 root_entries[entry.name] = entry
         entries[root] = root_entries
@@ -2666,6 +3112,36 @@ def _read_list_skill_names(
     read_entries = _enumerate_read_entries(target)
     names: dict[str, frozenset[str]] = {}
     for root in SIDECAR_SKILL_READ_ROOTS:
+        disk_names = set(read_entries.get(root, {}))
+        prefix = f"{root}/"
+        index_names = {
+            path[len(prefix) :].split("/", 1)[0]
+            for path in index_paths
+            if path.startswith(prefix) and len(path) > len(prefix)
+        }
+        names[root] = frozenset(disk_names | index_names)
+    return names
+
+
+def _read_list_agent_names(
+    target: Path, index_paths: AbstractSet[str]
+) -> dict[str, frozenset[str]]:
+    """Return the entry names present in every agent folder (Decision 9),
+    both the one write root (``.claude/agents``) and its read-only siblings,
+    from the index and the disk together, through the shared read-entry
+    enumerator. An entry is a file or a folder, in the client's own shape
+    (``reviewer.md``, ``reviewer.agent.md``, ``reviewer.toml``, or the folder
+    ``reviewer/`` holding ``agent.md``); the precedence check reduces each
+    to its identity with ``_entry_id``. Mirrors ``_read_list_skill_names``
+    for the one other file-unit kind with more than one folder of its own;
+    every other new-profile kind has exactly one folder, so its own
+    team-owned or foreign classification already covers it fully."""
+    roots = (_AGENT_WRITE_ROOT, *_AGENT_READ_ONLY_ROOTS)
+    read_entries = _enumerate_read_entries(
+        target, roots, write_roots=(_AGENT_WRITE_ROOT,), files_too=True
+    )
+    names: dict[str, frozenset[str]] = {}
+    for root in roots:
         disk_names = set(read_entries.get(root, {}))
         prefix = f"{root}/"
         index_names = {
@@ -2910,9 +3386,16 @@ def _gate_spelling(
     symlink. With no snapshot available, every unit is spelled as a folder
     (the pre-Decision-40 default). Bridges and individual files are gated as
     themselves. Uses ``_ALL_SKILL_WRITE_ROOTS`` so a retired root is still
-    spelled correctly."""
+    spelled correctly. The namespaced state root (Decision 2, 3) is folder-
+    shaped like a skill unit, not a single file, so it gets the same
+    folder-or-not spelling."""
     if path in _ALL_BRIDGES:
         return path
+    if path in _ALL_STATE_ROOTS:
+        snapshot = (snapshots or {}).get(path)
+        if snapshot is not None and snapshot.kind != "folder":
+            return path
+        return f"{path}/"
     for write_root in _ALL_SKILL_WRITE_ROOTS:
         prefix = f"{write_root}/"
         if path.startswith(prefix) and "/" not in path[len(prefix) :]:
@@ -3200,6 +3683,18 @@ def _preserve_unit(target: Path, destination: Path, unit_path: str) -> None:
     os.replace(source_path, destination)
 
 
+def _seed_state_file(target: Path, source: Path, relative_path: str) -> None:
+    """Add one missing state seed file (Decision 3): never overwrites a file
+    that is already there, at any depth under the state root, whatever its
+    own content -- ``relative_path`` is worktree-relative, matching
+    ``team_takeover_delete``'s own convention."""
+    destination = target / PurePosixPath(relative_path)
+    if destination.exists() or destination.is_symlink():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / PurePosixPath(relative_path), destination)
+
+
 def _empty_staging(staging: Path) -> None:
     if staging.exists() and not staging.is_symlink():
         shutil.rmtree(staging)
@@ -3230,6 +3725,8 @@ def _apply_actions(
             _delete_file(target, action.path)
         elif action.kind == "preserve":
             _preserve_unit(target, preserved_destinations[action.unit], action.unit)
+        elif action.kind == "seed_missing" and action.path is not None:
+            _seed_state_file(target, source, action.path)
         # "adopt", "unchanged", "retain", and "drop_record" touch no file:
         # the content already matches, the file already sits where it
         # belongs, or only the manifest record changes.
@@ -3243,6 +3740,7 @@ def _count_actions(plan_result: PlanResult) -> dict[str, int]:
         "adopt": 0,
         "unchanged": 0,
         "preserve": 0,
+        "seed_missing": 0,
     }
     for action in plan_result.actions:
         if action.kind in counts:
@@ -3253,7 +3751,7 @@ def _count_actions(plan_result: PlanResult) -> dict[str, int]:
 def _print_report(
     plan_result: PlanResult, preserved_destinations: Mapping[str, str] | None = None
 ) -> None:
-    """Print the run's summary and one line per removed, deleted, or
+    """Print the run's summary and one line per removed, deleted, seeded, or
     preserved path, plus every SKIPPED/RETAINED/PRESERVED report (S15: a
     real run must name what a takeover deleted, not only count it)."""
     preserved_destinations = preserved_destinations or {}
@@ -3261,7 +3759,8 @@ def _print_report(
     _info(
         f"installed {counts['install']}, updated {counts['update']}, "
         f"removed {counts['remove']}, adopted {counts['adopt']}, "
-        f"unchanged {counts['unchanged']}, preserved {counts['preserve']}"
+        f"unchanged {counts['unchanged']}, preserved {counts['preserve']}, "
+        f"seeded {counts['seed_missing']}"
     )
     for action in plan_result.actions:
         if action.kind == "remove":
@@ -3271,6 +3770,8 @@ def _print_report(
         elif action.kind == "preserve":
             destination = preserved_destinations.get(action.unit, "")
             _info(f"PRESERVED {action.unit} -> {destination}")
+        elif action.kind == "seed_missing" and action.path is not None:
+            _info(f"seeded {action.path}")
     for report in plan_result.reports:
         _info(f"{report.category} {report.path}: {report.remedy}")
 
@@ -3288,6 +3789,7 @@ def _describe_dry_run_actions(
         "retain": "retain",
         "drop_record": "drop the record for",
         "unchanged": "keep",
+        "seed_missing": "seed",
     }
     for action in plan_result.actions:
         if action.kind == "preserve":
@@ -3400,6 +3902,10 @@ def _install_sidecar_apply(
     pending_path.unlink(missing_ok=True)
 
     _empty_staging(staging)
+    # A profile switch or a dropped unit kind can empty a folder the sidecar
+    # created (for example .claude/templates on the way down to the skills
+    # profile); the same empty-only cleanup as uninstall applies.
+    _remove_empty_sidecar_parents(target)
     _print_report(
         plan_result, {unit: str(path) for unit, path in preserved_destinations.items()}
     )
@@ -3590,6 +4096,26 @@ def _run_target_preflight(target: Path) -> _TargetPreflight | int:
     index_entries = _read_index_entries(target)
     tracked = frozenset(path for _mode, path in index_entries)
 
+    # Decision 3: a tracked path under the namespaced state root aborts
+    # before any write, naming it -- unlike an ordinary team-owned unit
+    # (Decision 25), which is merely skipped and reported. The state root is
+    # the person's own local work; the sidecar must never plan around a
+    # team member having started to track part of it.
+    state_tracked = sorted(
+        path
+        for path in tracked
+        if any(path == root or path.startswith(f"{root}/") for root in _ALL_STATE_ROOTS)
+    )
+    if state_tracked:
+        shown = ", ".join(state_tracked[:5])
+        more = "" if len(state_tracked) <= 5 else f" (+{len(state_tracked) - 5} more)"
+        return _abort(
+            f"the repository tracks {shown}{more} under the sidecar's "
+            "namespaced state folder",
+            "untrack it (`git rm -r --cached <path>`) and commit that "
+            "removal, then rerun",
+        )
+
     # Decision 28: repository boundary and filesystem shape, before any
     # other Git-state gathering or write.
     boundary_violations = _repository_boundary_violations(
@@ -3629,8 +4155,15 @@ def _run_target_preflight(target: Path) -> _TargetPreflight | int:
     )
 
 
-def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int:
-    """Reconcile the sidecar overlay in ``target`` from ``source``.
+def install_sidecar(
+    target: Path,
+    source: Path,
+    *,
+    dry_run: bool = False,
+    profile: str = SIDECAR_DEFAULT_PROFILE,
+) -> int:
+    """Reconcile the sidecar overlay in ``target`` from ``source`` for
+    ``profile`` (Decision 1).
 
     Returns the process exit code: 0 on success, including per-path skips;
     non-zero when preflight aborts before any write. Implements the big
@@ -3640,6 +4173,8 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
     (``plan_sidecar_reconciliation``) decides every action; this function
     only gathers Git state, writes in the required order, and reports.
     """
+    if profile not in SIDECAR_PROFILES:
+        raise ValueError(f"unknown sidecar profile: {profile!r}")
     target = target.resolve()
     source = source.resolve()
 
@@ -3650,14 +4185,16 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
             "scripts/generate_targets.py --all` to build it; if you passed "
             f"--source, check that {source} is the path you meant",
         )
-    violations = _sidecar_source_violations(source)
+    violations = _sidecar_source_violations(source, profile)
     if violations:
         shown = ", ".join(violations[:5])
         more = "" if len(violations) <= 5 else f" (+{len(violations) - 5} more)"
         return _abort(
-            f"{source} is not a sidecar tree: {shown}{more}",
-            "pass a source built by generate_targets.py --all (dist/sidecar), "
-            "not a full-install tree such as dist/multi-agent",
+            f"{source} is not a sidecar tree for the {profile!r} profile: "
+            f"{shown}{more}",
+            "pass a source built by generate_targets.py --all "
+            f"(dist/sidecar/{profile}), not a full-install tree such as "
+            "dist/multi-agent or another profile's tree",
         )
 
     preflight = _run_target_preflight(target)
@@ -3674,13 +4211,20 @@ def install_sidecar(target: Path, source: Path, *, dry_run: bool = False) -> int
         return lock
     with lock:
         try:
-            return _install_sidecar_planned(target, source, preflight, dry_run=dry_run)
+            return _install_sidecar_planned(
+                target, source, preflight, dry_run=dry_run, profile=profile
+            )
         except OSError as exc:
             return _abort_write_failure(exc)
 
 
 def _install_sidecar_planned(
-    target: Path, source: Path, preflight: _TargetPreflight, *, dry_run: bool
+    target: Path,
+    source: Path,
+    preflight: _TargetPreflight,
+    *,
+    dry_run: bool,
+    profile: str = SIDECAR_DEFAULT_PROFILE,
 ) -> int:
     """``install_sidecar`` after preflight and the run lock: gather Git
     state, plan, check writability, then dry-run or apply."""
@@ -3696,12 +4240,13 @@ def _install_sidecar_planned(
         path for mode, path in preflight.index_entries if mode == "160000"
     )
 
-    desired_units = load_desired_units(source)
+    desired_units = load_desired_units(source, profile)
     required_units = required_snapshot_units(
         desired_units, manifest, exclude_block.listed_units, exclude_block.listed_files
     )
     read_list_skill_names = _read_list_skill_names(target, tracked)
     declared_skill_names = _declared_skill_names(target)
+    read_list_file_names = _read_list_agent_names(target, tracked)
     # Every listed unit is already part of required_units (it was folded in
     # above), so this is exactly the set the exclude block currently lists.
     excluded_units = exclude_block.listed_units
@@ -3716,9 +4261,13 @@ def _install_sidecar_planned(
         return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
     preserved_destinations = {
-        unit_path: preserved_root
-        / preserved_unit_slug(
-            unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+        unit_path: (
+            preserved_root / state_backup_slug(preserved_root)
+            if unit_path in _ALL_STATE_ROOTS
+            else preserved_root
+            / preserved_unit_slug(
+                unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+            )
         )
         for unit_path in required_units
     }
@@ -3737,12 +4286,14 @@ def _install_sidecar_planned(
         listed_files=exclude_block.listed_files,
         unrecognized_lines=exclude_block.unrecognized_lines,
         declared_skill_names=declared_skill_names,
+        read_list_file_names=read_list_file_names,
         ignorecase=ignorecase,
         preserved_conflicts=preserved_conflicts,
         preserved_destinations={
             unit: str(path) for unit, path in preserved_destinations.items()
         },
         pending_manifest=preflight.pending_manifest,
+        profile=profile,
     )
     if plan_result.aborts:
         message = "; ".join(
@@ -3800,9 +4351,16 @@ def _uninstall_final_exclude_text(
     write_text: str, plan_result: PlanResult, unrecognized_lines: Sequence[str]
 ) -> str:
     """The exclude text uninstall leaves behind once every action lands:
-    the whole block removed, or -- the one Decision 9 exception -- just its
-    final lines, when a preserve conflict kept the block (Decision 34)."""
-    if plan_result.kept_conflicts:
+    the whole block removed, or just its final lines when something stays
+    hidden on purpose: a preserve conflict kept a unit (Decision 34), or the
+    state folder is kept and its line must survive (workflow profile,
+    Decision 3)."""
+    own_final_lines = [
+        line
+        for line in plan_result.exclude_lines_final
+        if line not in set(unrecognized_lines)
+    ]
+    if plan_result.kept_conflicts or own_final_lines:
         return _replace_exclude_block(write_text, plan_result.exclude_lines_final)
     return _remove_exclude_block(write_text, unrecognized_lines)
 
@@ -3872,8 +4430,9 @@ def _uninstall_sidecar_apply(
     apply step and gate rule (Decision 40). Steps below match the small
     plan's numbered rebuild exactly."""
     assert not any(
-        action.kind in ("install", "update", "adopt") for action in plan_result.actions
-    ), "uninstall must never plan install, update, or adopt"
+        action.kind in ("install", "update", "adopt", "seed_missing")
+        for action in plan_result.actions
+    ), "uninstall must never plan install, update, adopt, or seed_missing"
 
     original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
     original_text = os.fsdecode(original_bytes) if original_bytes else ""
@@ -3965,7 +4524,9 @@ def _uninstall_sidecar_apply(
     return exit_code
 
 
-def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
+def uninstall_sidecar(
+    target: Path, *, dry_run: bool = False, purge_state: bool = False
+) -> int:
     """Remove the sidecar overlay from ``target`` entirely (Decision 34; the
     small plan's step 9).
 
@@ -3978,6 +4539,11 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
     visible to ``git add -A``; a block line the sidecar never understood
     survives as a plain line where the block was. Runs through the same
     target-only preflight as ``install_sidecar`` (steps 3, 4, 6).
+
+    The namespaced state root (Decision 3) is the one unit this does not
+    apply to: kept in place and hidden by default (reported, never removed),
+    or moved into the preserved-copy folder and un-hidden when
+    ``purge_state`` is set.
 
     Returns 0 on a clean uninstall, including when there was nothing to do;
     1 when a preserve conflict kept a unit in place -- the one exception to
@@ -4014,13 +4580,19 @@ def uninstall_sidecar(target: Path, *, dry_run: bool = False) -> int:
         return lock
     with lock:
         try:
-            return _uninstall_sidecar_planned(target, preflight, dry_run=dry_run)
+            return _uninstall_sidecar_planned(
+                target, preflight, dry_run=dry_run, purge_state=purge_state
+            )
         except OSError as exc:
             return _abort_write_failure(exc)
 
 
 def _uninstall_sidecar_planned(
-    target: Path, preflight: _TargetPreflight, *, dry_run: bool
+    target: Path,
+    preflight: _TargetPreflight,
+    *,
+    dry_run: bool,
+    purge_state: bool = False,
 ) -> int:
     """``uninstall_sidecar`` after preflight and the run lock: gather Git
     state, plan, check writability, then dry-run or apply."""
@@ -4058,9 +4630,13 @@ def _uninstall_sidecar_planned(
         return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
     preserved_destinations = {
-        unit_path: preserved_root
-        / preserved_unit_slug(
-            unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+        unit_path: (
+            preserved_root / state_backup_slug(preserved_root)
+            if unit_path in _ALL_STATE_ROOTS
+            else preserved_root
+            / preserved_unit_slug(
+                unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+            )
         )
         for unit_path in required_units
     }
@@ -4084,6 +4660,7 @@ def _uninstall_sidecar_planned(
             unit: str(path) for unit, path in preserved_destinations.items()
         },
         uninstall=True,
+        purge_state=purge_state,
         pending_manifest=preflight.pending_manifest,
     )
     if plan_result.aborts:
@@ -4127,3 +4704,36 @@ def _uninstall_sidecar_planned(
         exclude_block.has_block,
         preserved_root,
     )
+
+
+def backup_sidecar_state(target: Path, *, dry_run: bool = False) -> int:
+    """``--backup-state``: copy the namespaced state folder into the
+    preserved-copy folder, changing nothing else (Decision 3; the small
+    plan's step 6). A standalone action, unlike install or uninstall: no
+    manifest read or write, no reconciliation, no exclude-block change.
+    With ``dry_run`` it only reports the copy it would make.
+
+    Returns 0 whether or not the folder exists; a missing folder is
+    reported, not an error. Raises ``subprocess.CalledProcessError`` when
+    ``target`` is not a Git repository, for the caller to turn into a clean
+    message the same way every other Git-repository check here does.
+    """
+    target = target.resolve()
+    git_dir = Path(_git_rev_parse_or_raise(target, "--git-dir"))
+    preserved_root = git_dir / SIDECAR_PRESERVED_NAME
+    backed_up_any = False
+    for state_root in sorted(_ALL_STATE_ROOTS):
+        state_path = target / PurePosixPath(state_root)
+        if not state_path.is_dir() or state_path.is_symlink():
+            continue
+        destination = preserved_root / state_backup_slug(preserved_root)
+        if dry_run:
+            _info(f"would back up {state_path} -> {destination}")
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(state_path, destination)
+            _info(f"backed up {state_path} -> {destination}")
+        backed_up_any = True
+    if not backed_up_any:
+        _info("no state folder found; nothing to back up")
+    return 0

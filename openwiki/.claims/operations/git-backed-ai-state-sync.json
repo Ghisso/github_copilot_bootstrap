@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:2227cb871ced85cdf1be899a9dcb2ac6a041ee2177c726f129790f8e4befc49c",
+  "pageVersion": "sha256:5c765e740e1d30a4fea7d4352f2ff7aea231b2b1ba720e3db083b009d8d032d9",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
@@ -162,17 +162,17 @@
     },
     {
       "id": "claim_a815423ad1a149d0a35524d028b07cf5",
-      "statement": "The installer dispatches --uninstall to _run_uninstall (and so to uninstall_sidecar) and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install or uninstall creates or touches no nested .claude repository, ai-state branch, or state sync; a missing git executable ends both paths with 'git not found on PATH' instead of a traceback.",
+      "statement": "The installer dispatches --backup-state to _run_backup_state (and so to backup_sidecar_state), --uninstall to _run_uninstall (and so to uninstall_sidecar), and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install, uninstall, or state backup creates or touches no nested .claude repository, ai-state branch, or state sync; a missing git executable ends the install and uninstall paths with 'git not found on PATH' instead of a traceback.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1565-L1600",
-          "version": "repo-lines-v1:sha256:20833eb11ef8095a7eda9973e49144b2574440a79813a4289d708740a0c19290:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdmODY2NzI0Zjk4ZmRkNDBmNzY2YWNkMzA1YjUxM2U1ZDZhY2NjZjVkYWM2MTIzNzRjNTNjMDljZDRlNjA5NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1612-L1685",
+          "version": "repo-lines-v1:sha256:e6c9817e8935acf10a8c69b335965273b3aae304e4fbd21f95315ce3efa6e6e2:eyJzZWxlY3RlZExpbmVDb3VudCI6NzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T05:02:18.019Z"
+    "at": "2026-09-27T14:43:37.947Z"
   }
 }
