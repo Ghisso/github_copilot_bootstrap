@@ -65,7 +65,7 @@ CHECK_IDS = (
     "VFY-RECEIPT-001",
 )
 # Budget for one lint, type, generation, or pytest command. This
-# repository's own suite takes about 190 seconds (2,300 real-Git tests
+# repository's own suite takes about 190 seconds (2,225 tests, many real-Git,
 # after sidecar Phase L), so the earlier 180-second budget made `verify.py
 # phase` UNVERIFIED on an idle machine. Keep it below
 # VERIFICATION_ITEM_TIMEOUT_SECONDS by at least the lint and type time.
