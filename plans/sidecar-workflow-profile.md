@@ -1,7 +1,7 @@
 ---
 name: sidecar-workflow-profile
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: sidecar-workflow-profile_implementation
 started_at: 2026-09-27T10:31:47Z
@@ -9,7 +9,7 @@ phases:
   - 2026-09-27_phase-A-workflow-profile-evidence-and-content
   - 2026-09-27_phase-B-workflow-profile-implementation
   - 2026-09-27_phase-C-workflow-profile-knowledge-refresh
-current_phase: 2026-09-27_phase-C-workflow-profile-knowledge-refresh
+current_phase: 
 ---
 
 # Big Plan: Sidecar Workflow Profile
