@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-f48dfb5bc22ec5140aa8b810
     resource: repo://tests/test_install_bootstrap.py
-generated: { by: "claude-code", at: "2026-09-26T06:04:25.666Z" }
+generated: { by: "claude-code", at: "2026-09-27T05:02:18.019Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T06:04:25.666Z
+    at: 2026-09-27T05:02:18.019Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -35,10 +35,10 @@ The installer has two modes. A full install copies the generated target into a c
 Detection looks for three kinds of evidence:
 
 - Sidecar evidence: anything at the manifest path `ai-bootstrap-sidecar.json` in the Git directory, valid or not and including a dangling symlink, or a sidecar marker block in `info/exclude` (a local, untracked ignore file, separate from the team's tracked `.gitignore`). The exclude file is found through the common Git directory and read only when it is a regular file.
-- Full evidence: `.claude/.git` as a real directory with no index entry at or under `.claude`, `.claude/bootstrap-ownership.env`, or `--allow-self` with this repository as the target. A team `.claude` submodule, whose `.git` is a file, or an embedded repository tracked as a gitlink, is team configuration instead.
+- Full evidence: `--allow-self` with this repository as the target, or, when the outer index has no entry of any kind (file, symlink, or gitlink) at or under `.claude`, either `.claude/.git` as a real directory or `.claude/bootstrap-ownership.env` present (checked with `lexists`). `_full_install_evidence` reads the index once, before either check. A tracked `.claude` in any form is therefore team configuration even when it carries the ownership file: a team submodule at `.claude`, an embedded repository tracked as a gitlink, tracked files under `.claude/`, or `.claude` as a tracked symlink. Before this rule, a team that shipped its own AI-state repository as a submodule handed every clone "full evidence", and a plain install then committed an `ai-state` branch inside the team's submodule.
 - Team configuration: `git ls-files -z` lists a path under `FULL_INSTALL_ROOT_PATHS` (`.claude`, `.devcontainer`, and the restorable root adapter paths). These are the agent-harness paths. A tracked `.gitignore` is not one of them, so a repository that tracks only code and `.gitignore` gets the fresh full-install default.
 
-Detection runs Git with `LC_ALL=C`, so its error text is in English. A Git failure other than "not a git repository", such as a dubious-ownership error, aborts detection in every mode with Git's message and a `git config --global --add safe.directory` remedy, instead of silently falling through to a full install. An unbalanced sidecar marker block in `info/exclude` aborts detection the same way.
+Detection runs Git with `LC_ALL=C`, so its error text is in English. A Git failure other than "not a git repository", such as a dubious-ownership error, aborts detection in every mode with Git's message and a `git config --global --add safe.directory` remedy, instead of silently falling through to a full install. An unbalanced or doubled sidecar marker block in `info/exclude` also aborts detection in every mode, with the marker remedy rather than the `safe.directory` hint: `Refusing to detect an install mode: <reason>. To recover, fix info/exclude by hand: the sidecar's own BEGIN/END markers must appear exactly once each, with BEGIN before END, then rerun.` A missing `git` executable ends every entry path, including `--uninstall`, with `git not found on PATH: install Git or add it to PATH, then rerun.` instead of a traceback.
 
 The table shows the result for each case, in the order the function checks it.
 
@@ -48,18 +48,22 @@ The table shows the result for each case, in the order the function checks it.
 | `--mode sidecar` | a linked worktree (its `--git-dir` differs from `--git-common-dir`) | refuse |
 | `--mode sidecar` | anything else | sidecar install |
 | `--mode full` | sidecar evidence | refuse |
+| `--mode full` | no full evidence, and the target is a subfolder, a linked worktree, a bare repository, or has `.claude` as a regular file | refuse |
 | `--mode full` | anything else | full install |
 | no `--mode` | both kinds of evidence | refuse |
 | no `--mode` | sidecar evidence | sidecar install |
 | no `--mode` | full evidence | full install (refresh) |
 | no `--mode` | team configuration only | refuse, offering `--mode full` or `--mode sidecar` |
+| no `--mode` | nothing, but the target is a subfolder, a linked worktree, a bare repository, or has `.claude` as a regular file | refuse |
 | no `--mode` | nothing | full install (fresh default) |
 
-Every refusal is a `SystemExit` that names the evidence found and the way forward. The `--mode full` refusal on a sidecar consumer offers three ways forward: run without `--mode full` to keep the overlay, run `--uninstall` to remove it first, or ask whoever manages the sidecar to remove it. When the tracked paths include `.devcontainer/state-sync.sh`, the team-configuration refusal adds that the target looks like a fresh clone of a full consumer and says to run `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`. A target that is not a Git repository, or a target folder that does not exist, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table, each refusal message, the submodule and gitlink cases, the dubious-ownership abort, and the dangling manifest symlink.
+Every refusal is a `SystemExit` that names the evidence found and the way forward. The `--mode full` refusal on a sidecar consumer offers three ways forward: run without `--mode full` to keep the overlay, run `--uninstall` to remove it first, or ask whoever manages the sidecar to remove it. When the tracked paths include `.devcontainer/state-sync.sh`, the team-configuration refusal adds that the target looks like a fresh clone of a full consumer and says to run `bash .devcontainer/state-sync.sh setup` first, or pass `--mode full`.
+
+The two "nothing, but" rows come from `_fresh_default_refusal`, which runs only when no bootstrap evidence exists, so an existing full consumer is never affected. It refuses, in this order, a target that is not `git rev-parse --show-toplevel` of its repository, a linked worktree (its `--git-dir` differs from `--git-common-dir`), a bare repository, and a `.claude` that `os.lstat` reports as a regular file. Each message names the shape and then says `The full install supports only the root of a main worktree`, followed by a remedy: run from the repository root, run from the main worktree checkout, use a repository with a working tree, or let `.claude` become a directory. A target that is not a Git repository, or a target folder that does not exist, shows no evidence and falls through to the fresh full-install default. `tests/test_install_bootstrap.py` covers every row of the table, each refusal message, the tracked-`.claude` shapes with the ownership file (tracked files, a submodule, a tracked symlink), the four fresh-default shapes in both plain and `--mode full` runs, the dubious-ownership abort, the doubled-marker remedy, the missing-`git` message, and the dangling manifest symlink.
 
 After detection, `main` picks the source: `--source` when given, otherwise `dist/multi-agent/` for a full install or `dist/sidecar/` for a sidecar install. `require_source_exists` refuses a missing source; a missing default source says to run `uv run python scripts/generate_targets.py --all`, and a missing explicit `--source` names that path. A sidecar target then gets `validate_install_roots` with `allow_self=False` and no `--allow-self` hint, one warning naming any full-only option it ignores (`--commit-copilot-surface` or `--no-commit-copilot-surface`, `--state-remote`, `AI_STATE_REMOTE`, `--allow-self`), and a hand-off to `install_sidecar`. `--local-only` is accepted as a no-op there, and `--dry-run` works. No full-install step below ever runs for a sidecar target.
 
-`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full` and any full evidence. When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0. Otherwise it hands the target to `uninstall_sidecar`. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
+`--uninstall` skips the mode table entirely. `_run_uninstall` refuses `--mode full`, a target that is not a directory (`Refusing --uninstall: <target> is not a directory.`, exit 1), and any full evidence. It then warns once about ignored full-only options (`--uninstall ignores full-only option(s): ...`, naming `--source`, `--local-only`, `--state-remote` or `AI_STATE_REMOTE`, and the Copilot surface flags). When there is no sidecar evidence, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0; a target that Git does not recognize as a repository instead exits 1 with `Refusing --uninstall: <target> is not a Git repository, so it cannot hold a sidecar overlay.` Otherwise it hands the target to `uninstall_sidecar`. Because it never runs the team-configuration check, it works in a team repository; [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) describes what it removes and keeps.
 
 ## The ownership model
 

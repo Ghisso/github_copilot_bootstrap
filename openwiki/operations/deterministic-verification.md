@@ -3,9 +3,6 @@ type: operations
 title: "Deterministic verification: verify.py modes, receipts, and findings"
 description: What verify.py's fast, phase, closeout, and gate modes measure, the seven check ids, what a receipt binds (code state, nested AI state, and the bootstrap-root mirror), how closeout runs a plan's required verification items, what record_findings.py records, and which failures block a commit or push.
 tags: [verification, verify.py, receipts, provenance, findings, gates, closeout]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T05:37:12.382Z
 sources:
   - id: openwiki-source-37cd5f3d3aa49832caf1a222
     resource: repo://docs/runtime-checks.md
@@ -17,7 +14,10 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
+generated: { by: "claude-code", at: "2026-09-27T05:02:18.019Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-09-27T05:02:18.019Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -65,6 +65,8 @@ Every receipt carries the same seven checks, each `PASS`, `FAIL`, `UNVERIFIED`, 
 - **`fast`** is feedback during IMPLEMENT. It runs Ruff only on changed Python paths that still exist and marks every other check `NOT_APPLICABLE`. It never creates reusable evidence.
 - **`phase`** runs the full measurement group and persists reusable evidence. In this authoring repository it lints and type-checks `shared`, `scripts`, and `tests` and runs `tests/`. In a consumer it lints the repository excluding `.claude`, type-checks the configured mypy scope (or reports `UNVERIFIED` with the fix: add `src/` or set `[tool.mypy]` files, packages, or modules), and runs pytest.
 - **`closeout`** does not re-measure. It loads the persisted phase receipt for `VFY-RECEIPT-001` and proves freshness. `VFY-FRESH-001` passes only when `base_ref`, `branch`, `head_sha`, `merge_base_sha`, and `content_hash` equal the phase receipt's values. `VFY-FRESH-002` passes only when control-plane provenance still matches. The failure messages are `relevant code evidence is stale` and `governing control-plane provenance is stale`.
+
+Each lint, type, generation, or pytest command in `phase` mode runs under `COMMAND_TIMEOUT_SECONDS = 480`. A command that exceeds it is reported as `UNVERIFIED`, for example `VFY-PYTEST-001: UNVERIFIED - pytest did not run: Command ... timed out after 480 seconds`, and the phase receipt then cannot satisfy closeout's `VFY-RECEIPT-001`. The budget stays below the 600-second per-item budget described below, because a required closeout item may itself be `verify.py phase`; this repository's own suite takes about 190 seconds.
 
 `phase` and `closeout` refuse to run when `.claude` is not its own Git repository, because nested provenance is then unavailable. The message tells you to checkpoint with `git -C .claude add -A && git -C .claude commit`.
 

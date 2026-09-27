@@ -19,7 +19,7 @@ sources:
 generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T00:04:00.096Z
+    at: 2026-09-27T05:32:51.756Z
 ---
 
 # Quickstart: where to look for what

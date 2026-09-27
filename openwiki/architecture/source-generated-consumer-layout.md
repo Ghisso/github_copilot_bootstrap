@@ -5,7 +5,7 @@ description: The four places the bootstrap lives in (authoring shared/, generate
 tags: [architecture, layout, generation, validation, dist, ai-state, consumer]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T06:04:25.666Z
+    at: 2026-09-27T05:32:51.756Z
 sources:
   - id: openwiki-source-ea70eb6c045047448e446296
     resource: repo://.gitignore
@@ -25,7 +25,7 @@ sources:
     resource: repo://scripts/validate_targets.py
   - id: openwiki-source-2b53bea07579a982c3a0a847
     resource: repo://shared/mcp/servers.json
-generated: { by: "claude-code", at: "2026-09-26T00:04:00.096Z" }
+generated: { by: "claude-code", at: "2026-09-27T05:32:51.756Z" }
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -105,7 +105,7 @@ Text copied into a target passes through `transform_target_paths`, a table of li
 - the task-lane contract and the Codex model contract;
 - agents, MCP and hook wiring, the Antigravity manifest and skills, the Context Mode tool surface;
 - skills and paths;
-- the sidecar target and its adversarial cases: only allowlisted skill, `LICENSE`, and bridge paths; the exact source set, with nothing missing and nothing extra; no bootstrap-only path, `mcp__`, or `ctx_` reference; no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; each bridge with its client's frontmatter;
+- the sidecar target and its adversarial cases: only allowlisted skill, `LICENSE`, and bridge paths; the exact source set, with nothing missing and nothing extra; no forbidden text token (`SIDECAR_FORBIDDEN_TEXT_TOKENS` lists bootstrap-only paths such as `.claude/hooks/`, `.claude/plans/`, `.claude/session_logs/`, `.github/hooks/`, and `third_party/`, and the literals `verify.py`, `record_findings`, `mcp__`, `ctx_`, `MEMORY.md`, and `openwiki`); no leftover `SIDECAR_TEXT_REPLACEMENTS` phrase; the license and the `humanize` credit present; each bridge with its client's frontmatter;
 - coverage of every `dist/multi-agent/` file by `FULL_INSTALL_ROOT_PATHS`, the list the installer uses to recognize a team-owned repository, with its adversarial cases;
 - docs parity (which owns the skill-library integrity rules);
 - memory security authority and routing-table parity;

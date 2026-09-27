@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:969ebff731103a349a8a1349b280a30da35af384516cd5dafc89beb20fbc8e4f",
+  "pageVersion": "sha256:096b3f2e8e96140ca699cf790570cabc3aa733a8554561c5ececceedb20e7c72",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -103,8 +103,8 @@
       "statement": "validate_targets.py's main runs a fixed sequence of structural gates over dist/ (task-lane contract, agents, MCP and hooks, skills, the sidecar target and FULL_INSTALL_ROOT_PATHS coverage with their adversarial cases, docs parity, runtime drift, receipt-chain lifecycle, installer, state sync, determinism, and hook-gate regression tests), prints FAIL lines and exits 1 on any error, and otherwise prints 'PASS generated target is structurally valid'.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L11654-L11697",
-          "version": "repo-lines-v1:sha256:c483144e33102b5105755d7fa5da4e08490742d33629c53fccc42bfab0f257da:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+          "resource": "repo://scripts/validate_targets.py#L11659-L11702",
+          "version": "repo-lines-v1:sha256:43bc2009595a88942e91b1270b4d070da6b65ab992a7851721084a1483799a6c:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1ZTI1NDliMzRmYWQ3MTkzZDk4NTdkNjg4MmYxNmI0ZDM1OGUwNWMyZTY4YjhjNWQ0NjI2MGU2YzA4MTNhZWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5OWRiMWZhMGU2Nzc3OGEzM2I2MDAxODU4ZDczYmNlYzE0NzI4N2UxNGNjOWZiNzI4YzlmNjU1YjhhODFkMTciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZkYjIwZjI5NDM2ODBlNjNhNDk2NzE1YTQ1ZDE1OTI0YTg2ZTRjMDNhNTYyMTBlNDY0ZDYwMTZmMTg2M2FkYmMifQ"
         }
       ]
     },
@@ -114,11 +114,11 @@
       "evidence": [
         {
           "resource": "repo://docs/architecture.md#L108-L112",
-          "version": "repo-lines-v1:sha256:d7e42f67b4bd59dd383d5f975c8ff157686b28c55e6ffcfbe9e648e29b158125:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTVjZDM5NmJhYjg4YjIwNWRiNzM4ODA3ZjI3YjgzOWFlMjIxMDJmNjkyMGU1OWVjN2NhNDQ1ZTY2ZWYyZjQ5NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTdiYTcxYWMzNGYzN2QyODhjZGVmOTM3OTY0MmUyMjMxOWEzMGE1YjkyYjZlMmI3MGU1ZDNhMDMwMTYwZTNjMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYjI1NTA0NmRjM2FhNzg3NmQwOTQxY2Q1YjY2ZGI1NWM3NTc1MTBkNTdhZTBlYzZlODc4Y2I1NzVhYTJhNDNhYiJ9"
+          "version": "repo-lines-v1:sha256:603dc1703e07fe50aba0f588ff8c81fd134dd47fe2aa4643e6de9a058258f933:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTc0YTk5MTI1YTBmNGNmZTMyYzAzYmQ1ZDRhODk2Y2M5NjBlNzEzOTk5ZDFlMjk0ZTI1OWQ1NjBlNTQ0ZTE1NyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGRhZWMzOGU3YTdlZTcyNjg4ODc5OGY1MDZjZTllN2U2YWFkNWIwNTY5NDQ3NjI2ZTZkYTY4MmI0ZTQzYjc3YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmZjZTJlNTU3NTdlNTIwYWMyNWI0OGYxMTJmYTExN2Y1ODY1MmIzMmYwMjBhMjAxMTc3MGI1NGJmNDFjZmZlMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYThjZTUzOWFkMDBmOTEzNmY5NTg0Njg4MGRmNzNmNzg4NjI2MGY3NWYyZjQ1MDc4ODU0OWFjM2ExYjM5N2VhYSJ9"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L10636-L10660",
-          "version": "repo-lines-v1:sha256:25fd337c3783e9f25bde691b5b25923c616367f3ab1229dea197537640635342:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjljNDA2ZGMzZThiNzNkNzhjN2YwZDQ2NWJhNTU1YjgxOTkyNTVmMTYzZTIwYTk5ZjNkMjM5MTRkNTFkMDU1MTAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjRkZTU3NTFiOTM2YTZiMWM4NzhiMTI5MmU5NWQ3OTg4MWY2YmRiMmE4ODk4MTJkZmRkNDlmY2Y0MDkzYzVjNzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVmNTM3Y2ZlZjM2NDc2NzliZGM1MmUzNjA4NGQ4NmY2MGEzOTg1Y2ZjZTRjNTM5NDVjOWRiZTZjNWRiMzZiOTMifQ"
+          "resource": "repo://scripts/validate_targets.py#L10641-L10665",
+          "version": "repo-lines-v1:sha256:72c408f5a9b69d50b2768bc24dba0c1093e878a82c637692235447c6bb0f0fad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJhMGI1NWIxN2U3NGRjMjE1NjA3Mjg4MjI0ZjRjOGJkY2E5ZmZhYzJkNzc4NGUxYmRhNDVjMDBmNTU5NzVhYWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ1N2ExNTYwZGI2MzQ3OWJmMmI4N2JlNDA3MzAwNzQ2OTMzNjE2NGJmYTk0YWVmMDFhMWFiMGE2NmJhZWRjY2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE0ZTJiZjJkM2ZmZDZmNmEzMjdkYzQxMTVkYmVlNWVlMWQyZjVjYzQyYWU5ZWE1MzI2NDA5ODRmODc1Mzg5NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc1ZDE0YmYzZWM3NTU3YzMwMDJlNWZkY2NlYmM3ZWMyYWI5ZDQwYjQ0ZGQ5NmExODA5OWZkYTRhMmFhMmZhMjQifQ"
         }
       ]
     },
@@ -166,11 +166,11 @@
     },
     {
       "id": "claim_b832f30a18ae4be09dada4285ca8f8ae",
-      "statement": "The sidecar validator rejects any dist/sidecar/ file outside the allowlisted skill, LICENSE, and bridge paths, a tree that does not match the exact sidecar source set, any bootstrap-only path or MCP tool reference, any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, and a bridge without its client's frontmatter; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
+      "statement": "The sidecar validator rejects any dist/sidecar/ file outside the allowlisted skill, LICENSE, and bridge paths, a tree that does not match the exact sidecar source set, any text containing a SIDECAR_FORBIDDEN_TEXT_TOKENS entry (bootstrap-only paths such as .claude/hooks/, .claude/plans/, .claude/session_logs/, .github/hooks/, and third_party/, and the literals verify.py, record_findings, mcp__, ctx_, MEMORY.md, and openwiki), any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, and a bridge without its client's frontmatter; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8599-L8745",
-          "version": "repo-lines-v1:sha256:ba2d4026c71e20700d17854ef91c2ebf3489e10e3943550c95d68b8387dc8ef9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQ3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIzNzdiMGEzNTIyYWI0ZDk0MmI5NjY5NTE5OWEyM2FmZjU4MmNiNmRkODQyMTk4NTM2YmU5Zjk5Y2NiYmU5OGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxMDMwMjUzNTQ1M2M1MGZmYWUwN2ZlOTc5Yzg0ZDFmNDQ3NzVjMzVjNTQxODdhMzZlMDMyNjM3MWY1OTAwNDYyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJiYTMxMzY3ZGVjNWViYTg2YzQzNDYxM2RmYTlhMjIyNTVmM2FhNzQxZWY3OWJlMzEwMGMxZmJlYTU0YmQ2ZDE1In0"
+          "resource": "repo://scripts/validate_targets.py#L8599-L8750",
+          "version": "repo-lines-v1:sha256:b74874a9d9e6ecbe19a7fd8f65becd460bf5fab1662b244f1c8ecd80c5095a74:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIzNzdiMGEzNTIyYWI0ZDk0MmI5NjY5NTE5OWEyM2FmZjU4MmNiNmRkODQyMTk4NTM2YmU5Zjk5Y2NiYmU5OGMyIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxMDMwMjUzNTQ1M2M1MGZmYWUwN2ZlOTc5Yzg0ZDFmNDQ3NzVjMzVjNTQxODdhMzZlMDMyNjM3MWY1OTAwNDYyIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJiYTMxMzY3ZGVjNWViYTg2YzQzNDYxM2RmYTlhMjIyNTVmM2FhNzQxZWY3OWJlMzEwMGMxZmJlYTU0YmQ2ZDE1In0"
         }
       ]
     },
@@ -183,11 +183,11 @@
           "version": "repo-lines-v1:sha256:9cb4c4b3cc41ddb412f61cdff8288e3299214c35b3b966768201625257449659:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlZjFkMWI5NTgxYjRiYTA5M2VlOTZlYzg1NzA5ZDVkNGNiODNjN2FiZTRkNjVjOWIyMzg1YTZjOWUyNjJiNmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYxYjNlNzExOGU2MjU3MzAyNWE2MDZkZWE1YjdjNzliNTI3MWJiYmIwNTRlODk5M2YxM2EzYjZlOTRmY2NmMGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE5OGIwNjNkOWI0N2U2NTM3OTYyNTU3MmNjZTE5NzY2OWQ1NzY3ZTEyYzE4YmUwNzU2NTJiOGNkOTgxY2U4ZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjRmMTQyMGI0Y2YyNGFkM2E2Y2JkNWE0YTZlMjdlZjg2NDc3YmI0NWExNjAxYjExODY1N2I1ZGQ4ZjllMGQ2NjEifQ"
         },
         {
-          "resource": "repo://scripts/sidecar_overlay.py#L1986-L1999",
-          "version": "repo-lines-v1:sha256:01be034b8a507712fb22d96150ce798622ec755697225a6c5a23f6987998fecb:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkOGMyZjZhNDNmYWU5MWQ1ZjU1YWVkOWNiODEyZDg4NDA2ZjMxNDgyYWFlM2EwMzQyNGQ0MTZmODc0NGFiZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI1OWI3ZmU0YTQ5ZmQ4MWI1NDBhNWM2MzZjNjJmZTNkYWQ2ZjgyNDAyMzQzZDdjNjBkNGFkMDI0NThjOThlZjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExNjUyZjRlZTRjOWFkZjUyZDBjMDgyN2Q4MDU5YjBkMGM3OGMwNGMwOWEzMTlkZGEwOTFjNjA0ZGU0YzE5ZGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3Mzk2ZmUzMjk5ZjYzMWFlODVlODU0MTBhNTQzMWQ1Y2MxNDVmMzBkMjg5YmRkNjBmZjMwM2QyYjllODVmZjMifQ"
+          "resource": "repo://scripts/sidecar_overlay.py#L2203-L2218",
+          "version": "repo-lines-v1:sha256:86d6c82030dc4ffee742531025954204f6bab26c4b25f0d0688b19c562705d8d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNkOGMyZjZhNDNmYWU5MWQ1ZjU1YWVkOWNiODEyZDg4NDA2ZjMxNDgyYWFlM2EwMzQyNGQ0MTZmODc0NGFiZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImExNjUyZjRlZTRjOWFkZjUyZDBjMDgyN2Q4MDU5YjBkMGM3OGMwNGMwOWEzMTlkZGEwOTFjNjA0ZGU0YzE5ZGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc3ZjRmMzNjMjc4YWEwNmQzNzEwNDRlOGUwNWJjNTZkNDBhOWFmNWQ5ZjNkZmQ3OTM4MWY4NjIzN2VlMGVmOTAifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L8682-L8702",
+          "resource": "repo://scripts/validate_targets.py#L8687-L8707",
           "version": "repo-lines-v1:sha256:1dbcbed05b881f465e465a74518d1f0cf07e754c5ac666e874c111f57943a9bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFlYzdhMWViZjE5Yjg0Nzc5ODRjYTk4NDI4NWQwZDAxNmU2NjMyNDI4ZDdmYTZlZTI2OWQyMmIxMTVjNDVmN2EiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMxMTc4NzhjYTE4YzkzMzQyNWFhMmM2Y2VlNjIxYjQ5NmE4ODBiMWYzNTJlMDNkMThlZWIzN2IxYjEwNTRmNTkifQ"
         }
       ]
@@ -195,6 +195,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-26T06:04:25.666Z"
+    "at": "2026-09-27T05:32:51.756Z"
   }
 }
