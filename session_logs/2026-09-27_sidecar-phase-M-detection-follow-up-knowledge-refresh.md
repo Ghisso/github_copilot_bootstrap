@@ -69,6 +69,25 @@ knowledge-refresh phase.
 - Step 4: no MEMORY entry was wrong after Phase L. One lesson added (below).
 - Required items pre-checked on the refreshed tree: `validate_targets.py`
   PASS, `validate_plan_frontmatter.py` PASS, `verify.py fast` PASS.
+- REVIEW round 1 (`reviewer`, all six profiles, on `git diff -- openwiki`):
+  FAIL with one MAJOR and one MINOR. MAJOR: the quickstart claim on the
+  verification entrypoints cited `README.md#L990-L999` and `#L1064`,
+  which are the skill list and the Task Lanes paragraph; the mapping
+  script had matched text that was already wrong at the page's base.
+  MINOR: the forbidden-token sentence on the source-and-layout page read
+  as an exhaustive list but omitted `third_party/`. The reviewer
+  spot-checked well over 25 other evidence ranges and found them exact,
+  found no contradiction with Decisions 48-58, and no style violation.
+- Fix: both findings live in OpenWiki-owned claim files, so they were
+  corrected through a second run, `openwiki_begin` with `mode: "update"`
+  and `force: true` (run `de93b4d3-2130-40f8-b057-daca08933123`), with a
+  two-page plan. The source-and-layout page now names `third_party/` and
+  its claim statement matches; the same submission re-anchored the
+  drifted `sidecar_overlay.py` range (`L2203-L2218`) noted earlier, so
+  that item is closed. The quickstart claim now cites README's
+  "Verification Defaults" section (`L1100-L1122`). `openwiki_finish`
+  returned `complete`; the guard restored the adapters after both
+  `openwiki_begin` calls.
 
 ## [LEARN] Entries
 
@@ -127,8 +146,6 @@ generated `openwiki/` pages were refreshed through OpenWiki's own tools.
 - This is the big plan's last phase. The post-commit hook marks the big
   plan `complete` after this commit. The user owns the PR to `dev` and the
   merge.
-- Next refresh: re-anchor the one drifted `sidecar_overlay.py` range noted
-  in the Work Log on the source-and-layout page.
 - Known limits carried forward: Antigravity is still unverified for the
   sidecar; a skill unit that is a cross-filesystem mount point and not a
   real folder is not refused in preflight (since Phase L a failed preserve
