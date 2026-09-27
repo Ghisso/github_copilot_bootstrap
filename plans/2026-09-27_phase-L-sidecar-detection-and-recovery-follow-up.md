@@ -74,7 +74,8 @@ flowchart TD
   `_run_target_preflight`, `_install_sidecar_apply`,
   `_uninstall_sidecar_apply`, `install_sidecar`, `uninstall_sidecar`,
   `_info`, `_abort`, and the remedies.
-- `scripts/runtime_ownership.py` — `SIDECAR_FORBIDDEN_TEXT_TOKENS`.
+- `scripts/validate_targets.py` — `SIDECAR_FORBIDDEN_TEXT_TOKENS`.
+- `shared/scripts/verify.py` — `COMMAND_TIMEOUT_SECONDS` (step 15).
 - `tests/test_install_bootstrap.py`, `tests/test_sidecar_install.py`,
   `tests/test_sidecar_update.py`, `tests/test_sidecar_uninstall.py`,
   `tests/test_sidecar_overlay.py`, `tests/sidecar_test_helpers.py`.
@@ -416,6 +417,21 @@ Test rules for every step (Decision 47 applies unchanged):
   - Update `docs/target-mapping.md` and `docs/architecture.md` where they
     restate any of these. Never hand-edit `openwiki/`; Phase M refreshes
     it.
+
+- [x] **15. Verifier command budget (added during closeout).**
+  - **Owner:** `orchestrator`
+  - Found at closeout: `verify.py phase` reported `VFY-PYTEST-001:
+    UNVERIFIED` because its pytest run hit `COMMAND_TIMEOUT_SECONDS = 180`
+    while the full suite takes about 188 seconds on an idle machine (2,223
+    tests before this step; the suite was already near the limit before
+    this phase). Raise `COMMAND_TIMEOUT_SECONDS` in
+    `shared/scripts/verify.py` to 480, keeping it below
+    `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` by more than the lint and
+    type time, so the documented relationship between the two budgets
+    holds. One constant and its comment; no other verifier change.
+    Regenerate `dist/` and self-install so the installed copy matches.
+  - Evidence: `verify.py phase --format text` shows the timeout before the
+    change and PASS after it; the closeout session log records both.
 
 ## Acceptance Criteria
 

@@ -64,7 +64,12 @@ CHECK_IDS = (
     "VFY-GEN-001",
     "VFY-RECEIPT-001",
 )
-COMMAND_TIMEOUT_SECONDS = 180
+# Budget for one lint, type, generation, or pytest command. This
+# repository's own suite takes about 190 seconds (2,300 real-Git tests
+# after sidecar Phase L), so the earlier 180-second budget made `verify.py
+# phase` UNVERIFIED on an idle machine. Keep it below
+# VERIFICATION_ITEM_TIMEOUT_SECONDS by at least the lint and type time.
+COMMAND_TIMEOUT_SECONDS = 480
 # Separate from COMMAND_TIMEOUT_SECONDS because a required item may itself be
 # `verify.py phase`, which already spends up to COMMAND_TIMEOUT_SECONDS on
 # one pytest run.
