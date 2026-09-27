@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:8660caee8c5cea92a1348394584e541107751b83f69f4fefd9d4be6828735da3",
+  "pageVersion": "sha256:5e26931d12676edb94dcd01aacaaebe70e90464b562c0897ea36e312193280e0",
   "claims": [
     {
       "id": "claim_170b66d0359a4df39a8029164feadafe",
@@ -50,25 +50,25 @@
     },
     {
       "id": "claim_3fb9f8032c7b48b2afabcb978f7c6ac1",
-      "statement": "The installer has two modes: a full install from dist/multi-agent that owns the agent harness, and a sidecar install from dist/sidecar that adds Git-ignored skill and bridge files to a team-owned repository; generate_targets.py renders both targets.",
+      "statement": "The installer has two modes: a full install from dist/multi-agent that owns the agent harness, and a sidecar install from dist/sidecar/<profile> that adds Git-ignored files to a team-owned repository in the skills profile (skills and bridges) or the workflow profile (skills, agents, rules, review profiles, templates, and a hidden state folder); generate_targets.py renders the full target and both sidecar profiles.",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L1802-L1812",
-          "version": "repo-lines-v1:sha256:659cc87f1d0d30ca3e85f1ab964fb8a59cb50995750dc4bc9373dadc3f3fbf6f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZGY0YTg1Mzc3M2RkZTMyNjY1NTg0NTdiMzM5MmM0ZTA2MWRlMTI5MDcyMzQxZTBmZTM3NjA4YmFkMzhkNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNGRjYjk1NWE2NjlmMzU5ODY5Yjc2ZGJkZTYwMDIwOTA3YTg5MGFjYTY1OTVhNzQxYjFkZGI5YTAxNjhkMjUifQ"
+          "resource": "repo://scripts/generate_targets.py#L1966-L1980",
+          "version": "repo-lines-v1:sha256:d826c922fd621ed385974800ee4acbe79937f28f797ac6a053f967f2c59b683d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMmY3YTgxNmIzNzczZmEzNTczYThlYjg3MGI0NzZhMGE0MmIwMTQ4YTRlMTU1NjMxNTZkNmQ4ZDE0YmU0OTciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzZGY0YTg1Mzc3M2RkZTMyNjY1NTg0NTdiMzM5MmM0ZTA2MWRlMTI5MDcyMzQxZTBmZTM3NjA4YmFkMzhkNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNGRjYjk1NWE2NjlmMzU5ODY5Yjc2ZGJkZTYwMDIwOTA3YTg5MGFjYTY1OTVhNzQxYjFkZGI5YTAxNjhkMjUifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1565-L1600",
-          "version": "repo-lines-v1:sha256:20833eb11ef8095a7eda9973e49144b2574440a79813a4289d708740a0c19290:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdmODY2NzI0Zjk4ZmRkNDBmNzY2YWNkMzA1YjUxM2U1ZDZhY2NjZjVkYWM2MTIzNzRjNTNjMDljZDRlNjA5NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1631-L1685",
+          "version": "repo-lines-v1:sha256:c3cad6741974662452770b4a7008ab167d1dd77d721f96eccca989b36f45f75c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjM5ZWZkOWUxNzJlNTE2NDhjYzY1N2RiZWEwNDYxM2ZiNzc5M2Q2ZjZjYmViOTIyZjE2YWVkYTZmZDRhMTlmNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L57-L58",
-          "version": "repo-lines-v1:sha256:b2193c6e44e2093eb2c1fdeb890bcbeaee4474bb893ca0b99d78bb25fcde6454:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzY3ZDRjODRiODkzZTZiZmQ3OTA1ZjQ5MmY0YTdkMDc5ZDgwNmI5ZTliNDgyM2E0OGFhNTE5ODA4ODVjOTNkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOTI5Y2IwOTYzOTFiMmFiMjQxMmNkNzkxOTk3NjEwM2Q1Zjk5MTVmYzk3MmUxZDgwYWExNzNhYzQwMWY2N2I5MyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMmYwZWM2ZWY0NTg5ODZhYjg5NzVmMzdkYTdhMjgyNDgyOWFmNThlNjM4ZDgzYzlmYzY4YjAzMGM0NTA3OTM2ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOWQ4NTViMTliMmYwNTcwNmQ5ZmQyOTE1M2U0OGM3NGUxZjQzODlkOTZhYTE1MjU5MDkwODg0ZTkyNGM2Y2IxZiJ9"
+          "resource": "repo://scripts/install_bootstrap.py#L61-L70",
+          "version": "repo-lines-v1:sha256:cde9cb23000b60359710cd4ecf9945a174902d0ab11b424e336fe5a2373f5638:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2N2Q0Yzg0Yjg5M2U2YmZkNzkwNWY0OTJmNGE3ZDA3OWQ4MDZiOWU5YjQ4MjNhNDhhYTUxOTgwODg1YzkzZGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJmMDM2MWUyYWMyYWI1YzUzMmQyMDg4ODUyMjAzN2FhYzM3NWEwOWZhZjY4NjM3ZWUxMjY5OGVkZjc2YWVmZTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJmMGVjNmVmNDU4OTg2YWI4OTc1ZjM3ZGE3YTI4MjQ4MjlhZjU4ZTYzOGQ4M2M5ZmM2OGIwMzBjNDUwNzkzNmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI5ODI5MDAxMTY2NzE2NjkxYTQxODI0Y2VlNzY0ZWZhNGJlMzBmMDQ5ZmZiODUzNzhkZTA4NjE3ZDY3MzhiNzkifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T05:32:51.756Z"
+    "at": "2026-09-27T14:43:37.947Z"
   }
 }

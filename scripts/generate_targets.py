@@ -190,12 +190,12 @@ SIDECAR_TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-# Rewrites the workflow profile's review profiles and its two plan templates
-# from the full install's un-namespaced state folders to the profile's one
-# namespaced state root (big plan Decision 2; small plan Phase B step 2).
+# Rewrites the workflow profile's review profiles, its four relaxed templates,
+# and its skills from the full install's un-namespaced state folders to the
+# profile's one namespaced state root (big plan Decision 2; Phase B step 2).
 # Every other workflow unit (rules, instructions, agent prompts, state seeds)
 # is authored under shared/sidecar/workflow/ already naming the right path,
-# so only these two unit kinds need the rewrite.
+# so only these unit kinds need the rewrite.
 SIDECAR_WORKFLOW_PATH_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (".claude/plans/", ".claude/ai-bootstrap/plans/"),
     (".claude/session_logs/", ".claude/ai-bootstrap/session_logs/"),
@@ -1859,9 +1859,9 @@ def render_sidecar_workflow_units(target_root: Path) -> None:
     `applyTo: "**"` frontmatter Copilot needs). Each shipped agent renders
     with the full install's own Claude frontmatter (`claude_agent_frontmatter`)
     around its `workflow-prompt.md` body, never the canonical `prompt.md`
-    (Decision 6). The review profiles and the two plan templates are rewritten
-    to the namespaced state root; the other two templates ship the relaxed
-    variants authored for this profile. The state seeds are copied as-is
+    (Decision 6). The review profiles and all four templates (the relaxed
+    variants authored under shared/sidecar/workflow/templates/) are rewritten
+    to the namespaced state root. The state seeds are copied as-is
     (Decision 2-3: seeded once by the installer, never compared here).
     """
     workflow_root = REPO_ROOT / "shared" / "sidecar" / "workflow"

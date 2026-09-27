@@ -940,9 +940,9 @@ harness.
 - **The generated source must be complete and exact.** Full mode only
   requires that its source (`dist/multi-agent/`) include
   `.claude/hooks/scripts/state-sync.sh`; a source missing that file is
-  refused. Sidecar mode is stricter: its source (`dist/sidecar/`) must match
-  one exact allowlist, with no file missing and no extra file present, or
-  the install is refused.
+  refused. Sidecar mode is stricter: its source (`dist/sidecar/<profile>/`)
+  must match the profile's exact allowlist, with no file missing and no extra
+  file outside a shipped skill folder, or the install is refused.
 - **Inherited Git environment variables are ignored.** Before it runs any
   Git command, the installer clears `GIT_DIR`, `GIT_WORK_TREE`,
   `GIT_INDEX_FILE`, and Git's other repository-local environment variables
