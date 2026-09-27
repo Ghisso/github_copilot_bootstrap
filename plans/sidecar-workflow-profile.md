@@ -6,12 +6,9 @@ originating_branch: dev
 implementation_branch: sidecar-workflow-profile_implementation
 started_at:
 phases:
-  - 2026-09-27_phase-A-workflow-profile-provider-evidence
-  - 2026-09-27_phase-B-workflow-profile-relaxed-content
-  - 2026-09-27_phase-C-workflow-profile-rendering-and-validation
-  - 2026-09-27_phase-D-workflow-profile-installer-and-state-units
-  - 2026-09-27_phase-E-workflow-profile-docs-and-integration-run
-  - 2026-09-27_phase-F-workflow-profile-knowledge-refresh
+  - 2026-09-27_phase-A-workflow-profile-evidence-and-content
+  - 2026-09-27_phase-B-workflow-profile-implementation
+  - 2026-09-27_phase-C-workflow-profile-knowledge-refresh
 current_phase:
 ---
 
@@ -76,6 +73,9 @@ adapters, and any edit to a tracked file.
   and every unit is proven ignored before it is written.
 - Prove client behavior natively before claiming it, as Phase A of the
   first sidecar plan did.
+- Keep the ceremony to three phases: one for evidence and authored
+  content, one for all code and documentation, one for the knowledge
+  refresh.
 
 ## Non-Goals
 
@@ -104,7 +104,7 @@ adapters, and any edit to a tracked file.
 | 5 | Relaxed instruction set | `shared/sidecar/workflow/` holds the profile's own instruction files, authored for the profile, not derived from `shared/policies/` by text replacement: one workflow rule (read `MEMORY.md` first, use plans and the specialists when the task earns them, log and record lessons at the end, run the project's own checks, review with the reviewer agent), one reporting rule, one tool-routing rule. They render as `.claude/rules/ai-bootstrap-*.md` for Claude Code and as one `.github/instructions/ai-bootstrap-workflow.instructions.md` for Copilot. The existing sidecar bridge stays for the `skills` profile. | The canonical policies are written around hooks, receipts, and the closeout sequence; a replacement table cannot turn them into a relaxed workflow honestly. Short, purpose-written rules are easier to keep true. |
 | 6 | Agent variants | Each shipped agent renders from the same `shared/agents/<id>/` prompt with a workflow-profile supplement that replaces the lifecycle sections (branch, receipts, closeout, commit, push) with the relaxed loop: plan when useful, implement, verify with the project's own commands, review, log. The supplement lives beside the existing provider supplements. The validator rejects an agent text that still names a hook, a receipt, `verify.py`, or the nested repository. | One prompt body per role, as today, with the ceremony removed where the profile has none. |
 | 7 | Client coverage | Claude Code gets skills, agents (`.claude/agents/<id>.md`), rules, review profiles, templates, and state. Copilot in VS Code gets skills, agents (`.github/agents/<id>.agent.md`), and the instructions file. Codex gets skills and state, plus agents only if Phase A finds a config-free discovery path. Antigravity stays unverified unless Phase A can run it. | Codex custom agents need `.codex/config.toml`, which may be the team's; the sidecar never edits a tracked file. |
-| 8 | Skill selection | The workflow profile ships every `visibility: public` skill except a fixed denylist of skills that depend on the full install (`commit`, `context-status`, `knowledge-refresh`, `safe-consumer-bootstrap-refresh`, `setup-project`, `deep-audit`, `run-tests` where it names `verify.py`, and any skill whose text still trips the profile's forbidden tokens after replacements). Phase B fixes the list; the validator enforces it. | Everything else is either a coding skill or a workflow skill that works without hooks. Background skills stay out because no hook injects them. |
+| 8 | Skill selection | The workflow profile ships every `visibility: public` skill except a fixed denylist of skills that depend on the full install (`commit`, `context-status`, `knowledge-refresh`, `safe-consumer-bootstrap-refresh`, `setup-project`, `deep-audit`, `run-tests` where it names `verify.py`, and any skill whose text still trips the profile's forbidden tokens after replacements). Phase A fixes the list; the validator enforces it. | Everything else is either a coding skill or a workflow skill that works without hooks. Background skills stay out because no hook injects them. |
 | 9 | Write roots and precedence | New write roots per unit kind: `.claude/agents`, `.claude/rules`, `.claude/review-profiles`, `.claude/templates`, `.github/agents`, `.github/instructions`, and the state folder. Each new root joins the read list for collision checks. A team file with the same name at any read folder takes the unit, as skills work today, and the run reports it. | Same rule, more unit kinds. Phase A freezes the exact lists on evidence. |
 | 10 | Profile switching | `--profile skills` on a `workflow` install removes the workflow-only units through the ordinary remove and preserve rules and keeps the state folder hidden. `--profile workflow` on a `skills` install adds the missing units. A manifest with a different profile than the flag is an update, not an error. | The engine already reconciles a changed desired set. |
 | 11 | Validator per profile | `validate_targets.py` gains a per-profile allowlist and forbidden-token list. The workflow profile allows `MEMORY.md`, the state paths, and the agent, rule, review-profile, and template paths, and still forbids hooks, `verify.py`, `record_findings`, `.claude/scripts/`, `mcp__`, `ctx_`, and `openwiki`. `dist/sidecar/` becomes `dist/sidecar/skills/` and `dist/sidecar/workflow/`, and the installer's `--source` default follows the profile. | The allowlist is the self-containment contract; two profiles need two lists. |
@@ -165,11 +165,11 @@ the templates; the reviewer writes its report under
 
 ## Pre-Flight Before Branching
 
-- The branch `consumer-sidecar-bootstrap-overlay_implementation` must be
-  merged into `dev` first; this plan builds on Phase L's installer and
-  planner code, and a new implementation branch is created from a clean
-  `dev`.
-- Then confirm: `git status --porcelain` empty, nested `.claude` clean,
+- Done 2026-09-27: `consumer-sidecar-bootstrap-overlay_implementation` was
+  merged into `dev` as pull request #41 (`094f1f0`), so Phase L's installer
+  and planner code is on `dev` and the implementation branch can be
+  created from it.
+- Confirm right before branching: `git status --porcelain` empty, nested `.claude` clean,
   `uv run python scripts/check_runtime.py` PASS,
   `uv run python scripts/validate_plan_frontmatter.py` PASS,
   `uv run python .claude/scripts/verify.py fast --format text` PASS.
@@ -177,21 +177,23 @@ the templates; the reviewer writes its report under
 
 ## Phases
 
-- [ ] `2026-09-27_phase-A-workflow-profile-provider-evidence` — record per client, from documentation and native runs against a fixture with a team-tracked `.claude/`, whether ignored agent files, several rules files, and an instructions file load; freeze the profile's write roots, read roots, and client coverage; no code.
-- [ ] `2026-09-27_phase-B-workflow-profile-relaxed-content` — author the relaxed instruction set, the agent supplements, the skill denylist, and the state seeds under `shared/sidecar/workflow/`.
-- [ ] `2026-09-27_phase-C-workflow-profile-rendering-and-validation` — render `dist/sidecar/workflow/`, split the validator's allowlist and forbidden tokens per profile, and keep `dist/sidecar/skills/` byte-identical to today's output.
-- [ ] `2026-09-27_phase-D-workflow-profile-installer-and-state-units` — add `--profile`, the manifest profile field, state units with their create-once and keep-on-uninstall rules, `--purge-state`, `--backup-state`, the new write roots and precedence, profile switching, and the updater's profile reuse.
-- [ ] `2026-09-27_phase-E-workflow-profile-docs-and-integration-run` — document the profile and run the end-to-end scenario against a clone of a real consumer with a team-tracked `.claude/settings.json`.
-- [ ] `2026-09-27_phase-F-workflow-profile-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit.
+- [ ] `2026-09-27_phase-A-workflow-profile-evidence-and-content` — record per client, from documentation and native runs against a fixture with a team-tracked `.claude/`, whether ignored agent files, several rules files, and an instructions file load; freeze the profile's write roots, read roots, and client coverage; then author the relaxed instruction set, the agent supplements, the skill denylist, and the state seeds under `shared/sidecar/workflow/`. No code.
+- [ ] `2026-09-27_phase-B-workflow-profile-implementation` — profile constants, `dist/sidecar/workflow/` rendering with `dist/sidecar/skills/` byte-identical to today, the validator per profile, `--profile` and the manifest field, the new unit kinds and their precedence, the state folder with `--purge-state` and `--backup-state`, profile switching, the updater's reuse, README and docs, the end-to-end scenario test, and a manual run against a clone of a real consumer.
+- [ ] `2026-09-27_phase-C-workflow-profile-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit.
 
-## Decision Gate After Phase A
+Three phases, folded from six to reduce ceremony: the two document-only
+jobs share Phase A, and every code and documentation change shares Phase
+B, as Phase L of the first sidecar plan did. The refresh must stay last.
 
-Phase B starts only when Phase A records `native-run` evidence that at
-least Claude Code loads an ignored `.claude/agents/<id>.md` and an ignored
-`.claude/rules/ai-bootstrap-*.md` from a repository whose `.claude/` is
-team-tracked. Without that, the profile has no client and Phases B to F are
-cancelled. Copilot and Codex results decide only which unit kinds those two
-clients receive.
+## Decision Gate Inside Phase A
+
+Phase A's content steps, and Phases B and C, run only when Phase A's
+native runs record that at least Claude Code loads an ignored
+`.claude/agents/<id>.md` and an ignored `.claude/rules/ai-bootstrap-*.md`
+from a repository whose `.claude/` is team-tracked. Without that, the
+profile has no client: Phase A closes with the evidence alone, and Phases
+B and C are cancelled. Copilot and Codex results decide only which unit
+kinds those two clients receive.
 
 ## Devil's Advocate Summary
 
@@ -220,10 +222,10 @@ uv run python scripts/check_runtime.py
 ```
 
 Each small plan lists its own focused tests. Required review profiles:
-Phases C, D, and E use `code`, `architecture`, `security`, `tests`,
-`ponytail`, and `documentation`. Phase A and Phase B change documents and
-authored content only and use `documentation`, `architecture`, and
-`security`. Phase F uses the full set, as every knowledge-refresh phase has.
+Phase B uses `code`, `architecture`, `security`, `tests`, `ponytail`, and
+`documentation`. Phase A changes documents and authored content only and
+uses `documentation`, `architecture`, and `security`. Phase C uses the
+full set, as every knowledge-refresh phase has.
 
 ## Done Criteria
 
@@ -248,15 +250,15 @@ authored content only and use `documentation`, `architecture`, and
   reference.
 - Every client claim in the docs is backed by `native-run` evidence in
   `docs/sidecar-provider-contract.md`.
-- The end-to-end run in Phase E passes against a clone of a real consumer
+- The end-to-end run in Phase B passes against a clone of a real consumer
   with a team-tracked `.claude/`.
 - The final knowledge refresh and stale-claims audit ran after the last
-  code change (Phase F).
+  code change (Phase C).
 
 ## Completion Evidence
 
 The final phase listed under `phases:` is
-`2026-09-27_phase-F-workflow-profile-knowledge-refresh`. It runs the
+`2026-09-27_phase-C-workflow-profile-knowledge-refresh`. It runs the
 documentation, memory, and LEARN audit, sweeps every live-advice surface
 for claims this plan invalidated, corrects or supersedes each one, leaves
 dated records unchanged, and records the audited surfaces and each outcome

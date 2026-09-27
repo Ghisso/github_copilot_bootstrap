@@ -1,22 +1,22 @@
 ---
-name: 2026-09-27_phase-F-workflow-profile-knowledge-refresh
+name: 2026-09-27_phase-C-workflow-profile-knowledge-refresh
 type: small-plan
 parent_plan: sidecar-workflow-profile
-phase_index: 6
+phase_index: 3
 status: planned
 closeout_session_log:
 ---
 
-# Small Plan: Phase F — Workflow Profile Knowledge Refresh
+# Small Plan: Phase C — Workflow Profile Knowledge Refresh
 
 ## Scope
 
 The big plan's final knowledge-refresh phase, following the
 Knowledge-Refresh Final Phase rule in
 `shared/policies/workflow.instructions.md`. Refresh the generated OpenWiki
-pages after Phases A to E, then run the standing final-phase audit of stale
-claims. Add no implementation scope unless the audit exposes a concrete
-defect.
+pages after Phases A and B, then run the standing final-phase audit of
+stale claims. Add no implementation scope unless the audit exposes a
+concrete defect.
 
 Expected stale content: `openwiki/operations/sidecar-overlay.md` (profiles,
 unit kinds, the state folder, `--purge-state`, `--backup-state`),
@@ -39,8 +39,8 @@ profile trees and the per-profile validator), and
   - Follow `.claude/skills/knowledge-refresh/SKILL.md` with `mode: "update"`.
     For every page rewritten, map each cited range of every file the page
     cites from the recorded base to the current file before submitting
-    (MEMORY lessons from Phases K and M). Let no other agent edit tracked
-    files while the run is open.
+    (MEMORY lessons from the first sidecar plan's Phases K and M). Let no
+    other agent edit tracked files while the run is open.
 
 - [ ] **2. Review the generated diff.**
   - **Owner:** `orchestrator`
@@ -67,7 +67,7 @@ profile trees and the per-profile validator), and
 
 ## Acceptance Criteria
 
-- The generated knowledge layer reflects Phases A to E.
+- The generated knowledge layer reflects Phases A and B.
 - No live-advice surface contradicts the big plan's decisions.
 - The closeout session log has a non-empty `## Stale-claims surfaces checked`
   section.
