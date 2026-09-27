@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -14,8 +16,10 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+import install_bootstrap  # noqa: E402
 from install_bootstrap import (  # noqa: E402
     copy_generated_tree,
+    detect_install_mode,
     merge_gitignore,
     persisted_install_mode,
     populate_bootstrap_root,
@@ -24,8 +28,10 @@ from install_bootstrap import (  # noqa: E402
     substitute_python_version,
     validate_agents_takeover,
     validate_install_roots,
+    warn_tracked_paths,
 )
 from runtime_ownership import (  # noqa: E402
+    SIDECAR_MANIFEST_NAME,
     bootstrap_root_paths,
     restore_manifest,
 )
@@ -34,6 +40,7 @@ import generate_targets as target_generator  # noqa: E402
 
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 GENERATED = REPO_ROOT / "dist" / "multi-agent"
+SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar"
 LEGACY_SCHEMA_V2_RECEIPT = REPO_ROOT / "tests" / "fixtures" / "schema-v2-receipt.json"
 LEGACY_SCHEMA_V2_CLOSEOUT_RECEIPT = (
     REPO_ROOT / "tests" / "fixtures" / "schema-v2-closeout-receipt.json"
@@ -1114,6 +1121,8 @@ def test_generated_session_pull_restores_ignored_adapter_after_branch_switch(
             str(consumer),
             "--source",
             str(GENERATED),
+            "--mode",
+            "full",
             "--local-only",
         ],
         cwd=REPO_ROOT,
@@ -1971,3 +1980,1547 @@ def test_runtime_check_marker_gates_openwiki_skill_bundle_drift(
         "{}", encoding="utf-8"
     )
     assert runtime_drift_errors(target, GENERATED) == []
+
+
+# ---------------------------------------------------------------------------
+# Phase C: install mode detection (`--mode {full,sidecar}`), big plan
+# Decisions 11, 13, 15, 18 and "Design Overview" -> "Mode detection".
+# ---------------------------------------------------------------------------
+
+
+def _init_repo(target: Path) -> None:
+    """Init a Git repository with a deterministic author identity."""
+    target.mkdir(parents=True, exist_ok=True)
+    assert _git(target, "init", "-q").returncode == 0
+    assert _git(target, "config", "user.name", "Installer Test").returncode == 0
+    assert _git(target, "config", "user.email", "installer@example.com").returncode == 0
+
+
+def _commit_tracked_paths(target: Path, message: str) -> None:
+    assert _git(target, "add", "-A").returncode == 0
+    commit = subprocess.run(
+        ["git", "-C", str(target), "commit", "-q", "-m", message],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert commit.returncode == 0, commit.stderr
+
+
+def _write_sidecar_manifest(target: Path) -> Path:
+    """Fabricate sidecar evidence without running the (Phase C) sidecar
+    installer: write a manifest file straight at its Git-directory path."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(target),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            SIDECAR_MANIFEST_NAME,
+        ],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    manifest = Path(result.stdout.strip())
+    manifest.write_text("{}", encoding="utf-8")
+    return manifest
+
+
+def _porcelain_status(target: Path) -> str:
+    result = _git(target, "status", "--porcelain", "--untracked-files=all")
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def _repo_exclude_path(target: Path) -> Path:
+    return target / ".git" / "info" / "exclude"
+
+
+def _exclude_bytes(target: Path) -> bytes | None:
+    path = _repo_exclude_path(target)
+    return path.read_bytes() if path.is_file() else None
+
+
+# --- Unit tests: detect_install_mode implements the mode table exactly -----
+
+
+def test_detect_mode_defaults_to_full_with_no_evidence(tmp_path: Path) -> None:
+    """A fresh, evidence-free repository defaults to full (today's default)."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_defaults_to_full_when_not_a_git_repository(
+    tmp_path: Path,
+) -> None:
+    """A non-Git target (or one with no commits) reads back no Git evidence
+    and does not crash; it falls through to today's full-install default,
+    matching the full installer's own tolerance for such a target."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_sidecar_evidence_selects_sidecar_with_no_mode(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+    assert detect_install_mode(target, None, False) == "sidecar"
+
+
+def _add_nested_git_evidence(target: Path) -> None:
+    (target / ".claude" / ".git").mkdir(parents=True)
+
+
+def _add_ownership_env_evidence(target: Path) -> None:
+    claude_dir = target / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    (claude_dir / "bootstrap-ownership.env").write_text("x", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "make_evidence",
+    (_add_nested_git_evidence, _add_ownership_env_evidence),
+    ids=("nested-git", "ownership-env"),
+)
+def test_detect_mode_full_evidence_selects_full_with_no_mode(
+    tmp_path: Path, make_evidence: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    make_evidence(target)
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_both_evidence_kinds_abort_with_no_mode(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    _write_sidecar_manifest(target)
+    with pytest.raises(SystemExit, match="both full-install evidence") as error:
+        detect_install_mode(target, None, False)
+    assert "sidecar evidence" in str(error.value)
+    assert "--mode full or --mode sidecar" in str(error.value)
+
+
+def test_detect_mode_team_config_aborts_offering_both_modes(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    with pytest.raises(SystemExit, match="CLAUDE.md") as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+    assert "state-sync.sh setup" not in message
+
+
+def test_detect_mode_repo_tracking_only_code_and_gitignore_defaults_to_full(
+    tmp_path: Path,
+) -> None:
+    """Guard (O15/Decision 46): "an agent-harness path" means a path under
+    FULL_INSTALL_ROOT_PATHS, not .gitignore. A repository that tracks only
+    ordinary code and its own .gitignore must still get a plain, no-mode
+    full install, not a team-config refusal. Already correct on 010f08c;
+    FULL_INSTALL_ROOT_PATHS never included .gitignore."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "app.py").write_text("print('hello')\n", encoding="utf-8")
+    (target / ".gitignore").write_text("*.log\n", encoding="utf-8")
+    _commit_tracked_paths(target, "add code and gitignore")
+
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_detect_mode_team_config_devcontainer_only_aborts(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer" / "devcontainer.json"
+    devcontainer.parent.mkdir(parents=True)
+    devcontainer.write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer")
+    with pytest.raises(SystemExit, match=r"\.devcontainer/devcontainer\.json") as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+    assert "state-sync.sh setup" not in message
+
+
+def test_detect_mode_tracked_state_sync_script_adds_setup_hint(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    state_sync = target / ".devcontainer" / "state-sync.sh"
+    state_sync.parent.mkdir(parents=True)
+    state_sync.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer state-sync")
+    with pytest.raises(SystemExit, match="bash .devcontainer/state-sync.sh setup"):
+        detect_install_mode(target, None, False)
+
+
+def test_detect_mode_sidecar_mode_aborts_on_full_evidence(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    with pytest.raises(SystemExit, match="already has full-install evidence"):
+        detect_install_mode(target, "sidecar", False)
+
+
+def test_detect_mode_full_mode_aborts_on_sidecar_evidence(tmp_path: Path) -> None:
+    """O17: the refusal must mention --uninstall as a way forward, not only
+    "run without --mode full" or "ask whoever manages the sidecar"."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+    with pytest.raises(SystemExit, match="already has sidecar evidence") as exc_info:
+        detect_install_mode(target, "full", False)
+    assert "--uninstall" in str(exc_info.value)
+
+
+def test_detect_mode_full_mode_ignores_team_config(tmp_path: Path) -> None:
+    """Explicit --mode full keeps today's takeover behavior unconditionally."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    assert detect_install_mode(target, "full", False) == "full"
+
+
+def test_detect_mode_sidecar_mode_ignores_team_config(tmp_path: Path) -> None:
+    """Explicit --mode sidecar proceeds even over tracked bootstrap paths;
+    the team-config abort only applies to the no---mode auto-detect row."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+
+
+def test_detect_mode_sidecar_mode_aborts_in_linked_worktree(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _commit_tracked_paths(target, "seed")
+    worktree = tmp_path / "linked-worktree"
+    added = _git(target, "worktree", "add", "-q", str(worktree), "-b", "linked")
+    assert added.returncode == 0, added.stderr
+    with pytest.raises(SystemExit, match="linked worktree") as exc_info:
+        detect_install_mode(worktree, "sidecar", False)
+    assert "shared by every worktree" in str(exc_info.value)
+    assert "main worktree checkout" in str(exc_info.value)
+
+
+def test_detect_mode_allow_self_with_repo_root_counts_as_full_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--allow-self naming this repository as the target is full evidence
+    (Decision 18), even with no other evidence present at all."""
+    fake_repo_root = tmp_path / "fake-bootstrap-repo"
+    _init_repo(fake_repo_root)
+    monkeypatch.setattr(install_bootstrap, "REPO_ROOT", fake_repo_root)
+
+    with pytest.raises(SystemExit, match="--allow-self with this repository"):
+        detect_install_mode(fake_repo_root, "sidecar", True)
+
+    # Without --allow-self, the same target has no full evidence at all, so
+    # --mode sidecar proceeds instead of refusing.
+    assert detect_install_mode(fake_repo_root, "sidecar", False) == "sidecar"
+
+
+def test_detect_mode_allow_self_with_other_repository_is_not_full_evidence(
+    tmp_path: Path,
+) -> None:
+    """--allow-self only counts as evidence when the target *is* the
+    bootstrap repository; any other target is unaffected."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    assert detect_install_mode(target, None, True) == "full"
+    assert detect_install_mode(target, "sidecar", True) == "sidecar"
+
+
+# --------------------------------------------------------------------------
+# Phase H step 2: mode detection hardening (Decision 27; S1, S2, R5 sibling)
+# --------------------------------------------------------------------------
+
+
+def _add_git_submodule(target: Path, relative: str, tmp_path: Path) -> Path:
+    """Add a real local Git submodule at ``relative`` inside ``target``."""
+    submodule_source = tmp_path / f"{relative.replace('/', '_')}-submodule-source"
+    _init_repo(submodule_source)
+    (submodule_source / "settings.json").write_text(
+        '{"team": true}\n', encoding="utf-8"
+    )
+    _commit_tracked_paths(submodule_source, "submodule content")
+    add = _git(
+        target,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "-q",
+        str(submodule_source),
+        relative,
+    )
+    assert add.returncode == 0, add.stderr
+    _commit_tracked_paths(target, f"add {relative} submodule")
+    return submodule_source
+
+
+def test_claude_submodule_refuses_as_team_config_not_full_evidence(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    submodule_source = _add_git_submodule(target, ".claude", tmp_path)
+    remote_before = _git(target / ".claude", "remote", "get-url", "origin").stdout
+    head_before = _git(target / ".claude", "rev-parse", "HEAD").stdout
+    files_before = sorted(
+        p.relative_to(target / ".claude")
+        for p in (target / ".claude").rglob("*")
+        if p.is_file()
+    )
+
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "team config" in message.lower() or "tracks bootstrap-owned paths" in message
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert (
+        remote_before == _git(target / ".claude", "remote", "get-url", "origin").stdout
+    )
+    assert head_before == _git(target / ".claude", "rev-parse", "HEAD").stdout
+    files_after = sorted(
+        p.relative_to(target / ".claude")
+        for p in (target / ".claude").rglob("*")
+        if p.is_file()
+    )
+    assert files_after == files_before
+    assert str(submodule_source) not in result.stdout  # nothing was cloned again
+
+
+def test_claude_submodule_passes_detection_for_sidecar_mode_refused_as_nested_repo(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _add_git_submodule(target, ".claude", tmp_path)
+    status_before = _porcelain_status(target)
+
+    # Detection itself (Decision 27) does not abort --mode sidecar over a
+    # submodule; step 6's own boundary preflight is what refuses it.
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "nested repository or submodule" in result.stderr
+    assert "nothing was written" in result.stderr
+    assert _porcelain_status(target) == status_before
+
+
+def test_claude_embedded_gitlink_without_gitmodules_is_team_config(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    fake_commit = "b" * 40
+    cacheinfo = _git(
+        target, "update-index", "--add", "--cacheinfo", f"160000,{fake_commit},.claude"
+    )
+    assert cacheinfo.returncode == 0, cacheinfo.stderr
+    # Commit exactly what is staged: an unconditional "add -A" first would
+    # also stage the working-tree "deletion" of a gitlink with no populated
+    # folder on disk, cancelling the addition out.
+    commit = subprocess.run(
+        ["git", "-C", str(target), "commit", "-q", "-m", "embed .claude as a gitlink"],
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert commit.returncode == 0, commit.stderr
+
+    with pytest.raises(SystemExit, match="tracks bootstrap-owned paths"):
+        detect_install_mode(target, None, False)
+
+
+# --- N1: a tracked `.claude` is never full evidence, env file or not ------
+
+
+def _team_tracked_claude_with_env(target: Path, tmp_path: Path) -> None:
+    """Scenario A: the team tracks `.claude/**` including the env file."""
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("# team\n", encoding="utf-8")
+    (target / ".claude").mkdir()
+    (target / ".claude" / "settings.json").write_text("{}\n", encoding="utf-8")
+    skill = target / ".claude" / "skills" / "team-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: team-skill\n---\n", encoding="utf-8")
+    (target / ".claude" / "bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_ROOT_PATH=.agents\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target, "team harness with env file")
+
+
+def _claude_submodule_with_env(target: Path, tmp_path: Path) -> None:
+    """Scenario B: a `.claude` submodule whose content includes the env file."""
+    _init_repo(target)
+    _add_git_submodule(target, ".claude", tmp_path)
+    (target / ".claude" / "bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_ROOT_PATH=.agents\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target / ".claude", "ship the env file")
+    _commit_tracked_paths(target, "bump .claude submodule")
+
+
+def _claude_tracked_symlink_with_env(target: Path, tmp_path: Path) -> None:
+    """Scenario E2: `.claude` is a tracked symlink (mode 120000) to a folder
+    holding a `.git` directory and the env file."""
+    _init_repo(target)
+    store = tmp_path / "claude-store"
+    (store / ".git").mkdir(parents=True)
+    (store / "bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_ROOT_PATH=.agents\n", encoding="utf-8"
+    )
+    (target / ".claude").symlink_to(store, target_is_directory=True)
+    _commit_tracked_paths(target, "track .claude as a symlink")
+    assert "120000" in _git(target, "ls-files", "-s", "--", ".claude").stdout
+
+
+_TRACKED_CLAUDE_SHAPES = pytest.mark.parametrize(
+    "make_shape",
+    (
+        _team_tracked_claude_with_env,
+        _claude_submodule_with_env,
+        _claude_tracked_symlink_with_env,
+    ),
+    ids=("tracked-files", "submodule", "tracked-symlink"),
+)
+
+
+def _claude_snapshot(target: Path) -> tuple[str, str, str]:
+    claude = target / ".claude"
+    files = sorted(
+        str(p.relative_to(claude)) + (":" + p.read_text(encoding="utf-8"))
+        for p in claude.rglob("*")
+        if p.is_file()
+    )
+    head = _git(claude, "rev-parse", "HEAD").stdout
+    branch = _git(claude, "branch", "--show-current").stdout
+    return "\n".join(files), head, branch
+
+
+@_TRACKED_CLAUDE_SHAPES
+def test_tracked_claude_with_ownership_env_refuses_plain_install_not_full(
+    tmp_path: Path, make_shape: Callable[[Path, Path], None]
+) -> None:
+    """N1: the env file inside a tracked `.claude` is team content, not
+    full-install evidence, so a plain install hits the team-config refusal
+    and writes nothing."""
+    target = tmp_path / "consumer"
+    make_shape(target, tmp_path)
+    status_before = _porcelain_status(target)
+    snapshot_before = _claude_snapshot(target)
+
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    assert "tracks bootstrap-owned paths" in str(error.value)
+    assert "--mode sidecar" in str(error.value)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "tracks bootstrap-owned paths" in result.stderr
+    assert "Copilot surface mode" not in result.stdout
+    assert _porcelain_status(target) == status_before
+    assert _claude_snapshot(target) == snapshot_before
+    assert not (target / ".gitignore").exists()
+    assert not (target / ".devcontainer").exists()
+    assert _git(target, "config", "core.hooksPath").stdout == ""
+
+
+@_TRACKED_CLAUDE_SHAPES
+def test_tracked_claude_with_ownership_env_uninstall_never_sees_full_evidence(
+    tmp_path: Path, make_shape: Callable[[Path, Path], None]
+) -> None:
+    """N1 (D): `--uninstall` on the same shapes takes the sidecar path
+    ("no sidecar found") or a clean refusal, never "full-install evidence"."""
+    target = tmp_path / "consumer"
+    make_shape(target, tmp_path)
+    status_before = _porcelain_status(target)
+    snapshot_before = _claude_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "full-install evidence" not in result.stderr
+    assert "Traceback" not in result.stderr
+    if result.returncode == 0:
+        assert "no sidecar found; nothing to do" in result.stdout
+    assert _porcelain_status(target) == status_before
+    assert _claude_snapshot(target) == snapshot_before
+
+
+def _real_full_consumer(target: Path) -> None:
+    """An untracked `.claude` holding a real nested repository and the env file."""
+    _init_repo(target)
+    _init_repo(target / ".claude")
+    (target / ".claude" / "bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_ROOT_PATH=.agents\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target / ".claude", "ai-state")
+    (target / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+
+
+def _pre_git_state_consumer(target: Path) -> None:
+    """An untracked `.claude` with the env file and no nested `.git` yet."""
+    _init_repo(target)
+    (target / ".claude").mkdir()
+    (target / ".claude" / "bootstrap-ownership.env").write_text(
+        "BOOTSTRAP_ROOT_PATH=.agents\n", encoding="utf-8"
+    )
+    (target / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "make_consumer",
+    (_real_full_consumer, _pre_git_state_consumer),
+    ids=("full-consumer", "pre-git-state"),
+)
+def test_untracked_claude_with_ownership_env_still_detects_full(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    """N1 (G): the guard only fires for a tracked `.claude`; a genuine full
+    consumer and a pre-git-state consumer keep detecting as full."""
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    assert _git(target, "ls-files", "--", ".claude").stdout == ""
+
+    assert detect_install_mode(target, None, False) == "full"
+    assert install_bootstrap._full_install_evidence(target, False)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Copilot surface mode" in result.stdout
+
+
+# --- N13: malformed exclude markers get the marker remedy, not safe.directory
+
+
+@pytest.mark.parametrize(
+    "extra_args", ((), ("--mode", "sidecar")), ids=("plain", "sidecar")
+)
+def test_doubled_exclude_markers_abort_with_marker_remedy(
+    tmp_path: Path, extra_args: tuple[str, ...]
+) -> None:
+    from runtime_ownership import SIDECAR_EXCLUDE_BEGIN, SIDECAR_EXCLUDE_END
+
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    exclude = _repo_exclude_path(target)
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(
+        f"{SIDECAR_EXCLUDE_BEGIN}\n{SIDECAR_EXCLUDE_END}\n"
+        f"{SIDECAR_EXCLUDE_BEGIN}\n{SIDECAR_EXCLUDE_END}\n",
+        encoding="utf-8",
+    )
+    status_before = _porcelain_status(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), *extra_args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "BEGIN at line 1" in result.stderr
+    assert "END at line 4" in result.stderr
+    assert "fix info/exclude by hand" in result.stderr
+    assert "safe.directory" not in result.stderr
+    assert "git failed on" not in result.stderr
+    assert _porcelain_status(target) == status_before
+
+
+# --- N17: --uninstall on a missing or non-Git path is an error, not a no-op
+
+
+def test_uninstall_missing_target_exits_1_not_nothing_to_do(tmp_path: Path) -> None:
+    target = tmp_path / "typo-in-path"
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert f"{target} is not a directory" in result.stderr
+    assert "nothing to do" not in result.stdout
+    assert not target.exists()
+
+
+def test_uninstall_non_git_target_exits_1_not_nothing_to_do(tmp_path: Path) -> None:
+    target = tmp_path / "plain-folder"
+    target.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "not a Git repository" in result.stderr
+    assert "nothing to do" not in result.stdout
+    assert sorted(target.iterdir()) == []
+
+
+# --- NIT (step 12): --uninstall silently ignored --source, --local-only, --
+# --- state-remote, and --commit-copilot-surface; now warns once through
+# --- the same helper the sidecar install path uses. -----------------------
+
+
+def _no_sidecar_installed(target: Path) -> None:
+    _init_repo(target)
+
+
+def _sidecar_installed(target: Path) -> None:
+    import sidecar_overlay
+
+    _init_repo(target)
+    assert sidecar_overlay.install_sidecar(target, SIDECAR_SOURCE) == 0
+
+
+@pytest.mark.parametrize(
+    "make_target",
+    (_no_sidecar_installed, _sidecar_installed),
+    ids=("no-sidecar", "sidecar-installed"),
+)
+def test_uninstall_warns_about_ignored_full_only_options(
+    tmp_path: Path, make_target: Callable[[Path], None]
+) -> None:
+    """`--uninstall` used to silently ignore `--source`, `--local-only`,
+    `--state-remote`, and `--commit-copilot-surface`. All four now surface
+    in one warning through `warn_full_only_options_ignored`, and
+    `--uninstall` still exits per today's rules either way."""
+    target = tmp_path / "consumer"
+    make_target(target)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--uninstall",
+            "--source",
+            "/nonexistent",
+            "--local-only",
+            "--state-remote",
+            "x",
+            "--commit-copilot-surface",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    warning_lines = [
+        line for line in result.stderr.splitlines() if line.startswith("WARNING")
+    ]
+    assert len(warning_lines) == 1
+    warning = warning_lines[0]
+    assert "--source" in warning
+    assert "--local-only" in warning
+    assert "--state-remote" in warning
+    assert "--commit-copilot-surface" in warning
+
+
+# --- N11a: git missing from PATH aborts cleanly in every CLI entry path ----
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    ((), ("--mode", "sidecar"), ("--uninstall",)),
+    ids=("plain", "sidecar", "uninstall"),
+)
+def test_git_missing_from_path_aborts_without_traceback(
+    tmp_path: Path, extra_args: tuple[str, ...]
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    empty_path = tmp_path / "empty-path"
+    empty_path.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), *extra_args],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PATH": str(empty_path)},
+    )
+
+    assert result.returncode == 1
+    assert "git not found on PATH" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not (target / ".claude").exists()
+
+
+# --- N18: fresh-default refusals (Decision 48 step 2) ----------------------
+
+
+def _shape_subfolder(tmp_path: Path) -> tuple[Path, Path | None]:
+    """A subfolder of a repository's own root, with no bootstrap evidence
+    anywhere and nothing tracked under an agent-harness path."""
+    root = tmp_path / "consumer"
+    _init_repo(root)
+    (root / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _commit_tracked_paths(root, "seed")
+    target = root / "packages" / "svc"
+    target.mkdir(parents=True)
+    return target, root
+
+
+def _shape_linked_worktree(tmp_path: Path) -> tuple[Path, Path | None]:
+    """A linked worktree of a fresh, evidence-free repository."""
+    root = tmp_path / "consumer"
+    _init_repo(root)
+    (root / "seed.txt").write_text("seed\n", encoding="utf-8")
+    _commit_tracked_paths(root, "seed")
+    target = tmp_path / "linked-worktree"
+    added = _git(
+        root, "worktree", "add", "-q", str(target), "-b", "fresh-default-linked"
+    )
+    assert added.returncode == 0, added.stderr
+    return target, target
+
+
+def _shape_bare_repository(tmp_path: Path) -> tuple[Path, Path | None]:
+    """A bare repository, which has no working tree to hold generated files."""
+    target = tmp_path / "bare-consumer.git"
+    result = _git(tmp_path, "init", "--bare", "-q", target.name)
+    assert result.returncode == 0, result.stderr
+    return target, None
+
+
+def _shape_claude_regular_file(tmp_path: Path) -> tuple[Path, Path | None]:
+    """`.claude` exists as an untracked regular file, not a directory."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude").write_text("not a directory\n", encoding="utf-8")
+    return target, target
+
+
+_FRESH_DEFAULT_SHAPES = pytest.mark.parametrize(
+    "make_shape,message_fragment",
+    (
+        (_shape_subfolder, "is not the root of its Git repository"),
+        (_shape_linked_worktree, "is a linked worktree"),
+        (_shape_bare_repository, "is a bare repository"),
+        (_shape_claude_regular_file, ".claude exists as a regular file"),
+    ),
+    ids=("subfolder", "linked-worktree", "bare-repository", "claude-regular-file"),
+)
+
+
+@_FRESH_DEFAULT_SHAPES
+@pytest.mark.parametrize(
+    "extra_args", ((), ("--mode", "full")), ids=("plain", "mode-full")
+)
+def test_fresh_default_refuses_before_any_write(
+    tmp_path: Path,
+    make_shape: Callable[[Path], tuple[Path, Path | None]],
+    message_fragment: str,
+    extra_args: tuple[str, ...],
+) -> None:
+    """N18/Decision 48: with no bootstrap evidence, a fresh-default full
+    install refuses a subfolder target, a linked worktree, a bare
+    repository, and a `.claude` that is a regular file, before any write."""
+    target, status_root = make_shape(tmp_path)
+    requested_mode = "full" if extra_args else None
+
+    before_listing = (
+        None
+        if status_root is not None
+        else sorted(p.relative_to(target) for p in target.rglob("*"))
+    )
+    before_status = _porcelain_status(status_root) if status_root is not None else None
+    before_claude = (
+        (target / ".claude").read_bytes() if (target / ".claude").is_file() else None
+    )
+
+    with pytest.raises(SystemExit, match=re.escape(message_fragment)) as error:
+        detect_install_mode(target, requested_mode, False)
+    assert "supports only the root of a main worktree" in str(error.value)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), *extra_args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert message_fragment in result.stderr
+    assert "supports only the root of a main worktree" in result.stderr
+
+    if status_root is not None:
+        assert _porcelain_status(status_root) == before_status
+        assert not (status_root / ".gitignore").exists()
+        assert not (status_root / ".devcontainer").exists()
+        assert _git(status_root, "config", "core.hooksPath").stdout == ""
+    else:
+        after_listing = sorted(p.relative_to(target) for p in target.rglob("*"))
+        assert after_listing == before_listing
+    if before_claude is not None:
+        assert (target / ".claude").read_bytes() == before_claude
+
+
+def test_fresh_default_refusal_does_not_affect_existing_full_consumer_refresh(
+    tmp_path: Path,
+) -> None:
+    """Guard: an existing full consumer (real full-install evidence) still
+    refreshes normally; the new fresh-default checks only run in the
+    no-evidence branch (Decision 48)."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _add_nested_git_evidence(target)
+
+    assert detect_install_mode(target, None, False) == "full"
+    assert detect_install_mode(target, "full", False) == "full"
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_fresh_default_subfolder_mode_sidecar_keeps_todays_preflight_refusal(
+    tmp_path: Path,
+) -> None:
+    """Guard: `--mode sidecar` on the subfolder shape is untouched by this
+    change; detection still returns "sidecar" and the sidecar's own
+    preflight (not mode detection) gives today's refusal text."""
+    target, _root = _shape_subfolder(tmp_path)
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "is not the top level of its Git worktree" in result.stderr
+
+
+def test_fresh_default_linked_worktree_mode_sidecar_keeps_todays_refusal(
+    tmp_path: Path,
+) -> None:
+    """Guard: `--mode sidecar` on the linked-worktree shape is untouched by
+    this change; mode detection still gives today's refusal text (the same
+    property `test_detect_mode_sidecar_mode_aborts_in_linked_worktree`
+    already pins for a differently-built worktree)."""
+    target, _root = _shape_linked_worktree(tmp_path)
+    with pytest.raises(SystemExit, match="linked worktree") as error:
+        detect_install_mode(target, "sidecar", False)
+    assert "shared by every worktree" in str(error.value)
+    assert "main worktree checkout" in str(error.value)
+
+
+def test_fresh_default_bare_repository_mode_sidecar_keeps_todays_refusal(
+    tmp_path: Path,
+) -> None:
+    """Guard: `--mode sidecar` on the bare-repository shape is untouched by
+    this change; detection still returns "sidecar" (a bare repository has no
+    full or sidecar evidence to read either), and the sidecar's own
+    preflight refuses it with today's "not a Git repository" text -- a bare
+    repository has no working tree, so `git rev-parse --show-toplevel`
+    fails there too, hitting the `toplevel is None` branch of
+    `_run_target_preflight` (`scripts/sidecar_overlay.py` around line 3483),
+    not a bare-specific check."""
+    target, _status_root = _shape_bare_repository(tmp_path)
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+    before_listing = sorted(p.relative_to(target) for p in target.rglob("*"))
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert f"{target} is not a Git repository" in result.stderr
+    assert "run the sidecar install from the top level of a Git worktree" in (
+        result.stderr
+    )
+    assert sorted(p.relative_to(target) for p in target.rglob("*")) == before_listing
+
+
+def test_fresh_default_claude_regular_file_mode_sidecar_keeps_todays_refusal(
+    tmp_path: Path,
+) -> None:
+    """Guard: `--mode sidecar` on the `.claude`-is-a-regular-file shape is
+    untouched by this change; detection still returns "sidecar", and the
+    sidecar's own preflight refuses it with today's filesystem-shape text
+    (`.claude` is the nearest existing ancestor of every planned unit path,
+    and it is a regular file, not a folder)."""
+    target, status_root = _shape_claude_regular_file(tmp_path)
+    assert status_root is not None
+    assert detect_install_mode(target, "sidecar", False) == "sidecar"
+    before_status = _porcelain_status(status_root)
+    before_claude = (target / ".claude").read_bytes()
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert ".claude exists and is not a folder" in result.stderr
+    assert "fix the filesystem shape, then rerun" in result.stderr
+    assert (target / ".claude").read_bytes() == before_claude
+    assert _porcelain_status(status_root) == before_status
+
+
+def test_dubious_ownership_aborts_detection_in_every_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+    for requested_mode in (None, "sidecar", "full"):
+        with pytest.raises(SystemExit, match="dubious"):
+            detect_install_mode(target, requested_mode, False)
+
+
+def test_non_english_locale_on_non_git_folder_still_gives_full_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Detection forces LC_ALL=C for its own Git calls (Decision 27), so a
+    # person's own non-English locale never breaks the "not a git
+    # repository" classification into a false abort.
+    target = tmp_path / "consumer"
+    target.mkdir()
+    monkeypatch.setenv("LANG", "de_DE.UTF-8")
+    monkeypatch.setenv("LC_ALL", "de_DE.UTF-8")
+    assert detect_install_mode(target, None, False) == "full"
+
+
+def test_c_locale_env_always_forces_lc_all_c(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sidecar_overlay
+
+    monkeypatch.setenv("LC_ALL", "de_DE.UTF-8")
+    monkeypatch.setenv("LANG", "de_DE.UTF-8")
+    assert sidecar_overlay._c_locale_env()["LC_ALL"] == "C"
+
+
+def test_missing_target_folder_full_install_dry_run_behaves_as_today(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "does-not-exist"
+    assert detect_install_mode(target, None, False) == "full"
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    "write_exclude",
+    [
+        lambda path: path.write_bytes("café.txt\n".encode("latin-1")),
+        lambda path: path.write_bytes("café.txt\n".encode("utf-16")),
+        lambda path: path.mkdir(parents=True),
+    ],
+    ids=("latin-1", "utf-16", "folder"),
+)
+def test_full_install_works_with_every_info_exclude_shape(
+    tmp_path: Path, write_exclude: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    exclude_path = target / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    if exclude_path.exists():
+        if exclude_path.is_dir():
+            exclude_path.rmdir()
+        else:
+            exclude_path.unlink()
+    write_exclude(exclude_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_full_install_works_with_a_named_pipe_at_info_exclude(tmp_path: Path) -> None:
+    """O17: the old ``ThreadPoolExecutor``-wrapped deadline cannot actually
+    fire -- the context manager's own shutdown waits for the hung thread
+    regardless of ``future.result(timeout=...)``. A subprocess with its own
+    ``timeout=`` is a real, enforced deadline, and never opens the pipe in
+    this test process."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    exclude_path = target / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    if exclude_path.exists():
+        exclude_path.unlink()
+    os.mkfifo(exclude_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_warn_tracked_paths_turns_a_git_failure_into_a_warning(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """O17: ``tracked_generated_paths`` can raise ``GitDetectionError`` for a
+    Git failure other than "not a git repository" (Decision 27).
+    ``warn_tracked_paths`` runs after most of the full install's own writes,
+    so that must become a warning, never a crash mid-install. Fails on
+    010f08c."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    real_run = subprocess.run
+
+    def fake_run(args, *a, **kw):
+        if len(args) >= 3 and args[0] == "git" and "ls-files" in args:
+            return subprocess.CompletedProcess(
+                args, 128, stdout=b"", stderr=b"fatal: injected ls-files failure\n"
+            )
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(install_bootstrap.subprocess, "run", fake_run)
+
+    warn_tracked_paths(target, (".claude",))
+
+    err = capsys.readouterr().err
+    assert "injected ls-files failure" in err
+    assert "WARNING" in err
+
+
+def test_quote_path_false_with_non_utf8_tracked_name_gives_team_config_refusal(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    quote_path = _git(target, "config", "core.quotePath", "false")
+    assert quote_path.returncode == 0, quote_path.stderr
+    weird_name = os.fsdecode(b"caf\xe9.txt")
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    weird_path = target / weird_name
+    with open(os.fsencode(str(weird_path)), "wb") as handle:
+        handle.write(b"not utf-8 on purpose\n")
+    _commit_tracked_paths(target, "team guidance and a non-UTF-8 name")
+
+    with pytest.raises(SystemExit, match="tracks bootstrap-owned paths"):
+        detect_install_mode(target, None, False)
+
+
+# --- CLI refusals: never reach the sidecar dispatch, nothing is written ----
+
+
+def test_cli_refuses_mode_sidecar_when_full_evidence_present(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    first = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+    before_exclude = _exclude_bytes(target)
+
+    refused = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "sidecar",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert refused.returncode != 0
+    assert "already has full-install evidence" in refused.stderr
+    assert "nested AI-state repository" in refused.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+    assert _exclude_bytes(target) == before_exclude
+
+
+def test_cli_refuses_mode_full_when_sidecar_evidence_present(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_sidecar_manifest(target)
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "already has sidecar evidence" in result.stderr
+    assert "sidecar manifest" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+    assert not (target / ".claude" / ".git").exists()
+    assert not (target / ".claude" / "bootstrap-ownership.env").exists()
+
+
+# --------------------------------------------------------------------------
+# Review fix 3 (orchestrator finding): sidecar_evidence must not resolve the
+# manifest or info/exclude paths through a symlink (Decision 27)
+# --------------------------------------------------------------------------
+
+
+def _dangling_manifest_symlink(target: Path) -> Path:
+    """A manifest path that is itself a dangling symlink -- still sidecar
+    evidence per Decision 27, even though it resolves to nothing."""
+    manifest = target / ".git" / SIDECAR_MANIFEST_NAME
+    manifest.symlink_to(target / "does-not-exist-manifest-target")
+    return manifest
+
+
+def test_dangling_manifest_symlink_selects_sidecar_not_full(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    manifest = _dangling_manifest_symlink(target)
+
+    assert detect_install_mode(target, None, False) == "sidecar"
+    assert manifest.is_symlink()  # detection never follows or removes it
+
+
+def test_dangling_manifest_symlink_plain_install_refuses_via_sidecar_preflight(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _dangling_manifest_symlink(target)
+    before_status = _porcelain_status(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    # Took the sidecar path (not a full install), and failed on step 3's own
+    # symlinked-manifest preflight, not on a missing-source or full-install
+    # error.
+    assert "sidecar-install:" in result.stdout or "sidecar-install:" in result.stderr
+    assert "symlink" in result.stderr
+    assert "regular file" in result.stderr
+    assert not (target / ".claude" / ".git").exists()
+    assert not (target / ".claude" / "bootstrap-ownership.env").exists()
+    assert _porcelain_status(target) == before_status
+
+
+def test_dangling_manifest_symlink_refuses_mode_full(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _dangling_manifest_symlink(target)
+
+    with pytest.raises(SystemExit, match="already has sidecar evidence"):
+        detect_install_mode(target, "full", False)
+
+
+def test_dangling_manifest_symlink_uninstall_is_not_nothing_to_do(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _dangling_manifest_symlink(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "nothing to do" not in result.stdout
+    assert "symlink" in result.stderr
+
+
+def test_symlinked_info_exclude_with_a_block_is_not_evidence(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    real_exclude_elsewhere = tmp_path / "shared-exclude-file"
+    real_exclude_elsewhere.write_text(
+        "# BEGIN ai-bootstrap sidecar\n/.claude/skills/ponytail\n"
+        "# END ai-bootstrap sidecar\n",
+        encoding="utf-8",
+    )
+    exclude_path = target / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    if exclude_path.exists() or exclude_path.is_symlink():
+        exclude_path.unlink()
+    exclude_path.symlink_to(real_exclude_elsewhere)
+
+    assert detect_install_mode(target, None, False) == "full"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--mode",
+            "sidecar",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "symlink" in result.stderr
+    assert (
+        real_exclude_elsewhere.read_text(encoding="utf-8").count("ai-bootstrap sidecar")
+        == 2
+    )  # untouched: still exactly one BEGIN and one END line
+
+
+def test_cli_refuses_auto_detect_when_both_evidence_kinds_present(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / ".claude" / ".git").mkdir(parents=True)
+    _write_sidecar_manifest(target)
+
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "both full-install evidence" in result.stderr
+    assert "sidecar evidence" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status
+
+
+def test_cli_refuses_plain_install_when_repo_tracks_claude_md(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "CLAUDE.md" in result.stderr
+    assert "--mode sidecar" in result.stderr
+    assert "--mode full" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert not (target / ".claude" / ".git").exists()
+
+
+def test_cli_refuses_plain_install_when_repo_tracks_devcontainer_only(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer" / "devcontainer.json"
+    devcontainer.parent.mkdir(parents=True)
+    devcontainer.write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert ".devcontainer/devcontainer.json" in result.stderr
+    assert "--mode sidecar" in result.stderr
+    assert "--mode full" in result.stderr
+    assert "state-sync.sh setup" not in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+
+
+def test_cli_refuses_plain_install_and_hints_state_sync_setup(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    state_sync = target / ".devcontainer" / "state-sync.sh"
+    state_sync.parent.mkdir(parents=True)
+    state_sync.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer state-sync")
+
+    before_snapshot = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--source", str(GENERATED)],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "bash .devcontainer/state-sync.sh setup" in result.stderr
+    assert "--mode full" in result.stderr
+    assert _tree_snapshot(target) == before_snapshot
+
+
+def test_cli_mode_full_installs_into_repo_that_tracks_claude_md(
+    tmp_path: Path,
+) -> None:
+    """The plan's required regression: an unbootstrapped repository tracking
+    CLAUDE.md still gets today's full-install behavior under --mode full."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    (target / "CLAUDE.md").write_text("team guidance\n", encoding="utf-8")
+    _commit_tracked_paths(target, "team guidance")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (target / ".claude" / ".git").is_dir()
+    agent_relative = Path(".github/agents/orchestrator.agent.md")
+    assert (target / agent_relative).read_bytes() == (
+        GENERATED / agent_relative
+    ).read_bytes()
+
+
+# --------------------------------------------------------------------------
+# Phase H step 7: full mode refuses a sidecar source (Decision 31; S14, L2)
+# --------------------------------------------------------------------------
+
+
+def test_full_mode_with_sidecar_source_on_a_fresh_target_is_refused(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    status_before = _porcelain_status(target)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(SIDECAR_SOURCE),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "state-sync.sh" in result.stderr
+    assert _porcelain_status(target) == status_before
+    assert not (target / ".claude").exists()
+    assert not (target / ".gitignore").exists()
+
+
+def test_full_mode_with_sidecar_source_on_an_existing_full_consumer_is_refused(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    first = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(GENERATED),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    before_snapshot = _tree_snapshot(target)
+    before_status = _porcelain_status(target)
+
+    refused = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--source",
+            str(SIDECAR_SOURCE),
+            "--mode",
+            "full",
+            "--local-only",
+        ],
+        cwd=REPO_ROOT,
+        env=_actor_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert refused.returncode != 0
+    assert "state-sync.sh" in refused.stderr
+    assert _tree_snapshot(target) == before_snapshot
+    assert _porcelain_status(target) == before_status

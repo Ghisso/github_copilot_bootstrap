@@ -49,6 +49,29 @@ detailed threat model and reporting boundary, read [SECURITY.md](SECURITY.md).
 
 ## Quick Install
 
+The installer supports two modes. **Full install** (`--mode full`, or the
+default when the installer finds no other evidence) makes this bootstrap own
+the target repository's whole agent harness: hooks, the lifecycle, a nested
+AI-state repository, MCP configuration, and the devcontainer. Use it for a
+repository you own outright. **Sidecar install** (`--mode sidecar`) adds a
+small, private, per-clone overlay — a few skills and one short always-on rule
+per client — inside a repository whose agent harness a team already owns.
+Use it when you want your own coding-agent skills active in a team
+repository without changing anything the team tracks. With no `--mode`, the
+installer looks for full-install evidence and sidecar evidence on the
+target and picks whichever mode that evidence points to; when it finds
+neither, it still defaults to a full install, exactly as before. The one
+thing that changed: running the plain installer with no `--mode` on a
+repository that already tracks an agent-harness path — one of the paths a
+full install writes, such as `.claude`, `.devcontainer`, `CLAUDE.md`, or a
+Copilot surface file, but not `.gitignore` — and that carries no bootstrap
+or sidecar evidence, now refuses instead of silently taking that path over.
+A repository that tracks only code and `.gitignore` still gets a plain full
+install. The installer tells you to pass one of the two flags explicitly
+(see [Behavior changes](#behavior-changes-you-should-know-about) below).
+
+### Full Install
+
 Regenerate first, then install the single generated bootstrap into a target repo.
 The installer copies the generated AI files, substitutes the target repo name into
 the workspace instructions, keeps `.devcontainer/` trackable, adds an idempotent
@@ -93,7 +116,7 @@ git add .devcontainer .gitignore
 git commit -m "chore: add AI devcontainer bootstrap"
 ```
 
-### What the gates need from your project
+#### What the gates need from your project
 
 The deterministic verifier (`shared/scripts/verify.py`, installed as
 `.claude/scripts/verify.py`) measures your own project's Ruff, mypy, and
@@ -157,7 +180,7 @@ the consumer has pre-git `.claude/` content, the installer first records
 the nested `ai-state` status and a shell-safe `Publish later: ...` command for
 the target path.
 
-### Self-installing this source repository
+#### Self-installing this source repository
 
 This repository can use the generated bootstrap itself to dogfood the same
 `ai-state` lifecycle as consumer repositories. Its editable source of truth
@@ -188,6 +211,20 @@ preserved where appropriate, bootstrap-controlled runtime files are refreshed,
 and consumer-owned state remains untouched.
 
 ## Updating Existing Repos
+
+`scripts/update_consumers.py` regenerates `dist/` once, then delegates each
+listed target to `install_bootstrap.py`, in the order you passed the paths.
+It never passes `--mode`, so each target's mode is detected on its own —
+running one command over a batch that mixes full and sidecar consumers works
+without any extra flag. When one target's installer exits non-zero, or a
+listed path is not a directory, the updater records that target and moves on
+to the next one; it does not stop the batch. After the last target, it
+prints one line per failed target with its exit code and exits 1. It prints
+`All projects updated.` only when every target succeeded. A failure in the
+`dist/` regeneration step itself still stops the whole batch before any
+target runs, since every target needs that output.
+
+### Updating Full Consumers
 
 When you update this bootstrap (new hooks, revised instructions, agent changes),
 push the new version to all consumer repos with:
@@ -243,7 +280,7 @@ its nested status and a quoted command to publish later.
 uv run python scripts/update_consumers.py --local-only /path/to/repo
 ```
 
-### Upgrading a consumer with active work
+#### Upgrading a consumer with active work
 
 Use the supported mid-plan refresh when a consumer already has active plans,
 receipts, or other user state. Run the refresh with `--local-only` first. The
@@ -379,7 +416,7 @@ is exactly why `.devcontainer/` carries its own copy of the same script.
 separate step to remember. A session that starts with the hooks checked out
 but not yet active is told to re-run `setup`.
 
-### GitHub Copilot surface ownership
+#### GitHub Copilot surface ownership
 
 By default the installer gitignores the GitHub Copilot surface
 (`.github/agents/`, `.github/hooks/`, `.github/instructions/`,
@@ -403,6 +440,398 @@ Optional pruning after copy:
 - No Copilot: delete `.github/` and `.vscode/mcp.json`.
 - No Claude Code: delete `CLAUDE.md`, `.mcp.json`, and `.claude/settings.json`.
 - No Codex: delete `AGENTS.md` and `.codex/`.
+
+### Personal Sidecar Install
+
+Use this when you work in a repository your team owns and you cannot, or
+should not, run the full install there. The full install is a takeover of
+the target repository (see [What a full install changes in a team
+repository](#what-a-full-install-changes-in-a-team-repository) below). This
+bootstrap has no automatic full-to-sidecar or sidecar-to-full migration. The
+sidecar gives you your own copy of four coding-agent skills and one
+always-on rule per supported client, without touching anything the team
+tracks.
+
+```bash
+uv run python scripts/install_bootstrap.py /path/to/team-repo --mode sidecar
+```
+
+Run it from the main worktree checkout. Sidecar mode aborts in a linked
+worktree — a worktree that Git created with `git worktree add`, or that VS
+Code or the Codex app creates for a background session. The reason is not
+where the manifest lives: `.git/info/exclude` is shared by every worktree of
+one repository, but the sidecar's ownership manifest is specific to whichever
+Git directory it runs against. Trimming the shared exclude block from a
+linked worktree could expose paths that the main worktree's own manifest
+still owns, so sidecar mode refuses there and asks you to run it from the
+main worktree instead.
+
+**What it installs**, at two write roots, `.claude/skills/` and
+`.agents/skills/`:
+
+- Four skills: `debug-investigator`, `humanize`, `ponytail`, and
+  `ponytail-review`. The two vendored Ponytail skills each ship their MIT
+  `LICENSE` file alongside the skill content, at both write roots.
+- One short always-on rule per client that natively supports one: a Claude
+  Code rule (`.claude/rules/ai-bootstrap-sidecar.md`) and a Copilot
+  instructions file (`.github/instructions/ai-bootstrap-sidecar.instructions.md`,
+  `applyTo: "**"`). The rule tells the client to apply `ponytail` in `full`
+  mode to coding tasks and `ponytail-review` on non-trivial diffs, unless the
+  team's own guidance says otherwise.
+
+**What it does not install:** hooks, the plan/review/commit lifecycle, a
+nested AI-state git repository, MCP server configuration, a devcontainer, a
+`.gitignore` edit, a `core.hooksPath` change, or custom agents. The sidecar
+is not a smaller copy of the full bootstrap — it is a fixed, narrow overlay,
+and it stays that way.
+
+Every sidecar file is kept out of the team's Git state through a marked
+block in the local, untracked `.git/info/exclude` (not the tracked
+`.gitignore`). The installer writes that block first, then proves that
+every path the finished exclude block would list — not only the files it
+is about to write this run, but also an unfinished or locally modified unit
+and any retained file a team rule might expose — is actually ignored,
+before it writes any sidecar file. If that proof fails, it restores
+`.git/info/exclude` to its exact
+original bytes, writes no sidecar file at all, and exits 1 with a remedy —
+so a failed run still touches the exclude file transiently, but leaves your
+worktree and Git state exactly as it found them. An ownership
+manifest, `ai-bootstrap-sidecar.json`, and a staging folder,
+`ai-bootstrap-sidecar-staging/`, live inside the Git directory itself
+(`git rev-parse --git-dir`), where neither can be tracked or committed.
+
+Two more files live beside the manifest, inside the Git directory. A
+pending ownership record, `ai-bootstrap-sidecar.json.next`, is written right
+after the ignore proof passes and before any unit moves, and removed once
+the real manifest lands; it is evidence only, never an instruction, but it
+lets a rerun after an interrupted run recognize bytes already on disk as
+the sidecar's own instead of reporting them as your local edits. A run
+lock, `ai-bootstrap-sidecar.lock`, is held from just after preflight to the
+end of the run; a second sidecar run against the same target while one is
+already in progress exits 1 with `another sidecar run is active in
+<target>` and the remedy to wait for it to finish, then rerun. A dry run
+takes neither the lock nor writes the pending record. The lock file itself
+is left behind, empty, after every run — expected, not unfinished cleanup.
+
+A retained file's name may contain a backslash; the sidecar escapes it the
+same way it escapes any other exact-path line, and the name round-trips
+through install, rerun, and uninstall. Every rewrite of `.git/info/exclude`
+keeps the file's existing permissions instead of replacing them with a
+private mode; a newly created exclude file or manifest gets the ordinary
+`0666 & ~umask`. Every filesystem failure past preflight — a permission
+error, a full disk, a symlink race — ends the run with `ABORT: filesystem
+error at <path>: <reason>` and the remedy to fix the permissions or the
+filesystem problem at that path and rerun; the run stopped part-way, and a
+rerun picks up where it stopped. Installing the sidecar inside a
+submodule's own worktree works the same way as any other repository: its
+manifest lands under that submodule's own Git directory
+(`.git/modules/<name>/...`).
+
+**Reports on install, rerun, and update.** Re-running the same command later
+reconciles your sidecar to the current bootstrap version: it updates a
+changed skill, installs an added one, and removes an unchanged one that was
+dropped, while leaving team-tracked files alone. The report categories name
+paths the sidecar skipped or kept untouched, plus `PRESERVED`, where it moved
+an edited copy out of the way, together with the fix in each case:
+
+| Category | Cause | Meaning | Remedy |
+| --- | --- | --- | --- |
+| `SKIPPED` | Team-tracked path | A file inside a sidecar unit is tracked by the team. | `` the repository tracks `<path>`; the sidecar skips `<skill>` at every root `` (during uninstall, the same cause instead reads `` the sidecar leaves `<path>` alone ``, since uninstall has no skill left to skip). |
+| `SKIPPED` | Skill name taken | A skill name is taken by non-sidecar content the sidecar can see, tracked or not: an entry with that name at a write root (`.claude/skills/`, `.agents/skills/`), an entry with that name in a read-only skill folder (`.github/skills/`, `.agent/skills/`, `.codex/skills/`), a case variant of the name in any of those folders when Git's `core.ignorecase` is true, or another skill's `SKILL.md` frontmatter `name:` field declaring it. A symlinked folder counts the same as a real one, unless it resolves into a write root — that kind of symlink is only a mirror of the write root (the common `.github/skills -> ../.claude/skills` layout) and is never itself a collision. | `` the repository has `<path>`; the sidecar skips `<skill>` at every root ``. This does not mean the colliding content is tracked — only that it exists. |
+| `SKIPPED` | Foreign file in the way | An untracked file is in a path the sidecar wants to use, but the manifest does not own it. | `` the sidecar will not replace `<path>` and skips `<skill>` at every root; rename or remove `<path>` only if you do not need it `` (a bridge with no skill omits the "skips" clause). |
+| `SKIPPED` | Unit listed by the exclude block but never recorded, and its skill name is not one this bootstrap ships | A hand-added line in the sidecar's own exclude block names a folder the sidecar does not know as a skill and has no manifest record for. | The remedy says the unit is `listed by the sidecar's exclude block but never recorded`, not that it holds your edited copy — the sidecar never wrote it, so it has nothing to compare it against. |
+| `RETAINED` | Team took over a sidecar unit | The team started tracking a file inside a unit the sidecar used to own; the sidecar deleted its own copies that matched what it wrote, but left behind untracked files it did not recognize. | Move the file out of the folder, or commit it with `git add -f`. It stays hidden until then, and a pull can overwrite it. |
+| `RETAINED` | Unrecognized line in the sidecar's exclude block | A line sits between `# BEGIN ai-bootstrap sidecar` and `# END ai-bootstrap sidecar` in `.git/info/exclude` that the sidecar does not recognize as one of its own unit or retained-file lines. Kept in file order, after the sidecar's own sorted lines, so a negation such as `!keep.log` never gets sorted ahead of the `*.log` line above it. | `` the sidecar does not recognize `<line>` in its own exclude block and keeps it ``; move it outside the block to keep it, or delete it if you do not need it. |
+| `RETAINED` | Retained file a team rule still ignores, reported on uninstall | Removing the block un-hides a retained file, but a separate team `.gitignore` rule still matches it. | `` no longer hidden by the sidecar; a team rule still ignores it `` — `git status` will not show it until that team rule changes too. |
+| `PRESERVED` | Skill name taken, and your copy had edits | A skill name became taken (see the row above) while your sidecar copy of that skill had local edits. | Copy the preserved file(s) out of the Git directory if you want to keep them; see **Preserved copies** below. |
+
+A locally modified sidecar file (one you hand-edited) is kept, not
+overwritten. Because the file is hidden from Git, a pull or checkout can
+overwrite it without warning (see **Limits** below), so keep personal edits
+somewhere else, not inside a sidecar file. Each run reports it: if the
+skill is still shipped, the remedy reads "`<path>` has local edits, so the
+sidecar keeps it. A pull can overwrite hidden files without warning. To take
+the current version, copy your edits elsewhere, delete `<path>`, and rerun".
+If the sidecar no longer ships that skill at all, the remedy instead reads
+"`<path>` has local edits and the sidecar no longer ships `<skill>`; copy
+your edits elsewhere, then delete `<path>`".
+
+**Preserved copies.** When a skill name becomes taken by other content (the
+`SKIPPED`/"Skill name taken" row above) and your sidecar copy of that skill
+has local edits, the sidecar does not just skip the skill — it stops
+managing that skill at every write root. An unmodified sidecar copy is
+removed outright. A copy you hand-edited is moved instead, into
+`<git dir>/ai-bootstrap-sidecar-preserved/<unit path with "/" replaced by
+"__">--<content hash>`, and the run prints `PRESERVED <unit> -> <path>`. If
+that destination already exists — an earlier preserve landed the same
+bytes — the edited copy stays where it is instead of being moved, and the
+run reports a conflict so it never overwrites the existing preserved copy.
+While that conflict is open, the skill's other `SKIPPED`/"Skill name taken"
+rows change their remedy: instead of "the sidecar skips `<skill>` at every
+root", they read "`<skill>` is kept in place until its edited-copy conflict
+is resolved, not skipped at every root" — the conflicting copy is still
+there, so the skill is not fully gone. To recover a preserved copy, copy it
+out of the Git directory; the sidecar never empties
+`ai-bootstrap-sidecar-preserved/` on its own.
+
+**Uninstall.** Remove the sidecar overlay with the same installer:
+
+```bash
+uv run python scripts/install_bootstrap.py /path/to/team-repo --uninstall
+```
+
+`--mode sidecar` is optional here: with no `--mode` at all, `--uninstall`
+also works once detection finds sidecar evidence on the target. `--dry-run`
+previews the same removal without writing anything.
+
+Uninstall removes every sidecar file whose content still matches the
+manifest, the `# BEGIN ai-bootstrap sidecar` / `# END ai-bootstrap sidecar`
+block, the manifest itself, and the staging folder. It never deletes
+`<git dir>/ai-bootstrap-sidecar-preserved/`: that folder holds your edited
+copies (see **Preserved copies** above), and the sidecar leaves it alone on
+every run, including uninstall — delete it yourself only when you actually
+want to throw those edits away. Team-tracked and other foreign content is
+never touched. A line inside the exclude block that the sidecar never
+recognized as its own is not dropped: once the block is removed, that line
+is written back as a plain line where the block used to be, and reported.
+
+Removing the block also removes every `RETAINED` line, so any file that was
+hidden only because the sidecar was retaining it becomes visible to `git
+status` and `git add -A`; each one is reported by path so you can decide
+whether to track or delete it. Uninstall then removes any sidecar parent
+folder it created that is now empty — `.claude/skills`, `.agents/skills`,
+`.claude/rules`, `.github/instructions`, and then `.claude`, `.agents`, and
+`.github` themselves — but never one that still holds anything, including a
+team's own content.
+
+If the target carries no sidecar evidence at all, `--uninstall` prints "no
+sidecar found; nothing to do" and exits 0 — running it again after a clean
+uninstall is safe. Whenever `ai-bootstrap-sidecar-preserved/` holds
+anything, `--uninstall` also prints where that folder is, even on this "no
+sidecar found" path and even when there is otherwise nothing to do — so an
+edited copy from an earlier run is never silent about where it landed.
+
+Uninstall's own preflight checks run first, the same target-only checks the
+install uses; each refusal names its own cause (for example, an
+unbalanced `# BEGIN`/`# END` marker pair, or a linked worktree). Past
+preflight, `--uninstall` can still refuse before writing anything: a unit
+that is a symlink or holds a nested repository, a folder it cannot write to,
+or a kept unit whose ignore proof fails each stop the run and name the
+offending path, the same way install's own checks do. A preserve conflict —
+an edited copy would move to a path in `ai-bootstrap-sidecar-preserved/`
+that an earlier preserve already filled — is the only case where
+`--uninstall` still writes and then exits 1: it keeps that one unit and its
+exclude line in place, keeps the block, rewrites the manifest to hold only
+the units it kept, reports the conflict, and exits 1. Move or rename the
+conflicting file under `ai-bootstrap-sidecar-preserved/` and rerun
+`--uninstall` to finish the job.
+
+A team ignore rule that would otherwise expose a sidecar path never blocks
+uninstall: uninstall checks only the exclude lines it is actually keeping,
+not every line a team rule might expose, so a team's own `.gitignore`
+change cannot stop it from finishing.
+
+Uninstall still works after a later bootstrap version drops a skill
+entirely: if your copy of that skill had local edits, uninstall preserves
+it the same way an ordinary update would, instead of leaving it exposed.
+
+`--uninstall` refuses with `--mode full`, and it refuses on a target that
+has full-install evidence: it only ever removes a sidecar overlay, never a
+full install.
+
+**Manual fallback**, if you cannot run the installer: read
+`ai-bootstrap-sidecar.json` inside the Git directory for the exact paths it
+owns. Skip any of those paths that `git ls-files` already lists — the team
+has taken that one over, and it is no longer yours to delete. Delete only
+the files whose content hash still matches the manifest record, and never
+delete a file the manifest marks `retained`. Move any file you have
+hand-edited out of the sidecar folders first, so the edit survives, then
+delete the `# BEGIN ai-bootstrap sidecar` / `# END ai-bootstrap sidecar`
+block last. Leave `<git dir>/ai-bootstrap-sidecar-preserved/` alone — it
+holds preserved edits from earlier runs — and delete it only on purpose.
+
+**Switching modes manually.** There is no automatic migration. To move from
+sidecar to full, remove the sidecar with `--uninstall` as above, then run
+the installer with `--mode full`. To move from full to sidecar, you would
+need to remove the full install's `.claude/`, root adapters, and
+devcontainer changes by hand first — in practice, choose the right mode
+before your first install instead.
+
+**Client support.** Claude Code, Codex, and Copilot in VS Code (both the
+Local agent and Agent Host sessions) are verified with a real client run
+(`native-run` evidence in
+[docs/sidecar-provider-contract.md](docs/sidecar-provider-contract.md)).
+Codex is skill-only by design: no client mechanism lets an instruction file
+both stay additive to `AGENTS.md` and load in every session without a
+project-trust config file, so no Codex bridge ships. In a Copilot Local
+agent session, both bridge files load, so the one bridge body appears twice;
+the text is identical, so this is harmless. Google Antigravity is
+unverified for sidecar v1 — no client was available to run the fixture — and
+gets no rules file. Copilot CLI and cloud agents are out of scope, matching
+this project's existing Copilot claim.
+
+**Limits:**
+
+- The main worktree's `info/exclude` lines also hide the sidecar's paths in
+  every linked worktree, because `info/exclude` is shared by all worktrees
+  of one repository.
+- A linked worktree that VS Code or the Codex app creates for a background
+  session starts with no sidecar files at all, unless you list them in VS
+  Code's `git.worktreeIncludeFiles` setting or a `.worktreeinclude` file for
+  the Codex app — those tools copy an ignored file into a new worktree only
+  when it is explicitly listed.
+- Git treats an ignored file as disposable: if the team later commits a
+  tracked file at the same path as one of your sidecar files, `git
+  checkout`/`pull` silently overwrites your copy with the team's, without
+  warning. Keep any personal edits somewhere else, not inside a sidecar
+  file, if you want them to survive.
+- `.git/info/exclude` is a convenience, not a security boundary. A team
+  `.gitignore` rule can win over it and expose a sidecar path; the installer
+  proves every path is actually ignored before any sidecar file is written,
+  but that proof does not stop the team from changing their own ignore rules
+  later.
+
+### What a full install changes in a team repository
+
+The full installer is a takeover, and its protection is narrower than it
+looks — this is why the sidecar exists as a separate mode instead of a
+gentler full install. Checked against `scripts/install_bootstrap.py`:
+
+- Its only refusal about existing content is for an `.agents/` tree it
+  cannot prove it generated.
+- A non-empty `.claude/` with no `.git` is treated as legacy state and
+  turned into a nested Git repository.
+- Under `.claude/`, it overwrites every file it generates and deletes every
+  other file that is not consumer state, tracked or not; a copy survives
+  only in the new nested repository's history.
+- Inside the root adapter paths, it deletes every untracked file it does not
+  generate as an "obsolete generated file". Tracked root adapter files such
+  as `CLAUDE.md` and `AGENTS.md` are preserved, except the Copilot surface
+  in committed mode, where tracked team Copilot files are overwritten or
+  deleted.
+- It overwrites `.devcontainer/` even when the team tracks it.
+- It rewrites the tracked `.gitignore` and sets `core.hooksPath`.
+
+A full install into a team repository therefore changes and deletes team
+files. Use the sidecar instead when you do not own the repository's agent
+harness.
+
+### Behavior changes you should know about
+
+- **A plain install can now refuse.** With no `--mode`, the installer now
+  aborts on a repository that already tracks an agent-harness path — a path
+  under `.claude`, `.devcontainer`, a root adapter file such as `CLAUDE.md`
+  or `AGENTS.md`, or a Copilot surface file, but never `.gitignore` alone —
+  and carries no bootstrap or sidecar evidence yet. Pass `--mode full` to
+  keep today's takeover, or `--mode sidecar` for the overlay. This includes a
+  fresh clone of a repository that a full install already manages, whose
+  `.claude/` has not been restored yet: run `bash
+  .devcontainer/state-sync.sh setup` first, or pass `--mode full`.
+- **Sidecar mode supports only the main worktree.** It aborts in a linked
+  worktree; see Limits above.
+- **A batch update no longer stops at the first failure.** See [Updating
+  Sidecar Consumers](#updating-sidecar-consumers) below.
+- **Any tracked `.claude` is team config, not a full install, even when it
+  carries `bootstrap-ownership.env`.** When the outer index has any entry at
+  or under `.claude` — tracked files, a submodule's gitlink, or a tracked
+  symlink — neither a nested `.claude/.git` directory nor
+  `.claude/bootstrap-ownership.env` (checked by `lexists`, never followed)
+  counts as full-install evidence; a plain install refuses the target as
+  already-tracked team content instead of treating it as this bootstrap's
+  own nested AI-state repository.
+- **A plain or `--mode full` install now refuses four more shapes before any
+  write, when the target carries no bootstrap evidence at all.** A subfolder
+  of a repository (the target is not `git rev-parse --show-toplevel`), a
+  linked worktree, a bare repository, and a target whose `.claude` exists as
+  a regular file are each refused. Every message names the shape it found,
+  then says `The full install supports only the root of a main worktree`,
+  followed by a shape-specific remedy. This narrows only the mode table's
+  "no evidence" row; an existing full consumer refresh is unaffected.
+- **`--uninstall` refuses a missing or non-Git target instead of silently
+  succeeding.** A target that is not a directory exits 1 with `Refusing
+  --uninstall: <target> is not a directory.`; a target that Git does not
+  recognize as a repository exits 1 with `Refusing --uninstall: <target> is
+  not a Git repository, so it cannot hold a sidecar overlay.`
+- **Doubled or unbalanced exclude markers stop mode detection with the
+  marker remedy, not the `safe.directory` hint.** When `.git/info/exclude`
+  fails the sidecar's own marker check during mode detection (not only
+  during install), the run stops with `Refusing to detect an install mode:
+  <reason>. To recover, fix info/exclude by hand: the sidecar's own
+  BEGIN/END markers must appear exactly once each, with BEGIN before END,
+  then rerun.`
+- **A missing `git` executable is a clean message, not a traceback.** Every
+  mode — plain, `--mode sidecar`, `--mode full`, and `--uninstall` — exits 1
+  with `git not found on PATH: install Git or add it to PATH, then rerun.`
+  instead of crashing partway through detection.
+- **A Git error other than "not a git repository" stops detection instead of
+  guessing.** A "dubious ownership" error, for example, aborts in every mode
+  with Git's own message and a remedy (`git config --global --add
+  safe.directory <path>`), rather than being read as "no evidence found".
+- **Nested repositories, submodules, a symlinked ancestor of a skill folder,
+  bad filesystem shapes, and unwritable folders are refused before any
+  write.** Sidecar mode checks every path it plans to touch — a skill unit,
+  a write root, a bridge's parent folder — against the repository boundary
+  and the filesystem first, and refuses, naming the offending path, if any
+  of it does not fit. A symlink inside a skill folder, rather than as one of
+  its ancestors, does not abort the run; the folder is treated as
+  incomplete instead (see the next bullet).
+- **A skill folder that holds a symlink, named pipe, socket, device, or
+  empty subfolder is incomplete, not unchanged.** An empty leftover folder
+  with nothing else in it counts as absent, and the sidecar reinstalls it.
+  Otherwise a skill folder holding one of these entries never matches its
+  recorded content: it is treated as locally modified when the sidecar
+  already owns it, unfinished when it is only listed, or foreign otherwise —
+  and it is never deleted as if it matched what the sidecar would install.
+- **A skill folder's own nested repository is handled by ownership, not by a
+  blanket refusal.** A nested `.git` inside a skill folder that the sidecar
+  recorded or listed stops the run before any write, naming the folder. A
+  personal clone the sidecar never recorded or listed is skipped as
+  foreign instead, and nothing inside it is touched. A skill folder that is
+  itself a team submodule (a gitlink entry in the Git index) is team-owned
+  and never touched. In every case, no path inside any submodule — including
+  one nested below a skill folder — is hidden, checked, or changed by the
+  sidecar. The write-root and bridge-parent boundary checks above are
+  unchanged.
+- **Unbalanced markers in `.git/info/exclude` are refused, not repaired.**
+  If the sidecar's own `# BEGIN`/`# END` lines are missing one of the pair,
+  doubled, or out of order, the run stops before writing anything and names
+  the line numbers so you can fix them by hand.
+- **A file name that `.gitignore` syntax cannot express is reported, not
+  hidden.** A retained file whose name has an embedded newline or a
+  trailing carriage return never gets an exclude line; it stays visible and
+  is reported instead.
+- **The generated source must be complete and exact.** Full mode only
+  requires that its source (`dist/multi-agent/`) include
+  `.claude/hooks/scripts/state-sync.sh`; a source missing that file is
+  refused. Sidecar mode is stricter: its source (`dist/sidecar/`) must match
+  one exact allowlist, with no file missing and no extra file present, or
+  the install is refused.
+- **Inherited Git environment variables are ignored.** Before it runs any
+  Git command, the installer clears `GIT_DIR`, `GIT_WORK_TREE`,
+  `GIT_INDEX_FILE`, and Git's other repository-local environment variables
+  from its own process, so a variable left exported by a wrapper script or
+  an earlier `git -C` call can no longer redirect it to the wrong
+  repository.
+
+### Updating Sidecar Consumers
+
+The same `update_consumers.py` command updates a sidecar consumer: it
+detects the sidecar mode on that target and reconciles it by the rules in
+[Personal Sidecar Install](#personal-sidecar-install) — no separate script or
+flag. A batch that mixes full and sidecar consumers, or that mixes healthy
+and unsafe targets, updates every target it can and reports the rest:
+
+```bash
+uv run python scripts/update_consumers.py /path/to/team-repo /path/to/own-repo
+```
+
+If a target now carries evidence of both a full install and a sidecar
+overlay, or fails its own preflight checks for another reason, that
+installer run exits non-zero, refuses before writing anything, and the
+updater records it, continues with the remaining targets, and exits 1 at the
+end with that target named alongside its exit code. Nothing about a sidecar
+target's installer run needs `--mode`: the same auto-detection that a single
+`install_bootstrap.py` run uses also runs inside the batch.
 
 ## Architecture Flow
 
@@ -438,7 +867,7 @@ Interpretation:
 
 ## What Is Included
 
-- Generated bootstrap: installable output in `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build)
+- Generated bootstrap: full-install output in `dist/multi-agent/`, and the personal sidecar overlay in `dist/sidecar/` (both gitignored — run `uv run python scripts/generate_targets.py --all` to build; see [Personal Sidecar Install](#personal-sidecar-install))
 - Source policies: reusable instruction files in [shared/policies/](shared/policies/)
 - Agents: canonical metadata and prompts in [shared/agents/](shared/agents/)
 - Review profiles: unified reviewer checklists in [shared/review-profiles/](shared/review-profiles/)

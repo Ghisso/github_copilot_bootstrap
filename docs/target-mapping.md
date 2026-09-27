@@ -1,6 +1,9 @@
 # Target Mapping
 
-The repo generates one installable output: `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` to build).
+The repo generates two installable outputs: `dist/multi-agent/`, the full
+bootstrap, and `dist/sidecar/`, the personal per-clone overlay described
+below (both gitignored — run `uv run python scripts/generate_targets.py --all`
+to build).
 
 ## Devcontainer Bootloader
 
@@ -81,6 +84,51 @@ GitHub Copilot (secondary compatibility adapter):
 - `.vscode/mcp.json`
 
 Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
+
+## Sidecar Overlay
+
+`dist/sidecar/` is a second generated target: a narrow, per-clone developer
+overlay that `scripts/install_bootstrap.py --mode sidecar` installs inside a
+repository whose agent harness a team already owns, without changing any
+tracked file. The same installer, with `--uninstall`, removes the overlay
+again. See [README.md's Personal Sidecar
+Install](../README.md#personal-sidecar-install) for install, update, and
+uninstall instructions, and
+[docs/sidecar-provider-contract.md](sidecar-provider-contract.md) for the
+native-run evidence behind every row below.
+
+| Projection | Path(s) | Client(s) that read it |
+| --- | --- | --- |
+| Skill write root | `.claude/skills/<skill>/` | Claude Code; Copilot in VS Code (Local agent and Agent Host) |
+| Skill write root | `.agents/skills/<skill>/` | Codex; Copilot in VS Code (Local agent and Agent Host) |
+| Skill read-only check (never written) | `.github/skills/`, `.agent/skills/`, `.codex/skills/` | Scanned only to detect a name collision with team-owned content; the sidecar skips a skill at every write root rather than shadow a skill in one of these folders |
+| Bridge | `.claude/rules/ai-bootstrap-sidecar.md` (no frontmatter) | Claude Code; also loaded by Copilot's Local agent |
+| Bridge | `.github/instructions/ai-bootstrap-sidecar.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
+
+The four skills — `debug-investigator`, `humanize`, `ponytail`, and
+`ponytail-review` — are the sidecar's fixed profile. No bridge ships for
+Codex (skill-only by design) or for Google Antigravity (unverified for
+sidecar v1). The manifest, staging folder, preserved-copy folder, pending
+ownership record, and run lock that track sidecar ownership live inside the
+Git directory (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`,
+`ai-bootstrap-sidecar-preserved/`, `ai-bootstrap-sidecar.json.next`, and
+`ai-bootstrap-sidecar.lock`), never in the worktree, so none of them can be
+tracked. The pending record is written after the ignore proof passes and
+before any unit moves, and removed once the real manifest lands — extra
+ownership evidence for a rerun after an interrupted run, never an
+instruction on its own. The run lock is held from just after preflight to
+the end of the run and stays in place, empty, afterward; a dry run takes
+neither. All five paths are built from the same already-verified `git
+rev-parse --path-format=absolute --git-dir` value, never through `git
+rev-parse --git-path`: `--git-path` resolves a symlink in the path before
+printing it, which would hide exactly the symlinked Git-directory case the
+sidecar's own preflight checks exist to catch. The preserved folder holds an
+edited sidecar copy that a taken skill name displaced; see
+[README.md's Personal Sidecar Install](../README.md#personal-sidecar-install)
+for its naming and recovery, and its [Uninstall
+section](../README.md#personal-sidecar-install) for `--uninstall`, which
+removes the manifest and staging folder but leaves the preserved folder in
+place.
 
 See [Agent roster, prompts, and the skill
 library](../openwiki/architecture/agents-and-skills.md) for how each

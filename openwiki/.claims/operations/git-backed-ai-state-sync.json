@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:d1435dbf39e1331f5dc6595699db6239f06d70ad66eee9a004ab0c0137d524b8",
+  "pageVersion": "sha256:2227cb871ced85cdf1be899a9dcb2ac6a041ee2177c726f129790f8e4befc49c",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
-      "statement": ".claude/ in a consumer is a self-contained Git repository on the branch ai-state tracking both installed bootstrap files and mutable AI state, and the outer repository ignores it entirely so its commits are visible only through git -C .claude.",
+      "statement": ".claude/ in a full-install consumer is a self-contained Git repository on the branch ai-state tracking both installed bootstrap files and mutable AI state, and the outer repository ignores it entirely so its commits are visible only through git -C .claude.",
       "evidence": [
         {
           "resource": "repo://.gitignore#L1-L6",
@@ -151,18 +151,28 @@
       "statement": "Bootstrap refreshes land as bootstrap:-prefixed nested commits made by the installer's sync step, distinct from the session: commits session hooks make, so the nested log separates the two sources of change.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1136-L1200",
-          "version": "repo-lines-v1:sha256:03c98d08c3d94b3f4f2b75194ac2ffbb995e836703dc795e5469c7e2e390368e:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI0ODk3YzM4YTAwZGQyNWZkZjYzYzRjZDgxMDU4MTRhZDYzNDU2Y2FkMjMzYzUzMmM4YjQ5ODM3OWVlZjMzY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFmOTM3MjkyNjFhYjE1NzQ1NGYxYmEzYWQzNjNmMDhiNTBlODhkN2I2ZmY1NDg0OWYyOTk2NzFkZDdkNDkxYmUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L975-L1049",
+          "version": "repo-lines-v1:sha256:33903ed577fdee501497ad381ff96d4b4a77cd1c1d07e7fb5d031000215d30d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NzUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFlMDBhMmI2MmExODc1MzFjMzBhZjQ5NDkzZTEwMmY1NmEyNzZlMzU3MWQ1NjRkOTZmZjgyYzhiYWRlOWFjMTIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyZGJkMDU4YWVkNDI1NWUzNGQwYjEwYzRkMzlmMDczM2MyM2YwYjNlMjIwN2U5NjUxOTVhODVmZTJjYjliMjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ5MzQ0ZmIwZDExZDgyNDU1ZDYzMjBhZTE3Yjk1MGFhOTY2MzhlZjc4YzM3NDU3NzU4OGY1MTBjZTRjZmFkMTcifQ"
         },
         {
           "resource": "repo://shared/hooks/scripts/state-sync.sh#L174-L202",
           "version": "repo-lines-v1:sha256:5d9e22e83affb37125aff1c0f4db29054ef74ccaf822e8692eb577cc1f6d2cda:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM1NGRhMDE2NTk0YTY4ZDQ2YjEzZTJiMzM5ZjJhYzA0MWQxYzQ1MzE0YWUwNzM5NjcwNjk0NzQzZmMzOTAwYWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFmYzI2YjJhYWE0YWY0ODU5MmRkMGIxY2E5OTZlZDVmOTNlYTY4Zjg0NDU3NGJjNjE5ZGQyN2ExNWFmMmNkZDUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMyMWVjYTg0NTFiM2QyMGIwZDI5MTc1YzZmOWU4MjEwZDdjNGU5NWE3NmVjNDZiYzA4ZmFkOTczNDlmNzE4NDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ0Y2M3MmNmMmIzM2EwZjZkZjliMzhkMDQwODg3ODZiZmM1OTZlOTVmMDZkMWEyZjQ1ZTA5YmRhZGVlNjI5MjUifQ"
         }
       ]
+    },
+    {
+      "id": "claim_a815423ad1a149d0a35524d028b07cf5",
+      "statement": "The installer dispatches --uninstall to _run_uninstall (and so to uninstall_sidecar) and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install or uninstall creates or touches no nested .claude repository, ai-state branch, or state sync; a missing git executable ends both paths with 'git not found on PATH' instead of a traceback.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1565-L1600",
+          "version": "repo-lines-v1:sha256:20833eb11ef8095a7eda9973e49144b2574440a79813a4289d708740a0c19290:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdmODY2NzI0Zjk4ZmRkNDBmNzY2YWNkMzA1YjUxM2U1ZDZhY2NjZjVkYWM2MTIzNzRjNTNjMDljZDRlNjA5NTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T05:37:12.382Z"
+    "at": "2026-09-27T05:02:18.019Z"
   }
 }

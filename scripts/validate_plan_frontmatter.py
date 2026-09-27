@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import stat
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -43,11 +44,20 @@ BODY_PHASE_HEADING_PATTERN = re.compile(
     r"^## (?:Phase|Phases|Phase Order)[ \t]*\n(?P<body>.*?)(?=^## |\Z)",
     re.MULTILINE | re.DOTALL,
 )
+# Shared by _knowledge_refresh_phase_settled and validate_big_plan's
+# body-phase check: a valid phase slug never starts with a separator.
+PHASE_SLUG_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # See the canonical Knowledge-Refresh Final Phase rule in
 # shared/policies/workflow.instructions.md. This suffix is how a big plan's
 # own dedicated final knowledge-refresh phase is recognized; enforcing at
 # most one, and only as the last phase, is what makes the rule's termination
 # condition deterministic rather than a convention the planner could forget.
+# An earlier knowledge-refresh phase is exempt from that count once its own
+# small plan has settled its identity: a regular file (never a symlink) at
+# the expected sibling path, declaring `type: small-plan`, a `name` equal to
+# the phase slug, a `parent_plan` equal to the big plan's own non-empty
+# `name`, and `status: complete` or `cancelled` - the shape left behind when
+# a completed big plan is reopened.
 KNOWLEDGE_REFRESH_PHASE_SUFFIX = "-knowledge-refresh"
 # See the canonical Verification Evidence Contract rule in
 # shared/policies/workflow.instructions.md. Only a live small plan (never a
@@ -277,19 +287,81 @@ def validate_pause(path: Path, data: dict[str, Any], errors: list[str]) -> None:
         errors.append(f"{path}: pause_session_log must contain **Status:** PAUSED")
 
 
+def _knowledge_refresh_phase_settled(
+    path: Path, phase: str, last_phase: str, big_plan_name: str
+) -> bool:
+    """Return whether an earlier knowledge-refresh phase no longer counts.
+
+    Settled means the phase is not the plan's last entry, the big plan's own
+    ``name`` is non-empty, the phase name passes the existing slug pattern
+    (so the sibling path is always built inside the plans folder), and the
+    sibling at that path is a regular file - never a symlink, which is
+    rejected by an ``lstat`` identity check rather than ``Path.is_file()``,
+    which follows symlinks and would happily read through one that points
+    anywhere on disk. Being inside the plans folder is not enough on its
+    own: the sibling's frontmatter must also declare ``type: small-plan``, a
+    ``name`` equal to the phase slug, and a ``parent_plan`` equal to the big
+    plan's own ``name``, with ``status: complete`` or ``status: cancelled``.
+    A missing, unreadable, symlinked, misidentified, or differently-statused
+    small plan - or an empty big-plan ``name`` - fails closed: unsettled.
+    """
+    if phase == last_phase:
+        return False
+    if not big_plan_name:
+        return False
+    if not PHASE_SLUG_PATTERN.fullmatch(phase):
+        return False
+    sibling = path.parent / f"{phase}.md"
+    try:
+        mode = sibling.lstat().st_mode
+    except OSError:
+        return False
+    if not stat.S_ISREG(mode):
+        return False
+    try:
+        data = parse_frontmatter(sibling)
+    except (OSError, UnicodeError):
+        return False
+    if str(data.get("type", "")) != "small-plan":
+        return False
+    if str(data.get("name", "")) != phase:
+        return False
+    if str(data.get("parent_plan", "")) != big_plan_name:
+        return False
+    return data.get("status") in ("complete", "cancelled")
+
+
 def validate_knowledge_refresh_phase_position(
-    path: Path, phases: list[str], errors: list[str]
+    path: Path, phases: list[str], big_plan_name: str, errors: list[str]
 ) -> None:
-    """A knowledge-refresh phase must be unique and last, so it cannot recur."""
-    refresh_phases = [
-        phase for phase in phases if phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX)
+    """A knowledge-refresh phase must be unique and last, so it cannot recur.
+
+    A settled earlier knowledge-refresh phase (see
+    ``_knowledge_refresh_phase_settled``) is exempt from that count: the
+    shape left behind when a completed big plan is reopened after its
+    refresh phase finished.
+    """
+    last_phase = phases[-1]
+    unsettled_refresh_phases = [
+        phase
+        for phase in phases
+        if phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX)
+        and not _knowledge_refresh_phase_settled(path, phase, last_phase, big_plan_name)
     ]
-    if len(refresh_phases) > 1:
+    if len(unsettled_refresh_phases) > 1:
         errors.append(
             f"{path}: at most one knowledge-refresh phase is allowed, "
-            f"found {len(refresh_phases)}"
+            f"found {len(unsettled_refresh_phases)}"
         )
-    elif refresh_phases and phases[-1] != refresh_phases[0]:
+    elif unsettled_refresh_phases and last_phase != unsettled_refresh_phases[0]:
+        errors.append(
+            f"{path}: the knowledge-refresh phase must be the last phase in phases"
+        )
+    elif (
+        not unsettled_refresh_phases
+        and any(phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX) for phase in phases)
+        and not last_phase.endswith(KNOWLEDGE_REFRESH_PHASE_SUFFIX)
+    ):
         errors.append(
             f"{path}: the knowledge-refresh phase must be the last phase in phases"
         )
@@ -322,7 +394,9 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
         errors.append(f"{path}: phases must be a non-empty list")
         return
     if all(isinstance(phase, str) for phase in data["phases"]):
-        validate_knowledge_refresh_phase_position(path, data["phases"], errors)
+        validate_knowledge_refresh_phase_position(
+            path, data["phases"], str(data.get("name", "")), errors
+        )
     body = path.read_text(encoding="utf-8").split("---\n", 2)
     if len(body) != 3:
         return
@@ -341,10 +415,7 @@ def validate_big_plan(path: Path, data: dict[str, Any], errors: list[str]) -> No
         if (
             malformed
             or len(body_phases) != len(set(body_phases))
-            or any(
-                not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", phase)
-                for phase in body_phases
-            )
+            or any(not PHASE_SLUG_PATTERN.fullmatch(phase) for phase in body_phases)
         ):
             errors.append(f"{path}: body phase inventory is malformed")
         elif body_phases != data["phases"]:

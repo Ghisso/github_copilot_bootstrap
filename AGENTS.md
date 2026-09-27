@@ -4,7 +4,7 @@ This repository is a reusable multi-agent bootstrap. Preserve the pre-flight -> 
 
 Use `shared/policies/workspace.instructions.md` for the main workspace guidance. When choosing retrieval tools, treat `shared/policies/tool-routing.instructions.md` as the single source of truth.
 
-The source of truth lives in `shared/`; generated installable output lives in `dist/multi-agent/` (gitignored — run `uv run python scripts/generate_targets.py --all` before installing). Do not hand-edit generated files.
+The source of truth lives in `shared/`; generated installable output lives in `dist/multi-agent/` (the full bootstrap) and `dist/sidecar/` (the personal per-clone overlay), both gitignored — run `uv run python scripts/generate_targets.py --all` before installing either. Do not hand-edit generated files.
 
 An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context — never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 

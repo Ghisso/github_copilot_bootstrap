@@ -3,9 +3,6 @@ type: workflow
 title: Task lanes and the enforced lifecycle
 description: How a request is classified into a task lane, how big and small plans drive the PRE-FLIGHT to PUSH lifecycle on an implementation branch, the fixed closeout sequence, the verification evidence contract, the pause and cancel paths, and which of these rules hooks and the verifier enforce versus policy text.
 tags: [workflow, lifecycle, task-lanes, plans, closeout, verification, pause, cancel]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T05:37:12.382Z
 sources:
   - id: openwiki-source-cdb6e91f0fa049994704c487
     resource: repo://scripts/validate_plan_frontmatter.py
@@ -17,7 +14,12 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-588c1b68a254d094494d64f9
     resource: repo://shared/templates/plan-small.md
-generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
+  - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
+    resource: repo://tests/test_validate_plan_frontmatter.py
+generated: { by: "claude-code", at: "2026-09-26T06:04:25.666Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-09-26T06:04:25.666Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -45,7 +47,7 @@ Any commit on an implementation branch must satisfy the full ceremony, whichever
 - A **small plan** lives at `.claude/plans/<phase_slug>.md` with `type: small-plan`, `parent_plan`, `phase_index`, `status`, and `closeout_session_log`. Statuses add `planned` and `paused`.
 - `status` must occur exactly once. Templates are `shared/templates/plan-big.md` and `plan-small.md`.
 
-`scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one `-knowledge-refresh` phase and only last, and the verification lints below. `check_runtime.py` and the `commit-msg` Git hook both run it.
+`scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one unfinished `-knowledge-refresh` phase and only as the last phase, and the verification lints below. An earlier knowledge-refresh phase is exempt from that count only once it has settled, but a plan that has any knowledge-refresh phase must still end with one. Settled means the big plan's own `name` is not empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, that declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`. `check_runtime.py` and the `commit-msg` Git hook both run it.
 
 Plan-first, as policy text: check `.claude/MEMORY.md` for lessons, clarify ambiguous work, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
 
@@ -118,9 +120,20 @@ Both field sets are validated by `validate_plan_frontmatter.py`, including rejec
 
 New small plans default to `status: planned`. Branch creation activates the first phase and each completed-phase commit activates the next non-cancelled phase, flipping exactly one phase to `in-progress`. An unexpected next-phase status is never overwritten; the transition warns and leaves the phase machine where it is. `planned` blocks the same gates as `in-progress`.
 
+## Reopening a completed big plan
+
+A `complete` big plan can take new phases while its implementation branch still exists and is not merged; after a merge, a new big plan starts instead. The numbered procedure lives under "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`. In short:
+
+1. Record the new findings, then draft the new small plans as `planned`. Only a knowledge-refresh phase's slug may end in `-knowledge-refresh`, because the validator counts any slug with that suffix.
+2. If any listed phase is a knowledge-refresh phase, append one new `-knowledge-refresh` phase after the new phases. The validator requires this, so the final refresh and the stale-claims audit always follow the final code.
+3. Set the big plan to `in-progress`, point `current_phase` at the first new phase, and append the new phases to `phases:` and to the body phase list in the same order.
+4. Never edit a completed phase's plan, closeout log, findings, or receipts, and never re-persist its receipts. Set the first new phase to `in-progress` by hand, because no hook does it on an existing branch.
+
+Reopening defers the strict terminal gates to the new final phase; it never escapes them.
+
 ## Representative tests
 
-- `tests/test_validate_plan_frontmatter.py` covers every pause and cancellation field and the block-scalar and near-miss marker rejections.
+- `tests/test_validate_plan_frontmatter.py` covers every pause and cancellation field, the block-scalar and near-miss marker rejections, and the knowledge-refresh position rule, including a completed or cancelled earlier refresh phase, appending after a finished refresh, a slug that fails the slug pattern, and a sibling that fails the identity check (a symlink, an unrelated `parent_plan`, the wrong `type` or `name`, or an empty big-plan `name`).
 - `tests/test_commit_closeout.py` covers the post-commit phase advance across commit-message sources and its refusals.
 - `tests/test_hook_gates.py` covers the commit and push gate assertions against real temporary repositories.
 

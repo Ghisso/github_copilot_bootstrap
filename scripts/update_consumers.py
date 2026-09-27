@@ -2,20 +2,35 @@
 """
 Regenerate dist/ and update one or more consumer repos with the latest bootstrap.
 
-Runs install_bootstrap.py for each repo, which replaces every
+Runs install_bootstrap.py for each repo without `--mode`, so each target's
+install mode (full or sidecar) is auto-detected from the target alone
+(`detect_install_mode`). A full consumer gets today's takeover refresh: every
 bootstrap-controlled file (agents, hooks, instructions, settings, skills,
-templates) with the new version and commits+pushes the change on the
+templates) is replaced, and the change is committed and pushed on the
 consumer's git-backed ai-state branch (D1/D4 in
-plans/plan-git-state-sync.md). Files that exist only in the consumer repo
-(MEMORY.md, plans, session_logs, quality_reports, etc.) are state, not
-bootstrap content, so the installer never touches them beyond what a normal
-`bootstrap:` commit implies — there is no more backup/restore step, since
-state now lives in git history rather than being overwritten in place by a
-bucket pull.
+plans/plan-git-state-sync.md). A sidecar consumer instead gets its private,
+per-clone overlay reconciled (`sidecar_overlay.install_sidecar`): only its own
+skill and bridge files change, and no tracked file, hook, or AI-state branch
+is touched (big plan
+`.claude/plans/consumer-sidecar-bootstrap-overlay.md`, Decision 20). Files
+that exist only in a full consumer repo (MEMORY.md, plans, session_logs,
+quality_reports, etc.) are state, not bootstrap content, so the installer
+never touches them beyond what a normal `bootstrap:` commit implies — there
+is no more backup/restore step, since state now lives in git history rather
+than being overwritten in place by a bucket pull.
 
-For a consumer whose .claude/ predates this plan (no .claude/.git yet), the
-installer commits its pre-existing state as `migrate: import pre-git state`
-before the bootstrap update lands on top of it.
+For a full consumer whose .claude/ predates this plan (no .claude/.git yet),
+the installer commits its pre-existing state as `migrate: import pre-git
+state` before the bootstrap update lands on top of it.
+
+A batch may mix full and sidecar consumers. When one target's installer
+exits non-zero, or a target path is not a directory, this script records it
+and moves on to the next target instead of stopping the batch. After the
+last target it prints one `FAILED: <path> (exit <code>)` line per failed
+target and exits 1; it prints "All projects updated." (or, in `--dry-run`,
+"Preview complete; no projects were updated.") only when every target
+succeeded. A `dist/` regeneration failure still stops the batch before any
+target runs.
 
 Usage:
     uv run python scripts/update_consumers.py /path/to/repo1 /path/to/repo2 ...
@@ -40,6 +55,17 @@ GENERATOR = BOOTSTRAP_ROOT / "scripts" / "generate_targets.py"
 
 def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, cwd=BOOTSTRAP_ROOT)
+
+
+def run_target(cmd: list[str]) -> int:
+    """Run one target's installer and return its exit code without raising.
+
+    Unlike ``run``, a non-zero exit is a per-target failure (Decision 20 in
+    ``.claude/plans/consumer-sidecar-bootstrap-overlay.md``): the caller
+    records it and continues with the next target instead of stopping the
+    batch.
+    """
+    return subprocess.run(cmd, cwd=BOOTSTRAP_ROOT).returncode
 
 
 def main() -> None:
@@ -84,11 +110,14 @@ def main() -> None:
         else:
             run(cmd)
 
+    failures: list[tuple[Path, int]] = []
+
     for project_str in args.projects:
         project = Path(project_str).resolve()
         if not project.is_dir():
             print(f"ERROR: {project} is not a directory", file=sys.stderr)
-            sys.exit(1)
+            failures.append((project, 1))
+            continue
 
         action = "Previewing" if dry else "Updating"
         print(f"\n=== {action} {project.name} ({project}) ===", flush=True)
@@ -106,12 +135,20 @@ def main() -> None:
                 if args.commit_copilot_surface
                 else "--no-commit-copilot-surface"
             )
-        run(install_cmd)
+        exit_code = run_target(install_cmd)
+        if exit_code != 0:
+            failures.append((project, exit_code))
+            continue
 
         if dry:
             print(f"=== Preview complete: {project.name}; no files updated ===")
         else:
             print(f"=== Done: {project.name} ===")
+
+    if failures:
+        for project, exit_code in failures:
+            print(f"FAILED: {project} (exit {exit_code})")
+        sys.exit(1)
 
     print(
         "\nPreview complete; no projects were updated."
