@@ -71,6 +71,27 @@ the state seeds under `shared/sidecar/workflow/`.
   coverage table are filled; `.codex/agents` is dropped; `.github/agents`
   and the workflow instructions file wait for the Copilot run; the read
   roots for collision checks are frozen.
+- Steps 5 to 8 done by the second `documenter`: 15 files under
+  `shared/sidecar/workflow/` (three rules, the Copilot body, `skills.txt`,
+  the `MEMORY.md` seed, four state READMEs) and five
+  `shared/agents/<id>/workflow-supplement.md`; a grep for every forbidden
+  token and for `hook`, `receipt`, `checkpoint`, and `findings json` over
+  all 15 files found nothing, and every `.claude/` path named is under
+  `.claude/ai-bootstrap/` or `.claude/templates/`. Denylist: 12 skills
+  (`commit`, `context-status`, `knowledge-refresh`,
+  `safe-consumer-bootstrap-refresh`, `setup-project`, `deep-audit`,
+  `code-review`, `run-tests`, `code-style`, `onboard`,
+  `plan-decomposition`, `refactor`), each with its reason; 29 of the 40
+  public skills are eligible (the documenter's report said 43; recounted
+  by script). Follow-up sent: the planner supplement must also replace the
+  canonical prompt's mandatory `plan-decomposition` rule with the
+  templates.
+- Note for Phase B: `code-style`, `refactor`, and `run-tests` are denied
+  only because their text names `verify.py`; a profile text replacement
+  could rescue them. Decide there, not here.
+- Required items on the current tree: `validate_targets.py` PASS with the
+  new files present, `verify.py fast` NOT_APPLICABLE (no Python changed),
+  plans valid.
 
 ## [LEARN] Entries
 
