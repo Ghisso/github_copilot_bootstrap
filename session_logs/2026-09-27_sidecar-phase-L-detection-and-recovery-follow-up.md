@@ -54,6 +54,28 @@ real-Git regression test per behavior finding, then harden the write path.
   ran a tree-wide `ruff format`, which reformatted
   `scripts/sidecar_overlay.py` while coder A was editing it; coder A was
   told to re-read before further exact-text edits.
+- `coder` A done: step 6 docstring; step 9's `_team_takeover` now matches
+  the pending record's files (test failed first with a RETAINED report);
+  step 10's `fsync` of file and parent; step 12 (a)-(h), each with a
+  failing-first test, including `_still_ignored_by_another_rule` and
+  `_recheck_now_visible_reports` for the uninstall report,
+  `_unsafe_path_segment`, blank-line silence, the gate diagnostic, the
+  uninstall wording (`uninstall` flag on three remedies),
+  `SIDECAR_FORBIDDEN_TEXT_TOKENS` (which lives in
+  `scripts/validate_targets.py`, not `runtime_ownership.py` as the plan
+  said), and `_remove_empty_sidecar_parents`; step 13's four test fixes
+  and seven guard tests. Three pre-existing tests updated for the new
+  "never recorded" wording.
+- VERIFY: `generate_targets.py --all` (no `dist/` diff), `validate_targets.py`
+  PASS, `check_runtime.py` PASS, `validate_plan_frontmatter.py` PASS, ruff
+  check and format clean, mypy clean (41 files), `pytest tests/` 2223
+  passed, `verify.py fast` PASS. Working tree: 10 files changed, 2861
+  insertions, 169 deletions. Diff written to the session scratch folder
+  for the reviewer.
+- Documentation cross-check: the README quotes the "leaves ... alone",
+  "never recorded", "a team rule still ignores it", "another sidecar run
+  is active", and `ABORT: filesystem error at` messages as the code prints
+  them; the fresh-default refusals are described in prose. Sent to REVIEW.
 
 ## [LEARN] Entries
 
