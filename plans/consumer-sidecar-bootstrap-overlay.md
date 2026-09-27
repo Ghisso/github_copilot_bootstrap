@@ -1,7 +1,7 @@
 ---
 name: consumer-sidecar-bootstrap-overlay
 type: big-plan
-status: complete
+status: in-progress
 originating_branch: dev
 implementation_branch: consumer-sidecar-bootstrap-overlay_implementation
 started_at: 2026-09-25T03:07:56Z
@@ -17,7 +17,9 @@ phases:
   - 2026-09-25_phase-I-sidecar-hardening-knowledge-refresh
   - 2026-09-26_phase-J-sidecar-safety-follow-up
   - 2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh
-current_phase: 
+  - 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
+  - 2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh
+current_phase: 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
 ---
 
 # Big Plan: Consumer Sidecar Bootstrap Overlay
@@ -226,6 +228,33 @@ text has been updated to match.
 | 46 | Agent-harness wording | "A path the full install writes" means a path under `FULL_INSTALL_ROOT_PATHS`, the agent harness, not `.gitignore`. A plain full install into a repository that tracks only code and `.gitignore` stays allowed, and the docs say "an agent-harness path". | O15. Refusing on `.gitignore` would block a plain install into almost every repository. |
 | 47 | Tests through real gathering | Each sidecar behavior finding (R1-R4, O1-O12, O16, and O17 bullets 2 and 4) gets a real-Git regression test through `install_sidecar`, `uninstall_sidecar`, or the installer CLI, not only a pure-planner test. R5 gets validator tests. O13 is closed by fixing the precedence property test's fixtures so they produce real `adopt` and `unchanged` outcomes. O17 bullet 1 gets an installer test with a patched Git call. O14, O15, O18, and O19 are closed by the doc changes, Phase J's removals, and Decisions 37 and 40, recorded as dispositions. Each finding's regression test fails on `010f08c`; tests that guard behavior that already works are named as guards. | O13, O19, and the MEMORY lesson that planner-injection tests cannot catch gathering defects. |
 
+Decisions 48-58 come from a third review of the completed Phases A-K at
+`f6f36c8` on 2026-09-27:
+[post-Phase-K review](../quality_reports/2026-09-27_consumer-sidecar-bootstrap-overlay-review-3.md)
+(findings N1-N20 and NITs). Five parallel reviewers reproduced every
+BLOCKER and MAJOR in real Git repositories; the architecture holds and
+nothing from R1-R5 or O1-O19 regressed. User decision on 2026-09-27: fix
+within this big plan as Phase L with a new final refresh Phase M. Every fix
+below was prototyped and proven before Phase L was planned: each new test
+failed on `f6f36c8` and passed after its fix, and the three prototypes
+merged into one tree where 467 sidecar and installer tests, ruff, and mypy
+pass. Where Decisions 48-58 conflict with earlier decisions or design text,
+the later decisions win; the design text has been updated to match.
+
+| # | Topic | Decision | Why |
+| --- | --- | --- | --- |
+| 48 | Tracked `.claude` is never full evidence | `_full_install_evidence` reads the index once, before either evidence branch. When any index entry of any mode (file, symlink, or gitlink) is `.claude` or under `.claude/`, neither a nested `.claude/.git` directory nor `.claude/bootstrap-ownership.env` (checked with `lexists`) counts as full evidence, and the target falls through to the team-config refusal. With no `--mode`, or with `--mode full`, and no bootstrap evidence, a subfolder target, a linked worktree, a bare repository, and a `.claude` that is a regular file are refused before any write. `--uninstall` refuses a missing folder and a non-Git folder with exit 1; doubled markers show the marker remedy, never the `safe.directory` hint; a missing `git` aborts with one line. | N1: the AI-state repository tracks the env file, so a team that ships it in a `.claude` submodule hands every clone "full evidence"; a plain install then committed an `ai-state` branch inside the team's submodule and tried to push it to the team's remote. N13, N17, N18, N11a. The fresh-default refusals narrow only the row that has no evidence, so existing consumers are unaffected. |
+| 49 | Bridge index boundary | `_unit_index_relpaths` counts a bridge as tracked when any index path equals the bridge path or starts with `<bridge>/`. A tracked folder at a bridge path is therefore team-owned or a takeover (drop record only), never preserved. An untracked folder at a bridge path with no record is foreign; with a record it stays locally modified and is preserved on uninstall, because turning it foreign would un-hide it silently (Decision 23). | N2: a tracked `note.md` under a bridge-named folder was moved out of the worktree by uninstall with exit 0. |
+| 50 | Precedence covers dropped skills | Precedence is decided over `SIDECAR_SKILLS` plus the skill of every required unit, and `taken_units` spans `_ALL_SKILL_WRITE_ROOTS`. The taken-skill conversion allowlist is unchanged: a dropped skill's edited copy is preserved, its unchanged copy is removed. | N3: an edited copy of a dropped skill stayed hidden and recorded next to the team's version, visible to Claude Code. Uninstall already handled this (Decision 39); install and update did not. |
+| 51 | Tolerant frontmatter parsing | `_parse_frontmatter_name` decodes with `errors="replace"` and strips a leading BOM. The 4096-byte read window stays as the accepted limit: a closing `---` beyond it declares nothing, and a guard test documents it. | N4: a strict decode of a window cut inside a multibyte character declared nothing, so the sidecar shadowed a team skill. The name line is always near the top; widening the window changes what every read-list `SKILL.md` scan reads. |
+| 52 | Alias by identity | An entry or root of the read list is an alias when its resolved path differs from its lexical path and lies inside a write root, whether or not the last component is itself a symlink. Write roots are still listed through their own real entries. This amends Decision 41's "listed through its symlink" wording. | N5: `.agent -> .claude` made `.agent/skills/<x>` look like team content, so runs alternated install 10, remove 8, install 8. |
+| 53 | Backslash in retained names | `_validate_retained_path` accepts `\`; unit paths keep their rejection. `serialize_manifest` validates every retained path before rendering, so the sidecar never writes a manifest its own parser refuses. | N6: the escape pair already round-trips `\`, but the manifest validator rejected the name, so every later run aborted and uninstall could never un-hide the file. |
+| 54 | User lines keep file order | The planner receives the block's unrecognized lines as an ordered sequence and renders the block as the sorted sidecar lines followed by the user lines in their original order. Uninstall writes them back in that order. | N7: sorting `*.log` and `!keep.log` together flipped gitignore's last-match rule and hid a visible file. |
+| 55 | Pending ownership record | After the gate passes and before any unit moves, the next manifest is written to `<git dir>/ai-bootstrap-sidecar.json.next` and unlinked after the real manifest lands. Preflight parses it when present; a unit whose bytes match the pending record is sidecar-owned (update or remove), and a team takeover deletes a file that matches it. It is evidence only and never drives an action by itself, so Decision 10 stands. Uninstall removes it. | N8: an update interrupted between the unit swap and the manifest write, followed by a newer version, stayed "locally modified" forever and uninstall preserved the sidecar's own bytes as edits. |
+| 56 | Write hardening and the run lock | `_atomic_write` keeps an existing file's mode, gives a new file `0o666 & ~umask`, and `fsync`s the file and its parent. The writability preflight also checks the Git directory, takeover-delete parents, and preserve destinations. Every `OSError` after preflight ends in `ABORT: filesystem error at <path>` with a rerun remedy. An unreadable exclude file is evidence and a preflight abort; an unreadable file inside a unit makes it incomplete; `info` that is not a directory aborts; printed paths escape undecodable bytes. A non-blocking `flock` on `<git dir>/ai-bootstrap-sidecar.lock` is held from after preflight to the end of apply; a dry run takes no lock; the empty lock file stays. | N9-N12, N19, N11: the exclude file dropped to mode 0600 in group-shared clones, tracebacks replaced aborts, and two overlapping runs corrupted staging. |
+| 57 | Reports and small corrections | A unit line for an unknown skill stays a listed unit, but its remedies say "listed by the sidecar's exclude block but never recorded". A retained file a team rule still ignores is reported as still ignored. `--uninstall` warns about ignored full-only options. Unit paths reject control characters and space-only segments; retained paths reject `.` segments. Blank block lines are kept silently. The gate diagnostic names plain negations. Uninstall reports say the sidecar leaves a path alone. `SIDECAR_FORBIDDEN_TEXT_TOKENS` covers `MEMORY.md`, `openwiki`, `.github/hooks/`, `.claude/plans/`, and `.claude/session_logs/`. After uninstall, empty sidecar parents are removed, never a folder that holds anything. | N14, N16, and the NITs. Making an unknown-skill line unrecognized would leave the folder hidden forever, the N6 end state, so only the wording changes. |
+| 58 | Tests through real gathering, round 3 | Each N1-N12 scenario gets a real-Git regression test that fails on `f6f36c8`; N13-N20 and the NITs get tests or a recorded disposition. The tautological uninstall assertion is deleted, three weak tests assert real state, and the seven untested matrix cells become named guard tests. N18's four fresh-default refusals are the only full-install behavior change. | N20 and Decision 47. |
+
 ## Design Overview
 
 ### Consumer layout after a sidecar install
@@ -255,9 +284,9 @@ change, and no `.gitignore` edit.
 sidecar evidence = anything at the manifest path, including a dangling
                    symlink (valid or not)
                    OR a sidecar marker line in info/exclude (read as bytes)
-full evidence    = .claude/.git as a directory, with no index entry at or
-                   under .claude (Decision 27)
-                   OR .claude/bootstrap-ownership.env
+full evidence    = no index entry of any mode at or under .claude
+                   (Decisions 27 and 48), AND (.claude/.git as a directory
+                   OR .claude/bootstrap-ownership.env present by lexists)
                    OR --allow-self with this repository as the target
 team config      = git ls-files -z lists a path under FULL_INSTALL_ROOT_PATHS
                    (.claude, .devcontainer, and RESTORABLE_ROOT_PATHS)
@@ -279,7 +308,9 @@ no --mode        both kinds of evidence -> abort
                  sidecar evidence -> sidecar reconcile
                  full evidence -> current full install (refresh)
                  team config -> abort; offer --mode full or --mode sidecar
-                 otherwise -> current full install (fresh default)
+                 otherwise -> current full install (fresh default), except
+                 a subfolder target, a linked worktree, a bare repository,
+                 or a .claude that is a regular file -> abort (Decision 48)
 ```
 
 Detection runs first and reads only the target. The installer then picks
@@ -490,6 +521,8 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
 - [x] `2026-09-26_phase-J-sidecar-safety-follow-up` — unit-level repository boundaries, complete snapshots, uninstall on the install's write order, one path-identity rule, Git line splitting, accurate reports, the settled-refresh identity check, and corrected docs (Decisions 37-47).
 - [x] `2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase J.
+- [ ] `2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up` — tracked `.claude` never yields full evidence, fresh-default refusals, the bridge index boundary, precedence for dropped skills, tolerant frontmatter parsing, alias by identity, backslash retained names, user-line order, the pending ownership record, write hardening, the run lock, report wording, test hygiene, and corrected docs (Decisions 48-58).
+- [ ] `2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase L.
 
 Phase F must land before any other outer commit on this branch: once
 Phases F-I are listed, the installed validator rejects two knowledge-refresh
@@ -563,9 +596,10 @@ Required review profiles: Phases B-E use `code`, `architecture`, `security`,
 `tests`, and `ponytail`, plus `documentation` where documentation changes.
 Phase A changes one evidence document and uses `documentation`,
 `architecture`, and `security`. Phases F-H and J use `code`, `architecture`,
-`security`, `tests`, `ponytail`, and `documentation`. Phases I and K use the
-same full set, as Phase E did, because every multi-file diff is
+`security`, `tests`, `ponytail`, and `documentation`. Phases I, K, and M use
+the same full set, as Phase E did, because every multi-file diff is
 control-plane/high-risk (`shared/policies/workspace.instructions.md`).
+Phase L uses the same full set as Phase J.
 
 ## Done Criteria
 
@@ -592,8 +626,9 @@ control-plane/high-risk (`shared/policies/workspace.instructions.md`).
   targets are updated, and the updater exits 1.
 - Added, changed, and removed skills reconcile by the rules above. Team,
   foreign, retained, and locally modified paths are preserved and reported.
-  An interrupted install or update finishes when rerun, without intent
-  records.
+  An interrupted install or update finishes when rerun with the same or a
+  newer source, without intent records; the pending ownership record is
+  evidence only (Decision 55).
 - The vendored Ponytail skills ship with their MIT `LICENSE` at every write
   root.
 - A repeated update is idempotent.
@@ -624,17 +659,37 @@ control-plane/high-risk (`shared/policies/workspace.instructions.md`).
   source each end in a clear refusal before any write, or in a correct run.
 - `--uninstall` removes only unmodified sidecar files and sidecar metadata,
   preserves edited copies, and is idempotent.
+- Every confirmed finding in the 2026-09-27 review report has a real-Git
+  regression test that failed before its fix, or a documented disposition
+  (Decision 58).
+- A plain install never full-installs a repository whose index has any
+  entry at or under `.claude`, a subfolder of a repository, a linked
+  worktree, a bare repository, or a target whose `.claude` is a file
+  (Decision 48).
+- A tracked entry under a bridge path makes the bridge team-owned, a
+  dropped skill obeys the same precedence as a shipped one, and the name
+  scans survive a mid-character cut, a BOM, and a symlinked parent read
+  folder (Decisions 49-52).
+- The block never re-orders a person's own lines, a retained name with a
+  backslash round-trips, and an interrupted update converges on a rerun
+  with a newer source without preserving the sidecar's own bytes
+  (Decisions 53-55).
+- No run changes a pre-existing file mode; every environmental failure
+  named in the 2026-09-27 report ends in a clean abort; a concurrent run is
+  refused (Decision 56).
 - The final knowledge refresh and stale-claims audit are complete, and they
-  ran after the last code change (Phase K).
+  ran after the last code change (Phase M).
 
 ## Completion Evidence
 
 Phase E, `2026-09-24_phase-E-sidecar-knowledge-refresh`, was the final phase
 until the plan was reopened on 2026-09-25 (Decision 21), and Phase I,
 `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh`, was the final phase
-until it was reopened again on 2026-09-26; their closeout evidence stays as
-it is. The final phase listed under `phases:` is now
-`2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh`. It runs the documentation,
+until it was reopened again on 2026-09-26, and Phase K,
+`2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh`, was the final phase
+until the third reopen on 2026-09-27; their closeout evidence stays as it
+is. The final phase listed under `phases:` is now
+`2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh`. It runs the documentation,
 memory, and LEARN audit. It sweeps every live-advice surface for claims this
 plan invalidated, corrects or supersedes each one, leaves dated records
 unchanged, and records the audited surfaces and each outcome under
