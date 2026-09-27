@@ -117,6 +117,22 @@ the state seeds under `shared/sidecar/workflow/`.
   replaces. The evidence section, the tables, the tier labels, and every
   `.claude/` path were found consistent. All five sent back to the same
   `documenter` in the FIX LOOP.
+- FIX LOOP: the `documenter` redirected `## Retrieval` and
+  `## Communication Style` in every supplement to the profile's own rule
+  files, replaced the orchestrator's `## Quality Gates` and the reviewer's
+  Review Flow step 5 with no-gate text, denied `documentation` and
+  `learn`, added the `git clean -x` and `--backup-state` sentence to the
+  four state READMEs and `workflow.md`, and reworded the planner
+  supplement's opening sentence. Its grep over all 15 files: no matches.
+- Orchestrator check with a stricter token list that adds
+  `.claude/instructions/` (the reasoning the reviewer applied to
+  `documentation` and `learn`): the 15 authored files are clean and name
+  only paths under `.claude/ai-bootstrap/`, `.claude/rules/`, and
+  `.claude/templates/`; three more eligible skills name
+  `.claude/instructions/` (`deploy-service`, `bentoml-service`,
+  `create-feature`) and were denied for the same reason, leaving 24
+  eligible skills. Phase B may rescue any denied skill whose only problem
+  is a path or verifier mention through a profile text replacement.
 
 ## [LEARN] Entries
 
