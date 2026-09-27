@@ -173,7 +173,7 @@ the templates; the reviewer writes its report under
   `uv run python scripts/check_runtime.py` PASS,
   `uv run python scripts/validate_plan_frontmatter.py` PASS,
   `uv run python .claude/scripts/verify.py fast --format text` PASS.
-- The `openwiki` MCP server is reachable (`/mcp`), since Phase F needs it.
+- The `openwiki` MCP server is reachable (`/mcp`), since Phase C needs it.
 
 ## Phases
 
