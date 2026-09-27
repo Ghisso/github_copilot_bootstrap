@@ -172,8 +172,14 @@ the state seeds under `shared/sidecar/workflow/`.
   documentation exemption covers a single file only). A `ponytail`-only
   review round was added, the small plan's Review Profiles updated, and
   step 4 repeated.
-- Findings persisted with the four reviewed profiles and an empty
-  surviving list (the round-3 MINOR was fixed, not accepted).
+- Ponytail round (`reviewer`, `ponytail` only): WARN with one MINOR, the
+  data-loss paragraph repeated in the four state READMEs and
+  `workflow.md`. Accepted with reason: the security round required the
+  disclosure in each README, since a person opening a folder, or a Codex
+  or Copilot session that never loads the Claude rules file, reads the
+  README first. Findings persisted with the four reviewed profiles: 0
+  critical, 0 major, 1 minor with its disposition, `ponytail_reviewed:
+  true` (the round-3 documentation MINOR was fixed, not accepted).
 
 ## [LEARN] Entries
 
@@ -202,7 +208,8 @@ the state seeds under `shared/sidecar/workflow/`.
   is not installed and recorded `unverified`.
 
 `verify.py phase --format json --persist`: PASS. Findings report: 0
-critical, 0 major, 0 minor, three profiles, `dirty: false`.
+critical, 0 major, 1 minor (accepted, reason recorded), four profiles,
+`dirty: false`.
 
 Required items from `verify.py closeout --format text`:
 

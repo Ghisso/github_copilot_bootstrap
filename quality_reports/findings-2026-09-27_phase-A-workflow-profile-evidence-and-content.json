@@ -2,15 +2,26 @@
   "counts": {
     "critical": 0,
     "major": 0,
-    "minor": 0
+    "minor": 1
   },
   "profiles_reviewed": [
     "architecture",
     "documentation",
+    "ponytail",
     "security"
   ],
-  "findings": [],
-  "generated_at": "2026-09-27T11:41:39Z",
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "shrink: the Git-ignored, git clean -x, and --backup-state paragraph is repeated in the four state READMEs and rules/workflow.md instead of stated once with pointers",
+      "file": "shared/sidecar/workflow/state/explorations/README.md",
+      "line": 7,
+      "profile": "ponytail",
+      "disposition": "accepted",
+      "reason": "The security review of round 1 required the data-loss disclosure in each state README because a person opening a folder, or a Codex or Copilot session that never loads the Claude rules file, reads the README first; the repeated paragraph is nine lines and is the disclosure working as intended."
+    }
+  ],
+  "generated_at": "2026-09-27T11:57:50Z",
   "branch": "sidecar-workflow-profile_implementation",
   "head_sha": "094f1f0c11d85e2454f645328d2e51e209a73c5f",
   "base_ref": "dev",
@@ -36,5 +47,7 @@
     "shared/sidecar/workflow/state/plans/README.md",
     "shared/sidecar/workflow/state/quality_reports/README.md",
     "shared/sidecar/workflow/state/session_logs/README.md"
-  ]
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 1
 }
