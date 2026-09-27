@@ -3,8 +3,8 @@ name: 2026-09-27_phase-C-workflow-profile-knowledge-refresh
 type: small-plan
 parent_plan: sidecar-workflow-profile
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-27_workflow-profile-phase-C-knowledge-refresh.md
 ---
 
 # Small Plan: Phase C — Workflow Profile Knowledge Refresh
@@ -34,7 +34,7 @@ profile trees and the per-profile validator), and
 
 ## Steps
 
-- [ ] **1. Refresh OpenWiki.**
+- [x] **1. Refresh OpenWiki.**
   - **Owner:** `orchestrator`
   - Follow `.claude/skills/knowledge-refresh/SKILL.md` with `mode: "update"`.
     For every page rewritten, map each cited range of every file the page
@@ -42,12 +42,12 @@ profile trees and the per-profile validator), and
     (MEMORY lessons from the first sidecar plan's Phases K and M). Let no
     other agent edit tracked files while the run is open.
 
-- [ ] **2. Review the generated diff.**
+- [x] **2. Review the generated diff.**
   - **Owner:** `orchestrator`
   - Never hand-edit a generated page outside the page loop; never stage
     `openwiki/.run.json`; confirm `AGENTS.md` and `CLAUDE.md` unchanged.
 
-- [ ] **3. Audit stale claims.**
+- [x] **3. Audit stale claims.**
   - **Owner:** `documenter`, after `openwiki_finish`
   - Surfaces: `README.md`, `docs/`, `shared/policies/`, the skills that
     describe installer ownership, the templates, agent prompts, the
@@ -57,10 +57,10 @@ profile trees and the per-profile validator), and
     surface and outcome under `## Stale-claims surfaces checked` in the
     closeout session log.
 
-- [ ] **4. Record reusable lessons only.**
+- [x] **4. Record reusable lessons only.**
   - **Owner:** `orchestrator`
 
-- [ ] **5. Complete the final lifecycle checks.**
+- [x] **5. Complete the final lifecycle checks.**
   - **Owner:** `orchestrator`
   - This is the final phase; its closeout meets the strict terminal gates,
     and the big plan becomes `complete` after its commit.
@@ -94,11 +94,11 @@ uv run python .claude/scripts/verify.py fast --format json
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

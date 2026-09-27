@@ -94,6 +94,11 @@ final-phase gates.
   tags, and the Antigravity entry reworded as the folder `reviewer/`).
   `openwiki_finish` returned `complete`; the operations index regained the
   page's summary; adapters unchanged; no `openwiki/.run.json`.
+- REVIEW round 2 (same reviewer, six profiles, fix-only diff plus the
+  refreshed artifact): CLEAN, each fix confirmed against the files on disk,
+  frontmatter parsed with PyYAML, no new finding.
+- Step 4: three lessons recorded (below and in MEMORY). Step 5: closeout
+  sequence follows; this is the big plan's final phase.
 
 ## [LEARN] Entries
 
