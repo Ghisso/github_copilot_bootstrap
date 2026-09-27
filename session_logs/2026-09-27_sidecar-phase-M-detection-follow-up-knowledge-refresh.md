@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-27
 **Plan:** `.claude/plans/2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh.md`
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -108,8 +108,18 @@ knowledge-refresh phase.
 ## Verification
 
 Optional items: none (the plan has no `## Optional Verification` section).
-The required items' summary lines from `verify.py closeout --format text`
-follow.
+
+`verify.py phase --format json --persist`: PASS. Findings report: 0
+critical, 0 major, 0 minor, six profiles, `dirty: false`.
+
+Required items from `verify.py closeout --format text`:
+
+```text
+PASS       51.5s  uv run python scripts/validate_targets.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.4s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+```
 
 ## Stale-claims surfaces checked
 
