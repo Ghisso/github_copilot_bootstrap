@@ -40,6 +40,7 @@ from runtime_ownership import (
     restore_manifest,
 )
 from sidecar_overlay import (
+    _EXCLUDE_MARKER_REMEDY,
     ExcludeMarkerError,
     _c_locale_env,
     _read_index_entries,
@@ -1273,38 +1274,39 @@ def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
 
 
 def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
-    """Full-install evidence per the mode table (Decision 27). ``.claude/.git``
-    counts only when it is a directory (checked with ``lstat``, so a
-    submodule's ``.git`` file never counts) and the outer index has no entry
-    at or under ``.claude`` (Phase G's index reader, reused here: a team
-    submodule or an embedded repository tracked as a gitlink is team config
-    instead, not full evidence)."""
+    """Full-install evidence per the mode table (Decision 27). Neither
+    ``.claude/.git`` nor ``.claude/bootstrap-ownership.env`` counts when the
+    outer index has any entry at or under ``.claude`` (Phase G's index
+    reader, reused here): a team that tracks ``.claude/**``, ships it as a
+    submodule or an embedded gitlink, or tracks ``.claude`` as a symlink is
+    team config instead, however the checked-out content looks. Otherwise
+    ``.claude/.git`` counts only when it is a directory (checked with
+    ``lstat``, so a submodule's ``.git`` file never counts) and the env file
+    counts by ``lexists`` (never followed)."""
     evidence: list[str] = []
+    claude_tracked = False
+    if target.is_dir():
+        try:
+            entries = _read_index_entries(target)
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or b"").decode("utf-8", "replace")
+            if "not a git repository" not in stderr:
+                raise SystemExit(
+                    _detection_abort_message(target, stderr.strip())
+                ) from exc
+            entries = ()
+        claude_tracked = any(
+            path == ".claude" or path.startswith(".claude/") for _mode, path in entries
+        )
     nested_git = target / ".claude" / ".git"
     try:
         nested_is_dir = stat.S_ISDIR(os.lstat(nested_git).st_mode)
     except OSError:
         nested_is_dir = False
-    if nested_is_dir:
-        claude_tracked = False
-        if target.is_dir():
-            try:
-                entries = _read_index_entries(target)
-            except subprocess.CalledProcessError as exc:
-                stderr = (exc.stderr or b"").decode("utf-8", "replace")
-                if "not a git repository" not in stderr:
-                    raise SystemExit(
-                        _detection_abort_message(target, stderr.strip())
-                    ) from exc
-                entries = ()
-            claude_tracked = any(
-                path == ".claude" or path.startswith(".claude/")
-                for _mode, path in entries
-            )
-        if not claude_tracked:
-            evidence.append(f"nested AI-state repository {nested_git}")
+    if nested_is_dir and not claude_tracked:
+        evidence.append(f"nested AI-state repository {nested_git}")
     ownership_env = target / ".claude" / "bootstrap-ownership.env"
-    if ownership_env.exists():
+    if os.path.lexists(ownership_env) and not claude_tracked:
         evidence.append(f"full-install manifest {ownership_env}")
     if allow_self and target == REPO_ROOT:
         evidence.append("--allow-self with this repository as the target")
@@ -1327,7 +1329,10 @@ def _sidecar_evidence(target: Path) -> tuple[str, ...]:
             return ()
         raise SystemExit(_detection_abort_message(target, stderr.strip())) from exc
     except ExcludeMarkerError as exc:
-        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
+        raise SystemExit(
+            f"Refusing to detect an install mode: {exc}. "
+            f"To recover, {_EXCLUDE_MARKER_REMEDY}."
+        ) from exc
 
 
 def _team_config_evidence(target: Path) -> tuple[str, ...]:
@@ -1349,6 +1354,48 @@ def _is_linked_worktree(target: Path) -> bool:
     git_dir = rev_parse(target, "--git-dir")
     common_dir = rev_parse(target, "--git-common-dir")
     return git_dir is not None and common_dir is not None and git_dir != common_dir
+
+
+def _fresh_default_refusal(target: Path) -> str | None:
+    """Name why a fresh-default full install must refuse before any write
+    (Decision 48; N18), or return ``None`` when none of the checks fire.
+
+    Only called once neither full nor sidecar evidence is present: an
+    existing full consumer's refresh carries evidence (a nested AI-state
+    repository or the ownership manifest) and never reaches this function,
+    so a refresh is unaffected.
+    """
+    toplevel = rev_parse(target, "--show-toplevel")
+    if toplevel is not None and Path(toplevel).resolve() != target.resolve():
+        return (
+            f"{target} is not the root of its Git repository "
+            f"(the root is {toplevel}). The full install supports only the "
+            "root of a main worktree; run it from the repository root "
+            "instead."
+        )
+    if _is_linked_worktree(target):
+        return (
+            f"{target} is a linked worktree. The full install supports "
+            "only the root of a main worktree; run it from the main "
+            "worktree checkout instead."
+        )
+    if rev_parse(target, "--is-bare-repository") == "true":
+        return (
+            f"{target} is a bare repository. The full install supports "
+            "only the root of a main worktree, which needs a working tree "
+            "to hold the generated files."
+        )
+    try:
+        claude_is_regular_file = stat.S_ISREG(os.lstat(target / ".claude").st_mode)
+    except OSError:
+        claude_is_regular_file = False
+    if claude_is_regular_file:
+        return (
+            f"{target}/.claude exists as a regular file. The full install "
+            "supports only the root of a main worktree, where .claude can "
+            "become a directory."
+        )
+    return None
 
 
 def detect_install_mode(
@@ -1396,6 +1443,10 @@ def detect_install_mode(
                 "overlay, run --uninstall to remove it first, or ask whoever "
                 "manages the sidecar to remove it."
             )
+        if not full_ev:
+            refusal = _fresh_default_refusal(target)
+            if refusal is not None:
+                raise SystemExit(f"Refusing --mode full: {refusal}")
         return "full"
 
     # No --mode: auto-detect, in the table's exact order.
@@ -1428,14 +1479,32 @@ def detect_install_mode(
             )
         raise SystemExit(message)
 
+    refusal = _fresh_default_refusal(target)
+    if refusal is not None:
+        raise SystemExit(f"Refusing a plain install with no --mode: {refusal}")
+
     return "full"
 
 
-def warn_full_only_options_ignored(args: argparse.Namespace) -> None:
-    """Name every full-only option a sidecar target received and ignores
-    (Decision 13). ``--local-only`` is a silent no-op and ``--dry-run`` works
-    normally, so neither is named here."""
+def warn_full_only_options_ignored(
+    args: argparse.Namespace, *, uninstall: bool = False
+) -> None:
+    """Name every full-only option a sidecar install or ``--uninstall``
+    receives and ignores (Decision 13).
+
+    ``--source`` chooses a sidecar install's source tree, so it is never
+    ignored there; ``--uninstall`` never reads ``args.source`` at all, so it
+    is always named when given. ``--local-only`` is a silent no-op for a
+    sidecar install (``update_consumers.py`` forwards it to every target in
+    a batch, so naming it there would be noisy) and stays unnamed there, but
+    ``--uninstall`` never reads it either, so it is named. ``--allow-self``
+    still changes ``--uninstall``'s own full-evidence check (Decision 18),
+    so it is only named for a sidecar install, never for ``--uninstall``.
+    ``--dry-run`` works normally in both and is never named.
+    """
     ignored: list[str] = []
+    if uninstall and args.source is not None:
+        ignored.append("--source")
     if args.commit_copilot_surface is True:
         ignored.append("--commit-copilot-surface")
     elif args.commit_copilot_surface is False:
@@ -1444,10 +1513,13 @@ def warn_full_only_options_ignored(args: argparse.Namespace) -> None:
         ignored.append("--state-remote")
     if os.environ.get("AI_STATE_REMOTE"):
         ignored.append("AI_STATE_REMOTE")
-    if args.allow_self:
+    if uninstall and args.local_only:
+        ignored.append("--local-only")
+    if not uninstall and args.allow_self:
         ignored.append("--allow-self")
     if ignored:
-        warn("sidecar install ignores full-only option(s): " + ", ".join(ignored))
+        action = "--uninstall" if uninstall else "sidecar install"
+        warn(f"{action} ignores full-only option(s): " + ", ".join(ignored))
 
 
 def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
@@ -1460,6 +1532,8 @@ def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
             "Refusing --uninstall with --mode full: --uninstall only removes "
             "a sidecar overlay, never a full install."
         )
+    if not target.is_dir():
+        raise SystemExit(f"Refusing --uninstall: {target} is not a directory.")
     full_ev = _full_install_evidence(target, args.allow_self)
     if full_ev:
         raise SystemExit(
@@ -1467,11 +1541,19 @@ def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
             f"{target} has full-install evidence ({'; '.join(full_ev)}). "
             "--uninstall only removes a sidecar overlay."
         )
+    warn_full_only_options_ignored(args, uninstall=True)
     sidecar_ev = _sidecar_evidence(target)
     if not sidecar_ev:
         try:
             preserved_root = git_path(target, SIDECAR_PRESERVED_NAME)
-        except (subprocess.CalledProcessError, OSError):
+        except subprocess.CalledProcessError as exc:
+            if "not a git repository" in (exc.stderr or ""):
+                raise SystemExit(
+                    f"Refusing --uninstall: {target} is not a Git repository, "
+                    "so it cannot hold a sidecar overlay."
+                ) from exc
+            preserved_root = None
+        except OSError:
             preserved_root = None
         if preserved_root is not None:
             _report_preserved_folder_if_nonempty(preserved_root)
@@ -1485,10 +1567,16 @@ def main() -> int:
     args = parse_args()
     target = args.target_repo.expanduser().resolve()
 
-    if args.uninstall:
-        return _run_uninstall(target, args)
-
-    mode = detect_install_mode(target, args.mode, args.allow_self)
+    try:
+        if args.uninstall:
+            return _run_uninstall(target, args)
+        mode = detect_install_mode(target, args.mode, args.allow_self)
+    except FileNotFoundError as exc:
+        if exc.filename != "git":
+            raise
+        raise SystemExit(
+            "git not found on PATH: install Git or add it to PATH, then rerun."
+        ) from exc
     source_is_explicit = args.source is not None
     source = (
         args.source.expanduser().resolve()

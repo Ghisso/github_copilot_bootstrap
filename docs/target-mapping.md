@@ -108,17 +108,22 @@ native-run evidence behind every row below.
 The four skills — `debug-investigator`, `humanize`, `ponytail`, and
 `ponytail-review` — are the sidecar's fixed profile. No bridge ships for
 Codex (skill-only by design) or for Google Antigravity (unverified for
-sidecar v1). The manifest, staging folder, and preserved-copy folder that
-track sidecar ownership live inside the Git directory
-(`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`, and
-`ai-bootstrap-sidecar-preserved/`), never in the worktree, so none of them can
-be tracked. All three paths — manifest, staging folder, and preserved-copy
-folder — are built from the same already-verified `git rev-parse
---path-format=absolute --git-dir` value, never through `git rev-parse
---git-path`: `--git-path` resolves a symlink in the path before printing it,
-which would hide exactly the symlinked Git-directory case the sidecar's own
-preflight checks exist to catch. The preserved folder holds an edited
-sidecar copy that a taken skill name displaced; see
+sidecar v1). The manifest, staging folder, preserved-copy folder, pending
+ownership record, and run lock that track sidecar ownership live inside the
+Git directory (`ai-bootstrap-sidecar.json`, `ai-bootstrap-sidecar-staging/`,
+`ai-bootstrap-sidecar-preserved/`, `ai-bootstrap-sidecar.json.next`, and
+`ai-bootstrap-sidecar.lock`), never in the worktree, so none of them can be
+tracked. The pending record is written after the ignore proof passes and
+before any unit moves, and removed once the real manifest lands — extra
+ownership evidence for a rerun after an interrupted run, never an
+instruction on its own. The run lock is held from just after preflight to
+the end of the run and stays in place, empty, afterward; a dry run takes
+neither. All five paths are built from the same already-verified `git
+rev-parse --path-format=absolute --git-dir` value, never through `git
+rev-parse --git-path`: `--git-path` resolves a symlink in the path before
+printing it, which would hide exactly the symlinked Git-directory case the
+sidecar's own preflight checks exist to catch. The preserved folder holds an
+edited sidecar copy that a taken skill name displaced; see
 [README.md's Personal Sidecar Install](../README.md#personal-sidecar-install)
 for its naming and recovery, and its [Uninstall
 section](../README.md#personal-sidecar-install) for `--uninstall`, which

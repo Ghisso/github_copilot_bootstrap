@@ -269,6 +269,24 @@ def test_parse_manifest_rejects_unit_path_outside_namespace():
         parse_manifest(json.dumps(body))
 
 
+@pytest.mark.parametrize(
+    "bad_name",
+    ["a\nb", "a\rb", "a\x00b", "   "],
+    ids=["newline", "carriage-return", "nul", "space-only"],
+)
+def test_parse_manifest_rejects_unit_path_with_unsafe_segment(bad_name):
+    # NIT (step 12c): a control character or a space-only segment renders as
+    # a raw pattern tail no person can read in the exclude block.
+    path = f"{CLAUDE_ROOT}/{bad_name}"
+    body = {
+        "schema_version": 1,
+        "units": {path: {"files": {"a": "a" * 64}, "hash": "a" * 64}},
+        "retained": [],
+    }
+    with pytest.raises(ManifestError, match="unsafe unit path"):
+        parse_manifest(json.dumps(body))
+
+
 def test_parse_manifest_accepts_bridge_unit_path():
     body = {
         "schema_version": 1,
@@ -290,6 +308,19 @@ def test_parse_manifest_rejects_retained_path_with_dotdot():
         "schema_version": 1,
         "units": {},
         "retained": [f"{UNIT}/../escape.txt"],
+    }
+    with pytest.raises(ManifestError, match="unsafe retained path"):
+        parse_manifest(json.dumps(body))
+
+
+def test_parse_manifest_rejects_retained_path_with_dot_segment():
+    # NIT (step 12c): PurePosixPath drops a "." segment from .parts, so the
+    # ".." check alone never catches it; a "." segment made
+    # required_snapshot_units walk the whole write root as one unit.
+    body = {
+        "schema_version": 1,
+        "units": {},
+        "retained": [f"{UNIT}/./notes.txt"],
     }
     with pytest.raises(ManifestError, match="unsafe retained path"):
         parse_manifest(json.dumps(body))
@@ -1081,7 +1112,8 @@ def test_listed_no_record_content_differs_from_desired_is_unfinished():
     )
     assert kinds(result) == []
     assert result.reports[0].category == "SKIPPED"
-    assert "unfinished" in result.reports[0].remedy
+    # N14 (step 12a): "listed ... but never recorded", not "unfinished".
+    assert "never recorded" in result.reports[0].remedy
     assert unit_exclude_line(UNIT) in result.exclude_lines_write
     assert unit_exclude_line(UNIT) in result.exclude_lines_final
     assert UNIT not in result.next_manifest.units
@@ -1244,15 +1276,17 @@ def test_manifest_rejects_a_unit_path_with_a_backslash():
         parse_manifest(json.dumps(body))
 
 
-def test_manifest_rejects_a_retained_path_with_a_backslash():
+def test_manifest_accepts_a_retained_path_with_a_backslash():
+    # N6: a retained path is a person's own file name and may hold a
+    # backslash (unit paths stay fixed ASCII); the exclude line escapes and
+    # unescapes it exactly, so the manifest must accept what a run retains.
     path = f"{UNIT}/notes\\file.txt"
     body = {
         "schema_version": 1,
         "units": {},
         "retained": [path],
     }
-    with pytest.raises(ManifestError, match="unsafe retained path"):
-        parse_manifest(json.dumps(body))
+    assert parse_manifest(json.dumps(body)).retained == frozenset({path})
 
 
 def test_retired_write_root_manifest_unit_is_still_valid_and_goes_through_remove():
@@ -1545,3 +1579,41 @@ def test_manifest_retained_unexpressible_name_never_gets_a_line():
         r.path == weird_path and "cannot be hidden" in r.remedy for r in result.reports
     )
     assert weird_path not in result.next_manifest.retained
+
+
+def test_serialize_manifest_refuses_an_unsafe_retained_path():
+    # N6: the writer must fail closed on the same rule the reader enforces,
+    # so a run can never write a manifest the next run refuses.
+    manifest = Manifest(
+        schema_version=1,
+        units={},
+        retained=frozenset({"../outside"}),
+    )
+    with pytest.raises(ManifestError):
+        serialize_manifest(manifest)
+    round_trip = Manifest(
+        schema_version=1,
+        units={},
+        retained=frozenset({".claude/skills/ponytail/back\\slash"}),
+    )
+    assert parse_manifest(serialize_manifest(round_trip).decode()).retained == {
+        ".claude/skills/ponytail/back\\slash"
+    }
+
+
+def test_sidecar_forbidden_text_tokens_covers_the_step_12g_additions():
+    # NIT (step 12g): a rendered sidecar file must never leak these
+    # bootstrap-only references. The token list lives in
+    # scripts/validate_targets.py, not scripts/runtime_ownership.py; the
+    # generator/validator run (generate_targets.py --all, then
+    # validate_targets.py) is the real regression check and passes clean.
+    from validate_targets import SIDECAR_FORBIDDEN_TEXT_TOKENS
+
+    for token in (
+        "MEMORY.md",
+        "openwiki",
+        ".github/hooks/",
+        ".claude/plans/",
+        ".claude/session_logs/",
+    ):
+        assert token in SIDECAR_FORBIDDEN_TEXT_TOKENS

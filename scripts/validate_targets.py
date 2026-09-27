@@ -8602,11 +8602,16 @@ SIDECAR_FORBIDDEN_TEXT_TOKENS = (
     ".claude/agents/",
     ".claude/hooks/",
     ".claude/review-profiles/",
+    ".claude/plans/",
+    ".claude/session_logs/",
+    ".github/hooks/",
     "third_party/",
     "verify.py",
     "record_findings",
     "mcp__",
     "ctx_",
+    "MEMORY.md",
+    "openwiki",
 )
 
 

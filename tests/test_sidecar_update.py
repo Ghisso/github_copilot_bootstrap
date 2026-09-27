@@ -695,10 +695,15 @@ def test_crash_before_manifest_write_then_new_content_stays_hidden_as_unfinished
     monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
 
     # Pre-rerun state: the unit is fully installed with v1's bytes, listed
-    # in the exclude block, but has no manifest record yet.
+    # in the exclude block, but has no manifest record yet. N8 also leaves
+    # a pending manifest (`.next`) that would prove ownership and let the
+    # rerun update to v2 (covered below by
+    # test_update_interrupted_before_manifest_write_then_newer_source_converges);
+    # remove it here to keep testing the "no ownership record at all" case.
     skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
     assert skill_md.read_text(encoding="utf-8") == "content v1\n"
     assert not _manifest_path(repo).exists()
+    _pending_manifest_path(repo).unlink()
 
     exit_code = install_sidecar_with_profile(repo, v2, monkeypatch)
 
@@ -710,7 +715,8 @@ def test_crash_before_manifest_write_then_new_content_stays_hidden_as_unfinished
     status = _status(repo)
     assert ".claude/skills/ponytail" not in status
     out = capsys.readouterr().out
-    assert "unfinished" in out
+    # N14 (step 12a): "listed ... but never recorded", not "unfinished".
+    assert "never recorded" in out
 
 
 def test_crash_or_manifest_moved_aside_then_skill_stops_shipping_stays_hidden(
@@ -799,7 +805,8 @@ def test_invalid_manifest_recovery_run_does_not_unhide_other_files(
     assert skill_md.read_bytes() == edited_bytes
     assert _status(repo) == status_before
     out = capsys.readouterr().out
-    assert "unfinished" in out or "has local edits" in out
+    # N14 (step 12a): "listed ... but never recorded", not "unfinished".
+    assert "never recorded" in out or "has local edits" in out
 
 
 # --------------------------------------------------------------------------
@@ -919,3 +926,321 @@ def test_old_manifest_with_bootstrap_commit_key_still_parses_then_stabilizes(
     assert exit_code_2 == 0
     assert manifest_path.read_bytes() == stable_bytes
     assert manifest_path.stat().st_mtime_ns == stable_mtime
+
+
+# --------------------------------------------------------------------------
+# Review 3 follow-up (N8): an interrupted update followed by a newer source
+# --------------------------------------------------------------------------
+
+
+def _pending_manifest_path(repo: Path) -> Path:
+    return _manifest_path(repo).with_name(SIDECAR_MANIFEST_NAME + ".next")
+
+
+def _skill_md_at_both_roots(repo: Path, skill: str) -> set[str]:
+    return {
+        (repo / write_root / skill / "SKILL.md").read_text(encoding="utf-8")
+        for write_root in (".claude/skills", ".agents/skills")
+    }
+
+
+def test_update_interrupted_before_manifest_write_then_newer_source_converges(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # N8: units already swapped to v2, manifest still v1, then v3 arrives.
+    # The pending manifest (`.next`) is a second ownership record, so the
+    # ordinary update row runs instead of "local edits" forever.
+    v1, v2, v3 = (tmp_path / name for name in ("v1", "v2", "v3"))
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2\n"})
+    _write_sidecar_source(v3, {"ponytail": "content v3\n"})
+    assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+    status_before = _status(repo)
+
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_fault_point", _raise_at("before_manifest_write")
+    )
+    with pytest.raises(RuntimeError, match="before_manifest_write"):
+        install_sidecar_with_profile(repo, v2, monkeypatch)
+    monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
+    capsys.readouterr()
+    assert _skill_md_at_both_roots(repo, "ponytail") == {"content v2\n"}
+    assert _pending_manifest_path(repo).is_file()
+
+    # Dry run predicts the update and writes nothing.
+    assert install_sidecar_with_profile(repo, v3, monkeypatch, dry_run=True) == 0
+    out = capsys.readouterr().out
+    assert "local edits" not in out
+    assert "SKIPPED" not in out
+    assert _skill_md_at_both_roots(repo, "ponytail") == {"content v2\n"}
+
+    exit_code = install_sidecar_with_profile(repo, v3, monkeypatch)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "local edits" not in out
+    assert "SKIPPED" not in out
+    assert "updated 2" in out
+    assert _skill_md_at_both_roots(repo, "ponytail") == {"content v3\n"}
+    manifest = _read_manifest(repo)
+    v3_hash = sidecar_overlay_module.compute_file_hash(b"content v3\n")
+    for write_root in (".claude/skills", ".agents/skills"):
+        assert (
+            manifest["units"][f"{write_root}/ponytail"]["files"]["SKILL.md"] == v3_hash
+        )
+    assert not _pending_manifest_path(repo).exists()
+    assert _status(repo) == status_before
+
+    # Second run: no-op; dry run agrees.
+    exclude_before = _exclude_path(repo).read_bytes()
+    manifest_before = _manifest_path(repo).read_bytes()
+    assert install_sidecar_with_profile(repo, v3, monkeypatch) == 0
+    assert "updated 0" in capsys.readouterr().out
+    assert _exclude_path(repo).read_bytes() == exclude_before
+    assert _manifest_path(repo).read_bytes() == manifest_before
+    assert install_sidecar_with_profile(repo, v3, monkeypatch, dry_run=True) == 0
+    assert _status(repo) == status_before
+
+
+def test_update_interrupted_after_exclude_write_has_pending_record_and_converges(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # N8: the pending manifest is written right after the gate passes, so it
+    # is already on disk at the `after_exclude_write` checkpoint; a newer
+    # source then converges through the ordinary update row.
+    v1, v2, v3 = (tmp_path / name for name in ("v1", "v2", "v3"))
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2\n"})
+    _write_sidecar_source(v3, {"ponytail": "content v3\n"})
+    assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+    status_before = _status(repo)
+
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_fault_point", _raise_at("after_exclude_write")
+    )
+    with pytest.raises(RuntimeError, match="after_exclude_write"):
+        install_sidecar_with_profile(repo, v2, monkeypatch)
+    monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
+    capsys.readouterr()
+    assert _skill_md_at_both_roots(repo, "ponytail") == {"content v1\n"}
+    assert _pending_manifest_path(repo).is_file()
+
+    exit_code = install_sidecar_with_profile(repo, v3, monkeypatch)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "SKIPPED" not in out
+    assert "updated 2" in out
+    assert _skill_md_at_both_roots(repo, "ponytail") == {"content v3\n"}
+    assert not _pending_manifest_path(repo).exists()
+    assert _status(repo) == status_before
+    assert install_sidecar_with_profile(repo, v3, monkeypatch) == 0
+    assert "updated 0" in capsys.readouterr().out
+
+
+def test_uninstall_after_interrupted_update_removes_the_sidecars_own_bytes(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # N8: after the crash the v2 bytes are the sidecar's own (the pending
+    # record proves it), so --uninstall removes them instead of preserving
+    # them as personal edits.
+    from sidecar_overlay import uninstall_sidecar
+
+    status_before = _status(repo)
+    v1, v2 = (tmp_path / name for name in ("v1", "v2"))
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2\n"})
+    assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_fault_point", _raise_at("before_manifest_write")
+    )
+    with pytest.raises(RuntimeError, match="before_manifest_write"):
+        install_sidecar_with_profile(repo, v2, monkeypatch)
+    monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
+    capsys.readouterr()
+
+    assert uninstall_sidecar(repo, dry_run=True) == 0
+    assert "PRESERVED" not in capsys.readouterr().out
+    exit_code = uninstall_sidecar(repo)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "PRESERVED" not in out
+    assert "removed 4" in out
+    for write_root in (".claude/skills", ".agents/skills"):
+        assert not (repo / write_root / "ponytail").exists()
+    preserved_root = git_path(repo, "ai-bootstrap-sidecar-preserved")
+    assert not preserved_root.exists() or not any(preserved_root.iterdir())
+    assert not _manifest_path(repo).exists()
+    assert not _pending_manifest_path(repo).exists()
+    assert "ai-bootstrap sidecar" not in _exclude_path(repo).read_text(encoding="utf-8")
+    assert _status(repo) == status_before
+    assert uninstall_sidecar(repo) == 0
+
+
+def test_team_takeover_after_interrupted_update_deletes_the_pending_bytes(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # N8 (step 9 leftover): after the crash, `.claude/skills/ponytail/SKILL.md`
+    # already holds v2 bytes while the manifest still records v1 -- only the
+    # pending record (`.next`) proves those bytes are the sidecar's own. The
+    # team then tracks the unit's `LICENSE` (its text never varies across
+    # versions, so tracking it never itself changes an ownership hash) and
+    # commits, turning the whole `.claude/skills/ponytail` unit into a team
+    # takeover. `_team_takeover` must recognize the untracked `SKILL.md` as
+    # sidecar-owned through the pending record and delete it, instead of
+    # retaining it as a personal edit.
+    v1, v2, v3 = (tmp_path / name for name in ("v1", "v2", "v3"))
+    _write_sidecar_source(v1, {"ponytail": "content v1\n"})
+    _write_sidecar_source(v2, {"ponytail": "content v2\n"})
+    _write_sidecar_source(v3, {"ponytail": "content v3\n"})
+    assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+
+    monkeypatch.setattr(
+        sidecar_overlay_module, "_fault_point", _raise_at("before_manifest_write")
+    )
+    with pytest.raises(RuntimeError, match="before_manifest_write"):
+        install_sidecar_with_profile(repo, v2, monkeypatch)
+    monkeypatch.setattr(sidecar_overlay_module, "_fault_point", lambda name: None)
+    capsys.readouterr()
+    assert _pending_manifest_path(repo).is_file()
+
+    force_add = _git(repo, "add", "-f", "--", ".claude/skills/ponytail/LICENSE")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(repo, "team checkout tracks ponytail/LICENSE")
+    status_before = _status(repo)
+    skill_md = repo / ".claude" / "skills" / "ponytail" / "SKILL.md"
+    assert skill_md.read_text(encoding="utf-8") == "content v2\n"
+
+    dry_exit = install_sidecar_with_profile(repo, v3, monkeypatch, dry_run=True)
+    dry_out = capsys.readouterr().out
+    assert dry_exit == 0
+    assert "RETAINED" not in dry_out
+    assert skill_md.read_text(encoding="utf-8") == "content v2\n"
+
+    exit_code = install_sidecar_with_profile(repo, v3, monkeypatch)
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "RETAINED" not in out
+    assert not skill_md.exists()
+    manifest = _read_manifest(repo)
+    assert ".claude/skills/ponytail" not in manifest["units"]
+    exclude_text = _exclude_path(repo).read_text(encoding="utf-8")
+    assert "/.claude/skills/ponytail\n" not in exclude_text
+    assert _status(repo) == status_before
+
+    # Second run is stable, and a dry run agrees.
+    exclude_before = _exclude_path(repo).read_bytes()
+    manifest_before = _manifest_path(repo).read_bytes()
+    assert install_sidecar_with_profile(repo, v3, monkeypatch) == 0
+    assert "RETAINED" not in capsys.readouterr().out
+    assert _exclude_path(repo).read_bytes() == exclude_before
+    assert _manifest_path(repo).read_bytes() == manifest_before
+    assert install_sidecar_with_profile(repo, v3, monkeypatch, dry_run=True) == 0
+    assert _status(repo) == status_before
+
+
+# --------------------------------------------------------------------------
+# Review-3 finding N3 (failing-first on f6f36c8)
+# --------------------------------------------------------------------------
+
+
+def _n3_dropped_humanize_taken_by_team(
+    repo: Path, tmp_path: Path, monkeypatch, *, edit: bool
+) -> tuple[Path, bytes, str]:
+    """v1 ships humanize and ponytail; v2 drops humanize; the team commits
+    its own ``.github/skills/humanize``. Returns the ``.claude`` copy's
+    ``SKILL.md`` path, its bytes, and the status before the v2 run."""
+    v1 = tmp_path / "v1"
+    _write_sidecar_source(v1, {"humanize": "humanize v1\n", "ponytail": "pt v1\n"})
+    assert install_sidecar_with_profile(repo, v1, monkeypatch) == 0
+    copy = repo / ".claude" / "skills" / "humanize" / "SKILL.md"
+    if edit:
+        copy.write_text("humanize v1\nEDITED BY A PERSON\n", encoding="utf-8")
+    team = repo / ".github" / "skills" / "humanize" / "SKILL.md"
+    team.parent.mkdir(parents=True)
+    team.write_text("---\nname: humanize\n---\nTEAM-HUMANIZE\n", encoding="utf-8")
+    _commit(repo, "team ships humanize", ".github/skills/humanize")
+    return copy, copy.read_bytes(), _status(repo)
+
+
+def test_n3_dropped_skill_taken_by_a_team_copy_preserves_the_edited_copy(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """N3: both precedence loops iterated ``SIDECAR_SKILLS`` only, so a
+    skill dropped from the profile was never taken: the edited
+    ``.claude/skills/humanize`` stayed hidden and recorded while the team
+    shipped ``.github/skills/humanize``. Fails on f6f36c8."""
+    copy, edited_bytes, status_before = _n3_dropped_humanize_taken_by_team(
+        repo, tmp_path, monkeypatch, edit=True
+    )
+    v2 = tmp_path / "v2"
+    _write_sidecar_source(v2, {"ponytail": "pt v1\n"})
+    capsys.readouterr()
+
+    assert install_sidecar_with_profile(repo, v2, monkeypatch, dry_run=True) == 0
+    dry_out = capsys.readouterr().out
+    assert "would preserve .claude/skills/humanize" in dry_out
+    assert "would remove .agents/skills/humanize" in dry_out
+    assert copy.read_bytes() == edited_bytes
+    assert _status(repo) == status_before
+
+    exit_code = install_sidecar_with_profile(repo, v2, monkeypatch)
+
+    assert exit_code == 0
+    assert not (repo / ".claude" / "skills" / "humanize").exists()
+    assert not (repo / ".agents" / "skills" / "humanize").exists()
+    preserved_root = git_path(repo, "ai-bootstrap-sidecar-preserved")
+    entries = list(preserved_root.iterdir())
+    assert len(entries) == 1
+    assert entries[0].name.startswith(".claude__skills__humanize--")
+    assert (entries[0] / "SKILL.md").read_bytes() == edited_bytes
+    manifest = _read_manifest(repo)
+    assert ".claude/skills/humanize" not in manifest["units"]
+    assert ".agents/skills/humanize" not in manifest["units"]
+    exclude_text = _exclude_path(repo).read_text(encoding="utf-8")
+    assert "humanize" not in exclude_text
+    out = capsys.readouterr().out
+    assert f"PRESERVED .claude/skills/humanize -> {entries[0]}" in out
+    assert "SKIPPED .github/skills/humanize" in out
+    assert "copy your edits elsewhere" not in out
+    assert _status(repo) == status_before
+
+    status_before_2 = _status(repo)
+    exclude_before_2 = _exclude_path(repo).read_bytes()
+    manifest_before_2 = _manifest_path(repo).read_bytes()
+    assert install_sidecar_with_profile(repo, v2, monkeypatch) == 0
+    assert _status(repo) == status_before_2
+    assert _exclude_path(repo).read_bytes() == exclude_before_2
+    assert _manifest_path(repo).read_bytes() == manifest_before_2
+    assert list(preserved_root.iterdir()) == entries
+
+
+def test_n3_guard_dropped_skill_unchanged_copy_with_a_team_copy_is_removed(
+    repo: Path, tmp_path: Path, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """N3 guard: the same scenario with an unedited copy simply removes both
+    copies (the existing remove row), preserving nothing."""
+    copy, _, status_before = _n3_dropped_humanize_taken_by_team(
+        repo, tmp_path, monkeypatch, edit=False
+    )
+    v2 = tmp_path / "v2"
+    _write_sidecar_source(v2, {"ponytail": "pt v1\n"})
+    capsys.readouterr()
+
+    exit_code = install_sidecar_with_profile(repo, v2, monkeypatch)
+
+    assert exit_code == 0
+    assert not copy.parent.exists()
+    assert not (repo / ".agents" / "skills" / "humanize").exists()
+    assert not git_path(repo, "ai-bootstrap-sidecar-preserved").exists()
+    out = capsys.readouterr().out
+    assert "removed .claude/skills/humanize" in out
+    assert "removed .agents/skills/humanize" in out
+    assert "PRESERVED" not in out
+    assert "SKIPPED .github/skills/humanize" in out
+    assert "humanize" not in _read_manifest(repo)["units"].__str__()
+    assert _status(repo) == status_before
+    assert install_sidecar_with_profile(repo, v2, monkeypatch) == 0
+    assert _status(repo) == status_before
