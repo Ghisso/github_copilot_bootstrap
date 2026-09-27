@@ -92,6 +92,17 @@ the state seeds under `shared/sidecar/workflow/`.
 - Required items on the current tree: `validate_targets.py` PASS with the
   new files present, `verify.py fast` NOT_APPLICABLE (no Python changed),
   plans valid.
+- Planner supplement corrected by the same `documenter`: it now replaces
+  the canonical prompt's mandatory `plan-decomposition` rule with the two
+  templates (38 lines, grep clean).
+- Step 3, Copilot: the user could not run Copilot today and asked to skip
+  it. Recorded as `unverified` in every Copilot row. Step 4 final: Copilot
+  gets no agent file from the workflow profile; the workflow instructions
+  file ships on the 2026-09-25 `native-run` for the same unit kind (the
+  skills-profile bridge); `.github/agents` stays a read root only.
+  Antigravity unverified (no client). Frozen coverage: Claude Code gets
+  agents, rules, review profiles, templates, skills, and state; Copilot
+  gets the instructions file and skills; Codex gets skills and state.
 
 ## [LEARN] Entries
 
