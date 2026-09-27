@@ -187,7 +187,11 @@ clone of a real consumer.
 
 ## Verification
 
-Optional items: none (the plan has no `## Optional Verification` section).
+Optional items:
+
+- optional 1: PASS (the manual run against a fresh clone of
+  `schema-bootstrap-llm-wiki`, transcript in the Work Log above: every
+  step left `git status --porcelain --untracked-files=all` unchanged).
 
 `verify.py phase --format json --persist`: PASS (Ruff, mypy, pytest
 2260 passed, freshness, provenance, generated runtime). Findings
