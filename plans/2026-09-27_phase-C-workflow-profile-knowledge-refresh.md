@@ -3,7 +3,7 @@ name: 2026-09-27_phase-C-workflow-profile-knowledge-refresh
 type: small-plan
 parent_plan: sidecar-workflow-profile
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

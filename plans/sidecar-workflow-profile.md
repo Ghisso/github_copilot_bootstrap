@@ -9,7 +9,7 @@ phases:
   - 2026-09-27_phase-A-workflow-profile-evidence-and-content
   - 2026-09-27_phase-B-workflow-profile-implementation
   - 2026-09-27_phase-C-workflow-profile-knowledge-refresh
-current_phase: 2026-09-27_phase-B-workflow-profile-implementation
+current_phase: 2026-09-27_phase-C-workflow-profile-knowledge-refresh
 ---
 
 # Big Plan: Sidecar Workflow Profile
