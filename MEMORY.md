@@ -1380,3 +1380,8 @@
   claims; resubmit an issue-free claim whose range merely moved with the
   same id and the mapped range in the same `openwiki_submit_page` call to
   keep the whole page's evidence current (workflow profile Phase C).
+- [LEARN:tooling] Quote an OpenWiki page's `description:` when it holds a
+  colon, and parse the frontmatter with a YAML reader before submitting;
+  an unquoted colon makes `openwiki_finish` replace the whole frontmatter
+  with a fallback and the folder index loses the summary (workflow profile
+  Phase C).

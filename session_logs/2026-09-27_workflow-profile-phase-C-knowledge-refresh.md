@@ -69,6 +69,31 @@ final-phase gates.
   skills" line in the provider contract's 2026-09-25 evidence, and the
   `DEFAULT_SIDECAR_SOURCE` mention in `default_sidecar_source`'s docstring,
   which explains what replaced it.
+- Verification items pre-checked on the audited tree: ruff and format
+  clean, `validate_plan_frontmatter.py` PASS, `validate_targets.py` PASS,
+  `verify.py fast` PASS, and a `verify.py phase --format text` dry run PASS
+  (2260 tests).
+- REVIEW round 1 (`reviewer`, six profiles, artifact `phase-C-wp.diff`,
+  2277 lines): NOT CLEAN, 2 MAJOR and 1 MINOR, all `documentation`. The
+  first run's finalization had replaced `operations/sidecar-overlay.md`'s
+  frontmatter with a fallback (`type: "Reference"`, no description or
+  tags) because the new description held an unquoted colon, and the
+  operations index therefore lost that page's one-line summary; and the
+  page called the Antigravity agent entry `reviewer/agent.md` instead of
+  the folder `reviewer/`. Every other statement in the six pages was
+  confirmed against the code; the scripts diff was confirmed
+  comment-only.
+- Fix through a second refresh run, never by hand-editing a generated
+  page: `openwiki_begin` (`mode: "update"`) returned run
+  `a89c74d5-4a1d-4c10-b165-71b6842655fa` at base `753c354` with two stale
+  claims (both on `render_sidecar_workflow_units`, whose docstring the
+  audit changed). Plan of three pages: `agents-and-skills.md` and
+  `source-generated-consumer-layout.md` (each stale claim rechecked and
+  confirmed unchanged), and `sidecar-overlay.md` (frontmatter restored
+  with a quoted description and the sibling pages' `type: operations` and
+  tags, and the Antigravity entry reworded as the folder `reviewer/`).
+  `openwiki_finish` returned `complete`; the operations index regained the
+  page's summary; adapters unchanged; no `openwiki/.run.json`.
 
 ## [LEARN] Entries
 
@@ -82,6 +107,12 @@ final-phase gates.
   resubmitted with the same id and the mapped range in the same
   `openwiki_submit_page` call, which keeps the whole page's evidence
   current instead of only the flagged claims'. Added to MEMORY.
+- [LEARN:tooling] Quote an OpenWiki page's `description:` whenever it
+  contains a colon. An unquoted colon makes the frontmatter invalid YAML,
+  and `openwiki_finish` silently replaces the whole frontmatter with a
+  fallback (`type: "Reference"`, no description or tags), so the folder
+  index loses that page's summary. Parse the frontmatter with a YAML
+  reader before submitting the page. Added to MEMORY.
 
 ## Verification
 
