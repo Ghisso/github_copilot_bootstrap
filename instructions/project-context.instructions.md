@@ -32,7 +32,7 @@ this repository's bootstrap scripts, shell hooks, or generated adapters.
 - `shared/scripts/` and `shared/templates/`: shared scoring, findings, and
   workflow artifacts rendered into targets.
 - `scripts/generate_targets.py`: renders both `dist/multi-agent/` (the full
-  bootstrap) and `dist/sidecar/` (the personal per-clone overlay).
+  bootstrap) and `dist/sidecar/<profile>/` (the personal per-clone overlay).
 - `scripts/install_bootstrap.py`: installs generated output into a consumer,
   in `full` mode (a takeover, including a nested `.claude` `ai-state`
   repository) or `sidecar` mode (a private overlay inside a team-owned

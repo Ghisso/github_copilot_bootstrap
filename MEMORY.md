@@ -1372,3 +1372,11 @@
 - [LEARN:tooling] A preserved-copy name built from a per-second timestamp
   collides when two actions run in the same second; append a counter while
   the name exists (`state_backup_slug`, Phase B).
+- [LEARN:documentation] Make the stale-claims audit's comment and docstring
+  fixes after `openwiki_finish`, each at the same line count as the text it
+  replaces, so the ranges the refreshed pages just cited do not shift
+  (workflow profile Phase C).
+- [LEARN:tooling] An OpenWiki page job lists only stale or unresolved
+  claims; resubmit an issue-free claim whose range merely moved with the
+  same id and the mapped range in the same `openwiki_submit_page` call to
+  keep the whole page's evidence current (workflow profile Phase C).
