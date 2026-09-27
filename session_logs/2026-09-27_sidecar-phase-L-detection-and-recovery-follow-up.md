@@ -33,6 +33,27 @@ real-Git regression test per behavior finding, then harden the write path.
   sidecar tests (steps 6, 9, 10 leftovers, 12, 13); `coder` B owns
   `scripts/install_bootstrap.py` and its tests (step 2 and the uninstall
   option warning); `documenter` owns README and docs (step 14).
+- `documenter` done: README ("Behavior changes", the sidecar intro, the
+  report table, the uninstall paragraphs) and `docs/target-mapping.md`
+  (the `.json.next` and `.lock` files). `docs/architecture.md` and
+  `docs/runtime-checks.md` restate nothing that changed. Four phrases were
+  taken from the plan text because the code had not landed yet: the
+  fresh-default refusals, the "listed by the sidecar's exclude block but
+  never recorded" wording, the still-ignored retained message, and the
+  empty-folder cleanup; the orchestrator cross-checks them against the
+  final code before REVIEW.
+- `coder` B done: `_fresh_default_refusal(target) -> str | None` in
+  `scripts/install_bootstrap.py` (subfolder, linked worktree, bare
+  repository, `.claude` as a regular file), wired only into the
+  no-evidence branches of `--mode full` and no-`--mode`; the team-config
+  refusal still fires first; `--mode sidecar` untouched.
+  `warn_full_only_options_ignored(args, uninstall=True)` now names
+  `--source` and `--local-only` for `--uninstall`. Tests: 8 refusal cases
+  failed first with `DID NOT RAISE SystemExit`, 3 guards, and the
+  `--uninstall` warning test failed first with `assert 0 == 1`. Coder B
+  ran a tree-wide `ruff format`, which reformatted
+  `scripts/sidecar_overlay.py` while coder A was editing it; coder A was
+  told to re-read before further exact-text edits.
 
 ## [LEARN] Entries
 
