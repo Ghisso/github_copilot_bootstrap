@@ -121,8 +121,14 @@ clone of a real consumer.
   no empty folder); and `state_backup_slug` named the destination by a
   per-second timestamp, so a backup and an uninstall in the same second
   collided and read as a preserve conflict (now the slug appends `-2`,
-  `-3`, ... while the name exists). The three tests run in about two
-  seconds. Focused suites: 693 passed; ruff, format, mypy clean;
+  `-3`, ... while the name exists). Three more tests added for the
+  acceptance criteria: a version-1 manifest reads as `skills` and is
+  rewritten as schema 2 with no unit change; a team-tracked
+  `.claude/rules/ai-bootstrap-workflow.md` takes the rule unit and
+  survives uninstall; `update_consumers.py` updates a `skills` consumer
+  and a `workflow` consumer each in its own profile without passing
+  `--profile`. The six tests run in about seven seconds. Focused suites:
+  693 passed before the last three; ruff, format, mypy clean;
   `validate_targets.py` PASS.
 
 ## [LEARN] Entries
