@@ -190,7 +190,7 @@ clone of a real consumer.
 Optional items: none (the plan has no `## Optional Verification` section).
 
 `verify.py phase --format json --persist`: PASS (Ruff, mypy, pytest
-full suite, freshness, provenance, generated runtime). Findings
+2260 passed, freshness, provenance, generated runtime). Findings
 report: 0 critical, 0 major, 0 minor, six profiles, `dirty: false`.
 
 Required items from `verify.py closeout --format text`:
