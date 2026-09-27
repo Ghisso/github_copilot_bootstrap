@@ -58,6 +58,19 @@ the state seeds under `shared/sidecar/workflow/`.
   fixture in a Local agent session and an Agent Host session and reports
   the tokens seen. Antigravity: not installed on this host; unverified.
 - Content steps 5 to 8 delegated to a second `documenter` after the gate.
+- Steps 1 and 2 done by `documenter`: `## Workflow profile evidence`
+  appended to `docs/sidecar-provider-contract.md` (documented starting
+  point, questions per client, fixture recipe, operator checklist, empty
+  frozen matrix and coverage table). Two vendor claims could not be
+  confirmed online: Antigravity's agents page returned 404 (recorded at
+  the `source` tier from this repository's generator), and Codex's docs do
+  not say whether `.codex/config.toml` gates agent discovery (settled by
+  the native run above). The recipe's rule and instructions token names
+  were aligned with the tokens the runs used (`-OK`).
+- Step 4, partial: the matrix rows for Claude Code and Codex and the
+  coverage table are filled; `.codex/agents` is dropped; `.github/agents`
+  and the workflow instructions file wait for the Copilot run; the read
+  roots for collision checks are frozen.
 
 ## [LEARN] Entries
 
