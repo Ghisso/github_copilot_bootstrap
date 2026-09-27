@@ -1307,3 +1307,21 @@
   wrong section since Phase F. On every page a refresh rewrites, map each
   cited range from the recorded base (`.last-update.json` `gitHead`) to
   the current file (a `difflib` script works) and check the text there.
+- [LEARN:workflow] For a follow-up phase that fixes confirmed defects,
+  prototype every fix in a `git archive` export of HEAD before planning:
+  regenerate `dist/` there with `generate_targets.py --all`, run tools with
+  `uv run --project <repo>`, and require each new test to fail first. The
+  plan then quotes proven designs, the implementation is mostly mechanical,
+  and review passed on round 1 (sidecar Phase L). Tests that read `.claude/`
+  fail in such an export because the nested repository is not archived;
+  judge those against the real repository.
+- [LEARN:tooling] Do not transport a proven scratch tree as a patch. A
+  `git diff --no-index` between absolute paths writes headers that
+  `git apply` cannot consume at any `-p` depth, and a naive three-way merge
+  of append-only test files interleaves test bodies. Copy the proven files
+  into place, or rebuild a test file as one side plus the other side's
+  appended tail, then rerun the suite.
+- [LEARN:workflow] When two coders work in parallel on disjoint files, tell
+  each one to run `ruff format` only on its own files. A tree-wide format
+  by one coder rewrote the other's in-progress module mid-edit (sidecar
+  Phase L); nothing broke, but exact-text edits after that need a re-read.

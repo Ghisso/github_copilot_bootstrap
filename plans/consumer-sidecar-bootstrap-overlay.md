@@ -521,7 +521,7 @@ uv run python .claude/scripts/verify.py fast --format text
 - [x] `2026-09-25_phase-I-sidecar-hardening-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit again.
 - [x] `2026-09-26_phase-J-sidecar-safety-follow-up` — unit-level repository boundaries, complete snapshots, uninstall on the install's write order, one path-identity rule, Git line splitting, accurate reports, the settled-refresh identity check, and corrected docs (Decisions 37-47).
 - [x] `2026-09-26_phase-K-sidecar-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase J.
-- [ ] `2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up` — tracked `.claude` never yields full evidence, fresh-default refusals, the bridge index boundary, precedence for dropped skills, tolerant frontmatter parsing, alias by identity, backslash retained names, user-line order, the pending ownership record, write hardening, the run lock, report wording, test hygiene, and corrected docs (Decisions 48-58).
+- [x] `2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up` — tracked `.claude` never yields full evidence, fresh-default refusals, the bridge index boundary, precedence for dropped skills, tolerant frontmatter parsing, alias by identity, backslash retained names, user-line order, the pending ownership record, write hardening, the run lock, report wording, test hygiene, and corrected docs (Decisions 48-58).
 - [ ] `2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh` — refresh OpenWiki and run the final stale-claims audit after Phase L.
 
 Phase F must land before any other outer commit on this branch: once

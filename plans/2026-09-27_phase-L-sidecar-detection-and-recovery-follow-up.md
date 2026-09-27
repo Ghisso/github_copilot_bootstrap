@@ -3,8 +3,8 @@ name: 2026-09-27_phase-L-sidecar-detection-and-recovery-follow-up
 type: small-plan
 parent_plan: consumer-sidecar-bootstrap-overlay
 phase_index: 12
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-09-27_sidecar-phase-L-detection-and-recovery-follow-up.md
 ---
 
 # Small Plan: Phase L — Sidecar Detection and Recovery Follow-up
@@ -98,7 +98,7 @@ Test rules for every step (Decision 47 applies unchanged):
 - Tests that need an unreadable file or folder skip when running as root.
 - Implement every scenario listed below, not a representative subset.
 
-- [ ] **1. Tracked `.claude` never yields full evidence (Decision 48; N1, N13, N17, N11a).**
+- [x] **1. Tracked `.claude` never yields full evidence (Decision 48; N1, N13, N17, N11a).**
   - **Owner:** `coder`
   - `_full_install_evidence(target, allow_self)` keeps its signature and
     reads the index once, before either evidence branch: `claude_tracked`
@@ -144,7 +144,7 @@ Test rules for every step (Decision 47 applies unchanged):
       folder): plain, `--mode sidecar`, and `--uninstall` exit 1 with the
       message and no traceback, and no `.claude` is created.
 
-- [ ] **2. Fresh-default refusals (Decision 48; N18).**
+- [x] **2. Fresh-default refusals (Decision 48; N18).**
   - **Owner:** `coder`
   - Only the "otherwise -> current full install (fresh default)" row of the
     mode table changes. With no `--mode`, or with `--mode full`, and no
@@ -159,7 +159,7 @@ Test rules for every step (Decision 47 applies unchanged):
     writes nothing; guard: a full consumer refresh at a repository root
     still runs; `--mode sidecar` on the same shapes keeps today's results.
 
-- [ ] **3. Bridge index boundary (Decision 49; N2).**
+- [x] **3. Bridge index boundary (Decision 49; N2).**
   - **Owner:** `coder`
   - `_unit_index_relpaths`, bridge branch: the bridge counts as tracked
     when any index path equals the bridge path or starts with
@@ -180,7 +180,7 @@ Test rules for every step (Decision 47 applies unchanged):
     second runs stable. Guard: an untracked `<bridge>/note.md` without a
     record is foreign on install, rerun, dry run, and uninstall.
 
-- [ ] **4. Precedence covers dropped skills (Decision 50; N3).**
+- [x] **4. Precedence covers dropped skills (Decision 50; N3).**
   - **Owner:** `coder`
   - In `plan_sidecar_reconciliation`, before the precedence loops:
     `decided_skills = set(SIDECAR_SKILLS) | {skill of every required unit path that _skill_name recognizes}`;
@@ -199,7 +199,7 @@ Test rules for every step (Decision 47 applies unchanged):
     elsewhere", status unchanged; second run identical. Guard: the same
     with an unedited copy removes both copies and reports the team copy.
 
-- [ ] **5. Frontmatter parsing (Decision 51; N4).**
+- [x] **5. Frontmatter parsing (Decision 51; N4).**
   - **Owner:** `coder`
   - `_parse_frontmatter_name(data)`: decode with `errors="replace"` and
     strip a leading `﻿`; keep `_FRONTMATTER_MAX_BYTES = 4096` as the
@@ -212,7 +212,7 @@ Test rules for every step (Decision 47 applies unchanged):
     stable. Guard: a closing `---` past 4 KB still installs `ponytail`,
     documented as the accepted limit.
 
-- [ ] **6. Alias by identity (Decision 52; N5).**
+- [x] **6. Alias by identity (Decision 52; N5).**
   - **Owner:** `coder`
   - `_reflects_a_write_root(target, path)` returns False when the resolved
     path equals `path` (the target is already resolved, so equality means
@@ -227,7 +227,7 @@ Test rules for every step (Decision 47 applies unchanged):
     holding `skills/ponytail/SKILL.md` still takes `ponytail`. Every
     existing symlink test from Phase J step 8 passes unchanged.
 
-- [ ] **7. Retained names with a backslash (Decision 53; N6).**
+- [x] **7. Retained names with a backslash (Decision 53; N6).**
   - **Owner:** `coder`
   - `_validate_retained_path` no longer rejects `\`; unit paths keep their
     rejection in `_validate_unit_path`. `serialize_manifest` fails closed
@@ -244,7 +244,7 @@ Test rules for every step (Decision 47 applies unchanged):
     shows it. Pure test: `serialize_manifest` raises `ManifestError` on
     `../outside`.
 
-- [ ] **8. User lines keep their order (Decision 54; N7).**
+- [x] **8. User lines keep their order (Decision 54; N7).**
   - **Owner:** `coder`
   - `plan_sidecar_reconciliation(..., unrecognized_lines: Sequence[str] = (), ...)`
     replaces the set parameter. The loop only reports those lines;
@@ -260,7 +260,7 @@ Test rules for every step (Decision 47 applies unchanged):
     `!keep.tmp` in the file; both are reported RETAINED; uninstall writes
     `*.tmp\n!keep.tmp\n` back in that order with status unchanged.
 
-- [ ] **9. Pending ownership record (Decision 55; N8).**
+- [x] **9. Pending ownership record (Decision 55; N8).**
   - **Owner:** `coder`
   - `_install_sidecar_apply`: right after the gate passes and before
     `_fault_point("after_exclude_write")`, `_atomic_write` the serialized
@@ -295,7 +295,7 @@ Test rules for every step (Decision 47 applies unchanged):
     preserved folder empty. A team takeover after the crash deletes the
     matching v2 file instead of retaining it.
 
-- [ ] **10. Write hardening (Decision 56; N9, N10, N11, N19).**
+- [x] **10. Write hardening (Decision 56; N9, N10, N11, N19).**
   - **Owner:** `coder`
   - `_atomic_write`: when the destination exists, `os.fchmod` the temp
     descriptor to `stat.S_IMODE` of the existing mode; otherwise
@@ -334,7 +334,7 @@ Test rules for every step (Decision 47 applies unchanged):
     a retained `bad\xffname` prints as `bad\xffname` with no surrogate on
     stdout.
 
-- [ ] **11. Run lock (Decision 56; N12).**
+- [x] **11. Run lock (Decision 56; N12).**
   - **Owner:** `coder`
   - `_acquire_run_lock(git_dir, target)`: `os.open` on
     `<git dir>/ai-bootstrap-sidecar.lock` with
@@ -348,7 +348,7 @@ Test rules for every step (Decision 47 applies unchanged):
     exits 1 with the message and no traceback, nothing installed; after
     release a normal run succeeds and the lock file exists with size 0.
 
-- [ ] **12. Reports and small corrections (Decision 57; N14, N16, NITs).**
+- [x] **12. Reports and small corrections (Decision 57; N14, N16, NITs).**
   - **Owner:** `coder`
   - A unit line for a skill name that is neither in `SIDECAR_SKILLS` nor
     in the manifest stays a listed unit (turning it into an unrecognized
@@ -379,7 +379,7 @@ Test rules for every step (Decision 47 applies unchanged):
   - Tests assert each message and behavior; the empty-folder test checks
     that a team's non-empty `.claude/` survives.
 
-- [ ] **13. Test-suite hygiene (Decision 58; N20).**
+- [x] **13. Test-suite hygiene (Decision 58; N20).**
   - **Owner:** `coder`
   - Delete `assert install_sidecar is not None` from
     `tests/test_sidecar_uninstall.py`.
@@ -398,7 +398,7 @@ Test rules for every step (Decision 47 applies unchanged):
     worktree present; uninstall, install, uninstall; team tracks one file
     of `.agents/skills/ponytail` with an untracked matching `LICENSE`.
 
-- [ ] **14. Documentation (Decisions 48-58).**
+- [x] **14. Documentation (Decisions 48-58).**
   - **Owner:** `documenter`
   - `README.md` around lines 697-700: a tracked `.claude` in any form
     (files, submodule, symlink) is team config even when it carries
@@ -474,11 +474,11 @@ guard).
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

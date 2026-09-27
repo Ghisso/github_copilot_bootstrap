@@ -85,18 +85,51 @@ real-Git regression test per behavior finding, then harden the write path.
   quote `The full install supports only the root of a main worktree`, which
   every one of the four messages contains.
 
+- REVIEW round 2 (`reviewer`, `tests` and `documentation`, on the delta
+  since round 1): PASS, no findings; both round-1 MINORs confirmed
+  resolved against the code. Verification after the delta: ruff, ruff
+  format, mypy clean; 504 focused tests; `verify.py fast` PASS. Working
+  tree: 10 files changed, 2919 insertions, 169 deletions.
+- Findings persisted with all six reviewed profiles across the two rounds
+  and an empty surviving list.
+
 ## [LEARN] Entries
 
-(pending)
+- [LEARN:workflow] Prototype every fix of a confirmed-defect phase in a
+  `git archive` export before planning (regenerate `dist/` there, run
+  tools with `uv run --project <repo>`, require failing-first tests); the
+  plan then quotes proven designs and the implementation is mostly
+  mechanical. Tests that read `.claude/` fail in such an export. Added to
+  MEMORY.
+- [LEARN:tooling] Do not transport a proven scratch tree as a patch:
+  `git diff --no-index` headers between absolute paths are not consumable
+  by `git apply`, and a naive three-way merge of append-only test files
+  interleaves test bodies. Copy the proven files, or rebuild a test file as
+  one side plus the other side's appended tail. Added to MEMORY.
+- [LEARN:workflow] Tell parallel coders to scope `ruff format` to their own
+  files; a tree-wide run by one coder reformatted the other's in-progress
+  module. Added to MEMORY.
 
 ## Verification
 
-(pending)
+Optional items: none (the plan has no `## Optional Verification` section).
+The required items' summary lines from `verify.py closeout --format text`
+follow.
 
 ## Documentation
 
-(pending)
+`README.md` and `docs/target-mapping.md` updated by `documenter` (step 14),
+with one bullet corrected by the orchestrator after review to quote the
+refusal sentence. `docs/architecture.md` and `docs/runtime-checks.md`
+restate nothing that changed. `openwiki/` untouched; Phase M refreshes it.
 
 ## Open Questions / Next Steps
 
-(pending)
+- Next: Phase M (`2026-09-27_phase-M-sidecar-detection-follow-up-knowledge-refresh`),
+  activated by this phase's commit.
+- Disposition, pre-existing and outside this plan: a skill unit that is a
+  cross-filesystem mount point and not a real folder is still not refused
+  in preflight; since Phase L, an `OSError` from preserving it now ends in
+  the clean `ABORT: filesystem error at <path>` line instead of a
+  traceback, and a rerun converges.
+- Antigravity remains unverified for the sidecar (no client available).
