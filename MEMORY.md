@@ -1325,3 +1325,11 @@
   each one to run `ruff format` only on its own files. A tree-wide format
   by one coder rewrote the other's in-progress module mid-edit (sidecar
   Phase L); nothing broke, but exact-text edits after that need a re-read.
+- [LEARN:tooling] `verify.py phase` runs the whole suite under
+  `COMMAND_TIMEOUT_SECONDS` and reports `VFY-PYTEST-001: UNVERIFIED` when
+  the suite is slower than that budget, which then fails closeout's
+  receipt check even though every required item passed. The budget was
+  180 s while this repository's suite took 188 s (sidecar Phase L raised
+  it to 480 s). When a phase adds many real-Git tests, time `uv run
+  pytest tests/ -q` on an idle machine before closeout and compare it with
+  the constant in `shared/scripts/verify.py`.

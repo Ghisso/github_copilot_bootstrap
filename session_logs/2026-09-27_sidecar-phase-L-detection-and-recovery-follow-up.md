@@ -92,6 +92,19 @@ real-Git regression test per behavior finding, then harden the write path.
   tree: 10 files changed, 2919 insertions, 169 deletions.
 - Findings persisted with all six reviewed profiles across the two rounds
   and an empty surviving list.
+- CLOSEOUT step 4, first attempt: every required item PASS, but
+  `verify.py phase` was UNVERIFIED: `VFY-PYTEST-001: UNVERIFIED - pytest
+  did not run: Command '['uv', 'run', 'pytest', 'tests/', '-q', '--tb=no']'
+  timed out after 180 seconds`. The full suite takes 187.99 s wall on an
+  idle machine (2,223 tests). Root cause: the verifier's
+  `COMMAND_TIMEOUT_SECONDS = 180` was already close to the suite before
+  this phase; Phase L's real-Git tests pushed it over. No parallel test
+  runner is installed, and the constant has no override. Decision
+  (orchestrator, recorded as small-plan step 15): raise the constant to
+  480 in `shared/scripts/verify.py`, below the 600-second item budget by
+  more than the lint and type time, regenerate `dist/`, and self-install.
+  This is a control-plane change, so the phase returns to VERIFY and
+  REVIEW before closeout restarts at step 2.
 
 ## [LEARN] Entries
 
@@ -109,6 +122,12 @@ real-Git regression test per behavior finding, then harden the write path.
 - [LEARN:workflow] Tell parallel coders to scope `ruff format` to their own
   files; a tree-wide run by one coder reformatted the other's in-progress
   module. Added to MEMORY.
+- [LEARN:tooling] `verify.py phase` runs the whole suite under
+  `COMMAND_TIMEOUT_SECONDS` and reports `VFY-PYTEST-001: UNVERIFIED` when
+  the suite is slower, which fails closeout's receipt check even though
+  every required item passed. Time the suite on an idle machine before
+  closeout when a phase adds many real-Git tests, and compare it with the
+  constant. Added to MEMORY.
 
 ## Verification
 
