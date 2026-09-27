@@ -76,6 +76,14 @@ real-Git regression test per behavior finding, then harden the write path.
   "never recorded", "a team rule still ignores it", "another sidecar run
   is active", and `ABORT: filesystem error at` messages as the code prints
   them; the fresh-default refusals are described in prose. Sent to REVIEW.
+- REVIEW round 1 (`reviewer`, all six profiles, two passes): PASS, no
+  CRITICAL, no MAJOR, two MINOR: (1) only two of the four fresh-default
+  shapes had a `--mode sidecar` guard test; (2) the README bullet for the
+  fresh-default refusals paraphrased the message. Both fixed instead of
+  accepted: coder B adds the bare-repository and `.claude`-as-file
+  `--mode sidecar` guards; the orchestrator changed the README bullet to
+  quote `The full install supports only the root of a main worktree`, which
+  every one of the four messages contains.
 
 ## [LEARN] Entries
 
