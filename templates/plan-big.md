@@ -58,9 +58,7 @@ current_phase:
 ## Verification
 
 ```bash
-uv run python scripts/generate_targets.py --all
-uv run python scripts/validate_targets.py
-uv run python scripts/check_runtime.py
+uv run python .claude/scripts/verify.py fast --format json
 ```
 
 ## Completion Evidence

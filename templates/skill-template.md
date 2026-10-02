@@ -1,7 +1,8 @@
 ---
 # `name` must match this skill's directory name exactly.
 name: descriptive-kebab-case-name
-# Required under `shared/skills/`: public | background.
+# Required under `shared/skills/` (authoring repository) or `.claude/skills/`
+# (installed project): public | background.
 visibility: public
 # Required and must be unique; two skills sharing a description break
 # description-match loading.
