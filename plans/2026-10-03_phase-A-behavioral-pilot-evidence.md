@@ -16,6 +16,8 @@ and freeze the one test case before any runner code exists. Covers BEP-001,
 BEP-002, and BEP-007. No production code: only fixture data, one fixture
 test, a scratch probe script that is never committed, and a dated evidence
 document. This phase ends with an explicit proceed-or-stop decision.
+Its native budget (at most 5 user-run Claude Code sessions) was approved
+on 2026-10-03; see the big plan's approved decisions.
 
 ## Steps
 

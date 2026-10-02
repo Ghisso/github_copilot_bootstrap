@@ -34,6 +34,15 @@ The question is narrow: for one ordinary code-review task, does the
 reviewer's new requirement-comparison guidance change whether a missing
 requirement is reported? A "no difference" answer is a valid result.
 
+Approved decisions (user, 2026-10-03):
+
+- The plan is approved for implementation after the merge.
+- Native run budget: at most 5 Claude Code runs in Phase A and at most 12
+  in Phase C, each limited to 420 seconds (about 2 hours of runtime at the
+  ceiling). The user runs each native step in their own shell from a script
+  the orchestrator prepares.
+- Claude Code is the only client.
+
 ## Goals
 
 - Prove that the test actually loads the reviewer role and can tell a

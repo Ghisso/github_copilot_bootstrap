@@ -15,6 +15,8 @@ Run the bounded before/after comparison with Phase B's frozen runner and
 scorer, and publish a dated result. Covers BEP-005 and BEP-007. Runner and
 scorer code are not changed in this phase except through the repair rule in
 step 4. If Phase A stopped, this phase is cancelled with evidence instead.
+Its native budget (at most 12 user-run Claude Code sessions) was approved
+on 2026-10-03; see the big plan's approved decisions.
 
 ## Steps
 
