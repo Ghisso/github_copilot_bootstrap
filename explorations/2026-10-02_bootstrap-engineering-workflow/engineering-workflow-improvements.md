@@ -7,8 +7,9 @@ implementation_branch: engineering-workflow-improvements_implementation
 started_at:
 phases:
   - 2026-10-02_phase-A-engineering-evidence
-  - 2026-10-02_phase-B-engineering-workflow
-  - 2026-10-02_phase-C-engineering-knowledge-refresh
+  - 2026-10-02_phase-B-engineering-evaluator
+  - 2026-10-02_phase-C-engineering-workflow
+  - 2026-10-02_phase-D-engineering-knowledge-refresh
 current_phase:
 ---
 
@@ -25,7 +26,7 @@ and source register are at
 the implementation design is its sibling `design.md`.
 
 These are draft exploration artifacts. After user approval, promote this
-file and its three small plans together to `.claude/plans/`. Keep the
+file and its four small plans together to `.claude/plans/`. Keep the
 investigation/design at their original paths. Do not activate a phase,
 create an implementation branch, or approve the proposal while drafting.
 
@@ -51,8 +52,11 @@ repair, automatic PR, merge, force push, or historical evidence rewrite.
 Follow the design document's single-lifecycle integration. Risk, acceptance,
 contract, and test-strategy work lives inside existing planner discovery.
 One optional table in the spec/big plan maps stable requirement IDs to
-phases, symbols, and evidence. Reviewer handoffs carry these references;
-coverage/contract defects use ordinary findings and severity rules.
+phases, symbols, and evidence. Reviewer handoffs carry the approved plan/spec
+and approved scope changes, with version references. These are the authority
+for required behavior, not the reviewer's reconstructed interpretation.
+Separate specs and IDs stay optional for simple tasks. Coverage/contract
+defects use ordinary findings and severity rules.
 
 The original bug reproduction is re-exercised by the coder/orchestrator
 when feasible. An unavailable environment limits the claim of resolution.
@@ -63,41 +67,50 @@ Extend `check_native_clients.py` only after a native evidence phase. Preserve
 its legacy workload schema and shim experiment. A new, separate opt-in
 behavioral mode runs the design's three read-only packets with independent
 expected results and separately classified action evidence. Ordinary
-deterministic tests and commit receipts never invoke a model.
+deterministic tests and commit receipts never invoke a model. Phase B validates
+and freezes the evaluator using Phase A's preserved outputs before Phase C
+changes workflow guidance. Score saved baseline and candidate outputs with
+the same final scorer; retain original evidence and version each rescore.
 
 ## Requirements and Acceptance
 
 | ID | Required behavior | Phase | Acceptance and evidence |
 | --- | --- | --- | --- |
-| REQ-001 | Investigate decisive assumptions before decomposition; no production edits from a spike | B | Unknown-contract packet prompts a bounded evidence step; clear-contract control does not demand a spike or repeated approval. |
-| REQ-002 | Optional complex-task specification and stable requirement mapping | B | Template supports non-goals, constraints, acceptance/evidence, and phase mapping; existing plans still validate unchanged. |
-| REQ-003 | Cite existing contracts and settle critical test strategy before implementation steps | B | A schema-free example cites source invariants and negative cases without inventing a schema; integration/mocking choices have reasons. |
-| REQ-004 | Review missing behavior, missing evidence, and unauthorized scope within the existing findings model | B | Seeded duplicate-preservation gap is found; corrected and valid-alternative controls do not receive that finding; current JSON/receipts are unchanged. |
-| REQ-005 | Review independent expected values and recheck the original symptom | B | Weak-test fixture is identified; host negative control distinguishes good/broken variants; unreproduced symptom is not called resolved. |
-| REQ-006 | Bounded independent behavioral evaluation and before/after evidence | A, B | Frozen packets/oracles; one supported native transport demonstrated; three repetitions per primary case; explicit missing evidence, revision identity, and no automatic model gate. |
-| REQ-007 | Concise phase-boundary summary from existing artifacts | B | Objective, completed scope, deviations, checks, findings, needed decision, and next operation are visible without another persistent report or routine approval. |
-| REQ-008 | Route observed failures to smallest correction and regression | B | LEARN example prefers an existing test/skill and adds no duplicate rule or source-derived memory entry. |
-| REQ-009 | Preserve lifecycle, permissions, provider boundaries, historical evidence, and relaxed sidecars | A–C | Existing verifier/hook/plan tests pass; full/skills/workflow generation validates; no new sidecar gates, discovery claims, or receipt schema. |
+| REQ-001 | Investigate decisive assumptions before decomposition; no production edits from a spike | C | Unknown-contract packet prompts a bounded evidence step; clear-contract control does not demand a spike or repeated approval. |
+| REQ-002 | Optional complex-task specification and stable requirement mapping | C | Template supports non-goals, constraints, acceptance/evidence, and phase mapping; existing plans still validate unchanged. |
+| REQ-003 | Cite existing contracts and settle critical test strategy before implementation steps | C | A schema-free example cites source invariants and negative cases without inventing a schema; integration/mocking choices have reasons. |
+| REQ-004 | Review against the approved plan/spec and approved scope changes within the existing findings model | C | Seeded duplicate-preservation gap is found; repaired, valid-alternative, and approved-change controls avoid invented requirements; current JSON/receipts are unchanged. |
+| REQ-005 | Review independent expected values and recheck the original symptom | C | Weak-test fixture is identified; host negative control distinguishes good/broken variants; unreproduced symptom is not called resolved. |
+| REQ-006 | Bounded independent behavioral evaluation and comparable before/after evidence | A, B, C | Preserved outputs replay through the same final scorer; frozen scenario/oracle/scorer revisions and complete run identity; three repetitions per primary case; missing observations, invalid outputs, unavailable runs, and behavioral failures reported separately; confounding explicit; no automatic model gate. |
+| REQ-007 | Concise phase-boundary summary from existing artifacts | C | Objective, completed scope, deviations, checks, findings, needed decision, and next operation are visible without another persistent report or routine approval. |
+| REQ-008 | Route observed failures to smallest correction and regression | C | LEARN example prefers an existing test/skill and adds no duplicate rule or source-derived memory entry. |
+| REQ-009 | Preserve lifecycle, permissions, provider boundaries, historical evidence, and relaxed sidecars | A–D | Existing verifier/hook/plan tests pass; full/skills/workflow generation validates; no new sidecar gates, discovery claims, or receipt schema. |
 
 No acceptance row may be silently dropped or rewritten to match an
-implementation. Record a material scope change through the current policy.
+implementation. Record approved material scope changes through the current
+policy and supply them with the original approved artifacts to the reviewer.
 Before Phase B starts, incorporate Phase A's actual native limitations into
-affected steps only. Keep the baseline/model configuration unchanged during
-comparison or explicitly report a confounded comparison.
+affected steps only. Freeze scenario/oracle revisions in A and the validated
+scorer in B. Record provider, model, reasoning effort, permission mode,
+client/runtime version, source revision, and generated-bundle identity for
+each attempt. Hold comparison settings fixed apart from the intended workflow
+change; report unknown or changed controls as confounded comparisons.
 
 ## Phases
 
 - [ ] `2026-10-02_phase-A-engineering-evidence` — freeze the three cases and establish native transport/baseline evidence.
-- [ ] `2026-10-02_phase-B-engineering-workflow` — integrate planner, review, reporting, learning, and the bounded evaluator.
-- [ ] `2026-10-02_phase-C-engineering-knowledge-refresh` — refresh derived knowledge and audit all live advice.
+- [ ] `2026-10-02_phase-B-engineering-evaluator` — implement, validate, and freeze the evaluator using Phase A's saved evidence.
+- [ ] `2026-10-02_phase-C-engineering-workflow` — integrate planner, review, reporting, learning, and sidecar guidance; run matched candidate evaluation.
+- [ ] `2026-10-02_phase-D-engineering-knowledge-refresh` — refresh derived knowledge and audit all live advice.
 
 ## Ownership and Required Skills
 
 Main-thread orchestrator owns activation, bounded native runs, deterministic
 verification, findings, final state, closeout, commits, and normal pushes.
-One coder owns the native runner/tests; another may own prompt/template edits
-only if the orchestrator explicitly assigns disjoint files. Otherwise use a
-single coder. Reviewer remains independent and cannot execute tests.
+The Phase B coder owns the native runner/tests. Phase C prompt/template work
+starts only after evaluator validation and freezing; do not develop the
+measurement and measured workflow changes concurrently. Reviewer remains
+independent and cannot execute tests.
 Documenter updates live docs after review converges.
 
 All coding uses `shared/skills/ponytail/SKILL.md` in full mode plus
@@ -150,9 +163,12 @@ Small plans retain their concrete focused checks and host-evidence items.
 
 ## Completion Evidence
 
-All nine requirements map to final source and evidence in the Phase B log.
-Keep the baseline, scenario/oracle revisions, runtime details, unavailable
-signals, and before/after counts in a dated engineering-evaluation document.
+All nine requirements map to final source and evidence in the Phase C log,
+including Phase B's evaluator validation. Preserve baseline and candidate
+task outputs and allowlisted observations, not just scores, in companion
+evidence artifacts. The dated evaluation document identifies the common
+final scorer, frozen scenario/oracle revisions, complete run identity,
+separate invalid/unavailable/unobserved counts, and any confounding factors.
 Describe honestly whether measurements improved, regressed, or were
 inconclusive; a valid pilot need not manufacture an improvement claim.
 
