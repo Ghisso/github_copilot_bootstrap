@@ -1414,4 +1414,16 @@
 - [LEARN:workflow] Run `git checkout -b <plan>_implementation` as a bare
   Bash command. With a `cd ... &&` prefix the PostToolUse branch-state hook
   silently records nothing; recover by piping the bare-command JSON payload
-  to the `record-branch-state.sh` hook script.
+  to the `record-branch-state.sh` hook script. Not reproduced on 2026-10-02:
+  `cd <absolute repo root> && git switch -c <plan>_implementation` recorded
+  state normally. Keep the bare form as the safe default and confirm the
+  big plan's `started_at` and `current_phase` afterward.
+- [LEARN:review] Before claiming an agent handoff omits a field, read the
+  general "every delegation" rule as well as the role-specific bullet. The
+  orchestrator's general rule already carried plan requirements; a gap
+  analysis that read only the reviewer bullet overstated the gap
+  (engineering-workflow-improvements Phase A).
+- [LEARN:review] Review fix rounds on prompt prose keep producing MINORs
+  from their own new wording (three rounds in engineering-workflow Phase A).
+  Scope each follow-up round to defects that round introduced or earlier
+  findings not actually fixed; round 3 then converged with no new findings.

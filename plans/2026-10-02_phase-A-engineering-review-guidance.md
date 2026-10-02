@@ -3,8 +3,8 @@ name: 2026-10-02_phase-A-engineering-review-guidance
 type: small-plan
 parent_plan: engineering-workflow-improvements
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_engineering-review-guidance.md
 ---
 
 # Small Plan: Review and Original-Symptom Guidance
@@ -22,7 +22,7 @@ benchmark fixtures, or model runs are included.
 
 ## Steps
 
-- [ ] **1. Align requirement authority and meaningful-test review in existing roles.**
+- [x] **1. Align requirement authority and meaningful-test review in existing roles.**
   **Owner:** coder; reviewer evaluates the final result independently.
   **Files:** modify `shared/agents/orchestrator/prompt.md`,
   `shared/agents/coder/prompt.md`, `shared/agents/reviewer/prompt.md`,
@@ -57,7 +57,7 @@ benchmark fixtures, or model runs are included.
   A green suite with an untested original symptom is not represented as
   complete symptom verification.
 
-- [ ] **2. Adapt the review guidance to relaxed sidecars.**
+- [x] **2. Adapt the review guidance to relaxed sidecars.**
   **Owner:** coder.
   **Files:** modify the review and debugging parts of
   `shared/agents/orchestrator/workflow-prompt.md`,
@@ -80,7 +80,7 @@ benchmark fixtures, or model runs are included.
   receipts, forced plan lifecycle, or references to unshipped files.
   Existing team collision/status/index assertions still pass.
 
-- [ ] **3. Check instruction contracts, review, document, and close out.**
+- [x] **3. Check instruction contracts, review, document, and close out.**
   **Owner:** coder for tests; orchestrator for execution; independent reviewer;
   documenter after review convergence.
   **Files:** modify `tests/test_validate_targets.py`, and only as needed
@@ -140,11 +140,11 @@ state/authority boundaries explicitly.
 
 Follow the fixed CLOSEOUT order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

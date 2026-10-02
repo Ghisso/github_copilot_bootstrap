@@ -84,10 +84,33 @@ and the review part of REQ-009 from
   headings (`record_findings.py` reads only the JSON list), and that
   re-running review stays inside REVIEW without touching the CLOSEOUT order.
   All three sent to the same coder as fix round 3.
+- **REVIEW round 3** - Scoped to defects introduced by round 3 or round-2
+  findings not fixed. Gate PASS: 0 CRITICAL, 0 MAJOR, no new MINOR; R2-#1..#3
+  confirmed fixed; only round-1 #4 survives with its accepted disposition.
+  Verification block rerun: same green result.
+- **DOCUMENT** - `documenter` added one sentence to `README.md` `## Agent
+  System` and one to `docs/architecture.md:487` describing the requirements
+  comparison and the open-request/`WARN` mechanism; no other live README or
+  `docs/` text was stale.
+- **Self-overlay refresh** - `install_bootstrap.py . --allow-self
+  --local-only` exit 0; `check_runtime.py` then exit 0 with no FAIL lines.
+  The installer updated `.codex/hooks.json`, so Codex for VS Code may ask to
+  re-approve project hooks.
+- **Findings** - 9 MINOR recorded across three rounds: 8 `fixed`, 1
+  `accepted` (round-1 #4, three asset-to-text maps in the tests).
 
 ## [LEARN] Entries
 
-- Pending closeout.
+- [LEARN:review] Before claiming an agent handoff omits a field, read the
+  general "every delegation" rule as well as the role-specific bullet; the
+  orchestrator's general rule already carried plan requirements.
+- [LEARN:review] Review fix rounds on prompt prose keep producing MINORs from
+  their own new wording; scope each follow-up round to defects that round
+  introduced or earlier findings not actually fixed.
+- [LEARN:workflow] The MEMORY entry saying a `cd ... &&` prefix stops the
+  branch-state hook was not reproduced: `cd <repo> && git switch -c ...`
+  recorded state normally. Entry corrected in place, bare form kept as the
+  safe default.
 
 ## Verification
 
@@ -96,6 +119,9 @@ and the review part of REQ-009 from
 # verify.py phase/closeout receipt path
 ```
 
+- optional 1: PASS — orchestrator inspected generated `dist/multi-agent/.claude/agents/reviewer.md` and `.codex/agents/reviewer.toml` (approved-requirements input and `Open Requests` rule present) and `dist/sidecar/workflow/.claude/agents/reviewer.md` and its rule (approved requirements, simple-work clause, caller-saved report under `.ai-bootstrap/quality_reports/`); prose review only, not evidence of agent behavior.
+
 ## Open Questions / Next Steps
 
-- Implement Phase A steps 1-3, then VERIFY, REVIEW, CLOSEOUT.
+- Phase B (`2026-10-02_phase-B-engineering-planning-guidance`) is next; the
+  user asked to stop after Phase A because usage is low.
