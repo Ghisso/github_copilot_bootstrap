@@ -98,7 +98,7 @@ while active workflow prompts still point at a retired state location.
 ## Phases
 
 - [x] `2026-10-02_phase-A-sidecar-write-evidence` — prove direct and delegated writes and record the decision gate.
-- [ ] `2026-10-02_phase-B-sidecar-workflow-repair` — implement and verify findings 1–8 in one phase.
+- [x] `2026-10-02_phase-B-sidecar-workflow-repair` — implement and verify findings 1–8 in one phase.
 - [ ] `2026-10-02_phase-C-sidecar-workflow-repair-knowledge-refresh` — refresh OpenWiki and audit live advice.
 
 ## Ownership and Workflow

@@ -100,10 +100,54 @@ owned legacy state safely.
   `permission_denials` empty; no `.claude/ai-bootstrap/` created; team-file
   and index hashes unchanged; status differs only by `AM src/hello.py`.
 
+- **11:45** - Review 1 (code, architecture, security, tests, ponytail,
+  documentation; two passes) on the full code diff: PASS. Ruled out with
+  code and test evidence: symlinked legacy root, destination race before
+  `os.rename`, claiming an unowned or tracked legacy folder, `symlinks=True`
+  escape, duplicate migration on rerun, legacy-signal false positives,
+  leftover old paths. One MINOR: the planner prompt claimed "you have no
+  tool to save a file" though the planner keeps `Bash`. Fixed in the planner
+  and reviewer prompts ("do not write it to a file yourself") and the
+  `tests/test_validate_targets.py` assertions.
+- **12:00** - Documenter updated `README.md`, `docs/target-mapping.md`, and
+  `docs/sidecar-provider-contract.md` (new subsections "Legacy full-install
+  evidence, 2026-10-02" and "Rerun on the repaired install, 2026-10-02";
+  dated history untouched). Full verification after all edits: generate
+  exit 0, `validate_targets.py` PASS, `check_runtime.py` exit 0, full pytest
+  2313 passed, ruff, format, and mypy (42 files) clean.
+- **12:10** - Review 2 (same six profiles) on the docs and post-review
+  prompt edits: PASS. One MINOR: the rerun record dropped the `[LEARN:python]`
+  category. Fixed.
+
+## Findings to evidence
+
+| Finding | Fix | Evidence |
+| --- | --- | --- |
+| 1. Writes refused under `.claude/ai-bootstrap/` | State at `.ai-bootstrap/`; owned legacy state migrated | Phase A write gate and the 11:30 native rerun; migration, refusal, fault-point rerun, dry-run, profile-switch, uninstall, purge, and backup tests in `tests/test_sidecar_workflow_scenario.py`; batch migration in `tests/test_sidecar_update.py`; generated-tree scan in `tests/test_validate_targets.py` |
+| 2. Older full installs not detected | Legacy evidence in `_full_install_evidence`; mixed-evidence advice | HF-era, pre-manifest, negative, mixed, and CLI refusal tests in `tests/test_install_bootstrap.py`; uninstall refusal in `tests/test_sidecar_uninstall.py`; batch routing in `tests/test_sidecar_update.py` |
+| 3. Dry run printed past tense | `_print_report(dry_run=...)`; "would" remedy texts | Dry-run tests in `tests/test_sidecar_install.py`, `tests/test_sidecar_uninstall.py`, `tests/test_sidecar_workflow_scenario.py` |
+| 4. Backup without lock or error handling | Lock, temp copy then rename, `ABORT: filesystem error` | Lock contention, same-second, copy, rename, and cleanup failure, symlink, no-state, and CLI dry-run snapshot tests in `tests/test_sidecar_workflow_scenario.py` |
+| 5. Copilot told to ask missing agents | Copilot writes plans and self-reviews | Rendered-content tests in `tests/test_validate_targets.py` |
+| 6. Team agent removes the Claude agent | Delegate only to agents the session can start; else do it yourself | `.github/agents/coder.agent.md` fallback test in `tests/test_sidecar_workflow_scenario.py`; native rerun |
+| 7. No precedence test for profiles and templates | Tests added | Tracked, foreign-untracked, and deleted-tracked collision tests in `tests/test_sidecar_workflow_scenario.py` |
+| 8. Planner and reviewer told to save without a write tool | Return text; the caller saves | `tests/test_validate_targets.py` rendered-prompt tests; native rerun (orchestrator saved both, unprompted) |
+
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:workflow] In auto mode the safety classifier also denies the
+  self-install refresh `install_bootstrap.py . --allow-self --local-only`,
+  not only nested `claude -p`; hand both to the user up front.
+- [LEARN:review] Before a prompt states what a role can or cannot do, check
+  its rendered `tools:` line; the sidecar planner keeps `Bash` through the
+  `execute` capability.
 
 ## Verification
 
-Pending.
+- optional 1: PASS — native rerun on the actual generated workflow install,
+  run by the user on 2026-10-02 (Claude Code 2.1.226, `--agent
+  orchestrator`, `acceptEdits`); caller-saved plan and review, coder edit,
+  session log, and memory edit at `.ai-bootstrap/`; no permission denials.
+- optional 2: NOT RUN — no disposable clone of the reported legacy
+  consumer was made; its layout was inspected read-only and reproduced as
+  real-Git test fixtures instead, and the plan forbids touching the real
+  consumer.

@@ -1392,10 +1392,18 @@
   sensitive file even when ignored, so `.claude/ai-bootstrap/` writes failed
   while a root-level `.ai-bootstrap/` writes cleanly under `acceptEdits`
   (sidecar repair Phase A).
-- [LEARN:workflow] An agent session cannot start a nested `claude -p` probe:
-  the auto-mode safety classifier denies it. Prepare the fixture and a probe
-  script, have the user run it in their own shell, then verify the
-  `stream-json` tool events and on-disk files yourself.
+- [LEARN:workflow] In auto mode the safety classifier denies two
+  orchestrator actions in this repository: starting a nested `claude -p`
+  probe, and the self-install refresh `install_bootstrap.py . --allow-self
+  --local-only`. Hand both to the user up front: prepare the fixture and a
+  probe script, ask them to run it and the refresh in their own shell, then
+  verify the `stream-json` events, on-disk files, and `check_runtime.py`
+  yourself.
+- [LEARN:review] Before a prompt states what a role can or cannot do, check
+  the rendered `tools:` line. Claude tools come from `agent.yaml`
+  capabilities through `CLAUDE_TOOL_MAP`, so the sidecar planner keeps `Bash`
+  (capability `execute`) even without Write/Edit; "you have no tool to save
+  a file" was false for it (sidecar repair Phase B).
 - [LEARN:workflow] Run `git checkout -b <plan>_implementation` as a bare
   Bash command. With a `cd ... &&` prefix the PostToolUse branch-state hook
   silently records nothing; recover by piping the bare-command JSON payload

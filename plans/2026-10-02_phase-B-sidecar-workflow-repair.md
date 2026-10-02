@@ -3,8 +3,8 @@ name: 2026-10-02_phase-B-sidecar-workflow-repair
 type: small-plan
 parent_plan: sidecar-workflow-repair
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_sidecar-workflow-repair.md
 ---
 
 # Small Plan: Repair the Sidecar Workflow
@@ -30,7 +30,7 @@ their shared state and ownership contracts should change together.
 
 ## Steps
 
-- [ ] **1. Refuse recognized legacy full installs before sidecar mutation (finding 2).**
+- [x] **1. Refuse recognized legacy full installs before sidecar mutation (finding 2).**
   **Owner:** coder.
   **Files:** modify `scripts/install_bootstrap.py`,
   `tests/test_install_bootstrap.py`, `tests/test_sidecar_uninstall.py`, and
@@ -60,7 +60,7 @@ their shared state and ownership contracts should change together.
   sidecar-only, and mixed evidence. Assert status, index, excludes, manifests,
   and files are unchanged on refusals. Preserve batch continue-on-error.
 
-- [ ] **2. Make state backup safe for reuse by migration (finding 4).**
+- [x] **2. Make state backup safe for reuse by migration (finding 4).**
   **Owner:** coder.
   **Files:** modify `scripts/sidecar_overlay.py`,
   `scripts/install_bootstrap.py`, `tests/test_sidecar_workflow_scenario.py`.
@@ -84,7 +84,7 @@ their shared state and ownership contracts should change together.
   failure injection, lock release, unsafe paths, no-state success, and a
   byte-for-byte dry-run snapshot through the public CLI.
 
-- [ ] **3. Relocate state and migrate owned legacy state (finding 1).**
+- [x] **3. Relocate state and migrate owned legacy state (finding 1).**
   **Owner:** coder.
   **Files:** modify `scripts/runtime_ownership.py`, `scripts/sidecar_overlay.py`,
   `scripts/generate_targets.py`, `scripts/validate_targets.py`,
@@ -131,7 +131,7 @@ their shared state and ownership contracts should change together.
   run predicts the real action while its complete filesystem snapshot stays
   unchanged. Assert active generated workflow content has no old state path.
 
-- [ ] **4. Correct dry-run output (finding 3).**
+- [x] **4. Correct dry-run output (finding 3).**
   **Owner:** coder.
   **Files:** modify `_print_report`, `_describe_dry_run_actions`, and their
   callers in `scripts/sidecar_overlay.py`; regression tests in
@@ -147,7 +147,7 @@ their shared state and ownership contracts should change together.
   **Checks:** profile downgrade, team takeover, seed restoration, migration,
   backup, and purge predictions; assert output and unchanged filesystem.
 
-- [ ] **5. Handle missing specialists, caller-saved output, and team precedence (findings 5–8).**
+- [x] **5. Handle missing specialists, caller-saved output, and team precedence (findings 5–8).**
   **Owner:** coder.
   **Files:** modify `shared/sidecar/workflow/instructions.md`,
   `shared/sidecar/workflow/rules/workflow.md`, and
@@ -182,7 +182,7 @@ their shared state and ownership contracts should change together.
   return their text with no instruction to save a file themselves, and the
   orchestrator prompt and rules say the caller saves it.
 
-- [ ] **6. Regenerate, verify, review, and update public documentation.**
+- [x] **6. Regenerate, verify, review, and update public documentation.**
   **Owner:** coder for checks; reviewer for two-pass review; documenter
   after convergence; orchestrator for receipts, closeout, and preparing and
   verifying the native rerun, which the user runs.
@@ -248,11 +248,11 @@ transition table, native evidence, failure-injection results, and final diff.
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
