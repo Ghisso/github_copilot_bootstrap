@@ -1,0 +1,99 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 4
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "profile": "ponytail",
+      "file": "tests/test_validate_targets.py",
+      "line": 3576,
+      "title": "shrink: planning guidance tables asserted 111 exact phrases plus a per-phrase negative-control loop",
+      "detail": "Round 1. Exact-wording checks that break on harmless rewording.",
+      "disposition": "fixed",
+      "reason": "Tables trimmed to 48 unique short anchors; the loop was replaced by one removal case and one moved-out-of-section case asserting exactly two section errors. Round-2 review confirmed."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "tests",
+      "file": "tests/test_validate_targets.py",
+      "line": 3852,
+      "title": "Placement-negative assertions tested text position without a requirement",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "Both negative assertions were removed; the ordering assertion and the positive Phase 1 assertion remain."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/orchestrator/workflow-prompt.md",
+      "line": 14,
+      "title": "Sidecar orchestrator step 2 decisive-assumption sentence was ambiguous",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "Now: 'When you write the plan yourself, first check each decisive assumption as the workflow rule describes.' Test anchored on 'decisive assumption'."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/planner/prompt.md",
+      "line": 94,
+      "title": "Requirement-map trigger differed between planner, plan-big template, and plan-decomposition",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "All surfaces now say the requirements spec template is for requirements spanning several artifacts and the requirement map is for requirements spanning several phases; the sidecar plan-big names only the map."
+    }
+  ],
+  "generated_at": "2026-10-02T14:04:58Z",
+  "branch": "engineering-workflow-improvements_implementation",
+  "head_sha": "ca0fb3759dc188f41cb2661e8ee1f9a9af0d373b",
+  "base_ref": "dev",
+  "merge_base_sha": "16263644b8014ae958aecf7e2e563a8c2f261bd7",
+  "phase": "2026-10-02_phase-B-engineering-planning-guidance",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "1d891a17421f91633cfb8f5032c8883042652c01",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "shared/agents/coder/prompt.md",
+    "shared/agents/coder/workflow-prompt.md",
+    "shared/agents/documenter/workflow-prompt.md",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/agents/orchestrator/workflow-prompt.md",
+    "shared/agents/planner/prompt.md",
+    "shared/agents/planner/workflow-prompt.md",
+    "shared/agents/reviewer/prompt.md",
+    "shared/agents/reviewer/workflow-prompt.md",
+    "shared/policies/agent-reporting.instructions.md",
+    "shared/policies/workflow.instructions.md",
+    "shared/review-profiles/code.md",
+    "shared/review-profiles/tests.md",
+    "shared/sidecar/workflow/instructions.md",
+    "shared/sidecar/workflow/rules/workflow.md",
+    "shared/sidecar/workflow/templates/plan-big.md",
+    "shared/sidecar/workflow/templates/plan-small.md",
+    "shared/sidecar/workflow/templates/quality-report.md",
+    "shared/sidecar/workflow/templates/session-log.md",
+    "shared/skills/debug-investigator/SKILL.md",
+    "shared/skills/learn/SKILL.md",
+    "shared/skills/plan-decomposition/SKILL.md",
+    "shared/templates/plan-big.md",
+    "shared/templates/plan-small.md",
+    "shared/templates/requirements-spec.md",
+    "shared/templates/session-log.md",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 1
+}
