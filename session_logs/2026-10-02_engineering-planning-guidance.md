@@ -52,6 +52,15 @@ REQ-007, REQ-008, and the remaining part of REQ-009 from
   since an earlier refresh would go stale again. Coder deviations accepted by
   the reviewer; the authoring-path pointer in the session-log template and
   the sidecar plan-small orphan lines are suggested for the Phase C audit.
+- **FIX LOOP round 2** - Coder applied B1-#1..#4: 48 unique anchors (full
+  32, sidecar 21, shared template 5; down from 111), Phase A-style move +
+  removal test, placement-negative assertions removed, sidecar orchestrator
+  sentence clarified, requirement-map trigger consistent in four files.
+  Deviations: session-log template anchors and two other anchors dropped.
+  Open request answered: `generate_targets --all` and the self-overlay
+  refresh exit 0, then the full Verification block passed every item,
+  including `check_runtime.py` exit 0 with 0 FAIL lines. Round-2 delta and
+  the answer sent to the same reviewer.
 
 ## [LEARN] Entries
 
