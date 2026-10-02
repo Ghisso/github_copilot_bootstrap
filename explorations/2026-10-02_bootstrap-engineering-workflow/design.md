@@ -211,7 +211,9 @@ Freeze packets and expected results in Phase A, validate/freeze the evaluator
 in Phase B, then change workflow guidance and evaluate the candidate in Phase C.
 Start with one installed, trusted provider and three repetitions of each
 case: nine primary runs per revision. Run matched controls once each as
-measurement checks. A second provider is optional and scored separately.
+measurement checks. Additional approved-change/valid-alternative variants
+are offline controls within the coverage case, not extra primary scenarios
+or native runs. A second provider is optional and scored separately.
 No automatic retries, provider/model switching, or escalation of effort.
 Retain every attempt in the attempt totals, with separate counts for valid
 scored outputs, behavioral failures, invalid outputs, unavailable runs, and

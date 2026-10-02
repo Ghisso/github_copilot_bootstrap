@@ -12,8 +12,8 @@ closeout_session_log:
 ## Scope
 
 Refresh the enabled OpenWiki layer after Phase C's engineering changes and
-matched evaluation, then
-audit live advice for the full plan. This is the small final phase required
+matched evaluation, then audit live advice for the full plan. This is the
+small final phase required
 by the canonical Knowledge-Refresh Final Phase rule. It adds no feature,
 provider, or verification authority.
 

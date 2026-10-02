@@ -1,8 +1,8 @@
 ---
-name: 2026-10-02_phase-B-engineering-workflow
+name: 2026-10-02_phase-C-engineering-workflow
 type: small-plan
 parent_plan: engineering-workflow-improvements
-phase_index: 2
+phase_index: 3
 status: planned
 closeout_session_log:
 ---
@@ -12,44 +12,16 @@ closeout_session_log:
 ## Scope
 
 Implement the accepted recommendations through existing source components,
-using Phase A's frozen cases and native evidence. This phase covers all
-nine requirements; keep the full/sidecar distinction and all current gate
-contracts. Reconcile sidecar content with the separate repair's actual state
-before editing. Do not import its installer changes into this phase.
+using Phase A's frozen cases and Phase B's validated, frozen evaluator.
+This phase completes the nine requirements with evidence from A and B; keep
+the full/sidecar distinction and all current gate contracts. Evaluator changes
+are outside this phase's workflow implementation scope. Reconcile sidecar
+content with the separate repair's actual state before editing. Do not import
+its installer changes into this phase.
 
 ## Steps
 
-- [ ] **1. Extend existing native evaluation without rewriting its history.**
-  **Owner:** coder.
-  **Files:** modify `scripts/check_native_clients.py`,
-  `tests/test_check_native_clients.py`, `docs/native-client-acceptance.md`;
-  use the Phase A fixtures in `tests/fixtures/behavioral/`.
-  **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
-  `shared/skills/code-style/SKILL.md`, `shared/skills/testing-patterns/SKILL.md`,
-  `shared/skills/integration-gate-spike/SKILL.md`.
-  Add the proposed `--behavioral-workloads` bootstrap option, isolated from
-  the old planner-workload and shim-removal modes. Preserve existing public
-  function calls and return structures unless an additive optional argument
-  is necessary. Reuse workspace/process/timeout/version helpers; do not
-  create a provider registry, SDK wrapper, or separate runner. Reject the
-  ambiguous combination with `--planner-workloads` and preserve legacy
-  invocations and report keys when the new option is absent.
-  Copy only scenario inputs to the model-readable workspace. Evaluate
-  returned task artifacts against the hidden oracle; never grade returned
-  self-scores. Parse only event fields demonstrated in Phase A. Emit a
-  separate versioned behavioral result section with allowlisted metadata,
-  fixture/source/bundle/scorer identity, independent output results, observed
-  action results, unavailable metrics, duration, and exposed usage. Do not
-  change `native-client-observation.schema.json` to accept unrelated data.
-  Preserve raw-output disposal and current workspace/auth protections.
-  **Acceptance:** missing events, malformed or duplicate outputs, timeouts,
-  unavailable clients, and changed runtime identity cannot become behavioral
-  PASS. Scorer tests accept the true findings and reject planted false
-  findings; repaired/clear controls detect over-reporting. Ordinary test and
-  verification entrypoints never invoke models. Native results are advisory;
-  even a user-selected strict runner exit mode is not a commit-gate input.
-
-- [ ] **2. Make outcome, risk, contract, and test reasoning explicit in planning.**
+- [ ] **1. Make outcome, risk, contract, and test reasoning explicit in planning.**
   **Owner:** coder for shared guidance; documenter for worked examples.
   **Files:** modify `shared/agents/planner/prompt.md`,
   `shared/skills/plan-decomposition/SKILL.md`,
@@ -66,14 +38,17 @@ before editing. Do not import its installer changes into this phase.
   phase decomposition. Keep approved evidence-packet reuse and conditional
   clarification. A separate spec is optional; equivalent approved content
   in the plan suffices. Treat IDs as prose references, not new frontmatter
-  fields or a second plan parser. Retained experiment code must identify
-  proven behavior and shortcuts. Explicitly prohibit treating a spike as
+  fields or a second plan parser. Name the approved plan/spec and approved
+  scope-change records as requirement authority, with version references in
+  handoffs; separate specs and IDs remain optional for simple tasks.
+  Retained experiment code must identify proven behavior and shortcuts.
+  Explicitly prohibit treating a spike as
   authorization for production implementation.
   **Acceptance:** legacy/micro plans still validate; a simple known task
   needs no new artifact or approval; decisive uncertainty remains explicit;
   manual observations never enter executable command lists.
 
-- [ ] **3. Integrate requirements and meaningful-test review into existing roles.**
+- [ ] **2. Integrate requirements and meaningful-test review into existing roles.**
   **Owner:** coder; reviewer evaluates the final result independently.
   **Files:** modify `shared/agents/orchestrator/prompt.md`,
   `shared/agents/coder/prompt.md`, `shared/agents/reviewer/prompt.md`,
@@ -83,8 +58,12 @@ before editing. Do not import its installer changes into this phase.
   `shared/skills/testing-patterns/SKILL.md`,
   `shared/skills/debug-investigator/SKILL.md`,
   `shared/skills/code-review/SKILL.md`.
-  Carry approved scope/requirement/contract references into coder and reviewer
-  packets. Review coverage and scope in the normal two-pass review. Map a
+  Carry approved plan/specification, approved scope changes, and contract
+  references into coder and reviewer packets, with artifact versions and IDs
+  where present. The reviewer compares against that authority, not its own
+  reconstruction. Approved changes supersede affected original requirements;
+  ambiguity is surfaced rather than turned into an invented requirement.
+  Review coverage and scope in the normal two-pass review. Map a
   missing material requirement to existing severity; return ordinary
   finding objects, with IDs in existing titles/locations as useful. Add
   independent expected-value checks and targeted negative controls for
@@ -93,10 +72,13 @@ before editing. Do not import its installer changes into this phase.
   post-fix original-symptom check to debugging and coder guidance, with
   evidence of changed behavior or an honest unverified limitation.
   **Acceptance:** no separate convergence artifact/schema; no automatic
-  appended tasks; no mutation dependency. A green suite with an untested
-  original symptom is not represented as complete symptom verification.
+  appended tasks; no mutation dependency. Coverage-case controls respect
+  approved changes and valid alternative implementations without introducing
+  new requirements or requiring a separate spec/IDs for simple tasks.
+  A green suite with an untested original symptom is not represented as
+  complete symptom verification.
 
-- [ ] **4. Improve checkpoints and failure learning without duplicate records.**
+- [ ] **3. Improve checkpoints and failure learning without duplicate records.**
   **Owner:** coder/documenter.
   **Files:** modify `shared/policies/agent-reporting.instructions.md`,
   `shared/templates/session-log.md`, and `shared/skills/learn/SKILL.md`;
@@ -112,7 +94,7 @@ before editing. Do not import its installer changes into this phase.
   no new approval loop, pause status transition, report stream, or lesson
   quota. Include one worked example where no new instruction is justified.
 
-- [ ] **5. Adapt the same guidance to relaxed sidecars and validate generation.**
+- [ ] **4. Adapt the same guidance to relaxed sidecars and validate generation.**
   **Owner:** coder.
   **Files:** modify relevant `shared/agents/*/workflow-prompt.md`,
   `shared/sidecar/workflow/rules/workflow.md`,
@@ -122,7 +104,8 @@ before editing. Do not import its installer changes into this phase.
   or validator logic only for a demonstrated rendering/contract gap.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
   `shared/skills/testing-patterns/SKILL.md`.
-  Use concise advisory equivalents in existing templates; no additional
+  Use concise advisory equivalents, including approved-requirement authority,
+  in existing templates; no additional
   requirements-spec unit or skill is needed. Shared review profiles remain
   advice. Respect team ownership and absent specialists. Copilot instructions
   must work without shipped Copilot agents; Codex/Antigravity get no new
@@ -133,22 +116,35 @@ before editing. Do not import its installer changes into this phase.
   collision/status/index assertions still pass. Tests check contracts and
   forbidden authority changes rather than entire prose snapshots.
 
-- [ ] **6. Run matched evaluation, review, document, and close out.**
+- [ ] **5. Run matched evaluation, review, document, and close out.**
   **Owner:** orchestrator for evaluation/checks; reviewer; documenter after
   review convergence.
   **Files:** `README.md`, `docs/architecture.md`,
   `docs/native-client-acceptance.md`, the dated baseline/results document,
-  and relevant source help/comments.
+  companion evidence under `docs/evidence/engineering-behavioral/`, and
+  relevant source help/comments.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/code-review/SKILL.md`, `shared/skills/documentation/SKILL.md`,
   `shared/skills/humanize/SKILL.md`.
   Run the required deterministic checks. Refresh the authoring overlay with
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after generation if changed shared files make runtime checks stale.
-  Run one candidate wave matched to Phase A. Record per-case outcomes,
-  control false positives, event observability, duration/usage, and all
-  confounders. Do not choose only favorable repeats or call missing data an
-  improvement. A confirmed regression returns to the ordinary fix loop;
+  Run one candidate wave matched to Phase A's scenario/oracle revisions,
+  provider, model, reasoning effort, permissions, and client/runtime. Record
+  source revisions and generated-bundle identities and separate intended
+  workflow changes from unrelated source drift. Preserve every candidate
+  task output and allowlisted observation under the design's replay/privacy
+  contract. Rescore saved baseline and candidate evidence using the same
+  final Phase B scorer and rubric, with hashed inputs and versioned results.
+  Report per-case outcomes, control false positives, event observability,
+  duration/usage, and all confounders. Keep invalid outputs, unavailable runs,
+  missing observations, and behavioral failures separate; state denominators.
+  Unknown/changed controls or unreplayable evidence prevent a matched claim.
+  Do not choose favorable repeats or call missing data an improvement.
+  If a scorer defect is found, pause the comparison, validate the measurement
+  repair separately, freeze its new revision, and rescore both saved sets;
+  do not adjust scoring only for the candidate or overwrite prior evidence.
+  A confirmed regression returns to the ordinary fix loop;
   noisy outcomes inform review and do not introduce an automatic model gate.
   Map REQ-001 through REQ-009 to changed files and final evidence. Persist
   findings and receipts only through the existing closeout sequence.
@@ -168,7 +164,8 @@ uv run python .claude/scripts/verify.py fast --format json
 ## Optional Verification
 
 - Run the bounded candidate native wave on the same trusted host/model as
-  Phase A. Record failures, missing observations, cost, and any changed
+  Phase A, with Phase B's frozen scorer. Record behavioral failures, invalid
+  outputs, unavailable runs, missing observations, cost, and any changed
   environment. This host observation is required to claim measured behavior,
   but never becomes a probabilistic commit-gate command.
 - Repeat on a second provider only within a separate agreed budget; keep
@@ -181,8 +178,9 @@ Use `.claude/review-profiles/code.md`,
 `.claude/review-profiles/security.md`, `.claude/review-profiles/tests.md`,
 `.claude/review-profiles/ponytail.md`, and
 `.claude/review-profiles/documentation.md`. Review oracle independence,
-over-questioning controls, raw-data disposal, unchanged receipts, old
-invocation compatibility, and sidecar authority boundaries explicitly.
+over-questioning and approved-authority controls, safe replay retention,
+unchanged receipts, old invocation compatibility, and sidecar authority
+boundaries explicitly.
 
 ## Closeout Checklist
 
