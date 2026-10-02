@@ -72,6 +72,14 @@ is the plan's last phase; its closeout log must carry
   wiki line range; accept C-#4 (statements verified true against source;
   claim ranges change only through an OpenWiki update; fold into the next
   refresh).
+- **FIX LOOP round 2** - Coder fixed C-#1..#3 (sidecar plan-small header,
+  both plan-big Verification blocks, skill-template, code-review skill) and
+  broadened the template test (`AUTHORING_ONLY_TEXT`); edits avoid every
+  cited wiki line range. Open request answered: after regeneration and the
+  self-overlay refresh, `verify.py phase --format text` (no persist) exit 0
+  with ruff 0 violations, mypy 0 errors, pytest 2325 passed; the Phase C
+  Verification block items all exit 0. Round-2 delta sent to the same
+  reviewer.
 
 ## [LEARN] Entries
 
@@ -94,12 +102,23 @@ is the plan's last phase; its closeout log must carry
   `.claude/quality_reports/`, `.claude/explorations/`) - no stale claim.
 - `.claude/instructions/project-context.instructions.md` - no stale claim;
   its dated "Current status" note left as a dated record.
-- `shared/policies/`, `shared/skills/`, `shared/agents/`,
-  `shared/review-profiles/`, sidecar state READMEs - no stale claim.
+- `shared/policies/`, `shared/agents/`, `shared/review-profiles/`, sidecar
+  state READMEs - no stale claim.
+- `shared/skills/` - corrected (found by review round 1, missed by the first
+  sweep): `code-review/SKILL.md` cited the authoring-only
+  `shared/policies/workflow.instructions.md`; now
+  `.claude/instructions/workflow.instructions.md`. Other skills: no stale
+  claim.
 - `shared/templates/{session-log,plan-big,plan-small}.md` - corrected:
-  authoring-only `shared/policies/...` path replaced with the consumer path.
+  authoring-only `shared/policies/...` path replaced with the consumer path;
+  the full `plan-big.md` Verification block now uses
+  `.claude/scripts/verify.py fast` instead of authoring-only `scripts/...`
+  commands. `skill-template.md` now names both `shared/skills/` (authoring)
+  and `.claude/skills/` (installed project).
 - `shared/sidecar/workflow/templates/plan-small.md` - corrected: orphan
-  pause-log lines removed.
+  pause-log lines removed; header no longer claims hooks or lists pause
+  status and fields. `plan-big.md` - Verification block now asks for the
+  project's own commands instead of authoring-only `scripts/...`.
 - `scripts/install_bootstrap.py --help` - no stale claim.
 - `.claude/MEMORY.md` - corrected one entry in place (auto-mode refresh
   denial not reproduced); no other entry contradicted.
