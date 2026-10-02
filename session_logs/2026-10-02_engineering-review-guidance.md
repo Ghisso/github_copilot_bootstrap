@@ -72,6 +72,18 @@ and the review part of REQ-009 from
   same result as round 1 (1230 and 223 passed; only the 26 stale-copy
   notices from `check_runtime.py`). Round-2 diff-of-diffs sent to the same
   reviewer.
+- **REVIEW round 2** - Gate PASS: 0 CRITICAL, 0 MAJOR. Round-1 fixes #1,
+  #2, #3, #5, #6 confirmed; #4 stays accepted. Three new MINOR: R2-#1 the
+  open-request loop had no exit for evidence that cannot be produced (would
+  contradict REQ-005's honest-limitation rule) and did not cover missing
+  requirement records; R2-#2 leftover pre-mechanism wording (`[]` called
+  clean even with open requests, "ask for it" in the shared tests profile,
+  sidecar "question" wording and no Report slot for the still-needed list);
+  R2-#3 one tangled sentence, one nested parenthetical, one over-long line.
+  Reviewer confirmed nothing parses `Gate Result`, `WARN`, or report
+  headings (`record_findings.py` reads only the JSON list), and that
+  re-running review stays inside REVIEW without touching the CLOSEOUT order.
+  All three sent to the same coder as fix round 3.
 
 ## [LEARN] Entries
 
