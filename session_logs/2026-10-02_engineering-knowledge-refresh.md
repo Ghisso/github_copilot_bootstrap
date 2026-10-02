@@ -80,6 +80,15 @@ is the plan's last phase; its closeout log must carry
   with ruff 0 violations, mypy 0 errors, pytest 2325 passed; the Phase C
   Verification block items all exit 0. Round-2 delta sent to the same
   reviewer.
+- **REVIEW round 2** - Gate PASS; C-#1..#3 confirmed fixed; open request
+  closed. One new MINOR: the `skill-template.md` line-4 edit fell inside the
+  cited range `#L1-L14` of agents-page claim `claim_11607a59`, so the
+  orchestrator's "edits avoid every cited range" premise was wrong for that
+  file. Disposition: fixed by reverting that hunk by hand (file now
+  byte-identical to HEAD); no second OpenWiki refresh. The skill-template
+  "installed project" wording is a follow-up for the next change that
+  refreshes the agents page. Checks after the revert all exit 0. Round 3
+  (revert confirmation) sent to the same reviewer.
 
 ## [LEARN] Entries
 
@@ -113,8 +122,9 @@ is the plan's last phase; its closeout log must carry
   authoring-only `shared/policies/...` path replaced with the consumer path;
   the full `plan-big.md` Verification block now uses
   `.claude/scripts/verify.py fast` instead of authoring-only `scripts/...`
-  commands. `skill-template.md` now names both `shared/skills/` (authoring)
-  and `.claude/skills/` (installed project).
+  commands. `skill-template.md` - stale (names only `shared/skills/`) but
+  left unchanged: its lines 1-14 are cited OpenWiki evidence, so a fix waits
+  for the next change that refreshes the agents page.
 - `shared/sidecar/workflow/templates/plan-small.md` - corrected: orphan
   pause-log lines removed; header no longer claims hooks or lists pause
   status and fields. `plan-big.md` - Verification block now asks for the
