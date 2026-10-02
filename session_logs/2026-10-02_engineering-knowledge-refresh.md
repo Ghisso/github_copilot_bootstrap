@@ -57,7 +57,21 @@ is the plan's last phase; its closeout log must carry
   refresh: `validate_targets.py`, `check_runtime.py`,
   `validate_plan_frontmatter.py`, `verify.py fast` all exit 0; both pytest
   groups together 1460 passed.
-- **REVIEW round 1** - Fresh `reviewer`, six profiles.
+- **REVIEW round 1** - Fresh `reviewer`, six profiles. Gate WARN: 0
+  CRITICAL, 0 MAJOR, 4 MINOR, one open request (the full `verify.py phase`
+  result on the final tree, not only `verify.py fast`). Reviewer checked 65
+  claim line ranges by hash (61 exact; 4 older off-by-one ranges in
+  `scripts/validate_targets.py`, not from this diff) and found the wiki
+  prose accurate with no behavioral overclaim. MINORs: C-#1 the sidecar
+  `plan-small.md` header still claims hooks and lists pause fields; C-#2
+  both `plan-big.md` templates name authoring-only `scripts/...` commands
+  and `skill-template.md` names only `shared/skills/`; C-#3 the shipped
+  `code-review` skill cites `shared/policies/...`, so the audit line for
+  `shared/skills/` was wrong; C-#4 two claim-evidence gaps (statements true).
+  Decisions: fix C-#1..#3 in one coder round, without shifting any cited
+  wiki line range; accept C-#4 (statements verified true against source;
+  claim ranges change only through an OpenWiki update; fold into the next
+  refresh).
 
 ## [LEARN] Entries
 
