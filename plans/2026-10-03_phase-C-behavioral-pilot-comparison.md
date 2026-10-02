@@ -45,7 +45,12 @@ on 2026-10-03; see the big plan's approved decisions.
   "after" (defective 1, 2, 3, then repaired, valid-alternative, and
   approved-change). Same client, model, effort, and permission mode for
   both revisions. No retries; an unavailable run stays unavailable and its
-  slot is recorded in the schedule.
+  slot is recorded in the schedule. The first attempt is also the first
+  real test of Phase B's runner invocation. If it fails because of the
+  runner itself (not model behavior), stop the schedule instead of spending
+  the remaining runs: the failed attempt still counts against the budget,
+  the runner is fixed under step 4's repair rule with its own review, and
+  the schedule resumes only within the runs left.
   **Acceptance:** 12 attempts are accounted for in schedule order, each
   saved or explicitly unavailable.
 
@@ -82,9 +87,10 @@ on 2026-10-03; see the big plan's approved decisions.
   `.claude/skills/testing-patterns/SKILL.md`.
   Add one test that replays `docs/evidence/behavioral-pilot/phase-c/`
   through the scorer and asserts the counts the report states. If a scorer
-  defect is found, stop: fix it with its own review, rescore both saved
-  sets with the fixed scorer, keep the earlier results, and say so in the
-  report. Never adjust scoring for one revision only.
+  or runner defect is found, stop: fix it with its own review, rescore both
+  saved sets with the fixed scorer (for a runner fix, continue the schedule
+  only within the runs left), keep the earlier results, and say so in the
+  report. Never adjust scoring or running for one revision only.
   **Acceptance:** the replay test fails if the saved evidence or the report
   counts drift apart.
 

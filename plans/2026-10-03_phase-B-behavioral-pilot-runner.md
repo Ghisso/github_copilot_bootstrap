@@ -80,8 +80,10 @@ phase is cancelled with evidence instead.
   **Acceptance:** replaying Phase A's saved real outputs and judgments in
   `docs/evidence/behavioral-pilot/phase-a/` reproduces the outcomes the
   evidence document recorded; synthetic tests cover each category, each
-  conclusion rule, a duplicate or missing judgment, and an output that names
-  the defect without a requirement ID (it counts as a detection).
+  conclusion rule (including equal detection counts over different numbers
+  of valid runs, which are different rates), a duplicate or missing
+  judgment, and an output that names the defect without a requirement ID
+  (it counts as a detection).
 
 - [ ] **4. Review, document, and close out.**
   **Owner:** reviewer; documenter after review converges; orchestrator.
@@ -90,8 +92,10 @@ phase is cancelled with evidence instead.
   Review old-invocation compatibility, workspace and output privacy, the
   scorer's independence from the outputs it scores, and that no ordinary
   test or `verify.py` path can start a model. This phase makes no native
-  run: the approved budget covers only Phases A and C, and replaying Phase
-  A's saved outputs covers the end-to-end parsing check.
+  run: the approved budget covers only Phases A and C. Replaying Phase A's
+  saved outputs checks scoring and saved-output handling only, not whether
+  the new runner invokes Claude correctly; the first scheduled Phase C
+  attempt is the first real test of that invocation.
 
 ## Verification
 

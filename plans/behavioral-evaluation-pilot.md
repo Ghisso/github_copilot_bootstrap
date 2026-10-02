@@ -121,11 +121,14 @@ Phase A freezes these with the fixture, before any native run.
   - fewer than 2 valid defective runs for either revision: "inconclusive";
   - any control false positive on a revision: report it next to that
     revision's detections, and call the result "mixed" for that revision;
-  - otherwise, more detections for "after": "more detections observed in
-    the after revision (a of n versus b of m)";
-  - equal detections: "no difference observed";
-  - fewer detections for "after": "fewer detections observed in the after
-    revision".
+  - otherwise, compare observed detection rates (detections over valid
+    defective runs), because equal counts over different valid runs are
+    different rates; always show both fractions:
+    - higher rate for "after": "a higher observed detection rate in the
+      after revision (a of n versus b of m)";
+    - equal rates: "no difference observed (a of n versus b of m)";
+    - lower rate for "after": "a lower observed detection rate in the after
+      revision (a of n versus b of m)".
   The report never says "improved", "reliable", or "significant".
 
 ### Decisive assumptions

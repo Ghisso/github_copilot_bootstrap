@@ -105,8 +105,10 @@ on 2026-10-03; see the big plan's approved decisions.
   Proceed only when BEP-001 and BEP-002 both hold; "consistent with" is
   enough to proceed, but every later claim keeps that level. A rubric change
   is allowed only here, before Phase C, only to resolve an ambiguity the
-  outputs exposed, and never to match one output's wording; the document
-  records the change and its reason.
+  outputs exposed, and never to match one output's wording. A clarification
+  rescores every Phase A output under the revised rubric. Keep the original
+  rubric and judgments beside the revised ones, record the change and its
+  reason, and freeze the revised rubric before Phase C.
   Otherwise state the stop
   and the evidence, so the orchestrator can cancel Phases B and C under the
   big plan's stop rule.
