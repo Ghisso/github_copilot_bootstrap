@@ -40,7 +40,18 @@ REQ-007, REQ-008, and the remaining part of REQ-009 from
 - **VERIFY** - Verification block: all items exit 0 except
   `check_runtime.py` (22 stale-copy notices only); 1230 and 229 passed.
 - **REVIEW round 1** - Fresh `reviewer`, six profiles, with an explicit
-  question on whether ~100 asserted phrases is a near-snapshot.
+  question on whether ~100 asserted phrases is a near-snapshot. Gate WARN:
+  0 CRITICAL, 0 MAJOR, 4 MINOR, and one open request (show `check_runtime.py`
+  exit 0 after the self-overlay refresh) — the first real use of Phase A's
+  open-request mechanism. MINORs: B1-#1 111 exact phrases plus a 111-step
+  removal loop (trim to ~45 anchors, Phase A-style move + removal cases);
+  B1-#2 two placement-negative assertions with no requirement behind them;
+  B1-#3 ambiguous sidecar orchestrator sentence; B1-#4 requirement-map
+  trigger worded "several artifacts" vs "several phases". All four sent to
+  the same coder. The open request will be answered after the fix round,
+  since an earlier refresh would go stale again. Coder deviations accepted by
+  the reviewer; the authoring-path pointer in the session-log template and
+  the sidecar plan-small orphan lines are suggested for the Phase C audit.
 
 ## [LEARN] Entries
 
