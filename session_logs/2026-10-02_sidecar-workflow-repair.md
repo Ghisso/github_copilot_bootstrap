@@ -20,6 +20,21 @@ owned legacy state safely.
   prepared and verified by the orchestrator and run by the user, fresh
   install only). Big plan goal, phase line, and done criteria now say
   findings 1-8.
+- **07:50** - Step 1 (finding 2) by coder. `_full_install_evidence` adds a
+  legacy signal only when no modern marker fired: a real, untracked
+  `.claude/` (same tracked-path guard) plus either (a) tracked
+  `.devcontainer/hf-ai-sync.py` or `.devcontainer/state-sync.sh`, or (b) a
+  local `.claude/scripts/verify.py`, each corroborated by at least 2 of the
+  bootstrap hook scripts `run-hook.sh`, `protect-files.sh`, `session-log.sh`,
+  `context-mode-dispatch.sh`, `git-protection.sh`. Evidence: read-only
+  inspection of `img-classification` (has six such hook scripts, tracked
+  `hf-ai-sync.py`, no `verify.py`) and this repository's history
+  (`dd1ee06` retired `hf-ai-sync.py`; `3de8385` added `state-sync.sh`).
+  Rejected: an arbitrary hooks folder, a single hook name, a tracked team
+  `.claude/` with the same names. Mixed evidence now advises backup and
+  inspected cleanup; the ambiguous plain refusal stops steering toward
+  sidecar when a per-clone `.claude/` exists. Focused tests: 228 passed;
+  ruff, format, and mypy clean on touched files.
 
 ## [LEARN] Entries
 
