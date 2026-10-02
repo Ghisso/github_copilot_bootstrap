@@ -3,7 +3,7 @@ name: 2026-10-02_phase-A-engineering-review-guidance
 type: small-plan
 parent_plan: engineering-workflow-improvements
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

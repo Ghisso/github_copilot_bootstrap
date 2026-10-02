@@ -1,15 +1,15 @@
 ---
 name: engineering-workflow-improvements
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: engineering-workflow-improvements_implementation
-started_at:
+started_at: 2026-10-02T12:32:48Z
 phases:
   - 2026-10-02_phase-A-engineering-review-guidance
   - 2026-10-02_phase-B-engineering-planning-guidance
   - 2026-10-02_phase-C-engineering-knowledge-refresh
-current_phase:
+current_phase: 2026-10-02_phase-A-engineering-review-guidance
 ---
 
 # Big Plan: Engineering Workflow Guidance Improvements
