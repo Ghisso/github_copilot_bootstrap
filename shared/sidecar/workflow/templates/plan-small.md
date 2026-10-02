@@ -24,6 +24,8 @@ closeout_session_log:
 
 [What this phase changes]
 
+<!-- Cite the big plan's requirement IDs where present; do not copy the requirements. -->
+
 ## Steps
 
 - [ ] [Step]

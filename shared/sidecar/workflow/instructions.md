@@ -15,6 +15,15 @@ implement it directly. A task spanning several files or several decisions
 benefits from a plan: write one yourself, using a template under
 `.claude/templates/` (`plan-big.md` for a multi-phase piece of work,
 `plan-small.md` for one phase), and save it under `.ai-bootstrap/plans/`.
+Before you split a plan into phases, check anything that would break the
+design if it were false (a decisive assumption): look in the code and docs
+first, then run a small experiment with one question and a stop point, and
+say what it did not prove. An experiment is not approval to change production
+code. Ask the person only about their own preferences, not about facts you
+can check. Name the existing behavior each phase must keep and the tests that
+show it, including a negative case, one that should fail or be rejected. The
+templates offer an optional non-goals section and requirement map; a simple
+plan needs neither, and requirement IDs are labels in prose.
 
 Before you consider a change done, run this project's own test, lint, and
 type-checking commands, taken from this repository's own documentation
@@ -33,7 +42,14 @@ required second pass, and nothing here blocks a commit.
 
 At the end of a task, write a short session log under
 `.ai-bootstrap/session_logs/`, and add one line to
-`.ai-bootstrap/MEMORY.md` if you learned something worth keeping.
+`.ai-bootstrap/MEMORY.md` if you learned something worth keeping. If a
+failure taught you something, put its reproduction, cause, smallest fix, and
+guarding test in the log; add a `MEMORY.md` line only for a lesson the code
+and tests cannot show. At the end of a task, or of a plan phase, give the
+person one short summary: the goal, what changed, any departure from the
+plan, the checks you ran and where their output is, open review findings, a
+decision only if one is really needed, and the next step. Link instead of
+copying; the summary is not a new record and needs no approval.
 Scratch work you want to keep without committing goes under
 `.ai-bootstrap/explorations/`.
 

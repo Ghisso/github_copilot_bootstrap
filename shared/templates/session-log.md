@@ -18,6 +18,9 @@ identifier when applicable.
 
 ## Work Log
 
+<!-- At a phase boundary, add the short summary shape defined in
+     `.claude/instructions/agent-reporting.instructions.md`. -->
+
 - **HH:MM** - [What was done, what was decided, what was learned]
 
 ## [LEARN] Entries

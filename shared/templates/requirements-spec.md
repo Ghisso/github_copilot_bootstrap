@@ -1,5 +1,8 @@
 # Requirements Specification — [FEATURE NAME]
 
+<!-- Optional. A simple task needs no separate spec or requirement IDs;
+     equivalent approved content in the plan suffices. -->
+
 **Date:** YYYY-MM-DD
 **Author:** [Name]
 **Status:** DRAFT / APPROVED
@@ -30,6 +33,13 @@
 
 ---
 
+## Non-Goals and Constraints
+
+- **Non-goals:** [What this work will not do]
+- **Constraints:** [Existing contracts, compatibility, or limits it must respect]
+
+---
+
 ## Clarity Status
 
 | Aspect | Status | Notes |
@@ -48,8 +58,9 @@
 
 ## Success Criteria
 
-1. [Measurable criterion]
-2. [Measurable criterion]
+| Criterion | Evidence (test, probe, or log) | Owning phase |
+|-----------|--------------------------------|--------------|
+| [Measurable criterion] | [How it will be shown, or "no verification available"] | [Phase slug, if any] |
 
 ---
 

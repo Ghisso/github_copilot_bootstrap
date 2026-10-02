@@ -14,6 +14,8 @@ Follow the loop described in `.claude/rules/ai-bootstrap-workflow.md`:
    an obvious fix does not — delegate straight to the coder. A task that
    spans several files or several decisions benefits from a plan: ask the
    planner for one if this session has one, or write it yourself if not.
+   When you write the plan yourself, first check each decisive assumption
+   as the workflow rule describes.
 3. Delegate implementation to the coder, if this session has one, or
    implement the change yourself if not.
 4. Have the coder (or yourself) run the project's own test, lint, and
@@ -70,7 +72,18 @@ direct prose, one term per concept, no unexplained abbreviations.
 
 Before you consider the task finished, write a session log under
 `.ai-bootstrap/session_logs/` describing what changed and why, and
-add any reusable lesson to `.ai-bootstrap/MEMORY.md`. Nothing here
-requires a passing check, a review, or a specific commit sequence before
-the person commits: those are the person's own decision. The repository's
-own guidance always wins over this one when the two disagree.
+add any reusable lesson to `.ai-bootstrap/MEMORY.md`. If a failure taught
+you something, put its reproduction, cause, smallest fix, and guarding test
+in the log; add a `MEMORY.md` line only for a lesson the code and tests
+cannot show.
+
+At the end of a task, or of a plan phase, give the person one short summary:
+the goal, what changed, any departure from the plan, the checks you ran and
+where their output is, open review findings, a decision only if one is really
+needed, and the next step. Link the plan, report, and log instead of copying
+them. The summary is not a new record and needs no approval.
+
+Nothing here requires a passing check, a review, or a specific commit
+sequence before the person commits: those are the person's own decision.
+The repository's own guidance always wins over this one when the two
+disagree.

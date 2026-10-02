@@ -26,6 +26,18 @@ under `.claude/templates/` (`plan-big.md` for a multi-phase piece of work,
 `plan-small.md` for one phase). A plan here is a tool you use when it
 earns its cost, not a gate you must clear.
 
+Before you split a plan into phases, check anything that would break the
+design if it were false (a decisive assumption). Look in the code and docs
+first. If they settle nothing, run a small experiment with one question and
+a stop point, and say what it did not prove. An experiment is not approval
+to change production code. Ask the person only about their own preferences,
+such as a missing retention period, not about facts you can check, such as
+whether a library supports streaming. Name the existing behavior each phase
+must keep and the tests that show it, including a negative case, one that
+should fail or be rejected. The templates offer an optional non-goals
+section and requirement map. A simple plan needs neither, and requirement
+IDs are labels in prose.
+
 ## Implement
 
 Once you know what to change, make the change. Prefer the smallest
@@ -65,7 +77,15 @@ Write a short session log under `.ai-bootstrap/session_logs/`
 describing what you did and why. If you learned something about this
 repository that would help a future session — a pattern, a pitfall, a
 useful command — add one line about it to
-`.ai-bootstrap/MEMORY.md`.
+`.ai-bootstrap/MEMORY.md`. If a failure taught you something, put its
+reproduction, cause, smallest fix, and guarding test in the log, and add a
+`MEMORY.md` line only for a lesson the code and tests cannot show.
+
+At the end of a task, or of a plan phase, give the person one short
+summary: the goal, what changed, any departure from the plan, the checks you
+ran and where their output is, open review findings, a decision only if one
+is really needed, and the next step. Link the plan, report, and log instead
+of copying them. The summary is not a new record and needs no approval.
 
 ## Explorations
 

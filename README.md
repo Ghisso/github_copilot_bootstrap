@@ -1238,7 +1238,10 @@ plus a verification pass that refutes and drops findings that do not
 survive, with no helper agents. The reviewer compares the diff against the
 approved plan requirements, non-goals, and scope-change records. When it
 lacks a requirement or execution result, it lists an open request and answers
-`WARN`, and the orchestrator answers the request and re-runs the review.
+`WARN`, and the orchestrator answers the request and re-runs the review. For a
+full plan, the planner settles each assumption that would invalidate the
+design from code, docs, or a bounded experiment before it splits phases, and
+asks you only about preferences.
 
 See [Agent roster, prompts, and the skill
 library](openwiki/architecture/agents-and-skills.md) for how each target

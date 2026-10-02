@@ -56,7 +56,9 @@ happen atomically, they belong in the same phase.
 
 ### Step 1: Identify Phases
 
-Read the full scope. Look for natural boundaries:
+Read the full scope. Settle each decisive assumption (one that would
+invalidate the design if false) as the planner's Phase 1 risk and evidence
+decision describes, then look for natural boundaries:
 - **Foundation / scaffolding** — types, configs, pure functions (no external deps)
 - **Integration** — wiring to external libraries, APIs, or models
 - **Adaptation / training** — domain-specific tuning, fine-tuning, optimization
@@ -80,7 +82,10 @@ Plans that ignore project conventions waste implementation time on rework.
 Use `templates/plan-big.md`. It carries the frontmatter the branch/PR gates read
 (`type: big-plan`, `originating_branch`, `implementation_branch`, `phases`,
 `current_phase`) plus Context, Goals, a Design Overview (Mermaid welcome here),
-and the ordered `phases` list naming each small-plan slug.
+and the ordered `phases` list naming each small-plan slug. The requirements
+spec template is for requirements that span several artifacts; the big plan's
+optional requirement map is for requirements that span several phases. Simple
+plans omit both.
 
 **Location:**
 - `.claude/plans/` — concrete implementation plans a coding agent will execute
