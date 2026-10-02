@@ -11,8 +11,10 @@ closeout_session_log:
 
 ## Scope
 
-Resolve all seven findings from the hands-on review in one implementation
-phase. Phase A must first prove the selected state location. Keep one
+Resolve the seven hands-on review findings, plus finding 8 (planner and
+reviewer prompts ask for file saves their tools cannot make), in one phase.
+Phase A confirmed the `.ai-bootstrap/` state root; see `## Workflow state
+write gate, 2026-10-02` in `docs/sidecar-provider-contract.md`. Keep one
 coder responsible for installer, overlay, generator, and regression tests;
 their shared state and ownership contracts should change together.
 
@@ -145,13 +147,14 @@ their shared state and ownership contracts should change together.
   **Checks:** profile downgrade, team takeover, seed restoration, migration,
   backup, and purge predictions; assert output and unchanged filesystem.
 
-- [ ] **5. Handle missing specialists and test team precedence (findings 5–7).**
+- [ ] **5. Handle missing specialists, caller-saved output, and team precedence (findings 5–8).**
   **Owner:** coder.
   **Files:** modify `shared/sidecar/workflow/instructions.md`,
   `shared/sidecar/workflow/rules/workflow.md`, and
-  `shared/agents/orchestrator/workflow-prompt.md`; adjust other workflow-only
-  role prompts if their references assume a specialist exists. Update
-  `tests/test_validate_targets.py` and `tests/test_sidecar_workflow_scenario.py`.
+  `shared/agents/{orchestrator,planner,reviewer}/workflow-prompt.md`;
+  adjust other workflow-only role prompts if their references assume a
+  specialist exists. Update `tests/test_validate_targets.py` and
+  `tests/test_sidecar_workflow_scenario.py`.
   **Required Skills:** `shared/skills/ponytail/SKILL.md`,
   `shared/skills/testing-patterns/SKILL.md`.
   Copilot's instructions direct the current agent to write plans using
@@ -162,15 +165,27 @@ their shared state and ownership contracts should change together.
   change name precedence, or import the full install's mandatory delegation.
   A skipped template/profile may be supplied by the team; use the available
   artifact subject to team rules, or write a simple plan/review when absent.
+  Finding 8: the Claude tools of the planner and reviewer come from the
+  shared capabilities in `shared/agents/{planner,reviewer}/agent.yaml`,
+  which grant no Write or Edit. Apply the user's caller-saves decision
+  (2026-10-02): both return the plan or report text, and the agent that
+  asked, or the current agent when no specialist exists, saves it under the
+  state root. Align the orchestrator prompt, rules, and Copilot instructions.
+  Do not change `agent.yaml` capabilities or add a generator tool override.
   **Checks:** a team `.github/agents/coder.agent.md` suppresses the Claude
   sidecar coder as before; emitted guidance includes the fallback. Add
   tracked and foreign-untracked profile/template collisions, deleted-but-
   tracked entries, dry run, rerun, and uninstall; assert preserved bytes,
   index/status, and skip reasons through real installer entrypoints.
+  Beside the `test_render_sidecar_workflow_*` tests in
+  `tests/test_validate_targets.py`, assert the rendered planner and reviewer
+  return their text with no instruction to save a file themselves, and the
+  orchestrator prompt and rules say the caller saves it.
 
 - [ ] **6. Regenerate, verify, review, and update public documentation.**
   **Owner:** coder for checks; reviewer for two-pass review; documenter
-  after convergence; orchestrator for receipts and closeout.
+  after convergence; orchestrator for receipts, closeout, and preparing and
+  verifying the native rerun, which the user runs.
   **Files:** `README.md`, `docs/sidecar-provider-contract.md`,
   `docs/target-mapping.md`, relevant runtime docs, and source comments/help
   affected by these contracts. Regenerate both targets; never edit outputs.
@@ -182,13 +197,20 @@ their shared state and ownership contracts should change together.
   If changed runtime source makes this checkout's installed copy stale,
   regenerate and use `uv run python scripts/install_bootstrap.py .
   --allow-self --local-only` before rerunning runtime checks; do not manually
-  patch installed files. Run the Phase A recipe against the actual generated
-  workflow install and migrated fixture, not only hand-edited probe prompts.
-  Record a plan, reviewer report, log, and memory edit at the new root.
+  patch installed files. For the native rerun, the orchestrator builds a
+  disposable fixture from the actual generated workflow install (it already
+  uses `.ai-bootstrap/`, so no prompt repointing) and a probe script based
+  on the Phase A recipe. The user runs it in their own shell, because an
+  agent session cannot start a nested `claude -p`; put any fixture `git
+  commit` in that script. The orchestrator then checks `stream-json` events,
+  `permission_denials`, and on-disk contents for a caller-saved plan and
+  reviewer report, a log, and a memory edit at the new root. Use a fresh
+  install only: Phase A showed the client's write check depends on the
+  target path, and step 3's real-Git tests already prove migrated state.
   Document new/legacy behavior, refusal recovery, backup limitations,
-  missing-agent behavior, and unchanged support boundaries. Map findings
-  1–7 to tests/native evidence in the closeout log. Resolve CRITICAL/MAJOR
-  findings and explicitly dispose of MINOR findings before closing.
+  missing-agent and caller-saves behavior, and unchanged support boundaries.
+  Map findings 1–8 to tests/native evidence in the closeout log. Resolve
+  CRITICAL/MAJOR findings and explicitly dispose of MINOR findings before closing.
 
 ## Verification
 
@@ -203,8 +225,10 @@ uv run python .claude/scripts/verify.py fast --format json
 
 ## Optional Verification
 
-- Record the native host-session rerun from step 6 here. Successful direct
-  and delegated writes from the actual generated installation are an
+- Record the native host-session rerun from step 6 here: the user runs the
+  probe script, and the orchestrator records the verified results. Successful
+  direct, coder, and documenter writes, plus caller-saved planner and
+  reviewer output, from the actual generated installation are an
   acceptance condition even though this host check is not machine-run by
   `verify closeout`.
 - Reproduce the reported legacy consumer layout in a disposable clone if
