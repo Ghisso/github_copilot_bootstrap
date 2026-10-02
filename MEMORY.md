@@ -1392,13 +1392,14 @@
   sensitive file even when ignored, so `.claude/ai-bootstrap/` writes failed
   while a root-level `.ai-bootstrap/` writes cleanly under `acceptEdits`
   (sidecar repair Phase A).
-- [LEARN:workflow] In auto mode the safety classifier denies two
+- [LEARN:workflow] In auto mode the safety classifier has denied two
   orchestrator actions in this repository: starting a nested `claude -p`
   probe, and the self-install refresh `install_bootstrap.py . --allow-self
-  --local-only`. Hand both to the user up front: prepare the fixture and a
-  probe script, ask them to run it and the refresh in their own shell, then
-  verify the `stream-json` events, on-disk files, and `check_runtime.py`
-  yourself.
+  --local-only`. The refresh denial is not consistent: on 2026-10-02 the
+  refresh ran twice in auto mode without a denial. When either is denied,
+  hand it to the user: prepare the fixture and a probe script, ask them to
+  run it and the refresh in their own shell, then verify the `stream-json`
+  events, on-disk files, and `check_runtime.py` yourself.
 - [LEARN:review] Before a prompt states what a role can or cannot do, check
   the rendered `tools:` line. Claude tools come from `agent.yaml`
   capabilities through `CLAUDE_TOOL_MAP`, so the sidecar planner keeps `Bash`
