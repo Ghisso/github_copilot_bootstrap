@@ -9,7 +9,7 @@ phases:
   - 2026-10-02_phase-A-sidecar-write-evidence
   - 2026-10-02_phase-B-sidecar-workflow-repair
   - 2026-10-02_phase-C-sidecar-workflow-repair-knowledge-refresh
-current_phase: 2026-10-02_phase-A-sidecar-write-evidence
+current_phase: 2026-10-02_phase-B-sidecar-workflow-repair
 ---
 
 # Big Plan: Sidecar Workflow Repair

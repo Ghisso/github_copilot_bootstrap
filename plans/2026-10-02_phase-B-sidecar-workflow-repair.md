@@ -3,7 +3,7 @@ name: 2026-10-02_phase-B-sidecar-workflow-repair
 type: small-plan
 parent_plan: sidecar-workflow-repair
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
