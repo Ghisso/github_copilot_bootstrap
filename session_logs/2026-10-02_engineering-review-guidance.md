@@ -54,6 +54,18 @@ and the review part of REQ-009 from
 - **REVIEW** - Fresh `reviewer` with `code`, `architecture`, `security`,
   `tests`, `ponytail`, `documentation`; packet carried the approved plan,
   requirements, non-goals, and the scoped diff.
+- **REVIEW round 1** - Gate PASS: 0 CRITICAL, 0 MAJOR, 6 MINOR. Hash
+  re-capture judged acceptable (only the two `debug-investigator` copies in
+  `dist/sidecar/skills/` change). Decisions: fix #1 (reviewer cannot pause to
+  ask: add an optional `### Open Requests` section and answer `WARN` while a
+  request is open; the orchestrator packet carries verification results
+  already obtained; sidecar hand-back list names the negative control), #2
+  (sidecar simple-work clause), #3 (real moved-out-of-section test case), #5
+  (role-neutral, plain-words negative-control bullet), #6 (wrong "rule above"
+  pointer; separate lead-in for the test checks). Accept #4 (three
+  asset-to-text maps): shared-source and generated paths have different
+  shapes, so a helper would still need one path table per root and save
+  little. Fixes sent back to the same coder (same role and phase).
 
 ## [LEARN] Entries
 
