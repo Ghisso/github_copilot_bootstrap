@@ -1,0 +1,135 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 9
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "profile": "architecture",
+      "file": "shared/agents/reviewer/prompt.md",
+      "line": 50,
+      "title": "Reviewer 'ask the caller' had no channel for a one-shot subagent, and the packet did not pre-supply verification results",
+      "detail": "Round 1. A reviewer with a request but no finding could return PASS with [] and lose the request.",
+      "disposition": "fixed",
+      "reason": "Reviewer step 6 now lists open requests under an optional ### Open Requests section and answers WARN while any is open; orchestrator line 128 carries verification results already obtained; sidecar hand-back list names the negative control. Tests assert each phrase in its section."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/reviewer/workflow-prompt.md",
+      "line": 11,
+      "title": "Sidecar reviewer, rule, and instructions omitted that the request itself suffices for simple work",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "Sidecar reviewer Inputs, rule, and instructions now say for simple work the request itself is the requirement; tests assert it."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "tests",
+      "file": "tests/test_validate_targets.py",
+      "line": 3419,
+      "title": "Guidance negative control did not prove section scoping",
+      "detail": "Round 1. Both replacements deleted the only occurrence of a phrase.",
+      "disposition": "fixed",
+      "reason": "The test now moves a phrase from reviewer ## Inputs to ## Retrieval, asserts it is still in the file, and expects the section-scoped error."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "ponytail",
+      "file": "tests/test_validate_targets.py",
+      "line": 3460,
+      "title": "shrink: three similar asset-to-text maps in the new tests",
+      "detail": "Rounds 1-3.",
+      "disposition": "accepted",
+      "reason": "Shared-source paths and generated .claude/ paths have different shapes, so a shared helper would still need one path table per root and would save little; test-only readability preferred. Reviewer agreed the reason is sound."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "architecture",
+      "file": "shared/review-profiles/tests.md",
+      "line": 10,
+      "title": "Negative-control bullet embedded a reviewer-only rule in a shared profile and left the term undefined",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "Bullet is role-neutral, defines the term in plain words (the test fails when the fix is removed), and ends 'report it as still needed'."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/orchestrator/prompt.md",
+      "line": 128,
+      "title": "Ambiguous 'from the rule above' and a mixed lead-in in reviewer Pass 1",
+      "detail": "Round 1.",
+      "disposition": "fixed",
+      "reason": "The wrong pointer was removed; reviewer Pass 1 test checks have their own 'Also check the tests:' lead-in."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "architecture",
+      "file": "shared/agents/orchestrator/prompt.md",
+      "line": 128,
+      "title": "Open-request loop had no exit for evidence that cannot be produced and covered only execution evidence",
+      "detail": "Round 2.",
+      "disposition": "fixed",
+      "reason": "Orchestrator answers each request with the result or the plain reason it cannot be produced, and supplies or denies a missing requirement record; reviewer closes a reasoned request as an unverified limitation. Tests assert both."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/reviewer/prompt.md",
+      "line": 97,
+      "title": "Pre-mechanism wording remained ([] clean signal, 'ask for it', sidecar 'question' with no Report slot)",
+      "detail": "Round 2.",
+      "disposition": "fixed",
+      "reason": "[] is clean only when no request is open; tests.md ends 'report it as still needed'; sidecar reviewer raises unclear requirements in its report and its ## Report section lists what it still needs."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/orchestrator/prompt.md",
+      "line": 128,
+      "title": "Tangled reviewer-packet sentence, nested sidecar-rule parenthetical, over-long sidecar reviewer line",
+      "detail": "Round 2.",
+      "disposition": "fixed",
+      "reason": "Sentence split in two; simple-work clause is its own sentence in the sidecar rule; sidecar reviewer Inputs rewrapped to the file's column style. Round-3 review confirmed."
+    }
+  ],
+  "generated_at": "2026-10-02T13:14:07Z",
+  "branch": "engineering-workflow-improvements_implementation",
+  "head_sha": "16263644b8014ae958aecf7e2e563a8c2f261bd7",
+  "base_ref": "dev",
+  "merge_base_sha": "16263644b8014ae958aecf7e2e563a8c2f261bd7",
+  "phase": "2026-10-02_phase-A-engineering-review-guidance",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "548959cfa6478c6101be24baef847e7ce0b13c18",
+  "changed_files": [
+    "README.md",
+    "docs/architecture.md",
+    "shared/agents/coder/prompt.md",
+    "shared/agents/coder/workflow-prompt.md",
+    "shared/agents/orchestrator/prompt.md",
+    "shared/agents/orchestrator/workflow-prompt.md",
+    "shared/agents/reviewer/prompt.md",
+    "shared/agents/reviewer/workflow-prompt.md",
+    "shared/review-profiles/code.md",
+    "shared/review-profiles/tests.md",
+    "shared/sidecar/workflow/instructions.md",
+    "shared/sidecar/workflow/rules/workflow.md",
+    "shared/sidecar/workflow/templates/quality-report.md",
+    "shared/skills/debug-investigator/SKILL.md",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 1
+}
