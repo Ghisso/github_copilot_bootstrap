@@ -6,7 +6,8 @@ Use for test quality, coverage, fixtures, and mocking decisions.
 
 - New public behavior has tests.
 - Happy path, boundary, error, and state cases are covered where relevant.
-- Regression tests exist for bug fixes.
+- Regression tests exist for bug fixes, and the evidence shows the original reproduction now behaves correctly, not only that the suite is green.
+- Expected values are independent of the implementation under test (taken from the requirement or a known source, not copied from its output). For a critical or suspect test, check that a targeted negative control was run (the test fails when the fix is removed). If that evidence is missing and you cannot run it yourself, report it as still needed.
 - Tests have meaningful assertions.
 - `pytest.raises` checks messages with `match=`.
 - Test data is concrete, not vague placeholders.

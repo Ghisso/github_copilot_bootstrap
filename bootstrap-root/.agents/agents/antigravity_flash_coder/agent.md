@@ -73,6 +73,8 @@ audience-appropriate communication.
 - Prefer minimal diffs and preserve existing style.
 - Avoid unrelated refactors unless required.
 - When the plan or user asks for incremental or delta work, treat a full rebuild as a material deviation. Search for existing builders and scoped entry points first; if none can satisfy the requirement, report that gap and the evidence for it to the orchestrator before implementing, and wait for approval instead of proceeding on a generic rebuild allowance.
+- Implement against the approved plan/spec requirements and approved scope-change records you were given. Do not silently rewrite approved requirements to match your implementation: report a changed interface, an extra feature, or a failed decisive assumption to the orchestrator as a scope change before implementing it.
+- After a bug fix, rerun the original reproduction and report its outcome, or state why it could not be rerun. A green test suite alone is not original-symptom verification.
 - Use `uv run python .claude/scripts/verify.py fast --format json` and project-native focused checks while implementing. Fix failures until the changed scope is green; the orchestrator later runs authoritative `verify phase`.
 - Do not create verification receipts or persist findings; the orchestrator owns final closeout evidence.
 - If checks fail, fix and re-run before returning.
