@@ -35,6 +35,16 @@ owned legacy state safely.
   inspected cleanup; the ambiguous plain refusal stops steering toward
   sidecar when a per-clone `.claude/` exists. Focused tests: 228 passed;
   ruff, format, and mypy clean on touched files.
+- **08:15** - Step 2 (finding 4) by coder. `backup_sidecar_state` now runs
+  the shared target preflight, takes `_acquire_run_lock` only for a real
+  backup with state present, and copies through the new
+  `_copy_state_into_preserved(source, preserved_root)` helper: copy into a
+  `mkdtemp` sibling, then `os.rename` to the collision-free name; on
+  `OSError` it removes only its own staging copy (or names it as incomplete)
+  and prints the existing `ABORT: filesystem error at <path>: <reason>`.
+  Behavior change to document: a symlinked state root or preserved folder
+  now refuses instead of being skipped. `_run_backup_state` lost its dead
+  `CalledProcessError` wrapper. Full suite: 2289 passed.
 
 ## [LEARN] Entries
 
