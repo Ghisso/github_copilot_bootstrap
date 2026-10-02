@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:d2969097d3400f7df2b5033efd990746dc11ae2283c3829b55189d9ccc65e7c3",
+  "pageVersion": "sha256:69fdb06558ed1adcf83c4679e20829171b359d0cc6de5d7de3f884e775236b7f",
   "claims": [
     {
       "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
@@ -244,13 +244,31 @@
         },
         {
           "resource": "repo://shared/agents/orchestrator/workflow-prompt.md",
-          "version": "repo-file-v1:sha256:ae090797a52f6a9c226ffc2be7b38d7cac9db84c2b55650d093e4754129fc3db"
+          "version": "repo-file-v1:sha256:645bcd98b6afd43c746732ef45830d3d3ea90fe1c8f77290cec0cb21247aeb6c"
+        }
+      ]
+    },
+    {
+      "id": "claim_3e5e8e6296f64d67aaf1c1854e128f80",
+      "statement": "In the sidecar workflow profile, the orchestrator delegates a step only to an agent the current session can start and otherwise performs that step itself, while the planner and reviewer return their plan or report as reply text that the requesting agent saves under .ai-bootstrap/.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/orchestrator/workflow-prompt.md#L14-L52",
+          "version": "repo-lines-v1:sha256:a30f558db1fae1b76b4b7703f1b7c3b3124a7074bf05a7ffe8eeb65fddab0b69:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjMjA3ODFmMWU1YTA1ZmFiMTAwMzc1MjE1NzJmZDRiMTllMDg5NzQwMjc4YThhYWJmYmQ3YTA5YjYwMTE2YWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3ZWZkZjU3YzIzMjJiNTA5ZTI2YjMyZTQzZjdhYzMzMzJlNTQ3NmM4YjNmNWRlNWY4NDc0NzQ1NTczMjIyNjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5ZmE0NTU3MTRhMGY0ZjYzZjNmOTU4MzYxZDhkYjdkYmY1NGE5ZGQ1OTYxZDE1NWZkMjc0MmI2OTQwNDFhZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE5MjUzYjM5YTIyMTU0NzlhYTkzNWIwNmY3ZTIxMTkzNDk1NGIzNDBjOTg4MTMwYTRlZDg1N2ZjZTcwYzljYWYifQ"
+        },
+        {
+          "resource": "repo://shared/agents/planner/workflow-prompt.md#L11-L15",
+          "version": "repo-lines-v1:sha256:f63622217c6896f2ae4ff584cae6259cd9216c28a4bf87daada633a91648ceef:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZkYTkwODNmNTJlZGY0MjI3MDI3ZTNlYjU2MjljZTJlNDVhNWJlNzNmNTZkMDA4Y2NkYWZjOTM0NTk5ZWYyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFlY2JkZDJiMzZiN2Q1YThlYjQyNThkNjBlYjhmNzYxNGE5NGJhYjMzYmY3OTVjMTU3YjJlMTU1NmRlYWI1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjY0YmJmOTUwYzg1MTczZjZiYzA0NzM5NGUzZmIxN2QyNmQ0ZDkwNTYyMWVhYjg1YzMxYzI4YjZlZmQyN2MxMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDA3MzkyZjFiOWNlZjQ3NTkyNGNhYzk5ZGI1ZjA0MzFiYWI5MGFlMGQwMjZjMWY0MTczZDgzNmZkNWUyM2IyYyJ9"
+        },
+        {
+          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L36-L41",
+          "version": "repo-lines-v1:sha256:21716d88327f0df579519721cbe65941a9fba23760e46927a1caa0125da270b7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjVhZDRhYzRlMjIwNzhjZjNmOTU2YWFiMzg4ZTg0OWEzMmYxNzcwNGIwMWI0YjU4ZjM3NThmOTFmZmIwZjdkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UxZDVlMTkzM2Q3ZGVmYmEyYmM4OTA4ZDY4N2FkZGE1NzU2N2YzZTVjZDhmYTE5ODdlNGZiOGU3YTYzMDI5ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTcyM2RiMGQ4NDNjNjgwMzg3MjdlOWQ0ZWZjNGE0OTcwMjc0ZTJlYTQxYjY2ZWQ3OTM3OTk0OGI2ZDk2YWU3YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTg4ZmYzYTE1MTgyMjNjMmJjYWUxYzQ0ZjIwOGQzZmQxZjA0ZGE0Y2M5OGI2MTM2NzZkYmE1MDEzNWI4MzZkOCJ9"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T15:12:48.671Z"
+    "at": "2026-10-02T10:43:27.367Z"
   }
 }
