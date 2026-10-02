@@ -76,6 +76,5 @@ whenever the phase it is closing out is this list's last entry.
 
 In a repository where `openwiki/INSTRUCTIONS.md` exists, that final phase
 may also need to be a dedicated knowledge-refresh phase: see the canonical
-Knowledge-Refresh Final Phase rule in `shared/policies/workflow.instructions.md`
-(installed as `.claude/instructions/workflow.instructions.md`) for exactly
-when and how, including its recursion guard.
+Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+for exactly when and how, including its recursion guard.

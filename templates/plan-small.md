@@ -38,7 +38,7 @@ closeout_session_log:
      Anything a script cannot run — an interactive probe, a host session, a
      manual inspection — belongs under `## Optional Verification` instead.
      See the Verification Evidence Contract in
-     `shared/policies/workflow.instructions.md`. -->
+     `.claude/instructions/workflow.instructions.md`. -->
 
 ```bash
 uv run python .claude/scripts/verify.py fast --format json               # during IMPLEMENT
@@ -53,7 +53,7 @@ uv run python .claude/scripts/verify.py fast --format json               # durin
 
 ## Closeout Checklist
 
-Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
+Follow the fixed closeout order in `.claude/instructions/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
