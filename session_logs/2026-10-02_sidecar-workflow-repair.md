@@ -64,6 +64,28 @@ owned legacy state safely.
   `reserved` set via shared `preserved_destinations_for`. To document: the
   both-roots refusal applies to install/update only; uninstall/purge keep
   both roots independently. Full suite: 2308 passed.
+- **10:40** - Steps 4-5 by coder. Step 4: `_print_report(dry_run=True)`
+  skips past-tense per-action lines; preserve/purge remedy texts get "would"
+  wording through `plan_sidecar_reconciliation(dry_run=...)`. Step 5:
+  Copilot instructions write plans and self-review; shared rules and role
+  prompts delegate only to agents this session can start, otherwise the
+  current agent does the step (self-review labeled); planner and reviewer
+  return text and the caller saves it. Full suite: 2313 passed.
+- **10:50** - Orchestrator corrected the orchestrator prompt's Coder
+  bullet: the coder's text said a team agent in any client's folder still
+  counts as having a coder, which is false in Claude Code for a team's
+  `.github/agents/coder.agent.md`. Now: when this session cannot start an
+  agent named `coder`, implement the change yourself.
+- **10:55** - Step 6 checks: generate exit 0; validate PASS; 7 focused files
+  752 passed; zero `.claude/ai-bootstrap` hits in `dist/sidecar/workflow`;
+  `check_runtime.py` exit 1 only for the stale self-install copy of
+  `.claude/scripts/runtime_ownership.py` (expected). The self-install refresh
+  (`install_bootstrap.py . --allow-self --local-only`) was denied by the
+  auto-mode classifier; handed to the user. Built
+  `fixture-repair-rerun` from the new generated install (72 installed,
+  state seeded at `.ai-bootstrap/`, no legacy refs) and
+  `run-repair-rerun-probe.sh` (runs as the installed `orchestrator` agent,
+  no hint about who saves). Reviewer started on the Phase B diff.
 
 ## [LEARN] Entries
 
