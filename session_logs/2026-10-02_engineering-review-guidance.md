@@ -66,6 +66,12 @@ and the review part of REQ-009 from
   asset-to-text maps): shared-source and generated paths have different
   shapes, so a helper would still need one path table per root and save
   little. Fixes sent back to the same coder (same role and phase).
+- **FIX LOOP round 2** - Coder applied #1, #2, #3, #5, #6; its negative
+  control (revert this round's `shared/` edits) failed all 5 new test cases
+  on the new-mechanism phrases. Orchestrator reran the Verification block:
+  same result as round 1 (1230 and 223 passed; only the 26 stale-copy
+  notices from `check_runtime.py`). Round-2 diff-of-diffs sent to the same
+  reviewer.
 
 ## [LEARN] Entries
 
