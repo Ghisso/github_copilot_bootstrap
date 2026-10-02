@@ -40,7 +40,7 @@ work; revise affected future phases only, without reopening completed or
 unaffected scope.
 
 1. Check `.claude/MEMORY.md` for relevant `[LEARN]` entries.
-2. For ambiguous/complex tasks: clarify with user (max 3-5 questions), optionally create a spec in `.claude/quality_reports/specs/`.
+2. For ambiguous/complex tasks: clarify user preferences (max 3-5 questions) and settle decisive technical assumptions with evidence (planner Phase 1). A spec in `.claude/quality_reports/specs/` and requirement IDs are optional; equivalent approved content in the plan suffices.
 3. Draft plan -> save to `.claude/plans/` for concrete implementation plans or `.claude/explorations/` for exploratory/PoC plans.
 4. Present to user -> wait for approval unless the user explicitly supplied an approved implementation plan.
 5. After approval: create session log, then implement via the orchestrator loop.

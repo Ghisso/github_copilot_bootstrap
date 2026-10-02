@@ -30,6 +30,17 @@ Knowledge Ownership contract in `.claude/instructions/workspace.instructions.md`
 and a historical execution fact belongs in a session log or plan, never
 MEMORY.
 
+For an observed failure, connect it to its reproduction, cause, smallest
+correction, and regression, and record those in the session log. Prefer an
+existing test or skill as the durable home; add no new instruction where none
+is justified. Not every failure yields a lesson.
+
+Example with no new instruction: a test fails after a rename because one call
+site still uses the old helper name. Reproduction: the failing test. Cause: the
+missed call site. Smallest correction: update that call. Regression: the same
+test, which already covers the path. Code and test now enforce the fact, so no
+skill, `.claude/MEMORY.md` entry, or instruction is justified.
+
 ## Phase 2: Check Existing Skills
 
 Search the authoring source when one exists, otherwise the installed copy.

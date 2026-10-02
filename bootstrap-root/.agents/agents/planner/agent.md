@@ -74,6 +74,17 @@ decisions remain, use a focused PRD-style interview before drafting.
 - Start with the explicit artifact list and supplied evidence. Read only the key
   files needed to verify them or answer an unresolved question.
 - Identify affected layers, config surfaces, and test boundaries.
+- Decide the risk and evidence before splitting phases. List each decisive
+  assumption: one that would invalidate the design if false. Resolve it from
+  existing code or docs first. If that is not enough, plan a bounded experiment
+  with a question, an observable result, a stop condition, and the limits it
+  leaves. An experiment never authorizes production changes; retained
+  experiment code states what it proved and which shortcuts it takes. Keep an
+  unresolved decisive assumption explicit or blocked; never plan around it
+  silently. Known facts need no experiment. Third-party tools follow the
+  `integration-gate-spike` rule in Plan Requirements; this decision covers other
+  unknowns, such as local performance, data availability, permissions, or
+  organizational constraints.
 - Do not repeat answered discovery during a bounded full-plan revision. Do not
   start drafting until the remaining uncertainty is understood.
 
@@ -84,6 +95,9 @@ decisions remain, use a focused PRD-style interview before drafting.
   can support direct planning without another interview.
 - Explore only the alternatives that remain viable under approved decisions and
   constraints.
+- Ask the user about preferences, not facts that evidence can settle. A missing
+  retention period needs a question. Whether a library supports streaming is an
+  evidence question for Phase 1.
 
 **Phase 3 — Module Sketch (only when an unresolved interface decision needs it)**
 - Sketch the key modules, types, and interfaces only when they are needed to
@@ -91,6 +105,17 @@ decisions remain, use a focused PRD-style interview before drafting.
 - Present the sketch for confirmation only when the decision requires user input.
 
 **Phase 4 — Plan Draft**
+- Before splitting phases, cite the existing contracts the work touches (source
+  or symbol, behavior to preserve, planned change, evidence). Settle the test
+  strategy: critical cases, negative cases, real integration versus mocked
+  boundaries, expected values that do not come from the implementation, and any
+  criterion with no available verification.
+- A separate spec and requirement IDs are optional; equivalent approved content
+  in the plan suffices. The requirements spec template is for requirements that
+  span several artifacts; the big plan's optional requirement map is for
+  requirements that span several phases. IDs such as `REQ-001` are prose
+  references, not frontmatter fields. Approved requirements and scope-change
+  records stay the authority, as the orchestrator's Delegation Rules state.
 - Write the full phased plan with owner, files, required skills, and verification per step.
 - Include risks, fallback paths, and done criteria.
 - Before finalizing a multi-phase plan's `phases:` list, apply the Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`, including its required `-knowledge-refresh` slug suffix for the appended phase.
@@ -135,6 +160,6 @@ Use this structure:
 1. Goal and constraints
 2. Phase breakdown
 3. Step table: owner, files, required skills, review profiles, verification
-4. Risk and fallback paths
+4. Risk and fallback paths, with each decisive assumption's evidence or remaining limit
 5. Done criteria
 6. Devil's Advocate Report (when applicable) with questions for user

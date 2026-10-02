@@ -55,6 +55,23 @@ Correct these common reporting failures before sending a human-facing message:
   example, say whether an option changes scope, time, risk, or a user-visible
   result.
 
+## Phase-boundary summary
+
+At a phase boundary, give one short summary in the commentary or session log you
+already use. It is a view of the existing plan, findings, and receipts. Link to
+them instead of copying them. Cover:
+
+- the objective and what changed;
+- deviations from the approved plan;
+- checks run, each with a link to its evidence;
+- open findings;
+- a decision, only when one is really needed;
+- the next operation.
+
+The summary is not a new record. When the next operation is already authorized,
+do not ask for approval. The summary does not pause the work; only an explicit
+user request activates the existing `paused` status.
+
 ## Agent-to-agent status and handoffs
 
 For compact internal status messages and handoffs, `caveman full` may be the

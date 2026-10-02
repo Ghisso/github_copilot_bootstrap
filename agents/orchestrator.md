@@ -182,6 +182,7 @@ Before returning a normally completed phase, you MUST complete these steps:
    - Design decisions and rationale
    - Verification results
    - Open questions and next steps
+4. **Summarize at the phase boundary:** give the user the short summary that `.claude/instructions/agent-reporting.instructions.md` defines (Phase-boundary summary).
 
 Do not skip this step even if the task seems small. A session log already
 bound by a completed phase's receipt is immutable; write corrections to a
