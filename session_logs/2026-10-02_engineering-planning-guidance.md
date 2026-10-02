@@ -30,6 +30,17 @@ REQ-007, REQ-008, and the remaining part of REQ-009 from
   (~86) already holds the external-integration `integration-gate-spike`
   rule (~97-102). `shared/skills/learn/SKILL.md` Phase 1 Evaluate (~14-32)
   routes lessons but has no failure-to-regression route.
+- **IMPLEMENT** - Fresh `coder` (new phase). Result: 18 `shared/` files plus
+  `tests/test_validate_targets.py` (6 new test cases, ~100 section-scoped
+  key phrases; negative control: reverse-applying `shared/` fails all 6).
+  Deviations: an existing reporting-pointer test changed from a single
+  replace to replace-all; noted, not fixed: the sidecar plan-small template's
+  pre-existing `L1 verification-block-missing` example and three orphan
+  lines left by the sidecar repair.
+- **VERIFY** - Verification block: all items exit 0 except
+  `check_runtime.py` (22 stale-copy notices only); 1230 and 229 passed.
+- **REVIEW round 1** - Fresh `reviewer`, six profiles, with an explicit
+  question on whether ~100 asserted phrases is a near-snapshot.
 
 ## [LEARN] Entries
 
