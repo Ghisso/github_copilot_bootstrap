@@ -90,7 +90,7 @@ log must distinguish the eight in-scope requirements from deferred REQ-006.
 
 - [x] `2026-10-02_phase-A-engineering-review-guidance` — align requirement authority in handoffs and review, add the original-symptom check, adapt sidecars, and add focused checks.
 - [x] `2026-10-02_phase-B-engineering-planning-guidance` — add planning, reporting, and learning guidance, adapt sidecars, and add focused checks.
-- [ ] `2026-10-02_phase-C-engineering-knowledge-refresh` — refresh derived knowledge and audit live advice.
+- [x] `2026-10-02_phase-C-engineering-knowledge-refresh` — refresh derived knowledge and audit live advice.
 
 ## Ownership and Required Skills
 

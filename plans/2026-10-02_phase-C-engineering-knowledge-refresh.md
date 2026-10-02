@@ -3,8 +3,8 @@ name: 2026-10-02_phase-C-engineering-knowledge-refresh
 type: small-plan
 parent_plan: engineering-workflow-improvements
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_engineering-knowledge-refresh.md
 ---
 
 # Small Plan: Engineering Workflow Knowledge Refresh
@@ -18,7 +18,7 @@ provider, or verification authority.
 
 ## Steps
 
-- [ ] **1. Refresh through OpenWiki's own MCP lifecycle.**
+- [x] **1. Refresh through OpenWiki's own MCP lifecycle.**
   **Owner:** orchestrator.
   **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`,
   `.claude/skills/openwiki/SKILL.md`.
@@ -39,7 +39,7 @@ provider, or verification authority.
   and caller-saved specialist outputs. REQ-006 remains deferred; do not
   describe an evaluator as delivered or text checks as behavioral evidence.
 
-- [ ] **2. Audit live advice and durable learning.**
+- [x] **2. Audit live advice and durable learning.**
   **Owner:** documenter; orchestrator owns MEMORY and the session log.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/humanize/SKILL.md`, `shared/skills/learn/SKILL.md`.
@@ -54,7 +54,7 @@ provider, or verification authority.
   final closeout log. If source corrections stale generated claims/ranges,
   refresh the affected pages through MCP again.
 
-- [ ] **3. Review and complete terminal closeout.**
+- [x] **3. Review and complete terminal closeout.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `shared/skills/code-review/SKILL.md`,
   `shared/skills/learn/SKILL.md`.
@@ -92,11 +92,11 @@ and `.claude/review-profiles/ponytail.md`.
 
 Follow the fixed CLOSEOUT order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

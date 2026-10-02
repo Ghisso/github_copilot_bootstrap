@@ -1433,3 +1433,13 @@
   per-phrase removal loop. One to five short anchor terms per section (48
   total), one removal case, and one moved-out-of-section case still failed
   when the guidance was removed, and they tolerate harmless rewording.
+- [LEARN:review] Audit shipped surfaces by grepping the generated `dist/`
+  output for authoring-only text (`shared/policies/`, `scripts/...`), not by
+  reading source. The generator copies templates and most skill text
+  verbatim; a first source-reading sweep marked `shared/skills/` clean while
+  the shipped `code-review` skill still cited `shared/policies/...`.
+- [LEARN:workflow] After an OpenWiki refresh, any further source edit can
+  stale a cited claim range. Before editing a file, search
+  `openwiki/.claims/**` for its path and keep the edit outside every cited
+  range, or plan a second refresh; a one-line comment edit inside a
+  frontmatter range (`skill-template.md#L1-L14`) staled a claim.

@@ -89,10 +89,28 @@ is the plan's last phase; its closeout log must carry
   "installed project" wording is a follow-up for the next change that
   refreshes the agents page. Checks after the revert all exit 0. Round 3
   (revert confirmation) sent to the same reviewer.
+- **REVIEW round 3** - Gate PASS, findings `[]`. All 65 cited claim ranges
+  rechecked by hash: `claim_11607a59` resolves again; the only mismatches
+  are four older off-by-one ranges in `scripts/validate_targets.py`
+  committed in `27488a9`, not touched by this phase.
+- **Findings** - 5 MINOR recorded: C-#1, C-#3, and the round-2
+  skill-template finding `fixed`; C-#2 `accepted` (plan-big blocks fixed,
+  skill-template wording deferred); C-#4 `accepted` (claim-evidence gaps,
+  statements true).
+- **Follow-ups for a later plan** - `shared/templates/skill-template.md`
+  names only `shared/skills/` (fix together with an agents-page refresh);
+  four off-by-one claim ranges in `scripts/validate_targets.py`; two
+  incomplete claim-evidence ranges on the agents page; the sidecar
+  planner prompt lists big-plan statuses only.
 
 ## [LEARN] Entries
 
-- Pending closeout.
+- [LEARN:review] Audit shipped surfaces by grepping generated `dist/`
+  output for authoring-only text, not by reading source; the first sweep
+  missed the `code-review` skill's `shared/policies/...` pointer.
+- [LEARN:workflow] After an OpenWiki refresh, search `openwiki/.claims/**`
+  for a file's path before editing it and keep the edit outside every cited
+  range, or plan a second refresh.
 
 ## Stale-claims surfaces checked
 
@@ -143,6 +161,9 @@ is the plan's last phase; its closeout log must carry
 # verify.py phase/closeout receipt path
 ```
 
+- optional 1: PASS — `openwiki_finish` returned `complete` for run `78bd8306-edee-4334-9591-01f2b1f1ce42`; reviewed pages `openwiki/architecture/agents-and-skills.md` and `openwiki/workflows/lifecycle-and-task-lanes.md`; root `AGENTS.md`/`CLAUDE.md` unchanged and no `openwiki/.run.json` left.
+
 ## Open Questions / Next Steps
 
-- Audit, source fixes, OpenWiki refresh, then VERIFY, REVIEW, CLOSEOUT.
+- Plan complete after this commit; PR creation and merge are the user's
+  decision. Follow-ups are listed in the Work Log.
