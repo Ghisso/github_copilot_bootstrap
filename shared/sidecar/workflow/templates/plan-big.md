@@ -57,9 +57,8 @@ current_phase:
 ## Verification
 
 ```bash
-uv run python scripts/generate_targets.py --all
-uv run python scripts/validate_targets.py
-uv run python scripts/check_runtime.py
+# List this project's own test, lint, and type-check commands, taken from its
+# README or docs/ folder.
 ```
 
 ## Completion Evidence

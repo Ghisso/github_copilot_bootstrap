@@ -10,16 +10,20 @@ sources:
     resource: repo://shared/hooks/scripts/enforce-branch-state.sh
   - id: openwiki-source-fdc3f9ee55dbca2819c00001
     resource: repo://shared/hooks/scripts/record-branch-state.sh
+  - id: openwiki-source-3bb98e65d9ade30d41bb39f0
+    resource: repo://shared/policies/agent-reporting.instructions.md
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
+  - id: openwiki-source-4a96f2f176ecd3fcc4f95f18
+    resource: repo://shared/templates/plan-big.md
   - id: openwiki-source-588c1b68a254d094494d64f9
     resource: repo://shared/templates/plan-small.md
   - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
     resource: repo://tests/test_validate_plan_frontmatter.py
-generated: { by: "claude-code", at: "2026-09-26T06:04:25.666Z" }
+generated: { by: "claude-code", at: "2026-10-02T14:20:50.150Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-26T06:04:25.666Z
+    at: 2026-10-02T14:20:50.150Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -49,7 +53,11 @@ Any commit on an implementation branch must satisfy the full ceremony, whichever
 
 `scripts/validate_plan_frontmatter.py`, shipped verbatim into consumers, enforces the frontmatter contract: valid statuses, exact pause and cancellation fields, the body phase inventory matching `phases:`, at most one unfinished `-knowledge-refresh` phase and only as the last phase, and the verification lints below. An earlier knowledge-refresh phase is exempt from that count only once it has settled, but a plan that has any knowledge-refresh phase must still end with one. Settled means the big plan's own `name` is not empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, that declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`. `check_runtime.py` and the `commit-msg` Git hook both run it.
 
-Plan-first, as policy text: check `.claude/MEMORY.md` for lessons, clarify ambiguous work, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
+Plan-first, as policy text: check `.claude/MEMORY.md` for lessons, clarify user preferences on ambiguous work, settle decisive technical assumptions with evidence in planner Phase 1, draft into `.claude/plans/` (or `.claude/explorations/` for proofs of concept), get approval, then implement. Before each new phase the orchestrator checks whether earlier outcomes materially change the remaining work and, only then, invokes one planner to revise affected future phases.
+
+A separate spec and requirement IDs are optional, and equivalent approved content in the plan is enough. The big-plan template offers an optional non-goals section and an optional requirement map for requirements that span several phases; IDs such as `REQ-001` are prose references, not frontmatter fields, so the plan validator neither requires nor reads them.
+
+At a phase boundary, agents give one short summary defined in `shared/policies/agent-reporting.instructions.md`: the objective and what changed, deviations, checks with links to evidence, open findings, a decision only when one is needed, and the next operation. It is written policy, not a gate. It creates no new record, asks for no approval when the next step is already authorized, and never pauses the work.
 
 ## The lifecycle
 

@@ -3828,6 +3828,44 @@ def test_render_sidecar_workflow_carries_advisory_planning_guidance(
     assert sidecar_target_errors(tmp_path, "workflow") == []
 
 
+# Paths and scripts that exist only in this authoring repository, so a template
+# installed into a consumer must not send the reader to them.
+AUTHORING_ONLY_TEXT = (
+    "shared/policies/",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "scripts/check_runtime.py",
+)
+
+
+def test_rendered_templates_carry_no_stale_authoring_paths_or_pause_text(
+    tmp_path: Path,
+) -> None:
+    """No rendered full or sidecar template cites an authoring-only path or
+    script, and the relaxed sidecar plan-small names no pause fields and no
+    hooks (the sidecar has neither)."""
+    target_generator.render_shared_basis(tmp_path / "full", "multi-agent")
+    render_sidecar(tmp_path / "sidecar", "workflow")
+    rendered = {
+        path.relative_to(tmp_path).as_posix(): path.read_text(encoding="utf-8")
+        for root in ("full", "sidecar")
+        for path in (tmp_path / root / ".claude" / "templates").glob("*.md")
+    }
+    assert {
+        "full/.claude/templates/plan-big.md",
+        "full/.claude/templates/skill-template.md",
+        "sidecar/.claude/templates/plan-big.md",
+        "sidecar/.claude/templates/plan-small.md",
+    } <= rendered.keys()
+    stale = {
+        name: [text for text in AUTHORING_ONLY_TEXT if text in body]
+        for name, body in rendered.items()
+    }
+    assert {name: found for name, found in stale.items() if found} == {}
+    plan_small = rendered["sidecar/.claude/templates/plan-small.md"].lower()
+    assert [word for word in ("pause", "hook") if word in plan_small] == []
+
+
 def test_render_sidecar_workflow_review_profiles_and_templates_are_shipped(
     tmp_path: Path,
 ) -> None:

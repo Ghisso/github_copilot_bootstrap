@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "pages": {
     "/openwiki/architecture/agents-and-skills.md": {
-      "gitHead": "aaecb4832bc399f713e4b258bc4ebc9ffec24460",
-      "sourceFingerprint": "sha256:7d3f8564219abc574b78a3af00d43dc0651f1a695aa4a0dd78a9f21416cd1d71",
-      "pageVersion": "sha256:69fdb06558ed1adcf83c4679e20829171b359d0cc6de5d7de3f884e775236b7f",
+      "pageVersion": "sha256:1f02914ae6e9beece8f1e48ff4627f9b7c8b7dc2d43144533209b87e93ce63e4",
       "completedBy": "claude-code",
-      "completedRunId": "a5727377-f534-4291-b003-6d212b5153c5"
+      "completedRunId": "78bd8306-edee-4334-9591-01f2b1f1ce42",
+      "gitHead": "1d0ead167f5fc8992397634e2cea49e53e009451",
+      "sourceFingerprint": "sha256:918fd4a9c581b09a58933649c34a98b0f1ecaaba7ab844321d408fc5af614047"
     },
     "/openwiki/architecture/hooks-and-guardrails.md": {
       "gitHead": "294382d9f0d2010b0ce517a4a755e14fc581f714",
@@ -51,11 +51,11 @@
       "completedRunId": "a5727377-f534-4291-b003-6d212b5153c5"
     },
     "/openwiki/operations/sidecar-overlay.md": {
+      "gitHead": "aaecb4832bc399f713e4b258bc4ebc9ffec24460",
+      "sourceFingerprint": "sha256:7d3f8564219abc574b78a3af00d43dc0651f1a695aa4a0dd78a9f21416cd1d71",
       "pageVersion": "sha256:0bddaccd5bfc569709a691ae57712415d4c7d6e54c6808115f89f3d301ef1fba",
       "completedBy": "claude-code",
-      "completedRunId": "12e04929-aefe-46dd-aa19-49737e380e2c",
-      "gitHead": "aaecb4832bc399f713e4b258bc4ebc9ffec24460",
-      "sourceFingerprint": "sha256:7d3f8564219abc574b78a3af00d43dc0651f1a695aa4a0dd78a9f21416cd1d71"
+      "completedRunId": "12e04929-aefe-46dd-aa19-49737e380e2c"
     },
     "/openwiki/quickstart.md": {
       "gitHead": "753c354353f113fedcfeb8e42fe5efbc7d71b832",
@@ -65,11 +65,11 @@
       "completedRunId": "0205cf19-5f12-48a2-9ecf-750cba2888a1"
     },
     "/openwiki/workflows/lifecycle-and-task-lanes.md": {
-      "gitHead": "7d294ca56664208a54a7bccc18f7fc0496df0bae",
-      "sourceFingerprint": "sha256:ef43bef0a9e4757fd29fd551674059b9d8ce981220c5b883b16e90c0e7a2453b",
-      "pageVersion": "sha256:9c3d5cc9592b0d2c33459efefae5880e9ba9ac3c8183a122661e8fd343ff4a68",
+      "pageVersion": "sha256:7f4bd877c997e1172633b6d93ac0a81f1b3833d071621515427e246e0c038b7d",
       "completedBy": "claude-code",
-      "completedRunId": "d1517b39-c09c-4d8f-a5f8-4589f4b611b7"
+      "completedRunId": "78bd8306-edee-4334-9591-01f2b1f1ce42",
+      "gitHead": "1d0ead167f5fc8992397634e2cea49e53e009451",
+      "sourceFingerprint": "sha256:918fd4a9c581b09a58933649c34a98b0f1ecaaba7ab844321d408fc5af614047"
     }
   }
 }

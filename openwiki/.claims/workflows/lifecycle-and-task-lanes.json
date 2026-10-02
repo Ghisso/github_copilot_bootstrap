@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:9c3d5cc9592b0d2c33459efefae5880e9ba9ac3c8183a122661e8fd343ff4a68",
+  "pageVersion": "sha256:7f4bd877c997e1172633b6d93ac0a81f1b3833d071621515427e246e0c038b7d",
   "claims": [
     {
       "id": "claim_f49518af7629414a92868ab695c5bf80",
@@ -152,11 +152,11 @@
     },
     {
       "id": "claim_10052977a14e46c4af5a5cb4b741eeee",
-      "statement": "Plan-first protocol: check MEMORY.md for LEARN entries, clarify ambiguous work, draft into .claude/plans/ or .claude/explorations/, obtain approval, and before each new phase invoke one planner only when new evidence materially affects remaining work.",
+      "statement": "Plan-first protocol: check MEMORY.md for LEARN entries, clarify user preferences on ambiguous work and settle decisive technical assumptions with evidence in planner Phase 1, draft into .claude/plans/ or .claude/explorations/, obtain approval, and before each new phase invoke one planner only when new evidence materially affects remaining work.",
       "evidence": [
         {
           "resource": "repo://shared/policies/workflow.instructions.md#L29-L47",
-          "version": "repo-lines-v1:sha256:38628c9073a511ceac23da66481f34384b67fdf7a1194c61253b58d8e054e585:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMWU0MmMwZjI3YTYwOTJiZDM5MzE5ZjY3NjA4Y2NkMmU5N2IzNTZiMDZiOWQyM2JmMjVjZGJlODM2MjI1NmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyODFmY2U1YzZkZGVmYWMyZDdiOGI1MThkODIwOTdhNmQ4YmJjMmVkZWM3NWU2ZTI1YWM0MjQ4Mzk2MjdkZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2Mjg4ZmEwNjJjOWMyYTlmM2ZlNGM5NWUzMmYxMTk0MDRkMTRmOWU3ZWI0NWFiNTQzZmNlNDgxOTc0YTM0Y2EifQ"
+          "version": "repo-lines-v1:sha256:0beaf06a77fac064acd99b8499f462e286360dd59aff119f75a6752858947db2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAwMWU0MmMwZjI3YTYwOTJiZDM5MzE5ZjY3NjA4Y2NkMmU5N2IzNTZiMDZiOWQyM2JmMjVjZGJlODM2MjI1NmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyODFmY2U1YzZkZGVmYWMyZDdiOGI1MThkODIwOTdhNmQ4YmJjMmVkZWM3NWU2ZTI1YWM0MjQ4Mzk2MjdkZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImE2Mjg4ZmEwNjJjOWMyYTlmM2ZlNGM5NWUzMmYxMTk0MDRkMTRmOWU3ZWI0NWFiNTQzZmNlNDgxOTc0YTM0Y2EifQ"
         }
       ]
     },
@@ -169,10 +169,34 @@
           "version": "repo-lines-v1:sha256:f8a029869d52a0ae2cdf3fcd5c880ce5e84bcd36d97349bf2624eb360aa4ef3b:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI2ODJiOGRkOGY0ZGZlZWQ5YzgxYTQ4ZTMyM2NmNjcyZTQwOWJhZmYyNmU5NjZiZDk4ZjkyOGY2MTZjM2U4YzUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1NTYxM2MxNGEyYmI3MGRhZjI3ZWM3N2ExNWQzM2RhMzc3YjMxNTRlNTNiMTUwMzVlZWE0NjBmNzdiNWZmNTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZhYTE5ODdhNGU3ZjRiNTk4ZDYwNjAxNTY4OTUyZjAxMmM4ZDU1MjExMzYxNjkyOWE5NDk1Yjk2MDBiNmY0ZTMifQ"
         }
       ]
+    },
+    {
+      "id": "claim_3bedb4855c874435bb9097f23cc2b12c",
+      "statement": "A separate requirements spec and requirement IDs are optional, equivalent approved plan content suffices, and the big-plan template offers an optional non-goals section and an optional requirement map whose IDs are prose references rather than frontmatter fields.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/workflow.instructions.md#L43-L43",
+          "version": "repo-lines-v1:sha256:a3abc8b95a7855a89407123699a12994df694ab2e53c0b52b05ecb2d79c38c51:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNhYmM4Yjk1YTc4NTVhODk0MDcxMjM2OTlhMTI5OTRkZjY5NGFiMmU1M2MwYjUyYjA1ZWNiMmQ3OWMzOGM1MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYTNhYmM4Yjk1YTc4NTVhODk0MDcxMjM2OTlhMTI5OTRkZjY5NGFiMmU1M2MwYjUyYjA1ZWNiMmQ3OWMzOGM1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDUzOTc2MThiYTcyYjg2ZTVjNWZlZGZmN2NhOWUzYjZmOTA2NmE2OGFjNzFlODc1NTBjOWU4NzExYWExNmRiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMTA1OWZjZDZlZTNjN2E0NzUzYjMwZDdiOTI0NjM3Zjc5YmUyZWU2NjM2N2IyNWYwZWI0ZjQ3NWFjYTliYWNhMSJ9"
+        },
+        {
+          "resource": "repo://shared/templates/plan-big.md#L29-L45",
+          "version": "repo-lines-v1:sha256:9d59d31ed35f588c44c739aa3dc768320251a372875e0bd1f480a8b20f27d97a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdjN2RmOTQ1Y2E1YThmNjY0YzllNGVmMmE5MzZhODY5YzFjYTIxODFlZTg5ZWUwMmY1ZDg2OGY2Zjc4ZjZjNWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyNDZiNTg4OTg0YWJjY2M2ODM5MTQ2ZjExNWVkNjYyMzA3YmZiYTU2YzBiYjkxYzU0NmEyODE2MzZjODEzNTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZlY2FmM2JiZTQ4NWUwZTZlODc5ODI5MjNmNjQwZTI2YzkyYzY5YTVkOWUyY2M4N2IwNTdjOWM0ZGI0OTNmZmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE3YmM0NzEwODU3ZjM5NjNlYmIxMDBjZmM2MDgyMzA5MGNmYzlmM2I4YzM0YjVhNTNiMjMyNDIzNDY2YWI2MWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_dced870123f84cd7a3eafadc8a72656f",
+      "statement": "The reporting policy defines a short phase-boundary summary (objective and changes, deviations, checks with evidence links, open findings, a decision only when needed, and the next operation) that is not a new record, asks no approval for an authorized next step, and does not pause the work.",
+      "evidence": [
+        {
+          "resource": "repo://shared/policies/agent-reporting.instructions.md#L58-L74",
+          "version": "repo-lines-v1:sha256:37e500fabfacdf8f5cef60702f13308f0d9bbfcb8bd39b83a11ce272a11f8def:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ0NzI2MmEzN2EwYmI4ODk0ZWNlM2M1M2EwMTFhZjU3MTBlMjNmNzA0MzJiNzU4MTNhOTE0NThhODBhYzUzOTYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmNDJkOTc4Y2MxMDNhN2NmMWVkZTViZTBkNDY0YjA5YzVmZmExMTI1ZDc2ZDdhYzU4NmJkNTIxN2E3ZmVjMDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNmMDQwZjAxMTAwZjA5ZTRjMDY2ZmZlOWRmN2U5Y2RkMWMzN2NlZmYxNWRlOGU2NmFkYTBlZGViNmRkNjBkMTYifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-26T06:04:25.666Z"
+    "at": "2026-10-02T14:20:50.150Z"
   }
 }
