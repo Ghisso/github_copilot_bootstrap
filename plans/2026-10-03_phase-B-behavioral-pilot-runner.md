@@ -42,15 +42,20 @@ phase is cancelled with evidence instead.
   `tests/test_check_native_clients.py`, and `docs/native-client-acceptance.md`.
   **Required Skills:** `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/testing-patterns/SKILL.md`.
-  Add `--behavioral-case requirement-review` with `--repetitions N` and
-  `--evidence-out DIR`. It runs only on Claude Code, in a prepared workspace,
-  with the Phase A argv shape (`--agent reviewer`, prompt after `--`, packet
-  inline), one fixture variant per run. It rejects `--planner-workloads`, a
-  Codex client, and an `--evidence-out` inside the repository or workspace.
-  It saves, per run, only the bounded final result text and allowlisted
-  metadata (variant, repetition, source root, client version, reported
-  model, duration, usage). It never saves raw events, transcripts,
-  credentials, or user paths. Legacy modes keep their raw-output disposal.
+  Add `--behavioral-case requirement-review` with `--variant NAME`,
+  `--repetition N`, and `--evidence-out DIR`. One invocation is one native
+  run of one fixture variant, so a schedule script can alternate the two
+  revisions. It runs only on Claude Code, in a prepared workspace, with the
+  Phase A argv shape (`--agent reviewer`, prompt after `--`, packet inline).
+  It rejects `--planner-workloads`, a Codex client, an unknown variant, and
+  an `--evidence-out` inside the repository or workspace. It saves, per run,
+  only the bounded final result text and allowlisted metadata (variant,
+  repetition, source root, client version, any client-reported agent or
+  subagent field, reported model, duration, usage), in two files named by
+  run number (`run-NN.txt` and `run-NN.meta.json`), so an output can be
+  judged before its metadata is read. It never saves raw
+  events, transcripts, credentials, or user paths. Legacy modes keep their
+  raw-output disposal.
   **Acceptance:** tests with `run_process` doubles show the argv shape, the
   rejections, and that a private-output marker never reaches saved evidence
   or the report.
@@ -61,16 +66,22 @@ phase is cancelled with evidence instead.
   `tests/test_check_native_clients.py`.
   **Required Skills:** `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/testing-patterns/SKILL.md`.
-  Add `--score DIR`, which reads saved evidence, compares each output with
-  `tests/fixtures/behavioral/requirement-review/expected.json`, and prints
-  JSON counts per variant: correct, behavioral failure, invalid output,
-  unavailable run, and missing observation, each with its denominator. It
-  never calls a model. Parse the output the way Phase A's evidence document
-  decided. A malformed or empty output is invalid, never a pass or a fail.
-  **Acceptance:** replaying Phase A's saved real outputs in
+  Add `--score DIR`, which reads saved evidence plus a `judgments.json`
+  file beside it (one rubric judgment per output, written by hand against
+  `tests/fixtures/behavioral/requirement-review/rubric.md`). It checks each
+  output's validity the way Phase A's evidence document decided, compares
+  the judgments with `expected.json`, and prints JSON counts per revision
+  and variant: detections, control false positives, invalid outputs,
+  unavailable runs, and missing judgments, each with its denominator. It
+  then applies the frozen conclusion rules and prints the resulting
+  wording. It never matches on requirement IDs, never infers a judgment
+  from output text, and never calls a model. A malformed or empty output is
+  invalid, never a detection or a miss.
+  **Acceptance:** replaying Phase A's saved real outputs and judgments in
   `docs/evidence/behavioral-pilot/phase-a/` reproduces the outcomes the
-  evidence document recorded; synthetic tests cover each category and a
-  duplicate or missing variant.
+  evidence document recorded; synthetic tests cover each category, each
+  conclusion rule, a duplicate or missing judgment, and an output that names
+  the defect without a requirement ID (it counts as a detection).
 
 - [ ] **4. Review, document, and close out.**
   **Owner:** reviewer; documenter after review converges; orchestrator.
@@ -78,7 +89,9 @@ phase is cancelled with evidence instead.
   `.claude/skills/documentation/SKILL.md`.
   Review old-invocation compatibility, workspace and output privacy, the
   scorer's independence from the outputs it scores, and that no ordinary
-  test or `verify.py` path can start a model.
+  test or `verify.py` path can start a model. This phase makes no native
+  run: the approved budget covers only Phases A and C, and replaying Phase
+  A's saved outputs covers the end-to-end parsing check.
 
 ## Verification
 
@@ -88,12 +101,6 @@ uv run python scripts/validate_targets.py
 uv run python scripts/validate_plan_frontmatter.py
 uv run python .claude/scripts/verify.py fast --format json
 ```
-
-## Optional Verification
-
-- One user-run smoke session of the new case mode (one repetition of the
-  defective variant) in the Phase A workspace, to confirm the argv shape
-  end to end. Host-only; not a gate.
 
 ## Review Profiles
 

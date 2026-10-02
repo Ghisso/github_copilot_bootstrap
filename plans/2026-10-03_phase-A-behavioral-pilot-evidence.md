@@ -33,20 +33,27 @@ on 2026-10-03; see the big plan's approved decisions.
   `approved-change.diff` drops duplicates as the scope change allows),
   `prompt.md` (the ordinary review request with placeholders for the
   requirements, optional scope change, and diff), `expected.json` (per
-  variant: whether a requirement finding is expected and which requirement),
-  and `README.md` (what each file is for and its shortcuts; not a production
-  reference). Add one test in `tests/test_check_native_clients.py` that
-  rendered prompts for every variant contain no phrase that names the defect
-  or asks for a requirements check (for example "check requirements",
-  "consistency review", "duplicate", the expected requirement ID outside
-  the requirements block), and that `expected.json` is never referenced by
-  `prompt.md`.
+  variant: whether a detection is expected), `rubric.md` (the big plan's
+  behavior-based detection and false-positive definitions, with two or three
+  worked examples per definition, and the frozen conclusion rules; a
+  requirement ID is never required), and `README.md` (what each file is for
+  and its shortcuts; not a production reference). Add one test in
+  `tests/test_check_native_clients.py` that checks only the fixed request
+  wording of `prompt.md`, meaning everything outside the inserted
+  requirements, scope-change, and diff blocks: it contains no phrase that
+  names the defect or asks for a requirements check (for example "check
+  requirements", "consistency review", "duplicate", or a requirement ID).
+  The inserted requirements and scope-change blocks may name duplicates and
+  requirement IDs, because they are legitimate inputs. The test also checks
+  that `prompt.md` never references `expected.json` or `rubric.md`.
   **Required Skills:** `.claude/skills/ponytail/SKILL.md` (full),
   `.claude/skills/testing-patterns/SKILL.md`,
   `.claude/skills/code-style/SKILL.md`.
-  **Acceptance:** expected results are written before any native run; the
-  approved-change variant tests that an approved scope change supersedes a
-  requirement; the fixture test fails if the prompt names the defect.
+  **Acceptance:** expected results, rubric, and conclusion rules are written
+  before any native run; the approved-change variant tests that an approved
+  scope change supersedes a requirement; the fixture test fails if the
+  request wording names the defect, and passes with duplicates named inside
+  the requirements and scope-change blocks.
 
 - [ ] **2. Prepare the native probe.**
   **Owner:** orchestrator.
@@ -63,8 +70,9 @@ on 2026-10-03; see the big plan's approved decisions.
   role-loading probe with `--output-format stream-json --verbose`, then the
   defective, repaired, valid-alternative, and approved-change variants with
   `--output-format json`. From each run it keeps only the final result text
-  and allowlisted metadata (client version, reported model, duration, usage
-  counts) and discards raw events in memory. It never saves credentials,
+  and allowlisted metadata (client version, any client-reported agent or
+  subagent field, reported model, duration, usage counts) and discards raw
+  events in memory. It never saves credentials,
   user paths, or transcripts, and never changes trust or settings.
   **Acceptance:** the script's argv shape, kept fields, and budget are
   written down before the user runs it.
@@ -73,13 +81,15 @@ on 2026-10-03; see the big plan's approved decisions.
   **Owner:** user runs the script in their own shell; orchestrator checks.
   **Files:** copy the bounded saved outputs to
   `docs/evidence/behavioral-pilot/phase-a/`.
-  Record, for role loading, the strongest evidence class observed: a
-  client-reported agent field, or else the reviewer's report shape
-  (`## Review Report` plus a fenced findings JSON list), labeled as
-  model-produced. Score each variant by hand against `expected.json`.
-  Record an unavailable or timed-out run as unavailable, never as a result.
-  **Acceptance:** each variant has an outcome or an explicit unavailable
-  reason; no automatic retry.
+  Record role loading at its exact level: "confirmed" when a client-reported
+  agent field names the reviewer, or "consistent with" when only the
+  reviewer's report shape (`## Review Report` plus a fenced findings JSON
+  list) supports it. Judge each output against the frozen `rubric.md`, record
+  one judgment per output with a quoted sentence as its reason, and compare
+  it with `expected.json`. Record an unavailable or timed-out run as
+  unavailable, never as a result.
+  **Acceptance:** each variant has a rubric judgment or an explicit
+  unavailable reason; no automatic retry.
 
 - [ ] **4. Write the dated evidence document and the decision.**
   **Owner:** documenter, with the orchestrator's results.
@@ -88,10 +98,16 @@ on 2026-10-03; see the big plan's approved decisions.
   **Required Skills:** `.claude/skills/documentation/SKILL.md`,
   `.claude/skills/humanize/SKILL.md`.
   Record: the source revision and client version; the exact argv shape;
-  the role-loading evidence class; per-variant outcomes against expected
-  results; what the output format means for the scorer (parse the
-  reviewer's own findings JSON, or use a schema); limits; and the decision.
-  Proceed only when BEP-001 and BEP-002 both hold. Otherwise state the stop
+  the role-loading level ("confirmed" or "consistent with"); per-variant
+  rubric judgments against expected results; how the scorer will check
+  output validity (for example, whether the reviewer's findings JSON block
+  parses); any rubric gap the outputs exposed; limits; and the decision.
+  Proceed only when BEP-001 and BEP-002 both hold; "consistent with" is
+  enough to proceed, but every later claim keeps that level. A rubric change
+  is allowed only here, before Phase C, only to resolve an ambiguity the
+  outputs exposed, and never to match one output's wording; the document
+  records the change and its reason.
+  Otherwise state the stop
   and the evidence, so the orchestrator can cancel Phases B and C under the
   big plan's stop rule.
   **Acceptance:** a reader can reproduce the probe from the document; the
@@ -100,7 +116,9 @@ on 2026-10-03; see the big plan's approved decisions.
 - [ ] **5. Review and close out.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `.claude/skills/code-review/SKILL.md`.
-  Check the fixture for answer leakage, the controls for false-positive
+  Re-check every rubric judgment against its saved output, and check that
+  the rubric never requires a requirement ID. Check the fixture for answer
+  leakage, the controls for false-positive
   coverage, the privacy of saved outputs, and the honesty of the evidence
   class. Before Phase B starts, the orchestrator runs the material-impact
   check and revises only affected future phases.

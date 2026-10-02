@@ -31,8 +31,13 @@ into `dev`. Its "after" revision is that merge commit on `dev`. Its "before"
 revision is `1626364`, the `dev` commit just before that work.
 
 The question is narrow: for one ordinary code-review task, does the
-reviewer's new requirement-comparison guidance change whether a missing
-requirement is reported? A "no difference" answer is a valid result.
+bootstrap revision that carries the new requirement-comparison guidance
+report a missing requirement differently from the revision before it? The
+two revisions differ by the whole `engineering-workflow-improvements` diff,
+so any difference is an observed difference between those two revisions.
+It is not attributed to the reviewer instruction alone; isolating that
+instruction would need a separate controlled comparison. A "no difference"
+answer is a valid result.
 
 Approved decisions (user, 2026-10-03):
 
@@ -47,8 +52,9 @@ Approved decisions (user, 2026-10-03):
 
 - Prove that the test actually loads the reviewer role and can tell a
   defective change from correct ones, before any comparison.
-- Compare the "before" and "after" reviewer on that one case, with one fixed
-  runner and one fixed scorer.
+- Compare the "before" and "after" bootstrap revisions on that one case,
+  with one fixed runner, one frozen scoring rubric, and frozen conclusion
+  rules.
 - Report the result honestly, including "no difference" or "inconclusive".
 - Finish with the required knowledge refresh and the follow-ups left by the
   previous plan.
@@ -90,6 +96,38 @@ requirements and a diff, never names the defect, and never asks for a
 "requirements check". The expected results are written before any run and
 are never given to the model.
 
+### Scoring and conclusion rules
+
+Phase A freezes these with the fixture, before any native run.
+
+- **Score behavior, not format.** A detection is a finding or open request
+  that says, in any wording, that the change loses repeated values or breaks
+  the keep-duplicates requirement. A requirement ID is never required. The
+  "after" reviewer prompt asks for IDs in finding titles, so matching on IDs
+  would reward formatting. A control false positive is a finding that claims
+  a requirement is missing or violated for a control variant.
+- **Judge every output by hand.** The orchestrator judges each saved output
+  against the frozen rubric (`rubric.md` beside the fixture) and records one
+  judgment per output; the phase reviewer re-checks every judgment; the user
+  can audit them from the saved outputs. These are agent judgments against
+  a written rubric, recorded and re-checked; nothing in the runner asks a
+  model to score. The scorer only checks output validity and counts
+  recorded judgments.
+- **Fixed run order.** Phase C alternates revisions for each variant
+  (before, after, before, after, ...), so a change on the service side
+  during the session does not fall on one revision only.
+- **Fixed conclusion wording.** Unavailable and invalid runs are listed
+  separately and leave the denominator; there are no reruns. Then:
+  - fewer than 2 valid defective runs for either revision: "inconclusive";
+  - any control false positive on a revision: report it next to that
+    revision's detections, and call the result "mixed" for that revision;
+  - otherwise, more detections for "after": "more detections observed in
+    the after revision (a of n versus b of m)";
+  - equal detections: "no difference observed";
+  - fewer detections for "after": "fewer detections observed in the after
+    revision".
+  The report never says "improved", "reliable", or "significant".
+
 ### Decisive assumptions
 
 A decisive assumption is one that would invalidate this design if false.
@@ -98,7 +136,7 @@ A decisive assumption is one that would invalidate this design if false.
 | --- | --- | --- |
 | One fixed runner can build consumers from an older revision | Settled | An exported `1626364` tree (`git archive`) generated cleanly with its own `scripts/generate_targets.py`; its reviewer prompt lacks "approved scope-change records" (0 matches), while the current build has it (1). |
 | `claude -p --agent reviewer` loads the generated reviewer prompt | Open (Phase A) | `--agent planner` ran in the 2026-08-09 calibration with Claude Code 2.1.226 (`docs/2026-08-09-planner-reliability-calibration.md`), and the generated planner and reviewer files have the same frontmatter shape. Loading the reviewer itself is not yet observed. |
-| A client-reported field can show which agent ran | Open (Phase A) | Unknown. If none exists, the fallback is the reviewer's own report shape (`## Review Report`, a fenced findings JSON list), which is weaker, model-produced evidence and must be labeled that way. |
+| A client-reported field can show which agent ran | Open (Phase A) | Unknown. A client-reported agent field means role loading is "confirmed". If none exists, the reviewer's own report shape (`## Review Report`, a fenced findings JSON list) only means the run is "consistent with" role loading, which is model-produced evidence. Phase A may proceed on either, but the report must carry the exact level. |
 | The case flags the defective diff and none of the three correct controls | Open (Phase A) | Not observed. If the case cannot tell them apart, stop: cancel Phases B and C with evidence. |
 | The case packet can be given inline in the prompt | Open (Phase A) | The reviewer accepts "the exact changed hunks" as scope (`shared/agents/reviewer/prompt.md` Inputs), so no file staging inside the locked workspace should be needed. |
 
@@ -108,11 +146,11 @@ IDs are prose references for this plan only.
 
 | Requirement | Acceptance and existing contract | Owning phase | Evidence |
 | --- | --- | --- | --- |
-| BEP-001 | Role loading for the Claude reviewer is shown with the strongest available evidence class, and that class is named. | `2026-10-03_phase-A-behavioral-pilot-evidence` | Dated evidence document |
-| BEP-002 | On the "after" revision, the case flags the defective diff and does not flag the repaired, approved-scope-change, or valid-alternative control. The prompt never names the defect. | `2026-10-03_phase-A-behavioral-pilot-evidence` | Dated evidence document; frozen fixture and expected results |
+| BEP-001 | Role loading for the Claude reviewer is recorded at its exact level: "confirmed" (client-reported agent field) or "consistent with" (report shape only). | `2026-10-03_phase-A-behavioral-pilot-evidence` | Dated evidence document |
+| BEP-002 | On the "after" revision, rubric judgments show a detection for the defective diff and no false positive for the repaired, approved-scope-change, or valid-alternative control. The request wording never names the defect. | `2026-10-03_phase-A-behavioral-pilot-evidence` | Dated evidence document; frozen fixture, rubric, and conclusion rules |
 | BEP-003 | One fixed runner prepares consumers from a given source tree. Without the new option, every existing invocation, report key, and privacy rule is unchanged (`prepare_variants`, `safe_workspace`, `claude_workload_command`). | `2026-10-03_phase-B-behavioral-pilot-runner` | Offline tests in `tests/test_check_native_clients.py` |
-| BEP-004 | An offline scorer compares saved outputs with the frozen expected results. It counts correct results, behavioral failures, invalid outputs, unavailable runs, and missing observations separately, and replays saved outputs without a model. | `2026-10-03_phase-B-behavioral-pilot-runner` | Offline tests |
-| BEP-005 | A bounded before/after comparison on Claude Code, with a dated report: run counts, denominators, settings, source revisions, confounders, and saved outputs. "No difference" is allowed. | `2026-10-03_phase-C-behavioral-pilot-comparison` | Dated report; replay test reproduces its counts |
+| BEP-004 | An offline scorer checks saved outputs for validity and counts the recorded rubric judgments: detections, control false positives, invalid outputs, unavailable runs, and missing judgments, each with its denominator. It never matches on requirement IDs and never calls a model. | `2026-10-03_phase-B-behavioral-pilot-runner` | Offline tests |
+| BEP-005 | A bounded before/after comparison on Claude Code in the fixed alternating order, with a dated report: counts, denominators, settings, source revisions, confounders, saved outputs, and judgments. Its conclusion uses the frozen wording and describes an observed difference between two bootstrap revisions. | `2026-10-03_phase-C-behavioral-pilot-comparison` | Dated report; replay test reproduces its counts |
 | BEP-006 | Knowledge refresh and final audit, including the follow-ups below. | `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` | OpenWiki completion; `## Stale-claims surfaces checked` |
 | BEP-007 | Boundaries hold: no model call in ordinary tests or `verify.py`; no new gate; native steps run by the user; no credentials or transcripts saved. | all phases | Review and existing tests |
 
@@ -156,8 +194,9 @@ review profiles.
 - Real integration: native Claude Code runs in a prepared workspace (user-run).
 - Mocked boundaries: runner and scorer unit tests use the existing
   `run_process` doubles in `tests/test_check_native_clients.py`.
-- Independent expected values: written with the fixture in Phase A, before
-  any native run, and kept out of every prompt.
+- Independent expected values: the expected results, rubric, and
+  conclusion rules are written with the fixture in Phase A, before any
+  native run, and kept out of every prompt.
 - No available verification: whether the result generalizes beyond one
   case, one client, or one model. The report must say so.
 
@@ -166,8 +205,8 @@ review profiles.
 - A strong model may report the missing requirement with or without the new
   guidance (ceiling effect). Then the result is "no difference", which is
   still useful evidence.
-- Role loading may only be observable through the report shape. Label that
-  evidence as model-produced, not client-reported.
+- Role loading may only be observable through the report shape. Then the
+  report says "consistent with role loading", never "confirmed".
 - Results come from a few runs of one model; they are a diagnostic, not a
   statistical claim.
 - The two consumers differ by the whole `engineering-workflow-improvements`

@@ -40,10 +40,14 @@ on 2026-10-03; see the big plan's approved decisions.
   **Files:** copy saved evidence to `docs/evidence/behavioral-pilot/phase-c/`.
   Per revision: the defective variant 3 times and each of the three
   controls once, so 6 runs per revision and 12 in total, each limited to
-  420 seconds. Same client, model, effort, and permission mode for both
-  revisions. No retries; an unavailable run stays unavailable.
-  **Acceptance:** 12 attempts are accounted for, each scored or explicitly
-  unavailable.
+  420 seconds. The prepared schedule script runs them in the frozen
+  alternating order: for each variant and repetition, "before" then
+  "after" (defective 1, 2, 3, then repaired, valid-alternative, and
+  approved-change). Same client, model, effort, and permission mode for
+  both revisions. No retries; an unavailable run stays unavailable and its
+  slot is recorded in the schedule.
+  **Acceptance:** 12 attempts are accounted for in schedule order, each
+  saved or explicitly unavailable.
 
 - [ ] **3. Score and write the dated report.**
   **Owner:** orchestrator scores; documenter writes the report.
@@ -51,15 +55,25 @@ on 2026-10-03; see the big plan's approved decisions.
   actual date of the run).
   **Required Skills:** `.claude/skills/documentation/SKILL.md`,
   `.claude/skills/humanize/SKILL.md`.
-  Score both evidence sets with `--score`. Report per-variant counts with
-  denominators for each revision, control false positives, unavailable and
-  invalid runs, duration and usage, both SHAs, client version, reported
-  model, and confounders: what `git diff --stat 1626364 <after>` shows
+  Judge every saved `run-NN.txt` output by hand against the frozen
+  `rubric.md` before reading any `run-NN.meta.json` file or the schedule,
+  and record one judgment per output with a quoted sentence as its reason in
+  `judgments.json`. This blinding is partial: an output's own content (for
+  example an `### Open Requests` section) can still hint at its revision,
+  and the report says so. The reviewer
+  re-checks every judgment in step 5. Then run `--score` over both evidence
+  sets. Report per-variant counts with denominators for each revision,
+  control false positives, unavailable and invalid runs, duration and usage,
+  both SHAs, client version, reported model, the role-loading level from
+  Phase A, and confounders: what `git diff --stat 1626364 <after>` shows
   (expected: the plan's prompts, profiles, policies, skills, templates, and
-  docs, but no hook or script), one model, and few runs. State the conclusion plainly: improved,
-  no difference, regressed, or inconclusive. Never claim a generalization
-  beyond this case, client, and model.
-  **Acceptance:** every number in the report comes from the scorer output.
+  docs, but no hook or script), one model, and few runs. Use exactly the
+  conclusion wording the frozen rules produce, and describe it as an
+  observed difference between two bootstrap revisions, not an effect of the
+  reviewer instruction alone. Never claim a generalization beyond this case,
+  client, and model.
+  **Acceptance:** every number and the conclusion wording in the report come
+  from the scorer output over the recorded judgments.
 
 - [ ] **4. Lock the report's numbers with a replay test.**
   **Owner:** coder.
@@ -77,7 +91,8 @@ on 2026-10-03; see the big plan's approved decisions.
 - [ ] **5. Review and close out.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `.claude/skills/code-review/SKILL.md`.
-  Check the report against the scorer output, the privacy of saved
+  Re-check every rubric judgment against its saved output. Check the report
+  against the scorer output, the schedule order, the privacy of saved
   evidence, the confounders, and that no conclusion overreaches.
 
 ## Verification
