@@ -6,149 +6,122 @@ originating_branch: dev
 implementation_branch: engineering-workflow-improvements_implementation
 started_at:
 phases:
-  - 2026-10-02_phase-A-engineering-evidence
-  - 2026-10-02_phase-B-engineering-evaluator
-  - 2026-10-02_phase-C-engineering-workflow
-  - 2026-10-02_phase-D-engineering-knowledge-refresh
+  - 2026-10-02_phase-A-engineering-workflow
+  - 2026-10-02_phase-B-engineering-knowledge-refresh
 current_phase:
 ---
 
-# Big Plan: Engineering Workflow Improvements
+# Big Plan: Engineering Workflow Guidance Improvements
 
 ## Context
 
-Investigation against `dev` at `a2c68b3` found substantial existing coverage
-for the handoff's proposals. The remaining gaps concern connecting approved
-outcomes to evidence, verifying original symptoms, and distinguishing native
-task performance from self-reported checklist compliance. The investigation
-and source register are at
-`.claude/explorations/2026-10-02_bootstrap-engineering-workflow/README.md`;
-the implementation design is its sibling `design.md`.
+The initial investigation inspected `dev` at `a2c68b3`. This revision uses
+`dev` at `1626364`, after sidecar repair PR #43 merged. The repair is complete:
+sidecar state lives under `.ai-bootstrap/`, and callers save returned planner
+and reviewer text. Preserve those contracts.
 
-These are draft exploration artifacts. After user approval, promote this
-file and its four small plans together to `.claude/plans/`. Keep the
-investigation/design at their original paths. Do not activate a phase,
-create an implementation branch, or approve the proposal while drafting.
+The orchestrator already requires plan requirements and non-goals for every
+delegation. The narrower gap is that the reviewer's own inputs and review
+steps do not explicitly require comparison against the approved plan/spec
+and approved scope changes. The investigation and design remain in
+`.claude/explorations/2026-10-02_bootstrap-engineering-workflow/`.
+
+This draft has two phases. After implementation approval, promote this big
+plan and its two small plans together to `.claude/plans/`. Drafting does not
+activate a phase or create an implementation branch. The separate
+`behavioral-evaluation-pilot.md` is an optional later proposal, not a dependency.
 
 ## Goals
 
-- Resolve decisive uncertainty before detailed phase decomposition.
-- Reuse existing specs/plans to connect requirements, contracts, and evidence.
-- Review the original outcome and meaningful tests, not only a coherent diff.
-- Measure a small set of behaviors independently of agent self-assessment.
-- Improve phase summaries and failure learning without another report stream.
-- Preserve provider differences, relaxed sidecars, and deterministic authority.
+- Investigate decisive technical assumptions before detailed planning.
+- Keep specifications and requirement IDs optional; cite existing contracts.
+- Make reviewer inputs, caller instructions, and review behavior agree.
+- Require evidence that a fix addresses the original symptom.
+- Improve phase summaries and failure learning within existing records.
+- Preserve deterministic verification, independent review, and relaxed sidecars.
 
 ## Non-Goals
 
-No new permanent role, lifecycle status, requirement parser, receipt schema,
-Spec Kit dependency, memory store, model judge, dashboard, automatic prompt
-tuner, mandatory mutation package, or provider discovery expansion. No new
-approval for already-authorized routine steps. No installer/state-location
-repair, automatic PR, merge, force push, or historical evidence rewrite.
+No behavioral runner changes, model runs, executable benchmark fixtures,
+scorer, new provider support, model judge, or behavior-improvement claim.
+No new agent, requirement parser, receipt schema, dependency, memory store,
+mandatory spec, or routine approval. Do not reopen the merged sidecar repair,
+change installer/state semantics, or rewrite historical evidence.
 
 ## Design Overview
 
-Follow the design document's single-lifecycle integration. Risk, acceptance,
-contract, and test-strategy work lives inside existing planner discovery.
-One optional table in the spec/big plan maps stable requirement IDs to
-phases, symbols, and evidence. Reviewer handoffs carry the approved plan/spec
-and approved scope changes, with version references. These are the authority
-for required behavior, not the reviewer's reconstructed interpretation.
-Separate specs and IDs stay optional for simple tasks. Coverage/contract
-defects use ordinary findings and severity rules.
+Extend existing planner, template, review, debugging, reporting, and learning
+guidance. Carry the approved plan/spec and approved scope changes in existing
+handoffs and explicitly compare the implementation against them. The reviewer
+must not substitute its own reconstruction of requirements. Equivalent
+approved task instructions suffice for simple work without a separate spec.
 
-The original bug reproduction is re-exercised by the coder/orchestrator
-when feasible. An unavailable environment limits the claim of resolution.
-The reviewer evaluates supplied evidence and retains read/search-only tools.
-Manual probes never enter executable Verification blocks.
-
-Extend `check_native_clients.py` only after a native evidence phase. Preserve
-its legacy workload schema and shim experiment. A new, separate opt-in
-behavioral mode runs the design's three read-only packets with independent
-expected results and separately classified action evidence. Ordinary
-deterministic tests and commit receipts never invoke a model. Phase B validates
-and freezes the evaluator using Phase A's preserved outputs before Phase C
-changes workflow guidance. Score saved baseline and candidate outputs with
-the same final scorer; retain original evidence and version each rescore.
+Keep tests focused on instruction presence, consistency, generated output,
+and preserved authority boundaries. They establish what guidance is shipped,
+not whether a model follows it. The optional pilot must first demonstrate
+that its cases can detect the intended defects before any version comparison.
 
 ## Requirements and Acceptance
 
-| ID | Required behavior | Phase | Acceptance and evidence |
-| --- | --- | --- | --- |
-| REQ-001 | Investigate decisive assumptions before decomposition; no production edits from a spike | C | Unknown-contract packet prompts a bounded evidence step; clear-contract control does not demand a spike or repeated approval. |
-| REQ-002 | Optional complex-task specification and stable requirement mapping | C | Template supports non-goals, constraints, acceptance/evidence, and phase mapping; existing plans still validate unchanged. |
-| REQ-003 | Cite existing contracts and settle critical test strategy before implementation steps | C | A schema-free example cites source invariants and negative cases without inventing a schema; integration/mocking choices have reasons. |
-| REQ-004 | Review against the approved plan/spec and approved scope changes within the existing findings model | C | Seeded duplicate-preservation gap is found; repaired, valid-alternative, and approved-change controls avoid invented requirements; current JSON/receipts are unchanged. |
-| REQ-005 | Review independent expected values and recheck the original symptom | C | Weak-test fixture is identified; host negative control distinguishes good/broken variants; unreproduced symptom is not called resolved. |
-| REQ-006 | Bounded independent behavioral evaluation and comparable before/after evidence | A, B, C | Preserved outputs replay through the same final scorer; frozen scenario/oracle/scorer revisions and complete run identity; three repetitions per primary case; missing observations, invalid outputs, unavailable runs, and behavioral failures reported separately; confounding explicit; no automatic model gate. |
-| REQ-007 | Concise phase-boundary summary from existing artifacts | C | Objective, completed scope, deviations, checks, findings, needed decision, and next operation are visible without another persistent report or routine approval. |
-| REQ-008 | Route observed failures to smallest correction and regression | C | LEARN example prefers an existing test/skill and adds no duplicate rule or source-derived memory entry. |
-| REQ-009 | Preserve lifecycle, permissions, provider boundaries, historical evidence, and relaxed sidecars | A–D | Existing verifier/hook/plan tests pass; full/skills/workflow generation validates; no new sidecar gates, discovery claims, or receipt schema. |
+IDs retain their original meanings. REQ-006 is explicitly deferred rather
+than silently dropped, renumbered, or claimed complete.
 
-No acceptance row may be silently dropped or rewritten to match an
-implementation. Record approved material scope changes through the current
-policy and supply them with the original approved artifacts to the reviewer.
-Before Phase B starts, incorporate Phase A's actual native limitations into
-affected steps only. Freeze scenario/oracle revisions in A and the validated
-scorer in B. Record provider, model, reasoning effort, permission mode,
-client/runtime version, source revision, and generated-bundle identity for
-each attempt. Hold comparison settings fixed apart from the intended workflow
-change; report unknown or changed controls as confounded comparisons.
+| ID | Required behavior or guidance | Phase | Acceptance and evidence |
+| --- | --- | --- | --- |
+| REQ-001 | Investigate decisive assumptions before decomposition; a spike does not authorize production changes | A | Planner guidance names the decision, bounded evidence, and remaining limits. A reviewed technical-uncertainty example differs from a clarification question; known facts require no extra spike. |
+| REQ-002 | Optional complex-task specification and requirement mapping | A | Templates support non-goals, constraints, acceptance/evidence, and phase mapping; old plans validate; simple tasks require no separate spec or IDs. |
+| REQ-003 | Cite existing contracts and settle critical test strategy before steps | A | Source references, negative cases, and integration/mocking choices are supported without inventing a new schema layer. |
+| REQ-004 | Review against approved requirements and approved scope changes | A | Orchestrator general/reviewer handoffs and reviewer inputs/steps agree; focused checks cover the shipped guidance. Missing behavior uses existing findings; no reconstructed requirements. |
+| REQ-005 | Independent test expectations and original-symptom verification | A | Debug resolution and coder guidance require rerunning the original reproduction when feasible and recording outcome or limitation; reviewer assesses evidence without execute tools. |
+| REQ-006 | Bounded independent behavioral evaluation | Deferred | Owned by the separate optional pilot proposal; no native baseline, scorer, or behavior measurement is required for this plan. |
+| REQ-007 | Concise phase-boundary summary | A | Existing commentary/log guidance covers objective, changes, deviations, checks, findings, real decisions, and next operation without new records or approvals. |
+| REQ-008 | Route observed failures to smallest correction and regression | A | LEARN guidance prefers an existing test/skill and permits no new instruction where none is justified. |
+| REQ-009 | Preserve lifecycle, permissions, provider boundaries, history, and relaxed sidecars | A–B | Relevant generation/plan/verifier/hook/sidecar checks pass; caller-saved outputs and `.ai-bootstrap/` remain intact; no new sidecar gates. |
+
+Material scope changes use the existing approval policy. The supplied
+approved artifacts and changes remain the review authority. The completion
+log must distinguish the eight in-scope requirements from deferred REQ-006.
 
 ## Phases
 
-- [ ] `2026-10-02_phase-A-engineering-evidence` — freeze the three cases and establish native transport/baseline evidence.
-- [ ] `2026-10-02_phase-B-engineering-evaluator` — implement, validate, and freeze the evaluator using Phase A's saved evidence.
-- [ ] `2026-10-02_phase-C-engineering-workflow` — integrate planner, review, reporting, learning, and sidecar guidance; run matched candidate evaluation.
-- [ ] `2026-10-02_phase-D-engineering-knowledge-refresh` — refresh derived knowledge and audit all live advice.
+- [ ] `2026-10-02_phase-A-engineering-workflow` — update guidance, add focused deterministic checks, review, and document.
+- [ ] `2026-10-02_phase-B-engineering-knowledge-refresh` — refresh derived knowledge and audit live advice.
 
 ## Ownership and Required Skills
 
-Main-thread orchestrator owns activation, bounded native runs, deterministic
-verification, findings, final state, closeout, commits, and normal pushes.
-The Phase B coder owns the native runner/tests. Phase C prompt/template work
-starts only after evaluator validation and freezing; do not develop the
-measurement and measured workflow changes concurrently. Reviewer remains
-independent and cannot execute tests.
-Documenter updates live docs after review converges.
+The main-thread orchestrator owns activation, execution evidence, findings,
+closeout, commits, and normal pushes. A coder owns guidance and focused test
+changes. The independent reviewer remains read/search-only. The documenter
+updates live docs after review converges.
 
-All coding uses `shared/skills/ponytail/SKILL.md` in full mode plus
+Use `shared/skills/ponytail/SKILL.md` (full) for implementation,
 `shared/skills/code-style/SKILL.md` and
-`shared/skills/testing-patterns/SKILL.md`. Native probes use
-`shared/skills/integration-gate-spike/SKILL.md`. Documentation uses
-`shared/skills/documentation/SKILL.md` and
-`shared/skills/humanize/SKILL.md`. Small plans name further skills per step.
-
-Every phase uses the control-plane review profiles at
-`.claude/review-profiles/code.md`, `architecture.md`, `security.md`,
-`tests.md`, `ponytail.md`, and `documentation.md` in that directory.
-No reviewer or evaluation output replaces authoritative receipts.
+`shared/skills/testing-patterns/SKILL.md` for Python checks, and
+`shared/skills/documentation/SKILL.md` for documentation. Small plans name
+further skills. Each phase uses code, architecture, security, tests, ponytail,
+and documentation profiles from `.claude/review-profiles/`.
 
 ## Risks and Dependencies
 
-- Phase A needs a trusted native host and an explicitly bounded invocation
-  budget. If no provider supports the proposed observations, record the
-  limitation and revise affected future work; do not invent transport data.
-- `.claude` write failures and old-full detection remain owned by
-  `sidecar-workflow-repair`. Prefer its completion before sidecar text edits;
-  otherwise reconcile the two plans without copying a retired state path.
-- Requirement guidance can become excessive. Clear-task controls and the
-  no-new-parser rule bound its cost. IDs and separate specs stay optional.
-- Evaluation can reward guessing. Independent hidden oracles, repaired
-  controls, and separate observed-action fields bound claims, not intent.
-- A single provider's three-run pilot cannot establish universal model
-  quality. Never publish it as a cross-provider leaderboard.
-- Native authentication and OpenWiki availability are operational
-  prerequisites, not reasons to weaken permissions or skip required work.
+- Wording checks can pass while model behavior remains unchanged. Report only
+  instruction/generation evidence; behavioral improvement is unmeasured.
+- Do not duplicate the existing general delegation rule. Align its requirement
+  authority with the reviewer-specific handoff and recipient instructions.
+- Additional guidance can burden simple tasks. Keep separate specs, IDs,
+  investigations, and extra approvals conditional on actual need.
+- Reuse the merged sidecar repair. Do not restore old state paths or make
+  read-only specialists save their own output.
+- OpenWiki availability is required for the final refresh; report an actual
+  service failure without weakening the existing verification contract.
 
 ## Verification Strategy
 
-Keep the existing executable `## Verification`, findings/severity model,
-and immutable receipt validation. Focused unit tests cover the new scorer,
-missing events, privacy, fixture truth, and output compatibility. Existing
-plan/verifier/hook/sidecar tests cover preserved boundaries. Native outcomes
-remain separately recorded, repeated, and advisory as model measurements.
+Add small checks to existing `tests/test_validate_targets.py` for required
+instruction meaning and source/generated consistency. Cover approved scope
+changes, reviewer comparison, original-symptom rerun, optional specs/IDs, and
+preserved sidecar boundaries. Avoid complete prose snapshots and exact
+sentence matching. Use existing scenario tests for caller persistence and
+team-owned files; do not build a model benchmark to test text changes.
 
 ```bash
 uv run python scripts/generate_targets.py --all
@@ -157,24 +130,19 @@ uv run python scripts/check_runtime.py
 uv run python scripts/validate_plan_frontmatter.py
 ```
 
-The ordinary phase receipt supplies full tests, lint, and typing. Do not
-put an authenticated or probabilistic run into `verify.py` or its receipt.
-Small plans retain their concrete focused checks and host-evidence items.
+Small plans list focused tests. Existing phase and closeout receipts remain
+authoritative; ordinary deterministic verification never invokes a model.
 
 ## Completion Evidence
 
-All nine requirements map to final source and evidence in the Phase C log,
-including Phase B's evaluator validation. Preserve baseline and candidate
-task outputs and allowlisted observations, not just scores, in companion
-evidence artifacts. The dated evaluation document identifies the common
-final scorer, frozen scenario/oracle revisions, complete run identity,
-separate invalid/unavailable/unobserved counts, and any confounding factors.
-Describe honestly whether measurements improved, regressed, or were
-inconclusive; a valid pilot need not manufacture an improvement claim.
+The Phase A log maps the eight in-scope requirements to source and verification
+evidence and records REQ-006 as deferred. Record exact before/after source
+revisions for traceability; collecting a native baseline is not a prerequisite.
+Completion means the agreed guidance shipped and its checks passed, not that
+agent behavior measurably improved.
 
-Follow the canonical closeout sequence, one completion commit per phase and
-one normal push attempt. PR creation and merging remain user decisions.
-The final phase refreshes OpenWiki through its own MCP lifecycle and records
-the full documentation/MEMORY/LEARN audit under the exact heading
-`## Stale-claims surfaces checked`. Preserve completed logs, receipts, and
-older calibration evidence. The plan is complete only after that final phase.
+Follow canonical closeout, one completion commit per phase and a normal push
+attempt; PR creation/merging retain their authorization rules. Phase B uses
+OpenWiki's own MCP lifecycle and records the documentation/MEMORY/LEARN audit
+under `## Stale-claims surfaces checked`. Preserve completed records. The
+plan is complete only after this final phase.

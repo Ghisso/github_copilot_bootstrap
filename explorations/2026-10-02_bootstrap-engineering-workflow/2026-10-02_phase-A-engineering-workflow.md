@@ -1,23 +1,21 @@
 ---
-name: 2026-10-02_phase-C-engineering-workflow
+name: 2026-10-02_phase-A-engineering-workflow
 type: small-plan
 parent_plan: engineering-workflow-improvements
-phase_index: 3
+phase_index: 1
 status: planned
 closeout_session_log:
 ---
 
-# Small Plan: Integrated Engineering Workflow Improvements
+# Small Plan: Engineering Workflow Guidance
 
 ## Scope
 
-Implement the accepted recommendations through existing source components,
-using Phase A's frozen cases and Phase B's validated, frozen evaluator.
-This phase completes the nine requirements with evidence from A and B; keep
-the full/sidecar distinction and all current gate contracts. Evaluator changes
-are outside this phase's workflow implementation scope. Reconcile sidecar
-content with the separate repair's actual state before editing. Do not import
-its installer changes into this phase.
+Update existing guidance and its focused deterministic checks on `dev` after
+sidecar repair PR #43. This phase covers REQ-001–005 and REQ-007–009.
+REQ-006 is deferred to the separate optional pilot. Preserve `.ai-bootstrap/`,
+caller-saved specialist output, independent review, and all existing gates.
+No runner changes, executable benchmark fixtures, or model runs are included.
 
 ## Steps
 
@@ -42,11 +40,13 @@ its installer changes into this phase.
   scope-change records as requirement authority, with version references in
   handoffs; separate specs and IDs remain optional for simple tasks.
   Retained experiment code must identify proven behavior and shortcuts.
-  Explicitly prohibit treating a spike as
-  authorization for production implementation.
+  Explicitly prohibit treating a spike as authorization for production
+  implementation.
   **Acceptance:** legacy/micro plans still validate; a simple known task
   needs no new artifact or approval; decisive uncertainty remains explicit;
-  manual observations never enter executable command lists.
+  manual observations never enter executable command lists. A small reviewed
+  example distinguishes a technical assumption needing evidence from a user
+  preference needing clarification; it requires no executable fixture.
 
 - [ ] **2. Integrate requirements and meaningful-test review into existing roles.**
   **Owner:** coder; reviewer evaluates the final result independently.
@@ -58,8 +58,11 @@ its installer changes into this phase.
   `shared/skills/testing-patterns/SKILL.md`,
   `shared/skills/debug-investigator/SKILL.md`,
   `shared/skills/code-review/SKILL.md`.
-  Carry approved plan/specification, approved scope changes, and contract
-  references into coder and reviewer packets, with artifact versions and IDs
+  The general delegation rule already names requirements and non-goals.
+  Align it with the reviewer-specific packet and the reviewer's input list;
+  add the explicit instruction to compare the diff against supplied approved
+  requirements. Carry approved plan/specification, approved scope changes,
+  and contract references into coder and reviewer packets, with artifact versions and IDs
   where present. The reviewer compares against that authority, not its own
   reconstruction. Approved changes supersede affected original requirements;
   ambiguity is surfaced rather than turned into an invented requirement.
@@ -72,9 +75,10 @@ its installer changes into this phase.
   post-fix original-symptom check to debugging and coder guidance, with
   evidence of changed behavior or an honest unverified limitation.
   **Acceptance:** no separate convergence artifact/schema; no automatic
-  appended tasks; no mutation dependency. Coverage-case controls respect
-  approved changes and valid alternative implementations without introducing
-  new requirements or requiring a separate spec/IDs for simple tasks.
+  appended tasks; no mutation dependency. Guidance respects approved scope
+  changes and valid alternative implementations, with no separate spec/IDs
+  required for simple tasks. Instruction checks establish those rules are
+  shipped; they do not claim that a model followed them.
   A green suite with an untested original symptom is not represented as
   complete symptom verification.
 
@@ -105,55 +109,52 @@ its installer changes into this phase.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
   `shared/skills/testing-patterns/SKILL.md`.
   Use concise advisory equivalents, including approved-requirement authority,
-  in existing templates; no additional
-  requirements-spec unit or skill is needed. Shared review profiles remain
+  in existing templates; no additional requirements-spec unit or skill is
+  needed. Shared review profiles remain
   advice. Respect team ownership and absent specialists. Copilot instructions
   must work without shipped Copilot agents; Codex/Antigravity get no new
-  discovery claim. Preserve the skills-profile unit set and state semantics.
+  discovery claim. Preserve the skills-profile unit set. Keep state under
+  `.ai-bootstrap/`; planner/reviewer return text, and callers save it in
+  `plans/` and `quality_reports/` beneath that root. Retain the merged
+  repair's caller behavior, fallbacks, and team precedence.
   **Acceptance:** generated full guidance contains the intended optional
   extensions; workflow sidecar has no new hooks, settings, mandatory receipts,
   forced plan lifecycle, or references to unshipped files. Existing team
   collision/status/index assertions still pass. Tests check contracts and
   forbidden authority changes rather than entire prose snapshots.
 
-- [ ] **5. Run matched evaluation, review, document, and close out.**
-  **Owner:** orchestrator for evaluation/checks; reviewer; documenter after
-  review convergence.
-  **Files:** `README.md`, `docs/architecture.md`,
-  `docs/native-client-acceptance.md`, the dated baseline/results document,
-  companion evidence under `docs/evidence/engineering-behavioral/`, and
-  relevant source help/comments.
-  **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
-  `shared/skills/code-review/SKILL.md`, `shared/skills/documentation/SKILL.md`,
-  `shared/skills/humanize/SKILL.md`.
-  Run the required deterministic checks. Refresh the authoring overlay with
+- [ ] **5. Check instruction contracts, review, document, and close out.**
+  **Owner:** coder for tests; orchestrator for execution; independent reviewer;
+  documenter after review convergence.
+  **Files:** modify `tests/test_validate_targets.py`, `README.md`, and
+  `docs/architecture.md` as needed; reuse existing sidecar scenario tests.
+  **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
+  `shared/skills/code-style/SKILL.md`,
+  `shared/skills/testing-patterns/SKILL.md`,
+  `shared/skills/code-review/SKILL.md`,
+  `shared/skills/documentation/SKILL.md`.
+  Add small deterministic checks that general and reviewer-specific
+  delegation instructions, reviewer inputs, and review steps agree on
+  approved requirements and scope changes. Check that debug resolution
+  requires the original reproduction to be rerun, with outcome or limitation
+  recorded, and that source/generated variants preserve optional specs/IDs
+  and sidecar authority. Prefer contract assertions over full prose snapshots;
+  include changed skills in the generated-surface checks where shipped.
+  Do not add a new semantic evaluator or require one exact wording.
+  Run the required checks. Refresh the authoring overlay with
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   after generation if changed shared files make runtime checks stale.
-  Run one candidate wave matched to Phase A's scenario/oracle revisions,
-  provider, model, reasoning effort, permissions, and client/runtime. Record
-  source revisions and generated-bundle identities and separate intended
-  workflow changes from unrelated source drift. Preserve every candidate
-  task output and allowlisted observation under the design's replay/privacy
-  contract. Rescore saved baseline and candidate evidence using the same
-  final Phase B scorer and rubric, with hashed inputs and versioned results.
-  Report per-case outcomes, control false positives, event observability,
-  duration/usage, and all confounders. Keep invalid outputs, unavailable runs,
-  missing observations, and behavioral failures separate; state denominators.
-  Unknown/changed controls or unreplayable evidence prevent a matched claim.
-  Do not choose favorable repeats or call missing data an improvement.
-  If a scorer defect is found, pause the comparison, validate the measurement
-  repair separately, freeze its new revision, and rescore both saved sets;
-  do not adjust scoring only for the candidate or overwrite prior evidence.
-  A confirmed regression returns to the ordinary fix loop;
-  noisy outcomes inform review and do not introduce an automatic model gate.
-  Map REQ-001 through REQ-009 to changed files and final evidence. Persist
-  findings and receipts only through the existing closeout sequence.
+  **Acceptance:** focused checks and independent review pass; the eight
+  in-scope requirements map to source/evidence in the log. Record REQ-006
+  as deferred and before/after source revisions for traceability. Report
+  instruction consistency, not measured agent improvement. Persist findings
+  and receipts only through existing closeout.
 
 ## Verification
 
 ```bash
 uv run python scripts/generate_targets.py --all
-uv run pytest tests/test_check_native_clients.py tests/test_validate_plan_frontmatter.py tests/test_verify.py tests/test_hook_gates.py -q
+uv run pytest tests/test_validate_plan_frontmatter.py tests/test_verify.py tests/test_hook_gates.py -q
 uv run pytest tests/test_validate_targets.py tests/test_sidecar_workflow_scenario.py -q
 uv run python scripts/validate_targets.py
 uv run python scripts/check_runtime.py
@@ -163,13 +164,9 @@ uv run python .claude/scripts/verify.py fast --format json
 
 ## Optional Verification
 
-- Run the bounded candidate native wave on the same trusted host/model as
-  Phase A, with Phase B's frozen scorer. Record behavioral failures, invalid
-  outputs, unavailable runs, missing observations, cost, and any changed
-  environment. This host observation is required to claim measured behavior,
-  but never becomes a probabilistic commit-gate command.
-- Repeat on a second provider only within a separate agreed budget; keep
-  its evidence and support limitations separate.
+- Inspect generated full and workflow guidance for coherent requirements,
+  technical-risk examples, and caller-saved sidecar outputs. This is a prose
+  review, not evidence of agent behavior. No native evaluation is required.
 
 ## Review Profiles
 
@@ -177,10 +174,9 @@ Use `.claude/review-profiles/code.md`,
 `.claude/review-profiles/architecture.md`,
 `.claude/review-profiles/security.md`, `.claude/review-profiles/tests.md`,
 `.claude/review-profiles/ponytail.md`, and
-`.claude/review-profiles/documentation.md`. Review oracle independence,
-over-questioning and approved-authority controls, safe replay retention,
-unchanged receipts, old invocation compatibility, and sidecar authority
-boundaries explicitly.
+`.claude/review-profiles/documentation.md`. Review approved-requirement
+comparison, optional specs/IDs, original-symptom evidence, unchanged receipts,
+and sidecar state/authority boundaries explicitly.
 
 ## Closeout Checklist
 

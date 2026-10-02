@@ -1,6 +1,8 @@
 # Implementation Design
 
-**Status:** Proposed; source-supported gaps are in [the investigation](README.md).
+**Status:** Proposed guidance changes; based on `dev` at `1626364` after
+sidecar repair PR #43. See [the investigation](README.md) and the separate
+[optional behavioral pilot](behavioral-evaluation-pilot.md).
 
 ## One Existing Lifecycle
 
@@ -59,6 +61,12 @@ of satisfaction and gets no new deterministic gate.
 
 ### IMPLEMENT, VERIFY, and REVIEW
 
+The orchestrator already requires plan requirements and non-goals for every
+delegation. Align that general rule with the reviewer-specific handoff and
+the reviewer's own input list, and explicitly require comparison against the
+approved requirements and scope changes. This closes an instruction mismatch;
+it does not introduce requirement handoffs from nothing.
+
 Coder handoffs include the requirement/contract references. A changed
 interface, extra feature, or failed decisive assumption is reported through
 the existing scope-change route. The coder does not silently rewrite the
@@ -103,179 +111,68 @@ when reusable, or project memory for non-rederivable rationale. First check
 whether the existing model/instructions already produce the desired behavior.
 No automatic new rule per failure and no mandatory classification schema.
 
-## Bounded Evaluation Pilot
+## Focused Verification
 
-### Existing machinery to reuse
+Phase A updates guidance and adds small checks in the existing
+`tests/test_validate_targets.py`. Check the meaning of required clauses in
+shared source and generated full/sidecar output: approved requirements and
+scope changes are supplied and used in review, original symptoms are checked
+after fixes, and separate specifications/IDs remain optional. Avoid complete
+prose snapshots or a dependency on one exact sentence.
 
-Use `scripts/check_native_clients.py` for process limits, marker-owned
-workspace checks, client isolation, versions, and controlled result output.
-Keep `FROZEN_PLANNER_WORKLOADS`, `PLANNER_WORKLOAD_SCHEMA`, and the current
-`--planner-workloads` behavior/results unchanged. Its existing candidate is
-a shim-removal experiment; do not repurpose it as a general A/B workspace.
+Existing plan, hook, verifier, and sidecar tests protect current contracts.
+A small reviewed example can explain investigating a technical uncertainty;
+an unspecified user preference is a different problem, resolved by clarification.
+Neither examples nor instruction-presence tests are evidence of improved
+model behavior. No model calls, new evaluator, or native baseline belong to
+this plan.
 
-The proposed separate `--behavioral-workloads` option is a **new bootstrap
-CLI option**, justified after inspecting `parse_args`, `prepare_workspace`,
-`planner_workload_result`, and `build_report`. It is not a claimed vendor
-flag. It runs only the new pilot workloads and version/preflight checks;
-do not silently launch the older acceptance runs as well. Reject ambiguous
-combinations with the old workload flag. Use existing provider command
-shapes where the evidence phase confirms them. Do not introduce an SDK,
-persistent-thread protocol, external judge, or plugin architecture.
+## Preserve the Merged Sidecar Repair
 
-### Three initial cases
+PR #43 is already merged. Workflow state stays under `.ai-bootstrap/`.
+Planner and reviewer agents return text; the caller saves it under
+`.ai-bootstrap/plans/` or `.ai-bootstrap/quality_reports/`. Preserve the
+read-only specialist boundary and the existing caller persistence path.
 
-Create small authored packets under `tests/fixtures/behavioral/`. Stage or
-copy only the packet into the prepared model-readable workspace. Keep the
-expected answers and scorer outside that workspace and omit them from the
-supplied context. Read-only execution limits writes; it does not establish
-that every host path is unreadable. Record the actual read boundary in the
-evidence phase. An observed read of oracle/scorer material invalidates the
-run; absent read events leave oracle non-access unverified. Do not claim
-adversarial isolation from the working-directory layout alone. All cases
-are read-only.
+Adapt guidance in existing workflow role prompts, rules, and templates.
+Do not add a specification unit, new hook, receipt, mandatory branch,
+or commit gate. Team instructions retain precedence; missing specialists
+retain the existing fallbacks and honest self-review label. Skills-only
+sidecars keep their current unit set. Provider discovery and installer
+repair are outside this plan.
 
-| Case | Packet and task | Independent expected result | Observable behavior |
-| --- | --- | --- | --- |
-| Ambiguous retention | A request to expire records, with no retention period or definition of eligible records; current code does not settle those choices. Ask for a plan. | Two material questions remain unresolved; no chosen period or deletion implementation is approved. A matched control supplies both answers and should need no repeated interview. | A returned question/action artifact grounded in the missing fields, no writes, no invented deletion policy. Assess the actual artifact; do not ask the agent to rate its own restraint. |
-| Missing requirement coverage | Approved requirements for rejecting invalid input, preserving order, and retaining duplicates; a supplied phase plan covers only the first two and the code drops duplicates. Ask for consistency review. | The duplicate-preservation requirement lacks implementation and a regression check. Repaired, valid-alternative, and approved-scope-change controls must follow their approved authority rather than inventing requirements. | Correct requirement reference and cited approved scope/code/plan evidence; no extra component proposal. Expected gap IDs are not included in the prompt or result schema. |
-| Weak regression test | A tiny function must reject a negative value; a generated test asserts only non-None output and passes with a broken implementation. Ask for test review. | The test fails to establish rejection. The corrected test fails against the planted broken variant and passes against the good variant, as the host verifies offline. | Identification of the missing behavioral assertion and an appropriate failure-case test. Reviewer execution is not required; the host owns the negative-control run. |
+## Separate Optional Evaluation
 
-Use structured result fields to carry **task outputs**, such as questions,
-requirement references, and issue locations. The host compares them with
-independent fixture truth. Transport validity and behavioral correctness are
-separate. Natural-language explanations are checked with a small human
-rubric when a deterministic semantic check is inappropriate; do not compare
-whole response strings or call an LLM judge a deterministic oracle.
+The earlier combined proposal is superseded. The immediate plan has two
+phases: guidance with deterministic checks, then the required knowledge
+refresh. REQ-006 is explicitly deferred to the separate optional proposal.
+It does not block delivery and is not marked complete by text checks.
 
-For exposed tool events, derive only allowlisted indicators such as relevant
-artifact read, attempted forbidden write, and observed check outcome. Keep
-raw events in memory only and discard them after extraction. Missing event
-coverage is `unobserved`, never zero calls or an inferred PASS. A correct
-task answer does not prove a file was read. Preserve these as separate
-result dimensions. Unknown event formats stop the relevant measurement.
+Before building that pilot, demonstrate that each case detects its intended
+defect. For the reviewer, supply the approved plan with an ordinary code-review
+request; do not say “check requirements” or “consistency review” in the task,
+because that would supply the instruction being tested. Verify which role
+instructions the client actually loads. A deliberately broken versus correct
+handoff tests handoff sensitivity; a reviewer instruction change also needs
+a check that exercises the reviewer with the same supplied requirements.
+These are separate claims.
 
-### Scoring and replayable evidence
+Any later before/after comparison must use one runner and scorer against two
+recorded source versions. Preserve task outputs and basic run identity, and
+report invalid/missing results separately. Further details and unresolved
+choices belong to the optional proposal rather than the immediate phases.
 
-Phase A freezes scenario inputs, independent oracles, the initial human
-rubric, and the capture format before baseline collection. Preserve every
-attempt's bounded synthetic-fixture task output and allowlisted observations
-in companion evidence files under `docs/evidence/engineering-behavioral/`.
-Scores alone are insufficient. Phase B implements and validates the evaluator
-against that frozen evidence and independent controls, then freezes the final
-scorer implementation and rubric before any Phase C workflow change.
+## Risks and Decisions
 
-Each attempt records a stable run/case/control/repetition ID, scenario and
-oracle revision hashes, capture format, task-output/evidence hashes, bootstrap
-source revision and generated-bundle identity, UTC date, provider/client and
-version, requested model and reasoning effort, observed model/effort when
-exposed, permission mode, duration, and exposed usage counts. Record missing
-metadata as unknown; never infer that requested and observed settings match.
-Each scoring result references the input hashes, scorer/rubric revision, and
-any human judgment. Keep the human rubric separate from automated checks.
-
-Retain the complete bounded task answer used for scoring, including explanatory
-text needed by the rubric, rather than a lossy summary or self-score. Save
-normalized event indicators only where Phase A demonstrates their meaning.
-Do not persist provider transcripts, raw events, credentials, user paths,
-raw commands, environment dumps, or unrelated model text. Map fixture paths
-to case-local identifiers without altering scored meaning. If safe retention
-would remove evidence needed for replay, mark it unavailable for that check;
-do not silently score a sanitized substitute. Preserve bounded safe malformed
-task payloads where possible, otherwise retain the invalid-output reason.
-Legacy modes retain their existing raw-output disposal behavior.
-
-Replay baseline and candidate evidence through the **same final scorer** and
-rubric. Append versioned results; never overwrite original observations or
-baseline judgments. A changed scorer requires revalidation and rescoring both
-saved sets under a newly frozen revision. Never compare old baseline scores
-with new candidate scores. If a later check needs uncaptured evidence, mark
-it unobserved/unscorable for the affected attempt instead of inferring it.
-
-Distinguish three conclusions:
-
-- Offline parser/scorer tests passed: deterministic implementation evidence.
-- The agent produced a correct task output: fixture-specific behavioral result.
-- A required action was observed: event-based execution evidence.
-
-No conclusion implies the others. Keep unavailable runs (missing client,
-timeout, unsupported transport), invalid outputs (malformed, duplicate, or
-oracle-contaminated), missing observations, and scored behavioral failures
-separate. A valid answer with missing events can have an output verdict while
-its action evidence stays unobserved. Neither missing nor invalid evidence
-becomes a behavioral PASS or FAIL. Existing deterministic gate results remain
-authoritative and untouched.
-
-### Cost, comparison, and baseline
-
-Freeze packets and expected results in Phase A, validate/freeze the evaluator
-in Phase B, then change workflow guidance and evaluate the candidate in Phase C.
-Start with one installed, trusted provider and three repetitions of each
-case: nine primary runs per revision. Run matched controls once each as
-measurement checks. Additional approved-change/valid-alternative variants
-are offline controls within the coverage case, not extra primary scenarios
-or native runs. A second provider is optional and scored separately.
-No automatic retries, provider/model switching, or escalation of effort.
-Retain every attempt in the attempt totals, with separate counts for valid
-scored outputs, behavioral failures, invalid outputs, unavailable runs, and
-missing observations. State the denominator of each rate. Missing evidence
-must not inflate a score or be pooled into behavioral failures.
-
-With the runner's existing 420-second limit, nine primary attempts have a
-63-minute timeout ceiling per provider/revision, plus up to 21 minutes for
-three controls and setup. These are ceilings, not measured costs. Use one
-explicitly bounded wave first; record actual time/usage before expanding.
-Do not estimate token prices from memory or claim cost savings without data.
-
-Compare Phase A's saved baseline and Phase C's candidate using the same final
-Phase B scorer, scenario/oracle revisions, provider, model, reasoning effort,
-client/runtime, and permissions. Use separately prepared workspaces from
-recorded source revisions and generated bundles. The intended workflow change
-explains their source/bundle differences; identify unrelated source drift or
-unknown/changed comparison settings explicitly as confounding factors.
-Measurement code is held fixed and outside the task's supplied context.
-Do not claim a matched improvement for a confounded or unreplayable comparison.
-The existing shim-control/candidate pair is not
-the baseline/candidate pair for this experiment. Report per-case counts,
-false positives on controls, missing evidence, time, and usage. Nine primary
-runs are a diagnostic pilot, not statistical proof or a provider leaderboard.
-
-The evidence phase first establishes the real transport for each selected
-provider using existing commands and a small scratch packet. If it cannot
-observe a capability, mark it unobserved and narrow the pilot. Do not write
-a new provider adapter around an assumed event format. If no provider can
-produce the bounded task outputs, Phase B's native extension waits; the
-planner may revise only that affected future scope.
-
-### Existing and deferred scenarios
-
-Protected writes, incomplete receipts, and sidecar team preservation already
-have real deterministic hook/verifier/Git tests. Reuse them instead of paying
-for model runs to re-prove enforcement. Prompt restraint about unnecessary
-infrastructure is included in the coverage case. Context recovery already
-has policy and native-probe evidence classes, but robust interruption/resume
-evaluation needs a persistent session; defer it. Writable agent E2E and
-sidecar state-write evaluation belong to the existing native/provider work
-and separate sidecar repair, not this read-only pilot.
-
-## Risks and Alternatives
-
-| Risk | Decision |
+| Concern | Decision |
 | --- | --- |
-| Additional prose slows simple tasks | Scope new sections to material uncertainty/complexity; matched clear-task control measures over-questioning. |
-| Agent can guess fixture answers without doing requested work | Keep the oracle outside its workspace, use repaired controls, and separate correct output from observed actions. Do not promise intent detection. |
-| Native schema or permissions differ by provider/version | Phase A evidence first; supported observations only. No privilege changes to rescue a measurement. |
-| Requirement IDs turn into a second state machine | Optional Markdown only; no new frontmatter parser, receipt fields, or auto-created tasks. |
-| Reviewers mistake alternative designs for deviations | Approved plan/spec and approved changes are authority; include valid-alternative and approved-change controls within the coverage case. |
-| Scorer changes make apparent improvements incomparable | Preserve task outputs; freeze the evaluator before workflow changes; replay both sets through the same final scorer and report confounding. |
-| Large multi-file policy change is hard to review | Four phases: evidence, evaluator, workflow/candidate evaluation, required final knowledge refresh. Measurement changes precede changes to the measured workflow. |
-| New workflow text conflicts with sidecar repair | Rebase on its final path/content choices. Keep this work out of installer state migration and discovery changes. |
+| More instructions burden simple work | Keep specifications, IDs, extra investigation, and clarification conditional. |
+| Reviewer substitutes its own desired design | Approved requirements and approved scope changes are authority; existing correctness/security policy still applies. |
+| Text checks are mistaken for behavior evidence | Claim only instruction presence, consistency, generation, and preserved contracts. |
+| Guidance changes regress the sidecar repair | Keep `.ai-bootstrap/`, caller-saved outputs, team precedence, and relaxed semantics. |
+| Measurement work delays useful guidance | Defer it; require a useful broken-versus-correct check before investing in a runner. |
+| Later results reflect test-prompt hints instead of changed guidance | Use ordinary task requests and verify actual role loading before comparison. |
 
-## Devil's Advocate Result
-
-CHANGE the initial idea of a new behavioral framework: extend the existing
-runner. CHANGE mandatory traceability into optional complex-task guidance.
-CHANGE convergence from an append-tasks operation to the existing read-only
-review and scoped fix loop. INVESTIGATE native transport and baseline
-behavior before adding provider-specific measurement. ACCEPT the limits of
-a small, non-gating pilot and human judgment for semantic output. REJECT a
-new agent, evaluator dependency, generalized mutation engine, or receipt gate.
+The independent reviewer, deterministic verification authority, and existing
+closeout process remain intact. No new agent, state machine, dependency,
+model judge, or automatic behavior gate is proposed.
