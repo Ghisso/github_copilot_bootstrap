@@ -3,8 +3,8 @@ name: 2026-10-02_phase-B-engineering-planning-guidance
 type: small-plan
 parent_plan: engineering-workflow-improvements
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_engineering-planning-guidance.md
 ---
 
 # Small Plan: Planning, Reporting, and Learning Guidance
@@ -23,7 +23,7 @@ No runner changes, executable benchmark fixtures, or model runs are included.
 
 ## Steps
 
-- [ ] **1. Make outcome, risk, contract, and test reasoning explicit in planning.**
+- [x] **1. Make outcome, risk, contract, and test reasoning explicit in planning.**
   **Owner:** coder, including the worked example.
   **Files:** modify `shared/agents/planner/prompt.md`,
   `shared/skills/plan-decomposition/SKILL.md`,
@@ -51,7 +51,7 @@ No runner changes, executable benchmark fixtures, or model runs are included.
   example distinguishes a technical assumption needing evidence from a user
   preference needing clarification; it requires no executable fixture.
 
-- [ ] **2. Improve checkpoints and failure learning without duplicate records.**
+- [x] **2. Improve checkpoints and failure learning without duplicate records.**
   **Owner:** coder.
   **Files:** modify `shared/policies/agent-reporting.instructions.md`,
   `shared/templates/session-log.md`, and `shared/skills/learn/SKILL.md`;
@@ -67,7 +67,7 @@ No runner changes, executable benchmark fixtures, or model runs are included.
   no new approval loop, pause status transition, report stream, or lesson
   quota. Include one worked example where no new instruction is justified.
 
-- [ ] **3. Adapt planning, reporting, and learning guidance to relaxed sidecars.**
+- [x] **3. Adapt planning, reporting, and learning guidance to relaxed sidecars.**
   **Owner:** coder.
   **Files:** modify the planning and reporting parts of
   `shared/agents/planner/workflow-prompt.md`,
@@ -92,7 +92,7 @@ No runner changes, executable benchmark fixtures, or model runs are included.
   forced plan lifecycle, or references to unshipped files. Existing team
   collision/status/index assertions still pass.
 
-- [ ] **4. Check instruction contracts, review, document, and close out.**
+- [x] **4. Check instruction contracts, review, document, and close out.**
   **Owner:** coder for tests; orchestrator for execution; independent reviewer;
   documenter after review convergence.
   **Files:** modify `tests/test_validate_targets.py`, and only as needed
@@ -154,11 +154,11 @@ state/authority boundaries explicitly.
 
 Follow the fixed CLOSEOUT order in `shared/policies/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

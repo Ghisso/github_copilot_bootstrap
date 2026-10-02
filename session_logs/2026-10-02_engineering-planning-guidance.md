@@ -61,10 +61,27 @@ REQ-007, REQ-008, and the remaining part of REQ-009 from
   refresh exit 0, then the full Verification block passed every item,
   including `check_runtime.py` exit 0 with 0 FAIL lines. Round-2 delta and
   the answer sent to the same reviewer.
+- **REVIEW round 2** - Scoped to defects this round introduced. Gate PASS,
+  findings `[]`; B1-#1..#4 confirmed fixed; the open request closed; all
+  three coder deviations accepted. Optional (not a finding): three more
+  one-word anchors would cover the planner "remaining limit" clauses and the
+  sidecar rule's summary paragraph; not added.
+- **DOCUMENT** - `documenter` added one sentence to `README.md` `## Agent
+  System` on the planner's evidence step; the sidecar flow text and
+  `docs/architecture.md` were checked and are not stale.
+  `check_runtime.py` rechecked after the doc edit: exit 0.
+- **Findings** - 4 MINOR recorded from round 1, all `fixed`.
+- **Phase C audit follow-ups** - the full session-log template's
+  authoring-path pointer to the Verification Evidence Contract
+  (`shared/policies/...`), and the orphan lines plus comment-only example
+  block in `shared/sidecar/workflow/templates/plan-small.md`.
 
 ## [LEARN] Entries
 
-- Pending closeout.
+- [LEARN:testing] Section-scoped guidance tests drift toward prose
+  snapshots (111 phrases at first); one to five short anchors per section,
+  one removal case, and one moved-out-of-section case keep the check
+  meaningful and tolerate harmless rewording.
 
 ## Verification
 
@@ -73,7 +90,10 @@ REQ-007, REQ-008, and the remaining part of REQ-009 from
 # verify.py phase/closeout receipt path
 ```
 
+- optional 1: PASS — orchestrator inspected generated `dist/multi-agent/.claude/agents/planner.md`, `.codex/agents/planner.toml`, and `.claude/templates/plan-big.md` (decisive-assumption and experiment rules, optional requirement map) and `dist/sidecar/workflow/.claude/agents/planner.md` and its `plan-big.md` (advisory versions; planner returns its plan as reply text); prose review only, not evidence of agent behavior.
+
 ## Open Questions / Next Steps
 
-- Implement Phase B steps 1-3 and the test part of step 4, then VERIFY,
-  REVIEW, CLOSEOUT.
+- Phase C (`2026-10-02_phase-C-engineering-knowledge-refresh`) is next: the
+  OpenWiki refresh and the final live-advice audit, including the two
+  follow-ups above.

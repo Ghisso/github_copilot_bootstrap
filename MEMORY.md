@@ -1427,3 +1427,8 @@
   from their own new wording (three rounds in engineering-workflow Phase A).
   Scope each follow-up round to defects that round introduced or earlier
   findings not actually fixed; round 3 then converged with no new findings.
+- [LEARN:testing] Section-scoped guidance tests drift toward prose snapshots:
+  Phase B first asserted 111 phrases, many whole sentences, plus a
+  per-phrase removal loop. One to five short anchor terms per section (48
+  total), one removal case, and one moved-out-of-section case still failed
+  when the guidance was removed, and they tolerate harmless rewording.
