@@ -78,9 +78,9 @@ schemas intact. Missing required executable evidence remains FAIL or
 UNVERIFIED under the current contract. An unavailable optional observation
 must limit the claim of completion for the affected behavior.
 
-The existing reviewer receives the approved plan/specification, approved
-scope-change records, relevant IDs when present, contracts, scoped diff, and
-verification evidence. Review against these authoritative artifacts, not a
+After this change, the reviewer receives the approved plan/specification,
+approved scope-change records, relevant IDs when present, contracts, scoped
+diff, and verification evidence. Review against these authoritative artifacts, not a
 reconstructed interpretation or a newly preferred design. Surface ambiguity
 or missing authority through the existing clarification route; do not invent
 requirements. Existing correctness/security obligations still apply under
@@ -113,12 +113,13 @@ No automatic new rule per failure and no mandatory classification schema.
 
 ## Focused Verification
 
-Phase A updates guidance and adds small checks in the existing
-`tests/test_validate_targets.py`. Check the meaning of required clauses in
-shared source and generated full/sidecar output: approved requirements and
-scope changes are supplied and used in review, original symptoms are checked
-after fixes, and separate specifications/IDs remain optional. Avoid complete
-prose snapshots or a dependency on one exact sentence.
+Phases A and B update guidance and add small checks in the existing
+`tests/test_validate_targets.py`. Check that required key terms appear in the
+named sections of shared source and generated full/sidecar output: approved
+requirements and scope changes are supplied and used in review, original
+symptoms are checked after fixes, and separate specifications/IDs remain
+optional. Avoid complete prose snapshots, a dependency on one exact sentence,
+or a semantic checker.
 
 Existing plan, hook, verifier, and sidecar tests protect current contracts.
 A small reviewed example can explain investigating a technical uncertainty;
@@ -143,9 +144,9 @@ repair are outside this plan.
 
 ## Separate Optional Evaluation
 
-The earlier combined proposal is superseded. The immediate plan has two
-phases: guidance with deterministic checks, then the required knowledge
-refresh. REQ-006 is explicitly deferred to the separate optional proposal.
+The earlier combined proposal is superseded. The immediate plan has three
+phases: review guidance with deterministic checks, planning/reporting/learning
+guidance with deterministic checks, then the required knowledge refresh. REQ-006 is explicitly deferred to the separate optional proposal.
 It does not block delivery and is not marked complete by text checks.
 
 Before building that pilot, demonstrate that each case detects its intended

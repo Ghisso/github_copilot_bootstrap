@@ -1,8 +1,8 @@
 ---
-name: 2026-10-02_phase-B-engineering-knowledge-refresh
+name: 2026-10-02_phase-C-engineering-knowledge-refresh
 type: small-plan
 parent_plan: engineering-workflow-improvements
-phase_index: 2
+phase_index: 3
 status: planned
 closeout_session_log:
 ---
@@ -11,7 +11,7 @@ closeout_session_log:
 
 ## Scope
 
-Refresh the enabled OpenWiki layer after Phase A's guidance changes, then
+Refresh the enabled OpenWiki layer after Phase A's and Phase B's guidance changes, then
 audit live advice for the full plan. This is the final phase retained
 by the canonical Knowledge-Refresh Final Phase rule. It adds no feature,
 provider, or verification authority.

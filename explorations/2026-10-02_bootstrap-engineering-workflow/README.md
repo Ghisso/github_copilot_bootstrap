@@ -30,16 +30,19 @@ Align those instructions; do not treat requirement handoffs as wholly new.
 - This file: research, corrected gap analysis, and decisions.
 - [Implementation design](design.md): immediate guidance and preserved boundaries.
 - [Plan 1: guidance improvements](engineering-workflow-improvements.md).
-- [Phase A: guidance and focused checks](2026-10-02_phase-A-engineering-workflow.md).
-- [Phase B: required knowledge refresh](2026-10-02_phase-B-engineering-knowledge-refresh.md).
+- [Phase A: review guidance and focused checks](2026-10-02_phase-A-engineering-review-guidance.md).
+- [Phase B: planning, reporting, and learning guidance](2026-10-02_phase-B-engineering-planning-guidance.md).
+- [Phase C: required knowledge refresh](2026-10-02_phase-C-engineering-knowledge-refresh.md).
 - [Plan 2: optional behavioral pilot](behavioral-evaluation-pilot.md): deferred
   design and evidence requirements; not implementation-ready.
 
 All documents remain in this exploration directory. Only after implementation
-approval, move Plan 1 and its two small plans together to `.claude/plans/`
+approval, move Plan 1 and its three small plans together to `.claude/plans/`
 and validate them. The optional pilot has no active phases and does not block
 Plan 1. The previous four-phase draft is superseded; its evidence/evaluator
-small plans are removed, and workflow/knowledge refresh are now A/B.
+small plans are removed. Its workflow phase is split so the review alignment
+lands and is reviewed first (A), the planning/reporting/learning guidance
+follows (B), and the knowledge refresh is C.
 
 Sidecar repair is already merged. Preserve its `.ai-bootstrap/` state root
 and caller-saved planner/reviewer outputs; no repair work is added here.
@@ -174,13 +177,14 @@ prove this repository's adapter behavior. Provider expansion is deferred.
 | Behavioral evaluation | Optional later plan | First prove cases detect intended defects and load the changed roles; only then build a bounded comparison using one runner/scorer. No native runs are required by Plan 1. |
 | Concise boundary summary and failure-to-regression routing | Implement now | Extend existing log/reporting/LEARN guidance, not another report stream. |
 | Independent reviewer, deterministic receipts, protected operations, team precedence, provenance | Already covered | Preserve and regression-test them; duplicating them adds no value. |
-| General mutation-testing dependency, broad model/provider leaderboard, writable agent E2E suite, automatic prompt tuning | Implement later only with evidence of need | Runtime/version/cost complexity is not justified by the current three gaps. |
+| General mutation-testing dependency, broad model/provider leaderboard, writable agent E2E suite, automatic prompt tuning | Implement later only with evidence of need | Runtime/version/cost complexity is not justified by the gaps identified here. |
 | Codex discovery revalidation and sidecar repair | Outside this plan | Repair PR #43 is merged; preserve its behavior. Additional provider discovery work remains separate. |
 | Spec Kit install, new verifier/planner/reviewer, new memory store, compulsory spec for every task, LLM convergence receipt | Reject | Duplicates authority or adds ceremony without a demonstrated gap. |
 | Automatic commits, PRs, merges, force pushes, pause-on-failure, approvals for routine steps | Reject | Conflicts with existing authorization and lifecycle boundaries. |
 
 “Implement now” means recommended in the draft, not implementation approval.
-Plan 1 has two phases: guidance/checks, then required knowledge refresh.
+Plan 1 has three phases: review guidance and checks, planning/reporting/learning
+guidance and checks, then the required knowledge refresh.
 REQ-006 is explicitly deferred to Plan 2. Native behavior remains unmeasured;
 no baseline, runner extension, or behavior-improvement claim is needed to
 complete Plan 1. The optional pilot must first demonstrate a useful test.
