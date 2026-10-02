@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:69fdb06558ed1adcf83c4679e20829171b359d0cc6de5d7de3f884e775236b7f",
+  "pageVersion": "sha256:1f02914ae6e9beece8f1e48ff4627f9b7c8b7dc2d43144533209b87e93ce63e4",
   "claims": [
     {
       "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
@@ -132,11 +132,11 @@
     },
     {
       "id": "claim_77e4112fe74b4db290e59d7df0aeadaa",
-      "statement": "The reviewer loads checklists from review profiles rather than carrying them in its prompt, and runs a primary pass followed by a verification pass that attempts to refute each finding, repeating until a pass changes nothing (at most 3 rounds).",
+      "statement": "The reviewer loads checklists from review profiles rather than carrying them in its prompt, and runs a primary pass followed by a verification pass that attempts to refute each finding, repeating verification until two passes in a row change nothing or at most 3 rounds.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/reviewer/prompt.md#L21-L44",
-          "version": "repo-lines-v1:sha256:6894a5e3123c64dbd7be24c01bb319f90f4cf028bbf70bf53898f5a980b8a1bf:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE3MWRhNjVkMTdjZmIxZWQzYzNkN2QxNjNlNDU1YmQzZGYzMDM2OTExZjFhM2NlZjBhNzc4NzhkMTNiOGE3MTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEyNTE2MTA0ZmM5ZTBlN2EwYmI4ZjBjZWNmMjJkNGM2ZTQ1M2NlOTdkYTU5NzYyMzNmYjdiY2ExYmEzNDFiZGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJkMTVhZjc2MjFhYzAwMWUxYWZhYzRjYWE3OGQzZGU0N2E5MmMxZGM2YmZhZWJiYzQ4ZDhjOWE0Nzg2ZTNhNGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImEzOTY2Yjk0MGJiMmVjZjY2ODVjODkwMDVkMzhlMjQ0MWFjNTgxNGZhYWE2OWQ2OTgxMDhkYmMxNTEzOTFlODQifQ"
+          "resource": "repo://shared/agents/reviewer/prompt.md#L28-L45",
+          "version": "repo-lines-v1:sha256:c72fe87c945de5dc3c6e36c106c3f6e6a333830ea14bc9c18d901db210a2d0a8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4YzgzZjIyMGYyMzJmNjhlYTFlNmYzMGM2YTk2MjYwMWVkYjI4ZDYyNjA4OWMwOTQyY2Q4N2FlZmQ2MDI4MTkiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZlMzk1OTExMDEwZTdjZDFmODA2NmU3NGU1OGU1YTJkMDczZTczNDRmMWU0NWFjZTgyMzUzYjJhMDBmNGFkM2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgyZWRkMDgyOGZmZDIwZmFiMzhiZWY1NGQ0YzAxODY0OGY3NGI3NWUzZjk3NTFmNjdlYTE5NzU1Mzc1N2NhZjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNlMTg0ZDk0N2M1NzIzNzdiMTRiYjBhYTQ0ZDQzYTFkMTY4MTk5NjEwOGE5NmZiMjNhNDU2Y2U2ZDIwMGE0ODcifQ"
         }
       ]
     },
@@ -244,7 +244,7 @@
         },
         {
           "resource": "repo://shared/agents/orchestrator/workflow-prompt.md",
-          "version": "repo-file-v1:sha256:645bcd98b6afd43c746732ef45830d3d3ea90fe1c8f77290cec0cb21247aeb6c"
+          "version": "repo-file-v1:sha256:c67157aff4393a376e223423d6560c75c9b9e8057939c23edf72761b0b2d525d"
         }
       ]
     },
@@ -253,22 +253,106 @@
       "statement": "In the sidecar workflow profile, the orchestrator delegates a step only to an agent the current session can start and otherwise performs that step itself, while the planner and reviewer return their plan or report as reply text that the requesting agent saves under .ai-bootstrap/.",
       "evidence": [
         {
-          "resource": "repo://shared/agents/orchestrator/workflow-prompt.md#L14-L52",
-          "version": "repo-lines-v1:sha256:a30f558db1fae1b76b4b7703f1b7c3b3124a7074bf05a7ffe8eeb65fddab0b69:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjMjA3ODFmMWU1YTA1ZmFiMTAwMzc1MjE1NzJmZDRiMTllMDg5NzQwMjc4YThhYWJmYmQ3YTA5YjYwMTE2YWMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3ZWZkZjU3YzIzMjJiNTA5ZTI2YjMyZTQzZjdhYzMzMzJlNTQ3NmM4YjNmNWRlNWY4NDc0NzQ1NTczMjIyNjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijk5ZmE0NTU3MTRhMGY0ZjYzZjNmOTU4MzYxZDhkYjdkYmY1NGE5ZGQ1OTYxZDE1NWZkMjc0MmI2OTQwNDFhZTQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE5MjUzYjM5YTIyMTU0NzlhYTkzNWIwNmY3ZTIxMTkzNDk1NGIzNDBjOTg4MTMwYTRlZDg1N2ZjZTcwYzljYWYifQ"
+          "resource": "repo://shared/agents/orchestrator/workflow-prompt.md#L13-L62",
+          "version": "repo-lines-v1:sha256:cba3ebd73c56f6ea4447c415094037948d9f7139fdda9a03dd599a17d70b83e2:eyJzZWxlY3RlZExpbmVDb3VudCI6NTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY3MmFlYTAwMDBmMGU1MDgxMDc4MDQwODgwZTMxMjU4ZTI2NThlNDM0M2VjZTk3ZjkxMTU3ZGYwZDEzMjBmMjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMjlkNjQ4ZjI2ODNhNmZmOTYzOWIxMDc2NDM1MGJhZmJiMWJlNTk1NzM4YTQ2NDJjYjExNWE0NTRhZjcwZmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzYzQyYThlZGU0ZjQ3NmM0Mjg4ZWJiMzI3YzEwMmE4NDMwZjA2MjcxNDI5ZmM1NmI3ODc1ODNhMmE2YjAyMzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0NjgyYTIyNjc0MDFkNjdiMTMyZmM1Njg4YzFkNjZkMjg0MmY0MWIyMTlmNTA0MWFjZjk2NjY1MzQwNzZiNDAifQ"
         },
         {
-          "resource": "repo://shared/agents/planner/workflow-prompt.md#L11-L15",
-          "version": "repo-lines-v1:sha256:f63622217c6896f2ae4ff584cae6259cd9216c28a4bf87daada633a91648ceef:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNzZkYTkwODNmNTJlZGY0MjI3MDI3ZTNlYjU2MjljZTJlNDVhNWJlNzNmNTZkMDA4Y2NkYWZjOTM0NTk5ZWYyNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFlY2JkZDJiMzZiN2Q1YThlYjQyNThkNjBlYjhmNzYxNGE5NGJhYjMzYmY3OTVjMTU3YjJlMTU1NmRlYWI1MSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjY0YmJmOTUwYzg1MTczZjZiYzA0NzM5NGUzZmIxN2QyNmQ0ZDkwNTYyMWVhYjg1YzMxYzI4YjZlZmQyN2MxMCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDA3MzkyZjFiOWNlZjQ3NTkyNGNhYzk5ZGI1ZjA0MzFiYWI5MGFlMGQwMjZjMWY0MTczZDgzNmZkNWUyM2IyYyJ9"
+          "resource": "repo://shared/agents/planner/workflow-prompt.md#L10-L16",
+          "version": "repo-lines-v1:sha256:b339309c79b5600858f6ff9cdd0d4722a9a9750e0d5797b479e98dbcf42086c6:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNjg1NWEzMTJmYmY5ZDkzNDI4Y2IxNmNlZTY1YzQyMTZjYjI5NDAzZDI0ZTExZDY5YmJkY2JhOGNjMGRkMzJhNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODkyNmQ4ZmJjOGU2MGIzZDI1YTcyMzBjOTBkYTg2NjIxNjczZmE4YjQ3MDNmMjg3YjM4ODAzZWZmMDAwOTk1ZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDk1MDM0MzRjOTJlMWE3YjVhNDIzOWNhYTVlMWRlMjk5MWY4MTMyM2IxY2NhZjI2YWE3NjM0YzAwYWEzNmMwZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODdmMzcyMjJmZWM4NDNiMjQ4OGEzODE1NWRmYTVmMzk4ZjkxY2I0NmU4MmRiYTczMzRkNTc1NDAxMzRkY2Y4YSJ9"
         },
         {
-          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L36-L41",
-          "version": "repo-lines-v1:sha256:21716d88327f0df579519721cbe65941a9fba23760e46927a1caa0125da270b7:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjVhZDRhYzRlMjIwNzhjZjNmOTU2YWFiMzg4ZTg0OWEzMmYxNzcwNGIwMWI0YjU4ZjM3NThmOTFmZmIwZjdkYiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiN2UxZDVlMTkzM2Q3ZGVmYmEyYmM4OTA4ZDY4N2FkZGE1NzU2N2YzZTVjZDhmYTE5ODdlNGZiOGU3YTYzMDI5ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTcyM2RiMGQ4NDNjNjgwMzg3MjdlOWQ0ZWZjNGE0OTcwMjc0ZTJlYTQxYjY2ZWQ3OTM3OTk0OGI2ZDk2YWU3YiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTg4ZmYzYTE1MTgyMjNjMmJjYWUxYzQ0ZjIwOGQzZmQxZjA0ZGE0Y2M5OGI2MTM2NzZkYmE1MDEzNWI4MzZkOCJ9"
+          "resource": "repo://shared/agents/reviewer/workflow-prompt.md#L47-L57",
+          "version": "repo-lines-v1:sha256:c89b6d414bfa81c3671b2ef3b5676918da4902371f58e564a1da5157f3733b08:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk2OGUwYmE3MGFjNTRkMTc2ZTA5ZTFlMTc1ZGJjZjA5NDQxMzNjMWM1MGE5ZDI0YjllNGIzYmZiNGEwYzU5ZDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdlMWQ1ZTE5MzNkN2RlZmJhMmJjODkwOGQ2ODdhZGRhNTc1NjdmM2U1Y2Q4ZmExOTg3ZTRmYjhlN2E2MzAyOWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVhZjY2NmFiZGRlNDNkMGQwOWUzYzdkZDM5MjM4ZWQxNjY1OGViNGYwNzc3YTlmNzAyMzIyYzNkODYxNGY1OTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk4OGZmM2ExNTE4MjIzYzJiY2FlMWM0NGYyMDhkM2ZkMWYwNGRhNGNjOThiNjEzNjc2ZGJhNTAxMzViODM2ZDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_442563f4a3584a04a55249e8872faeb3",
+      "statement": "The reviewer compares the diff against the supplied approved plan or spec requirements and approved scope-change records: every in-scope behavior needs an implementation and evidence, an approved scope change supersedes the requirement it changes, a valid alternative implementation is not a deviation, and missing material behavior is an ordinary finding rather than an invented requirement.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L35-L41",
+          "version": "repo-lines-v1:sha256:c0e572c9464dc32d1223cae6aeb31cd5390f07664931a9f34a2ec01f77a32994:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTU2MDIyMzUyYTgwZjJlNTQwY2U5NjQ3ZDhlNjZkNmQzZmZmNmY0Y2JkNDgyNGQ2YWU3NDMwNGU3NzQwMDVkMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDFlMWJjMDJlYTA2YzcyOWExZTg2MjBkZGU2M2I3NmYyZWNlMWVlYzA3OThhM2NkNmMxZDQ4M2IxZDU5NGJjMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjExZDZhOTM4ZmRiMTFmMjRmODBiZjQ0NTJlYjgxZjI1Y2VmYmJiOGU0ZTc2ZjUxZWJmYTY0NTNmZDExOTgzOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYTIxY2I4YjM0YTNjMGQ5ZmZlZjhkZTUyZDYxZjc3MDI2MTBlMDQyMGY0MzQ0MGMxNmE5MTA1MTE5NGM4MDZiOSJ9"
+        },
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L9-L9",
+          "version": "repo-lines-v1:sha256:3b20f6f4bef481bc2918c4d8eb74045e12859df1b7b25843db3a6686ee2384be:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2IyMGY2ZjRiZWY0ODFiYzI5MThjNGQ4ZWI3NDA0NWUxMjg1OWRmMWI3YjI1ODQzZGIzYTY2ODZlZTIzODRiZSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2IyMGY2ZjRiZWY0ODFiYzI5MThjNGQ4ZWI3NDA0NWUxMjg1OWRmMWI3YjI1ODQzZGIzYTY2ODZlZTIzODRiZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWMzN2M2MmNmYTdkMGQ1NjJhNDdiOWFjYmU0ODJkMmI3NTBkNmZmNmRiOGQwNjhlMjI0N2MxYzRkM2YxZWFlMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMjU5YzM5NzJhZTI5NmFhMTEzYmJjZTUwNjg0NGVjZWM2MzNlMTM3M2U1NGEzZjVhYjE1ZTI5ZTJjNGNhZTA2OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6b16cb7780dc495e881461195ac2968e",
+      "statement": "Because the reviewer cannot pause to ask, it lists missing requirements or execution evidence under an optional Open Requests report section and answers WARN instead of PASS; a request answered with a stated reason closes as an unverified limitation, open requests stay out of the findings JSON, and an empty findings list is a clean signal only when no request is open.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L50-L50",
+          "version": "repo-lines-v1:sha256:824817ad83d4ff1bdf5f361daafac17f72a79b3c88160159f2c229511cf29731:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiODI0ODE3YWQ4M2Q0ZmYxYmRmNWYzNjFkYWFmYWMxN2Y3MmE3OWIzYzg4MTYwMTU5ZjJjMjI5NTExY2YyOTczMSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiODI0ODE3YWQ4M2Q0ZmYxYmRmNWYzNjFkYWFmYWMxN2Y3MmE3OWIzYzg4MTYwMTU5ZjJjMjI5NTExY2YyOTczMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTdjYzRjMmRiNGMzMGE1NGU4M2E3NzQ1NjE0YmZhYjIzYmM3NzJlOTcwZDM3NWZlMzgyY2UwNzQ4ZTNiZTEzMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYWM4ZjczNGI4YTc3M2RhMmE3YWNhNTFhMTk1YjgyZTgzNDQxNzRjMTk4NzllZDhmNjUwMTUzNDMxZWY5NWQ2NCJ9"
+        },
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L74-L78",
+          "version": "repo-lines-v1:sha256:f9ddf43f840a59d47ba98e8bd7d9044cb980b2d14b25d0fc2269320985e91c4f:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzQ1YTBjNjM5ODY5ZDczZDRlODJhZjk3NzkyNGVlMTU0YWVmNTYwM2JmMTUzZGI2OWE2OGZiNzQ4MzE3Njk1YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUyM2Y1ZGQxODc2ZmE1NDM4NDU4ZGI0MjNkODA3MGQ3M2RjOWZjYmI1YTA4ZmY1YTIyMWEzYWRlNDg3MjliMiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZGJhOTJlN2I1N2ZjOWI1YzAyMGFhNjQxOWI2Y2Q3ZTIzOWZhYzg2YTMzY2E5MTcyZWU1MzIwYWE4ZDhjNDVjYiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDk3OTA2YTg1ZDUwYjQwMTFjNGFhMWUwYzEwNjY1MTA1YzM5OWE3ZmI2N2U5ODAzMmNmMjA1M2QyMGJlYjk4YyJ9"
+        },
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L97-L97",
+          "version": "repo-lines-v1:sha256:de097647b765451a41853ddd4546dc8298045671385887d1d926116db1f141ef:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUwOTc2NDdiNzY1NDUxYTQxODUzZGRkNDU0NmRjODI5ODA0NTY3MTM4NTg4N2QxZDkyNjExNmRiMWYxNDFlZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZGUwOTc2NDdiNzY1NDUxYTQxODUzZGRkNDU0NmRjODI5ODA0NTY3MTM4NTg4N2QxZDkyNjExNmRiMWYxNDFlZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNDYyYTMyZTM1OGMwMThhZGNlOGI3OTJkOGZkMzAyYjJjZWY4N2E1NzZiMzc1MDk3YTFiOTlhMzkxMTYxMmI4MyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjIsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGEyZTQyNmZkYWZjMGUxM2I5YzI4ZjlkNzc4YmRjNTVhMGI3MWViMDhjMDk4MTg0NjQ3YTY5YzdkNDcyMTE5ZiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_d26ac3c2b198468ebd1e8ca88631491d",
+      "statement": "The orchestrator's reviewer packet carries the approved requirements, non-goals, approved scope-change records, and the verification results already obtained, and the orchestrator answers each open request with the result or the plain reason it cannot be produced before re-running the review.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/orchestrator/prompt.md#L126-L128",
+          "version": "repo-lines-v1:sha256:5157c74229aeb68840e37dc477f2245256eac1cb024bafbcee216aa3b275db3e:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTU0OTIyMzVhMjJkMmI2MjI0OTNmMTkxZGVlNjdlOGU1NDIzN2UyY2JkMmUxZWQ4NjViMzlmOWJjZDk0YzVmNCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTkyODdmODk3MGFlNDg5YjdlYWVhNzRkMDUwOTI3YmVjZDdlOTI3ZGI4NWFkYzY4Y2QxMmIzZGEwNWU5ZWVlMSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZmQ0ZDViNmM0NTMxMjhlNDhjM2U3MWExMDJkZTQ0MWEzNjFhNTUwNDcxZjJlNmUxMjNiOTZiMmEzMDVmNjIwYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmI1MjNmNTIwYTIyM2I0Y2MzOWM4MTVmNGEyMmIwZTMzNTA0ODVhMzVmNjcwM2M2ZGZmMDc0Y2QxZGJmODQyNSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_95d3b20f9caf4d3ab11b3c21db3646c5",
+      "statement": "In full-plan mode the planner settles each decisive assumption (one that would invalidate the design if false) from code, docs, or a bounded experiment before splitting phases, never treats an experiment as authorization for production changes, asks the user only about preferences, and cites existing contracts and the test strategy before writing steps.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/planner/prompt.md#L53-L98",
+          "version": "repo-lines-v1:sha256:4965a0eb8e70ebb313b59e048158b9dd254e354d069342cd13e06e31a493324c:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBiZTNhMzY5MTE4M2VjZGM4ODM5NmIyNzdiNThjMWRiNGJjZDk0ZGRiMmRlOTI4ZDhjMGZlNTFkNWU3NjE5MGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFmM2M0ODE2YmM4MWMyYzNlZTNhNmZlYWQyMDJkNzBlMTFiNzc3OTFhNGFlNDY1YzUzZGZjMGFhMDhlZjNlOWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImI5ZDVlNWE0NmYwZWQyNmVlODcyYzE5Mjg0OTc4YzI2ZmJiYmU4NzU3YTI1MjFjMTgyM2ZkNGUxMWVmMGViMjEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmN2RlNjI4ZjgyMThlYmVhOGMxZDVmYjE1NjE2OTExYzdhM2Y3MGIwMmNkNGU5ODdhOTI0MWE4Y2JkN2I0NWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_101e81d1d54a4e7b8eb9282255704662",
+      "statement": "After a bug fix the coder and the debug-investigator skill rerun the original reproduction and record the outcome or why it could not be rerun, and a green test suite alone does not count as original-symptom verification.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/coder/prompt.md#L56-L57",
+          "version": "repo-lines-v1:sha256:f730d7eed422586d72414caff1561b5c03cc06cb7b329492e030448d8a0884e1:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiM2EyZjcwMzczODM0NDhkY2IwMzhhODkxMzk5MmIwZDA1MGQzMjg3NDkwYzI2OWJlOGU3MzQ4ZGQxZjM3YmZjNiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNGI5MmUyN2UyM2JjNTc5YzQxZGZlOGQyMTA5ZmU3ZTQ0MTE5ZTI2YjliY2RiMWNiYWRlMDUzY2MxZjYwOGFlNSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYjM3OTNiOTc2ZDFkNDBlOGZhZTg0Mjc3NDk1MjUwODdiMzllZTgyNWEzNDQxYzIzMzlkMmRiNTJmZDY3MzY4YyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMGFjNzI0NmM5NGI1Yzk5NDBhMzRjMjA5NDBhZDZmYTFjMzFlNzYzNDhlZWE3NWYyYjJkYzI4YWI2Yzk5MzkzNCJ9"
+        },
+        {
+          "resource": "repo://shared/skills/debug-investigator/SKILL.md#L138-L148",
+          "version": "repo-lines-v1:sha256:4c9bc7e379a464961169a5a27219f61ffacb2a333f40c8665a78d18fb243f0f9:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM2NjgyZmE2MDI0Y2Q0NjIxM2MyNGRiMjgwZDRlN2Y0OTFiZmE0OTcwMjRhOTY2OWM2NDg2OTE2NDhlNDM4MmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU3OTNhNDg0MzcyMjAyNGY5YjEzNjdjYmY3ZmRhZWM5NTU5YWU4MTA3MjkxYzNjZjI1NzU1YzI1NTg4Nzk0NzAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiMzRmOGEyMTBlMTM1N2UzNzQzNTE0ZjFlZDEwZTM0ZDVmNzdlMjExNDdjNzU2Njc0ZTBlZjkyMTg1NTlhYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczNjU1ZWEzOTBiNTNkNjM1YjVhNzA2ZmExN2ZmODU3NDgzNmNmY2MyYzgwYjIyNzU2MGUzOWUyOGFmYmNiMzIifQ"
+        },
+        {
+          "resource": "repo://shared/skills/debug-investigator/SKILL.md#L212-L218",
+          "version": "repo-lines-v1:sha256:80dd7405e5f1fcf6fe1eaed030f483b627a99c65aa435a5f7b03aa7c8e3a3b20:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTUzODJmYjYwMmMzM2I4MmJlMTczNjgwYjk2OGVhNmRiMjgwNjg0MjFjZDA1ODc5YWMxOGZmOTcxYzQ2MzJlNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNDdjMDZjNTYxZDVjMzI3MzQzNjg1MjY4YTQ2YjMzOTFmMzk5OGVlZTg5MGQyYmU1MWYwZDIxY2M0YTUzYWU2ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjMzNjliNjVjNTllNjdjYmQzODIxZDQ1NzAyZDNlOTQwNzAyMGU2MDJhYzliOTY2NjY0ZDY3Y2Q5NjYyMGEwMiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNzVjMGNlZDc5ZTIzMmM2ODU4NzZlMTE4ZWViNzAyZmU5NTUyYzBjZTkzNTc0NWNkNDNhMDgxZTEzZTY4YzQxMiJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_06546674c67c44a2a436e8a5af23ae3d",
+      "statement": "Section-scoped key-phrase tests check that the review and planning guidance ships in the shared source and in generated Claude Code, Codex, and sidecar output, and fail when a phrase is removed or moved out of its section; they check shipped text, not model behavior.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_validate_targets.py#L3224-L3460",
+          "version": "repo-lines-v1:sha256:1121c95df47c1b73944fc4b229604fc66bc77f182511d99f4cdbb41e62693d7c:eyJzZWxlY3RlZExpbmVDb3VudCI6MjM3LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3ZjE0OTRkM2MyODAwYTI2NDBkM2QyMjI0NGYyOGUwNDg1ZjRhMTRkNmM4NjlmMDQ4MDljMTk1ZjFlNDkzMjczIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJkMTdjNjhiMjExY2E3ZTMzM2U1YTA2MjkxMTEzZTEwZjc2NjViOWFjNjhkNGRjZjgxYjIxYzBhMzRkYmNlZDg3IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhZWQ0ZTNmMDUzMTkyN2VjMzQwYTU3MzQwMzkzYTM1NzAzZWJmMjdjZDUyZmY4ZjlmOTA0MDg0YmM3YmQ5YjBmIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkYzMzMWEwNTk4ODZiOGJmMTc1NDYzZDA1Njg1MmRiNDczMTNiOTgzMWQ0NzE2YzkzMjFjYTdiZmY5ODEyOGUyIn0"
+        },
+        {
+          "resource": "repo://tests/test_validate_targets.py#L3569-L3760",
+          "version": "repo-lines-v1:sha256:a62ee1f300eb24d5b951d7908ebaf1be521d7d8709b9546e2ee4727460c54b1b:eyJzZWxlY3RlZExpbmVDb3VudCI6MTkyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwNjQ4NjJlMWYyNjQ2ZWRlMzJiNjQwNzRhZDk0MTA1MDNjMDhkNzg2YzhlYzhiM2U0M2NiNjQxMjNmOWFkOThjIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiI1YTE4N2M0MTY1YmQ0NDlkMWNjMjAzN2MxZjBmYjBiNmRlMzYwMTBhYmM3OGMwOTQwZjQ2MGE2NGY3ZTk3ZjI5IiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJjM2JjMjhmZTY5Y2RhN2E5YTY4MTc0NWY0NGEzMTA0YmEyMTRjMzAwOWQxYzJiN2EwNTg5ZGI5OGE1ZjE4MTI5IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJmYTQ1ZWU0MDY1YTY5MmVhYjhjNDI3ZWJhN2UwN2JiMjBlZGY3NjcwOTgzNjAwNzViODgxMWE0OTAzMTZhN2RmIn0"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-10-02T10:43:27.367Z"
+    "at": "2026-10-02T14:20:50.150Z"
   }
 }

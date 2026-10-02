@@ -3,15 +3,10 @@ name: <YYYY-MM-DD_phase-X-slug>
 type: small-plan
 parent_plan: <big-plan-slug>
 phase_index: 1
-# status must occur exactly once: planned | in-progress | paused | complete | cancelled
-# New phase files default to planned (not yet started); the branch-creation
-# and post-commit hooks flip the active phase to in-progress automatically.
+# status must occur exactly once: planned | in-progress | complete | cancelled
+# New phase files default to planned (not yet started).
 status: planned
 closeout_session_log:
-# Pause fields (required only when status is paused):
-# paused_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
-# paused_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
-# pause_session_log: <repository-relative readable UTF-8 PAUSED session log>
 # Cancellation fields (required only when status is cancelled):
 # cancelled_at: <valid UTC YYYY-MM-DDTHH:MM:SSZ timestamp>
 # cancelled_reason: <meaningful single-line prose; no YAML block/collection/list/comment forms or leading quotes>
@@ -23,6 +18,8 @@ closeout_session_log:
 ## Scope
 
 [What this phase changes]
+
+<!-- Cite the big plan's requirement IDs where present; do not copy the requirements. -->
 
 ## Steps
 
@@ -55,6 +52,3 @@ None of this blocks a commit; it is the order that keeps the record honest.
 - [ ] Session log under `.ai-bootstrap/session_logs/` has `**Status:** COMPLETED`
 - [ ] Reviewer's report saved under `.ai-bootstrap/quality_reports/` and its Critical and Major items resolved or explicitly deferred
 - [ ] The Verification commands above ran and passed
-Keep the big plan `in-progress` with the same `current_phase`. On resume, read
-the pause log and Git state, restore this plan to `in-progress`, and continue
-this same phase without creating another small plan.

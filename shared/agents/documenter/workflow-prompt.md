@@ -49,7 +49,9 @@ knowing — a naming pattern, a doc convention, a pitfall — add one line to
 `.ai-bootstrap/MEMORY.md`. If you are the one closing out the task,
 write or update the session log under
 `.ai-bootstrap/session_logs/` describing what you documented and
-why.
+why. When the task hit a failure, record its reproduction, cause,
+smallest fix, and guarding test there; add a `MEMORY.md` line only for a
+lesson the code and tests cannot show.
 
 ## Reporting back
 

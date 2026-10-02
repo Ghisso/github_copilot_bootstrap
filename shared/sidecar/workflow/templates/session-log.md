@@ -13,6 +13,9 @@
 
 ## Work Log
 
+<!-- At a stopping point, add a short summary: goal, what changed,
+     departures from the plan, checks run, open findings, and next step. -->
+
 - **HH:MM** - [What was done, what was decided, what was learned]
 
 ## Verification

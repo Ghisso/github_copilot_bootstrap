@@ -26,9 +26,23 @@ current_phase:
 
 - [Goal]
 
+## Non-Goals and Constraints (optional)
+
+- [What this plan will not do, and limits it must respect]
+
 ## Design Overview
 
 [High-level design]
+
+## Requirement Map (optional)
+
+<!-- The optional requirement map is for requirements that span several
+     phases; a simple plan omits this section. IDs such as REQ-001 are prose
+     references, not frontmatter fields. -->
+
+| Requirement | Acceptance and existing contract | Owning phase | Evidence |
+| --- | --- | --- | --- |
+| REQ-001 | [Observable behavior; source or symbol] | `<small-plan-slug-1>` | [Test, probe, or log] |
 
 ## Phases
 
@@ -43,9 +57,8 @@ current_phase:
 ## Verification
 
 ```bash
-uv run python scripts/generate_targets.py --all
-uv run python scripts/validate_targets.py
-uv run python scripts/check_runtime.py
+# List this project's own test, lint, and type-check commands, taken from its
+# README or docs/ folder.
 ```
 
 ## Completion Evidence

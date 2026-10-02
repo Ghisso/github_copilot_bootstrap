@@ -532,7 +532,7 @@ guidance, if any, always wins over the sidecar's.
 ```mermaid
 flowchart LR
     M[read MEMORY.md] --> P{plan helps?}
-    P -->|yes| PL[planner writes a plan]
+    P -->|yes| PL[planner drafts a plan]
     P -->|no| I[implement]
     PL --> I
     I --> V[run the project's own checks]
@@ -541,10 +541,10 @@ flowchart LR
 ```
 
 Read `.ai-bootstrap/MEMORY.md` first; write a plan under `.ai-bootstrap/plans/`
-when a task spans several files or decisions — the `planner` agent if this
+when a task spans several files or decisions — the `planner` agent (which returns the plan text for you to save) if this
 session has one, otherwise the agent itself; implement; run the project's
 own checks; review a non-trivial diff with the `reviewer` agent, whose
-Markdown report goes to `.ai-bootstrap/quality_reports/`, or as a
+Markdown report you save to `.ai-bootstrap/quality_reports/`, or as a
 self-review when no reviewer is available; log the session and record
 lessons in `.ai-bootstrap/MEMORY.md`. No step blocks a commit.
 
@@ -1235,7 +1235,13 @@ orchestrator and canonical scripts, not delegated agent roles. The unified
 routed via the single authoritative table in
 `.claude/instructions/workspace.instructions.md`, and runs a primary pass
 plus a verification pass that refutes and drops findings that do not
-survive, with no helper agents.
+survive, with no helper agents. The reviewer compares the diff against the
+approved plan requirements, non-goals, and scope-change records. When it
+lacks a requirement or execution result, it lists an open request and answers
+`WARN`, and the orchestrator answers the request and re-runs the review. For a
+full plan, the planner settles each assumption that would invalidate the
+design from code, docs, or a bounded experiment before it splits phases, and
+asks you only about preferences.
 
 See [Agent roster, prompts, and the skill
 library](openwiki/architecture/agents-and-skills.md) for how each target

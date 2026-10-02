@@ -141,8 +141,9 @@ After finding the root cause:
 
 1. **Root cause** — What was actually wrong, precisely.
 2. **Fix** — What was changed and why.
-3. **Prevention** — How to prevent recurrence (test, lint rule, type check, etc.).
-4. **Lessons** — What was learned that applies beyond this specific bug.
+3. **Original-symptom check** — Rerun the original reproduction (the Phase 1 symptom or the Minimal Reproduction) after the fix and record what it now shows. If it cannot be rerun, record why. That is an unverified limitation, not "resolved". A passing test suite alone is not this check.
+4. **Prevention** — How to prevent recurrence (test, lint rule, type check, etc.).
+5. **Lessons** — What was learned that applies beyond this specific bug.
 
 ## Output Format
 
@@ -211,6 +212,7 @@ supports — the three rows below are an example, not a required count.
 ### Resolution
 **Root cause:** {What was wrong}
 **Fix:** {What was changed — file:line, diff summary}
+**Original symptom after fix:** {Original reproduction rerun and its result, or why it could not be rerun}
 **Prevention:** {Test added, lint rule, type annotation, etc.}
 **Lessons:** {What generalizes beyond this bug}
 ```

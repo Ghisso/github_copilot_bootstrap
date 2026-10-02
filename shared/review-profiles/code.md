@@ -13,6 +13,7 @@ Use for Python source quality, maintainability, and local design.
 - File I/O uses `pathlib.Path`.
 - Resources use context managers.
 - Exceptions are specific and chained with `from e`.
+- Every in-scope behavior in the supplied approved requirements and scope-change records is implemented, and nothing unapproved was added. Missing material behavior is an ordinary correctness finding; a style omission alone is not.
 
 ## Severity
 

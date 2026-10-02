@@ -18,6 +18,9 @@ identifier when applicable.
 
 ## Work Log
 
+<!-- At a phase boundary, add the short summary shape defined in
+     `.claude/instructions/agent-reporting.instructions.md`. -->
+
 - **HH:MM** - [What was done, what was decided, what was learned]
 
 ## [LEARN] Entries
@@ -34,7 +37,7 @@ Paste the required items' `PASS <duration> <item>` summary lines that
 `verify closeout --format text` printed. Then record every optional item's
 outcome, one line per item: `- optional <n>: PASS|FAIL|NOT RUN — <detail>`;
 a `NOT RUN` line needs a non-empty `<detail>`. See the Verification Evidence
-Contract in `shared/policies/workflow.instructions.md` for the full rules.
+Contract in `.claude/instructions/workflow.instructions.md` for the full rules.
 
 ```text
 # verify closeout --format text summary lines

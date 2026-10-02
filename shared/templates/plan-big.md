@@ -26,9 +26,24 @@ current_phase:
 
 - [Goal]
 
+## Non-Goals and Constraints (optional)
+
+- [What this plan will not do, and limits it must respect]
+
 ## Design Overview
 
 [High-level design]
+
+## Requirement Map (optional)
+
+<!-- The optional requirement map is for requirements that span several
+     phases; a simple plan omits this section. A separate requirements spec is
+     for requirements that span several artifacts. IDs such as REQ-001 are
+     prose references, not frontmatter fields. -->
+
+| Requirement | Acceptance and existing contract | Owning phase | Evidence |
+| --- | --- | --- | --- |
+| REQ-001 | [Observable behavior; source or symbol] | `<small-plan-slug-1>` | [Test, probe, or log] |
 
 ## Phases
 
@@ -43,9 +58,7 @@ current_phase:
 ## Verification
 
 ```bash
-uv run python scripts/generate_targets.py --all
-uv run python scripts/validate_targets.py
-uv run python scripts/check_runtime.py
+uv run python .claude/scripts/verify.py fast --format json
 ```
 
 ## Completion Evidence
@@ -61,6 +74,5 @@ whenever the phase it is closing out is this list's last entry.
 
 In a repository where `openwiki/INSTRUCTIONS.md` exists, that final phase
 may also need to be a dedicated knowledge-refresh phase: see the canonical
-Knowledge-Refresh Final Phase rule in `shared/policies/workflow.instructions.md`
-(installed as `.claude/instructions/workflow.instructions.md`) for exactly
-when and how, including its recursion guard.
+Knowledge-Refresh Final Phase rule in `.claude/instructions/workflow.instructions.md`
+for exactly when and how, including its recursion guard.

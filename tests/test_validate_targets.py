@@ -802,7 +802,7 @@ def test_reporting_policy_and_agent_prompts_preserve_the_audience_boundary() -> 
         assert reporting_prompt_errors(prompt_path.parent.name, prompt) == []
         assert reporting_prompt_errors(
             prompt_path.parent.name,
-            prompt.replace("agent-reporting.instructions.md", "reporting.md", 1),
+            prompt.replace("agent-reporting.instructions.md", "reporting.md"),
         )
 
     coder_prompt = (REPO_ROOT / "shared" / "agents" / "coder" / "prompt.md").read_text(
@@ -2969,9 +2969,12 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # render_sidecar(target_root) -- the single-profile signature, immediately
 # before it gained a `profile` parameter and the `dist/sidecar/skills/` vs.
 # `dist/sidecar/workflow/` split. Acceptance Criteria: "dist/sidecar/skills/
-# equals today's dist/sidecar/ byte for byte."
+# equals today's dist/sidecar/ byte for byte." Any edit to one of the four
+# shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
+# changes this hash and needs the same re-capture; the last one was the
+# engineering-workflow-improvements Phase A debug-investigator step.
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "05eace56227ab6b0cc9678c2b34b06403be9b302a61aa16fbd1ce687a0d27396"
+    "a00e2ef4e7f1d6fa132455c9bc5d4336c3073904bd030fcc7c552053a857d985"
 )
 
 
@@ -3201,6 +3204,666 @@ def test_render_sidecar_workflow_orchestrator_and_rules_say_the_caller_saves(
     assert "you save that report under" in rule_text
     assert "write the plan yourself instead" in rule_text
     assert "review the diff yourself against the review profiles" in rule_text
+
+
+def _section(text: str, heading: str) -> str:
+    """Return the body under `heading`, up to the next heading of equal or
+    higher level; an empty string when the heading is absent. A bold label
+    without `#` (the planner's `**Phase 1 ...**`) ends at the next bold label
+    or heading."""
+    level = len(heading) - len(heading.lstrip("#"))
+    end = rf"^#{{1,{level}}} " if level else r"^\*\*|^#{1,6} "
+    match = re.search(
+        rf"^{re.escape(heading)}[ \t]*\n(.*?)(?={end}|\Z)",
+        text,
+        re.DOTALL | re.MULTILINE,
+    )
+    return match.group(1) if match else ""
+
+
+def _guidance_errors(
+    texts: dict[str, str], guidance: tuple[tuple[str, str, tuple[str, ...]], ...]
+) -> list[str]:
+    """List each key phrase missing from its named section of its asset.
+
+    Phrases are short and whitespace-normalized, so a rewrap passes but
+    removing the guidance (or moving it out of its section) fails.
+    """
+    errors: list[str] = []
+    for asset, heading, phrases in guidance:
+        body = _collapsed(_section(texts[asset], heading))
+        errors.extend(
+            f"{asset} {heading!r} lacks {phrase!r}"
+            for phrase in phrases
+            if phrase not in body
+        )
+    return errors
+
+
+# (asset, section heading, key phrases) for the full-install guidance:
+# REQ-004 (review against approved requirements and scope changes) and
+# REQ-005 (independent test expectations, original-symptom verification).
+FULL_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "orchestrator",
+        "## Delegation Rules",
+        (
+            "the approved plan/spec requirements and non-goals, the approved scope-change records",
+            "must also carry the approved requirements, non-goals, and approved scope-change records",
+            "the verification results already obtained",
+            "A `WARN` report with open requests is not a clean review",
+            "or, when it cannot be produced, the plain reason",
+            "supply it, or say it does not exist",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Inputs",
+        ("approved plan/spec requirements", "approved scope-change records"),
+    ),
+    (
+        "reviewer",
+        "## Review Flow",
+        (
+            "compare the diff against the supplied approved requirements",
+            "valid alternative implementation of an approved requirement is not a deviation",
+            "never as a requirement you invent",
+            "Also check the tests",
+            "as an open request",
+            "You cannot pause to ask the caller",
+            "answer `WARN`, not `PASS`, while any request is open",
+            "under `### Open Requests` just before `### Gate Result`",
+            "keep them out of the Findings JSON",
+            "is closed: record it in the report as an unverified limitation",
+        ),
+    ),
+    ("reviewer", "### Open Requests", ("only when a request is open",)),
+    ("reviewer", "## Findings JSON", ("but only when no request is open",)),
+    (
+        "coder",
+        "## Execution Rules",
+        (
+            "approved scope-change records",
+            "Do not silently rewrite approved requirements",
+            "rerun the original reproduction",
+            "A green test suite alone is not original-symptom verification",
+        ),
+    ),
+    (
+        "debug-investigator",
+        "### Phase 6: Resolution Documentation",
+        ("Rerun the original reproduction", 'unverified limitation, not "resolved"'),
+    ),
+    (
+        "debug-investigator",
+        "### Resolution",
+        ("Original symptom after fix", "why it could not be rerun"),
+    ),
+    (
+        "code-profile",
+        "## Checklist",
+        ("supplied approved requirements and scope-change records",),
+    ),
+    (
+        "tests-profile",
+        "## Checklist",
+        (
+            "independent of the implementation under test",
+            "targeted negative control",
+            "report it as still needed",
+            "original reproduction now behaves correctly",
+        ),
+    ),
+)
+
+# The same guidance in the relaxed sidecar's advisory wording. The reviewer
+# still returns text and its caller saves it under `.ai-bootstrap/`.
+SIDECAR_REVIEW_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "orchestrator",
+        "## The relaxed loop",
+        ("rerun the original reproduction",),
+    ),
+    (
+        "orchestrator",
+        "## Delegation",
+        (
+            "the approved requirements and any approved scope changes",
+            "it compares the diff against them",
+            "a rerun of the original reproduction, or a negative control",
+            "run it yourself and hand back the output",
+            "you save that report yourself under `.ai-bootstrap/quality_reports/`",
+        ),
+    ),
+    (
+        "coder",
+        "## Implementing",
+        ("Do not rewrite the approved requirements", "as a scope change"),
+    ),
+    (
+        "coder",
+        "## Verification",
+        (
+            "rerun the original reproduction",
+            "a passing test suite alone does not show the original symptom is gone",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Inputs you need",
+        (
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+            "do not reconstruct it from the diff",
+            "list what you still need at the end of your report",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Review flow",
+        (
+            "compare the diff against the approved requirements and scope changes",
+            "valid alternative way to meet a requirement is not a deviation",
+            "never invent one",
+            "list it at the end of your report for the caller",
+        ),
+    ),
+    (
+        "reviewer",
+        "## Report",
+        (
+            "as your reply text",
+            "do not write it to a file yourself",
+            "when you still need something, a short list of it at the end",
+        ),
+    ),
+    (
+        "rule",
+        "## Run the project's own checks",
+        ("rerun the original reproduction",),
+    ),
+    (
+        "rule",
+        "## Review non-trivial diffs",
+        (
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+            "you save that report under `.ai-bootstrap/quality_reports/`",
+        ),
+    ),
+    (
+        "instructions",
+        "## Workflow",
+        (
+            "rerun the original reproduction",
+            "approved requirements and any approved scope changes",
+            "the request itself is the requirement",
+        ),
+    ),
+    (
+        "debug-investigator",
+        "### Phase 6: Resolution Documentation",
+        ("Rerun the original reproduction",),
+    ),
+    (
+        "code-profile",
+        "## Checklist",
+        ("approved requirements and scope-change records",),
+    ),
+    ("tests-profile", "## Checklist", ("targeted negative control",)),
+)
+
+
+def _source_texts() -> dict[str, str]:
+    """Read the shared source assets the full-install guidance lives in."""
+    paths = {
+        "orchestrator": "agents/orchestrator/prompt.md",
+        "reviewer": "agents/reviewer/prompt.md",
+        "coder": "agents/coder/prompt.md",
+        "debug-investigator": "skills/debug-investigator/SKILL.md",
+        "code-profile": "review-profiles/code.md",
+        "tests-profile": "review-profiles/tests.md",
+    }
+    return {
+        asset: (REPO_ROOT / "shared" / path).read_text(encoding="utf-8")
+        for asset, path in paths.items()
+    }
+
+
+def test_shared_review_guidance_names_approved_requirements_and_original_symptom() -> (
+    None
+):
+    """REQ-004/REQ-005: in their named sections, the orchestrator's general and
+    reviewer-specific delegation rules, the reviewer's Inputs and review
+    steps, the coder's rules, the debug resolution, and the code and tests
+    profiles carry the approved-requirement comparison and the
+    original-symptom check."""
+    assert _guidance_errors(_source_texts(), FULL_REVIEW_GUIDANCE) == []
+
+
+def test_review_guidance_check_fails_when_text_is_removed_or_moved() -> None:
+    """The guidance check is section-scoped: deleting a phrase, or leaving it
+    only outside its named section, is reported."""
+    texts = _source_texts()
+    phrase = "approved scope-change records"
+    reviewer = texts["reviewer"]
+    inputs = _section(reviewer, "## Inputs")
+    assert phrase in inputs
+    # Moved: cut the phrase out of Inputs and append it under another section.
+    reviewer = reviewer.replace(inputs, inputs.replace(phrase, "records", 1), 1)
+    texts["reviewer"] = reviewer.replace(
+        "## Retrieval\n", f"## Retrieval\n{phrase}\n", 1
+    )
+    assert phrase in texts["reviewer"]  # a whole-file search would still pass
+    # Removed: drop the debug resolution step outright.
+    texts["debug-investigator"] = texts["debug-investigator"].replace(
+        "Rerun the original reproduction", "Check the fix", 1
+    )
+    errors = _guidance_errors(texts, FULL_REVIEW_GUIDANCE)
+    assert any("reviewer '## Inputs'" in error for error in errors)
+    assert any("Resolution Documentation" in error for error in errors)
+    assert len(errors) == 2
+
+
+@pytest.mark.parametrize("surface", ["claude", "codex"])
+def test_generated_full_output_carries_review_guidance(
+    tmp_path: Path, surface: str
+) -> None:
+    """REQ-004/REQ-005: the generated Claude files (agents, debug skill,
+    review profiles) and the Codex agent `developer_instructions` carry the
+    same guidance as the shared source."""
+    roles = ("orchestrator", "reviewer", "coder")
+    if surface == "claude":
+        target_generator.render_shared_basis(tmp_path, "multi-agent")
+        target_generator.render_claude_agents(tmp_path)
+        claude = tmp_path / ".claude"
+        texts = {
+            **{
+                role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+                for role in roles
+            },
+            "debug-investigator": (
+                claude / "skills" / "debug-investigator" / "SKILL.md"
+            ).read_text(encoding="utf-8"),
+            "code-profile": (claude / "review-profiles" / "code.md").read_text(
+                encoding="utf-8"
+            ),
+            "tests-profile": (claude / "review-profiles" / "tests.md").read_text(
+                encoding="utf-8"
+            ),
+        }
+    else:
+        agents = {agent["id"]: agent for agent, _dir in shared_agents()}
+        texts = {
+            role: tomllib.loads(render_codex_agent_adapter(agents[role]))[
+                "developer_instructions"
+            ]
+            for role in roles
+        }
+    guidance = tuple(item for item in FULL_REVIEW_GUIDANCE if item[0] in texts)
+    assert guidance
+    assert _guidance_errors(texts, guidance) == []
+
+
+def test_render_sidecar_workflow_carries_advisory_review_guidance(
+    tmp_path: Path,
+) -> None:
+    """REQ-004/REQ-005/REQ-009: the relaxed workflow sidecar's agents, rule,
+    Copilot instructions, debug skill, and review profiles carry concise
+    approved-requirement and original-symptom guidance, while the reviewer
+    still returns text for its caller to save under `.ai-bootstrap/`."""
+    render_sidecar(tmp_path, "workflow")
+    claude = tmp_path / ".claude"
+    texts = {
+        **{
+            role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+            for role in ("orchestrator", "coder", "reviewer")
+        },
+        "rule": (claude / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        ),
+        "instructions": (
+            tmp_path
+            / ".github"
+            / "instructions"
+            / "ai-bootstrap-workflow.instructions.md"
+        ).read_text(encoding="utf-8"),
+        "debug-investigator": (
+            claude / "skills" / "debug-investigator" / "SKILL.md"
+        ).read_text(encoding="utf-8"),
+        "code-profile": (claude / "review-profiles" / "code.md").read_text(
+            encoding="utf-8"
+        ),
+        "tests-profile": (claude / "review-profiles" / "tests.md").read_text(
+            encoding="utf-8"
+        ),
+    }
+    assert _guidance_errors(texts, SIDECAR_REVIEW_GUIDANCE) == []
+    assert "**Requirements:**" in (
+        claude / "templates" / "quality-report.md"
+    ).read_text(encoding="utf-8")
+
+
+# Planning, reporting, and learning guidance: REQ-001 (decisive assumptions
+# before decomposition), REQ-002 (optional spec and requirement map), REQ-003
+# (existing contracts and test strategy), REQ-007 (phase-boundary summary),
+# and REQ-008 (a failure routes to a regression). The planner's phases are
+# bold labels, not headings.
+PLANNER_PHASE_1 = "**Phase 1 — Bounded Discovery**"
+PLANNER_PHASE_2 = "**Phase 2 — Focused Clarification (only when needed)**"
+PLANNER_PHASE_4 = "**Phase 4 — Plan Draft**"
+
+# The two plan templates read the same in the full install and the relaxed
+# sidecar, so both tables share these entries. Anchors are short terms, not
+# sentences, and each is matched only inside its named section.
+TEMPLATE_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("plan-big", "## Non-Goals and Constraints (optional)", ("will not do",)),
+    (
+        "plan-big",
+        "## Requirement Map (optional)",
+        ("Owning phase", "span several phases", "not frontmatter fields"),
+    ),
+    ("plan-small", "## Scope", ("requirement IDs",)),
+)
+
+FULL_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "planner",
+        PLANNER_PHASE_1,
+        (
+            "decisive assumption",
+            "bounded experiment",
+            "authorizes production",
+            "shortcuts",
+            "Known facts",
+            "integration-gate-spike",
+        ),
+    ),
+    ("planner", PLANNER_PHASE_2, ("retention period", "streaming")),
+    (
+        "planner",
+        PLANNER_PHASE_4,
+        (
+            "existing contracts",
+            "negative cases",
+            "no available verification",
+            "Delegation Rules",
+        ),
+    ),
+    (
+        "orchestrator",
+        "## Completion Protocol (Mandatory)",
+        ("agent-reporting.instructions.md",),
+    ),
+    (
+        "reporting-policy",
+        "## Phase-boundary summary",
+        (
+            "deviations",
+            "link to its evidence",
+            "next operation",
+            "not a new record",
+            "paused",
+        ),
+    ),
+    ("workflow-policy", "## Plan-First Protocol", ("decisive technical assumptions",)),
+    ("plan-decomposition", "### Step 1: Identify Phases", ("decisive assumption",)),
+    ("plan-decomposition", "### Step 3: Write the Big Plan", ("requirement map",)),
+    (
+        "learn",
+        "## Phase 1: Evaluate",
+        (
+            "reproduction",
+            "regression",
+            "existing test or skill",
+            "Example with no new instruction",
+        ),
+    ),
+    (
+        "requirements-spec",
+        "# Requirements Specification — [FEATURE NAME]",
+        ("no separate spec",),
+    ),
+    ("requirements-spec", "## Non-Goals and Constraints", ("Non-goals",)),
+    ("requirements-spec", "## Success Criteria", ("Owning phase",)),
+    *TEMPLATE_PLANNING_GUIDANCE,
+)
+
+# The same guidance in the relaxed sidecar's advisory wording. The planner
+# still returns text and its caller saves it under `.ai-bootstrap/plans/`.
+SIDECAR_PLANNING_GUIDANCE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "planner",
+        "## Plan content",
+        (
+            "decisive assumption",
+            "production code",
+            "retention period",
+            "negative case",
+        ),
+    ),
+    ("orchestrator", "## The relaxed loop", ("decisive assumption",)),
+    ("orchestrator", "## Ending a task", ("guarding test", "short summary")),
+    ("documenter", "## Memory and session log", ("guarding test",)),
+    (
+        "rule",
+        "## Decide whether a plan helps",
+        ("decisive assumption", "production code", "requirement map"),
+    ),
+    ("rule", "## At the end of a task", ("guarding test",)),
+    (
+        "instructions",
+        "## Workflow",
+        ("decisive assumption", "requirement map", "guarding test", "short summary"),
+    ),
+    *TEMPLATE_PLANNING_GUIDANCE,
+)
+
+
+def _drop(text: str, phrase: str) -> str:
+    """Delete `phrase` wherever it occurs, however the source wrapped it."""
+    return re.sub(r"\s+".join(re.escape(word) for word in phrase.split()), "", text)
+
+
+def _read_shared(paths: dict[str, str]) -> dict[str, str]:
+    """Read the named files under `shared/` keyed by asset name."""
+    return {
+        asset: (REPO_ROOT / "shared" / path).read_text(encoding="utf-8")
+        for asset, path in paths.items()
+    }
+
+
+def _planning_source_texts() -> dict[str, str]:
+    """Read the shared source assets the full-install planning guidance lives in."""
+    return _read_shared(
+        {
+            "planner": "agents/planner/prompt.md",
+            "orchestrator": "agents/orchestrator/prompt.md",
+            "reporting-policy": "policies/agent-reporting.instructions.md",
+            "workflow-policy": "policies/workflow.instructions.md",
+            "plan-decomposition": "skills/plan-decomposition/SKILL.md",
+            "learn": "skills/learn/SKILL.md",
+            "requirements-spec": "templates/requirements-spec.md",
+            "plan-big": "templates/plan-big.md",
+            "plan-small": "templates/plan-small.md",
+        }
+    )
+
+
+def _sidecar_planning_source_texts() -> dict[str, str]:
+    """Read the shared source assets the sidecar planning guidance lives in."""
+    return _read_shared(
+        {
+            "planner": "agents/planner/workflow-prompt.md",
+            "orchestrator": "agents/orchestrator/workflow-prompt.md",
+            "documenter": "agents/documenter/workflow-prompt.md",
+            "rule": "sidecar/workflow/rules/workflow.md",
+            "instructions": "sidecar/workflow/instructions.md",
+            "plan-big": "sidecar/workflow/templates/plan-big.md",
+            "plan-small": "sidecar/workflow/templates/plan-small.md",
+        }
+    )
+
+
+def test_shared_planning_guidance_names_risk_contracts_summary_and_learning() -> None:
+    """REQ-001/002/003/007/008: in their named sections, the planner phases,
+    the reporting policy, the plan-first policy, the LEARN evaluation step, the
+    templates, and the sidecar prompts, rule, instructions, and templates carry
+    the risk and evidence decision, optional specs and IDs, contract and test
+    strategy, boundary summary, and failure route."""
+    assert _guidance_errors(_planning_source_texts(), FULL_PLANNING_GUIDANCE) == []
+    assert (
+        _guidance_errors(_sidecar_planning_source_texts(), SIDECAR_PLANNING_GUIDANCE)
+        == []
+    )
+
+
+def test_planner_settles_risk_and_evidence_before_splitting_phases() -> None:
+    """REQ-001: the risk and evidence decision sits in Phase 1, ahead of the
+    Phase 4 contract and test-strategy step that splits the work."""
+    planner = _planning_source_texts()["planner"]
+    assert planner.index(PLANNER_PHASE_1) < planner.index(PLANNER_PHASE_4)
+    assert "decisive assumption" in _section(planner, PLANNER_PHASE_1)
+
+
+def test_planning_guidance_check_fails_when_text_is_removed_or_moved() -> None:
+    """The guidance check is section-scoped: deleting an anchor, or leaving it
+    only outside its named section, is reported."""
+    texts = _planning_source_texts()
+    phrase = "bounded experiment"
+    phase_1 = _section(texts["planner"], PLANNER_PHASE_1)
+    assert phrase in phase_1
+    # Moved: cut the anchor out of Phase 1 and append it under Phase 2.
+    moved = texts["planner"].replace(phase_1, _drop(phase_1, phrase), 1)
+    texts["planner"] = moved.replace(
+        PLANNER_PHASE_2, f"{PLANNER_PHASE_2}\n- {phrase}", 1
+    )
+    assert phrase in _section(texts["planner"], PLANNER_PHASE_2)  # whole-file passes
+    # Removed: drop the LEARN failure route's durable-home anchor outright.
+    removed = "existing test or skill"
+    assert removed in _section(texts["learn"], "## Phase 1: Evaluate")
+    texts["learn"] = _drop(texts["learn"], removed)
+    assert _guidance_errors(texts, FULL_PLANNING_GUIDANCE) == [
+        f"planner {PLANNER_PHASE_1!r} lacks {phrase!r}",
+        f"learn '## Phase 1: Evaluate' lacks {removed!r}",
+    ]
+
+
+@pytest.mark.parametrize("surface", ["claude", "codex"])
+def test_generated_full_output_carries_planning_guidance(
+    tmp_path: Path, surface: str
+) -> None:
+    """REQ-001/002/003/007/008: the generated Claude agents, skills, policies,
+    and templates, and the Codex planner and orchestrator
+    `developer_instructions`, carry the same guidance as the shared source."""
+    roles = ("planner", "orchestrator")
+    if surface == "claude":
+        target_generator.render_shared_basis(tmp_path, "multi-agent")
+        target_generator.render_claude_agents(tmp_path)
+        claude = tmp_path / ".claude"
+        paths = {
+            **{role: f"agents/{role}.md" for role in roles},
+            "reporting-policy": "instructions/agent-reporting.instructions.md",
+            "workflow-policy": "instructions/workflow.instructions.md",
+            "plan-decomposition": "skills/plan-decomposition/SKILL.md",
+            "learn": "skills/learn/SKILL.md",
+            **{
+                name: f"templates/{name}.md"
+                for name in ("requirements-spec", "plan-big", "plan-small")
+            },
+        }
+        texts = {
+            asset: (claude / path).read_text(encoding="utf-8")
+            for asset, path in paths.items()
+        }
+    else:
+        agents = {agent["id"]: agent for agent, _dir in shared_agents()}
+        texts = {
+            role: tomllib.loads(render_codex_agent_adapter(agents[role]))[
+                "developer_instructions"
+            ]
+            for role in roles
+        }
+    guidance = tuple(item for item in FULL_PLANNING_GUIDANCE if item[0] in texts)
+    assert guidance
+    assert _guidance_errors(texts, guidance) == []
+
+
+def test_render_sidecar_workflow_carries_advisory_planning_guidance(
+    tmp_path: Path,
+) -> None:
+    """REQ-001/002/007/008/009: the relaxed workflow sidecar's agents, rule,
+    Copilot instructions, and templates carry concise planning, summary, and
+    failure-route guidance. The planner still returns text for its caller to
+    save under `.ai-bootstrap/plans/`, and the sidecar names no unshipped
+    requirements-spec file."""
+    render_sidecar(tmp_path, "workflow")
+    claude = tmp_path / ".claude"
+    texts = {
+        **{
+            role: (claude / "agents" / f"{role}.md").read_text(encoding="utf-8")
+            for role in ("planner", "orchestrator", "documenter")
+        },
+        "rule": (claude / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        ),
+        "instructions": (
+            tmp_path
+            / ".github"
+            / "instructions"
+            / "ai-bootstrap-workflow.instructions.md"
+        ).read_text(encoding="utf-8"),
+        **{
+            name: (claude / "templates" / f"{name}.md").read_text(encoding="utf-8")
+            for name in ("plan-big", "plan-small")
+        },
+    }
+    assert _guidance_errors(texts, SIDECAR_PLANNING_GUIDANCE) == []
+    assert "Return the finished plan as your reply text" in _collapsed(texts["planner"])
+    assert "you save it under `.ai-bootstrap/plans/`" in _collapsed(
+        texts["orchestrator"]
+    )
+    assert all("requirements-spec" not in text for text in texts.values())
+    assert not (claude / "templates" / "requirements-spec.md").exists()
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+
+
+# Paths and scripts that exist only in this authoring repository, so a template
+# installed into a consumer must not send the reader to them.
+AUTHORING_ONLY_TEXT = (
+    "shared/policies/",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "scripts/check_runtime.py",
+)
+
+
+def test_rendered_templates_carry_no_stale_authoring_paths_or_pause_text(
+    tmp_path: Path,
+) -> None:
+    """No rendered full or sidecar template cites an authoring-only path or
+    script, and the relaxed sidecar plan-small names no pause fields and no
+    hooks (the sidecar has neither)."""
+    target_generator.render_shared_basis(tmp_path / "full", "multi-agent")
+    render_sidecar(tmp_path / "sidecar", "workflow")
+    rendered = {
+        path.relative_to(tmp_path).as_posix(): path.read_text(encoding="utf-8")
+        for root in ("full", "sidecar")
+        for path in (tmp_path / root / ".claude" / "templates").glob("*.md")
+    }
+    assert {
+        "full/.claude/templates/plan-big.md",
+        "full/.claude/templates/skill-template.md",
+        "sidecar/.claude/templates/plan-big.md",
+        "sidecar/.claude/templates/plan-small.md",
+    } <= rendered.keys()
+    stale = {
+        name: [text for text in AUTHORING_ONLY_TEXT if text in body]
+        for name, body in rendered.items()
+    }
+    assert {name: found for name, found in stale.items() if found} == {}
+    plan_small = rendered["sidecar/.claude/templates/plan-small.md"].lower()
+    assert [word for word in ("pause", "hook") if word in plan_small] == []
 
 
 def test_render_sidecar_workflow_review_profiles_and_templates_are_shipped(
