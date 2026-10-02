@@ -1,8 +1,8 @@
 ---
-name: 2026-10-02_phase-C-engineering-knowledge-refresh
+name: 2026-10-02_phase-D-engineering-knowledge-refresh
 type: small-plan
 parent_plan: engineering-workflow-improvements
-phase_index: 3
+phase_index: 4
 status: planned
 closeout_session_log:
 ---
@@ -11,7 +11,8 @@ closeout_session_log:
 
 ## Scope
 
-Refresh the enabled OpenWiki layer after the engineering changes, then
+Refresh the enabled OpenWiki layer after Phase C's engineering changes and
+matched evaluation, then
 audit live advice for the full plan. This is the small final phase required
 by the canonical Knowledge-Refresh Final Phase rule. It adds no feature,
 provider, or verification authority.
@@ -34,7 +35,9 @@ provider, or verification authority.
   init. Rebaseline only by the documented unreachable-base procedure.
   **Acceptance:** the OpenWiki lifecycle reports completion; generated
   claims distinguish optional behavioral measurements from deterministic
-  receipts and full-install gates from sidecar advice.
+  receipts and full-install gates from sidecar advice. They also preserve
+  approved-plan/scope-change authority, optional specs/IDs, and the common
+  final-scorer comparison contract with separate evidence limitations.
 
 - [ ] **2. Audit live advice and durable learning.**
   **Owner:** documenter; orchestrator owns MEMORY and the session log.

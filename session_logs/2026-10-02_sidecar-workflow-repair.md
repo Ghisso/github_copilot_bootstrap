@@ -86,6 +86,19 @@ owned legacy state safely.
   state seeded at `.ai-bootstrap/`, no legacy refs) and
   `run-repair-rerun-probe.sh` (runs as the installed `orchestrator` agent,
   no hint about who saves). Reviewer started on the Phase B diff.
+- **11:30** - The user ran the self-install refresh (nested commit
+  `47deb93 bootstrap: update`); `check_runtime.py` now exit 0. The user ran
+  `run-repair-rerun-probe.sh` (exit 0). Claude Code 2.1.226, `--agent
+  orchestrator`, `acceptEdits`, tools Read/Write/Edit/Grep/Glob/Agent.
+  Events: planner, coder, reviewer invoked through `Agent`; the planner and
+  reviewer returned text and the orchestrator saved
+  `.ai-bootstrap/plans/2026-10-02_phase-1-hello-docstring-and-greeting.md`
+  (76 lines) and `.ai-bootstrap/quality_reports/2026-10-02_hello-docstring-and-greeting-review.md`
+  (30 lines) with its own Write, unprompted; the coder edited
+  `src/hello.py`; the orchestrator wrote the session log (50 lines) and
+  added a `[LEARN:python]` line to `.ai-bootstrap/MEMORY.md`.
+  `permission_denials` empty; no `.claude/ai-bootstrap/` created; team-file
+  and index hashes unchanged; status differs only by `AM src/hello.py`.
 
 ## [LEARN] Entries
 

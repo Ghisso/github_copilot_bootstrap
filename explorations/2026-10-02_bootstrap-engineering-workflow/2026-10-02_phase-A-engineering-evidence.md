@@ -29,7 +29,10 @@ to implement the policy proposals. It covers REQ-006 and REQ-009.
   `shared/skills/documentation/SKILL.md`, `shared/skills/ponytail/SKILL.md`.
   Record the actual source revision and generated-bundle digest. Freeze
   the three cases from the design, with independent expected results and
-  matched repaired/clear controls. Expected answers stay outside the
+  matched repaired/clear controls. Freeze approved-change and valid-alternative
+  variants within the coverage case for offline authority checks; these add
+  no primary scenario or native wave. Pin scenario/oracle hashes, initial
+  human-rubric revision, and capture format. Expected answers stay outside the
   model-readable workspace. Use two tiny function/test variants for the
   weak-test case: host execution must demonstrate that the weak test lets
   the bug through and the corrected test detects it. List any shortcut or
@@ -53,7 +56,8 @@ to implement the policy proposals. It covers REQ-006 and REQ-009.
   the budget rather than assuming the flag runs only two workloads.
   Run one bounded scratch case using the inspected provider command shape
   and a task-output schema. Record exact argv shape, version, requested and
-  observed model metadata, permission mode, available event fields, result
+  observed model and reasoning-effort metadata, provider, permission mode,
+  available event fields, result
   format, and artifact hashes without retaining raw transcripts or auth.
   Never change trust/settings automatically or enable extra execution tools
   to force an observation. Withhold the scorer/oracle from supplied inputs;
@@ -66,17 +70,29 @@ to implement the policy proposals. It covers REQ-006 and REQ-009.
 
 - [ ] **3. Record one bounded baseline wave.**
   **Owner:** orchestrator; documenter records the evidence.
-  **Files:** dated baseline document and fixture definitions.
+  **Files:** dated baseline document, fixture definitions, and bounded replay
+  artifacts under `docs/evidence/engineering-behavioral/`.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/documentation/SKILL.md`.
   Follow the design's nine primary attempts and three controls on one
   provider, with no automatic retry. Count setup/transport calls separately.
-  Preserve failed, unavailable, and unobserved results. A second provider
+  Preserve every attempt: distinguish behavioral failure, invalid output,
+  unavailable run, and missing observation. A second provider
   is optional, separately budgeted, and not averaged into the first.
-  Score actual task output against independent expectations; record human
-  rubric judgments as such. Separate output correctness from observed reads,
+  Save complete bounded fixture task outputs and allowlisted observations,
+  not just scores, following the design's privacy and replay contract. Record
+  run/case/repetition IDs, scenario/oracle/output/evidence hashes, capture
+  format, provider/client/version, model, reasoning effort, permission mode,
+  source revision, generated-bundle identity, and unavailable metadata.
+  Initial scoring is provisional until Phase B's final scorer can replay it;
+  preserve original judgments and identify their rubric revision. Separate
+  output correctness from observed reads,
   forbidden writes, or check execution. No overall action PASS without events.
-  **Acceptance:** freeze baseline and cost observations before prompt edits.
+  **Acceptance:** freeze baseline outputs, observations, identities, and cost
+  records before evaluator or prompt edits. Phase B must be able to rescore
+  saved task answers without rerunning the baseline. Any evidence that cannot
+  safely be retained remains explicitly unavailable for replay; no inferred
+  success. Unknown comparison settings are recorded as potential confounders.
   If the client or transport is unavailable, leave native evidence incomplete
   and report the blocker. Replan the affected future native step if needed;
   do not fabricate a successful baseline or cancel work unilaterally.
@@ -86,7 +102,8 @@ to implement the policy proposals. It covers REQ-006 and REQ-009.
   **Required Skills:** `shared/skills/code-review/SKILL.md`,
   `shared/skills/documentation/SKILL.md`, `shared/skills/humanize/SKILL.md`.
   Check answer leakage, planted-defect truth, false-positive controls,
-  event completeness, privacy, cost bound, and provider claims. Resolve
+  event completeness, replay sufficiency, privacy, cost bound, approved
+  requirement authority, and provider claims. Resolve
   high-severity findings. Give Phase B the exact measured transport and
   limitations; do not add a new permanent agent or general experiment engine.
 
