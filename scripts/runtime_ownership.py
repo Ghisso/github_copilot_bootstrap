@@ -201,8 +201,17 @@ SIDECAR_PROFILE_FILE_UNITS: dict[str, tuple[str, ...]] = {
     ),
 }
 # The one namespaced state folder (Decision 2): seeded once, never compared
-# or updated, kept by --uninstall, hidden by one exclude line.
-SIDECAR_STATE_ROOT = ".claude/ai-bootstrap"
+# or updated, kept by --uninstall, hidden by one exclude line. Moved out of
+# `.claude/` to the consumer root (finding 1; the 2026-10-02 workflow state
+# write gate in docs/sidecar-provider-contract.md): Claude Code refuses
+# writes anywhere under `.claude/`, but accepts them here.
+SIDECAR_STATE_ROOT = ".ai-bootstrap"
+# Recognized former state root (pre-finding-1 workflow installs). Never
+# seeded or written to as a profile's own state root; kept only so the
+# installer can recognize, back up, and migrate an owned folder left there,
+# and so an old exclude line or manifest reference still parses (Decision
+# 2, 3; finding 1's migration).
+SIDECAR_LEGACY_STATE_ROOT = ".claude/ai-bootstrap"
 SIDECAR_STATE_SEED_FILES = (
     "MEMORY.md",
     "explorations/README.md",

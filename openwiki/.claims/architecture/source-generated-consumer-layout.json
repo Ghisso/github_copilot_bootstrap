@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:511b286412ad8b8e3eac201a07632c0cab4000068c447ae58f36e95ee472228d",
+  "pageVersion": "sha256:7601e6f5f098cc6841a1da4cb879b87220987efb9762cf943f410753c625e582",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -174,19 +174,15 @@
     },
     {
       "id": "claim_b832f30a18ae4be09dada4285ca8f8ae",
-      "statement": "sidecar_target_errors(root, profile) rejects any file outside the paths the profile installs (any file inside a shipped skill folder is allowed; everything else must match the exact set), a tree that does not match the exact source set, any text containing a token of that profile's forbidden list (SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS lists bootstrap-only paths such as .claude/instructions/, .claude/scripts/, .claude/agents/, .claude/hooks/, .claude/review-profiles/, .claude/plans/, .claude/session_logs/, .github/hooks/, third_party/ and the literals verify.py, record_findings, mcp__, ctx_, MEMORY.md, openwiki; SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS drops MEMORY.md and .claude/review-profiles/ and adds settings.json, core.hooksPath, ai-state, state-sync, .claude/quality_reports/, .claude/explorations/), any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, a skills-profile bridge without its client's frontmatter, and a workflow single-file unit whose frontmatter differs from what the generator builds; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
+      "statement": "sidecar_target_errors(root, profile) rejects any file outside the paths the profile installs (any file inside a shipped skill folder is allowed; everything else must match the exact set), a tree that does not match the exact source set, any text containing a token of that profile's forbidden list (SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS lists bootstrap-only paths such as .claude/instructions/, .claude/scripts/, .claude/agents/, .claude/hooks/, .claude/review-profiles/, .claude/plans/, .claude/session_logs/, .github/hooks/, third_party/ and the literals verify.py, record_findings, mcp__, ctx_, MEMORY.md, openwiki; SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS drops MEMORY.md and .claude/review-profiles/ and adds settings.json, core.hooksPath, ai-state, state-sync, .claude/quality_reports/, .claude/explorations/, and the retired state root .claude/ai-bootstrap), any leftover SIDECAR_TEXT_REPLACEMENTS phrase, a missing or different Ponytail LICENSE, a missing humanize credit, a skills-profile bridge without its client's frontmatter, and a workflow single-file unit whose frontmatter differs from what the generator builds; a separate check rejects any dist/multi-agent/ file that no FULL_INSTALL_ROOT_PATHS entry covers.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8605-L8697",
-          "version": "repo-lines-v1:sha256:bc892b2c2c78b39a3ae5a6d7faf8de5cd8e9949624519ed00800515dea227eb4:eyJzZWxlY3RlZExpbmVDb3VudCI6OTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVjMmUwNjY1NDhhOThkMjkyNDZmOTA5YmY1YmUyNmY5ZGYyNTg2OGYyNGFkZDRkZTc1ODEyNzNlYWEyMDNkNDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlmNTg4NWY2MzM1MjJhZTJkYTNiODA1NTk0MjcyODVjMzcxOTdiZjFjZWYxMGMxYTg0YTJlOWYyOTcyYmYwZjUifQ"
+          "resource": "repo://scripts/validate_targets.py#L8605-L8653",
+          "version": "repo-lines-v1:sha256:482054529692303581eff2b7bed68fd3d7fba1d5419a761aff77313fd2baef85:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MTE2ZTE4NTNmMGM4ZjI2NjZmODdiYTQzZjdiM2UzZDEwNWVhNmMyOGVmZTAyNGYxNTlkZjcyMDk2MjE3NmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwZmU5NTA2N2VkZGQ0YjI2NzlhYWU0ZTY2Mjk2ZDQxYTA1NmY5ZWVjN2M5ZTI3ZTIwZWQwYzNlMjJiM2E4NDUifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L8745-L8812",
-          "version": "repo-lines-v1:sha256:394ed5a52a3dd6dd2a08d52acad9c0f0a2c2284c199c3a31dfbb5dfc82d8d768:eyJzZWxlY3RlZExpbmVDb3VudCI6NjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU0MWU3N2U1Njc2ZmNhZDE3ZDYwZTY5OWM2NDhmZDljYTM3ZWE5MDU2N2ZiOTk2YTVmOWMxNTEzYmZmNzI3MDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUyNWQzMzc4NTBmODFiODFmNmE2ZTIwNDY2Y2IwZDJhOWZmYWU4Nzk2NjNkMjZiNTA0ZWNmOTQxZjcwMTczMmMifQ"
-        },
-        {
-          "resource": "repo://scripts/validate_targets.py#L8857-L8870",
-          "version": "repo-lines-v1:sha256:1d27aecc2bc97ccd3343015d61401c576b82a3e9bc0b5e43ab7e8cd234d5d7df:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI1M2Q4YjI3MDljOTMyZjU5OGNhMWY3ZTI3MmZlM2FkZWM3OGFkNDRhMGQ0NWYyMGE2ZmNiNjdlMmZiNjc1NGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE0MzlhNmZkN2Y3YmU0NjRjODgwMDM1NzEyYTE0MjZkZTA2MTUzODI5ODEwNmI4MjFmMGZkMTVmYWE1ZDNiY2IiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImMwZmNjOTViNjIxNmZhYzdhOTg2ZTJjZTIzYTliMzJjZjAyOTY0Mzc4Y2RiMjc3YzE2MzhjODgyODRlZTM5NzYifQ"
+          "resource": "repo://scripts/validate_targets.py#L8665-L8836",
+          "version": "repo-lines-v1:sha256:801f3560bb59c73039e6d442d4ed854d060f152bb8d5ef13496f5a00b25cd1ae:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcyLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiIwMjZiYTlhMzMxMGZjOTIzMDE0ZjBlYTExZGQyZmEwM2IyODEyYmFmYThjOGJjZTEzYTM1YTA1NDhjOTk1ZWYxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJiNzYwNDFkYjI3MzRlZjIxY2YwMmZlN2YwZjJiYTVkMjhiYjhhNmY5OTM2N2ZiOWNjZDY1MWQ1YmViNDM3MzIwIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJhN2JiNGYwNTQ3OTA0OTUwN2I1M2RkZjRlNmJlNWY3NjJkYmRjZTZiZjM5ZjhhZTg0MmI3MWE5YzI3ODFkMTAwIn0"
         }
       ]
     },
@@ -210,15 +206,15 @@
     },
     {
       "id": "claim_777f9ecb61874def850126e45e0e0e28",
-      "statement": "render_sidecar_workflow_units writes the workflow profile's rules as .claude/rules/ai-bootstrap-<name>.md, the Copilot file .github/instructions/ai-bootstrap-workflow.instructions.md with applyTo: \"**\", the five agents from their workflow-prompt.md with sidecar_agent_frontmatter, the review profiles and all four templates from shared/sidecar/workflow/templates/ with the state-path rewrite, and the state seed files under .claude/ai-bootstrap/.",
+      "statement": "render_sidecar_workflow_units writes the workflow profile's rules as .claude/rules/ai-bootstrap-<name>.md, the Copilot file .github/instructions/ai-bootstrap-workflow.instructions.md with applyTo: \"**\", the five agents from their workflow-prompt.md with sidecar_agent_frontmatter, the review profiles and all four templates from shared/sidecar/workflow/templates/ with the state-path rewrite, and the state seed files under .ai-bootstrap/ at the repository root, outside .claude/.",
       "evidence": [
         {
           "resource": "repo://scripts/generate_targets.py#L1854-L1918",
           "version": "repo-lines-v1:sha256:efacbfca2d4d899b4674d2a7f32835e8023cc0ac6ff8d1c1320d1e80c45d9cc8:eyJzZWxlY3RlZExpbmVDb3VudCI6NjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4YWY5MWQwNzc2MWVkY2FmZWVjYmUyYTQ2YTg5ZTBkNmYzMTIwYTEyZjgwYzM5YWE4ZGY3Mzc2NzM2NTI3NDgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQyYjUyN2NkZTI1NTQ1ZWU5YTc3ODEwMDYzOWQ4ZWY2ZjI2NWNhZWQxYWYyYTMzNGUyY2IyMTIyMzI0M2VkNDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjgzNjJlNmFhNjFkZTcxMDU4MzRhNGNlODVmYzA1NDc3OGE0NWRmYmRjNjg1ZjViZDliZTkxNzdkZDM0MjhhMjIifQ"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L190-L219",
-          "version": "repo-lines-v1:sha256:0db168f108dc55e9b7badf787ac2d4160d1801d23bbc09d74a0ed5b47e91e753:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJkZTcyNzJjMWNhNGU4ODRmNTczNjczYjA5YjA4YTgxMjE2MmYxMDYxYmE0OWI0OGZhNWJjZjQzOTExZDI4OGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhODlhMzkyZDUxNzYzYTk3OTRhZmJmMDk0MjY5NzUwMjU3MWMwZDgwODExZWRkMTg4YjkyYTM0ZWJjNjdmYWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3ZGJkZjBjMzI3NjU5NDExNGNmMTQ1N2MyYzkyOWE1ZjUzNTAxMmM3OWU3MTI2NWY1MmZjMWMwMDVhMThkZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVmMTdhZDczYzEwZjIzNGU1Zjk5YTRjZmFiYjVhZWQ3MWEwNjNjZDZhYmJiNzgwNjI0NjhmOTU4MjA5MDQ4ODUifQ"
+          "resource": "repo://scripts/runtime_ownership.py#L200-L225",
+          "version": "repo-lines-v1:sha256:555a3b91d1058c320c5017c016867f5e7a8c83f8c150154736d8c0fad5f50c17:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjIyYzlhMjQ5NzJiMjEwMjExN2FlYzE4ZGM3NmIyZDZmNTIzOTc5N2ZmNmI2OGEwMGU0ZjllNWU5YTE3N2ZhN2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc4NzA2YjExNTExZTMxYWMwZTg5ZmNjMjY1NWI5MzJjMzZmOGMwMWMwMDFlM2E2MTgyNmQxNDlmZWY2ZmFlNDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1Zjc1NjE0MDg0ZTQ5YTBkODllOTFjMTVmYmI0MjdkMDk3M2U0MjU4OTNiYjA3Zjk4ZjI3ZGFlMjQ4NDNkY2YifQ"
         }
       ]
     },
@@ -235,6 +231,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T15:12:48.671Z"
+    "at": "2026-10-02T10:43:27.367Z"
   }
 }

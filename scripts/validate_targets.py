@@ -44,6 +44,7 @@ from runtime_ownership import (
     FULL_INSTALL_ROOT_PATHS,
     SIDECAR_BRIDGES,
     SIDECAR_DEFAULT_PROFILE,
+    SIDECAR_LEGACY_STATE_ROOT,
     SIDECAR_PROFILE_SKILLS,
     SIDECAR_PROFILES,
     SIDECAR_SKILL_WRITE_ROOTS,
@@ -8627,10 +8628,12 @@ SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS = (
 # review profile) is not a leftover full-install reference; dropping the
 # token keeps the check meaningful instead of rejecting correct content.
 # `MEMORY.md` is dropped for the same reason: the profile's own memory file
-# is `.claude/ai-bootstrap/MEMORY.md`. Every other token still names
-# something the profile never ships. Six tokens are added for ceremony this
-# profile deliberately drops (Decision 4) or for the namespaced state paths
-# `.claude/plans/` and `.claude/session_logs/` do not already cover.
+# is `.ai-bootstrap/MEMORY.md`. Every other token still names something the
+# profile never ships. Seven tokens are added for ceremony this profile
+# deliberately drops (Decision 4), for the namespaced state paths
+# `.claude/plans/` and `.claude/session_logs/` do not already cover, or for
+# the retired state root (finding 1): active, generated content must never
+# mention `.claude/ai-bootstrap` again once a consumer has migrated off it.
 SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS = tuple(
     token
     for token in SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS
@@ -8642,6 +8645,7 @@ SIDECAR_WORKFLOW_FORBIDDEN_TEXT_TOKENS = tuple(
     "state-sync",
     ".claude/quality_reports/",
     ".claude/explorations/",
+    SIDECAR_LEGACY_STATE_ROOT,
 )
 SIDECAR_FORBIDDEN_TEXT_TOKENS_BY_PROFILE: dict[str, tuple[str, ...]] = {
     "skills": SIDECAR_SKILLS_FORBIDDEN_TEXT_TOKENS,

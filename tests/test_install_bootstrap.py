@@ -2099,15 +2099,374 @@ def test_detect_mode_full_evidence_selects_full_with_no_mode(
     assert detect_install_mode(target, None, False) == "full"
 
 
+# --------------------------------------------------------------------------
+# Finding 2: recognized legacy full installs (HF-sync and pre-manifest eras)
+# --------------------------------------------------------------------------
+
+_LEGACY_HOOK_SCRIPT_NAMES = (
+    "run-hook.sh",
+    "protect-files.sh",
+    "session-log.sh",
+    "context-mode-dispatch.sh",
+    "git-protection.sh",
+)
+
+
+def _write_legacy_hook_scripts(target: Path) -> None:
+    """Match the reported legacy consumer's `.claude/hooks/scripts/`: this
+    bootstrap's own hook script names (confirmed against
+    `shared/hooks/scripts/` and the checked-out legacy consumer), minus the
+    retired `hf-ai-sync.sh` helper."""
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    for name in _LEGACY_HOOK_SCRIPT_NAMES:
+        (hooks_dir / name).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+
+def _hf_era_legacy_consumer(target: Path) -> None:
+    """The reported legacy consumer's exact shape: a tracked
+    `.devcontainer/hf-ai-sync.py` next to a real, untracked `.claude/` that
+    carries this bootstrap's own hook scripts, no nested `.git`, and no
+    `bootstrap-ownership.env` (HF-sync era, before either existed)."""
+    _init_repo(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    (devcontainer / "devcontainer.json").write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer HF-sync era")
+    claude_dir = target / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "MEMORY.md").write_text("legacy memory\n", encoding="utf-8")
+    _write_legacy_hook_scripts(target)
+    (target / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+
+
+def _pre_manifest_full_consumer(target: Path) -> None:
+    """A full install from before `bootstrap-ownership.env` existed: a
+    real, untracked `.claude/` with a local `.claude/scripts/verify.py` and
+    this bootstrap's own hook scripts, no tracked devcontainer sync script,
+    no nested `.git`."""
+    _init_repo(target)
+    scripts_dir = target / ".claude" / "scripts"
+    scripts_dir.mkdir(parents=True)
+    (scripts_dir / "verify.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+    _write_legacy_hook_scripts(target)
+    (target / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+
+
+_LEGACY_FULL_CONSUMERS = pytest.mark.parametrize(
+    "make_consumer",
+    (_hf_era_legacy_consumer, _pre_manifest_full_consumer),
+    ids=("hf-era", "pre-manifest"),
+)
+
+
+@_LEGACY_FULL_CONSUMERS
+def test_detect_mode_recognized_legacy_full_install_selects_full(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    assert detect_install_mode(target, None, False) == "full"
+    assert install_bootstrap._full_install_evidence(target, False)
+
+
+@_LEGACY_FULL_CONSUMERS
+def test_cli_plain_install_on_legacy_full_consumer_selects_full_dry_run(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    """The real installer entrypoint, not just unit `detect_install_mode`:
+    a plain `--dry-run` on a recognized legacy full install proceeds as a
+    full refresh instead of the old "tracks bootstrap-owned paths ...
+    --mode sidecar" steer (finding 2)."""
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    status_before = _porcelain_status(target)
+    snapshot_before = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Copilot surface mode" in result.stdout
+    assert "--mode sidecar" not in result.stdout
+    assert _porcelain_status(target) == status_before
+    assert _tree_snapshot(target) == snapshot_before
+
+
+@_LEGACY_FULL_CONSUMERS
+def test_cli_mode_sidecar_refuses_on_legacy_full_consumer(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    status_before = _porcelain_status(target)
+    snapshot_before = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--mode", "sidecar"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "already has full-install evidence" in result.stderr
+    assert "legacy full install evidence" in result.stderr
+    assert _porcelain_status(target) == status_before
+    assert _tree_snapshot(target) == snapshot_before
+
+
+@_LEGACY_FULL_CONSUMERS
+def test_cli_mode_sidecar_dry_run_refuses_on_legacy_full_consumer(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    status_before = _porcelain_status(target)
+    snapshot_before = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(INSTALLER),
+            str(target),
+            "--mode",
+            "sidecar",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "already has full-install evidence" in result.stderr
+    assert _porcelain_status(target) == status_before
+    assert _tree_snapshot(target) == snapshot_before
+
+
+@_LEGACY_FULL_CONSUMERS
+def test_cli_uninstall_refuses_on_legacy_full_consumer(
+    tmp_path: Path, make_consumer: Callable[[Path], None]
+) -> None:
+    target = tmp_path / "consumer"
+    make_consumer(target)
+    status_before = _porcelain_status(target)
+    snapshot_before = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "full-install evidence" in result.stderr
+    assert _porcelain_status(target) == status_before
+    assert _tree_snapshot(target) == snapshot_before
+
+
+def test_tracked_claude_with_legacy_hook_scripts_is_team_config_not_full_evidence(
+    tmp_path: Path,
+) -> None:
+    """The `claude_tracked` guard applies to the new legacy signature too:
+    a team that tracks `.claude/**`, including hook scripts that happen to
+    match this bootstrap's filenames, is team config, never a recognized
+    legacy full install."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    _write_legacy_hook_scripts(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target, "team-tracked claude and devcontainer")
+
+    assert install_bootstrap._full_install_evidence(target, False) == ()
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    assert "tracks bootstrap-owned paths" in str(error.value)
+
+
+def test_detect_mode_arbitrary_hooks_dir_alone_is_not_legacy_evidence(
+    tmp_path: Path,
+) -> None:
+    """An unrelated `.claude/hooks/scripts` with made-up filenames, even
+    next to a tracked devcontainer sync script, is not legacy evidence: an
+    arbitrary hooks directory alone proves nothing."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target, "devcontainer sync")
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "my-custom-hook.sh").write_text("echo hi\n", encoding="utf-8")
+
+    assert install_bootstrap._full_install_evidence(target, False) == ()
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" not in message
+    assert "--mode full" in message
+
+
+def test_detect_mode_single_legacy_hook_name_is_not_enough(tmp_path: Path) -> None:
+    """One familiar hook script filename is not corroboration: at least two
+    of this bootstrap's own names are required together."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target, "devcontainer sync")
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / "run-hook.sh").write_text("echo hi\n", encoding="utf-8")
+
+    assert install_bootstrap._full_install_evidence(target, False) == ()
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    assert "--mode sidecar" not in str(error.value)
+
+
+def test_detect_mode_tracked_hf_ai_sync_without_claude_dir_still_suggests_sidecar(
+    tmp_path: Path,
+) -> None:
+    """Without any `.claude/` yet, a tracked `hf-ai-sync.py` alone stays
+    ambiguous the same way `.devcontainer/state-sync.sh` already does: this
+    looks like a fresh clone awaiting restoration, not a confirmed legacy
+    install, so the sidecar suggestion is still safe here."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    _commit_tracked_paths(target, "devcontainer sync only")
+
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" in message
+    assert "--mode full" in message
+
+
+def test_detect_mode_unrelated_claude_dir_next_to_tracked_devcontainer_explains_restore(
+    tmp_path: Path,
+) -> None:
+    """Finding 2: a real, untracked `.claude/` that is empty or holds
+    content unrelated to this bootstrap, next to a tracked devcontainer
+    path, stays ambiguous -- but the refusal must explain restore/refresh,
+    never steer the user toward installing a sidecar overlay next to it."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    devcontainer = target / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "devcontainer.json").write_text("{}\n", encoding="utf-8")
+    _commit_tracked_paths(target, "devcontainer only")
+    claude_dir = target / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "notes.txt").write_text("unrelated\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "--mode sidecar" not in message
+    assert "--mode full" in message
+    assert "restore" in message.lower() or "refresh" in message.lower()
+
+
+def test_detect_mode_empty_unrelated_claude_dir_with_no_team_config_defaults_to_full(
+    tmp_path: Path,
+) -> None:
+    """An empty/unrelated untracked `.claude/` with no tracked bootstrap
+    path anywhere keeps today's default: no refusal, plain full install."""
+    target = tmp_path / "consumer"
+    _init_repo(target)
+    claude_dir = target / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "notes.txt").write_text("unrelated\n", encoding="utf-8")
+
+    assert detect_install_mode(target, None, False) == "full"
+    assert install_bootstrap._full_install_evidence(target, False) == ()
+
+
+def test_detect_mode_mixed_legacy_full_and_sidecar_evidence_refuses_with_backup_advice(
+    tmp_path: Path,
+) -> None:
+    """Finding 2's own reproduction: following the old plain-mode message,
+    `--mode sidecar` was run against a legacy full install. Detecting both
+    kinds of evidence at once must not recommend a mode flag that an
+    explicit choice would then reject."""
+    target = tmp_path / "consumer"
+    _hf_era_legacy_consumer(target)
+    _write_sidecar_manifest(target)
+
+    with pytest.raises(SystemExit) as error:
+        detect_install_mode(target, None, False)
+    message = str(error.value)
+    assert "full-install evidence" in message
+    assert "sidecar evidence" in message
+    assert "back up" in message.lower()
+    assert "--mode sidecar" not in message
+    assert "--mode full" not in message
+
+
+def test_cli_mixed_legacy_full_and_sidecar_evidence_refuses_before_any_write(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "consumer"
+    _hf_era_legacy_consumer(target)
+    _write_sidecar_manifest(target)
+    status_before = _porcelain_status(target)
+    snapshot_before = _tree_snapshot(target)
+
+    result = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Refusing to auto-detect an install mode" in result.stderr
+    assert "back up" in result.stderr.lower()
+    assert _porcelain_status(target) == status_before
+    assert _tree_snapshot(target) == snapshot_before
+
+
 def test_detect_mode_both_evidence_kinds_abort_with_no_mode(tmp_path: Path) -> None:
+    """Finding 2: mixed evidence must not suggest a mode flag that an
+    explicit choice would then reject (--mode full refuses on sidecar
+    evidence; --mode sidecar and --uninstall refuse on full evidence).
+    Backup and manual inspection are the only working recovery here."""
     target = tmp_path / "consumer"
     _init_repo(target)
     (target / ".claude" / ".git").mkdir(parents=True)
     _write_sidecar_manifest(target)
     with pytest.raises(SystemExit, match="both full-install evidence") as error:
         detect_install_mode(target, None, False)
-    assert "sidecar evidence" in str(error.value)
-    assert "--mode full or --mode sidecar" in str(error.value)
+    message = str(error.value)
+    assert "sidecar evidence" in message
+    assert "back up" in message.lower()
+    assert "--mode full" not in message
+    assert "--mode sidecar" not in message
 
 
 def test_detect_mode_team_config_aborts_offering_both_modes(tmp_path: Path) -> None:

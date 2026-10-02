@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T15:12:48.671Z
+    at: 2026-10-02T10:43:27.367Z
 sources:
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
@@ -21,8 +21,12 @@ sources:
     resource: repo://shared/agents/orchestrator/agent.yaml
   - id: openwiki-source-869fc2d8dd56f006523bcc67
     resource: repo://shared/agents/orchestrator/workflow-prompt.md
+  - id: openwiki-source-277d57d25696ddfa72249dd2
+    resource: repo://shared/agents/planner/workflow-prompt.md
   - id: openwiki-source-fd43a5fc69056375b46b4386
     resource: repo://shared/agents/reviewer/prompt.md
+  - id: openwiki-source-ed5529d66aa4a666e3003ed9
+    resource: repo://shared/agents/reviewer/workflow-prompt.md
   - id: openwiki-source-fa7286655feb8d4301c96b64
     resource: repo://shared/agents/sol_coder/agent.yaml
   - id: openwiki-source-f11e4ce184d9addc83c16d26
@@ -35,7 +39,7 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-3f83db488140df5d5a38535a
     resource: repo://shared/templates/skill-template.md
-generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
+generated: { by: "claude-code", at: "2026-10-02T10:43:27.367Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -112,7 +116,7 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 ## What each host receives
 
 - **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with the frontmatter `claude_agent_frontmatter` builds: `name`, `description`, a `tools` list derived from `capabilities`, optional `model` and `effort` from `model_intent["claude-code"]`, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body is the canonical prompt with target path rewrites.
-- **Sidecar workflow profile.** `render_sidecar_workflow_units` writes the same `.claude/agents/<id>.md` for the five canonical agents into `dist/sidecar/workflow/`, with `sidecar_agent_frontmatter`, which is the Claude Code frontmatter with every `mcp__*` tool grant removed because the sidecar ships no MCP configuration, around the agent's `workflow-prompt.md`. No `.github/agents` or `.codex/agents` file ships in that profile. The [sidecar overlay page](/openwiki/operations/sidecar-overlay.md) covers how those files reach a team-owned repository.
+- **Sidecar workflow profile.** `render_sidecar_workflow_units` writes the same `.claude/agents/<id>.md` for the five canonical agents into `dist/sidecar/workflow/`, with `sidecar_agent_frontmatter`, which is the Claude Code frontmatter with every `mcp__*` tool grant removed because the sidecar ships no MCP configuration, around the agent's `workflow-prompt.md`. No `.github/agents` or `.codex/agents` file ships in that profile. The workflow orchestrator delegates a step only to an agent the session can start, and otherwise does that step itself and labels a self-review as one. The planner and reviewer return their plan or report as reply text, and the agent that asked saves it under `.ai-bootstrap/`, because their tools come from the shared `capabilities` and include no `Write` or `Edit`. The [sidecar overlay page](/openwiki/operations/sidecar-overlay.md) covers how those files reach a team-owned repository.
 - **GitHub Copilot.** `render_github_agent_adapter` writes a thin pointer: frontmatter with `name`, `description`, tools, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body tells Copilot to read the canonical `.claude/agents/<name>.md`. An agent not eligible for Claude Code gets a self-contained body instead.
 - **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, a `sandbox_mode` derived from capabilities, and the composed prompt as `developer_instructions`.
 - **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents.

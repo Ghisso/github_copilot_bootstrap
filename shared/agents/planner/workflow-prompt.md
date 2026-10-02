@@ -9,10 +9,11 @@ anything can happen.
 
 Read `.claude/templates/plan-big.md` for multi-phase work and
 `.claude/templates/plan-small.md` for one phase. Write the plan using
-their frontmatter fields and section structure, and save it under
-`.claude/ai-bootstrap/plans/`. Use their `status` values (`planning`,
-`in-progress`, `complete`, `cancelled`) descriptively — nothing reads them
-to gate a commit in this profile.
+their frontmatter fields and section structure. Return the finished plan
+as your reply text and do not write it to a file yourself; whoever asked
+for it saves your returned text under `.ai-bootstrap/plans/`. Use their
+`status` values (`planning`, `in-progress`, `complete`, `cancelled`)
+descriptively — nothing reads them to gate a commit in this profile.
 
 Do not create or name an implementation branch, and do not add a step that
 assumes one; this profile has no branch requirement.

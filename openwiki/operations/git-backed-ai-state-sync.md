@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
+generated: { by: "claude-code", at: "2026-10-02T10:43:27.367Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T14:43:37.947Z
+    at: 2026-10-02T10:43:27.367Z
 ---
 
 # Git-backed AI-state sync
@@ -28,7 +28,7 @@ Source, tests, and the policies under `shared/policies/` outrank this page.
 
 In every full-install consumer, `.claude/` is a plain, self-contained Git repository with its own `.git/` directory on one branch named `ai-state`. It tracks the installed bootstrap files and the mutable AI state: `MEMORY.md`, `plans/**`, `explorations/**`, `session_logs/**`, and `quality_reports/**`. The outer repository ignores `.claude/` entirely, so `git branch` and `git log` at the root never show `ai-state`. Inspect it with `git -C .claude <command>`.
 
-A sidecar install (`--mode sidecar`, in either profile) has none of this. The installer hands `--backup-state` to `backup_sidecar_state`, `--uninstall` to `uninstall_sidecar`, and a sidecar target to `install_sidecar`, each before any full-install step, so no nested repository, `ai-state` branch, or state sync is created or touched. The workflow profile's personal state folder, `.claude/ai-bootstrap/`, is a plain Git-ignored folder, not a nested repository; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
+A sidecar install (`--mode sidecar`, in either profile) has none of this. The installer hands `--backup-state` to `backup_sidecar_state`, `--uninstall` to `uninstall_sidecar`, and a sidecar target to `install_sidecar`, each before any full-install step, so no nested repository, `ai-state` branch, or state sync is created or touched. The workflow profile's personal state folder, `.ai-bootstrap/` at the repository root, is a plain Git-ignored folder, not a nested repository; see [Sidecar overlay](/openwiki/operations/sidecar-overlay.md).
 
 ## Two kinds of commit
 

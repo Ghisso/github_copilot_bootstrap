@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:c5576bf0d3a3ebfa917f9ca0d8a22f017cd32af27b42565f28d3e87e0a459f66",
+  "pageVersion": "sha256:6431967345f884c63355ebebb9a37781f915b696d5242a4b0d67f6584c1eee6b",
   "claims": [
     {
       "id": "claim_b1af9741cfc242439d4d2f5655e2f681",
@@ -189,8 +189,8 @@
       "statement": "detect_install_mode reads only the target: --mode sidecar refuses full evidence or a linked worktree, --mode full refuses sidecar evidence, no --mode refuses both kinds of evidence or team configuration only, and otherwise chooses by the evidence found, defaulting to a fresh full install.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1440-L1527",
-          "version": "repo-lines-v1:sha256:6e6db401e47f8f8c674a9d58c1d116be98ffa66c491d10ea56346c4d82df379f:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ZTMwYzM3MDNlMTcyN2ZmZmU1ZjJhMzJkNTkwYzkwMjAzNTgzNDI5OTNkMTcyYTQ0OTVjZWFkOWJiMGI3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkOGQ5NWFjZTMxNjFiMmZlY2MyODRmYjQyZGEyOGM4YTBlMWE5MGVmZjExYWM0NzcyMzAyNGMwNmY5ZDY2MzgifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1565-L1662",
+          "version": "repo-lines-v1:sha256:8ebd987b2642614929f081ab8058ef0d10158b31a1ba38862175e704e20d94b4:eyJzZWxlY3RlZExpbmVDb3VudCI6OTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ZTMwYzM3MDNlMTcyN2ZmZmU1ZjJhMzJkNTkwYzkwMjAzNTgzNDI5OTNkMTcyYTQ0OTVjZWFkOWJiMGI3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjA4MmQ1YzgyMzczOTczOGNkMDlkZTJiZGUyODFjNTU1ZGNiNjk3YmZkNDIwYWZlN2YxODE4ZjM2ODkzNjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NWE3MGQ3NDVmYTU1MmQ3MTAyYzRkYTQxZmYzMGZlMDk3ZDczNGQ0MDBhNjFiMzNjZWY5NDE0MTBjMjY5OWEifQ"
         },
         {
           "resource": "repo://scripts/runtime_ownership.py#L90-L90",
@@ -200,11 +200,11 @@
     },
     {
       "id": "claim_931a097522584a8c8f9e6e12bc8c7e9e",
-      "statement": "When the tracked team configuration includes .devcontainer/state-sync.sh, the plain-install refusal says the target looks like a fresh clone of a full consumer and says to run bash .devcontainer/state-sync.sh setup first, or pass --mode full.",
+      "statement": "With team configuration only and no untracked .claude directory, when the tracked paths include .devcontainer/state-sync.sh, the plain-install refusal says the target looks like a fresh clone of a full consumer and says to run bash .devcontainer/state-sync.sh setup first, or pass --mode full; next to an untracked .claude directory it instead offers only --mode full and says a sidecar overlay must not sit next to an existing per-clone .claude/ setup.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1440-L1527",
-          "version": "repo-lines-v1:sha256:6e6db401e47f8f8c674a9d58c1d116be98ffa66c491d10ea56346c4d82df379f:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ZTMwYzM3MDNlMTcyN2ZmZmU1ZjJhMzJkNTkwYzkwMjAzNTgzNDI5OTNkMTcyYTQ0OTVjZWFkOWJiMGI3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkOGQ5NWFjZTMxNjFiMmZlY2MyODRmYjQyZGEyOGM4YTBlMWE5MGVmZjExYWM0NzcyMzAyNGMwNmY5ZDY2MzgifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1632-L1656",
+          "version": "repo-lines-v1:sha256:a571276eb2254a093dcaf42455ffcbe9a03ed1cd7076d9d428ab194ca940203f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjNzY0NzQ0MDcyMzgwNmI2ZjBmMGQ5ODUzMDMzYjZjNWQzNWUxMDA5OGEyMjE1ZDE3YmViNWEwYjA4MDBjOTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYxYTViYTM5ZjI5M2Q4ZjdmZjFiYTcxYTkxODY2NzAyMWU1MGI1NmFiODljYmI2MzhiMGNiZTY0OTliNmM4NjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyMGQ3MTc3YjcyNzY0ZTU0N2QwZTNkYmNmMWFmODg2YzdmZDE4ZTM1OGExYjYyOWI0OTUwODk4NDE2MTUyNTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImFjNjE0NGJiYjc0MWExYmRiNDM4OGE5ODlmZjVkMzc4MWYyZDI0ZTNmNTdiMzE2NjA3NzVjMDg2ZTM3MmU5NGIifQ"
         }
       ]
     },
@@ -320,11 +320,11 @@
     },
     {
       "id": "claim_f04a256ef2b94d769acb993d5df587b0",
-      "statement": "_full_install_evidence reads the outer index once before either evidence check, and when any entry of any mode (a file, a symlink, or a gitlink) sits at or under .claude, the target has no full evidence even if .claude/.git or the ownership file exists.",
+      "statement": "_full_install_evidence reads the outer index once before either modern evidence check, and when any entry of any mode (a file, a symlink, or a gitlink) sits at or under .claude, the target has no full evidence even if .claude/.git or the ownership file exists; only when neither modern marker fired does it check a real, untracked .claude for legacy evidence: at least two of five bootstrap hook scripts under .claude/hooks/scripts plus either a tracked .devcontainer/hf-ai-sync.py or .devcontainer/state-sync.sh, or a local .claude/scripts/verify.py.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1315-L1354",
-          "version": "repo-lines-v1:sha256:5cb1542373013b91659c64701bfd2baa3b153a1813999640a80b97fec6197af0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJlNmI1MWExYzhiNjI4MWE2ODEyNDJkYTc0ZTMwNWE2Zjc3OGJkOWRmZGFiNjliOWE1YmU1MmU1ODlkYTVmMWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YTgyYWU2OWZjZGMxYjQxMzNjMTRhNTkwNzNiNTkxMjliYTBkMDAzMzNiNWNjNWNmMTgxMGExMzEwMWYzZDgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQwZjBiYWRkZmI4YzRmODMyNDEwMjFlNTc2Yzc4M2I0MmIwZTY5MjE4OTliNmMwYzg4ZGUzNzFiMjY1MjlmODgifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1342-L1477",
+          "version": "repo-lines-v1:sha256:0db0deb08418bad1163edfb155ada09612607e78d588913983918fa210cf0eee:eyJzZWxlY3RlZExpbmVDb3VudCI6MTM2LCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiI3OTc4YTUyN2ZhMzNmNGVmMDljODFhOWZlNjgzYmNhYTNjZGIwZDJlZmIwNWJkMTYxMWM4N2ZiY2E1NjY4OWYxIiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiJjZjY3ZGIwYzZlNjNjNTRiNTE5ZDU4ZjYzNTI1NzM3ZTg4MzY5ZTBjODViZmYxYmY2YmIxMzBjMDA5ZWIzZWYyIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJhOThiMDYzZDliNDdlNjUzNzk2MjU1NzJjY2UxOTc2NjlkNTc2N2UxMmMxOGJlMDc1NjUyYjhjZDk4MWNlOGQ1IiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiIyNTdkY2I3MzgyNmQ1MTU2NTFhY2I4MmJiY2NiNmNjYmY0ZDI1OTAyMThjOTRiOGYwZjk3MjhhYTViNzhiNDI1In0"
         }
       ]
     },
@@ -333,44 +333,44 @@
       "statement": "_fresh_default_refusal runs only in the two no-evidence rows (no --mode, and --mode full without full evidence) and refuses, before any write, a target that is not its repository's top level, a linked worktree, a bare repository, or a .claude that is a regular file, each with a remedy.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1398-L1439",
-          "version": "repo-lines-v1:sha256:bdeb78417ede5e49f232123a4a478ae1da7003abb662469d1891dd77a39c0ff2:eyJzZWxlY3RlZExpbmVDb3VudCI6NDIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkMjA4MWI4NWEyMWY4NmFiYWZkMTcwNThhNDExMThhNTMwNDQ1N2FkYThhZTMzNDFiZDRmODdlZjQ2ODc4ZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIyMmI4MzU2OWNjY2U1ZTI4YzMxNmI0MmNjNjk4YzcyNjBlYzY4MWQyNjc4MjQ5NmI5YzA2OTY0YTY4MWZmZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjlmYmIwMzhlZDFhOTVmMzYyZWU0Y2Q2ODE1ZGM4OTBkZWE4OTdlODZkYjI1YTM2MDNkYTEyNjJiMDc0OWQ3MGMifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1523-L1562",
+          "version": "repo-lines-v1:sha256:cd16bf0894b118d019c6eedce4e9cbecc5a4305bd60f759fbb65a176ebb5ceec:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjdkMjA4MWI4NWEyMWY4NmFiYWZkMTcwNThhNDExMThhNTMwNDQ1N2FkYThhZTMzNDFiZDRmODdlZjQ2ODc4ZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTYwMGE3M2QyZTAyZjM1MmI5MGZlZjFkOGQ2MzgxMWJhNGE4ZWUwYzFiZWFhN2FlNDY1OGYzNmFhMmUxOTgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIyMmI4MzU2OWNjY2U1ZTI4YzMxNmI0MmNjNjk4YzcyNjBlYzY4MWQyNjc4MjQ5NmI5YzA2OTY0YTY4MWZmZDYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQyNThhM2JkYWEzYWM5MGFmMzU2YzgxNGQ2ZjUxNDVkNTc1YjA1MDFlNjA0OTcxM2I1ZTk5OTZlNjBlZTRkOGUifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1440-L1527",
-          "version": "repo-lines-v1:sha256:6e6db401e47f8f8c674a9d58c1d116be98ffa66c491d10ea56346c4d82df379f:eyJzZWxlY3RlZExpbmVDb3VudCI6ODgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg1ZTMwYzM3MDNlMTcyN2ZmZmU1ZjJhMzJkNTkwYzkwMjAzNTgzNDI5OTNkMTcyYTQ0OTVjZWFkOWJiMGI3OWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3MDE0OWUwNjlhZDY3ZWNjZjQ3MzY0NmZmMWM3NTAwNTBkMzI5ZDExMDAxOGRjNTc2Njg3OGVhZmExZDYwN2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNkOGQ5NWFjZTMxNjFiMmZlY2MyODRmYjQyZGEyOGM4YTBlMWE5MGVmZjExYWM0NzcyMzAyNGMwNmY5ZDY2MzgifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1599-L1662",
+          "version": "repo-lines-v1:sha256:822cc233e156e999771b5337978dbee225b867b011ab29754074fbeea673afe7:eyJzZWxlY3RlZExpbmVDb3VudCI6NjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMDlhZjUzOWZhNGMyY2JjZDgxNWM0M2FiNGFhNmY5MjAxZmE0MDdkZWNlNzk1MTE0NmRmYjk0NTNjODkwZTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2ZjA4MmQ1YzgyMzczOTczOGNkMDlkZTJiZGUyODFjNTU1ZGNiNjk3YmZkNDIwYWZlN2YxODE4ZjM2ODkzNjkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImNiODNlZTBlNDE3ZTlkNmZiZjRmZWYyNzA5MmVmZTU2NmEyNzM3ZGYyOTEyZjdmYzQ0NTU0MTM0Y2M1NThmMzIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4NWE3MGQ3NDVmYTU1MmQ3MTAyYzRkYTQxZmYzMGZlMDk3ZDczNGQ0MDBhNjFiMzNjZWY5NDE0MTBjMjY5OWEifQ"
         }
       ]
     },
     {
       "id": "claim_4fd72d08e35a4900a6ac28eb970b8c0b",
-      "statement": "--backup-state is a standalone installer action dispatched by main before --uninstall and mode detection to _run_backup_state, which refuses a non-directory target and turns a non-repository into 'Refusing --backup-state: <target> is not a Git repository.'; with --dry-run it only prints 'would back up ...' and writes nothing.",
+      "statement": "--backup-state is a standalone installer action dispatched by main before --uninstall and mode detection to _run_backup_state, which refuses a non-directory target and otherwise returns backup_sidecar_state's result, whose shared sidecar preflight aborts a target that is not a Git repository; with --dry-run it only prints 'would back up ...' and writes nothing.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1612-L1640",
-          "version": "repo-lines-v1:sha256:97a72b3e220e42679ab60ae9d7059e796b711b5f39abb51ff02c674427e15c00:eyJzZWxlY3RlZExpbmVDb3VudCI6MjksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjOWFlMWNkMjdlYzI0NGRlZjc0MTk4YzgwNTg1NTBkYWUyOGJlZWIzM2ViZjljNTFhZmEwNDBjOGMyNmZhYmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1Yzc3OTdlOTA4OWQ4ZTlmMjViYWRhNjU0MDk4YTcxM2EwNTA2MTYxZjU5ZGZhYzc5ZDkzOWIzMzJhMDgxYzUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1749-L1773",
+          "version": "repo-lines-v1:sha256:2a6f7b667714a263a3108b802adb9c853584dcc9fb68f08deaba310f8b62dcbe:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjOWFlMWNkMjdlYzI0NGRlZjc0MTk4YzgwNTg1NTBkYWUyOGJlZWIzM2ViZjljNTFhZmEwNDBjOGMyNmZhYmQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE1Yzc3OTdlOTA4OWQ4ZTlmMjViYWRhNjU0MDk4YTcxM2EwNTA2MTYxZjU5ZGZhYzc5ZDkzOWIzMzJhMDgxYzUifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L184-L191",
-          "version": "repo-lines-v1:sha256:65febbb8864aee743aaf8e7013b318e28a7a58024357af93a0ecbec68427a772:eyJzZWxlY3RlZExpbmVDb3VudCI6OCwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNmJlNDM5YTQ3NTAzNDI3YTRjNzlmOWJkM2MzYzNmYzFmOTNmZDFlN2I0YzdhMTUxZDVhZmFkMDQwMmQxYThlYSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNTE1MjM2MThkMjcxZmU1YmZhNDM5NTIxZjc5ZTFkOTVkN2I1YTUwOTZhNDdmMTMxN2JlMjcyYzRkZTBhY2JiYiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYTZhZGE4OWMxMDVhYTM1OGRjMDViYzdmZTQ2NDVjZjk1MjkwM2I1N2UxYmJkNDI0YmU0OWE5NzJlYTdiNDNkNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmI2YTYwODc2ZTBjMGQ3MmU0MDU1MTE3ZTM3NzZiYzU4NjM2NjQ5OWU4NzI4NDQ1ODU1ZTZmZWJjZTI4NWI2MCJ9"
+          "resource": "repo://scripts/sidecar_overlay.py#L4085-L4091",
+          "version": "repo-lines-v1:sha256:60f4299ea3a2e762f3557bcaf954b443ee69f1b60d440e1849c876dc54c7c12a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZDQ3MGEzNTg4YTZhOTJlYjQwYjU2OTk3NjViZjE5ZmIyNmI0ZTNlOGQ0Yjk5Y2FjYmI1MjViYTlmMjQ5ZDkxMCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2ZkZDkwNWVmZDJiNThmOWUwZDg4NDA0NTVhN2U3MjhiYmQyNzdjZTkyMzZiYzM0NWQ3ZGQ4ODlhMWI2MzUwOSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMDVmOTUxN2FlODg2MTI0NjY0NTM5ZWFlODA1ZjM2MjYwZjlmNGIwZTBkODY0YTEyNzE1MTM2NjYwNDdkNzdlNCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzRkYjJmMGViNDIxZjRkM2YwMTNiODYyNjIyMTQ5M2FkNGNmOTMwYTA4ZTU2MDljM2YyOGJlMzQxNWVkNjhjMSJ9"
         },
         {
-          "resource": "repo://tests/test_sidecar_workflow_scenario.py#L431-L445",
-          "version": "repo-lines-v1:sha256:b9e50aa0f08662274bf6983e7976f5fd3cb197a38c3ca14e027faf40368ecaf7:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg5ZmYzZWIxNDJkOTk1MjVlNzdmNTcwY2UxOTI4YWQxMGU3ZWMyY2Q2OTZkMDRhOWYwNjk1YWQzODE4YTgxNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImE2YmE0YzhjZjM1ZGU3NzI2OTA2Mzg0NGU5YThmNGEwYTkzZGUwYTc3NzRlY2UwMThhZTdhODk4Mzc3NmYzYWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ3NDgwMzNlMDYwOWU0OTc3MzdiZGEzMmQzNGUxMjczYWUzMTI1NzQwNjJiZjE0YjIwMGI3MTU4YjE5OTNhMzEifQ"
+          "resource": "repo://tests/test_sidecar_workflow_scenario.py",
+          "version": "repo-file-v1:sha256:7236dcc830f779e655f16f850c35695e262046a4a34c7acdbf55419abf40b42d"
         }
       ]
     },
     {
       "id": "claim_bcc9720d1c7f42d6afef41257a5ff19e",
-      "statement": "The installer's --profile option accepts skills or workflow, is used only in sidecar mode, and defaults to an existing manifest's recorded profile, else skills; --purge-state is read only with --uninstall and moves the state folder .claude/ai-bootstrap into the preserved-copy folder instead of keeping it hidden in place.",
+      "statement": "The installer's --profile option accepts skills or workflow, is used only in sidecar mode, and defaults to an existing manifest's recorded profile, else skills; --purge-state is read only with --uninstall and moves the state folder .ai-bootstrap into the preserved-copy folder instead of keeping it hidden in place.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L124-L132",
-          "version": "repo-lines-v1:sha256:7505765e12bb1c5ea7b4e5001761e3cd001e61b6e5f2b16c44c9a724e4a6b5a2:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNGEwNmM3NDU4ZjY2ZGM0YmQ4NzE3MGNmZTY3ZmRhYjMyYWQwZTU4MTEzOGRhOWNiNDNiOGU5YTkxYmM0YWMxYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzBjMWYxODhmMTQyZWQ3YTgyNDY4MGIyMDcxNzJjNTUxOWJjNjE0YTQ4ZmRhN2NmMTY3ZWRiOGRkZjc5OTU2YyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOWVhOTY1YWY5ZDcwNDQyMzBiNzUwZTkzMjRkMTQ4ZjllM2RiYWZmZDhhNGEyZTkxMGE5NGU4MDFlNDUyNGVhNSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWFmNjM5MTRmYmE1NWY5NDViMThiNjJiZmJjZDkzMzBiNTQwMTk4NWE3MDMzNmI1MTg3ZWE2YmM0Y2U1Yjc5MyJ9"
+          "resource": "repo://scripts/install_bootstrap.py#L123-L132",
+          "version": "repo-lines-v1:sha256:bf8d6c2fc88919ac2a01fe46ba36c308620bae67af2325ba4309d5940d534630:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiZTQzOWE0NzUwMzQyN2E0Yzc5ZjliZDNjM2MzZmMxZjkzZmQxZTdiNGM3YTE1MWQ1YWZhZDA0MDJkMWE4ZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMwYzFmMTg4ZjE0MmVkN2E4MjQ2ODBiMjA3MTcyYzU1MTliYzYxNGE0OGZkYTdjZjE2N2VkYjhkZGY3OTk1NmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjMzZmNmNzM3OTJhOGM4NDA2ZDk1Y2M1YjFiZGIwYmJlZWZlNjg2ZThjOWFkZGE0NGFmZThlYjJjMDQyYjFiOWYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhZjYzOTE0ZmJhNTVmOTQ1YjE4YjYyYmZiY2Q5MzMwYjU0MDE5ODVhNzAzMzZiNTE4N2VhNmJjNGNlNWI3OTMifQ"
         },
         {
-          "resource": "repo://scripts/install_bootstrap.py#L169-L191",
-          "version": "repo-lines-v1:sha256:d3eb4595390babe6be0ef78f58dd2f99bf18c4e3fb68ecd32b74cb2f4c365c71:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjBhM2Q1YzE1ODAyOGUxNzI1NDQ1NzVkYjFiZmMyZGIwZTRkM2ZkYTFmMTZmOTJhN2M2MjcxZGVlMzIzZWU3ZGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNTIzNjE4ZDI3MWZlNWJmYTQzOTUyMWY3OWUxZDk1ZDdiNWE1MDk2YTQ3ZjEzMTdiZTI3MmM0ZGUwYWNiYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRmMGM0M2Q4YmRhM2FiZWQ1ZWFlZjJmMzM3NGI5MWQxMzlkNTVjNWI3MmU0NzQxOTg1NjI3MGQ2MGFiMGIwMTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiNmE2MDg3NmUwYzBkNzJlNDA1NTExN2UzNzc2YmM1ODYzNjY0OTllODcyODQ0NTg1NWU2ZmViY2UyODViNjAifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L165-L191",
+          "version": "repo-lines-v1:sha256:0f10c6d10deb03ca8ca82abaaa907efd5df159f1e6cb30240aba851b1c5e0fd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZiZTQzOWE0NzUwMzQyN2E0Yzc5ZjliZDNjM2MzZmMxZjkzZmQxZTdiNGM3YTE1MWQ1YWZhZDA0MDJkMWE4ZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNTIzNjE4ZDI3MWZlNWJmYTQzOTUyMWY3OWUxZDk1ZDdiNWE1MDk2YTQ3ZjEzMTdiZTI3MmM0ZGUwYWNiYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImQ3ZjRiODFkYjMxMjU1NDY0NDMwNjZhYjgyZGFkNzYwNmJjZjY1NWU2ZDdiYjk3MDM0OTdiMGU1NWM5N2Q1MDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiNmE2MDg3NmUwYzBkNzJlNDA1NTExN2UzNzc2YmM1ODYzNjY0OTllODcyODQ0NTg1NWU2ZmViY2UyODViNjAifQ"
         }
       ]
     },
@@ -391,6 +391,6 @@
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T14:43:37.947Z"
+    "at": "2026-10-02T10:43:27.367Z"
   }
 }

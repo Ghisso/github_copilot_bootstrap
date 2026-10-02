@@ -1,4 +1,4 @@
-<!-- Save as .claude/ai-bootstrap/quality_reports/YYYY-MM-DD_<topic>.md -->
+<!-- Save as .ai-bootstrap/quality_reports/YYYY-MM-DD_<topic>.md -->
 # Quality Report — [short topic]
 
 **Date:** YYYY-MM-DD

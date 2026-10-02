@@ -38,7 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import sidecar_overlay as sidecar_overlay_module  # noqa: E402
-from runtime_ownership import SIDECAR_MANIFEST_NAME  # noqa: E402
+from runtime_ownership import (  # noqa: E402
+    SIDECAR_LEGACY_STATE_ROOT,
+    SIDECAR_MANIFEST_NAME,
+    SIDECAR_STATE_ROOT,
+)
 from sidecar_overlay import git_path, install_sidecar  # noqa: E402
 from sidecar_test_helpers import (  # noqa: E402
     _commit,
@@ -56,6 +60,7 @@ from sidecar_test_helpers import (  # noqa: E402
 UPDATER = REPO_ROOT / "scripts" / "update_consumers.py"
 INSTALLER = REPO_ROOT / "scripts" / "install_bootstrap.py"
 SIDECAR_SOURCE = REPO_ROOT / "dist" / "sidecar" / "skills"
+WORKFLOW_SOURCE = REPO_ROOT / "dist" / "sidecar" / "workflow"
 
 
 # --------------------------------------------------------------------------
@@ -482,6 +487,60 @@ def test_batch_target_with_both_evidence_kinds_is_refused_others_continue(
     assert _tree_snapshot(bad) == before_bad  # refused before any write
 
 
+def test_mixed_batch_treats_legacy_full_consumer_as_full_not_sidecar(
+    tmp_path: Path,
+) -> None:
+    """Finding 2: a batch run against a recognized legacy full install (the
+    HF-sync era -- a tracked `.devcontainer/hf-ai-sync.py` next to this
+    bootstrap's own hook scripts, no nested AI-state repository yet)
+    refreshes it as a full consumer instead of mixing a sidecar overlay
+    into it, and the other target in the same batch still completes."""
+    legacy = tmp_path / "legacy-consumer"
+    _init_repo(legacy)
+    devcontainer = legacy / ".devcontainer"
+    devcontainer.mkdir()
+    (devcontainer / "hf-ai-sync.py").write_text(
+        "#!/usr/bin/env python3\n", encoding="utf-8"
+    )
+    _commit(legacy, "devcontainer HF-sync era", ".devcontainer/hf-ai-sync.py")
+    hooks_dir = legacy / ".claude" / "hooks" / "scripts"
+    hooks_dir.mkdir(parents=True)
+    for name in (
+        "run-hook.sh",
+        "protect-files.sh",
+        "session-log.sh",
+        "context-mode-dispatch.sh",
+        "git-protection.sh",
+    ):
+        (hooks_dir / name).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+    good = tmp_path / "good"
+    _init_repo(good)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(UPDATER),
+            "--skip-regen",
+            "--local-only",
+            str(legacy),
+            str(good),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "All projects updated." in result.stdout
+    assert "=== Done: legacy-consumer ===" in result.stdout
+    assert "=== Done: good ===" in result.stdout
+    assert (legacy / ".claude" / ".git").is_dir()
+    assert (legacy / ".claude" / "hooks" / "scripts" / "run-hook.sh").is_file()
+    assert not (legacy / ".git" / SIDECAR_MANIFEST_NAME).exists()
+
+
 def test_batch_target_refused_by_agents_takeover_others_continue(
     tmp_path: Path,
 ) -> None:
@@ -546,6 +605,62 @@ def test_mixed_batch_updates_full_and_sidecar_targets(tmp_path: Path) -> None:
     assert (full_target / ".claude" / ".git").is_dir()
     assert (sidecar_target / ".claude" / "skills").is_dir()
     assert not (sidecar_target / ".claude" / ".git").exists()
+
+
+def test_batch_update_migrates_legacy_state_and_continues_the_other_target(
+    tmp_path: Path,
+) -> None:
+    """Finding 1: through the real ``update_consumers.py`` batch entrypoint
+    -- not just a direct ``install_sidecar`` call -- a workflow consumer
+    whose state is still at the recognized legacy root gets migrated, byte
+    for byte, while an unrelated target in the same batch still completes."""
+    legacy_target = tmp_path / "legacy-workflow-consumer"
+    _init_repo(legacy_target)
+    assert install_sidecar(legacy_target, WORKFLOW_SOURCE, profile="workflow") == 0
+    memory = legacy_target / SIDECAR_STATE_ROOT / "MEMORY.md"
+    memory.write_text(
+        memory.read_text(encoding="utf-8") + "\n- kept\n", encoding="utf-8"
+    )
+    new_dir = legacy_target / SIDECAR_STATE_ROOT
+    legacy_dir = legacy_target / SIDECAR_LEGACY_STATE_ROOT
+    legacy_dir.parent.mkdir(parents=True, exist_ok=True)
+    new_dir.rename(legacy_dir)
+    exclude_path = _exclude_path(legacy_target)
+    exclude_path.write_text(
+        exclude_path.read_text(encoding="utf-8").replace(
+            f"/{SIDECAR_STATE_ROOT}\n", f"/{SIDECAR_LEGACY_STATE_ROOT}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    good_target = tmp_path / "good-sidecar-consumer"
+    _init_repo(good_target)
+    assert install_sidecar(good_target, SIDECAR_SOURCE) == 0
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(UPDATER),
+            "--skip-regen",
+            "--local-only",
+            str(legacy_target),
+            str(good_target),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "All projects updated." in result.stdout
+    assert "=== Done: legacy-workflow-consumer ===" in result.stdout
+    assert "=== Done: good-sidecar-consumer ===" in result.stdout
+    assert not legacy_dir.exists()
+    assert (legacy_target / SIDECAR_STATE_ROOT / "MEMORY.md").is_file()
+    assert "kept" in (legacy_target / SIDECAR_STATE_ROOT / "MEMORY.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_batch_reports_not_a_directory_targets_and_continues(tmp_path: Path) -> None:

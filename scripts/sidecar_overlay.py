@@ -70,6 +70,7 @@ from runtime_ownership import (
     SIDECAR_EXCLUDE_BEGIN,
     SIDECAR_EXCLUDE_END,
     SIDECAR_FILE_UNIT_READ_ROOTS,
+    SIDECAR_LEGACY_STATE_ROOT,
     SIDECAR_MANIFEST_NAME,
     SIDECAR_PRESERVED_NAME,
     SIDECAR_PROFILE_FILE_UNITS,
@@ -114,12 +115,20 @@ _AGENT_READ_ONLY_ROOTS = tuple(
     for root in SIDECAR_FILE_UNIT_READ_ROOTS
     if PurePosixPath(root).name == "agents" and root != _AGENT_WRITE_ROOT
 )
-# The one namespaced state root every profile that has one shares (Decision
-# 2, 3). A ``frozenset`` even though only one exists today, so a future
-# profile's own state root needs no new plumbing here.
+# The namespaced state root every profile that has one shares (Decision 2,
+# 3), plus the recognized former root (finding 1). Classification,
+# validation, backup, and uninstall all recognize both roots identically --
+# a legacy folder a profile install finds still gets kept hidden (or
+# preserved on purge) exactly like the current one, the same way a retired
+# skill write root or bridge is still recognized (Decision 9's own
+# ``_ALL_SKILL_WRITE_ROOTS``/``_ALL_BRIDGES`` pattern). Only the dedicated
+# migration decision (``_legacy_state_migration_outcome``) treats the two
+# roots differently: it alone decides whether a run migrates the legacy
+# root, refuses, or leaves it alone, before this set's ordinary
+# classification ever runs.
 _ALL_STATE_ROOTS: frozenset[str] = frozenset(
     root for root in SIDECAR_PROFILE_STATE_ROOT.values() if root is not None
-)
+) | frozenset({SIDECAR_LEGACY_STATE_ROOT})
 _ESCAPE_CHARS = frozenset("\\*?[")
 
 # Every write root and bridge/file-unit-parent folder (Decision 28): the
@@ -238,18 +247,33 @@ def preserved_unit_slug(unit_path: str, content_hash: str) -> str:
     return f"{unit_path.replace('/', '__')}--{content_hash}"
 
 
-def state_backup_slug(preserved_root: Path) -> str:
+def state_backup_slug(
+    preserved_root: Path, *, reserved: AbstractSet[str] = frozenset()
+) -> str:
     """Return a free preserved-copy folder name for one state-folder backup
     or purge (Decision 3): ``state--<UTC timestamp>``, with ``-2``, ``-3``,
     and so on appended while that name already exists under
-    ``preserved_root``. Never content-hashed like ``preserved_unit_slug``,
-    since the state root is never hashed at all. The suffix keeps a backup
-    and an uninstall in the same second from colliding, which would
-    otherwise read as a preserve conflict and fail the uninstall."""
+    ``preserved_root`` or is in ``reserved``. Never content-hashed like
+    ``preserved_unit_slug``, since the state root is never hashed at all.
+    The suffix keeps a backup and an uninstall in the same second from
+    colliding, which would otherwise read as a preserve conflict and fail
+    the uninstall.
+
+    ``reserved`` (finding 1) is a caller-tracked set of names already
+    handed out by an earlier call in the same *planning* pass -- for
+    example two recognized state roots (the current one and the legacy
+    one) both needing a destination in the same preserve/backup plan,
+    before either actually exists on disk yet. Without it, both calls
+    would see the same empty ``preserved_root`` and compute the identical
+    name."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     slug = f"state--{timestamp}"
     counter = 1
-    while (preserved_root / slug).exists() or (preserved_root / slug).is_symlink():
+    while (
+        slug in reserved
+        or (preserved_root / slug).exists()
+        or (preserved_root / slug).is_symlink()
+    ):
         counter += 1
         slug = f"state--{timestamp}-{counter}"
     return slug
@@ -730,6 +754,33 @@ def required_snapshot_units(
     return frozenset(units)
 
 
+def preserved_destinations_for(
+    required_units: AbstractSet[str],
+    preserved_root: Path,
+    snapshots: Mapping[str, UnitSnapshot],
+) -> dict[str, Path]:
+    """Return each required unit's preserved-copy destination: a state
+    root's own ``state_backup_slug``, or an ordinary unit's content-hashed
+    ``preserved_unit_slug``. Shared by install and uninstall (Decision 24;
+    finding 1), threading one ``reserved`` set of slugs across every state
+    root handled in this single call, so two of them -- the current root
+    and the recognized legacy one, both possibly needing a destination in
+    the same preserve/backup plan -- never compute the identical
+    timestamp-based name before either actually exists on disk."""
+    reserved_state_slugs: set[str] = set()
+    destinations: dict[str, Path] = {}
+    for unit_path in required_units:
+        if unit_path in _ALL_STATE_ROOTS:
+            slug = state_backup_slug(preserved_root, reserved=reserved_state_slugs)
+            reserved_state_slugs.add(slug)
+            destinations[unit_path] = preserved_root / slug
+        else:
+            destinations[unit_path] = preserved_root / preserved_unit_slug(
+                unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
+            )
+    return destinations
+
+
 # --------------------------------------------------------------------------
 # Exclude-line rendering (Decision 17)
 # --------------------------------------------------------------------------
@@ -1147,9 +1198,17 @@ def _unrecognized_line_remedy(line: str) -> str:
     )
 
 
-def _preserved_remedy(unit_path: str) -> str:
+def _preserved_remedy(unit_path: str, *, dry_run: bool = False) -> str:
     name = _unit_name(unit_path)
     display = _named(name, _unit_kind_word(unit_path)) if name else f"`{unit_path}`"
+    if dry_run:
+        # Finding 3: the planner is dry-run-agnostic (one PlanResult for a
+        # preview and a real run alike), so this is the one place a dry
+        # run's own PRESERVED report says "would", never "was".
+        return (
+            f"the repository now uses {display}, so your edited copy would "
+            "be moved out of the client folders"
+        )
     return (
         f"the repository now uses {display}, so your edited copy was moved "
         "out of the client folders"
@@ -1270,7 +1329,9 @@ def _state_kept_remedy(unit_path: str) -> str:
     return f"kept {unit_path} and its exclude line; pass --purge-state to remove it"
 
 
-def _state_purged_remedy(unit_path: str) -> str:
+def _state_purged_remedy(unit_path: str, *, dry_run: bool = False) -> str:
+    if dry_run:
+        return f"a real uninstall with --purge-state would move {unit_path} out of the client folders"
     return (
         f"the sidecar was uninstalled with --purge-state, so {unit_path} was "
         "moved out of the client folders"
@@ -1284,6 +1345,7 @@ def _classify_state_unit(
     *,
     uninstall: bool,
     purge_state: bool,
+    dry_run: bool = False,
 ) -> _UnitOutcome:
     """Classify the namespaced state unit (Decision 2, 3; the big plan's
     Design Overview, "Unit kinds"). Never hashed or compared against
@@ -1312,7 +1374,9 @@ def _classify_state_unit(
             # preserved_conflicts/kept_conflicts -- state_backup_slug()
             # picks a name that does not exist yet, so a purge can never
             # collide with an earlier backup, even within the same second.
-            report = Report("PRESERVED", unit_path, _state_purged_remedy(unit_path))
+            report = Report(
+                "PRESERVED", unit_path, _state_purged_remedy(unit_path, dry_run=dry_run)
+            )
             return _UnitOutcome(
                 "preserve",
                 None,
@@ -1353,6 +1417,7 @@ def _classify_unit(
     next_record: ManifestUnit | None = None,
     *,
     purge_state: bool = False,
+    dry_run: bool = False,
 ) -> _UnitOutcome:
     """Classify one unit (the big plan's table, first matching row wins).
 
@@ -1376,7 +1441,12 @@ def _classify_unit(
     """
     if unit_path in _ALL_STATE_ROOTS:
         return _classify_state_unit(
-            unit_path, snapshot, desired, uninstall=uninstall, purge_state=purge_state
+            unit_path,
+            snapshot,
+            desired,
+            uninstall=uninstall,
+            purge_state=purge_state,
+            dry_run=dry_run,
         )
 
     if snapshot.is_gitlink:
@@ -1622,18 +1692,28 @@ def _extra_taking_paths(
     return frozenset(paths)
 
 
-def _preserved_uninstall_remedy(unit_path: str, *, unfinished: bool = False) -> str:
+def _preserved_uninstall_remedy(
+    unit_path: str, *, unfinished: bool = False, dry_run: bool = False
+) -> str:
     name = _unit_name(unit_path)
     display = _named(name, _unit_kind_word(unit_path)) if name else f"`{unit_path}`"
     if unfinished:
         # N14: no manifest record backs this copy, so it was never "your
         # edited copy" of anything the sidecar shipped -- only its own
         # exclude-block line ever claimed it.
+        if dry_run:
+            return (
+                f"{display} is listed by the sidecar's exclude block but "
+                "never recorded; a real uninstall would move it out of the "
+                "client folders"
+            )
         return (
             f"the sidecar was uninstalled; {display} was listed by the "
             "sidecar's exclude block but never recorded, so it was moved "
             "out of the client folders"
         )
+    if dry_run:
+        return f"a real uninstall would move your edited copy of {display} out of the client folders"
     return f"the sidecar was uninstalled, so your edited copy of {display} was moved out of the client folders"
 
 
@@ -1643,6 +1723,8 @@ def _convert_for_taken_skill(
     preserved_conflicts: AbstractSet[str],
     preserved_destinations: Mapping[str, str],
     uninstall: bool = False,
+    *,
+    dry_run: bool = False,
 ) -> _UnitOutcome:
     """Convert one taken skill's unit outcome to an allowed one (Decisions
     22 and 24; uninstall reuses this for every skill and bridge, Decision
@@ -1677,10 +1759,10 @@ def _convert_for_taken_skill(
             )
         remedy = (
             _preserved_uninstall_remedy(
-                unit_path, unfinished=outcome.kind == "unfinished"
+                unit_path, unfinished=outcome.kind == "unfinished", dry_run=dry_run
             )
             if uninstall
-            else _preserved_remedy(unit_path)
+            else _preserved_remedy(unit_path, dry_run=dry_run)
         )
         report = Report("PRESERVED", unit_path, remedy)
         return _UnitOutcome(
@@ -1715,6 +1797,7 @@ def plan_sidecar_reconciliation(
     purge_state: bool = False,
     pending_manifest: Manifest | None = None,
     profile: str = SIDECAR_DEFAULT_PROFILE,
+    dry_run: bool = False,
 ) -> PlanResult:
     """Plan one sidecar reconciliation run. Performs no I/O.
 
@@ -1791,6 +1874,11 @@ def plan_sidecar_reconciliation(
             used to stamp ``next_manifest.profile``; every other decision
             here is driven purely by ``desired_units`` (already built for
             this profile by the caller's own ``load_desired_units`` call).
+        dry_run: Finding 3. This plan is still "performs no I/O" either way
+            -- the only effect is wording: a PRESERVED report's remedy
+            says "would be moved"/"would move" instead of "was moved",
+            since the same ``PlanResult`` shape serves both a preview and
+            a real run, and the real run's own reports must stay accurate.
 
     Returns:
         A ``PlanResult``. When ``aborts`` is non-empty, every other field is
@@ -1866,6 +1954,7 @@ def plan_sidecar_reconciliation(
             uninstall,
             next_record,
             purge_state=purge_state,
+            dry_run=dry_run,
         )
 
     # One precedence decision per skill (Decision 22): a skill is taken by
@@ -1974,6 +2063,7 @@ def plan_sidecar_reconciliation(
             preserved_conflicts,
             preserved_destinations,
             uninstall=uninstall,
+            dry_run=dry_run,
         )
 
     # Decision 44/O12: while a conflict copy remains, a taken unit's own
@@ -3749,11 +3839,19 @@ def _count_actions(plan_result: PlanResult) -> dict[str, int]:
 
 
 def _print_report(
-    plan_result: PlanResult, preserved_destinations: Mapping[str, str] | None = None
+    plan_result: PlanResult,
+    preserved_destinations: Mapping[str, str] | None = None,
+    *,
+    dry_run: bool = False,
 ) -> None:
-    """Print the run's summary and one line per removed, deleted, seeded, or
-    preserved path, plus every SKIPPED/RETAINED/PRESERVED report (S15: a
-    real run must name what a takeover deleted, not only count it)."""
+    """Print the run's prospective counts, plus every SKIPPED/RETAINED/
+    PRESERVED report. A real run (``dry_run=False``, the default) also
+    prints one past-tense line per removed, deleted, seeded, or preserved
+    path, naming the actual preserved destination (S15: a real run must
+    name what a takeover deleted, not only count it). Finding 3: a dry run
+    never claims one of those four happened -- ``_describe_dry_run_actions``
+    is the dry run's own, separate "would ..." prediction for every action,
+    called by every caller of this function in a dry run."""
     preserved_destinations = preserved_destinations or {}
     counts = _count_actions(plan_result)
     _info(
@@ -3762,16 +3860,17 @@ def _print_report(
         f"unchanged {counts['unchanged']}, preserved {counts['preserve']}, "
         f"seeded {counts['seed_missing']}"
     )
-    for action in plan_result.actions:
-        if action.kind == "remove":
-            _info(f"removed {action.unit}")
-        elif action.kind == "team_takeover_delete" and action.path is not None:
-            _info(f"deleted {action.path}")
-        elif action.kind == "preserve":
-            destination = preserved_destinations.get(action.unit, "")
-            _info(f"PRESERVED {action.unit} -> {destination}")
-        elif action.kind == "seed_missing" and action.path is not None:
-            _info(f"seeded {action.path}")
+    if not dry_run:
+        for action in plan_result.actions:
+            if action.kind == "remove":
+                _info(f"removed {action.unit}")
+            elif action.kind == "team_takeover_delete" and action.path is not None:
+                _info(f"deleted {action.path}")
+            elif action.kind == "preserve":
+                destination = preserved_destinations.get(action.unit, "")
+                _info(f"PRESERVED {action.unit} -> {destination}")
+            elif action.kind == "seed_missing" and action.path is not None:
+                _info(f"seeded {action.path}")
     for report in plan_result.reports:
         _info(f"{report.category} {report.path}: {report.remedy}")
 
@@ -3824,7 +3923,7 @@ def _install_sidecar_dry_run(
     if not passed:
         return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
     _describe_dry_run_actions(plan_result, preserved_destinations)
-    _print_report(plan_result, preserved_destinations)
+    _print_report(plan_result, preserved_destinations, dry_run=True)
     _info(
         "dry-run gate is an approximation: Git ranks info/exclude above "
         "core.excludesFile, so the real run's gate decides"
@@ -4155,6 +4254,172 @@ def _run_target_preflight(target: Path) -> _TargetPreflight | int:
     )
 
 
+# --------------------------------------------------------------------------
+# Legacy state migration (finding 1; the big plan's "Migration outcomes")
+# --------------------------------------------------------------------------
+
+
+def _legacy_state_migration_outcome(
+    target: Path, desired_root: str, legacy_listed: bool
+) -> Literal["none", "migrate", "both_exist", "unowned"]:
+    """Decide what a workflow install/update does about the recognized
+    former state root, from data alone (no I/O beyond two directory checks).
+
+    ``legacy_listed`` is whether the sidecar's own exclude block already
+    lists ``SIDECAR_LEGACY_STATE_ROOT`` as a unit (``excluded_units``) --
+    a recognized old managed exclude entry, or the retained-state-only
+    block a plain ``--uninstall`` leaves behind; either qualifies, and
+    neither needs a manifest (a state unit is never recorded in one).
+    Folder existence alone is never enough for the legacy root (unlike the
+    current root's own accepted "claim by name" design): a real, untracked
+    `.claude/ai-bootstrap` the exclude block does not already own is left
+    alone, reported as ``"unowned"`` so the caller refuses before any
+    write, rather than silently claimed as migratable state.
+
+    Both roots being a real directory (not a symlink, not tracked, not an
+    unsafe shape) is already guaranteed by the shared preflight's own
+    filesystem-shape check (``_SIDECAR_STRUCTURAL_PATHS`` includes every
+    member of ``_ALL_STATE_ROOTS``, both roots now), so this only has to
+    decide between the remaining cases: neither exists ("none", the
+    ordinary fresh-install or already-migrated case), only the current
+    root exists ("none", "Only new root exists" in the migration table --
+    ordinary reconciliation already preserves and seeds it), only the
+    legacy root exists with evidence ("migrate"), only the legacy root
+    exists without evidence ("unowned"), or both exist ("both_exist").
+    """
+    legacy_dir = target / PurePosixPath(SIDECAR_LEGACY_STATE_ROOT)
+    desired_dir = target / PurePosixPath(desired_root)
+    if not legacy_dir.is_dir():
+        return "none"
+    if desired_dir.is_dir():
+        return "both_exist"
+    if not legacy_listed:
+        return "unowned"
+    return "migrate"
+
+
+def _describe_legacy_state_migration_dry_run(
+    legacy_dir: Path, desired_dir: Path, preserved_root: Path
+) -> None:
+    """Predict the real migration's two actions, and nothing else: a dry
+    run must never claim a backup or a move happened (Decision per finding
+    3's own "no past-tense dry-run noise", applied here from the start)."""
+    destination = preserved_root / state_backup_slug(preserved_root)
+    _info(f"would back up {legacy_dir} -> {destination}")
+    _info(f"would move {legacy_dir} -> {desired_dir}")
+
+
+def _legacy_state_migration_refusal(
+    migration: Literal["both_exist", "unowned"], legacy_dir: Path, desired_dir: Path
+) -> int:
+    """Render the "both roots exist" or "unowned legacy root" refusal
+    (migration table rows 4 and 5): both abort before any write, and
+    neither ever suggests a flag or an automatic cleanup."""
+    if migration == "both_exist":
+        return _abort(
+            f"both {legacy_dir} and {desired_dir} exist",
+            "back up both folders (`--backup-state` preserves either "
+            "recognized root), inspect which one holds your current work, "
+            "then remove the other by hand before rerunning",
+        )
+    return _abort(
+        f"{legacy_dir} exists but the sidecar's own exclude block does not list it",
+        f"this run will not claim an unrecognized folder as sidecar state; "
+        f"move or remove {legacy_dir} by hand, then rerun",
+    )
+
+
+def _perform_legacy_state_migration(
+    target: Path, preflight: _TargetPreflight, desired_root: str
+) -> int | None:
+    """Migrate the recognized legacy state root into ``desired_root``,
+    under the already-held install lock (no nested lock acquisition).
+
+    Establishes an exclusion for ``desired_root`` next to the legacy
+    root's own existing line and proves it ignored before any data moves;
+    creates the complete backup with the step-2 copy helper
+    (``_copy_state_into_preserved``); rechecks the destination is still
+    absent immediately before the one same-filesystem, no-overwrite
+    directory rename. A failure at or before the rename restores
+    ``info/exclude`` to its exact original bytes and aborts, preserving the
+    source and every earlier backup -- "before the move" per the parent
+    plan. A failure after the rename keeps the new root's exclusion in
+    place and reports the rerun needed to finish (``_abort_write_failure``'s
+    own remedy already says so): this function's caller runs the ordinary
+    reconciliation right after a successful migration in the same process,
+    and a rerun after any later failure sees the legacy root already gone
+    and converges through that same ordinary path -- no second journal.
+
+    Returns ``None`` on a successful move (the caller must continue
+    building ``desired_units``/snapshots/the plan as usual), or an
+    already-printed abort code the caller must return immediately.
+    """
+    legacy_dir = target / PurePosixPath(SIDECAR_LEGACY_STATE_ROOT)
+    desired_dir = target / PurePosixPath(desired_root)
+    exclude_path = preflight.exclude_path
+    preserved_root = preflight.preserved_root
+
+    original_bytes = exclude_path.read_bytes() if exclude_path.is_file() else None
+    original_text = os.fsdecode(original_bytes) if original_bytes else ""
+    lines = _split_exclude_text(original_text)
+    markers = _find_exclude_markers(lines)
+    block_lines = list(lines[markers[0] + 1 : markers[1]]) if markers else []
+    new_line = unit_exclude_line(desired_root)
+    if new_line not in block_lines:
+        block_lines.append(new_line)
+    write_text = _replace_exclude_block(original_text, block_lines)
+    write_bytes = os.fsencode(write_text)
+    if write_bytes != (original_bytes or b""):
+        _atomic_write(exclude_path, write_bytes)
+
+    try:
+        passed, failing = run_ignore_gate(
+            target, (f"{desired_root}/",), write_bytes, dry_run=False
+        )
+    except GitCheckIgnoreError as exc:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(str(exc), _ignore_gate_remedy())
+    if not passed:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(_describe_gate_failure(failing), _ignore_gate_remedy())
+
+    if _device_id(legacy_dir) != _device_id(target):
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(
+            f"{legacy_dir} is on a different filesystem than {target}",
+            "the sidecar needs one filesystem for an atomic move; relocate "
+            f"{legacy_dir} onto the same filesystem as {target}, then rerun",
+        )
+
+    try:
+        _copy_state_into_preserved(legacy_dir, preserved_root)
+    except OSError as exc:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort_write_failure(exc)
+
+    _fault_point("after_legacy_state_backup")
+
+    if desired_dir.exists() or desired_dir.is_symlink():
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort(
+            f"{desired_dir} appeared during the migration",
+            f"back up both {legacy_dir} and {desired_dir} (`--backup-state` "
+            "preserves either recognized root), inspect which one holds "
+            "your current work, then remove the other by hand before "
+            "rerunning",
+        )
+
+    try:
+        os.rename(legacy_dir, desired_dir)
+    except OSError as exc:
+        _restore_exclude(exclude_path, original_bytes)
+        return _abort_write_failure(exc)
+
+    _fault_point("after_legacy_state_rename")
+    _info(f"moved {legacy_dir} -> {desired_dir}")
+    return None
+
+
 def install_sidecar(
     target: Path,
     source: Path,
@@ -4240,6 +4505,30 @@ def _install_sidecar_planned(
         path for mode, path in preflight.index_entries if mode == "160000"
     )
 
+    desired_root = SIDECAR_PROFILE_STATE_ROOT[profile]
+    if desired_root is not None:
+        legacy_dir = target / PurePosixPath(SIDECAR_LEGACY_STATE_ROOT)
+        desired_dir = target / PurePosixPath(desired_root)
+        legacy_listed = SIDECAR_LEGACY_STATE_ROOT in exclude_block.listed_units
+        migration = _legacy_state_migration_outcome(target, desired_root, legacy_listed)
+        if migration in ("both_exist", "unowned"):
+            return _legacy_state_migration_refusal(migration, legacy_dir, desired_dir)
+        if migration == "migrate":
+            if dry_run:
+                _describe_legacy_state_migration_dry_run(
+                    legacy_dir, desired_dir, preserved_root
+                )
+                return 0
+            aborted = _perform_legacy_state_migration(target, preflight, desired_root)
+            if aborted is not None:
+                return aborted
+            # The migration just rewrote info/exclude on disk (adding
+            # desired_root's own line); refresh the in-memory block so the
+            # rest of this run -- and the snapshot/classification it
+            # drives -- sees the current file, not the one preflight read
+            # before the move.
+            exclude_block = _read_exclude_block(exclude_path)
+
     desired_units = load_desired_units(source, profile)
     required_units = required_snapshot_units(
         desired_units, manifest, exclude_block.listed_units, exclude_block.listed_files
@@ -4260,17 +4549,9 @@ def _install_sidecar_planned(
     if unit_shape_violations:
         return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
-    preserved_destinations = {
-        unit_path: (
-            preserved_root / state_backup_slug(preserved_root)
-            if unit_path in _ALL_STATE_ROOTS
-            else preserved_root
-            / preserved_unit_slug(
-                unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
-            )
-        )
-        for unit_path in required_units
-    }
+    preserved_destinations = preserved_destinations_for(
+        required_units, preserved_root, snapshots
+    )
     preserved_conflicts = frozenset(
         unit_path
         for unit_path, destination in preserved_destinations.items()
@@ -4294,6 +4575,7 @@ def _install_sidecar_planned(
         },
         pending_manifest=preflight.pending_manifest,
         profile=profile,
+        dry_run=dry_run,
     )
     if plan_result.aborts:
         message = "; ".join(
@@ -4403,7 +4685,7 @@ def _uninstall_sidecar_dry_run(
         plan_result, target, dry_run=True, candidate_text=os.fsencode(final_text)
     )
     _describe_dry_run_actions(plan_result, preserved_destinations)
-    _print_report(plan_result, preserved_destinations)
+    _print_report(plan_result, preserved_destinations, dry_run=True)
     _report_preserved_folder_if_nonempty(preserved_root)
     if plan_result.kept_conflicts:
         _info(
@@ -4629,17 +4911,9 @@ def _uninstall_sidecar_planned(
     if unit_shape_violations:
         return _abort(unit_shape_violations[0], "fix the filesystem shape, then rerun")
 
-    preserved_destinations = {
-        unit_path: (
-            preserved_root / state_backup_slug(preserved_root)
-            if unit_path in _ALL_STATE_ROOTS
-            else preserved_root
-            / preserved_unit_slug(
-                unit_path, compute_unit_hash(snapshots[unit_path].file_hashes)
-            )
-        )
-        for unit_path in required_units
-    }
+    preserved_destinations = preserved_destinations_for(
+        required_units, preserved_root, snapshots
+    )
     preserved_conflicts = frozenset(
         unit_path
         for unit_path, destination in preserved_destinations.items()
@@ -4662,6 +4936,7 @@ def _uninstall_sidecar_planned(
         uninstall=True,
         purge_state=purge_state,
         pending_manifest=preflight.pending_manifest,
+        dry_run=dry_run,
     )
     if plan_result.aborts:
         message = "; ".join(
@@ -4706,34 +4981,108 @@ def _uninstall_sidecar_planned(
     )
 
 
+def _copy_state_into_preserved(source: Path, preserved_root: Path) -> Path:
+    """Copy ``source`` into ``preserved_root`` under the collision-free
+    ``state--<timestamp>`` name (``state_backup_slug``), returning the final
+    path. The caller must already hold the run lock (``_acquire_run_lock``):
+    this picks the final name only once the copy has fully succeeded, so
+    two callers racing here would otherwise collide on both the name check
+    and the copy itself.
+
+    Copies into a sibling directory this call creates exclusively
+    (``tempfile.mkdtemp``, so no other process can be mid-copy into the
+    same path), then publishes it with a same-filesystem rename -- the
+    narrow, lock-holding half of the atomic "stage, then rename" idiom this
+    module already uses for single files (``_atomic_write``). A failure in
+    the copy or the publish rename removes only this call's own temporary
+    copy; ``source`` and every earlier backup are untouched either way,
+    since the final name is never chosen until the copy is already done.
+    If that cleanup itself fails, the two ``OSError``\\ s are folded into
+    one whose ``filename`` names the temporary path left behind incomplete,
+    chained from the original failure, for the caller's own
+    ``_abort_write_failure`` to report; the caller must have no other
+    cleanup of its own to do.
+
+    Reused by step 3's migration for the legacy state root under the
+    install lock -- hence a plain ``source`` parameter rather than anything
+    specific to today's one namespaced state root. ``symlinks=True``: a
+    symlink found anywhere inside ``source`` (a person's own file, not
+    something the sidecar ever creates in a state folder) is copied as a
+    symlink, never followed and dereferenced into whatever it points at.
+    """
+    preserved_root.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".state--staging-", dir=preserved_root))
+    try:
+        shutil.copytree(source, staging, symlinks=True, dirs_exist_ok=True)
+        destination = preserved_root / state_backup_slug(preserved_root)
+        os.rename(staging, destination)
+    except OSError as exc:
+        try:
+            shutil.rmtree(staging)
+        except OSError as cleanup_exc:
+            raise OSError(
+                cleanup_exc.errno,
+                f"{cleanup_exc.strerror or cleanup_exc} (left incomplete after "
+                f"{exc.strerror or exc})",
+                str(staging),
+            ) from exc
+        raise
+    return destination
+
+
 def backup_sidecar_state(target: Path, *, dry_run: bool = False) -> int:
     """``--backup-state``: copy the namespaced state folder into the
     preserved-copy folder, changing nothing else (Decision 3; the small
-    plan's step 6). A standalone action, unlike install or uninstall: no
-    manifest read or write, no reconciliation, no exclude-block change.
-    With ``dry_run`` it only reports the copy it would make.
+    plan's step 6; finding 4). A standalone action, unlike install or
+    uninstall: no manifest read or write, no reconciliation, no
+    exclude-block change. With ``dry_run`` it only reports the copy it
+    would make -- no lock is taken and no backup is created.
 
     Returns 0 whether or not the folder exists; a missing folder is
-    reported, not an error. Raises ``subprocess.CalledProcessError`` when
-    ``target`` is not a Git repository, for the caller to turn into a clean
-    message the same way every other Git-repository check here does.
+    reported, not an error. Shares ``install_sidecar`` and
+    ``uninstall_sidecar``'s own ``_run_target_preflight`` (Git-directory,
+    symlink, containment, and filesystem-shape diagnostics), which needs no
+    manifest to exist, so retained state with no manifest at all still
+    backs up cleanly. A real backup then takes the same non-blocking run
+    lock as install and uninstall before picking a destination name, and
+    holds it until the copy is published or cleaned up; a filesystem
+    failure past that point is reported as ``ABORT: filesystem error at
+    <path>: <reason>`` (``_abort_write_failure``), the same way install and
+    uninstall already report one, and never leaves a partial directory at a
+    real ``state--<timestamp>`` name.
     """
     target = target.resolve()
-    git_dir = Path(_git_rev_parse_or_raise(target, "--git-dir"))
-    preserved_root = git_dir / SIDECAR_PRESERVED_NAME
-    backed_up_any = False
-    for state_root in sorted(_ALL_STATE_ROOTS):
-        state_path = target / PurePosixPath(state_root)
-        if not state_path.is_dir() or state_path.is_symlink():
-            continue
-        destination = preserved_root / state_backup_slug(preserved_root)
-        if dry_run:
-            _info(f"would back up {state_path} -> {destination}")
-        else:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(state_path, destination)
-            _info(f"backed up {state_path} -> {destination}")
-        backed_up_any = True
-    if not backed_up_any:
+    preflight = _run_target_preflight(target)
+    if isinstance(preflight, int):
+        return preflight
+    preserved_root = preflight.preserved_root
+    # A symlinked state root (or a symlinked ancestor of one) is already a
+    # filesystem-shape violation `_run_target_preflight` aborted on above
+    # (`_filesystem_shape_violations`, reused via `_SIDECAR_STRUCTURAL_PATHS`,
+    # which includes every state root): a state path reached here can only
+    # be a real directory or absent, so `is_dir()` alone is enough.
+    state_paths = [
+        target / PurePosixPath(state_root) for state_root in sorted(_ALL_STATE_ROOTS)
+    ]
+    real_state_paths = [state_path for state_path in state_paths if state_path.is_dir()]
+    if not real_state_paths:
         _info("no state folder found; nothing to back up")
+        return 0
+    if dry_run:
+        reserved_state_slugs: set[str] = set()
+        for state_path in real_state_paths:
+            slug = state_backup_slug(preserved_root, reserved=reserved_state_slugs)
+            reserved_state_slugs.add(slug)
+            _info(f"would back up {state_path} -> {preserved_root / slug}")
+        return 0
+    lock = _acquire_run_lock(preflight.git_dir_path, target)
+    if isinstance(lock, int):
+        return lock
+    with lock:
+        try:
+            for state_path in real_state_paths:
+                destination = _copy_state_into_preserved(state_path, preserved_root)
+                _info(f"backed up {state_path} -> {destination}")
+        except OSError as exc:
+            return _abort_write_failure(exc)
     return 0

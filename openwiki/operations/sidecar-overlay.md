@@ -3,9 +3,6 @@ type: operations
 title: "Sidecar overlay: a personal install inside a team-owned repository"
 description: "How install_bootstrap.py --mode sidecar adds Git-ignored files to a team-owned repository in one of two profiles (skills, with four skills and two bridges, or workflow, with every eligible skill, agents, rules, review profiles, templates, and a personal state folder), how the planner in sidecar_overlay.py decides ownership, repository boundaries, and team precedence for every unit kind, how the state folder follows its own rules, how preflight, the ignore gate, and atomic moves keep every run safe, how edited copies are preserved, and how --uninstall, --purge-state, and --backup-state behave."
 tags: [sidecar, install, overlay, profiles, workflow-profile, state-folder, reconciliation, info-exclude, ignore-gate, manifest, team-repository, uninstall]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-27T15:12:48.671Z
 sources:
   - id: openwiki-source-00cc54d3b93f5692c95beeb7
     resource: repo://docs/sidecar-provider-contract.md
@@ -19,11 +16,12 @@ sources:
     resource: repo://tests/test_sidecar_install.py
   - id: openwiki-source-0b6f8c38a312ee46c4820997
     resource: repo://tests/test_sidecar_uninstall.py
-  - id: openwiki-source-3917eaf8fd9f30e25e7198d1
-    resource: repo://tests/test_sidecar_update.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-09-27T15:12:48.671Z" }
+generated: { by: "claude-code", at: "2026-10-02T11:00:38.908Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-10-02T11:00:38.908Z
 ---
 
 
@@ -57,7 +55,7 @@ A unit is one skill directory at one write root, one single-file unit (a bridge,
 | Copilot instructions | `workflow` | `.github/instructions/ai-bootstrap-workflow.instructions.md`, with `applyTo: "**"` |
 | Review profiles | `workflow` | `.claude/review-profiles/<name>.md` |
 | Templates | `workflow` | `.claude/templates/plan-big.md`, `plan-small.md`, `session-log.md`, `quality-report.md`, relaxed variants that name no verifier or receipt |
-| State folder | `workflow` | `.claude/ai-bootstrap/` with `MEMORY.md` and the `plans/`, `session_logs/`, `explorations/`, `quality_reports/` READMEs as seeds; hidden by the one line `/.claude/ai-bootstrap` |
+| State folder | `workflow` | `.ai-bootstrap/` at the repository root with `MEMORY.md` and the `plans/`, `session_logs/`, `explorations/`, `quality_reports/` READMEs as seeds; hidden by the one line `/.ai-bootstrap` |
 
 Both bridges carry the same short body from `shared/sidecar/bridge.md`: tracked repository guidance wins over the sidecar, and `ponytail` applies to coding tasks in `full` mode. The workflow rules describe a relaxed loop (read memory, plan when a task spans several files, implement, run the project's own checks, review a non-trivial diff, log the session) that nothing enforces. No `.github/agents` or `.codex/agents` file ships in either profile, because neither Copilot nor Codex has a config-free way to discover a custom agent from an ignored file; `docs/sidecar-provider-contract.md` records the native runs behind that.
 
@@ -97,7 +95,7 @@ Install and uninstall share one preflight, `_run_target_preflight`. Every check 
 5. The manifest, staging, preserved-copy, and `info/exclude` paths are built from the Git directory, never through `--git-path`, which resolves symlinks. Each is checked with `lstat`: none may be a symlink, the manifest and exclude file must be regular files, and the two folders must be real folders. `info/` itself must be a real folder, neither a symlink nor a file. A named pipe is refused without being opened. An exclude file that exists but cannot be read aborts with `cannot read <exclude>: <strerror>`; during mode detection the same file counts as sidecar evidence, `unreadable <path> (<strerror>)`, so a full install never guesses past it.
 6. The manifest, when present, parses and names only paths inside the sidecar namespace (every profile's write roots, single-file units, retired units, and the state root). A pending record `ai-bootstrap-sidecar.json.next` that is a regular file and parses is loaded too; one that does not parse is ignored here and removed by the next real run.
 7. No nested repository or submodule sits at or above a skill write root, a single-file unit's parent folder, or the state root, and every existing ancestor of those paths is a real folder on the target's device. A state root that exists as a file or a symlink is refused here too. Skill folders themselves follow the unit-level rule in the next section.
-8. No tracked path sits under the state root `.claude/ai-bootstrap/`; a team that tracks anything there makes the run abort before any write, the same way any other tracked-path collision does.
+8. No tracked path sits under either state root, `.ai-bootstrap/` or the legacy `.claude/ai-bootstrap/`; a team that tracks anything there makes the run abort before any write, the same way any other tracked-path collision does.
 9. The sidecar markers in `info/exclude` form exactly one BEGIN line followed by one END line. Anything else is refused, naming the line numbers, because an orphan BEGIN would otherwise let a run erase the person's own ignore lines.
 
 After preflight, the run gathers each unit's state from disk and the index, then plans. These checks also run before any write:
@@ -154,7 +152,33 @@ A unit is incomplete when it holds a symlink, named pipe, socket, device, empty 
 
 A symlink or a plain file at a unit path is classified like any other entry: a tracked one is team-owned, a recorded one is locally modified, and an untracked, unrecorded one is foreign. Adoption needs a record or the sidecar's own exclude line, so it never claims or hides a file the sidecar did not plan. It finishes an interrupted install or update, or rebuilds a lost manifest. `tests/test_sidecar_overlay.py` has cases for every row.
 
-The state folder is the one unit that never enters this table. `_classify_state_unit` never hashes or compares it: an absent folder is seeded from the profile's seed files (one `install` unit in the summary); an existing folder gets one `seed_missing` action per seed file it lacks, printed as `seeded <path>`, and nothing already there is ever touched; its exclude line is kept even when the active profile has no state root, so switching to `skills` keeps an existing folder hidden. Under uninstall it is kept in place and reported as `RETAINED .claude/ai-bootstrap: kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it`, or, with `--purge-state`, moved into the preserved-copy folder as `state--<UTC timestamp>` (with `-2`, `-3` appended while that name exists) and reported as `PRESERVED`. `backup_sidecar_state` copies it to the same place without touching anything else, printing `backed up <folder> -> <destination>`, `would back up ...` in a dry run, or `no state folder found; nothing to back up`.
+The state folder is the one unit that never enters this table. `_classify_state_unit` never hashes or compares it: an absent folder is seeded from the profile's seed files (one `install` unit in the summary); an existing folder gets one `seed_missing` action per seed file it lacks, printed as `seeded <path>`, and nothing already there is ever touched; its exclude line is kept even when the active profile has no state root, so switching to `skills` keeps an existing folder hidden. Under uninstall it is kept in place and reported as `RETAINED .ai-bootstrap: kept .ai-bootstrap and its exclude line; pass --purge-state to remove it`, or, with `--purge-state`, moved into the preserved-copy folder as `state--<UTC timestamp>` (with `-2`, `-3` appended while that name exists or is already reserved by another state root in the same run) and reported as `PRESERVED`. A retained legacy `.claude/ai-bootstrap/` gets the same treatment as its own unit.
+
+`backup_sidecar_state` copies every existing state root to the same place without touching anything else. It runs the shared preflight, so a symlinked state folder or preserved-copy folder is refused. A real backup takes the run lock, copies into a temporary folder created inside the preserved-copy folder, and gives the copy its `state--<timestamp>` name with `os.rename` only after the copy succeeds. A filesystem failure prints `ABORT: filesystem error at <path>: <reason>` and removes only this run's partial copy; if that cleanup fails too, the message names the incomplete path. It prints `backed up <folder> -> <destination>`, `would back up ...` in a dry run (which takes no lock), or `no state folder found; nothing to back up`. The lock serializes sidecar commands only, so another editor can still change the folder during a copy.
+
+## State folder location and migration
+
+The state folder lives at `.ai-bootstrap/` (`SIDECAR_STATE_ROOT`), outside `.claude/`, because Claude Code refuses agent writes anywhere under `.claude/`, even an ignored path; `docs/sidecar-provider-contract.md` records the native write gate. Earlier workflow installs used `.claude/ai-bootstrap/` (`SIDECAR_LEGACY_STATE_ROOT`), which the installer still recognizes but never seeds.
+
+Before planning, a workflow install or update calls `_legacy_state_migration_outcome`, which reads only whether each root is a folder and whether the sidecar's own exclude block lists the legacy root. That listing is the only ownership evidence; a folder with familiar file names is not enough.
+
+| Folders found | Outcome |
+| --- | --- |
+| neither | seed `.ai-bootstrap/` as usual |
+| only `.ai-bootstrap/` | keep it; seed only missing files |
+| only `.claude/ai-bootstrap/`, listed in the block | migrate |
+| only `.claude/ai-bootstrap/`, not listed | refuse before any write: the run will not claim an unrecognized folder |
+| both | refuse before any write: back up both, decide which holds current work, remove the other by hand |
+
+`_perform_legacy_state_migration` runs under the install lock:
+
+1. It adds the `/.ai-bootstrap` line next to the legacy line and proves the new root ignored with the ignore gate; on failure it restores `info/exclude` to its original bytes.
+2. It refuses a legacy folder on a different filesystem than the target, before any backup is made, and restores `info/exclude`.
+3. It makes a full backup with the same copy helper as `--backup-state`, copying a symlink inside the folder as a symlink.
+4. It rechecks that `.ai-bootstrap/` is still absent, then renames the folder with `os.rename`, never merging, and prints `moved <old> -> <new>`.
+5. Ordinary reconciliation then runs in the same call, and drops the old exclude line because the old folder no longer exists.
+
+Fault points `after_legacy_state_backup` and `after_legacy_state_rename` let tests interrupt the migration; a rerun converges without moving or resetting the state again. A dry run prints `would back up ...` and `would move ...` and writes nothing. Skills-profile runs and plain `--uninstall` leave a legacy folder where it is, and a later workflow install migrates it.
 
 ## Team precedence
 
@@ -233,15 +257,15 @@ flowchart LR
 
 Every write of the exclude file, the manifest, or the pending record goes through `_atomic_write`: a temporary file in the same folder, `fsync`, `os.replace`, and an `fsync` of the folder. An existing file keeps its mode, so a group-shared `info/exclude` does not drop to `0600`; a new file gets `0o666` less the umask. The exclude file and the manifest are written only when their bytes change.
 
-There are no intent records: the pending record is ownership evidence and never drives an action on its own. After a crash, each unit is old, new, or absent, and the next run's classification finishes the work: the adopt row takes a new unit whose record was not written when the same source is rerun, the pending-record row takes it when a newer source is rerun, and the install row restores an absent one. Tests inject faults after the exclude write, in the middle of a unit swap, and before the manifest write, rerun with the same and with a newer bootstrap version, and add an uninstall after each; uninstall adds a fault after its units are removed. Each rerun converges. Uninstall follows the same order, as described below.
+There are no intent records: the pending record is ownership evidence and never drives an action on its own. After a crash, each unit is old, new, or absent, and the next run's classification finishes the work: the adopt row takes a new unit whose record was not written when the same source is rerun, the pending-record row takes it when a newer source is rerun, and the install row restores an absent one. Tests inject faults after the exclude write, in the middle of a unit swap, and before the manifest write, rerun with the same and with a newer bootstrap version, and add an uninstall after each; uninstall adds a fault after its units are removed, and the state migration adds faults after its backup and after its rename. Each rerun converges. Uninstall follows the same order, as described below.
 
 ## Dry-run
 
-`--dry-run` runs preflight and planning, then the same gate on the candidate block through a temporary `core.excludesFile` outside the worktree and the Git directory. It prints each action as `would ...` and writes nothing, including the staging folder, the pending record, and the lock file. Git ranks `info/exclude` above `core.excludesFile`, so the output says the dry-run gate is an approximation and the real run's gate decides.
+`--dry-run` runs preflight and planning, then the same gate on the candidate block through a temporary `core.excludesFile` outside the worktree and the Git directory. It prints each action as `would ...` and writes nothing, including the staging folder, the pending record, and the lock file. It never prints a past-tense `removed`, `deleted`, `seeded`, or `PRESERVED ... ->` line for an action, and remedy texts use "would" wording, because `_print_report` skips those lines when `dry_run` is set. Git ranks `info/exclude` above `core.excludesFile`, so the output says the dry-run gate is an approximation and the real run's gate decides.
 
 ## Reports and remedies
 
-An install prints `installed N, updated N, removed N, adopted N, unchanged N, preserved N, seeded N`, then one line per removed, deleted, seeded, or preserved path, then one line per report. Per-path skips never fail an install. A remedy names a workflow unit by its kind word (`_unit_kind_word`: `the agent \`reviewer\``, `the rule \`ai-bootstrap-workflow\``, `review profile`, `template`, `state`); skills and the two original bridges keep the plain wording below. A unit's display name is the file name up to its first dot (`_unit_name`), so the Copilot instructions unit is `ai-bootstrap-workflow`.
+An install prints `installed N, updated N, removed N, adopted N, unchanged N, preserved N, seeded N`, then, in a real run only, one line per removed, deleted, seeded, or preserved path, then one line per report. Per-path skips never fail an install. A remedy names a workflow unit by its kind word (`_unit_kind_word`: `the agent \`reviewer\``, `the rule \`ai-bootstrap-workflow\``, `review profile`, `template`, `state`); skills and the two original bridges keep the plain wording below. A unit's display name is the file name up to its first dot (`_unit_name`), so the Copilot instructions unit is `ai-bootstrap-workflow`.
 
 | Report | Cause | What the remedy says |
 | --- | --- | --- |
@@ -257,7 +281,7 @@ An install prints `installed N, updated N, removed N, adopted N, unchanged N, pr
 | `RETAINED` | a file was left behind by a team takeover | it stays hidden and a pull can overwrite it; move it out, or commit it with `git add -f` |
 | `RETAINED` | a retained file now sits inside a submodule, or uninstall un-hid it | it is now visible to `git add -A`; when a team rule still ignores it after uninstall, that it is no longer hidden by the sidecar but a team rule still ignores it |
 | `RETAINED` | a block line the sidecar does not recognize | the line is kept; move it outside the block to keep it, or delete it |
-| `RETAINED` | the state folder under plain `--uninstall` | `kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it` |
+| `RETAINED` | the state folder under plain `--uninstall` | `kept .ai-bootstrap and its exclude line; pass --purge-state to remove it` |
 | `PRESERVED` | the state folder under `--uninstall --purge-state` | where it was moved: `<git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>` |
 
 Every printed path passes through `_printable`, which escapes bytes that are not valid UTF-8 as `\xNN`, so a report line for such a name neither crashes the run nor emits a lone surrogate.
@@ -266,7 +290,7 @@ Every printed path passes through `_printable`, which escapes bytes that are not
 
 `--uninstall` removes the overlay through the same preflight, the same planner, and the same write order and apply step as an install. With no manifest and no block, it prints where the preserved-copy folder is if that folder holds anything, then prints `no sidecar found; nothing to do` and exits 0.
 
-Otherwise it gathers every well-known unit of every profile, including retired skill roots and retired bridges, and plans against an empty wanted set, so a `workflow` install and a `skills` install are removed by the same command with no `--profile`. Every classified unit is taken, including a skill the current bootstrap no longer ships, except the state folder, which is kept unless `--purge-state` is passed:
+Otherwise it gathers every well-known unit of every profile, including retired skill roots and retired bridges, and plans against an empty wanted set, so a `workflow` install and a `skills` install are removed by the same command with no `--profile`. Every classified unit is taken, including a skill the current bootstrap no longer ships, except the state folders (`.ai-bootstrap/` and a retained legacy `.claude/ai-bootstrap/`), each kept unless `--purge-state` is passed. Uninstall never refuses because both state roots exist; it handles each one separately:
 
 - a unit whose content matches its record is removed;
 - an edited or unfinished copy, including an incomplete one and a bridge, is preserved in the preserved-copy folder;
@@ -286,7 +310,7 @@ Every run ends by printing `preserved copies are in <folder>; the sidecar never 
 
 ## Profile switching
 
-`--profile skills` on a `workflow` install removes the workflow-only units through the ordinary remove-and-preserve rules and keeps the state folder in place and hidden. `--profile workflow` on a `skills` install adds the missing units and seeds the state folder. A manifest recording a different profile than the flag is an ordinary update, not an error, in either direction, and a rerun without `--profile` keeps the manifest's profile. Switching never touches the state folder's contents.
+`--profile skills` on a `workflow` install removes the workflow-only units through the ordinary remove-and-preserve rules and keeps the state folder in place and hidden. `--profile workflow` on a `skills` install adds the missing units and seeds the state folder. A manifest recording a different profile than the flag is an ordinary update, not an error, in either direction, and a rerun without `--profile` keeps the manifest's profile. Switching never touches the state folder's contents, except that switching back to `workflow` migrates a retained, owned legacy `.claude/ai-bootstrap/` as described above.
 
 ## Limits
 
@@ -306,7 +330,7 @@ Every run ends by printing `preserved copies are in <folder>; the sidecar never 
 - `tests/test_sidecar_install.py` covers preflight aborts, index-based ownership (sparse checkout, `skip-worktree`, gitlinks, deleted tracked files), repository boundaries at skill folders, incomplete units (pipes, sockets, empty subfolders, inner symlinks, a plain file), symlinked read folders, aliases, and case variants, frontmatter names, the gate (directory-only rules, symlink units, unfinished units, fatal Git errors), line splitting, non-UTF-8 names, dry-run, fault recovery, and reruns.
 - `tests/test_sidecar_update.py` covers upgrades and mixed full and sidecar batches.
 - `tests/test_sidecar_uninstall.py` covers uninstall, dropped skills and retired units, preserve conflicts with the gate, team rules that never block, crash convergence, and refusals.
-- `tests/test_sidecar_workflow_scenario.py` runs the workflow profile end to end against a real team repository with a tracked `.claude/settings.json`, a team skill, agent, and rule: dry run, install, rerun with personal edits, both profile switches, backup (including a dry run), uninstall that keeps the state, purge, and reseed; a version-1 manifest upgrading in place; a team rule and team agents in each client's own file shape taking the sidecar's units; a tracked path under the state root aborting; `git clean -fdx` losing the state while the backup survives; and a mixed `skills` and `workflow` batch through the updater. `git status --porcelain --untracked-files=all` is asserted unchanged at every step.
+- `tests/test_sidecar_workflow_scenario.py` runs the workflow profile end to end against a real team repository with a tracked `.claude/settings.json`, a team skill, agent, and rule: dry run, install, rerun with personal edits, both profile switches, backup (including a dry run), uninstall that keeps the state, purge, and reseed; a version-1 manifest upgrading in place; a team rule and team agents in each client's own file shape taking the sidecar's units; tracked and foreign review profiles and templates winning by name; the legacy-state migration, its refusals, its fault-point reruns, and its dry run; backup lock contention and failure injection; a tracked path under the state root aborting; `git clean -fdx` losing the state while the backup survives; and a mixed `skills` and `workflow` batch through the updater. `git status --porcelain --untracked-files=all` is asserted unchanged at every step.
 
 ## Related pages
 

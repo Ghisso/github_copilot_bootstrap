@@ -51,9 +51,9 @@ closeout_session_log:
 None of this blocks a commit; it is the order that keeps the record honest.
 
 - [ ] Documentation updated for changed public behavior, or noted as internal
-- [ ] Lessons recorded in `.claude/ai-bootstrap/MEMORY.md`, or "none" noted
-- [ ] Session log under `.claude/ai-bootstrap/session_logs/` has `**Status:** COMPLETED`
-- [ ] Reviewer's report saved under `.claude/ai-bootstrap/quality_reports/` and its Critical and Major items resolved or explicitly deferred
+- [ ] Lessons recorded in `.ai-bootstrap/MEMORY.md`, or "none" noted
+- [ ] Session log under `.ai-bootstrap/session_logs/` has `**Status:** COMPLETED`
+- [ ] Reviewer's report saved under `.ai-bootstrap/quality_reports/` and its Critical and Major items resolved or explicitly deferred
 - [ ] The Verification commands above ran and passed
 Keep the big plan `in-progress` with the same `current_phase`. On resume, read
 the pause log and Git state, restore this plan to `in-progress`, and continue

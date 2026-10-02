@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:5c765e740e1d30a4fea7d4352f2ff7aea231b2b1ba720e3db083b009d8d032d9",
+  "pageVersion": "sha256:8713e37b9f9bfea4bab7b8ca750e697600564b999a33ac7ac62ce01a28aacbe4",
   "claims": [
     {
       "id": "claim_de542fb80b8c4b3ba24e1410c4c9458c",
@@ -165,14 +165,14 @@
       "statement": "The installer dispatches --backup-state to _run_backup_state (and so to backup_sidecar_state), --uninstall to _run_uninstall (and so to uninstall_sidecar), and a sidecar target to install_sidecar before validate_agents_takeover or any other full-install step, so a sidecar install, uninstall, or state backup creates or touches no nested .claude repository, ai-state branch, or state sync; a missing git executable ends the install and uninstall paths with 'git not found on PATH' instead of a traceback.",
       "evidence": [
         {
-          "resource": "repo://scripts/install_bootstrap.py#L1612-L1685",
-          "version": "repo-lines-v1:sha256:e6c9817e8935acf10a8c69b335965273b3aae304e4fbd21f95315ce3efa6e6e2:eyJzZWxlY3RlZExpbmVDb3VudCI6NzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzYmRlNTlmYzE1MmYxZjlmZjBmZWZmY2Y2YTE5NDhjYTAzMmRhZDQ2MzkwYTMxMzcwYjM3ZGM0YzIwZTU4ZDIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAyODRjY2M3NmQwZTNmODU2M2Y1OTEwNDEzZDMwN2UyNjYyOWVkNDVhNGYzOTAxMmZlMzViOTMyOWJlNDJlNjUifQ"
+          "resource": "repo://scripts/install_bootstrap.py#L1749-L1815",
+          "version": "repo-lines-v1:sha256:ac28a779ac7ba094908fa78459e9dc9fb21c43444c109f3b6fb9e299ed402a2d:eyJzZWxlY3RlZExpbmVDb3VudCI6NjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc3NjIwMDQ4YjBiNDNhZDNhNGQxNTA0MWQ1MzRkOTBlOWEzY2JjODNkN2NiZTY4MzJmNmEyNmZlMTc3NGQyYWYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImUyNWU3YjgyYTM4NTk5ZTU2MjQxODQ0OThhOThiN2YzMDM1MjQ2MjUzNDk4ODJhMmQ0MDIxMzg5NmRkOTg5ZjgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjI5MjMwYTUyNDI2YjYxMDZlMzZhNzcxZmZlYzU0MzI4OTU4ZWQ3NmQwMDdhNDJlZWUxNTg2MjQzNzEzYWE3MDciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjViZTc1OGFjZDE0ZWU0YzkwYzI2YzNhZjc4MzUyYjczODA3YjMwYzdlODFlZTVlOWNlYzBjNzRiMmZhNDdlZDMifQ"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T14:43:37.947Z"
+    "at": "2026-10-02T10:43:27.367Z"
   }
 }

@@ -197,11 +197,11 @@ SIDECAR_TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
 # is authored under shared/sidecar/workflow/ already naming the right path,
 # so only these unit kinds need the rewrite.
 SIDECAR_WORKFLOW_PATH_REPLACEMENTS: tuple[tuple[str, str], ...] = (
-    (".claude/plans/", ".claude/ai-bootstrap/plans/"),
-    (".claude/session_logs/", ".claude/ai-bootstrap/session_logs/"),
-    (".claude/quality_reports/", ".claude/ai-bootstrap/quality_reports/"),
-    (".claude/MEMORY.md", ".claude/ai-bootstrap/MEMORY.md"),
-    (".claude/explorations/", ".claude/ai-bootstrap/explorations/"),
+    (".claude/plans/", ".ai-bootstrap/plans/"),
+    (".claude/session_logs/", ".ai-bootstrap/session_logs/"),
+    (".claude/quality_reports/", ".ai-bootstrap/quality_reports/"),
+    (".claude/MEMORY.md", ".ai-bootstrap/MEMORY.md"),
+    (".claude/explorations/", ".ai-bootstrap/explorations/"),
     # The profile's own rule file stands in for the full install's policy.
     (
         ".claude/instructions/workspace.instructions.md",
