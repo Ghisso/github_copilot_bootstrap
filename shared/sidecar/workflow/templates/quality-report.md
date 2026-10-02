@@ -4,6 +4,7 @@
 **Date:** YYYY-MM-DD
 **Profiles:** [e.g. code, tests, documentation]
 **Scope:** [files or diff reviewed]
+**Requirements:** [approved requirements and scope changes compared against, or the request itself]
 
 ## Critical
 

@@ -38,17 +38,24 @@ Before you consider a change done, run this project's own test, lint, and
 type-checking commands. Find them in this repository's own documentation
 (its README or its `docs/` folder) rather than assuming a fixed command
 line — every project names its own commands differently. Fix a failure
-before moving on.
+before moving on. After a bug fix, rerun the original reproduction and
+note what it now shows, or say plainly why you could not rerun it; a
+passing test suite alone does not show the original symptom is gone.
 
 ## Review non-trivial diffs
 
 For a change that is more than a one-line fix, and a reviewer agent is
-available in this session, ask it to look at the diff. It returns a short
+available in this session, ask it to look at the diff, and give it the
+approved requirements and any approved scope changes so it compares the
+diff against them instead of its own guess. It returns a short
 Markdown report grouped by severity as text, and you save that report
 under `.ai-bootstrap/quality_reports/`. When no reviewer agent is
 available, review the diff yourself against the review profiles under
-`.claude/review-profiles/` that fit the change, write the same kind of
-report, say plainly that it is a self-review, and save it the same way.
+`.claude/review-profiles/` that fit the change, and against the approved
+requirements and scope changes (each should have an implementation and
+evidence, and nothing unapproved should be added). For simple work the
+request itself is the requirement. Write the same kind of report, say
+plainly that it is a self-review, and save it the same way.
 Read it, fix what is worth fixing, and move on — there is no required
 second pass and no gate that stops a commit.
 

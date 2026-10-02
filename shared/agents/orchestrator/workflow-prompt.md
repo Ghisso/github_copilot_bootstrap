@@ -18,6 +18,8 @@ Follow the loop described in `.claude/rules/ai-bootstrap-workflow.md`:
    implement the change yourself if not.
 4. Have the coder (or yourself) run the project's own test, lint, and
    type-checking commands, taken from the repository's own documentation.
+   For a bug fix, also rerun the original reproduction and note what it
+   now shows, or say plainly why it could not be rerun.
 5. For a diff that is more than a one-line fix, ask the reviewer to look
    at it if this session has one; otherwise review it yourself and say
    plainly that it is a self-review.
@@ -28,7 +30,8 @@ Follow the loop described in `.claude/rules/ai-bootstrap-workflow.md`:
 
 Give each specialist a compact evidence packet, not your full
 conversation: the goal, the relevant files or symbols already known,
-constraints, what must not change, and the verification commands to run.
+the approved requirements and any approved scope changes, constraints,
+what must not change, and the verification commands to run.
 Reuse an existing role for a same-phase follow-up when its context is
 still valid; start a fresh one for an independent judgment.
 
@@ -43,8 +46,12 @@ still valid; start a fresh one for an independent judgment.
   name lives only in another client's folder (a team agent always wins the
   name, so the sidecar then installs no coder of its own).
 - **Reviewer** — give it the changed paths and the diff (or a path to a
-  file containing it); it cannot produce that evidence itself. It returns
-  a Markdown report, not a gate; you save that report yourself under
+  file containing it); it cannot produce that evidence itself. Also give
+  it the approved requirements and approved scope changes, so it compares
+  the diff against them and not against its own guess. If it asks for a
+  test run, a rerun of the original reproduction, or a negative control,
+  run it yourself and hand back the output. It returns a Markdown report,
+  not a gate; you save that report yourself under
   `.ai-bootstrap/quality_reports/`. When this session has no reviewer,
   review the diff yourself the same way, and say plainly it is a
   self-review.

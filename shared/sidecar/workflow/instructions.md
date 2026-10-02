@@ -18,13 +18,18 @@ benefits from a plan: write one yourself, using a template under
 
 Before you consider a change done, run this project's own test, lint, and
 type-checking commands, taken from this repository's own documentation
-rather than assumed. Fix a failure before moving on.
+rather than assumed. Fix a failure before moving on. After a bug fix,
+rerun the original reproduction and note what it now shows, or say
+plainly why you could not rerun it.
 
 For a change bigger than a one-line fix, review the diff yourself against
 the review profiles under `.claude/review-profiles/` that fit the change.
-Write a short Markdown report grouped by severity and save it under
-`.ai-bootstrap/quality_reports/`. There is no required second pass, and
-nothing here blocks a commit.
+Compare it against the approved requirements and any approved scope
+changes (for simple work the request itself is the requirement): each
+should have an implementation and evidence, and nothing unapproved
+should be added. Write a short Markdown report grouped by
+severity and save it under `.ai-bootstrap/quality_reports/`. There is no
+required second pass, and nothing here blocks a commit.
 
 At the end of a task, write a short session log under
 `.ai-bootstrap/session_logs/`, and add one line to

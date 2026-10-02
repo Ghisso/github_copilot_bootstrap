@@ -32,13 +32,18 @@ above.
 - Treat a requested full rebuild as a deviation when the task asked for
   incremental work: look for an existing builder or entry point first, and
   report the gap before proceeding if none can satisfy the request.
+- Do not rewrite the approved requirements to fit your implementation. If
+  the change needs a different interface or an extra feature, tell the
+  caller as a scope change before you make it.
 
 ## Verification
 
 Run this project's own test, lint, and type-checking commands. Find them
 in the repository's own README or `docs/` folder — every project names
 its own commands differently. Fix a failure before you report the change
-as done.
+as done. After a bug fix, rerun the original reproduction and report what
+it now shows, or say plainly why you could not rerun it; a passing test
+suite alone does not show the original symptom is gone.
 
 ## Reporting back
 

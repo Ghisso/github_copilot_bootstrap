@@ -1235,7 +1235,10 @@ orchestrator and canonical scripts, not delegated agent roles. The unified
 routed via the single authoritative table in
 `.claude/instructions/workspace.instructions.md`, and runs a primary pass
 plus a verification pass that refutes and drops findings that do not
-survive, with no helper agents.
+survive, with no helper agents. The reviewer compares the diff against the
+approved plan requirements, non-goals, and scope-change records. When it
+lacks a requirement or execution result, it lists an open request and answers
+`WARN`, and the orchestrator answers the request and re-runs the review.
 
 See [Agent roster, prompts, and the skill
 library](openwiki/architecture/agents-and-skills.md) for how each target
