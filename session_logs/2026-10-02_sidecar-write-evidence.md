@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-02
 **Plan:** .claude/plans/2026-10-02_phase-A-sidecar-write-evidence.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -71,6 +71,11 @@ writes the workflow profile needs, before Phase B changes production code.
   command; a `cd ... &&` prefix makes the branch-state hook record nothing.
 
 ## Verification
+
+```text
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+```
 
 - optional 1: PASS — host-session evidence from steps 2 and 3, Claude Code
   2.1.226 print mode, `acceptEdits`, run by the user on 2026-10-02; checked

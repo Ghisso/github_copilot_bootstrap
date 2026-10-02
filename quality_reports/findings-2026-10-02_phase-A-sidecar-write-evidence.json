@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "docs/sidecar-provider-contract.md",
+      "line": 1019,
+      "title": "Recipe did not state the fixture must be named fixture-write-gate and sit next to the probe script",
+      "detail": "The probe script hardcodes fixture-write-gate/ in its own directory while the prose only asked for an empty throwaway directory.",
+      "fix": "State the required name and location.",
+      "disposition": "fixed",
+      "reason": "The recipe prose now names fixture-write-gate/ beside the probe script and where the snapshot files go."
+    }
+  ],
+  "generated_at": "2026-10-02T07:42:49Z",
+  "branch": "sidecar-workflow-repair_implementation",
+  "head_sha": "a2c68b397a04caa9fbece041e6b066683430d5ee",
+  "base_ref": "dev",
+  "merge_base_sha": "a2c68b397a04caa9fbece041e6b066683430d5ee",
+  "phase": "2026-10-02_phase-A-sidecar-write-evidence",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "c7de2f8b6fd98c3653ffad507045463161a3ae36",
+  "changed_files": [
+    "docs/sidecar-provider-contract.md"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
