@@ -1385,3 +1385,18 @@
   an unquoted colon makes `openwiki_finish` replace the whole frontmatter
   with a fallback and the folder index loses the summary (workflow profile
   Phase C).
+- [LEARN:verification] A native evidence gate must exercise every capability
+  the feature relies on, not only discovery. The 2026-09-27 sidecar gate
+  proved ignored agents and rules load, but never that agents can write the
+  state folder; Claude Code treats every path under `.claude/` as a
+  sensitive file even when ignored, so `.claude/ai-bootstrap/` writes failed
+  while a root-level `.ai-bootstrap/` writes cleanly under `acceptEdits`
+  (sidecar repair Phase A).
+- [LEARN:workflow] An agent session cannot start a nested `claude -p` probe:
+  the auto-mode safety classifier denies it. Prepare the fixture and a probe
+  script, have the user run it in their own shell, then verify the
+  `stream-json` tool events and on-disk files yourself.
+- [LEARN:workflow] Run `git checkout -b <plan>_implementation` as a bare
+  Bash command. With a `cd ... &&` prefix the PostToolUse branch-state hook
+  silently records nothing; recover by piping the bare-command JSON payload
+  to the `record-branch-state.sh` hook script.

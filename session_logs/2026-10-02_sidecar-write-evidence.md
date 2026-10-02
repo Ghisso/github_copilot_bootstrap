@@ -38,10 +38,42 @@ writes the workflow profile needs, before Phase B changes production code.
   reviewer return text and the requesting agent saves it, matching the full
   install's read-only reviewer. This is a Phase B scope addition.
 
+- **07:05** - The user ran `run-write-gate-probe.sh` (both sessions exit 0).
+  Parsed the `stream-json` events outside the model. Direct run: all four
+  `.ai-bootstrap/` folder markers written then edited, `MEMORY.md` edited;
+  control A (`.claude/ai-bootstrap/plans/`) refused as "a sensitive file"
+  and listed in `permission_denials`; control B (root file) written, then
+  removed. Delegated run: planner, coder, reviewer, and documenter each
+  invoked through `Agent` tool events; coder Edit and documenter Write
+  succeeded natively at their targets; plan and review saved by the main
+  session; `permission_denials` empty. On disk: every marker matches, the old
+  root holds only its five seeded files, team-file and index hashes match
+  the snapshot, status differs only by the intended `src/hello.py` edit.
+- **07:10** - Documenter appended `## Workflow state write gate, 2026-10-02`
+  to `docs/sidecar-provider-contract.md` (append-only; earlier evidence
+  untouched). Reviewer (code, architecture, security, tests, ponytail,
+  documentation; two passes) returned PASS with one MINOR: the recipe did
+  not say the fixture must be `fixture-write-gate/` beside the probe
+  script. Fixed in the document; recorded as `fixed`.
+- **07:15** - Decision gate: PASS for Claude Code. Phase B may relocate
+  sidecar state to `.ai-bootstrap/`. Phase B scope addition (user
+  decision): planner and reviewer return text; the requesting agent saves.
+
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:verification] A native evidence gate must exercise every capability
+  the feature relies on, not only discovery; the earlier gate proved loading
+  but never writing, and Claude Code protects every path under `.claude/`.
+- [LEARN:workflow] An agent session cannot start a nested `claude -p` probe
+  (auto-mode classifier denial); the user runs the prepared script and the
+  agent verifies the events and files.
+- [LEARN:workflow] Run the implementation-branch create as a bare Bash
+  command; a `cd ... &&` prefix makes the branch-state hook record nothing.
 
 ## Verification
 
-Pending.
+- optional 1: PASS — host-session evidence from steps 2 and 3, Claude Code
+  2.1.226 print mode, `acceptEdits`, run by the user on 2026-10-02; checked
+  from `stream-json` events and on-disk contents as logged above.
+- optional 2: NOT RUN — no other client session was already available, and
+  the plan does not require one.

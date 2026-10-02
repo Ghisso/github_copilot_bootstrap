@@ -3,8 +3,8 @@ name: 2026-10-02_phase-A-sidecar-write-evidence
 type: small-plan
 parent_plan: sidecar-workflow-repair
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_sidecar-write-evidence.md
 ---
 
 # Small Plan: Native Sidecar State Write Evidence
@@ -25,7 +25,7 @@ folder; it did not prove the proposed root or delegated plan/report writes.
 
 ## Steps
 
-- [ ] **1. Prepare one isolated fixture and a bounded probe recipe.**
+- [x] **1. Prepare one isolated fixture and a bounded probe recipe.**
   **Owner:** orchestrator; documenter records the recipe in
   `docs/sidecar-provider-contract.md`.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
@@ -41,7 +41,7 @@ folder; it did not prove the proposed root or delegated plan/report writes.
   Keep an old-root write probe as a control, and a normal root-file probe
   to distinguish general Write denial from the protected-path problem.
 
-- [ ] **2. Run direct state writes with ordinary client permissions.**
+- [x] **2. Run direct state writes with ordinary client permissions.**
   **Owner:** orchestrator on the native host.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`.
   Record `claude --version`, the working directory, model, exact command,
@@ -58,7 +58,7 @@ folder; it did not prove the proposed root or delegated plan/report writes.
   team bytes and index match the snapshot. Remove the root-file control
   created by this probe before comparing final status.
 
-- [ ] **3. Prove delegated writes and a short end-to-end task.**
+- [x] **3. Prove delegated writes and a short end-to-end task.**
   **Owner:** orchestrator; documenter records results.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/documentation/SKILL.md`.
@@ -72,7 +72,7 @@ folder; it did not prove the proposed root or delegated plan/report writes.
   **Acceptance:** all required artifacts exist at the new root with the
   expected content, without manual approvals or writes to the old root.
 
-- [ ] **4. Record the decision gate and review the evidence.**
+- [x] **4. Record the decision gate and review the evidence.**
   **Owner:** documenter, then reviewer; orchestrator owns closeout.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/humanize/SKILL.md`, `shared/skills/code-review/SKILL.md`.
@@ -115,11 +115,11 @@ Load `.claude/review-profiles/code.md`,
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
