@@ -45,6 +45,25 @@ owned legacy state safely.
   Behavior change to document: a symlinked state root or preserved folder
   now refuses instead of being skipped. `_run_backup_state` lost its dead
   `CalledProcessError` wrapper. Full suite: 2289 passed.
+- **09:30** - Step 3 (finding 1) by coder. `SIDECAR_STATE_ROOT =
+  ".ai-bootstrap"`, new `SIDECAR_LEGACY_STATE_ROOT = ".claude/ai-bootstrap"`;
+  `_ALL_STATE_ROOTS` is the union, which extends validation, exclude
+  parsing, tracked/symlink protections, backup, and uninstall to both roots.
+  `_legacy_state_migration_outcome` (none / migrate / both_exist / unowned;
+  ownership = legacy line in the managed exclude block) runs before
+  classification; `_perform_legacy_state_migration` adds and proves the new
+  exclude line (restoring `info/exclude` bytes on early failure), backs up
+  via `_copy_state_into_preserved` (`symlinks=True`), refuses a
+  cross-filesystem move, rechecks the destination, renames, then falls into
+  normal reconciliation, which drops the obsolete legacy line. New fault
+  points `after_legacy_state_backup` and `after_legacy_state_rename`.
+  Generator path table and all workflow sources render `.ai-bootstrap/`;
+  `validate_targets.py` forbids the legacy path in generated workflow
+  content. Bug fixed: two state roots needing preserved copies in one pass
+  got the same `state--<timestamp>` name; `state_backup_slug` now takes a
+  `reserved` set via shared `preserved_destinations_for`. To document: the
+  both-roots refusal applies to install/update only; uninstall/purge keep
+  both roots independently. Full suite: 2308 passed.
 
 ## [LEARN] Entries
 
