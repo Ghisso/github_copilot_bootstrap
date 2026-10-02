@@ -3,8 +3,8 @@ name: 2026-10-02_phase-C-sidecar-workflow-repair-knowledge-refresh
 type: small-plan
 parent_plan: sidecar-workflow-repair
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-02_sidecar-workflow-repair-knowledge-refresh.md
 ---
 
 # Small Plan: Sidecar Repair Knowledge Refresh
@@ -28,7 +28,7 @@ feature or migration work.
 
 ## Steps
 
-- [ ] **1. Refresh through OpenWiki's own MCP tools.**
+- [x] **1. Refresh through OpenWiki's own MCP tools.**
   **Owner:** orchestrator.
   **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md`,
   `.claude/skills/openwiki/SKILL.md`.
@@ -45,7 +45,7 @@ feature or migration work.
   success until the tool lifecycle reports completion. Use only the skill's
   rebaseline procedure when its recorded base is unreachable.
 
-- [ ] **2. Inspect generated changes and audit all live advice.**
+- [x] **2. Inspect generated changes and audit all live advice.**
   **Owner:** documenter after the refresh completes; orchestrator owns memory.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/humanize/SKILL.md`, `shared/skills/learn/SKILL.md`.
@@ -64,7 +64,7 @@ feature or migration work.
   changes a source claim or citation range, refresh the affected page again
   rather than leaving the knowledge layer stale.
 
-- [ ] **3. Review and complete the terminal lifecycle.**
+- [x] **3. Review and complete the terminal lifecycle.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `shared/skills/code-review/SKILL.md`,
   `shared/skills/learn/SKILL.md`.
@@ -102,11 +102,11 @@ and `.claude/review-profiles/ponytail.md`.
 Follow the fixed closeout order in `shared/policies/workflow.instructions.md`
 (Canonical Orchestrator Loop, step 5: CLOSEOUT).
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

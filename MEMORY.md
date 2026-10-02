@@ -1404,6 +1404,13 @@
   capabilities through `CLAUDE_TOOL_MAP`, so the sidecar planner keeps `Bash`
   (capability `execute`) even without Write/Edit; "you have no tool to save
   a file" was false for it (sidecar repair Phase B).
+- [LEARN:tooling] A review finding on a just-refreshed OpenWiki page is
+  fixed with a second `openwiki_begin` in `update` mode right away: it opens
+  planning (not `noop`) with no claim issues, so plan only that page, call
+  `openwiki_inspect_page_claims`, then revise the claim by its existing id.
+  When a page lists steps in order, check that order against the source
+  lines; the first review caught a backup listed before the check that
+  precedes it (sidecar repair Phase C).
 - [LEARN:workflow] Run `git checkout -b <plan>_implementation` as a bare
   Bash command. With a `cd ... &&` prefix the PostToolUse branch-state hook
   silently records nothing; recover by piping the bare-command JSON payload

@@ -79,10 +79,30 @@ live advice across the whole plan for stale claims.
 | `.claude/explorations/2026-10-02_sidecar-workflow-profile-hands-on-review.md` | left as a dated record (still says OPEN); its findings map to fixes in `.claude/session_logs/2026-10-02_sidecar-workflow-repair.md` |
 | Completed plans, receipt-bound session logs, quality reports, `docs/2026-*` | left as dated records |
 
+- **14:25** - Re-review of the fix (same six profiles, two passes): PASS,
+  no findings. Only `operations/sidecar-overlay.md`, its claims file, and
+  OpenWiki metadata changed in the second run; adapters clean;
+  `openwiki/.run.json` absent. The MAJOR is resolved, so the findings
+  report records no surviving findings.
+- **14:30** - Plan done: Phase A (`e8297f8`) native write gate; Phase B
+  (`aaecb48`) findings 1-8; Phase C OpenWiki refresh and audit. The real
+  `img-classification` consumer was not touched; refreshing it with
+  `--mode full` stays separate maintenance work.
+
 ## [LEARN] Entries
 
-Pending.
+- [LEARN:tooling] Fix a review finding on a just-refreshed OpenWiki page
+  with a second `openwiki_begin` `update` run: it opens planning with no
+  claim issues, so plan one page, inspect claims, and revise by id. Check
+  any ordered step list against source order.
 
 ## Verification
 
-Pending.
+- optional 1: PASS — OpenWiki run `a5727377-f534-4291-b003-6d212b5153c5`
+  (five pages) and run `12e04929-aefe-46dd-aa19-49737e380e2c` (one-page
+  correction) both returned `complete` from `openwiki_finish`. Reviewed
+  pages: `architecture/agents-and-skills.md`,
+  `architecture/source-generated-consumer-layout.md`,
+  `operations/git-backed-ai-state-sync.md`,
+  `operations/install-ownership-and-runtime-checks.md`,
+  `operations/sidecar-overlay.md`.
