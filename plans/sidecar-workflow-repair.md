@@ -1,15 +1,15 @@
 ---
 name: sidecar-workflow-repair
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: sidecar-workflow-repair_implementation
-started_at:
+started_at: 2026-10-02T06:40:46Z
 phases:
   - 2026-10-02_phase-A-sidecar-write-evidence
   - 2026-10-02_phase-B-sidecar-workflow-repair
   - 2026-10-02_phase-C-sidecar-workflow-repair-knowledge-refresh
-current_phase:
+current_phase: 2026-10-02_phase-A-sidecar-write-evidence
 ---
 
 # Big Plan: Sidecar Workflow Repair
