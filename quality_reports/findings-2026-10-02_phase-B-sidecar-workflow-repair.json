@@ -1,0 +1,77 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 2
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "shared/agents/planner/workflow-prompt.md",
+      "line": 13,
+      "title": "Planner prompt claimed it has no tool to save a file, but its rendered tools include Bash",
+      "detail": "Capability execute maps to Bash, so the claim contradicted the rendered tools line.",
+      "fix": "Reword to: return the text and do not write it to a file yourself.",
+      "disposition": "fixed",
+      "reason": "Planner and reviewer prompts now say do not write it to a file yourself; tests assert the new wording and the absence of the false claim."
+    },
+    {
+      "severity": "MINOR",
+      "profile": "documentation",
+      "file": "docs/sidecar-provider-contract.md",
+      "line": 1245,
+      "title": "Native-rerun record dropped the [LEARN:python] category tag",
+      "detail": "The verified rerun added a [LEARN:python] line; the record said [LEARN].",
+      "fix": "Restore the category.",
+      "disposition": "fixed",
+      "reason": "The rerun record now names the [LEARN:python] line."
+    }
+  ],
+  "generated_at": "2026-10-02T10:33:47Z",
+  "branch": "sidecar-workflow-repair_implementation",
+  "head_sha": "e8297f88759891647ae277caaa6f87df67ae18a4",
+  "base_ref": "dev",
+  "merge_base_sha": "a2c68b397a04caa9fbece041e6b066683430d5ee",
+  "phase": "2026-10-02_phase-B-sidecar-workflow-repair",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "a0b8f91adc59cfeaba2252bace9a17d3fa675173",
+  "changed_files": [
+    "README.md",
+    "docs/sidecar-provider-contract.md",
+    "docs/target-mapping.md",
+    "scripts/generate_targets.py",
+    "scripts/install_bootstrap.py",
+    "scripts/runtime_ownership.py",
+    "scripts/sidecar_overlay.py",
+    "scripts/validate_targets.py",
+    "shared/agents/documenter/workflow-prompt.md",
+    "shared/agents/orchestrator/workflow-prompt.md",
+    "shared/agents/planner/workflow-prompt.md",
+    "shared/agents/reviewer/workflow-prompt.md",
+    "shared/sidecar/workflow/instructions.md",
+    "shared/sidecar/workflow/rules/workflow.md",
+    "shared/sidecar/workflow/templates/plan-big.md",
+    "shared/sidecar/workflow/templates/plan-small.md",
+    "shared/sidecar/workflow/templates/quality-report.md",
+    "shared/sidecar/workflow/templates/session-log.md",
+    "tests/test_install_bootstrap.py",
+    "tests/test_sidecar_install.py",
+    "tests/test_sidecar_overlay.py",
+    "tests/test_sidecar_uninstall.py",
+    "tests/test_sidecar_update.py",
+    "tests/test_sidecar_workflow_scenario.py",
+    "tests/test_validate_targets.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

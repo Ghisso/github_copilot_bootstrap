@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-02
 **Plan:** .claude/plans/2026-10-02_phase-B-sidecar-workflow-repair.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -142,6 +142,15 @@ owned legacy state safely.
   `execute` capability.
 
 ## Verification
+
+```text
+PASS        0.4s  uv run python scripts/generate_targets.py --all
+PASS       51.7s  uv run python scripts/validate_targets.py
+PASS      106.6s  uv run pytest tests/test_install_bootstrap.py tests/test_sidecar_overlay.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_sidecar_workflow_scenario.py -q
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.9s  uv run python .claude/scripts/verify.py fast --format json
+```
 
 - optional 1: PASS — native rerun on the actual generated workflow install,
   run by the user on 2026-10-02 (Claude Code 2.1.226, `--agent
