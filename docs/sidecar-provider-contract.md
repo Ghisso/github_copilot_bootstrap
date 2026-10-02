@@ -983,3 +983,207 @@ plus today's skill read roots (`.github/skills`, `.agent/skills`,
 `.codex/skills`) for skills, and `.codex/agents` and `.agents/agents` for
 agents, so a team agent at any of those paths takes the sidecar's agent of
 the same name even where the sidecar does not write.
+
+## Workflow state write gate, 2026-10-02
+
+The 2026-09-27 matrix above only proves that clients *load* files from
+ignored paths. It never tests whether a client can *write* to one. This
+section is a separate gate for writes, run before any production code
+change.
+
+### Why this gate exists
+
+The 2026-10-02 hands-on review
+(`.claude/explorations/2026-10-02_sidecar-workflow-profile-hands-on-review.md`,
+finding 1) found that Claude Code refuses to write under
+`.claude/ai-bootstrap/`. It treats the path as "a sensitive file" and
+blocks the write even with `--permission-mode acceptEdits` and an
+`Edit(...)` allow rule. The repair plan proposes moving sidecar state out
+of `.claude/` entirely, to a new hidden folder at the repository root,
+`.ai-bootstrap/`. Before changing any installer or template code, this gate
+tests whether that new root actually accepts the writes the workflow needs.
+
+This supersedes the row above, "state folder (`.claude/ai-bootstrap/`) ...
+frozen", for future releases. That row is left as written; it is historical
+evidence of the old root, not a current recommendation.
+
+### Reproducible recipe
+
+Two scripts build the fixture and run the probe. Run the fixture build
+first, from the bootstrap repository root, with one argument: an empty
+throwaway directory. Then run the probe script yourself, in your own shell.
+The orchestrating agent could not start the probe directly: on 2026-10-02
+the agent session's auto-mode safety classifier denied starting a nested
+`claude -p` call from an agent tool call, so the user ran it instead.
+
+The probe script looks for the fixture at `fixture-write-gate/` in its own
+directory. So save both scripts in one directory, and pass
+`<that directory>/fixture-write-gate` as the build script's argument. The
+build script writes its snapshot files (`snap-*.txt`) next to the fixture.
+
+```bash
+#!/usr/bin/env bash
+# Exact fixture build used for the 2026-10-02 write gate (run from the
+# bootstrap repository root). Team files are staged, not committed, because
+# this repository's commit-gate hook blocks agent-run commits in any repo.
+set -euo pipefail
+F="$1"   # empty throwaway directory, no remote
+test ! -e "$F" || { echo "refusing: $F exists" >&2; exit 1; }
+mkdir -p "$F" && cd "$F" && git init -q
+mkdir -p .claude/rules src
+printf '{\n  "outputStyle": "concise"\n}\n' > .claude/settings.json
+printf 'TEAM-RULE-OK\n' > .claude/rules/team.md
+cat > src/hello.py <<'EOF'
+def hello() -> str:
+    """Return a fixed greeting for the write-gate fixture."""
+    return "hello from the write-gate fixture"
+EOF
+git add .claude/settings.json .claude/rules/team.md src/hello.py
+cd - >/dev/null
+uv run python scripts/install_bootstrap.py "$F" --mode sidecar --profile workflow
+cd "$F"
+# Fixture-only candidate root: copy seeded state, repoint installed copies.
+cp -a .claude/ai-bootstrap .ai-bootstrap
+grep -rl --exclude-dir=.git --exclude-dir=.ai-bootstrap --exclude-dir=ai-bootstrap \
+  '\.claude/ai-bootstrap' . | xargs sed -i 's#\.claude/ai-bootstrap#.ai-bootstrap#g'
+printf '/.ai-bootstrap\n' >> "$(git rev-parse --path-format=absolute --git-path info/exclude)"
+git check-ignore -q .ai-bootstrap/MEMORY.md
+git ls-files -s | sha256sum > ../snap-index.txt
+sha256sum .claude/settings.json .claude/rules/team.md src/hello.py > ../snap-team.txt
+git status --porcelain --untracked-files=all > ../snap-status.txt
+```
+
+The fixture is a real sidecar-workflow install from current `dev`. Only the
+12 files it installed that referenced the old root
+(`.claude/ai-bootstrap/`) were repointed to the candidate root
+(`.ai-bootstrap/`), and only inside the throwaway fixture. No production
+source and no `dist/` file was changed.
+
+```bash
+#!/usr/bin/env bash
+# Phase A native write-gate probe (sidecar-workflow-repair).
+# Run this yourself, in your own shell:  bash run-write-gate-probe.sh
+# It starts two Claude Code print-mode sessions inside the throwaway fixture.
+# It uses ordinary permissions (acceptEdits), changes no settings, and gives
+# the sessions no shell tool, so every file must come from native Write/Edit.
+set -uo pipefail
+
+S="$(cd "$(dirname "$0")" && pwd)"
+F="$S/fixture-write-gate"
+cd "$F" || { echo "fixture missing: $F" >&2; exit 1; }
+
+echo "claude version: $(claude --version)"
+echo "working dir: $(pwd)"
+
+# Step 2: direct writes by the main session.
+claude -p --model sonnet --permission-mode acceptEdits \
+  --tools Read,Write,Edit \
+  --output-format stream-json --verbose --no-session-persistence --strict-mcp-config \
+  "This is a write-permission probe. Use only the Write and Edit tools; do not ask questions. Do these in order and keep going even if one is refused:
+1. Write .ai-bootstrap/plans/probe-plan.md with exactly the line: PROBE-PLAN-CREATED
+2. Write .ai-bootstrap/session_logs/probe-log.md with exactly the line: PROBE-LOG-CREATED
+3. Write .ai-bootstrap/quality_reports/probe-report.md with exactly the line: PROBE-REPORT-CREATED
+4. Write .ai-bootstrap/explorations/probe-exploration.md with exactly the line: PROBE-EXPLORATION-CREATED
+5. Edit each of the four files above, replacing CREATED with EDITED.
+6. Edit .ai-bootstrap/MEMORY.md: append a new final line: PROBE-MEMORY-EDITED
+7. Control A: Write .claude/ai-bootstrap/plans/control-old-root.md with exactly the line: CONTROL-OLD-ROOT
+8. Control B: Write notes-probe.md with exactly the line: CONTROL-ROOT-FILE
+Finally, list each step with OK or REFUSED." \
+  > "$S/probe-direct.jsonl" 2> "$S/probe-direct.err"
+echo "step 2 exit=$?"
+
+# Step 3: delegated work through the installed workflow agents.
+claude -p --model sonnet --permission-mode acceptEdits \
+  --tools Read,Write,Edit,Grep,Glob,Agent \
+  --output-format stream-json --verbose --no-session-persistence --strict-mcp-config \
+  "Follow the workflow rule in .claude/rules/ai-bootstrap-workflow.md for this small task, and do not ask questions.
+Task: in src/hello.py, add a module docstring and change the greeting text to \"hello from the repaired fixture\". Change no other source file.
+Required steps, in order:
+1. Delegate planning to the planner subagent. Save the plan it produces to .ai-bootstrap/plans/hello-greeting.md. If the planner cannot save the file itself, save its returned text yourself with Write.
+2. Delegate the edit to the coder subagent. Tell it to use only Edit or Write, not a shell.
+3. Delegate review to the reviewer subagent. Give it this exact diff text for src/hello.py, which you build from the before and after contents. Save its report to .ai-bootstrap/quality_reports/hello-greeting-review.md. If the reviewer cannot save the file itself, save its returned text yourself with Write.
+4. Delegate to the documenter subagent: tell it to write .ai-bootstrap/session_logs/hello-greeting.md with a three-line summary of the task, using its own Write tool.
+5. Yourself: append a final line to .ai-bootstrap/MEMORY.md: PROBE-DELEGATED-MEMORY-EDITED
+Finally, for each step say which agent wrote which file, or what was refused." \
+  > "$S/probe-delegated.jsonl" 2> "$S/probe-delegated.err"
+echo "step 3 exit=$?"
+echo "done; tell the orchestrator session to inspect the results"
+```
+
+Results were checked outside the model: parsing the `stream-json` output's
+`tool_use`/`tool_result` events and the final `permission_denials` list,
+then independently reading the actual file contents on disk, the Git index
+hash, the team-file hashes, and `git status`.
+
+### Evidence table, 2026-10-02
+
+Client: Claude Code 2.1.226, print mode, `--model sonnet` (the `init` event
+reported model `claude-sonnet-5`), `--permission-mode acceptEdits`,
+`--no-session-persistence --strict-mcp-config`. No settings change and no
+permission bypass.
+
+| Check | Tools available | Result |
+| --- | --- | --- |
+| Direct writes at `.ai-bootstrap/` (plans, session_logs, quality_reports, explorations) | `Read,Write,Edit` | native-run pass: Write then Edit succeeded for all four marker files; each reads `PROBE-*-EDITED` on disk; no approval needed |
+| Direct edit of `.ai-bootstrap/MEMORY.md` | `Read,Write,Edit` | native-run pass: file ends with `PROBE-MEMORY-EDITED` |
+| Control A, write `.claude/ai-bootstrap/plans/control-old-root.md` | `Read,Write,Edit` | reproduces the known defect: refused as "a sensitive file", listed in `permission_denials`; file absent on disk |
+| Control B, write `notes-probe.md` at the fixture root | `Read,Write,Edit` | written successfully, then removed before the status comparison; rules out a general Write denial |
+| Delegated run: planner, coder, reviewer, documenter subagents | `Read,Write,Edit,Grep,Glob,Agent` (listed as tool `Task` in the `init` event; agents include coder, documenter, orchestrator, planner, reviewer) | native-run pass overall, `permission_denials` empty; see breakdown below |
+
+Delegation was confirmed by `Agent` tool_use events and subagent events
+carrying `parent_tool_use_id`, not by reply text claiming a role.
+
+Delegated-run breakdown:
+
+- **planner** subagent: read `.claude/templates/plan-small.md` and
+  `.ai-bootstrap/MEMORY.md`, then returned plan text. It has no Write or
+  Edit tool, so the main session saved the result to
+  `.ai-bootstrap/plans/hello-greeting.md` (58 lines, small-plan
+  frontmatter).
+- **coder** subagent: made the only allowed source change, a native Edit of
+  `src/hello.py`.
+- **reviewer** subagent (`Read,Grep,Glob` only): read
+  `.claude/review-profiles/code.md` and returned a Markdown report (PASS,
+  one minor note); the main session saved it to
+  `.ai-bootstrap/quality_reports/hello-greeting-review.md`.
+- **documenter** subagent: wrote
+  `.ai-bootstrap/session_logs/hello-greeting.md` with its own Write tool —
+  a delegated write at the new root, not a main-session save.
+- **main session**: Edit appended `PROBE-DELEGATED-MEMORY-EDITED` to
+  `.ai-bootstrap/MEMORY.md`.
+
+The old root, `.claude/ai-bootstrap/`, held only its five originally seeded
+files after both sessions; nothing new was written there.
+
+Integrity: `.claude/settings.json` and `.claude/rules/team.md` hashes stayed
+unchanged; the Git index hash stayed unchanged; `git status` differed from
+the pre-probe snapshot only by `AM src/hello.py`, the intended task edit.
+
+### Capabilities recorded separately
+
+| Capability | Result |
+| --- | --- |
+| Discovery (agents listed in the `init` event) | native-run pass |
+| Direct writing at `.ai-bootstrap/` | native-run pass |
+| Delegated writing at `.ai-bootstrap/` | native-run pass for the coder and documenter subagents, which have a write tool; the planner and reviewer have no write tool by design, so the main session saves their output |
+
+### Side finding, carried into Phase B
+
+The shipped sidecar `planner` and `reviewer` prompts tell those agents to
+save their own plan or report, but their tool lists — rendered from the
+shared `shared/agents/{planner,reviewer}/agent.yaml` capabilities, the same
+list the full install uses — give neither agent a file-write tool. Decision
+(user, 2026-10-02): "caller saves" — the planner and reviewer return text,
+and the requesting agent saves it, matching how the full install's
+read-only reviewer already works.
+
+### Unverified
+
+Copilot in VS Code, Codex, and Antigravity were not run for this gate; they
+stay unverified. Do not expand any support claim beyond Claude Code on this
+evidence. An interactive, non-print session was also not tested.
+
+### Decision gate result, 2026-10-02
+
+Pass, for Claude Code. Phase B may relocate sidecar state to
+`.ai-bootstrap/`.
