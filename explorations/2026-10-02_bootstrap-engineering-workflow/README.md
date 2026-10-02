@@ -6,7 +6,7 @@
 
 **Current planning baseline:** `dev`, `1626364`, after sidecar repair PR #43.
 
-**Status:** Investigation complete; recommendations and plans are drafts for review. No implementation is authorized by this document.
+**Status:** Investigation complete. Plan 1 was approved for implementation on 2026-10-02 and moved to `.claude/plans/`; Plan 2 remains a deferred proposal.
 
 ## Recommendation
 
@@ -29,16 +29,16 @@ Align those instructions; do not treat requirement handoffs as wholly new.
 
 - This file: research, corrected gap analysis, and decisions.
 - [Implementation design](design.md): immediate guidance and preserved boundaries.
-- [Plan 1: guidance improvements](engineering-workflow-improvements.md).
-- [Phase A: review guidance and focused checks](2026-10-02_phase-A-engineering-review-guidance.md).
-- [Phase B: planning, reporting, and learning guidance](2026-10-02_phase-B-engineering-planning-guidance.md).
-- [Phase C: required knowledge refresh](2026-10-02_phase-C-engineering-knowledge-refresh.md).
+- [Plan 1: guidance improvements](../../plans/engineering-workflow-improvements.md).
+- [Phase A: review guidance and focused checks](../../plans/2026-10-02_phase-A-engineering-review-guidance.md).
+- [Phase B: planning, reporting, and learning guidance](../../plans/2026-10-02_phase-B-engineering-planning-guidance.md).
+- [Phase C: required knowledge refresh](../../plans/2026-10-02_phase-C-engineering-knowledge-refresh.md).
 - [Plan 2: optional behavioral pilot](behavioral-evaluation-pilot.md): deferred
   design and evidence requirements; not implementation-ready.
 
-All documents remain in this exploration directory. Only after implementation
-approval, move Plan 1 and its three small plans together to `.claude/plans/`
-and validate them. The optional pilot has no active phases and does not block
+Plan 1 and its three small plans were approved and moved together to
+`.claude/plans/` on 2026-10-02; the investigation, design, and optional pilot
+stay in this exploration directory. The optional pilot has no active phases and does not block
 Plan 1. The previous four-phase draft is superseded; its evidence/evaluator
 small plans are removed. Its workflow phase is split so the review alignment
 lands and is reviewed first (A), the planning/reporting/learning guidance

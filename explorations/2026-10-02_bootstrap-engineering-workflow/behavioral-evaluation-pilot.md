@@ -1,7 +1,7 @@
 # Plan 2: Optional Behavioral Evaluation Pilot
 
 **Status:** Deferred proposal; not implementation-ready or activated.
-**Requirement:** REQ-006 from [the guidance plan](engineering-workflow-improvements.md).
+**Requirement:** REQ-006 from [the guidance plan](../../plans/engineering-workflow-improvements.md).
 **Dependency:** None for delivery of the guidance plan. Consider this separately
 after its changes and knowledge refresh are complete.
 

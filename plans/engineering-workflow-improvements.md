@@ -27,13 +27,13 @@ steps do not explicitly require comparison against the approved plan/spec
 and approved scope changes. The investigation and design remain in
 `.claude/explorations/2026-10-02_bootstrap-engineering-workflow/`.
 
-This draft has three phases. Phase A delivers the highest-value change, the
+This plan has three phases. Phase A delivers the highest-value change, the
 review alignment and original-symptom check, so it is reviewed on its own.
 Phase B adds the planning, reporting, and learning guidance. Phase C is the
-required knowledge refresh. After implementation approval, promote this big
-plan and its three small plans together to `.claude/plans/`. Drafting does not
-activate a phase or create an implementation branch. The separate
-`behavioral-evaluation-pilot.md` is an optional later proposal, not a dependency.
+required knowledge refresh. The user approved implementation on 2026-10-02,
+and this big plan and its three small plans were moved together to
+`.claude/plans/`. The separate `behavioral-evaluation-pilot.md` in the
+exploration directory is an optional later proposal, not a dependency.
 
 ## Goals
 
