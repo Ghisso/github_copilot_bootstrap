@@ -170,21 +170,21 @@ def parse_args() -> argparse.Namespace:
         "of deleted, and team or foreign content is never touched. Only valid "
         "for a sidecar target (explicit --mode sidecar, or no --mode when "
         "detection finds sidecar evidence); refused with --mode full or full "
-        "evidence. The namespaced state folder (.claude/ai-bootstrap) is kept "
+        "evidence. The namespaced state folder (.ai-bootstrap) is kept "
         "and hidden by default; pass --purge-state to remove it too.",
     )
     parser.add_argument(
         "--purge-state",
         action="store_true",
         help="With --uninstall, move the namespaced state folder "
-        "(.claude/ai-bootstrap) into the preserved-copy folder and stop "
+        "(.ai-bootstrap) into the preserved-copy folder and stop "
         "hiding it, instead of the default: kept in place, still hidden. "
         "Ignored without --uninstall.",
     )
     parser.add_argument(
         "--backup-state",
         action="store_true",
-        help="Copy the namespaced state folder (.claude/ai-bootstrap) into "
+        help="Copy the namespaced state folder (.ai-bootstrap) into "
         "the preserved-copy folder and change nothing else: a standalone "
         "action, taking priority over --uninstall and every install option.",
     )
@@ -1312,31 +1312,152 @@ def warn_tracked_paths(target: Path, patterns: tuple[str, ...]) -> None:
     print(f"git rm --cached -r -- {' '.join(unique_roots)}")
 
 
+# Hook script filenames this bootstrap has shipped under `.claude/hooks/
+# scripts/` across both full-install eras (HF-sync and today's git-backed
+# state sync; confirmed against `shared/hooks/scripts/` history and the
+# reported legacy consumer's checked-out `.claude/hooks/scripts/`, which
+# also has the retired `hf-ai-sync.sh`, left out here since it would then
+# exclude a current install). An arbitrary hooks directory with unrelated
+# filenames is not evidence on its own, so `_legacy_hook_scripts_present`
+# requires more than one of these names together.
+_LEGACY_HOOK_SCRIPT_NAMES = (
+    "run-hook.sh",
+    "protect-files.sh",
+    "session-log.sh",
+    "context-mode-dispatch.sh",
+    "git-protection.sh",
+)
+_LEGACY_HOOK_SCRIPT_MIN_MATCHES = 2
+
+# Tracked devcontainer paths this bootstrap has used to drive its own state
+# sync, one per full-install era: `hf-ai-sync.py` (retired) and today's
+# `state-sync.sh`. Either, tracked, next to a real untracked `.claude` and
+# the hook scripts above, is legacy full-install evidence (finding 2).
+_LEGACY_DEVCONTAINER_SYNC_PATHS = (
+    ".devcontainer/hf-ai-sync.py",
+    ".devcontainer/state-sync.sh",
+)
+
+
+def _claude_dir_tracked(target: Path) -> bool:
+    """Return whether the outer Git index has any entry at or under
+    ``.claude`` (Phase G's index reader, reused here): a team that tracks
+    ``.claude/**``, ships it as a submodule or an embedded gitlink, or
+    tracks ``.claude`` as a symlink is team config, however the checked-out
+    content looks. A target that is not a Git repository reads as "nothing
+    tracked"; any other Git failure aborts detection in every mode
+    (Decision 27)."""
+    if not target.is_dir():
+        return False
+    try:
+        entries = _read_index_entries(target)
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode("utf-8", "replace")
+        if "not a git repository" not in stderr:
+            raise SystemExit(_detection_abort_message(target, stderr.strip())) from exc
+        entries = ()
+    return any(
+        path == ".claude" or path.startswith(".claude/") for _mode, path in entries
+    )
+
+
+def _real_untracked_claude_dir(target: Path) -> bool:
+    """Return whether ``target/.claude`` exists as a real directory
+    (checked with ``lstat``, so a symlink never counts) that the outer
+    index does not track. This alone only says a private per-clone
+    ``.claude/`` setup already exists; corroborating bootstrap evidence
+    under it (``_legacy_full_install_evidence``) still decides whether it
+    is a recognized legacy full install. A plain-mode refusal also uses
+    this on its own, so it never recommends installing a sidecar overlay
+    next to an existing ``.claude/`` setup it cannot yet confirm
+    (finding 2)."""
+    try:
+        if not stat.S_ISDIR(os.lstat(target / ".claude").st_mode):
+            return False
+    except OSError:
+        return False
+    return not _claude_dir_tracked(target)
+
+
+def _legacy_hook_scripts_present(target: Path) -> bool:
+    """Return whether at least ``_LEGACY_HOOK_SCRIPT_MIN_MATCHES`` of
+    ``_LEGACY_HOOK_SCRIPT_NAMES`` exist as regular files under
+    ``.claude/hooks/scripts``. One familiar filename alone is not legacy
+    evidence; several of this bootstrap's own hook script names together
+    are."""
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    try:
+        if not stat.S_ISDIR(os.lstat(hooks_dir).st_mode):
+            return False
+    except OSError:
+        return False
+    matches = 0
+    for name in _LEGACY_HOOK_SCRIPT_NAMES:
+        try:
+            if stat.S_ISREG(os.lstat(hooks_dir / name).st_mode):
+                matches += 1
+        except OSError:
+            continue
+    return matches >= _LEGACY_HOOK_SCRIPT_MIN_MATCHES
+
+
+def _legacy_verify_script_present(target: Path) -> bool:
+    """Return whether ``.claude/scripts/verify.py`` exists as a regular
+    file: a path this bootstrap has generated at this exact location since
+    before ``bootstrap-ownership.env`` existed (a pre-manifest full
+    install)."""
+    try:
+        return stat.S_ISREG(
+            os.lstat(target / ".claude" / "scripts" / "verify.py").st_mode
+        )
+    except OSError:
+        return False
+
+
+def _legacy_full_install_evidence(target: Path) -> str | None:
+    """Return a description of recognized legacy full-install evidence
+    under a real, untracked ``.claude`` directory, or ``None``. Neither a
+    tracked devcontainer sync path nor a local ``verify.py`` counts by
+    itself, and neither counts without the corroborating hook scripts: an
+    arbitrary ``.claude/hooks`` directory is not evidence on its own.
+    Callers must only invoke this after ``_real_untracked_claude_dir``."""
+    if not _legacy_hook_scripts_present(target):
+        return None
+    try:
+        tracked_sync = tracked_generated_paths(target, _LEGACY_DEVCONTAINER_SYNC_PATHS)
+    except GitDetectionError as exc:
+        raise SystemExit(_detection_abort_message(target, str(exc))) from exc
+    hooks_dir = target / ".claude" / "hooks" / "scripts"
+    if tracked_sync:
+        return f"tracked {', '.join(sorted(tracked_sync))}; local {hooks_dir}"
+    if _legacy_verify_script_present(target):
+        verify_script = target / ".claude" / "scripts" / "verify.py"
+        return f"local {verify_script}; local {hooks_dir}"
+    return None
+
+
 def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
     """Full-install evidence per the mode table (Decision 27). Neither
     ``.claude/.git`` nor ``.claude/bootstrap-ownership.env`` counts when the
-    outer index has any entry at or under ``.claude`` (Phase G's index
-    reader, reused here): a team that tracks ``.claude/**``, ships it as a
-    submodule or an embedded gitlink, or tracks ``.claude`` as a symlink is
-    team config instead, however the checked-out content looks. Otherwise
-    ``.claude/.git`` counts only when it is a directory (checked with
-    ``lstat``, so a submodule's ``.git`` file never counts) and the env file
-    counts by ``lexists`` (never followed)."""
+    outer index has any entry at or under ``.claude``: a team that tracks
+    ``.claude/**``, ships it as a submodule or an embedded gitlink, or
+    tracks ``.claude`` as a symlink is team config instead, however the
+    checked-out content looks. Otherwise ``.claude/.git`` counts only when
+    it is a directory (checked with ``lstat``, so a submodule's ``.git``
+    file never counts) and the env file counts by ``lexists`` (never
+    followed).
+
+    A real, untracked ``.claude`` with neither of those two modern markers
+    can still be a recognized legacy full install (finding 2): the
+    HF-sync and git-backed state-sync eras both tracked a devcontainer sync
+    script and shipped this bootstrap's own hook scripts under
+    ``.claude/hooks/scripts``; a pre-manifest install instead has a local
+    ``.claude/scripts/verify.py`` next to those same hook scripts. This
+    check only runs once neither modern marker already fired, so a current
+    full install -- which also ships those same hook scripts and tracks
+    ``.devcontainer/state-sync.sh`` -- is never mislabeled "legacy"."""
     evidence: list[str] = []
-    claude_tracked = False
-    if target.is_dir():
-        try:
-            entries = _read_index_entries(target)
-        except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or b"").decode("utf-8", "replace")
-            if "not a git repository" not in stderr:
-                raise SystemExit(
-                    _detection_abort_message(target, stderr.strip())
-                ) from exc
-            entries = ()
-        claude_tracked = any(
-            path == ".claude" or path.startswith(".claude/") for _mode, path in entries
-        )
+    claude_tracked = _claude_dir_tracked(target)
     nested_git = target / ".claude" / ".git"
     try:
         nested_is_dir = stat.S_ISDIR(os.lstat(nested_git).st_mode)
@@ -1347,6 +1468,10 @@ def _full_install_evidence(target: Path, allow_self: bool) -> tuple[str, ...]:
     ownership_env = target / ".claude" / "bootstrap-ownership.env"
     if os.path.lexists(ownership_env) and not claude_tracked:
         evidence.append(f"full-install manifest {ownership_env}")
+    if not evidence and _real_untracked_claude_dir(target):
+        legacy = _legacy_full_install_evidence(target)
+        if legacy is not None:
+            evidence.append(f"legacy full install evidence ({legacy})")
     if allow_self and target == REPO_ROOT:
         evidence.append("--allow-self with this repository as the target")
     return tuple(evidence)
@@ -1493,8 +1618,11 @@ def detect_install_mode(
         raise SystemExit(
             "Refusing to auto-detect an install mode: "
             f"{target} has both full-install evidence ({'; '.join(full_ev)}) and "
-            f"sidecar evidence ({'; '.join(sidecar_ev)}). Pass --mode full or "
-            "--mode sidecar explicitly to say which one this run means."
+            f"sidecar evidence ({'; '.join(sidecar_ev)}). Every explicit mode and "
+            "--uninstall refuse while both remain, so this is not a flag choice: "
+            f"back up {target}, inspect which installation you intend to keep, remove "
+            "the other overlay by hand, then rerun once only one kind of evidence is "
+            "left."
         )
     if sidecar_ev:
         return "sidecar"
@@ -1503,6 +1631,15 @@ def detect_install_mode(
 
     team_config = _team_config_evidence(target)
     if team_config:
+        if _real_untracked_claude_dir(target):
+            raise SystemExit(
+                "Refusing a plain install with no --mode: "
+                f"{target} already tracks bootstrap-owned paths ({', '.join(team_config)}) "
+                "next to an existing, untracked .claude/ this run cannot yet confirm as "
+                "a recognized bootstrap install. A sidecar overlay must not sit next to "
+                "an existing per-clone .claude/ setup; pass --mode full to restore or "
+                "refresh it instead."
+            )
         message = (
             "Refusing a plain install with no --mode: "
             f"{target} already tracks bootstrap-owned paths ({', '.join(team_config)}) "
@@ -1612,20 +1749,16 @@ def _run_uninstall(target: Path, args: argparse.Namespace) -> int:
 def _run_backup_state(target: Path, dry_run: bool) -> int:
     """``--backup-state``: a standalone action, independent of install and
     uninstall (Decision 3; the small plan's step 6). ``--dry-run`` reports
-    the copy without making it, like every other action here."""
+    the copy without making it, like every other action here.
+
+    ``backup_sidecar_state`` (finding 4) now runs the sidecar's own shared
+    preflight and turns a "not a Git repository" target or a filesystem
+    failure into its own already-printed diagnostic -- an ``ABORT:
+    filesystem error at <path>: <reason>`` for the latter, matching install
+    and uninstall -- so this needs no exception handling of its own."""
     if not target.is_dir():
         raise SystemExit(f"Refusing --backup-state: {target} is not a directory.")
-    try:
-        return backup_sidecar_state(target, dry_run=dry_run)
-    except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr or ""
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode("utf-8", "replace")
-        if "not a git repository" in stderr:
-            raise SystemExit(
-                f"Refusing --backup-state: {target} is not a Git repository."
-            ) from exc
-        raise
+    return backup_sidecar_state(target, dry_run=dry_run)
 
 
 def main() -> int:

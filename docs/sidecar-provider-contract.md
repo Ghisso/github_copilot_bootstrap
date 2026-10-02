@@ -1187,3 +1187,70 @@ evidence. An interactive, non-print session was also not tested.
 
 Pass, for Claude Code. Phase B may relocate sidecar state to
 `.ai-bootstrap/`.
+
+### Legacy full-install evidence, 2026-10-02
+
+A read-only inspection of a reported HF-sync-era consumer (an older full
+install from before the `.claude/ai-bootstrap/` state folder and the
+current manifest existed) found a real, untracked `.claude/` directory that
+carries none of today's full-install markers (no `.claude/.git`, no
+`.claude/bootstrap-ownership.env`), so the existing detection read it as
+plain, unmanaged content — wrong, since it is actually an older full
+install this bootstrap itself generated and still owns. Installing a
+sidecar overlay next to it, or uninstalling as a sidecar, would have been
+unsafe.
+
+Two eras of this bootstrap's own history explain the two shapes a legacy
+full install can take. Commit `3de8385` (`R-SYNC-05b`) added
+`.devcontainer/state-sync.sh` for git-backed state sync; commit `dd1ee06`
+(`R-SYNC-05e`) retired the earlier `.devcontainer/hf-ai-sync.py`. A target
+from either era still ships this bootstrap's own hook scripts under
+`.claude/hooks/scripts/`; a target old enough to predate both devcontainer
+sync scripts instead has a local `.claude/scripts/verify.py`.
+
+| Signal | Counts as legacy evidence | Does not count alone |
+| --- | --- | --- |
+| A real, untracked `.claude/` directory | Required precondition for every row below | A tracked `.claude/` (team config) never counts, however the checked-out content looks |
+| Tracked `.devcontainer/hf-ai-sync.py` or `.devcontainer/state-sync.sh` | Yes, together with the hook-script row below | A devcontainer sync script alone, with no corroborating hook scripts |
+| Local `.claude/scripts/verify.py` (pre-manifest install, no devcontainer sync script tracked) | Yes, together with the hook-script row below | `verify.py` alone, with no corroborating hook scripts |
+| At least 2 of `run-hook.sh`, `protect-files.sh`, `session-log.sh`, `context-mode-dispatch.sh`, `git-protection.sh` under `.claude/hooks/scripts/` | Required alongside either row above | A single matching hook script name; an arbitrary `.claude/hooks/` folder with unrelated filenames |
+
+A plain install (no `--mode`) treats this combination as full-install
+evidence, same as the current manifest markers. `--mode sidecar`, its dry
+run, and a sidecar `--uninstall` refuse instead of proceeding. If a target
+somehow carries both full-install and sidecar evidence at once, every mode
+refuses with a back-up-and-inspect remedy — see README.md, "Behavior
+changes you should know about".
+
+### Rerun on the repaired install, 2026-10-02
+
+A native rerun of the orchestrator, after the state-folder move and the
+legacy-detection fix above, against a fresh generated workflow install (72
+units installed, state seeded at `.ai-bootstrap/`, zero references left to
+the old path). Claude Code 2.1.226, print mode, `--agent orchestrator`,
+`acceptEdits` permission mode, tools `Read`, `Write`, `Edit`, `Grep`,
+`Glob`, and `Agent` available. The user ran the session in their own shell;
+the prompt given to the orchestrator did not say who should save a
+delegated agent's output.
+
+Verified from the session's stream-json events and the resulting disk
+state:
+
+- The `Agent` tool invoked the `planner`, `coder`, and `reviewer` subagents.
+- The orchestrator itself saved the plan the planner returned (76 lines)
+  under `.ai-bootstrap/plans/` with its own `Write` call, and the review
+  the reviewer returned (30 lines) under `.ai-bootstrap/quality_reports/`,
+  the same way.
+- The `coder` subagent edited `src/hello.py`, the intended source change.
+- The orchestrator wrote the session log and a `[LEARN:python]` line in
+  `.ai-bootstrap/MEMORY.md` itself.
+- `permission_denials` was empty for the whole run.
+- No `.claude/ai-bootstrap/` folder was created anywhere during the run.
+- Team-owned file hashes and the Git index hash were unchanged after the
+  run; `git status` differed from the pre-run snapshot only by the
+  intended `src/hello.py` edit.
+
+This confirms the caller-saves decision from "Side finding, carried into
+Phase B" above against a real generated install, not only the fixture-only
+probe earlier in this section. Copilot in VS Code, OpenAI Codex, and
+Google Antigravity remain unverified for delegated writes.

@@ -1119,6 +1119,40 @@ def test_full_evidence_refuses_uninstall(tmp_path: Path) -> None:
     assert (target / ".claude" / ".git").exists()
 
 
+def test_legacy_full_install_evidence_refuses_uninstall(tmp_path: Path) -> None:
+    """Finding 2: an older full install with no nested AI-state repository
+    and no `bootstrap-ownership.env` yet -- the HF-sync era -- must refuse
+    `--uninstall` the same way a current full install does, never "no
+    sidecar found; nothing to do"."""
+    target = tmp_path / "legacy-consumer"
+    _init_repo(target)
+    _write(target / ".devcontainer" / "hf-ai-sync.py", "#!/usr/bin/env python3\n")
+    _commit(target, "devcontainer HF-sync era", ".devcontainer/hf-ai-sync.py")
+    for name in (
+        "run-hook.sh",
+        "protect-files.sh",
+        "session-log.sh",
+        "context-mode-dispatch.sh",
+        "git-protection.sh",
+    ):
+        _write(target / ".claude" / "hooks" / "scripts" / name, "#!/usr/bin/env bash\n")
+    status_before = _status(target)
+
+    refused = subprocess.run(
+        [sys.executable, str(INSTALLER), str(target), "--uninstall"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert refused.returncode != 0
+    assert "full-install evidence" in refused.stderr
+    assert "legacy full install evidence" in refused.stderr
+    assert "no sidecar found" not in refused.stdout
+    assert _status(target) == status_before
+    assert (target / ".claude" / "hooks" / "scripts" / "run-hook.sh").is_file()
+
+
 def test_mode_full_uninstall_is_refused(repo: Path) -> None:
     result = subprocess.run(
         [sys.executable, str(INSTALLER), str(repo), "--mode", "full", "--uninstall"],
@@ -1188,6 +1222,8 @@ def test_uninstall_dry_run_cli_flag(repo: Path) -> None:
     assert _manifest_path(repo).read_bytes() == manifest_before
     assert _status(repo) == status_before
     assert "would remove" in result.stdout
+    # Finding 3: a dry run never claims a removal already happened.
+    assert "removed .claude/skills/ponytail" not in result.stdout
 
 
 # --------------------------------------------------------------------------

@@ -1566,6 +1566,62 @@ def test_real_run_prints_exact_lines_for_remove_delete_and_preserve(
     assert f"PRESERVED .agents/skills/humanize -> {preserved_entries[0]}" in out
 
 
+def test_dry_run_prints_would_lines_never_past_tense_for_remove_delete_and_preserve(
+    team_repo: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """Finding 3: the same scenario as the real-run test above (remove,
+    delete, and preserve all in one run), but as a dry run. Only the
+    prospective ``would ...`` lines from ``_describe_dry_run_actions`` may
+    appear; `_print_report`'s own past-tense `removed`/`deleted`/
+    `PRESERVED -> <path>` lines must not, and the PRESERVED *report*'s own
+    remedy must say "would be moved", never "was moved". Nothing on disk
+    changes."""
+    assert install_sidecar(team_repo, SOURCE) == 0
+
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/ponytail/SKILL.md")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team takes ponytail SKILL.md")
+
+    edited = team_repo / ".agents" / "skills" / "humanize" / "SKILL.md"
+    edited.write_text(
+        edited.read_text(encoding="utf-8") + "\nEDITED\n", encoding="utf-8"
+    )
+    team_content = "---\nname: humanize\n---\nTEAM-OWNED-HUMANIZE\n"
+    _write(team_repo / ".claude" / "skills" / "humanize" / "SKILL.md", team_content)
+    force_add = _git(team_repo, "add", "-f", "--", ".claude/skills/humanize")
+    assert force_add.returncode == 0, force_add.stderr
+    _commit_staged(team_repo, "team owns humanize")
+
+    reduced_source = tmp_path / "reduced-source"
+    shutil.copytree(SOURCE, reduced_source)
+    for write_root in (".claude/skills", ".agents/skills"):
+        shutil.rmtree(reduced_source / write_root / "debug-investigator")
+    patch_sidecar_skills(monkeypatch, ("humanize", "ponytail", "ponytail-review"))
+
+    status_before = _status(team_repo)
+    exclude_before = _exclude_path(team_repo).read_bytes()
+    manifest_before = _manifest_path(team_repo).read_bytes()
+
+    exit_code = install_sidecar(team_repo, reduced_source, dry_run=True)
+    out = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "would remove .claude/skills/debug-investigator" in out
+    assert "would remove .agents/skills/debug-investigator" in out
+    assert "would delete .claude/skills/ponytail/LICENSE" in out
+    assert "would preserve .agents/skills/humanize ->" in out
+    assert "your edited copy would be moved out of the client folders" in out
+    assert "removed .claude/skills/debug-investigator" not in out
+    assert "removed .agents/skills/debug-investigator" not in out
+    assert "deleted .claude/skills/ponytail/LICENSE" not in out
+    assert "PRESERVED .agents/skills/humanize ->" not in out
+    assert "was moved out of the client folders" not in out
+    assert _status(team_repo) == status_before
+    assert _exclude_path(team_repo).read_bytes() == exclude_before
+    assert _manifest_path(team_repo).read_bytes() == manifest_before
+    assert not git_path(team_repo, "ai-bootstrap-sidecar-preserved").exists()
+
+
 # --------------------------------------------------------------------------
 # Phase G step 2: R2, symlinked read roots and skill entries
 # --------------------------------------------------------------------------

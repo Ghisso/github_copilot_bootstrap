@@ -34,9 +34,11 @@ interface, and `ponytail` for a multi-file diff.
 Write the surviving findings, grouped Critical, Major, Minor, each with
 its file, its location, why it matters, and a fix, plus a short summary
 and a verdict line (`PASS`, `WARN`, or `FAIL` as your own assessment of
-the diff, not a gate anyone else must honor). Save the report as
-`.claude/ai-bootstrap/quality_reports/<date>_<topic>.md` and return it. Do
-not emit a JSON list; a Markdown report is the only output.
+the diff, not a gate anyone else must honor). Return the finished report
+as your reply text and do not write it to a file yourself; whoever asked
+you to review saves your returned text as
+`.ai-bootstrap/quality_reports/<date>_<topic>.md`. Do not emit a JSON
+list; a Markdown report is the only output.
 
 ## Reporting style
 

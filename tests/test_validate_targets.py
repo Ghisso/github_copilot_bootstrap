@@ -44,6 +44,7 @@ from generate_targets import (  # noqa: E402
     transform_target_paths,
 )
 from runtime_ownership import (  # noqa: E402
+    SIDECAR_LEGACY_STATE_ROOT,
     SIDECAR_PROFILE_SKILLS,
     SIDECAR_PROFILES,
     SIDECAR_STATE_ROOT,
@@ -3137,6 +3138,71 @@ def test_render_sidecar_workflow_agent_bodies_are_self_contained(
         assert sidecar_text_errors(PurePosixPath("agent"), body, "workflow") == []
 
 
+def _collapsed(text: str) -> str:
+    """Normalize whitespace so an assertion survives an 80-column rewrap."""
+    return " ".join(text.split())
+
+
+def test_render_sidecar_workflow_planner_and_reviewer_return_text_not_save_it(
+    tmp_path: Path,
+) -> None:
+    """Finding 8: the planner's and reviewer's Claude tools (shared
+    `agent.yaml` capabilities) grant no Write or Edit, so their rendered
+    prompts must tell them to return the plan/report as reply text, never
+    to save a file themselves (the planner still has Bash, so the prompt
+    must not claim it has no way to write)."""
+    render_sidecar(tmp_path, "workflow")
+    planner_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "planner.md").read_text(encoding="utf-8")
+    )
+    assert "Return the finished plan as your reply text" in planner_text
+    assert "do not write it to a file yourself" in planner_text
+    assert "no tool to save" not in planner_text
+    assert "save it under `.ai-bootstrap/plans/`" not in planner_text
+    assert "save the plan" not in planner_text.lower()
+
+    reviewer_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "reviewer.md").read_text(encoding="utf-8")
+    )
+    assert "Return the finished report as your reply text" in reviewer_text
+    assert "do not write it to a file yourself" in reviewer_text
+    assert "Save the report as `.ai-bootstrap" not in reviewer_text
+
+
+def test_render_sidecar_workflow_orchestrator_and_rules_say_the_caller_saves(
+    tmp_path: Path,
+) -> None:
+    """Findings 6 and 8: the orchestrator prompt and the shared workflow
+    rule both say the caller -- the orchestrator, or the current agent when
+    no specialist exists -- saves the planner's or reviewer's returned
+    text, and both delegate only to a role actually available this
+    session."""
+    render_sidecar(tmp_path, "workflow")
+    orchestrator_text = _collapsed(
+        (tmp_path / ".claude" / "agents" / "orchestrator.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "you save it under `.ai-bootstrap/plans/`" in orchestrator_text
+    assert (
+        "you save that report yourself under `.ai-bootstrap/quality_reports/`"
+        in orchestrator_text
+    )
+    assert "write the plan yourself instead" in orchestrator_text
+    assert "review the diff yourself" in orchestrator_text
+    assert "implement the change yourself instead" in orchestrator_text
+
+    rule_text = _collapsed(
+        (tmp_path / ".claude" / "rules" / "ai-bootstrap-workflow.md").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "you save it under `.ai-bootstrap/plans/`" in rule_text
+    assert "you save that report under" in rule_text
+    assert "write the plan yourself instead" in rule_text
+    assert "review the diff yourself against the review profiles" in rule_text
+
+
 def test_render_sidecar_workflow_review_profiles_and_templates_are_shipped(
     tmp_path: Path,
 ) -> None:
@@ -3173,9 +3239,9 @@ def test_apply_sidecar_workflow_path_replacements_rewrites_the_five_state_paths(
     )
     rewritten = target_generator.apply_sidecar_workflow_path_replacements(text)
     assert rewritten == (
-        "See .claude/ai-bootstrap/plans/, .claude/ai-bootstrap/session_logs/, "
-        ".claude/ai-bootstrap/quality_reports/, .claude/ai-bootstrap/MEMORY.md, "
-        "and .claude/ai-bootstrap/explorations/."
+        "See .ai-bootstrap/plans/, .ai-bootstrap/session_logs/, "
+        ".ai-bootstrap/quality_reports/, .ai-bootstrap/MEMORY.md, "
+        "and .ai-bootstrap/explorations/."
     )
 
 
@@ -3293,3 +3359,41 @@ def test_sidecar_target_errors_rejects_an_agent_naming_verify_py(
     )
     errors = sidecar_target_errors(tmp_path, "workflow")
     assert any("still references" in error for error in errors)
+
+
+def test_real_generated_workflow_tree_has_no_retired_state_path(
+    tmp_path: Path,
+) -> None:
+    """Finding 1: the active, generated workflow content never mentions
+    the retired state root again, anywhere -- the real render, not a
+    synthetic fixture, so a path left un-rewritten in a shared source file
+    or the generator's own rewrite table would fail this."""
+    render_sidecar(tmp_path, "workflow")
+    assert sidecar_target_errors(tmp_path, "workflow") == []
+    for path in tmp_path.rglob("*"):
+        if path.is_file():
+            assert SIDECAR_LEGACY_STATE_ROOT not in path.read_text(
+                encoding="utf-8", errors="replace"
+            ), path
+
+
+def test_sidecar_target_errors_rejects_a_leftover_legacy_state_path(
+    tmp_path: Path,
+) -> None:
+    """New behavior (adversarial case: a leftover retired state path): a
+    rendered file mentioning the old ``.claude/ai-bootstrap`` root must be
+    rejected, the same way any other leftover bootstrap-only reference is
+    -- outside this explicit legacy-handling test, active generated
+    content must never reference it again."""
+    render_sidecar(tmp_path, "workflow")
+    rule_path = tmp_path / ".claude" / "rules" / "ai-bootstrap-workflow.md"
+    rule_path.write_text(
+        rule_path.read_text(encoding="utf-8")
+        + f"\nSee `{SIDECAR_LEGACY_STATE_ROOT}/MEMORY.md`.\n",
+        encoding="utf-8",
+    )
+    errors = sidecar_target_errors(tmp_path, "workflow")
+    assert any(
+        "still references" in error and SIDECAR_LEGACY_STATE_ROOT in error
+        for error in errors
+    )

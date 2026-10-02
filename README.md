@@ -504,8 +504,8 @@ see `docs/sidecar-provider-contract.md`):
   (`applyTo: "**"`).
 - Review profiles at `.claude/review-profiles/<name>.md` and templates
   (`plan-big.md`, `plan-small.md`) at `.claude/templates/`.
-- A namespaced state folder, `.claude/ai-bootstrap/` — see **The state
-  folder** below.
+- A namespaced state folder, `.ai-bootstrap/` at the repository root (not
+  under `.claude/`) — see **The state folder** below.
 
 Client coverage differs by unit kind (native-run evidence in
 `docs/sidecar-provider-contract.md`, "Workflow profile evidence"): Claude
@@ -540,18 +540,23 @@ flowchart LR
     R --> L[session log and lessons]
 ```
 
-Read `.claude/ai-bootstrap/MEMORY.md` first; write a plan under
-`.claude/ai-bootstrap/plans/` when a task spans several files or decisions;
-implement; run the project's own checks; review a non-trivial diff with the
-`reviewer` agent, whose Markdown report goes to
-`.claude/ai-bootstrap/quality_reports/`; log the session and record lessons
-in `.claude/ai-bootstrap/MEMORY.md`. No step blocks a commit.
+Read `.ai-bootstrap/MEMORY.md` first; write a plan under `.ai-bootstrap/plans/`
+when a task spans several files or decisions — the `planner` agent if this
+session has one, otherwise the agent itself; implement; run the project's
+own checks; review a non-trivial diff with the `reviewer` agent, whose
+Markdown report goes to `.ai-bootstrap/quality_reports/`, or as a
+self-review when no reviewer is available; log the session and record
+lessons in `.ai-bootstrap/MEMORY.md`. No step blocks a commit.
 
-**The state folder** (`.claude/ai-bootstrap/`, workflow profile only) holds
-`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, and
-`quality_reports/`, each with a README, hidden by one exclude line,
-`/.claude/ai-bootstrap`. It follows its own rules, separate from every other
-sidecar unit:
+**The state folder** (`.ai-bootstrap/` at the repository root, workflow
+profile only) holds `MEMORY.md`, `plans/`, `session_logs/`, `explorations/`,
+and `quality_reports/`, each with a README, hidden by one exclude line,
+`/.ai-bootstrap`. It lives at the repository root, not under `.claude/`,
+because Claude Code refuses agent writes anywhere under `.claude/` even in
+`acceptEdits` mode (see `docs/sidecar-provider-contract.md`, "Workflow state
+write gate, 2026-10-02"); the tooling that reads and writes it stays under
+`.claude/`. It follows its own rules, separate from every other sidecar
+unit:
 
 - **Seeded once.** An absent folder is created from its seed files on
   install; an existing folder gets any seed file it is missing added, and
@@ -564,24 +569,53 @@ sidecar unit:
   `MEMORY.md`, your plans, and your session logs are yours.
 - **Kept by uninstall.** Plain `--uninstall` keeps the folder and its
   exclude line in place and prints
-  `RETAINED .claude/ai-bootstrap: kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it`.
+  `RETAINED .ai-bootstrap: kept .ai-bootstrap and its exclude line; pass --purge-state to remove it`.
 - **Purged only on request.** `--uninstall --purge-state` moves the folder
   into the preserved-copy folder and drops the exclude line, printing
-  `PRESERVED .claude/ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`.
+  `PRESERVED .ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`.
   A later reinstall reseeds it from scratch.
-- **Backed up on request.** `--backup-state`, independent of install and
-  uninstall, copies the folder into the same preserved-copy location and
+- **Backed up on request.** `--backup-state` takes the same run lock as
+  install and uninstall, independent of either, copies the folder into the
+  same preserved-copy location only after the copy fully succeeds, and
   changes nothing else, printing
-  `backed up <repo>/.claude/ai-bootstrap -> <repo>/.git/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`,
-  or `no state folder found; nothing to back up` when there is none. With
-  `--dry-run` it prints `would back up ...` instead and copies nothing.
+  `backed up <repo>/.ai-bootstrap -> <repo>/.git/ai-bootstrap-sidecar-preserved/state--<UTC timestamp>`,
+  or `no state folder found; nothing to back up` when there is none. A
+  filesystem failure partway through prints `ABORT: filesystem error at
+  <path>: <reason>` and removes only its own partial copy, never a real
+  `state--<timestamp>` destination. It refuses a symlinked state folder or a
+  symlinked preserved-copy folder instead of silently skipping it. With
+  `--dry-run` it prints `would back up ...` instead, takes no lock, and
+  copies nothing. The run lock only serializes sidecar commands against
+  each other; to get a true point-in-time copy, stop any other editor of the
+  state folder first.
 - **`git clean -x` risk.** `git clean -x` (or `-fdx`) deletes ignored files,
   including the state folder — this is the one Git command that can destroy
   your plans, memory, and logs. `--backup-state` is the mitigation this
   bootstrap offers: it copies the folder into the Git directory, which
   `git clean` never touches.
-- A tracked path already sitting under `.claude/ai-bootstrap/` aborts the
-  run before any write, the same way any other tracked-path collision does.
+- A tracked path already sitting under `.ai-bootstrap/` aborts the run
+  before any write, the same way any other tracked-path collision does.
+- **Migrating from the old `.claude/ai-bootstrap/`.** An earlier workflow
+  install used `.claude/ai-bootstrap/` as the state folder; installs since
+  this fix use `.ai-bootstrap/` instead. A workflow install or update
+  migrates an owned old folder automatically: it is evidence of ownership
+  when the sidecar's own exclude block already lists
+  `.claude/ai-bootstrap/` (a prior managed install, or the retained-state
+  block a plain `--uninstall` leaves behind), and `.ai-bootstrap/` is not
+  already present. The run adds and proves the new exclude line, makes a
+  complete backup under the preserved-copy folder, refuses a cross-filesystem
+  move, renames the folder (never merges it), then continues the ordinary
+  reconciliation; the old exclude line is dropped once the old path is
+  gone. The run refuses before any write, with a manual-recovery remedy, if
+  both `.claude/ai-bootstrap/` and `.ai-bootstrap/` already exist, if
+  `.claude/ai-bootstrap/` exists with no ownership evidence, or if either
+  folder is tracked or symlinked. Interrupting a migration and rerunning
+  converges without moving the state twice. A dry run only predicts the
+  move (`would back up ...`, `would move ...`) and writes nothing. A
+  skills-only rerun or a plain `--uninstall` leaves old state where it is;
+  `--backup-state` and `--purge-state` recognize both the old and the new
+  root. See `docs/sidecar-provider-contract.md`, "Workflow state write
+  gate, 2026-10-02", for why the folder moved.
 
 **Profile switching.** `--profile skills` on a `workflow` install removes
 the workflow-only units through the ordinary remove-and-preserve rules and
@@ -651,8 +685,8 @@ an edited copy out of the way, together with the fix in each case:
 | `RETAINED` | Unrecognized line in the sidecar's exclude block | A line sits between `# BEGIN ai-bootstrap sidecar` and `# END ai-bootstrap sidecar` in `.git/info/exclude` that the sidecar does not recognize as one of its own unit or retained-file lines. Kept in file order, after the sidecar's own sorted lines, so a negation such as `!keep.log` never gets sorted ahead of the `*.log` line above it. | `` the sidecar does not recognize `<line>` in its own exclude block and keeps it ``; move it outside the block to keep it, or delete it if you do not need it. |
 | `RETAINED` | Retained file a team rule still ignores, reported on uninstall | Removing the block un-hides a retained file, but a separate team `.gitignore` rule still matches it. | `` no longer hidden by the sidecar; a team rule still ignores it `` — `git status` will not show it until that team rule changes too. |
 | `PRESERVED` | Skill name taken, and your copy had edits | A skill name became taken (see the row above) while your sidecar copy of that skill had local edits. | Copy the preserved file(s) out of the Git directory if you want to keep them; see **Preserved copies** below. |
-| `RETAINED` | State folder kept on plain `--uninstall` (workflow profile only) | `.claude/ai-bootstrap/` and its exclude line are never removed unless you ask. | `` kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it ``. |
-| `PRESERVED` | State folder moved by `--uninstall --purge-state` (workflow profile only) | The namespaced state folder was moved into the preserved-copy folder and its exclude line dropped. | `` the sidecar was uninstalled with --purge-state, so .claude/ai-bootstrap was moved out of the client folders ``. |
+| `RETAINED` | State folder kept on plain `--uninstall` (workflow profile only) | `.ai-bootstrap/` and its exclude line are never removed unless you ask. | `` kept .ai-bootstrap and its exclude line; pass --purge-state to remove it ``. |
+| `PRESERVED` | State folder moved by `--uninstall --purge-state` (workflow profile only) | The namespaced state folder was moved into the preserved-copy folder and its exclude line dropped. | `` the sidecar was uninstalled with --purge-state, so .ai-bootstrap was moved out of the client folders ``. |
 
 A workflow-profile unit that is one of Decision 9's new single-file kinds —
 an agent, a rule, a review profile, or a template — names its kind word in
@@ -728,16 +762,18 @@ including a team's own content or, for the workflow profile, the state
 folder (below).
 
 **The state folder on uninstall** (workflow profile only). Plain
-`--uninstall` keeps `.claude/ai-bootstrap/` and its exclude line in place —
-it is your work, not the bootstrap's — and reports
-`` RETAINED .claude/ai-bootstrap: kept .claude/ai-bootstrap and its exclude line; pass --purge-state to remove it ``.
+`--uninstall` keeps `.ai-bootstrap/` and its exclude line in place — it is
+your work, not the bootstrap's — and reports
+`` RETAINED .ai-bootstrap: kept .ai-bootstrap and its exclude line; pass --purge-state to remove it ``.
 `--uninstall --purge-state` moves the folder into the preserved-copy folder,
 the same place an edited skill copy would land, and drops the exclude line:
-`` PRESERVED .claude/ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp> ``.
+`` PRESERVED .ai-bootstrap -> <git dir>/ai-bootstrap-sidecar-preserved/state--<UTC timestamp> ``.
 A later reinstall reseeds an empty state folder from scratch. `--backup-state`
 copies the folder to the same preserved-copy location without uninstalling
 anything, and works even with no manifest at all — it only ever touches the
-namespaced state folder.
+namespaced state folder. Both `--backup-state` and `--purge-state` recognize
+an old, unmigrated `.claude/ai-bootstrap/` folder the same way they
+recognize `.ai-bootstrap/`.
 
 If the target carries no sidecar evidence at all, `--uninstall` prints "no
 sidecar found; nothing to do" and exits 0 — running it again after a clean
@@ -949,6 +985,31 @@ harness.
   from its own process, so a variable left exported by a wrapper script or
   an earlier `git -C` call can no longer redirect it to the wrong
   repository.
+- **A target with both full-install and sidecar evidence refuses every
+  mode, not just automatic detection.** With no `--mode`, `--mode full`,
+  `--mode sidecar`, and `--uninstall` all refuse a target that carries
+  both kinds of evidence, since there is no flag that can safely pick one
+  for you: back up the target, inspect which installation to keep, remove
+  the other overlay by hand, then rerun once only one kind of evidence is
+  left.
+- **An older, pre-manifest full install is now recognized as a legacy full
+  install, not mistaken for a sidecar target.** A real, untracked
+  `.claude/` directory next to either a tracked
+  `.devcontainer/hf-ai-sync.py` or `.devcontainer/state-sync.sh`, or a local
+  `.claude/scripts/verify.py`, together with at least two of this
+  bootstrap's own hook script names (`run-hook.sh`, `protect-files.sh`,
+  `session-log.sh`, `context-mode-dispatch.sh`, `git-protection.sh`) under
+  `.claude/hooks/scripts/`, counts as a recognized legacy full install. A
+  plain install treats it as full-install evidence; `--mode sidecar` (and
+  its dry run) and a sidecar `--uninstall` refuse instead of installing
+  next to it. An arbitrary hooks folder, a single matching hook script
+  name, or a team-tracked `.claude/` with the same filenames is not
+  evidence on its own. See `docs/sidecar-provider-contract.md`, "Legacy
+  full-install evidence", for the full signal table.
+- **A dry run never claims a write happened.** `--dry-run` reports (install,
+  uninstall, and `--backup-state` alike) print only predicted `would ...`
+  actions, counts, and `SKIPPED`/`RETAINED` reports — never a past-tense
+  line claiming something was removed, preserved, seeded, or backed up.
 
 ### Updating Sidecar Consumers
 

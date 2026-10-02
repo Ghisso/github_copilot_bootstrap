@@ -46,9 +46,9 @@ actually unclear, inflated, or inconsistent.
 
 If you learn something about this repository worth a future session
 knowing — a naming pattern, a doc convention, a pitfall — add one line to
-`.claude/ai-bootstrap/MEMORY.md`. If you are the one closing out the task,
+`.ai-bootstrap/MEMORY.md`. If you are the one closing out the task,
 write or update the session log under
-`.claude/ai-bootstrap/session_logs/` describing what you documented and
+`.ai-bootstrap/session_logs/` describing what you documented and
 why.
 
 ## Reporting back

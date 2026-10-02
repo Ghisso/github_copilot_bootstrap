@@ -115,7 +115,7 @@ default (`dist/sidecar/<profile>/`); an explicit `--source` overrides that.
 | Instructions (`workflow` profile) | `.github/instructions/ai-bootstrap-workflow.instructions.md` (`applyTo: "**"`) | Copilot in VS Code (Local agent and Agent Host) |
 | Review profile (`workflow` profile) | `.claude/review-profiles/<name>.md` | Claude Code only |
 | Template (`workflow` profile) | `.claude/templates/plan-big.md`, `plan-small.md` | Claude Code only |
-| State (`workflow` profile) | `.claude/ai-bootstrap/` (`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, `quality_reports/`, each with a README) | Claude Code, Copilot in VS Code, and Codex all read it; it is content, not a discovery mechanism, so every client that opens the file sees it |
+| State (`workflow` profile) | `.ai-bootstrap/` at the repository root (`MEMORY.md`, `plans/`, `session_logs/`, `explorations/`, `quality_reports/`, each with a README) | Claude Code, Copilot in VS Code, and Codex all read it; it is content, not a discovery mechanism, so every client that opens the file sees it |
 
 The `skills` profile ships the four skills — `debug-investigator`,
 `humanize`, `ponytail`, and `ponytail-review` — plus the two bridges above.
@@ -154,14 +154,20 @@ section](../README.md#personal-sidecar-install) for `--uninstall`, which
 removes the manifest and staging folder but leaves the preserved folder in
 place.
 
-The state unit (`.claude/ai-bootstrap/`, `workflow` profile only) follows
-its own rules, not the ordinary unit rules above: seeded once, from its
-seed files, when the folder is absent; an existing folder only ever gets a
-missing seed file added, never a comparison or an overwrite; kept in place
-and hidden by plain `--uninstall`; moved into the preserved-copy folder and
-un-hidden only by `--uninstall --purge-state`; copied to the preserved-copy
-folder, without uninstalling anything, by the standalone `--backup-state`
-action. See [README.md's Personal Sidecar
+The state unit (`.ai-bootstrap/` at the repository root, `workflow` profile
+only) follows its own rules, not the ordinary unit rules above: seeded
+once, from its seed files, when the folder is absent; an existing folder
+only ever gets a missing seed file added, never a comparison or an
+overwrite; kept in place and hidden by plain `--uninstall`; moved into the
+preserved-copy folder and un-hidden only by `--uninstall --purge-state`;
+copied to the preserved-copy folder, without uninstalling anything, by the
+standalone `--backup-state` action. It lives at the repository root, not
+under `.claude/`, because Claude Code refuses agent writes anywhere under
+`.claude/`; an earlier workflow install's `.claude/ai-bootstrap/` folder is
+migrated into it automatically on the next install or update when the
+sidecar's own exclude block already shows it as owned — see
+[docs/sidecar-provider-contract.md](sidecar-provider-contract.md), "Workflow
+state write gate, 2026-10-02". See [README.md's Personal Sidecar
 Install](../README.md#personal-sidecar-install), "The state folder", for
 the exact messages each case prints and the `git clean -x` risk it
 mitigates.

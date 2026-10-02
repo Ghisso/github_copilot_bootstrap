@@ -23,6 +23,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from runtime_ownership import (  # noqa: E402
     SIDECAR_BRIDGES,
+    SIDECAR_LEGACY_STATE_ROOT,
     SIDECAR_SKILL_WRITE_ROOTS,
     SIDECAR_STATE_ROOT,
 )
@@ -887,8 +888,10 @@ def test_required_snapshot_units_includes_desired_and_recorded_units():
     # too (Decision 2, 3), regardless of desired_units or the manifest, so a
     # run in the "skills" profile still sees a state folder a previous
     # "workflow" install left behind and keeps it hidden instead of
-    # silently un-hiding it.
-    assert required == {UNIT, OTHER_UNIT, SIDECAR_STATE_ROOT}
+    # silently un-hiding it. Finding 1: the recognized former root is
+    # included the same way, so a legacy folder is kept hidden too, not
+    # just the current one.
+    assert required == {UNIT, OTHER_UNIT, SIDECAR_STATE_ROOT, SIDECAR_LEGACY_STATE_ROOT}
 
 
 # --------------------------------------------------------------------------

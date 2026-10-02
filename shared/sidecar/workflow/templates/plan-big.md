@@ -52,5 +52,5 @@ uv run python scripts/check_runtime.py
 
 When the last phase closes, sweep the project's own docs for claims this
 plan changed, correct each one, and note the surfaces checked in that
-phase's session log under `.claude/ai-bootstrap/session_logs/`. Nothing
+phase's session log under `.ai-bootstrap/session_logs/`. Nothing
 here blocks a commit; the repository's own guidance wins on any conflict.

@@ -3,14 +3,14 @@
 This rule is part of a personal, Git-ignored sidecar. It adds working habits
 for you, the person using this client here. Nothing in this file blocks a
 commit, and none of these folders are visible to anyone else: they sit
-under `.claude/ai-bootstrap/`, which is Git-ignored even though the rest of
+under `.ai-bootstrap/`, which is Git-ignored even though the rest of
 `.claude/` in this repository is tracked by the team. If anything here
 conflicts with this repository's own tracked instructions, follow the
 repository.
 
 ## Before non-trivial work
 
-Read `.claude/ai-bootstrap/MEMORY.md` first. It holds lessons you or a
+Read `.ai-bootstrap/MEMORY.md` first. It holds lessons you or a
 past session recorded about this repository: patterns that work, traps
 that do not, and facts worth not rediscovering.
 
@@ -18,11 +18,13 @@ that do not, and facts worth not rediscovering.
 
 A task that touches one file with an obvious fix does not need a plan —
 implement it directly. A task that spans several files, several decisions,
-or a design choice benefits from a plan. When it does, ask the planner
-agent for one. Save it under `.claude/ai-bootstrap/plans/`, using the
-templates under `.claude/templates/` (`plan-big.md` for a multi-phase
-piece of work, `plan-small.md` for one phase). A plan here is a tool you
-use when it earns its cost, not a gate you must clear.
+or a design choice benefits from a plan. When it does and a planner agent
+is available in this session, ask it for one; it returns the plan as text,
+and you save it under `.ai-bootstrap/plans/`. When no planner agent is
+available, write the plan yourself instead. Either way, use the templates
+under `.claude/templates/` (`plan-big.md` for a multi-phase piece of work,
+`plan-small.md` for one phase). A plan here is a tool you use when it
+earns its cost, not a gate you must clear.
 
 ## Implement
 
@@ -40,24 +42,28 @@ before moving on.
 
 ## Review non-trivial diffs
 
-For a change that is more than a one-line fix, ask the reviewer agent to
-look at the diff. It returns a short Markdown report grouped by severity.
-Save that report under `.claude/ai-bootstrap/quality_reports/`. Read it,
-fix what is worth fixing, and move on — there is no required second pass
-and no gate that stops a commit.
+For a change that is more than a one-line fix, and a reviewer agent is
+available in this session, ask it to look at the diff. It returns a short
+Markdown report grouped by severity as text, and you save that report
+under `.ai-bootstrap/quality_reports/`. When no reviewer agent is
+available, review the diff yourself against the review profiles under
+`.claude/review-profiles/` that fit the change, write the same kind of
+report, say plainly that it is a self-review, and save it the same way.
+Read it, fix what is worth fixing, and move on — there is no required
+second pass and no gate that stops a commit.
 
 ## At the end of a task
 
-Write a short session log under `.claude/ai-bootstrap/session_logs/`
+Write a short session log under `.ai-bootstrap/session_logs/`
 describing what you did and why. If you learned something about this
 repository that would help a future session — a pattern, a pitfall, a
 useful command — add one line about it to
-`.claude/ai-bootstrap/MEMORY.md`.
+`.ai-bootstrap/MEMORY.md`.
 
 ## Explorations
 
 If you want to try something and keep the scratch work without committing
-it, put it under `.claude/ai-bootstrap/explorations/`.
+it, put it under `.ai-bootstrap/explorations/`.
 
 ## What this is, and is not
 
