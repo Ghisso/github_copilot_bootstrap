@@ -39,6 +39,21 @@ and the review part of REQ-009 from
   render_github`, as in `tests/test_validate_targets.py` (~1423, ~1685,
   ~3141). The orchestrator keeps generation-after-settle, the self-overlay
   refresh, and the documentation step.
+- **IMPLEMENT result** - Coder changed 12 `shared/` files and
+  `tests/test_validate_targets.py` (5 new section-scoped key-phrase test
+  cases; negative control: reverse-applying the `shared/` diff fails all 5).
+  Deviation: re-captured `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` because the
+  edited `debug-investigator` skill ships in the skills-only sidecar; sent to
+  review for judgment.
+- **VERIFY** - Orchestrator ran the plan's Verification block: generation,
+  both pytest groups (1230 and 223 passed), `validate_targets.py`,
+  `validate_plan_frontmatter.py`, and `verify.py fast` all exit 0.
+  `check_runtime.py` exit 1 with 26 failures, all "stale runtime path" for
+  the self-installed copies of the changed files; cleared by the closeout
+  self-overlay refresh.
+- **REVIEW** - Fresh `reviewer` with `code`, `architecture`, `security`,
+  `tests`, `ponytail`, `documentation`; packet carried the approved plan,
+  requirements, non-goals, and the scoped diff.
 
 ## [LEARN] Entries
 
