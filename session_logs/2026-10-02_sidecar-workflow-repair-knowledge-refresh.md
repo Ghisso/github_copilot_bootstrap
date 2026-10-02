@@ -44,6 +44,40 @@ live advice across the whole plan for stale claims.
   claims (the 2026-09-25 discovery entry is dated and still accurate; the
   Phase A and B entries describe the move). Documenter auditing the other
   live-advice surfaces.
+- **14:05** - Documenter audit found no stale claims (table below). The
+  orchestrator added a direct search of root `CLAUDE.md`, `AGENTS.md`,
+  `shared/policies`, `shared/skills`, `shared/templates`,
+  `shared/review-profiles`, and `shared/hooks` for `ai-bootstrap`,
+  `backup-state`, `purge-state`, and "ask the planner/reviewer agent": no
+  hits. Checks: `validate_targets.py` PASS, `validate_plan_frontmatter.py`,
+  `check_runtime.py`, and `verify.py fast` all exit 0.
+- **14:15** - Review (documentation, code, architecture, security, tests,
+  ponytail; two passes): one MAJOR. The new migration step list and claim
+  `claim_72ca231b8e5940399f51c1bab7c9032c` put the backup before the
+  cross-filesystem refusal; `_perform_legacy_state_migration` checks the
+  device first (with `_restore_exclude`) and backs up after. Confirmed in
+  source. Fixed through a second OpenWiki run
+  (`12e04929-aefe-46dd-aa19-49737e380e2c`: begin `update`, adapters clean,
+  one-page plan, `openwiki_inspect_page_claims`, revised claim with the same
+  id, `openwiki_finish` complete). No hand edit outside the page job.
+
+## Stale-claims surfaces checked
+
+| Surface | Outcome |
+| --- | --- |
+| `README.md` (state folder, backup and purge, migration, report tables, dry-run wording) | no stale claims; updated in Phase B |
+| `docs/target-mapping.md`, non-dated sections of `docs/sidecar-provider-contract.md` | no stale claims; dated 2026-09-25, 2026-09-27, and 2026-10-02 evidence sections left as dated records |
+| Other non-dated `docs/*.md` (`architecture.md`, `runtime-checks.md`, and the rest) | no stale claims; no sidecar state path asserted |
+| Root `CLAUDE.md`, `AGENTS.md` | no stale claims |
+| `shared/policies/*`, `shared/skills/*/SKILL.md`, `shared/templates/`, `shared/review-profiles/`, `shared/hooks/` | no stale claims (direct search, no hits) |
+| `shared/agents/*/prompt.md` and `workflow-prompt.md` | no stale claims; workflow prompts use `.ai-bootstrap/`, conditional delegation, caller saves |
+| `shared/sidecar/**` (bridge, workflow instructions, rules, templates, state READMEs) | no stale claims |
+| Installer, updater, overlay, ownership, generator, validator help and comments | no stale claims; `.claude/ai-bootstrap` appears only as the legacy or migration root |
+| `.claude/instructions/project-context.instructions.md` | no stale claims; no sidecar state assertion |
+| `.claude/MEMORY.md` | no stale claims; Phase A and B entries are current, the 2026-09-25 discovery entry is dated and accurate |
+| `openwiki/**` | refreshed through two OpenWiki runs; five pages current |
+| `.claude/explorations/2026-10-02_sidecar-workflow-profile-hands-on-review.md` | left as a dated record (still says OPEN); its findings map to fixes in `.claude/session_logs/2026-10-02_sidecar-workflow-repair.md` |
+| Completed plans, receipt-bound session logs, quality reports, `docs/2026-*` | left as dated records |
 
 ## [LEARN] Entries
 
