@@ -166,9 +166,9 @@ prompt lists only big-plan statuses
 
 ## Phases
 
-- [ ] `2026-10-03_phase-A-behavioral-pilot-evidence` — settle role loading and case sensitivity with native evidence; freeze the fixture and expected results; no production code.
-- [ ] `2026-10-03_phase-B-behavioral-pilot-runner` — add the optional source root, the one case, and the offline scorer, with tests (revised after Phase A if its evidence requires it).
-- [ ] `2026-10-03_phase-C-behavioral-pilot-comparison` — run the bounded before/after comparison and publish the dated report.
+- [x] `2026-10-03_phase-A-behavioral-pilot-evidence` — frozen fixture and evidence complete; reviewer loading is consistent with the role, but four unavailable case runs trigger the stop rule. See `docs/2026-10-06-behavioral-pilot-evidence.md`.
+- [x] `2026-10-03_phase-B-behavioral-pilot-runner` — cancelled under the approved stop rule; Phase A did not establish case sensitivity. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
+- [x] `2026-10-03_phase-C-behavioral-pilot-comparison` — cancelled under the approved stop rule; no comparison was run. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
 - [ ] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` — refresh OpenWiki, run the final audit, and close the follow-ups.
 
 Stop rule: if Phase A cannot show role loading (BEP-001) or case

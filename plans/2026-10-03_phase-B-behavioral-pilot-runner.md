@@ -3,7 +3,10 @@ name: 2026-10-03_phase-B-behavioral-pilot-runner
 type: small-plan
 parent_plan: behavioral-evaluation-pilot
 phase_index: 2
-status: planned
+status: cancelled
+cancelled_at: 2026-10-06T05:18:11Z
+cancelled_reason: Phase A could not establish case sensitivity within the approved five-run budget.
+cancelled_evidence: .claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md
 closeout_session_log:
 ---
 

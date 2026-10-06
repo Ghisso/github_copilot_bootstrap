@@ -3,8 +3,8 @@ name: 2026-10-03_phase-A-behavioral-pilot-evidence
 type: small-plan
 parent_plan: behavioral-evaluation-pilot
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-06_behavioral-pilot-phase-a.md
 ---
 
 # Small Plan: Behavioral Pilot Evidence
@@ -77,7 +77,7 @@ on 2026-10-03; see the big plan's approved decisions.
   **Acceptance:** the script's argv shape, kept fields, and budget are
   written down before the user runs it.
 
-- [ ] **3. User runs the probe; orchestrator checks the saved results.**
+- [x] **3. User runs the probe; orchestrator checks the saved results.**
   **Owner:** user runs the script in their own shell; orchestrator checks.
   **Files:** copy the bounded saved outputs to
   `docs/evidence/behavioral-pilot/phase-a/`.
@@ -91,7 +91,7 @@ on 2026-10-03; see the big plan's approved decisions.
   **Acceptance:** each variant has a rubric judgment or an explicit
   unavailable reason; no automatic retry.
 
-- [ ] **4. Write the dated evidence document and the decision.**
+- [x] **4. Write the dated evidence document and the decision.**
   **Owner:** documenter, with the orchestrator's results.
   **Files:** create `docs/2026-10-03-behavioral-pilot-evidence.md` (use the
   actual date of the run).
@@ -115,7 +115,7 @@ on 2026-10-03; see the big plan's approved decisions.
   **Acceptance:** a reader can reproduce the probe from the document; the
   decision follows the stop rule exactly.
 
-- [ ] **5. Review and close out.**
+- [x] **5. Review and close out.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `.claude/skills/code-review/SKILL.md`.
   Re-check every rubric judgment against its saved output, and check that
@@ -152,11 +152,11 @@ Use `.claude/review-profiles/code.md`,
 
 Follow the fixed closeout order in `.claude/instructions/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

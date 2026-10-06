@@ -1,6 +1,6 @@
 # Behavioral evaluation pilot — Phase A
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** .claude/plans/2026-10-03_phase-A-behavioral-pilot-evidence.md
 
 ## Objective and authorization
@@ -8,17 +8,18 @@
 Execute the approved pilot as main-thread orchestrator. The required merge is
 present: `a6346968c5bb1fdc4ee4fc1dca43e23d327af3fd` on `dev`. The starting
 outer worktree was clean. The approved plan requires the user to run native
-Claude sessions from their own shell. No native sessions have run in this turn.
+Claude sessions from their own shell. The user ran all five approved sessions;
+one role output was saved and all four scheduled case runs were unavailable.
 
 ## Workflow tracking
 
 - [x] PRE-FLIGHT: approved plan, Phase A, guidance, merge, and clean tree checked.
 - [x] BRANCH: `behavioral-evaluation-pilot_implementation`; hook activated Phase A.
 - [x] PLAN WHEN NEEDED: existing approved plan remains ready; planner not needed.
-- [ ] IMPLEMENT: fixture, test, and scratch probe complete; native evidence and dated document remain.
-- [ ] VERIFY: focused tests and fast checks; native evidence requires user action.
-- [ ] REVIEW: no surviving pre-run findings; final review needs saved outputs.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: repeat until checks and review pass.
+- [x] IMPLEMENT: fixture, test, scratch probe, evidence, and judgments complete.
+- [x] VERIFY: focused tests, fast checks, frozen hashes and saved records checked.
+- [x] REVIEW: all five judgments independently reviewed; no findings.
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: verification and review converged.
 - [ ] CLOSEOUT: evidence, judgments, dated document, findings, and receipts.
 - [ ] COMMIT: one completed-phase commit after required gates.
 - [ ] PUSH: one normal outer-repository push after commit.
@@ -64,8 +65,10 @@ checks around rendering, so later fixture edits cannot change later packets.
 - Prompt test: REQ-003 negative mutation detected after fixing regex escaping.
 - `git diff --check`: PASS.
 - Probe `--freeze` then `--check-only`: PASS; no native calls.
-- Native evidence: not run; handoff prepared at
-  `/tmp/behavioral-pilot-phase-a-handoff.md`.
+- optional 1: FAIL — five user-run Claude Code 2.1.226 sessions produced one saved role output and four unavailable nonzero_client_exit case runs; case sensitivity remains unproven and the stop rule applies. Evidence: `docs/evidence/behavioral-pilot/phase-a/`.
+
+- Evidence check: PASS for frozen fixture hashes, five records, four unavailable
+  runs, parseable role findings list, and five unique recorded judgments.
 
 ## Pre-run review
 
@@ -75,8 +78,29 @@ escaped requirement-ID regex and incorrect diff line counts. The reviewer
 found that reading fixtures between calls could invalidate frozen-input
 evidence; the orchestrator resolved it by rendering immutable packets before
 execution and checking hashes around rendering. No surviving pre-run finding
-was reported. The full Phase A review is WARN only because native outputs and
-independent re-checks of every rubric judgment remain outstanding.
+was reported. The final evidence review is PASS, with no findings or open
+requests. Every judgment was independently re-checked against its output.
+
+## Result and stop decision
+
+The dated document is `docs/2026-10-06-behavioral-pilot-evidence.md`.
+The reviewer checked it after documentation and resolved its sole wording
+finding; the final report has zero findings and no open requests.
+
+BEP-001 is met at the exact level "consistent with". The repaired role probe
+contains the reviewer heading and a valid empty findings list, but no
+client-selected-agent field. The reported model is `claude-sonnet-5`.
+BEP-002 is unproven: all four scheduled case runs are unavailable. Their
+nonzero exits are not model review failures or valid negative controls.
+There are zero valid defective case runs and zero valid control case runs;
+the repaired role probe separately has zero false positives in one valid output.
+No detection rate or before/after conclusion is available. All five calls
+consumed the approved budget; no retry was attempted.
+
+The approved stop rule cancels Phases B and C, with evidence at
+`.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`. Phase D
+still runs. The unknown nonzero-exit cause is a stated limitation because raw
+errors were discarded. No rubric change or material scope deviation occurred.
 
 The default uv cache was read-only. Checks use
 `UV_CACHE_DIR=/tmp/behavioral-pilot-uv-cache`. Branch creation needed the normal
@@ -84,13 +108,12 @@ sandbox escalation because `.git` is read-only in the default sandbox; it succee
 
 ## Next steps
 
-The next action is the user's one-shot command in the handoff. Then inspect saved
-outputs, record rubric judgments, obtain independent re-checks, and follow
-the proceed-or-stop rule. Phase B cannot begin without Phase A evidence.
-Do not rerun native sessions or modify the frozen fixture. Results are expected
-in `/tmp/native-client-probe-behavioral/phase-a-results/`. The phase remains
-`in-progress`; no completed-phase commit or push is appropriate yet.
+Finish the dated document and receipt checks, commit Phase A, attempt its
+normal push, then activate Phase D. Do not rerun native sessions or modify the
+frozen fixture. Phases B and C are cancelled, not deferred experiments.
 
 ## [LEARN] Entries
 
-No reusable lesson identified yet; this is an open session, not closeout evidence.
+No new reusable lessons. The scratch packet-integrity issue was fixed and
+checked before running; the client-exit cause remains unknown. These are
+historical evidence and do not justify a new skill or MEMORY.md entry.
