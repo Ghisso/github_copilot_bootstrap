@@ -1,6 +1,6 @@
 # Behavioral evaluation pilot — final audit and knowledge refresh
 
-**Status:** IN PROGRESS
+**Status:** PAUSED
 **Plan:** .claude/plans/2026-10-03_phase-D-behavioral-pilot-knowledge-refresh.md
 
 ## Context and workflow tracking
@@ -16,7 +16,7 @@ is needed: the stopped-pilot path was explicitly planned.
 - [x] BRANCH: continue `behavioral-evaluation-pilot_implementation`.
 - [x] PLAN WHEN NEEDED: existing final phase covers the negative result.
 - [x] IMPLEMENT: live advice audit, two source corrections, docs and OpenWiki complete.
-- [ ] VERIFY: required source/runtime/plan/fast checks and full phase checks.
+- [x] VERIFY: source/runtime/plan/fast and full phase checks passed; closeout not run.
 - [x] REVIEW: fresh independent final-phase review PASS; both MINOR findings resolved.
 - [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: repeat until checks and review pass.
 - [ ] CLOSEOUT: final audit, requirement mapping, findings and receipts.
@@ -40,8 +40,8 @@ limit before implementation. The orchestrator applied the two planned prose
 corrections from that audit: authoring versus installed skill paths, and big
 versus small plan statuses in the sidecar planner. No executable behavior
 changed and no new test is warranted for these wording corrections; existing
-generation and validation checks verify rendering. Independent review remains
-required. The documenter owns README and live native-acceptance documentation.
+generation and validation checks verify rendering. Independent review passed
+with no findings. The documenter completed README and live native-acceptance documentation.
 
 Before each source edit, its OpenWiki claim ranges were checked. Source edits
 finish before the single planned MCP refresh. No native reruns occur.
@@ -119,7 +119,12 @@ Generation, target validation, runtime wiring, plan frontmatter, fast
 verification, and diff whitespace checks passed. Source/doc review before the
 refresh passed with no findings. Final generated-diff review passed after
 the two evidence-range corrections; no findings or open requests remain.
-Phase receipts are pending.
+Final `verify.py phase --format text --persist` passed: Ruff clean, mypy
+zero errors, and 2326 tests passed in 214.65 seconds. The phase receipt is
+`.claude/quality_reports/verification-phase-2026-10-03_phase-D-behavioral-pilot-knowledge-refresh.json`.
+The user then requested stopping at the next logical boundary. No Phase D
+closeout dry run or closeout receipt has been produced. Resume instructions
+are in `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d-paused.md`.
 
 - optional 1: PASS — OpenWiki finish returned complete for initial run e115c340-244c-40ca-9677-ce8ce344fe7b and review-correction run cf2ec248-4f91-4cf9-8d4f-4986fe3ece99; reviewed page is openwiki/architecture/agents-and-skills.md; no active run file remains.
 
