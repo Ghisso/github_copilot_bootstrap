@@ -105,6 +105,9 @@ errors were discarded. No rubric change or material scope deviation occurred.
 The default uv cache was read-only. Checks use
 `UV_CACHE_DIR=/tmp/behavioral-pilot-uv-cache`. Branch creation needed the normal
 sandbox escalation because `.git` is read-only in the default sandbox; it succeeded.
+The first full phase-verification attempt could not create a receipt because
+the sandbox also prevented `git write-tree` from providing `tree_sha`.
+The verifier is rerun with normal Git metadata access; no gate is bypassed.
 
 ## Next steps
 

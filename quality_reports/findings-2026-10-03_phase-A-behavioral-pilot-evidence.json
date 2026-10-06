@@ -1,0 +1,48 @@
+{
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [],
+  "generated_at": "2026-10-06T05:28:06Z",
+  "branch": "behavioral-evaluation-pilot_implementation",
+  "head_sha": "a6346968c5bb1fdc4ee4fc1dca43e23d327af3fd",
+  "base_ref": "dev",
+  "merge_base_sha": "a6346968c5bb1fdc4ee4fc1dca43e23d327af3fd",
+  "phase": "2026-10-03_phase-A-behavioral-pilot-evidence",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "8358bf2a838ebdef67b398d475c68b3699745820",
+  "changed_files": [
+    "docs/2026-10-06-behavioral-pilot-evidence.md",
+    "docs/evidence/behavioral-pilot/phase-a/approved-change.json",
+    "docs/evidence/behavioral-pilot/phase-a/defective.json",
+    "docs/evidence/behavioral-pilot/phase-a/judgments.json",
+    "docs/evidence/behavioral-pilot/phase-a/manifest.json",
+    "docs/evidence/behavioral-pilot/phase-a/repaired.json",
+    "docs/evidence/behavioral-pilot/phase-a/role-loading.json",
+    "docs/evidence/behavioral-pilot/phase-a/valid-alternative.json",
+    "tests/fixtures/behavioral/requirement-review/README.md",
+    "tests/fixtures/behavioral/requirement-review/approved-change.diff",
+    "tests/fixtures/behavioral/requirement-review/defective.diff",
+    "tests/fixtures/behavioral/requirement-review/expected.json",
+    "tests/fixtures/behavioral/requirement-review/prompt.md",
+    "tests/fixtures/behavioral/requirement-review/repaired.diff",
+    "tests/fixtures/behavioral/requirement-review/requirements.md",
+    "tests/fixtures/behavioral/requirement-review/rubric.md",
+    "tests/fixtures/behavioral/requirement-review/scope-change.md",
+    "tests/fixtures/behavioral/requirement-review/valid-alternative.diff",
+    "tests/test_check_native_clients.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}
