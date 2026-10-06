@@ -124,6 +124,8 @@ frozen fixture. Phases B and C are cancelled, not deferred experiments.
 
 ## [LEARN] Entries
 
-No new reusable lessons. The scratch packet-integrity issue was fixed and
+[LEARN] none - no new lessons this session
+
+The scratch packet-integrity issue was fixed and
 checked before running; the client-exit cause remains unknown. These are
 historical evidence and do not justify a new skill or MEMORY.md entry.
