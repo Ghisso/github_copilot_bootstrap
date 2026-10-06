@@ -3,7 +3,7 @@ name: 2026-10-03_phase-A-behavioral-pilot-evidence
 type: small-plan
 parent_plan: behavioral-evaluation-pilot
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
@@ -21,7 +21,7 @@ on 2026-10-03; see the big plan's approved decisions.
 
 ## Steps
 
-- [ ] **1. Author and freeze the requirement-review fixture.**
+- [x] **1. Author and freeze the requirement-review fixture.**
   **Owner:** coder.
   **Files:** create `tests/fixtures/behavioral/requirement-review/` with
   `requirements.md` (three approved requirements for one small function,
@@ -55,7 +55,7 @@ on 2026-10-03; see the big plan's approved decisions.
   request wording names the defect, and passes with duplicates named inside
   the requirements and scope-change blocks.
 
-- [ ] **2. Prepare the native probe.**
+- [x] **2. Prepare the native probe.**
   **Owner:** orchestrator.
   **Files:** scratch only: a probe script in the session scratchpad and a
   dedicated workspace such as `/tmp/native-client-probe-behavioral` (outside
