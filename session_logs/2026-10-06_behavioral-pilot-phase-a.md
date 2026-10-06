@@ -20,7 +20,7 @@ one role output was saved and all four scheduled case runs were unavailable.
 - [x] VERIFY: focused tests, fast checks, frozen hashes and saved records checked.
 - [x] REVIEW: all five judgments independently reviewed; no findings.
 - [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: verification and review converged.
-- [ ] CLOSEOUT: evidence, judgments, dated document, findings, and receipts.
+- [x] CLOSEOUT: evidence, judgments, dated document, clean findings, and checks complete.
 - [ ] COMMIT: one completed-phase commit after required gates.
 - [ ] PUSH: one normal outer-repository push after commit.
 
@@ -53,6 +53,13 @@ before execution. All packets are rendered once before calls begin, with hash
 checks around rendering, so later fixture edits cannot change later packets.
 
 ## Verification
+
+PASS        1.0s  uv run pytest tests/test_check_native_clients.py -q
+PASS        0.2s  uv run python scripts/validate_plan_frontmatter.py
+PASS        1.1s  uv run python .claude/scripts/verify.py fast --format json
+
+Full phase verification: PASS; Ruff and mypy clean; 2326 tests passed in
+210.91 seconds. Closeout dry run: PASS. No surviving review findings.
 
 - Workspace preparation: PASS using the existing `--prepare-only` command.
 - Scratch probe Ruff check: PASS.
