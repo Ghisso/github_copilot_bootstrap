@@ -25,9 +25,10 @@ to reflect the user-requested pause.
 - Branch: `behavioral-evaluation-pilot_implementation`.
 - Base: `a6346968c5bb1fdc4ee4fc1dca43e23d327af3fd`, the required merge on dev.
 - Completed Phase A commit: `f3a8337fed3243023d225a6558b60e479c0d2fcb`.
-- A local, non-final Phase D checkpoint is to be created at this pause.
-  Inspect `git log --oneline -5` on resume for its hash. It must retain D as
-  paused and must not be treated as the final phase completion commit.
+- Local, non-final Phase D checkpoint: `f9c47f7`
+  (`chore: checkpoint behavioral pilot final phase before closeout`).
+  It retained D as paused and is not a final phase completion commit.
+  Outer worktree was clean after it; the big plan remained in progress.
 - No outer-repository push succeeded. Automatic approval review rejected
   `git push -u origin HEAD` because remote ownership/trust was not established.
 - The verified configured remote is
