@@ -3,8 +3,8 @@ name: 2026-10-03_phase-D-behavioral-pilot-knowledge-refresh
 type: small-plan
 parent_plan: behavioral-evaluation-pilot
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-06_behavioral-pilot-phase-d.md
 ---
 
 # Small Plan: Behavioral Pilot Knowledge Refresh
@@ -20,7 +20,7 @@ not Phases B and C were cancelled; a stopped pilot is recorded as such.
 
 ## Steps
 
-- [ ] **1. Audit live advice and fix stale claims before the refresh.**
+- [x] **1. Audit live advice and fix stale claims before the refresh.**
   **Owner:** documenter for README and `docs/`; coder for `shared/` and
   tests; orchestrator for `.claude/MEMORY.md` and the session log.
   **Required Skills:** `.claude/skills/documentation/SKILL.md`,
@@ -41,7 +41,7 @@ not Phases B and C were cancelled; a stopped pilot is recorded as such.
   **Acceptance:** every audited surface has a recorded outcome for
   `## Stale-claims surfaces checked`.
 
-- [ ] **2. Refresh through OpenWiki's own MCP lifecycle.**
+- [x] **2. Refresh through OpenWiki's own MCP lifecycle.**
   **Owner:** orchestrator.
   **Required Skills:** `.claude/skills/knowledge-refresh/SKILL.md`,
   `.claude/skills/openwiki/SKILL.md`.
@@ -56,7 +56,7 @@ not Phases B and C were cancelled; a stopped pilot is recorded as such.
   `openwiki/.run.json` remains; generated claims describe the pilot as
   advisory host evidence, never as a deterministic receipt.
 
-- [ ] **3. Review and complete terminal closeout.**
+- [x] **3. Review and complete terminal closeout.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `.claude/skills/code-review/SKILL.md`,
   `.claude/skills/learn/SKILL.md`.
@@ -91,11 +91,11 @@ and `.claude/review-profiles/ponytail.md`.
 
 Follow the fixed closeout order in `.claude/instructions/workflow.instructions.md`.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

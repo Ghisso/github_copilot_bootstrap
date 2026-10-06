@@ -1,7 +1,7 @@
 ---
 name: behavioral-evaluation-pilot
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: behavioral-evaluation-pilot_implementation
 started_at: 2026-10-06T01:26:15Z
@@ -138,10 +138,10 @@ A decisive assumption is one that would invalidate this design if false.
 | Assumption | Status | Evidence or remaining limit |
 | --- | --- | --- |
 | One fixed runner can build consumers from an older revision | Settled | An exported `1626364` tree (`git archive`) generated cleanly with its own `scripts/generate_targets.py`; its reviewer prompt lacks "approved scope-change records" (0 matches), while the current build has it (1). |
-| `claude -p --agent reviewer` loads the generated reviewer prompt | Open (Phase A) | `--agent planner` ran in the 2026-08-09 calibration with Claude Code 2.1.226 (`docs/2026-08-09-planner-reliability-calibration.md`), and the generated planner and reviewer files have the same frontmatter shape. Loading the reviewer itself is not yet observed. |
-| A client-reported field can show which agent ran | Open (Phase A) | Unknown. A client-reported agent field means role loading is "confirmed". If none exists, the reviewer's own report shape (`## Review Report`, a fenced findings JSON list) only means the run is "consistent with" role loading, which is model-produced evidence. Phase A may proceed on either, but the report must carry the exact level. |
-| The case flags the defective diff and none of the three correct controls | Open (Phase A) | Not observed. If the case cannot tell them apart, stop: cancel Phases B and C with evidence. |
-| The case packet can be given inline in the prompt | Open (Phase A) | The reviewer accepts "the exact changed hunks" as scope (`shared/agents/reviewer/prompt.md` Inputs), so no file staging inside the locked workspace should be needed. |
+| `claude -p --agent reviewer` loads the generated reviewer prompt | Consistent with | The repaired role probe produced `## Review Report` and a parseable empty findings list; see `docs/2026-10-06-behavioral-pilot-evidence.md`. This is model-produced evidence, not client confirmation. |
+| A client-reported field can show which agent ran | Not observed | No selected-agent field was retained in the successful role probe. Loading is never called confirmed. |
+| The case flags the defective diff and none of the three correct controls | Unproven; stop rule applied | All four scheduled case runs were unavailable with `nonzero_client_exit`. Five-run budget consumed; Phases B and C cancelled with evidence. |
+| The case packet can be given inline in the prompt | Observed for the role probe only | The repaired inline packet produced a valid review with no control false positive. The four unavailable case runs add no packet-validity evidence. |
 
 ## Requirement Map (optional)
 
@@ -169,7 +169,7 @@ prompt lists only big-plan statuses
 - [x] `2026-10-03_phase-A-behavioral-pilot-evidence` — frozen fixture and evidence complete; reviewer loading is consistent with the role, but four unavailable case runs trigger the stop rule. See `docs/2026-10-06-behavioral-pilot-evidence.md`.
 - [x] `2026-10-03_phase-B-behavioral-pilot-runner` — cancelled under the approved stop rule; Phase A did not establish case sensitivity. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
 - [x] `2026-10-03_phase-C-behavioral-pilot-comparison` — cancelled under the approved stop rule; no comparison was run. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
-- [ ] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` — refresh OpenWiki, run the final audit, and close the follow-ups.
+- [x] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` — completed the live-advice audit, source follow-ups, and managed OpenWiki refresh; see `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d.md`.
 
 Stop rule: if Phase A cannot show role loading (BEP-001) or case
 sensitivity (BEP-002), cancel Phases B and C with the cancellation evidence

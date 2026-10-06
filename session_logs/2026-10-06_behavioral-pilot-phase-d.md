@@ -15,9 +15,9 @@ is needed: the stopped-pilot path was explicitly planned.
 - [x] PRE-FLIGHT: Phase A evidence, review and receipts checked.
 - [x] BRANCH: continue `behavioral-evaluation-pilot_implementation`.
 - [x] PLAN WHEN NEEDED: existing final phase covers the negative result.
-- [ ] IMPLEMENT: live advice audit, two source corrections, docs and OpenWiki.
+- [x] IMPLEMENT: live advice audit, two source corrections, docs and OpenWiki complete.
 - [ ] VERIFY: required source/runtime/plan/fast checks and full phase checks.
-- [ ] REVIEW: fresh independent final-phase review.
+- [x] REVIEW: fresh independent final-phase review PASS; both MINOR findings resolved.
 - [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: repeat until checks and review pass.
 - [ ] CLOSEOUT: final audit, requirement mapping, findings and receipts.
 - [ ] COMMIT: one final-phase completion commit.
@@ -51,15 +51,56 @@ finish before the single planned MCP refresh. No native reruns occur.
 - Shared policies, skills, templates, agents and review profiles: audit found
   the two planned corrections only; no unsupported behavioral-pilot claims.
 - Generated dist/multi-agent and dist/sidecar: read-only audit located the
-  same two source-derived phrases; regenerate after corrections.
+  same two source-derived phrases; regenerated after corrections and validated.
 - MEMORY.md: searched native evidence, behavioral evaluation, reviewer
   requirements, status and skill-path guidance; no invalidated live advice
   identified. Historical run details remain in dated evidence, not memory.
-- README, root guidance, non-dated docs, state READMEs and installer help:
-  documenter audit in progress; final results pending.
-- OpenWiki: agents-page follow-ups pending managed refresh. Additional stale
-  roster claim noticed: planner and reviewer visibility are public in current
-  agent.yaml files but hidden in the existing wiki table; reconcile in refresh.
+- README.md: added a short dated-evidence link and stopped/advisory boundary.
+- Root AGENTS.md and CLAUDE.md: report-only audit found no invalidated pilot
+  claim; both stayed byte-identical through install and OpenWiki begin.
+- Non-dated docs: documenter found no contradictory native/deterministic
+  claims; docs/native-client-acceptance.md now links the dated stopped pilot
+  and states the exact role-evidence level. Other live docs need no change.
+- State READMEs: plans already distinguish big/small statuses, including
+  planned/paused; exploration, session-log and quality-report guidance remains
+  accurate. Dated records and completed logs were left unchanged.
+- Installer help: inspected full/sidecar profiles, local-only, and trust
+  boundaries; no invalidated claims or behavioral-mode option is present.
+- OpenWiki: managed agents-page refresh repaired the planned validator ranges,
+  expanded sidecar advisory and guidance-test evidence, updated descriptive
+  plan statuses and skill paths, and corrected the stale planner/reviewer
+  visibility table. The added dated-pilot claim is advisory, not a gate.
+
+## OpenWiki completion
+
+Applied knowledge-refresh and OpenWiki skills. Run
+`e115c340-244c-40ca-9677-ce8ce344fe7b` used `mode: update`. The only page with
+flagged claims was `openwiki/architecture/agents-and-skills.md`; it was also
+the page explicitly required by this phase. After `inspect_page_claims`,
+the run revised six existing claims and added three, retaining other current
+claims. The four validator ranges were re-anchored from actual source, not
+blindly offset: the duplicate-description evidence now includes its full
+check rather than an unrelated following function. Guidance-test ranges now
+include the real generated and sidecar assertions. The sidecar advisory
+sentence has explicit planner/coder/reviewer source evidence.
+
+`openwiki_submit_page`, the final `openwiki_next_page`, and `openwiki_finish`
+returned `complete`. No `.run.json` remains, and no root setup snippet or
+workflow file changed. No tracked source file changed while the run was open.
+
+Final review found two MINOR evidence-completeness gaps: roster exclusivity
+needed all eight metadata files, and sidecar advisory evidence needed the
+explicit non-gating clauses. A second, narrowly scoped managed update
+(`cf2ec248-4f91-4cf9-8d4f-4986fe3ece99`) inspected and expanded only those
+two claim evidence sets. Its submit, queue completion and finish all returned
+`complete`, and no active run remains. This is a review-driven extra refresh
+beyond the planned single pass; no source or page-body edit occurred during
+it. Claim sidecars were changed only by OpenWiki.
+
+The required runtime check initially found the installed skill template stale.
+The supported generated self-install with `--allow-self --local-only` refreshed
+it, preserved root authoring adapters and mutable state, and performed no
+network publication. The runtime check then passed. No trust settings changed.
 
 ## Requirement mapping
 
@@ -68,13 +109,19 @@ finish before the single planned MCP refresh. No native reruns occur.
 - BEP-003: not implemented; Phase B validly cancelled.
 - BEP-004: not implemented; Phase B validly cancelled.
 - BEP-005: not evaluated; Phase C validly cancelled, no comparative conclusion.
-- BEP-006: final audit and OpenWiki refresh in progress.
+- BEP-006: met; audited surfaces above, source/doc fixes, and completed OpenWiki run.
 - BEP-007: ordinary tests/verifier make no model call; no new gate or runner
   mode; native calls were user-run; saved evidence is bounded and reviewed.
 
 ## Verification
 
-Pending final-phase checks.
+Generation, target validation, runtime wiring, plan frontmatter, fast
+verification, and diff whitespace checks passed. Source/doc review before the
+refresh passed with no findings. Final generated-diff review passed after
+the two evidence-range corrections; no findings or open requests remain.
+Phase receipts are pending.
+
+- optional 1: PASS — OpenWiki finish returned complete for initial run e115c340-244c-40ca-9677-ce8ce344fe7b and review-correction run cf2ec248-4f91-4cf9-8d4f-4986fe3ece99; reviewed page is openwiki/architecture/agents-and-skills.md; no active run file remains.
 
 ## [LEARN] Entries
 
