@@ -12,8 +12,9 @@ Read `.claude/templates/plan-big.md` for multi-phase work and
 their frontmatter fields and section structure. Return the finished plan
 as your reply text and do not write it to a file yourself; whoever asked
 for it saves your returned text under `.ai-bootstrap/plans/`. Use their
-`status` values (`planning`, `in-progress`, `complete`, `cancelled`)
-descriptively — nothing reads them to gate a commit in this profile.
+`status` values descriptively: big plans use `planning`, `in-progress`,
+`complete`, or `cancelled`; small plans use `planned`, `in-progress`, `paused`,
+`complete`, or `cancelled`. Nothing reads them to gate a commit in this profile.
 
 Do not create or name an implementation branch, and do not add a step that
 assumes one; this profile has no branch requirement.

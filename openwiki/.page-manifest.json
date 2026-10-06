@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "pages": {
     "/openwiki/architecture/agents-and-skills.md": {
-      "pageVersion": "sha256:1f02914ae6e9beece8f1e48ff4627f9b7c8b7dc2d43144533209b87e93ce63e4",
-      "completedBy": "claude-code",
-      "completedRunId": "78bd8306-edee-4334-9591-01f2b1f1ce42",
-      "gitHead": "1d0ead167f5fc8992397634e2cea49e53e009451",
-      "sourceFingerprint": "sha256:918fd4a9c581b09a58933649c34a98b0f1ecaaba7ab844321d408fc5af614047"
+      "pageVersion": "sha256:c27cb4c05d249f8e220190b26870731fa13f85bfe7158e7afea402dd3770e871",
+      "completedBy": "codex",
+      "completedRunId": "cf2ec248-4f91-4cf9-8d4f-4986fe3ece99",
+      "gitHead": "f3a8337fed3243023d225a6558b60e479c0d2fcb",
+      "sourceFingerprint": "sha256:73b2dac33935ad90d6660a495bd2eb58c00204024a2a482bc989922b772614c7"
     },
     "/openwiki/architecture/hooks-and-guardrails.md": {
       "gitHead": "294382d9f0d2010b0ce517a4a755e14fc581f714",
@@ -65,11 +65,11 @@
       "completedRunId": "0205cf19-5f12-48a2-9ecf-750cba2888a1"
     },
     "/openwiki/workflows/lifecycle-and-task-lanes.md": {
+      "gitHead": "1d0ead167f5fc8992397634e2cea49e53e009451",
+      "sourceFingerprint": "sha256:918fd4a9c581b09a58933649c34a98b0f1ecaaba7ab844321d408fc5af614047",
       "pageVersion": "sha256:7f4bd877c997e1172633b6d93ac0a81f1b3833d071621515427e246e0c038b7d",
       "completedBy": "claude-code",
-      "completedRunId": "78bd8306-edee-4334-9591-01f2b1f1ce42",
-      "gitHead": "1d0ead167f5fc8992397634e2cea49e53e009451",
-      "sourceFingerprint": "sha256:918fd4a9c581b09a58933649c34a98b0f1ecaaba7ab844321d408fc5af614047"
+      "completedRunId": "78bd8306-edee-4334-9591-01f2b1f1ce42"
     }
   }
 }
