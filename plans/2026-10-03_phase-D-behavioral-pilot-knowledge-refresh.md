@@ -3,7 +3,7 @@ name: 2026-10-03_phase-D-behavioral-pilot-knowledge-refresh
 type: small-plan
 parent_plan: behavioral-evaluation-pilot
 phase_index: 4
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

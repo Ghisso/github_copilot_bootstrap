@@ -10,7 +10,7 @@ phases:
   - 2026-10-03_phase-B-behavioral-pilot-runner
   - 2026-10-03_phase-C-behavioral-pilot-comparison
   - 2026-10-03_phase-D-behavioral-pilot-knowledge-refresh
-current_phase: 2026-10-03_phase-A-behavioral-pilot-evidence
+current_phase: 2026-10-03_phase-D-behavioral-pilot-knowledge-refresh
 ---
 
 # Big Plan: Behavioral Evaluation Pilot
