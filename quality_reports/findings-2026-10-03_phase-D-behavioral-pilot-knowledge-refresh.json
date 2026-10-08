@@ -13,9 +13,9 @@
     "tests"
   ],
   "findings": [],
-  "generated_at": "2026-10-06T09:16:28Z",
+  "generated_at": "2026-10-08T02:32:08Z",
   "branch": "behavioral-evaluation-pilot_implementation",
-  "head_sha": "f3a8337fed3243023d225a6558b60e479c0d2fcb",
+  "head_sha": "f9c47f70d78d58978febdedcc9b8e6275a101596",
   "base_ref": "dev",
   "merge_base_sha": "a6346968c5bb1fdc4ee4fc1dca43e23d327af3fd",
   "phase": "2026-10-03_phase-D-behavioral-pilot-knowledge-refresh",
