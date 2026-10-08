@@ -1,6 +1,6 @@
 # Behavioral evaluation pilot — final audit and knowledge refresh
 
-**Status:** IN PROGRESS
+**Status:** COMPLETED
 **Plan:** .claude/plans/2026-10-03_phase-D-behavioral-pilot-knowledge-refresh.md
 
 The paused checkpoint is `f9c47f7`. Its continuation handoff is
@@ -20,10 +20,10 @@ is needed: the stopped-pilot path was explicitly planned.
 - [x] BRANCH: continue `behavioral-evaluation-pilot_implementation`.
 - [x] PLAN WHEN NEEDED: existing final phase covers the negative result.
 - [x] IMPLEMENT: live advice audit, two source corrections, docs and OpenWiki complete.
-- [x] VERIFY: source/runtime/plan/fast and full phase checks passed; closeout not run.
+- [x] VERIFY: source/runtime/plan/fast, full phase, and closeout dry-run checks passed.
 - [x] REVIEW: fresh independent final-phase review PASS; both MINOR findings resolved.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: repeat until checks and review pass.
-- [ ] CLOSEOUT: final audit, requirement mapping, findings and receipts.
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT: checks and review passed.
+- [x] CLOSEOUT: final audit, requirement mapping, findings and dry-run receipt checks passed.
 - [ ] COMMIT: one final-phase completion commit.
 - [ ] PUSH: normal outer-repository publication.
 
@@ -126,9 +126,9 @@ the two evidence-range corrections; no findings or open requests remain.
 Final `verify.py phase --format text --persist` passed: Ruff clean, mypy
 zero errors, and 2326 tests passed in 214.65 seconds. The phase receipt is
 `.claude/quality_reports/verification-phase-2026-10-03_phase-D-behavioral-pilot-knowledge-refresh.json`.
-The user then requested stopping at the next logical boundary. No Phase D
-closeout dry run or closeout receipt has been produced. Resume instructions
-are in `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d-paused.md`.
+The user then requested stopping at the next logical boundary. The historical
+pause and resume instructions remain in
+`.claude/session_logs/2026-10-06_behavioral-pilot-phase-d-paused.md`.
 
 On 2026-10-08, plan-frontmatter validation, generated-target validation,
 runtime wiring, and `tests/test_validate_targets.py` passed (194 tests).
@@ -142,7 +142,17 @@ limit. A clean PATH and the standard owner-accessible `/tmp` pytest directory
 resolved both without changing source or tests. A diagnostic bytecode file
 created under `.claude/scripts/__pycache__/` was removed after it made the
 runtime check fail. The four required closeout commands passed in a dry run;
-its freshness check correctly requires a receipt rebound to this plan state.
+its freshness check required a receipt rebound to the resumed plan state.
+After the final small-plan checkpoint, the phase verifier passed again: Ruff
+clean, mypy zero errors, and 2326 tests passed in 183.88 seconds. The review
+findings report was rebound to the current outer commit with zero findings.
+The closeout dry run then passed with matching phase and control-plane
+provenance. Its required command summaries are:
+
+- PASS 47.0s — `uv run python scripts/validate_targets.py`
+- PASS 0.9s — `uv run python scripts/check_runtime.py`
+- PASS 0.1s — `uv run python scripts/validate_plan_frontmatter.py`
+- PASS 0.2s — `uv run python .claude/scripts/verify.py fast --format json`
 
 - optional 1: PASS — OpenWiki finish returned complete for initial run e115c340-244c-40ca-9677-ce8ce344fe7b and review-correction run cf2ec248-4f91-4cf9-8d4f-4986fe3ece99; reviewed page is openwiki/architecture/agents-and-skills.md; no active run file remains.
 

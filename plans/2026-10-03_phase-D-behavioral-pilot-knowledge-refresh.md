@@ -59,7 +59,7 @@ not Phases B and C were cancelled; a stopped pilot is recorded as such.
   `openwiki/.run.json` remains; generated claims describe the pilot as
   advisory host evidence, never as a deterministic receipt.
 
-- [ ] **3. Review and complete terminal closeout.**
+- [x] **3. Review and complete terminal closeout.**
   **Owner:** reviewer, then orchestrator.
   **Required Skills:** `.claude/skills/code-review/SKILL.md`,
   `.claude/skills/learn/SKILL.md`.
@@ -96,9 +96,9 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 
 - [x] Documentation updated or explicitly skipped as pure-internal
 - [x] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
+- [x] Closeout session log has `**Status:** COMPLETED`
 - [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
 - [x] Intended outer files explicitly staged and `git diff --cached` reviewed
 - [x] Every surviving MINOR has an explicit disposition and non-empty reason
 - [x] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
