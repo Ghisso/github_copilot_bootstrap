@@ -1,11 +1,11 @@
 # Behavioral evaluation pilot — final audit and knowledge refresh
 
-**Status:** PAUSED
+**Status:** IN PROGRESS
 **Plan:** .claude/plans/2026-10-03_phase-D-behavioral-pilot-knowledge-refresh.md
 
-Local paused checkpoint: `f9c47f7`. Outer worktree is clean. The exact
-continuation handoff is `2026-10-06_behavioral-pilot-phase-d-paused.md` beside
-this log. Final closeout and publication were deliberately not performed.
+The paused checkpoint is `f9c47f7`. Its continuation handoff is
+`2026-10-06_behavioral-pilot-phase-d-paused.md` beside this log. Phase D
+resumed on 2026-10-08 for final closeout.
 
 ## Context and workflow tracking
 
