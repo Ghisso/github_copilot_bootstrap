@@ -130,6 +130,14 @@ The user then requested stopping at the next logical boundary. No Phase D
 closeout dry run or closeout receipt has been produced. Resume instructions
 are in `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d-paused.md`.
 
+On 2026-10-08, plan-frontmatter validation, generated-target validation,
+runtime wiring, and `tests/test_validate_targets.py` passed (194 tests).
+`verify.py fast` failed before ordinary checks because its control-plane
+provenance was invalid. A pre-existing three-line edit in protected
+`.codex/config.toml` leaves the live root adapter out of sync with its
+managed mirror. The repository hook refused a temporary stash. The edit was
+preserved, and final closeout remains open pending a decision on that file.
+
 - optional 1: PASS — OpenWiki finish returned complete for initial run e115c340-244c-40ca-9677-ce8ce344fe7b and review-correction run cf2ec248-4f91-4cf9-8d4f-4986fe3ece99; reviewed page is openwiki/architecture/agents-and-skills.md; no active run file remains.
 
 ## [LEARN] Entries
