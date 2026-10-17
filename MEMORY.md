@@ -1514,3 +1514,13 @@
   or loops over an installed hook script is refused; probe with
   `git -C .claude hash-object`/`ls-files`, payload files, and the
   `shared/hooks/scripts/` copy instead.
+- [LEARN:documentation] Take every OpenWiki claim's line range from a search
+  run in the same step as `openwiki_submit_page`, not from an earlier read
+  or a subagent report. Two ranges cited from an earlier read were about 40
+  lines off and needed a corrective run (gate-repair Phase E).
+- [LEARN:verification] Editing a vendored Ponytail skill (`ponytail`,
+  `ponytail-review`, `deep-audit`) moves three pins: the hash in
+  `scripts/validate_targets.py`, the "Local allowlist hashes" in
+  `shared/third_party/ponytail/UPSTREAM.md`, and, for skills the sidecar
+  ships, `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` and the line counts in
+  `tests/test_validate_targets.py` (gate-repair Phase E).
