@@ -3,7 +3,7 @@
 **Date:** 2026-10-17
 **Plan:** .claude/plans/2026-10-17_phase-A-review-gate-integrity.md
 **Parent plan:** .claude/plans/gate-repair.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -23,7 +23,8 @@ tests (GR-003), and post-closeout drift (GR-004).
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready; no planner.
 - [x] IMPLEMENT/VERIFY/REVIEW — three review rounds; final Gate Result `PASS`
   with no findings.
-- [ ] CLOSEOUT
+- [x] CLOSEOUT: documentation, final AI state, checkpoint, staged index,
+  findings, phase receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -118,6 +119,19 @@ tests (GR-003), and post-closeout drift (GR-004).
   `tests/test_install_bootstrap.py`.
 
 ## Verification
+
+- PASS        0.3s  uv run python scripts/generate_targets.py --all
+- PASS       43.2s  uv run python scripts/validate_targets.py
+- PASS       56.8s  uv run pytest tests/test_verify.py tests/test_commit_closeout.py tests/test_validate_targets.py tests/test_lifecycle_hooks.py -q
+- PASS        0.8s  uv run python scripts/check_runtime.py
+- PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+- PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+
+Phase receipt: `verify.py phase --format json --persist` PASS (Ruff, mypy,
+pytest, VFY-FRESH-001/002, VFY-GEN-001). Findings report:
+`.claude/quality_reports/findings-2026-10-17_phase-A-review-gate-integrity.json`
+(0 findings, `gate_result: PASS`, profiles code, architecture, security,
+tests, ponytail, documentation).
 
 - optional 1: NOT RUN — the native Claude Code and Codex commit attempt with a `WARN` report in a disposable clone is a user-run host check; the installed commit-msg hook smoke in `scripts/validate_targets.py` exercises the same shared `assert_commit_invariants` path and denies a `WARN` report.
 
