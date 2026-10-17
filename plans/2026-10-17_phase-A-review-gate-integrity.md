@@ -3,7 +3,7 @@ name: 2026-10-17_phase-A-review-gate-integrity
 type: small-plan
 parent_plan: gate-repair
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
@@ -77,7 +77,11 @@ later phase of this plan is reviewed under the repaired gate.
   `gate_receipt_errors`, compute the requirement from the receipt's
   machine-produced `changed_paths` (bound by `tree_sha`); add no new path
   discovery in shell. Union it with the existing multi-file Ponytail rule,
-  and report missing profiles by name in one error. The changed paths are
+  and report missing profiles by name in one error. Apply the same
+  schema-version rule as step 1: always at the commit gate (`exact`
+  relation), and at the push gates only for reports with
+  `schema_version >= 2`, so completed phases recorded before the upgrade
+  are not re-judged. The changed paths are
   cumulative from the merge-base, so a later phase keeps the requirements of
   earlier phases on the same branch; document that. The user approved this
   rule on 2026-10-17.

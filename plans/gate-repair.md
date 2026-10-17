@@ -1,17 +1,17 @@
 ---
 name: gate-repair
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: gate-repair_implementation
-started_at:
+started_at: 2026-10-17T04:58:19Z
 phases:
   - 2026-10-17_phase-A-review-gate-integrity
   - 2026-10-17_phase-B-context-mode-hook-sanitizer
   - 2026-10-17_phase-C-mcp-surface-parity
   - 2026-10-17_phase-D-guard-coverage
   - 2026-10-17_phase-E-gate-repair-knowledge-refresh
-current_phase:
+current_phase: 2026-10-17_phase-A-review-gate-integrity
 ---
 
 # Big Plan: Gate Repair
@@ -167,7 +167,7 @@ IDs are prose references for this plan only.
 | Requirement | Acceptance and existing contract | Owning phase | Evidence |
 | --- | --- | --- | --- |
 | GR-001 | `record_findings.py` writes `schema_version: 2`, the reviewer's `gate_result`, and `open_requests`. The commit gate (`exact` relation, phase completion) blocks unless `gate_result == "PASS"` and no request is open; a report without the field is rejected there. Push gates (`ancestor`, `certified`) apply the same rule only to reports with `schema_version >= 2`, so reports written before the upgrade stay valid. The reviewer prompt maps results: `FAIL` when a CRITICAL or MAJOR survives, `WARN` when a request is open, otherwise `PASS` (surviving MINORs with dispositions allow `PASS`). Contract: `report_errors` (`shared/scripts/verify.py:2227`). | `2026-10-17_phase-A-review-gate-integrity` | `tests/test_verify.py`, `tests/test_commit_closeout.py`, `scripts/validate_targets.py` smoke |
-| GR-002 | Gates require the profiles the branch's changed paths call for, computed from the receipt's `changed_paths` in `gate_receipt_errors`. Test surfaces (checked first: `tests/` prefix, `test_*.py`, `*_test.py`, `conftest.py`) require `tests`. `control-plane` and `generator` paths and dependency files (`DEPENDENCY_FILES`, `pyproject.toml`, `requirements*.txt`, `requirements*.in`) require `code`, `architecture`, `security`, `tests`, `ponytail`. `.vscode/mcp.json` joins `CONTROL_PLANE_FILES`. The diff is cumulative from the merge-base, so later phases of a branch keep the earlier phases' requirements. The multi-file Ponytail rule stays. | `2026-10-17_phase-A-review-gate-integrity` | `tests/test_verify.py`; `scripts/validate_targets.py` smoke |
+| GR-002 | Gates require the profiles the branch's changed paths call for, computed from the receipt's `changed_paths` in `gate_receipt_errors`. Test surfaces (checked first: `tests/` prefix, `test_*.py`, `*_test.py`, `conftest.py`) require `tests`. `control-plane` and `generator` paths and dependency files (`DEPENDENCY_FILES`, `pyproject.toml`, `requirements*.txt`, `requirements*.in`) require `code`, `architecture`, `security`, `tests`, `ponytail`. `.vscode/mcp.json` joins `CONTROL_PLANE_FILES`. The diff is cumulative from the merge-base, so later phases of a branch keep the earlier phases' requirements. The multi-file Ponytail rule stays. Same schema-version rule as GR-001: always at the commit gate, at push gates only for `schema_version >= 2` reports. | `2026-10-17_phase-A-review-gate-integrity` | `tests/test_verify.py`; `scripts/validate_targets.py` smoke |
 | GR-003 | A `tests/test_verify.py` unit test covers the required-Ponytail error. The installed-hook smoke in `scripts/validate_targets.py` adds a `WARN` report denied by the commit-msg hook and a test-file diff missing `tests` denied. | `2026-10-17_phase-A-review-gate-integrity` | same |
 | GR-004 | A staged documentation change after closeout blocks the commit with "closeout receipt final tracked state is stale". `tracked_state_hash` is documented as informational. | `2026-10-17_phase-A-review-gate-integrity` | `tests/test_verify.py` |
 | GR-005 | Every tracked root MCP adapter (Claude `.mcp.json`, Copilot `.vscode/mcp.json`, Codex `.codex/config.toml`) starts Context Mode through `context-mode-dispatch.sh server`. The validator fails on any direct start. | `2026-10-17_phase-C-mcp-surface-parity` | `tests/test_validate_targets.py` |
@@ -298,12 +298,12 @@ extra-high effort, devils-advocate skill). Outcome:
   declined.
 - The user-level `context-mode@context-mode` plugin (user, 2026-10-17): the
   user handles it.
-- Push-gate treatment of findings reports written before the upgrade:
-  option (b), schema-marked reports. Recommended by the review and
-  awaiting user confirmation at plan approval. Option (a), the commit
-  gate only, would lose the check on completion commits made with
+- Push-gate treatment of findings reports written before the upgrade
+  (user, 2026-10-17): option (b), schema-marked reports. Option (a), the
+  commit gate only, would lose the check on completion commits made with
   `--no-verify`. Option (c), "push before upgrading", would strand
   consumers mid-plan.
+- Plan approved by the user on 2026-10-17 with these decisions.
 
 ## Verification
 
