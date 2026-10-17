@@ -73,6 +73,15 @@ Antigravity MCP reachability from documentation (GR-006).
   quotes older Codex docs on agent-file keys; decide there whether it is a
   dated record (errata) or live advice.
 
+- **10:20** - Review round 1: Gate Result `PASS`, no CRITICAL or MAJOR, five
+  MINOR (wiring test ignores helper arguments; GR-005 check covers only the
+  `context-mode` entry while docs said "any direct start"; duplicate test
+  helper; Codex "(confirmed)" without basis and "fixed" wording; duplicated
+  runtime-checks bullet). Reviewer re-checked the Codex source at HEAD via
+  Semble (no sandbox, approval, or MCP override field). All five sent back
+  for fixing. Plan GR-005 wording corrected to the real check; Phase E
+  follow-up now records that Codex ignores per-agent `sandbox_mode`.
+
 ## [LEARN] Entries
 
 ## Verification
