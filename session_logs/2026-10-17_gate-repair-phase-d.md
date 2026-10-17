@@ -29,6 +29,30 @@ remove the stale agent schema (GR-011).
   only one process regenerates `dist/`); step 3 Copilot documentation
   research delegated in parallel to a read-only agent.
 
+- **11:25** - Step 3 research (WebFetch on code.visualstudio.com; raw
+  sources at microsoft/vscode-docs `ef0ca127806a0e7eb9cd9e39e1d71c05e0a5769b`
+  and microsoft/vscode `1e81fc75bb564738c29771d9b17c72e708a8211c`;
+  docs.github.com fetched 2026-10-17):
+  - VS Code agent hooks load from `.github/hooks/*.json`, and also from
+    `.claude/settings.json` and `.claude/settings.local.json` when
+    `chat.useClaudeHooks` is on (https://code.visualstudio.com/docs/agent-customization/hooks).
+  - Workspace settings `chat.useHooks` (default true; false turns off local
+    hooks), `chat.hookFilesLocations` (can drop `.github/hooks` or add
+    locations), and `chat.useClaudeHooks` have window scope, so
+    `.vscode/settings.json` can set them in a trusted workspace.
+  - Copilot CLI (and VS Code's Copilot harness, same SDK) also reads
+    `.github/copilot/settings.json` and `.github/copilot/settings.local.json`
+    (inline `hooks`, top-level `disableAllHooks` that skips every hook)
+    (https://docs.github.com/en/copilot/reference/hooks-reference).
+  - Auto-approval does not bypass PreToolUse: `deny` returns before
+    auto-confirm in `languageModelToolsService.ts`; approvals docs say a
+    PreToolUse `deny` blocks a terminal call.
+  - Decision: protect `.vscode/settings.json`, `.github/copilot/settings.json`,
+    `.github/copilot/settings.local.json` by the same rule (plan step 3:
+    protect each documented file). Not protected: `.agent.md` frontmatter
+    hooks (add-only; most restrictive wins); `*.code-workspace` (unverified).
+    Sent to the coder as an addition to step 1.
+
 ## [LEARN] Entries
 
 ## Verification
