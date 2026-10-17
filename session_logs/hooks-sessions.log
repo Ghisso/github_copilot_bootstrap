@@ -871,3 +871,4 @@
 2026-10-17T09:24:25.000Z,event=Stop,target=claude-code,sessionId=0e9613fc-8ab0-4671-a209-070da7504128
 2026-10-17T09:36:49.000Z,event=Stop,target=claude-code,sessionId=0e9613fc-8ab0-4671-a209-070da7504128
 2026-10-17T09:45:25.000Z,event=Stop,target=claude-code,sessionId=0e9613fc-8ab0-4671-a209-070da7504128
+2026-10-17T10:14:39.000Z,event=SessionStart,target=claude-code,sessionId=0e9613fc-8ab0-4671-a209-070da7504128,source=compact
