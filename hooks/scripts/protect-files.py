@@ -35,6 +35,23 @@ HOOK_CONFIGS = {
     ".github/copilot/settings.json",
     ".github/copilot/settings.local.json",
 }
+# Tools whose input is a shell command line (`tool_input.command`). A name that
+# ends in `bash` or an empty name is also treated as a shell command in `main`.
+TERMINAL_TOOLS = {"bash", "shell", "run_in_terminal", "send_to_terminal"}
+# Native tools that only read. Their path arguments are never writes, so they
+# get no decision. Exact lowercase names only; anything else is checked.
+READ_ONLY_TOOLS = {
+    "read_file",
+    "view_image",
+    "list_dir",
+    "file_search",
+    "grep_search",
+    "semantic_search",
+    "view",
+    "grep",
+    "rg",
+    "glob",
+}
 PATH_KEYS = {
     "path",
     "file",
@@ -1487,9 +1504,11 @@ def main() -> int:
         tool_input = json.loads(tool_input)
     if not isinstance(tool_input, dict):
         raise AmbiguousCommand("tool input is not an object")
+    if tool_name in READ_ONLY_TOOLS:
+        return 0
     paths: list[str] = []
     uncertain: list[str] = []
-    if tool_name in {"bash", "shell"} or tool_name.endswith("bash") or not tool_name:
+    if tool_name in TERMINAL_TOOLS or tool_name.endswith("bash") or not tool_name:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise AmbiguousCommand("Bash payload has no command")

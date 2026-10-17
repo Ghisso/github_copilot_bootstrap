@@ -229,12 +229,17 @@ print(str(value).lower() if type(value) is bool else value)
 PY
 }
 
+# True for a tool call whose input is a shell command: any name containing
+# bash or shell, `execute`, and VS Code Copilot's terminal tools
+# (`run_in_terminal`, `send_to_terminal`), whose command is `tool_input.command`.
+# An empty name is treated as a shell command so an unnamed payload is still
+# inspected. protect-files.py keeps its own list (TERMINAL_TOOLS).
 is_bash_tool_payload() {
   local payload="$1"
   local tool
   tool="$(hook_tool_name_any "$payload")"
   tool="$(hook_to_lower "$tool")"
-  [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" ]]
+  [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" || "$tool" == "run_in_terminal" || "$tool" == "send_to_terminal" ]]
 }
 
 fm_read() {
