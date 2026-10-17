@@ -145,6 +145,18 @@ remove the stale agent schema (GR-011).
   Same reviewer asked for a full review of the scope change plus the two
   confirmations.
 
+- **15:20** - Review round 3: scope change reviewed in full, items 1 and 4
+  closed; Gate Result `PASS` with one MINOR: the read exemption skipped the
+  whole classifier, dropping the existing secret-file deny for Copilot read
+  tools (`.env` read had been denied, then allowed). Fixed by the coder
+  (`read_only` flag: drop hook-config hits only; no patch scan of read-tool
+  text); controls caught both directions. Plan scope-change record
+  corrected (git-protection already covered Copilot terminals). Docs: VS
+  Code task tools added as an unverified follow-up; read rule made precise.
+  Regenerate, self-install, `check_runtime.py` PASS, `validate_targets.py`
+  PASS, `verify.py phase` PASS (pytest 2767 passed, 1 skipped). Same
+  reviewer asked to confirm.
+
 ## [LEARN] Entries
 
 ## Verification
