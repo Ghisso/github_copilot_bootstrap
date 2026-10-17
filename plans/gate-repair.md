@@ -123,7 +123,7 @@ Confirmed defects (audit §5 IDs, corrected by the review):
 | Review result and profile gate (A) | shared `verify.py` gate via `pretool-bash-guard.sh` and installed Git hooks | same | same; `enforce-commit-gate.sh` listed directly | same via `antigravity-pretool.py`; native deny unobserved |
 | Hook lane advisory only (B) | `claude-code` client id | `openai-codex` | `github-copilot` | upstream ships `antigravity-cli` hooks, but the bootstrap does not wire them: nothing to sanitize, no continuity (recorded gap) |
 | Guarded Context Mode server (C) | root `.mcp.json` fixed; generated already guarded | root and generated already guarded | root `.vscode/mcp.json` fixed; generated already guarded | installed and generated guarded; the bridge denies MCP calls today (gap, see C) |
-| Context7 for subagents (C) | add `mcp__context7` grant | inherit session servers (evidence in C) | `context7/*` already | `inheritMcp: true`; bridge gap as above |
+| Context7 for subagents (C) | add `mcp__context7` grant | inherit session servers (confirmed by official docs and source, 2026-10-17) | `context7/*` already | unverified: `inheritMcp: true` is not a documented field; bridge gap as above |
 | Hook- and server-config protection (D) | add `settings.local.json`, `.mcp.json` (ask) | `config.toml`, `hooks.json`, `hooks/` already (deny) | add `.vscode/mcp.json` (ask); workspace settings per docs evidence | add `.agents/hooks.json`, `.agents/mcp_config.json` (deny, decided in `protect-files.py` itself) |
 | Plan checks at branch creation (D) | shared `enforce-branch-state.sh` | same | same | same via bridge |
 | Shipped commands cannot hide failures (D) | shared skills | same | same | same |
