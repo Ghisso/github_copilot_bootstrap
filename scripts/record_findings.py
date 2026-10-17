@@ -8,10 +8,15 @@ schema the commit/push gates verify against
 
 Usage:
     uv run python .claude/scripts/record_findings.py src/ --profile code \
-        --profile ponytail --phase phase-one \
+        --profile ponytail --phase phase-one --gate-result WARN \
+        --open-request "add a regression test for the empty-input path" \
         --findings-json findings.json --out .claude/quality_reports/findings-phase-one.json
     echo '[]' | uv run python .claude/scripts/record_findings.py src/ --profile ponytail --phase phase-one \
-        --out .claude/quality_reports/findings-phase-one.json
+        --gate-result PASS --out .claude/quality_reports/findings-phase-one.json
+
+--gate-result is the reviewer's own result (FAIL when a CRITICAL or MAJOR
+survives, WARN when a request is open, otherwise PASS). PASS with any
+--open-request is refused. The report records schema_version 2.
 """
 
 from __future__ import annotations
@@ -25,6 +30,10 @@ from pathlib import Path
 
 
 VALID_SEVERITIES = {"CRITICAL", "MAJOR", "MINOR"}
+GATE_RESULTS = ("PASS", "WARN", "FAIL")
+# Schema 2 adds gate_result and open_requests; the push gates apply those rules
+# only to schema >= 2 reports (a report with no schema_version counts as 1).
+REPORT_SCHEMA_VERSION = 2
 
 
 def _run(args: list[str], cwd: str = ".") -> tuple[int, str, str]:
@@ -209,6 +218,20 @@ def main() -> None:
         default=[],
         help="Review profile that was executed; repeat for every reviewed profile.",
     )
+    parser.add_argument(
+        "--gate-result",
+        required=True,
+        choices=GATE_RESULTS,
+        help="The reviewer's own gate result: FAIL when a CRITICAL or MAJOR "
+        "survives, WARN when a request is open, otherwise PASS.",
+    )
+    parser.add_argument(
+        "--open-request",
+        action="append",
+        default=[],
+        metavar="TEXT",
+        help="An open reviewer request; repeat for each. Not allowed with PASS.",
+    )
     args = parser.parse_args()
 
     try:
@@ -231,10 +254,25 @@ def main() -> None:
         print(f"error: invalid findings-json: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    open_requests = [request.strip() for request in args.open_request]
+    if not all(open_requests):
+        print("error: --open-request must not be empty", file=sys.stderr)
+        sys.exit(1)
+    if args.gate_result == "PASS" and open_requests:
+        print(
+            "error: --gate-result PASS cannot be recorded with --open-request; "
+            "use WARN or FAIL",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     counts = count_severities(findings)
     ponytail_reviewed = "ponytail" in profiles_reviewed
     # Keep canonical report fields first for stable, readable JSON artifacts.
     result = {
+        "schema_version": REPORT_SCHEMA_VERSION,
+        "gate_result": args.gate_result,
+        "open_requests": open_requests,
         "counts": counts,
         "profiles_reviewed": profiles_reviewed,
         "findings": findings,
@@ -260,7 +298,8 @@ def main() -> None:
     print(
         f"recorded {len(findings)} finding(s): "
         f"{counts['critical']} critical, {counts['major']} major, {counts['minor']} minor; "
-        f"ponytail_reviewed={str(ponytail_reviewed).lower()}"
+        f"ponytail_reviewed={str(ponytail_reviewed).lower()}; "
+        f"gate_result={args.gate_result}"
     )
     print(f"report: {args.out}")
     sys.exit(0)

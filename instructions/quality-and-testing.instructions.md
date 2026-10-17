@@ -108,25 +108,34 @@ receipt, findings report, and completed session log:
 A **findings report**, persisted by `record_findings.py`, carries a
 git-metadata freshness binding (`branch`, `head_sha`, `merge_base_sha`,
 `base_ref`, `dirty`, `content_hash`) plus computed severity counts
-(`critical`, `major`, `minor`).
+(`critical`, `major`, `minor`), `schema_version: 2`, the reviewer's
+`gate_result` (`PASS`, `WARN`, or `FAIL`), and `open_requests` (a list of
+plain sentences, empty when nothing is open).
 
 The reviewer runs its primary + verification passes as usual (see the
-`reviewer` agent) and returns the surviving findings as JSON; the reviewer has
-no `execute` capability, so **the orchestrator** persists that JSON:
+`reviewer` agent) and returns the surviving findings as JSON together with its
+Gate Result and open requests; the reviewer has no `execute` capability, so
+**the orchestrator** persists them. `--gate-result` is required and takes the
+reviewer's value; repeat `--open-request` once per open request. The recorder
+refuses `--gate-result PASS` together with any `--open-request`:
 
 ```bash
-uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
+uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json
 ```
 
-An empty findings list (`[]`) is valid and yields all-zero counts — the normal
-"review passed clean" report, not an omission.
+An empty findings list (`[]`) is valid and yields all-zero counts. It is the
+normal "review passed clean" report, not an omission, only with
+`gate_result: PASS` and no open request.
 
 **Severity tiering:**
 
 | Gate | Requires |
 |---|---|
-| Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, and an explicit `disposition` plus non-empty `reason` on every surviving MINOR |
-| Push / PR | the same contract, re-checked across every completed phase |
+| Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, an explicit `disposition` plus non-empty `reason` on every surviving MINOR, `gate_result == "PASS"` with `open_requests == []`, and every review profile the changed paths require in `profiles_reviewed` |
+| Push / PR | the same contract, re-checked across every completed phase; the `gate_result` and required-profile rules apply only to reports with `schema_version >= 2`, so phases recorded before the upgrade are not re-judged |
+
+A commit gate rejects a report with no `gate_result`: re-record the current
+phase's report with `--gate-result` before closeout.
 
 An intermediate commit made while the phase is still in progress is not
 blocked merely because an unresolved MAJOR finding exists. MAJOR blocks the
@@ -152,7 +161,7 @@ When `.claude/scripts/record_findings.py` is available, persist the reviewer's
 surviving findings with deterministic phase-named output:
 
 ```bash
-uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
+uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json
 ```
 
 Commit and push gates read the persisted JSON, not the reviewer's prose
@@ -173,6 +182,17 @@ control-plane/high-risk precedence applies. Ponytail findings use the ordinary
 severity gates: CRITICAL and MAJOR both block the phase-completion commit
 (not only push/PR), and a surviving MINOR needs an explicit disposition and
 reason but is otherwise advisory. There is no special zero-Ponytail gate.
+
+The gate also requires `profiles_reviewed` to include every profile the
+closeout receipt's `changed_paths` call for. A test file (a path under
+`tests/`, `test_*.py`, `*_test.py`, or `conftest.py`) requires `tests`. A
+control-plane, generator (`scripts/`, `shared/scripts/`), or dependency path
+(lockfiles, `pyproject.toml`, `requirements*.txt`, `requirements*.in`)
+requires `code`, `architecture`, `security`, `tests`, and `ponytail`.
+Documentation-only paths require none. This rule joins the multi-file
+Ponytail rule, and the gate reports every missing profile by name in one
+error. The paths are cumulative from the merge-base, so a later phase of a
+branch keeps the requirements of earlier phases on that branch.
 
 ---
 

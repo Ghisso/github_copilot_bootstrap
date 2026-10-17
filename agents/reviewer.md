@@ -58,7 +58,8 @@ executes identically on every runtime.
 6. Output one consolidated report of the findings that survived verification. You cannot pause to ask the caller a question. When requirements or execution evidence you need are missing, review what you can, list each open request as one plain sentence under `### Open Requests` just before `### Gate Result`, and answer `WARN`, not `PASS`, while any request is open. A request answered with a stated reason that it cannot be produced is closed: record it in the report as an unverified limitation instead of keeping `WARN` for it. Open requests are not findings: keep them out of the Findings JSON.
 7. Also emit the reviewed profile names and the surviving findings as a JSON
    list (see **Findings JSON** below), for the orchestrator to persist with
-   `record_findings.py`. You have no `execute` capability
+   `record_findings.py`, together with your Gate Result and open requests (see
+   **Gate Result** below). You have no `execute` capability
    (`.claude/agents/reviewer.md` capabilities are `read`/`search` only) —
    return the JSON, do not attempt to run the script yourself.
 
@@ -85,6 +86,16 @@ Gate: advisory | commit | PR
 ### Gate Result
 PASS | WARN | FAIL
 ```
+
+## Gate Result
+
+Answer with exactly one value:
+
+- `FAIL` when a CRITICAL or MAJOR finding survives verification. `FAIL` wins when a request is also open.
+- `WARN` when any request is open (see **Review Flow**, step 6).
+- Otherwise `PASS`. A surviving MINOR that has an explicit disposition and reason allows `PASS`.
+
+The orchestrator records your value with `--gate-result` and each open request with one `--open-request`. The commit gate accepts only `PASS` with no open request, and the recorder refuses `PASS` together with an open request, so report the result honestly: it is a recorded claim, not proof.
 
 ## Findings JSON
 
