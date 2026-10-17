@@ -104,17 +104,11 @@ done < <(fm_read_list "$BIG_PLAN" "phases")
 failures=()
 assert_plan_frontmatter "$REPO_ROOT" ${PLAN_PATHS[@]+"${PLAN_PATHS[@]}"}
 if [[ "${#failures[@]}" -gt 0 ]]; then
-  REASON=""
-  SHOWN=0
-  for FAILURE in ${failures[@]+"${failures[@]}"}; do
-    REASON="$REASON$FAILURE; "
-    SHOWN=$((SHOWN + 1))
-    if [[ "$SHOWN" -ge 3 ]]; then
-      break
-    fi
-  done
-  if [[ "${#failures[@]}" -gt "$SHOWN" ]]; then
-    REASON="$REASON(and $((${#failures[@]} - SHOWN)) more); "
+  # Only runs with at least one failure, so the slice is never of an empty
+  # array (a Bash 3.2 hazard under set -u).
+  REASON="$(printf '%s; ' "${failures[@]:0:3}")"
+  if ((${#failures[@]} > 3)); then
+    REASON="$REASON(and $((${#failures[@]} - 3)) more); "
   fi
   deny_pretool "plan checks must pass before branch creation: $REASON"
   exit 0

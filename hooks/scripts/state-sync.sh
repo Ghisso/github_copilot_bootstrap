@@ -136,7 +136,9 @@ untrack_local_settings() {
 # a merge or rebase moves between trees that track it and trees that do not
 # (a remote that still tracks it, or an unpushed local commit that touched it).
 # Losing it was unrecoverable once, so keep a byte copy under .git/ while git
-# runs and put it back if the working file changed or disappeared.
+# runs. Afterwards put it back only if the file is gone or holds the blob git
+# just wrote from origin/$BRANCH; any other bytes are a newer write by someone
+# else (Claude Code saving an approval, another session) and are kept.
 LOCAL_SETTINGS_BACKUP=""
 
 preserve_local_settings() {
@@ -155,13 +157,24 @@ restore_local_settings() {
   local backup="$LOCAL_SETTINGS_BACKUP" file="$CLAUDE_DIR/settings.local.json"
   [[ -n "$backup" ]] || return 0
   LOCAL_SETTINGS_BACKUP=""
-  if ! cmp -s "$backup" "$file"; then
-    if ! cp -p "$backup" "$file"; then
-      warn "could not restore local settings.local.json after reconciliation; its bytes are kept at $backup."
-      return 1
-    fi
-    warn "restored local settings.local.json, which git replaced during reconciliation."
+  if cmp -s "$backup" "$file"; then
+    rm -f "$backup"
+    return 0
   fi
+  if [[ -e "$file" ]]; then
+    local written current
+    written="$(git -C "$CLAUDE_DIR" rev-parse --verify --quiet "origin/$BRANCH:settings.local.json" 2>/dev/null || true)"
+    current="$(git -C "$CLAUDE_DIR" hash-object -- settings.local.json 2>/dev/null || true)"
+    if [[ -z "$written" || "$current" != "$written" ]]; then
+      warn "settings.local.json was written while state sync ran; kept the newer file. The copy taken before sync is kept at $backup."
+      return 0
+    fi
+  fi
+  if ! cp -p "$backup" "$file"; then
+    warn "could not restore local settings.local.json after reconciliation; its bytes are kept at $backup."
+    return 1
+  fi
+  warn "restored local settings.local.json, which git replaced during reconciliation."
   rm -f "$backup"
 }
 
