@@ -103,6 +103,18 @@ no native client.
   `tests/fixtures/context_mode_hook/capture.py`, pin-tie test, event-name
   check), documenter (limits, wording, procedure pointer).
 
+- **08:30** - All five MINOR fixes landed. The capture script is committed
+  as `tests/fixtures/context_mode_hook/capture.py`; it now records raw
+  upstream output directly (the dispatcher filters), with a private
+  `TMPDIR` (upstream's once-per-session tip files in the shared temporary
+  directory had suppressed tips on a re-run). A scratch re-run reproduced
+  all 32 fixtures byte for byte. Orchestrator caught one doc inaccuracy
+  (step 1 said the script runs through the dispatcher); documenter fixed it.
+  Self-install, `check_runtime.py` PASS, `validate_targets.py` PASS,
+  `verify.py phase` PASS (pytest 2460 passed, 1 skipped), real test PASS.
+  Signal forwarding on timeout stays out of scope (documented limit).
+  Same reviewer asked to confirm, with the full fix evidence.
+
 ## [LEARN] Entries
 
 ## Verification
