@@ -131,7 +131,7 @@ normal "review passed clean" report, not an omission, only with
 
 | Gate | Requires |
 |---|---|
-| Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, an explicit `disposition` plus non-empty `reason` on every surviving MINOR, `gate_result == "PASS"` with `open_requests == []`, and every review profile the changed paths require in `profiles_reviewed` |
+| Phase-completion commit | `counts.critical == 0` **and** `counts.major == 0` in a fresh, matching findings report, an explicit `disposition` plus non-empty `reason` on every surviving MINOR, and `gate_result == "PASS"` with `open_requests == []` |
 | Push / PR | the same contract, re-checked across every completed phase; the `gate_result` and required-profile rules apply only to reports with `schema_version >= 2`, so phases recorded before the upgrade are not re-judged |
 
 A commit gate rejects a report with no `gate_result`: re-record the current
@@ -184,15 +184,23 @@ severity gates: CRITICAL and MAJOR both block the phase-completion commit
 reason but is otherwise advisory. There is no special zero-Ponytail gate.
 
 The gate also requires `profiles_reviewed` to include every profile the
-closeout receipt's `changed_paths` call for. A test file (a path under
-`tests/`, `test_*.py`, `*_test.py`, or `conftest.py`) requires `tests`. A
-control-plane, generator (`scripts/`, `shared/scripts/`), or dependency path
-(lockfiles, `pyproject.toml`, `requirements*.txt`, `requirements*.in`)
-requires `code`, `architecture`, `security`, `tests`, and `ponytail`.
-Documentation-only paths require none. This rule joins the multi-file
-Ponytail rule, and the gate reports every missing profile by name in one
-error. The paths are cumulative from the merge-base, so a later phase of a
-branch keeps the requirements of earlier phases on that branch.
+closeout receipt's `changed_paths` call for. Test surfaces are checked first: a
+path under `tests/`, or a file named `test_*.py`, `*_test.py`, or
+`conftest.py`, requires only `tests` (so `scripts/test_x.py` needs just
+`tests`). Any other control-plane or generator path (`scripts/`,
+`shared/scripts/`) and any dependency file requires `code`, `architecture`,
+`security`, `tests`, and `ponytail`. The dependency files are `DEPENDENCY_FILES`
+in `verify.py` (lockfiles and manifests such as `uv.lock`, `package.json`,
+`Cargo.toml`, `Pipfile`, `go.mod`, and `go.sum`) plus `pyproject.toml` and
+`requirements*.txt` or `requirements*.in`. Documentation-only paths require
+none. This rule joins the multi-file Ponytail rule, and the gate reports every
+missing profile by name in one error.
+
+At the commit gate (the `exact` relation) the profile rule applies to every
+commit, and the `gate_result` rule applies to the phase-completion commit. Push
+gates apply both only to reports with `schema_version >= 2`. The paths are
+cumulative from the merge-base, so a later phase of a branch keeps the
+requirements of earlier phases on that branch.
 
 ---
 

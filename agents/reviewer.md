@@ -93,7 +93,7 @@ Answer with exactly one value:
 
 - `FAIL` when a CRITICAL or MAJOR finding survives verification. `FAIL` wins when a request is also open.
 - `WARN` when any request is open (see **Review Flow**, step 6).
-- Otherwise `PASS`. A surviving MINOR that has an explicit disposition and reason allows `PASS`.
+- Otherwise `PASS`. Surviving MINOR findings do not change the result; the orchestrator adds a disposition and reason for each at closeout.
 
 The orchestrator records your value with `--gate-result` and each open request with one `--open-request`. The commit gate accepts only `PASS` with no open request, and the recorder refuses `PASS` together with an open request, so report the result honestly: it is a recorded claim, not proof.
 
