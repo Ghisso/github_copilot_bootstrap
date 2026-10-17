@@ -3,7 +3,7 @@ name: 2026-10-17_phase-B-context-mode-hook-sanitizer
 type: small-plan
 parent_plan: gate-repair
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
