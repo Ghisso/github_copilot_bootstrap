@@ -70,8 +70,7 @@ the repaired gate.
   requires none. Compute the paths from the same merge-base diff the gate
   already uses (working tree for commit, pushed ref for push). Union the
   result with the existing multi-file Ponytail rule. Report missing profiles
-  by name in one error. Use the strictness the user chose at plan approval;
-  the rule above is the recommended default.
+  by name in one error. The user approved this rule on 2026-10-17.
   **Tests:** a table-driven unit test of the pure function (docs-only, a
   `tests/` path, a fixture JSON under `tests/`, `scripts/`, `shared/`,
   `.mcp.json`, `uv.lock`, an ordinary `src/` module); gate tests where a

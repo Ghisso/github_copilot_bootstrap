@@ -235,17 +235,18 @@ Every phase uses the `code`, `architecture`, `security`, `tests`, and
 | --- | --- | --- | --- |
 | Transcribed gate result can be wrong | MED | Parse the saved reviewer report for `### Gate Result` | ACCEPT: parsing model-written Markdown is brittle; record the limit |
 | Sanitizer drops continuity | MED | Stop forwarding all upstream output | INVESTIGATE in Phase B step 1, with a stop rule |
-| Path-based profiles add review cost | LOW | Require only `tests` and `security` | User decision below |
+| Path-based profiles add review cost | LOW | Require only `tests` and `security` | Decided by the user: recommended rule (see below) |
 | Protecting `settings.local.json` blocks agent edits a user wants | LOW | Key-level protection | ACCEPT: matches `settings.json`; Claude asks rather than denies |
 | Antigravity parity claims overreach | MED | Leave Antigravity untouched | CHANGE applied: change Antigravity only with documentation evidence, otherwise record the gap |
 
-### Decision needed at approval
+### Decisions recorded
 
-GR-002 profile strictness. Recommended: control-plane and generator paths
-require the five Task Lanes profiles, and test paths require `tests`.
-Narrower option: test paths require `tests` and hook or guard paths
-require `security`. The narrower option leaves the written Task Lanes rule
-enforced only in part.
+- GR-002 profile strictness (user, 2026-10-17): the recommended rule.
+  Control-plane and generator paths, and dependency files, require the five
+  Task Lanes profiles. Test surfaces require `tests`. The narrower option
+  (`tests` for tests, `security` for hooks only) was declined.
+- The user-level `context-mode@context-mode` plugin (user, 2026-10-17): the
+  user handles it. The plan changes no user-level file.
 
 ## Verification
 
