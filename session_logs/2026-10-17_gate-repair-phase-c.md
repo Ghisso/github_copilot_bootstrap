@@ -56,6 +56,23 @@ Antigravity MCP reachability from documentation (GR-006).
     code change without documented shape. Parity matrix row for Context7
     on Antigravity is downgraded to "unverified".
 
+- **09:50** - Coder finished steps 1–2: root `.mcp.json` and
+  `.vscode/mcp.json` use the guarded route; `root_mcp_adapter_errors` checks
+  all three root adapters with their own keys; `mcp__context7` added to the
+  Claude `search` map and grant check. Negative controls failed as expected.
+  Generator comment corrected (Antigravity `inheritMcp` is undocumented).
+  Self-install repopulated `.claude/bootstrap-root/` (clears the
+  `verify.py fast` provenance mismatch the coder reported) and the installed
+  agents (clears `check_runtime.py`). `fast` PASS, `validate_targets.py`
+  PASS, `verify.py phase` PASS (pytest 2468 passed, 1 skipped). The
+  installer's printed `git rm --cached ...` line is consumer advice only;
+  every root adapter stayed tracked here.
+- **09:55** - Documenter: parity rows, recorded follow-ups, and runtime-check
+  bullets. Two live overclaims in `docs/smoke-tests.md` (lines 117, 119) sent
+  back for fixing. For Phase E: `docs/sidecar-provider-contract.md:672-676`
+  quotes older Codex docs on agent-file keys; decide there whether it is a
+  dated record (errata) or live advice.
+
 ## [LEARN] Entries
 
 ## Verification
