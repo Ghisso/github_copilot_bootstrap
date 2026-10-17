@@ -1304,7 +1304,7 @@ scripts under `shared/hooks/scripts/` (installed as
 calls the direct Python bridge `antigravity-pretool.py` instead, which
 normalizes its payload into the same guards. A single ordered Bash lane
 (protected files, dangerous Git, branch, commit, then PR) decides every
-Bash tool call, and matching git hooks (`commit-msg`, `pre-push`) enforce
+Bash tool call (Copilot's `run_in_terminal` and `send_to_terminal` go through the same guards), and matching git hooks (`commit-msg`, `pre-push`) enforce
 the same commit and push contracts directly inside Git. See [Hook
 dispatcher and guardrail
 scripts](openwiki/architecture/hooks-and-guardrails.md) for the full event

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:6912547aa4edd2bad370b4e191fba04889b53e5544e82abcd71af30bfa7ed221",
+  "pageVersion": "sha256:b7c8af916b81092ea495cfa1ed457706bd73f356221cea297dfb11f7c215f0a1",
   "claims": [
     {
       "id": "claim_577abfccd7214b578dafc049c57d3ba8",
@@ -86,19 +86,19 @@
     },
     {
       "id": "claim_3023c921163348fb87d94ede8990cd19",
-      "statement": "protect-files.py classifies mutations of credential-shaped names (.env, .env.*, credentials*), uv.lock, and the four hook configuration files; a protected mutation is denied on openai-codex and google-antigravity and produces an ask decision on other hosts; the wrapper runs the classifier with plain python3 and fails closed when it exits non-zero.",
+      "statement": "protect-files.py classifies mutations of credential-shaped names (.env, .env.*, credentials*, *.pem, *.key), uv.lock, and the twelve hook- and server-launching configs in HOOK_CONFIGS; a protected hook-config mutation is denied on openai-codex and google-antigravity and produces an ask decision on other hosts, an uncertain command naming a protected file is denied on every host, and the wrapper runs the classifier with plain python3 and fails closed when it exits non-zero.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L14-L19",
-          "version": "repo-lines-v1:sha256:0f37a18609366a5af5fa83ed80b21273f55a0c6bce0653cde4f2c10371c051e0:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDFiYTQ3MTljODBiNmZlOTExYjA5MWE3YzA1MTI0YjY0ZWVlY2U5NjRlMDljMDU4ZWY4Zjk4MDVkYWNhNTQ2YiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjg0Y2M4ODE0ZGMxNjEzNDQ2OTdmNDYyYWNjOTVhNmM3OWFkZGUzOWZhOWVlY2RlYmM2YmY2NmI3ODM3NDc2ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNjg2Y2E3YjIzNDdhYjFlYjNiNzYzNjMxN2U5ODk0NjUzYTZhOWQ3MmE2MGY1YjVkMTg2NGNkMGJkYTNlNjJjOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNjc1MzUyYTZlZjIwYTYxMTM4MDgzYTcwNzA4YThhMDk4OGE1YWQ3ZjAyM2MxMjZiMTBhNDkwZTVhODdlYzQ4ZiJ9"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1459-L1496",
+          "version": "repo-lines-v1:sha256:6c5ad9014206865946d1dc71c85bdec66a0a9ab97cd7877521b0a4d14f12b4a0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNTRhMGYyZmYzMjcxOGEyZjY4ZTQzMTdiNDc5ZDQwYmU0OWVhODMwNmZjOTkxMjFlNzk2Y2JiMTc0OGMxMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMmU0NDEzZDg4Mjk1ZDhkZjBhMzIwYTA1YzJiOTJjNWI4ZjA2Y2Q2YjNjNDhjYzlkMjA1OWNlZDUzNWU2NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijc5NGZhZWQ4NjJmYjBiYWRjNDkzNTM2MGFjZDNkNzJiNTg2NDAxNmMyMTA1YzcxYzhmMTczNWNlNDJlODdmYjgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQ4NTYxODg1ZDM1MTU2ZGZjZTA5N2VmMjJiOWE4OWU3NTRmNjg4NTBmOTgyN2EwMGUxMzAyMjg5MWY4NWE2NDEifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L1420-L1445",
-          "version": "repo-lines-v1:sha256:fceff6e2283711f30bfdc5c8eb42a52d8cc08d2651a3c08e17befa6fac358ab1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA4ZGUzNWVmYmI3Yzg2ZmYxNmEyMTdkMDgwNjk1MjdlMDg0Mjk1ZTk5MjU4MTA4ZjI0ZmQ4M2Y5Mzg5MDY2ZjIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYzM2I4M2Y1ZTE5MDY3ZjcyN2Q1MDYxOWU5MTQxZWZjZTAzYmUzNGRlMDQ5YzFlYTkwNjIyMDVlMWJlYTI5ZWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIzMTg1NjgxZTkyNjc1YzllMWFlN2U3YzI5YTAyMzg5NWJhMWMwOGZmMDkyNjdkNTFjNjFlMGM5NTk0NWU2MTYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjQ0MzlkMmVlN2NmYjYzOTk3MDFlYTQ4MmU0NjVmZDEwZDRiOTlmOTcyYzlkNWJkNmMxZjJiMTViOTM4NGFkOWMifQ"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L15-L37",
+          "version": "repo-lines-v1:sha256:8957d1a325a284e8798cdadc73e7a22b3ba13508f9621fe8518a8357679584fb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIyMTRmMTcwOTY3YTBlOTAzNTNmOTk4NmNlOTliNjY1YTU3NjIyZjE3MTZhYjE5ZTcyZWY1NTMzNDMxOTAzY2YiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUyOWQ2N2FlMzljZDAxYjllZDZkN2Q1N2JlYTFhYjhiYjRlMzNiZTVjZTM0ZGIxNTdjZWZmNzEzNTEzMjY4ZTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZjZGJkMWIwNjc2YjY2MTRhNGY2YzZlOWFkMWIwODUzNDFmMmQzNzlkMTRkN2EwN2E0NzEzNjk4OTJmMmRjNDMifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/protect-files.py#L300-L306",
-          "version": "repo-lines-v1:sha256:94697756a5a3dbefee21c2214ec955f36389258b670537f662dbe7ab05b1862a:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiZWMzYTk3ZWNkZjZkMTc2YTQ4NzM2MWEwODdjNmUyMTM0MzkxMTU4NzY1OGMzOTBiMWU4ZWM4ZjI5NGQ5NmJjZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiZmVhNWQyZGI1MDAxNjJmMTEzNDJhMjQ1ZWM5Y2MyOTliZjM2Njk3ODE4MmE0MzEzYTAzNjhkN2Q0MmE5NDIwZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZDNlMTUyY2M3NzJhOWFiZWM3NTQ4YjYxMDM1ZTBhOTlhZWE5NDM2NDY0NjdhNTY2NDc0MmQ4ODFmN2ExNzg2NCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYThlZmRmYTkwMmZjNzU5YzM0MzdlODJlZjNhMTc1M2RmM2MzZTAzNGVmMTI4MGY0OTRkNWYzNjM5NTljNzY5ZiJ9"
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L339-L345",
+          "version": "repo-lines-v1:sha256:f3d96e90ab2e9851d47e578299a18aa83bf6fb6fcd53fcef07a6f70c8fcf96b0:eyJzZWxlY3RlZExpbmVDb3VudCI6NywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOTY3NjVhYmJiNzQzNTc1YjczNTdjZjkxOTNjNDY0MzNhNjI4ZWNiMjQ4N2VlNDhlYzU1OWNkYTJhMWQ2MjMzNyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiNWRiOTYyMzA3MGI0ZjliZWI1MjFmNzllMmEzNGM3ZDU0NjQwZjFjZmJiMDlmYTcyZWRlMTMxOWQzNDdmYTA3OSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZjY3ODhjMmI4YzA4MWJlZDBiMjM4MzkyMWFmYmMwMmRkYTdjMzBiOGQyNzZjM2JmZTYyZTc1NTVhNWU3YTNjNyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZDcwMTQ5ZTA2OWFkNjdlY2NmNDczNjQ2ZmYxYzc1MDA1MGQzMjlkMTEwMDE4ZGM1NzY2ODc4ZWFmYTFkNjA3ZCJ9"
         },
         {
           "resource": "repo://shared/hooks/scripts/protect-files.sh#L20-L56",
@@ -118,11 +118,11 @@
     },
     {
       "id": "claim_ec605c1578ae40c0a87d272f6418e355",
-      "statement": "enforce-branch-state.sh requires a new branch named <plan_name>_implementation created from a clean dev checkout and backed by a big plan with type big-plan, one status field, and status planning or in-progress; a branch created in another repository via -C, --git-dir, or --work-tree is not judged by this repository.",
+      "statement": "enforce-branch-state.sh requires a new branch named <plan_name>_implementation created from a clean dev checkout and backed by a big plan with type big-plan, one status field, and status planning or in-progress, and then runs the plan-frontmatter validator on the big plan and its listed phase files as explicit paths, denying with the first three errors; a branch created in another repository via -C, --git-dir, or --work-tree is not judged by this repository.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/enforce-branch-state.sh#L8-L87",
-          "version": "repo-lines-v1:sha256:9eabe477fbcc793f5d2ee1daf51721cf91a5f1099f01bd65660cb44c2048b8cb:eyJzZWxlY3RlZExpbmVDb3VudCI6ODAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY4NjBjODcyY2IxNGU0MmZjMzg3Mzc3ZDI3MGUzYzNiZTFlMDg1YWE4OWFjZTUxM2YyOTllNmI3MmEzYWNhNjciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImY5YzBkNjIzYWM4MzRlMDAxZjZhNGM5NzUxY2E2NmM1ZTFhOTNkNDNlMzMzNDI4NzA4ZTNhMjcxM2Y2OGYxMDAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "resource": "repo://shared/hooks/scripts/enforce-branch-state.sh#L8-L117",
+          "version": "repo-lines-v1:sha256:241e4fd74fc27f4e715716f74779e4b8cf625e16b962ebe7be6876037240d45a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJmODYwYzg3MmNiMTRlNDJmYzM4NzM3N2QyNzBlM2MzYmUxZTA4NWFhODlhY2U1MTNmMjk5ZTZiNzJhM2FjYTY3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIyOGQzYjllODgwYTc3OTc1NDkzZGM3ZTM1OTE0NGMwMjk1YTRmNjk0Y2ZlMGFmNGY5MjhjMjIzMDdiYzVjMzIwIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiJmOWMwZDYyM2FjODM0ZTAwMWY2YTRjOTc1MWNhNjZjNWUxYTkzZDQzZTMzMzQyODcwOGUzYTI3MTNmNjhmMTAwIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MCwiZm9sbG93aW5nQ29udGV4dEhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1In0"
         }
       ]
     },
@@ -229,10 +229,46 @@
           "version": "repo-lines-v1:sha256:e384657842acf96a53410a40cb795a52dd0bd650ed09ed1e622ec88731fa3213:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFkOTVmYzA0YTgwYzk1MmY0OWNlNDE4ODYyN2M1M2IwZmJlOGM0NDA0MWI5NTJkNTkyYWNkMWRlOTk4NjE0NjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNkNTZiYjU3ODBmZjIwOGZmYzZlZTcwYjEwZWYzYTM3YmEwYmFiOTkzZjY4ZWU3YzUwZWZiYjk0NmMwMTBiMGMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY5YzBkNjIzYWM4MzRlMDAxZjZhNGM5NzUxY2E2NmM1ZTFhOTNkNDNlMzMzNDI4NzA4ZTNhMjcxM2Y2OGYxMDAifQ"
         }
       ]
+    },
+    {
+      "id": "claim_2089bfda47d34728bd027582974b2a75",
+      "statement": "Guards treat a payload as a terminal command when its tool name is empty, contains bash or shell, equals execute, or is VS Code's Local-harness run_in_terminal or send_to_terminal, so Copilot terminal commands go through the branch, commit, and PR gates and the protected-file shell analysis.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L234-L243",
+          "version": "repo-lines-v1:sha256:9d1e288389e464c4a32f280361fecbeedba058a30f4396d4acb43b6bdc210388:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZkMTczYTZkMzk2MDVjYTI3YzJhYzM5MGRiZTliMjQxYTRhMjJmNDQ1NDU5MmVmOGUyMTc3NDBkMjEzM2Y3NDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjZmYzJhZGJiNzg2NWZjY2VjMGU1ZjRkNDQ5ZmQ5ZDZjMzRhZmRhNzNjNDcyOTFmMGZhNGZjODk2OTYwZWM0MTgiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijk3ZTM2NjhlMGVhMDYwMjhlYzAzZDIwM2NhMmFlNDAyMWIxMGRmNjkyOTk3M2M1ZmFlYWUwYzcxZWYwY2U2OGIifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1510-L1531",
+          "version": "repo-lines-v1:sha256:3ba08b90516abe7e73845810b94e07b74ddcbfa639159a18a8aca75b11abd40e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L38-L40",
+          "version": "repo-lines-v1:sha256:fcdbd1b0676b6614a4f6c6e9ad1b085341f2d379d14d7a07a471369892f2dc43:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjE0MTNiMjgxYzU1YTQ1YTJmNmY5YjRiZDMzMTU2Y2Y3ODE5ZGM5NDk3ZTdhZmRmMzFiNjZiYTRlYzQ0NjI4MSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiM2RhNGIxNzMxNjEwZDU5M2EyYjJiN2U5YjZlZTM2NWMyY2VmZTkyODQ4MzhjMTVmOTliNzFjYmExOWE0YWM4ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGFhYTBiMzMyMjFmNzY4M2IzODlmMmYyMzU4ZjJlMTYxYzA3ODE0MWI4NDkwMzcyZWQ2ZWYxYWEzM2JjYWJhOCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZWVkNzdiMmE0MmY1NWU5YzIxZjU0Zjc2ZDE1ZGFhNDZjZWJiNjgyZWFmZGIxYTFiZGZiODQ2NTU1ZTlhOTIzZCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_b5686a991b86400d9e3f4bb7d15b4c83",
+      "statement": "Native read-only tools (read_file, view_image, list_dir, file_search, grep_search, semantic_search, view, grep, rg, glob) get no decision for hook-config paths, keep the secret-file deny, and are not scanned for patch text.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1437-L1467",
+          "version": "repo-lines-v1:sha256:8d1fbd6c9c9b753a849db43f099822bad9725af0472ec31005ce4fdb39a74a5e:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExYTJhNTJmMzk2YjM0YzU3NmZlMmUxODk1NGU3OWY4ODUwNTc4OGYxZWMxOWU2ZTIzM2ExMDlhYzA2ZWEzZWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ0ODAwMzFhZTczNjA4Njc5Yzg2Y2ZkOTEyMTRkNWQzNWI1ZWJlN2RiNTBmZGY2NzlkZGNmZjdhYWI1YzE1YmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjNkNGY3MTM4MjZlMjkyZWI4Y2NiNmM3ODAxYjIyYTQyZDg1NmM2NGRjNjc3M2FlMmU0N2RhMWMxZjk3MDkzNzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBlMTg2MTk0MzA1MDRhZmMzODQ1NWI2OTlkNWY1MDQ3OGEwYmNjMDc3Njk2YzZkMWE4ZmQ3MmE3YjRkMGZkZGQifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L1510-L1531",
+          "version": "repo-lines-v1:sha256:3ba08b90516abe7e73845810b94e07b74ddcbfa639159a18a8aca75b11abd40e:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFiMzk3OTMzYTI0YTgwMWVlOTIzMzI3YmQ2OWEwMTA0OWMwNzc5MTUwMjFjZjJlYzM5ZGRhNGY4MWFhODM3ZTQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2MjMzYjNmZmVhMzJhMjNkZjUzMDY1MzQzNDhmMmRlZTc3NmE1YTZmNzRmYjUzMzE3NWRkYzUzOWE4ZmU0NjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhjYzRhN2QxY2M3OTZhYmEzZTQ2NzIzMzI3ZjUxN2U5ZjgxMTk4MmQyNTBmMDcwMjk4NmU0YjU3NjRhZDk1ODkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjNkNDEzNDBjYzIzOWExNTljZTliNjAyMmU5ZjYzMjI4MzJlMmVhZDc2Y2FlOWU0NzU0ZDIxMGViOGZiNmQ1ZTgifQ"
+        },
+        {
+          "resource": "repo://shared/hooks/scripts/protect-files.py#L41-L56",
+          "version": "repo-lines-v1:sha256:db9eee77083f98043736249758bc089607a1beebd41154e2f98a18db01ca58d8:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjNlODY0N2E3YmYzYzhhZDg3MTRmY2FjNWFhOWQ1NTk1YWFlYjQ2NGRjYjc4YTkxMmI0NWViODBjZjMyNWQ2ODMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImZjZGJkMWIwNjc2YjY2MTRhNGY2YzZlOWFkMWIwODUzNDFmMmQzNzlkMTRkN2EwN2E0NzEzNjk4OTJmMmRjNDMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM5MmQ5ZTY4M2JjZjBjODJiY2UzOTJmODE3ZjljYWIwNDRjMjY0YTJlZDBkMTE3NDU3NTk2NWNiN2U1MmQ4ZDUifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T05:37:12.382Z"
+    "at": "2026-10-17T10:05:00.756Z"
   }
 }

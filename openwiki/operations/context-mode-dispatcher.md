@@ -3,9 +3,6 @@ type: operations
 title: "Context Mode dispatcher: version pin, tool filter, and cache security"
 description: How context-mode-dispatch.sh runs the pinned Context Mode 1.0.169 both as an MCP server behind a four-tool filter and as a hook-event runner, how it proves the version pin, why it owns exactly one cache location, and how a random provenance secret stops an untrusted cache from ever being trusted.
 tags: [context-mode, mcp, dispatcher, cache, security, version-pin, hooks]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T06:07:33.954Z
 sources:
   - id: openwiki-source-e119253b3c3737247dc63f2a
     resource: repo://.openwikiignore
@@ -17,11 +14,16 @@ sources:
     resource: repo://shared/hooks/scripts/context-mode-dispatch.sh
   - id: openwiki-source-b213a8cd2e1bfd19ba5d119e
     resource: repo://shared/hooks/scripts/context-mode-mcp-filter.mjs
+  - id: openwiki-source-bba83befb2bcd49f273ddec2
+    resource: repo://tests/fixtures/context_mode_hook/capture.py
   - id: openwiki-source-d93dd5f5161771a7b6074981
     resource: repo://tests/test_context_mode_dispatch.py
   - id: openwiki-source-1cc03a6e7c67d535ae1d0cac
     resource: repo://tests/test_context_mode_mcp_filter.py
-generated: { by: "claude-code", at: "2026-09-21T06:07:33.954Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Context Mode dispatcher: version pin, tool filter, and cache security
@@ -33,9 +35,21 @@ Context Mode is an optional retrieval helper (an MCP server that indexes and sea
 ## Two modes, one script
 
 - **Server mode** (`context-mode-dispatch.sh server`) is what `.mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`, and `.agents/mcp_config.json` launch. It starts `context-mode-mcp-filter.mjs` under Node in front of the pinned Context Mode, so every MCP message passes through the filter first.
-- **Hook mode** (`context-mode-dispatch.sh <host> <event>`) runs from SessionStart, PreToolUse, PostToolUse, and PreCompact hooks. It maps the host name to Context Mode's own target name (`github-copilot` to `vscode-copilot`, `openai-codex` to `codex`) and runs `context-mode hook <target> <event>`.
+- **Hook mode** (`context-mode-dispatch.sh <host> <event>`) runs from SessionStart, PreToolUse, PostToolUse, and PreCompact hooks. It maps the host name to Context Mode's own target name (`github-copilot` to `vscode-copilot`, `openai-codex` to `codex`), runs `context-mode hook <target> <event>` as a child (not `exec`), captures its output and exit status, and passes the output through the filter's `--hook-output` mode before anything reaches the host.
 
-The two modes differ in how they fail. Hook mode is optional observability, so a missing `context-mode` binary (with no `npx` fallback) or unavailable storage warns and exits 0; hook mode never checks for Node. Server mode is the real tool, so the same two conditions print an `ERROR context-mode-dispatch:` line and exit non-zero, and server mode additionally requires Node and the filter script, failing the same way when either is missing.
+The two modes differ in how they fail. Hook mode is optional observability and always exits 0: a missing `context-mode` binary (with no `npx` fallback) or unavailable storage warns and skips the event; a nonzero upstream exit is logged once and its output is still filtered; empty upstream output exits at once without starting Node; and a missing Node or filter script, or a failing filter, warns and drops the output. Server mode is the real tool, so a missing binary or storage prints an `ERROR context-mode-dispatch:` line and exits non-zero, and server mode additionally requires Node and the filter script, failing the same way when either is missing.
+
+## Hook output is advice only
+
+Upstream `context-mode hook` output at 1.0.169 is not advisory on its own. A capture with fixed payloads showed it denying WebFetch and plain `curl` (Claude Code), `web_fetch` (Codex), and `fetch` (Copilot), returning `allow` with a rewritten `updatedInput` for `curl` commands and subagent prompts, and injecting long routing blocks that name tools the MCP filter blocks. The repository documents this lane as making no safety decision or mutation, and `--hook-output` enforces that:
+
+- It builds a new object with only `hookSpecificOutput.hookEventName` and `additionalContext`. Every other field is dropped, including any decision, `permissionDecisionReason`, `updatedInput`, `tool_input`, `decision`, `continue`, `stopReason`, and `systemMessage`.
+- `hookEventName` must be a plain word (letters only), or nothing is emitted.
+- It strips the advice blocks `<context_window_protection>`, `<context_guidance>`, and `<session_search>`. Restored session data inside `<session_knowledge>`/`<session_guide>` is kept.
+- As a safety net, the whole `additionalContext` field is dropped if it still names a plugin-prefixed tool (`mcp__plugin_context-mode_`) or a `ctx_` tool outside the four-tool allowlist. Unclosed, nested, or differently cased advice tags are not stripped and rely on this net.
+- Empty, unparseable, or non-object output produces nothing.
+
+The recorded upstream outputs live in `tests/fixtures/context_mode_hook/1.0.169/<client-id>/<event>-<case>.json`. `tests/fixtures/context_mode_hook/capture.py` re-records them in isolation (temporary Git repository, temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `TMPDIR`, direct pinned binary asserted first, temporary paths redacted). A test ties the fixture directory name to `PINNED_CONTEXT_MODE_VERSION`, so a pin bump fails until the fixtures are re-captured. Antigravity has no Context Mode hooks wired, so it has no hook lane and no session continuity.
 
 ## The version pin is proven, not assumed
 
@@ -93,12 +107,13 @@ The consequence for lifecycle evidence is simple. No cache is ever searched or c
 ## Where the rules live
 
 - The tool allowlist and the four-tool contract are also stated in `shared/policies/tool-routing.instructions.md`, and `validate_targets.py`'s Context Mode tool-surface check keeps the generated configuration in agreement.
+- This repository's own tracked root adapters (`.mcp.json`, `.vscode/mcp.json`, `.codex/config.toml`) also start the server only through the dispatcher; `validate_targets.py` checks each one's `context-mode` entry. A user-level Context Mode plugin enabled in a person's own client settings brings its own unfiltered server and hooks, which the repository cannot govern.
 - Hook wiring per host is in `scripts/generate_targets.py`; see [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md).
 
 ## Representative tests
 
-- `tests/test_context_mode_dispatch.py` covers the storage rules (relative, traversal, tracked, symlinked, and external overrides all fall back and never create the refused path; an approved subtree is preserved), the version contract (direct binary only at the exact pin, refusal of wrong or undeterminable versions, `npx` fallback), the self-check fields, and the server-mode failure messages when Node or the filter is missing.
-- `tests/test_context_mode_mcp_filter.py` covers the exact allowlist in `initialize` and `tools/list`, no tools on a version mismatch, blocked and unknown calls never reaching upstream, guarded `ctx_index` arguments, and the duplicate-id and racing-id leak cases.
+- `tests/test_context_mode_dispatch.py` covers the storage rules (relative, traversal, tracked, symlinked, and external overrides all fall back and never create the refused path; an approved subtree is preserved), the version contract (direct binary only at the exact pin, refusal of wrong or undeterminable versions, `npx` fallback), the self-check fields, and the server-mode failure messages when Node or the filter is missing. It also replays every recorded upstream fixture through the real dispatcher (no decision, rewrite, or blocked name survives; restored session data is kept), the nonzero-exit and missing-Node paths, stdin forwarding, the fixture-version tie, and an opt-in real-binary test run with `CONTEXT_MODE_REAL=1 ... -k real_upstream` that fails rather than downloading when the pinned binary is absent.
+- `tests/test_context_mode_mcp_filter.py` covers the exact allowlist in `initialize` and `tools/list`, no tools on a version mismatch, blocked and unknown calls never reaching upstream, guarded `ctx_index` arguments, the duplicate-id and racing-id leak cases, and the `--hook-output` rules.
 
 ## Related pages
 

@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-c3f54dc63823dfff60ef659d
     resource: repo://tests/test_state_sync.py
-generated: { by: "claude-code", at: "2026-10-02T10:43:27.367Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T10:43:27.367Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Git-backed AI-state sync
@@ -81,6 +81,7 @@ The dispatcher wraps every command in a warn-and-continue and always exits 0. Wa
 ## What the nested repository never tracks
 
 - `.cache/` (Context Mode storage and the OpenWiki guard's snapshot directory) and `session_logs/hooks-errors.log` are ignored. `checkpoint` and every successful reconcile untrack them if an earlier commit tracked them, without deleting the files.
+- `settings.local.json` (Claude Code's per-user local settings) is ignored and, through `untrack_local_settings` in `commit_local_state`, removed from the index only, so the first checkpoint after an upgrade commits the untrack and the next publish removes the file from the shared remote. Because git would otherwise delete or overwrite a clone's own copy when it pulls that commit, `preserve_local_settings` keeps a byte copy at `.claude/.git/settings.local.json.<suffix>` around every pull and unrelated-history merge, and `restore_local_settings` decides afterwards: an unchanged file just drops the copy; a missing file, or one whose bytes equal the `origin/<branch>` version git wrote, gets the copy back ("restored local settings.local.json, which git replaced during reconciliation."); any other content is a newer local write, so it is kept along with the copy and a warning names the copy. If the copy cannot be made, the pull or merge is skipped with a warning and retried next sync. A write that lands before git writes its version in the same window cannot be told apart, so the older copy is restored in that case.
 - `session_logs/hooks-bypass.log` stays tracked.
 - The `.gitattributes` gives append-only `session_logs/*.log` files Git's `merge=union` driver, so two sessions appending to the same log reconcile automatically. Plans, `MEMORY.md`, and prose keep conflict-and-abort behavior so a real divergence stops for a human.
 

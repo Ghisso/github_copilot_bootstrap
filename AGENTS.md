@@ -11,7 +11,7 @@ An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is
 Semble and context-mode are optional helpers:
 
 - Use Semble for semantic repository discovery and related-code lookup.
-- Use context-mode for large outputs, logs, long markdown, and compaction-safe session continuity.
+- Use context-mode (`ctx_index`, `ctx_search`) to index and search large content such as logs and long markdown. Session continuity comes from its lifecycle hooks, which Antigravity does not wire.
 - Use `rg` for exact literals and direct file reads for known paths.
 
 For every user-facing message, use clear, direct language with short sentences

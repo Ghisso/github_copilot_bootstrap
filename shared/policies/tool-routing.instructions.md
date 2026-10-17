@@ -5,7 +5,7 @@ applicability: always
 
 # Tool Routing
 
-This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble is the optional semantic retrieval helper. Context Mode is available as both lifecycle hooks and a filtered Model Context Protocol (MCP) server; the MCP surface exposes exactly four guarded tools: `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`. Neither replaces the pre-flight, branch, plan, verify, review, document, learn, session-log, commit workflow, hook guardrails, or project-specific instructions.
+This file is the authoritative routing policy for retrieval helpers in this bootstrap. Semble is the optional semantic retrieval helper. Context Mode is available as both lifecycle hooks and a filtered Model Context Protocol (MCP) server; the MCP surface exposes exactly four guarded tools: `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`. Neither replaces the pre-flight, branch, plan, verify, review, document, learn, session-log, commit workflow, hook guardrails, or project-specific instructions. The Context Mode lifecycle hooks give advice only: the dispatcher forwards `hookEventName` and filtered `additionalContext`, never a decision or an input rewrite.
 
 ## Routing Contract
 
@@ -25,7 +25,7 @@ This file is the authoritative routing policy for retrieval helpers in this boot
 3. Use Semble for broader semantic discovery only when direct reads and exact search leave a concrete gap.
 4. If Semble is unavailable, continue with direct reads and `rg`; missing optional binaries are warnings, not blockers.
 
-Context Mode lifecycle hooks and its MCP server both run through `.claude/hooks/scripts/context-mode-dispatch.sh` (`server` mode starts the guarded MCP filter). By default it exports the canonical absolute project-local cache root `<repo>/.claude/.cache/context-mode`. Inside the repository, overrides are accepted only within that subtree; canonical external absolute overrides remain supported. The cache is derived local state: never commit, sync, restore, or cite it as lifecycle evidence. Context Mode is pinned to exactly `1.0.169`; when it is unavailable or its version does not match, hooks warn and fail open and the MCP server warns clearly and exits nonzero, falling back to direct reads, `rg`, and Semble.
+Context Mode lifecycle hooks and its MCP server both run through `.claude/hooks/scripts/context-mode-dispatch.sh` (`server` mode starts the guarded MCP filter). The root adapters (`.mcp.json`, `.vscode/mcp.json`, and `.codex/config.toml`) start the server only through this guarded dispatcher, and the bootstrap's `validate_targets.py` checks each adapter's `context-mode` entry. By default it exports the canonical absolute project-local cache root `<repo>/.claude/.cache/context-mode`. Inside the repository, overrides are accepted only within that subtree; canonical external absolute overrides remain supported. The cache is derived local state: never commit, sync, restore, or cite it as lifecycle evidence. Context Mode is pinned to exactly `1.0.169`; when it is unavailable or its version does not match, hooks warn and fail open and the MCP server warns clearly and exits nonzero, falling back to direct reads, `rg`, and Semble.
 
 ## Do Not Use Optional Retrieval For
 

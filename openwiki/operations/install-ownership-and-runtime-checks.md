@@ -16,14 +16,16 @@ sources:
     resource: repo://scripts/update_consumers.py
   - id: openwiki-source-92c74e76955d0f817db531c4
     resource: repo://shared/hooks/scripts/state-sync.sh
+  - id: openwiki-source-b7cd6d01f37550e855f61bdc
+    resource: repo://shared/scripts/verify.py
   - id: openwiki-source-f48dfb5bc22ec5140aa8b810
     resource: repo://tests/test_install_bootstrap.py
   - id: openwiki-source-b856c5ae4b7ba9cdb970706a
     resource: repo://tests/test_sidecar_workflow_scenario.py
-generated: { by: "claude-code", at: "2026-10-02T10:43:27.367Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T10:43:27.367Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Installing the bootstrap, file ownership, and runtime drift checks
@@ -121,7 +123,7 @@ flowchart TD
 5. `migrate_pre_existing_state` commits a pre-Git `.claude/` with real content as `migrate: import pre-git state` before anything is replaced.
 6. `copy_generated_tree` copies `dist/multi-agent/` over the target. It logs `preserve consumer state`, `preserve tracked authoring adapter`, and `preserve third-party skill`, and `remove obsolete generated file` for bootstrap-owned files the new generation no longer produces. Pruning walks only `.claude/` and the restorable root paths.
 7. Project name and Python version are substituted into the installed instructions.
-8. `populate_bootstrap_root` mirrors the root adapters into `.claude/bootstrap-root/` so the Git-backed checkout carries them.
+8. `populate_bootstrap_root` mirrors the root adapters into `.claude/bootstrap-root/` so the Git-backed checkout carries them. The verifier's control-plane provenance requires each live root adapter to equal its mirror, so in this authoring repository an edit to a tracked root adapter such as `.mcp.json` or `.vscode/mcp.json` makes `verify.py` report invalid control-plane provenance until the self-install (`install_bootstrap.py . --allow-self --local-only`) repopulates the mirror.
 9. `merge_gitignore` writes or refreshes an idempotent block between `# BEGIN multi-agent bootstrap generated/private AI content` and its `# END` marker; runtime scripts are made executable; `configure_git_hooks_path` sets `core.hooksPath` to `.claude/hooks/git-hooks`; tracked paths that should be ignored are reported with the exact `git rm --cached` command. That check runs after most of the writes, so `warn_tracked_paths` turns a Git failure into the warning `could not check for tracked generated paths: <error>` instead of stopping the install.
 10. `sync_state_after_install` runs `state-sync.sh` to make the `bootstrap: install/update <timestamp>` nested commit and, unless `--local-only`, publish it.
 11. A reminder that Codex for VS Code may require renewed approval of the content-bound `.codex/hooks.json`. The installer never approves hooks itself.

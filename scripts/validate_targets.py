@@ -7961,12 +7961,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             / "shared"
             / "skills"
             / "ponytail"
-            / "SKILL.md": "9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3",
+            / "SKILL.md": "7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1",
             REPO_ROOT
             / "shared"
             / "skills"
             / "ponytail-review"
-            / "SKILL.md": "bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656",
+            / "SKILL.md": "0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8",
             REPO_ROOT
             / "shared"
             / "third_party"
@@ -9138,7 +9138,8 @@ def _sidecar_skills_profile_cases(good_root: Path, errors: list[str]) -> None:
     write(
         skill_md,
         original_skill
-        + "\nthe workflow's final Ponytail diff review remains mandatory.\n",
+        + "\nthe `ponytail` review profile still runs wherever the review-routing table or\n"
+        "the commit gate requires it.\n",
     )
     check(
         any(
@@ -11726,7 +11727,8 @@ def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
         # verbatim by shared/policies/workspace.instructions.md's
         # control-plane definition ("Control-plane files include
         # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
-        # .mcp.json, .devcontainer/, CLAUDE.md, and AGENTS.md") must also be
+        # .mcp.json, .vscode/mcp.json, .devcontainer/, CLAUDE.md, and
+        # AGENTS.md") must also be
         # excluded - a docs(typo): commit must never rewrite root guidance
         # or the .codex/.devcontainer control-plane surfaces unreviewed.
         for relative_path in (

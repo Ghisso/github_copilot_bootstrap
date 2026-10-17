@@ -5,7 +5,7 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-06T09:13:17.144Z
+    at: 2026-10-17T10:05:00.756Z
 sources:
   - id: openwiki-source-5939cd6c98209174dac35ee6
     resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
@@ -13,6 +13,8 @@ sources:
     resource: repo://docs/evidence/behavioral-pilot/phase-a/judgments.json
   - id: openwiki-source-0538e0ce41cc304631959580
     resource: repo://docs/native-client-acceptance.md
+  - id: openwiki-source-7aaa88e66a4141ea24c14706
+    resource: repo://docs/target-mapping.md
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
   - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
@@ -57,13 +59,15 @@ sources:
     resource: repo://shared/policies/workspace.instructions.md
   - id: openwiki-source-ac6151a0e717fb82e280dbaf
     resource: repo://shared/scripts/record_findings.py
+  - id: openwiki-source-b7cd6d01f37550e855f61bdc
+    resource: repo://shared/scripts/verify.py
   - id: openwiki-source-a931d0171c8876319a735abf
     resource: repo://shared/skills/debug-investigator/SKILL.md
   - id: openwiki-source-3f83db488140df5d5a38535a
     resource: repo://shared/templates/skill-template.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "codex", at: "2026-10-06T09:06:27.232Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -139,11 +143,11 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 
 ## What each host receives
 
-- **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with the frontmatter `claude_agent_frontmatter` builds: `name`, `description`, a `tools` list derived from `capabilities`, optional `model` and `effort` from `model_intent["claude-code"]`, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body is the canonical prompt with target path rewrites.
+- **Claude Code.** `render_claude_agents` writes `.claude/agents/<name>.md` with the frontmatter `claude_agent_frontmatter` builds: `name`, `description`, a `tools` list derived from `capabilities`, optional `model` and `effort` from `model_intent["claude-code"]`, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body is the canonical prompt with target path rewrites. The `search` capability maps to `Grep`, `Glob`, and the server-level grants `mcp__semble`, `mcp__context-mode`, and `mcp__context7`, so every agent that can search also gets read-only documentation lookup through Context7.
 - **Sidecar workflow profile.** `render_sidecar_workflow_units` writes the same `.claude/agents/<id>.md` for the five canonical agents into `dist/sidecar/workflow/`, with `sidecar_agent_frontmatter`, which is the Claude Code frontmatter with every `mcp__*` tool grant removed because the sidecar ships no MCP configuration, around the agent's `workflow-prompt.md`. No `.github/agents` or `.codex/agents` file ships in that profile. The workflow orchestrator delegates a step only to an agent the session can start, and otherwise does that step itself and labels a self-review as one. The planner and reviewer return their plan or report as reply text, and the agent that asked saves it under `.ai-bootstrap/`, because their tools come from the shared `capabilities` and include no `Write` or `Edit`. These relaxed prompts carry short advisory versions of the checks described under "Requirement authority and evidence" below: the planner names each decisive assumption, the coder reruns the original reproduction after a bug fix, and the reviewer compares the diff against the approved requirements and lists anything it still needs at the end of its report. The [sidecar overlay page](/openwiki/operations/sidecar-overlay.md) covers how those files reach a team-owned repository.
 - **GitHub Copilot.** `render_github_agent_adapter` writes a thin pointer: frontmatter with `name`, `description`, tools, an `agents:` list from `delegates`, `user-invocable: false` for hidden agents, and `disable-model-invocation: true` for the orchestrator. The body tells Copilot to read the canonical `.claude/agents/<name>.md`. An agent not eligible for Claude Code gets a self-contained body instead.
-- **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, a `sandbox_mode` derived from capabilities, and the composed prompt as `developer_instructions`.
-- **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents.
+- **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, a `sandbox_mode` derived from capabilities, and the composed prompt as `developer_instructions`. Codex custom agents inherit the parent session's MCP servers, sandbox, and approval policy, and a custom agent file cannot override them. The emitted `sandbox_mode = "read-only"` therefore has no effect: read-only roles run with the parent session's sandbox. That is a recorded follow-up in `docs/target-mapping.md`.
+- **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents. `inheritMcp` is not a documented Antigravity field (the documented subagent field is `mcpServers`), so whether Antigravity subagents reach the workspace MCP servers is unverified, and the Antigravity hook bridge denies MCP tool calls in any case.
 
 The sidecar planner uses different status lists for big and small plans. Big plans use `planning`, `in-progress`, `complete`, or `cancelled`; small plans use `planned`, `in-progress`, `paused`, `complete`, or `cancelled`. These labels are descriptive and do not gate a sidecar commit.
 
@@ -156,8 +160,8 @@ The ten profiles are `api`, `architecture`, `code`, `config`, `documentation`, `
 Which profiles apply is decided by the routing table in `shared/policies/workspace.instructions.md`, not by the reviewer:
 
 - Hooks, scripts, generators, and control-plane code always get `code`, `architecture`, `security`, `tests`, and `ponytail`.
-- Ponytail review is mandatory for every control-plane or high-risk diff and every multi-file diff. The commit gate enforces this by requiring `ponytail_reviewed=true` in the findings report for such diffs.
-- Ponytail is optional only for a single low-complexity documentation file or a single workflow-state file.
+- Ponytail is required for every control-plane or high-risk diff, every multi-file diff, and every diff that expands complexity. It is optional only for one low-complexity documentation file or one workflow-state file.
+- The commit gate enforces the deterministic part. `required_review_profiles` in `shared/scripts/verify.py` maps the changed paths to profiles: test surfaces (checked first) need `tests`; control-plane, generator, and dependency paths need `code`, `architecture`, `security`, `tests`, and `ponytail`. The gate adds `ponytail` for any multi-file diff and refuses a findings report that lacks any required profile. Complexity expansion inside one ordinary file stays the reviewer's call.
 
 ## Requirement authority and evidence
 
@@ -166,6 +170,7 @@ The approved plan or spec, its non-goals, and its approved scope-change records 
 - **Orchestrator.** Every delegation packet carries the approved requirements, non-goals, and scope-change records. The reviewer packet also carries the verification results already obtained, such as the coder's rerun of the original reproduction.
 - **Reviewer.** Pass 1 checks that every in-scope behavior has an implementation and evidence, and that nothing unapproved was added. An approved scope change replaces the requirement it changes, and a valid alternative implementation is not a deviation. Missing material behavior is an ordinary finding at the existing severity; the reviewer never invents a requirement.
 - **Open requests.** The reviewer cannot pause to ask a question. It lists missing requirements or execution evidence under an optional `### Open Requests` section and answers `WARN` instead of `PASS`. The orchestrator answers each request with the result or the plain reason it cannot be produced, then reruns the review; a request answered with a reason closes as an unverified limitation. Open requests never enter the findings JSON, and an empty `[]` means a clean review only when no request is open.
+- **Gate result.** The reviewer ends with `FAIL` when a CRITICAL or MAJOR finding survives, `WARN` when a request is open, and otherwise `PASS`. The orchestrator records that value with `record_findings.py --gate-result` and each open request with `--open-request`. The commit gate refuses a phase-completion commit unless the recorded result is `PASS` with no open request.
 - **Planner.** In full-plan mode, Phase 1 lists each decisive assumption (one that would invalidate the design if false) and settles it from code, docs, or a bounded experiment before phases are split. An experiment never authorizes production changes, and an unresolved assumption stays explicit or blocked. Phase 2 asks the user only about preferences, and Phase 4 cites the existing contracts and the test strategy.
 - **Coder and debugging.** After a bug fix, the coder and the `debug-investigator` skill rerun the original reproduction and record the outcome or why it could not be rerun. A green test suite alone does not count as that check. The `tests` profile also checks that expected values do not come from the implementation under test.
 
@@ -204,7 +209,7 @@ There is one library, rendered three ways.
 - `visibility` is `public` or `background`, and `description` is non-empty and unique across the library;
 - a backtick-quoted path naming a known repository root or a `references/` path must resolve to a real file (`SKILL_BROKEN_REFERENCE`). Bare filenames and glob patterns are not checked.
 
-`validate_skills_and_paths` adds the target-level checks: the generated skill count equals the shared count, the Ponytail and humanize contracts hold, and the generated documenter prompt still references `humanize`. Semantic skill quality is left to the `deep-audit` skill on purpose.
+`validate_skills_and_paths` adds the target-level checks: shipped shell blocks may not hide a test, lint, or verify failure behind `|| true`, `|| :`, or `|| echo`; the generated skill count equals the shared count; the Ponytail and humanize contracts hold; and the generated documenter prompt still references `humanize`. Semantic skill quality is left to the `deep-audit` skill on purpose.
 
 ## Representative tests
 

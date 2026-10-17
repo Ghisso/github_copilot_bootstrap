@@ -14,10 +14,10 @@ sources:
     resource: repo://shared/scripts/record_findings.py
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-27T05:02:18.019Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T05:02:18.019Z
+    at: 2026-10-17T10:13:26.159Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -72,7 +72,7 @@ Each lint, type, generation, or pytest command in `phase` mode runs under `COMMA
 
 ## What a receipt binds
 
-Receipt metadata holds `base_ref`, `branch`, `head_sha`, `merge_base_sha`, `tree_sha` (from `git write-tree`, so it binds the index), `phase`, `content_hash` (the diff against the merge base), `tracked_state_hash`, `changed_paths`, `relevant_paths`, `path_discovery_ok`, and a `control_plane_provenance` object.
+Receipt metadata holds `base_ref`, `branch`, `head_sha`, `merge_base_sha`, `tree_sha` (from `git write-tree`, so it binds the index), `phase`, `content_hash` (the diff against the merge base), `tracked_state_hash`, `changed_paths`, `relevant_paths`, `path_discovery_ok`, and a `control_plane_provenance` object. `tracked_state_hash` is informational and no gate compares it; at commit time `tree_sha` is the binding check, so any change staged after closeout, documentation included, makes the receipt stale. `changed_paths` also drives the required review profiles described below.
 
 `control_plane_provenance` stops evidence from one runtime or plan being reused for another:
 
@@ -113,7 +113,8 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 `shared/scripts/record_findings.py` persists the reviewer's surviving findings as `.claude/quality_reports/findings-<phase>.json`:
 
 - Each finding needs a `severity` of `CRITICAL`, `MAJOR`, or `MINOR`, a non-empty `title`, and a `profile` among the repeated `--profile` arguments.
-- The report records `counts`, `profiles_reviewed`, the findings, and Git metadata: `branch`, `head_sha`, `merge_base_sha`, `content_hash`, `changed_files`, and `dirty: true` when any tracked change is unstaged. That is why the closeout sequence stages before recording.
+- The report records `schema_version: 2`, `counts`, `profiles_reviewed`, the findings, the reviewer's `gate_result` (from the required `--gate-result PASS|WARN|FAIL`), `open_requests` (from repeatable `--open-request`), and Git metadata: `branch`, `head_sha`, `merge_base_sha`, `content_hash`, `changed_files`, and `dirty: true` when any tracked change is unstaged. That is why the closeout sequence stages before recording.
+- The recorder refuses `--gate-result PASS` together with any open request, and an empty open request, and writes nothing in that case.
 - When `ponytail` was reviewed the report carries `ponytail_reviewed: true` and `ponytail_findings`.
 
 ## What blocks a commit or push
@@ -124,7 +125,14 @@ Any violation fails `VFY-GEN-001` and, through the same function, the commit gat
 - `ancestor`, for pushes of later work: the receipt's head must be an ancestor of the pushed ref.
 - `certified`, for the exact phase-completion commit: the pushed commit must be the direct child of the receipt's `head_sha`, because receipts are generated before the commit they certify.
 
-In every relation the gate requires a passing `closeout` receipt for `base_ref` `dev`, the same branch and phase, and a matching `merge_base_sha`. It also requires `counts.critical == 0` and `counts.major == 0` in the findings report and a `disposition` with a non-empty `reason` on every surviving MINOR. For a multi-file or otherwise high-risk diff it requires `ponytail_reviewed=true`; the refusal reads `this high-risk diff requires a fresh Ponytail review`.
+In every relation the gate requires a passing `closeout` receipt for `base_ref` `dev`, the same branch and phase, and a matching `merge_base_sha`. It also requires `counts.critical == 0` and `counts.major == 0` in the findings report and a `disposition` with a non-empty `reason` on every surviving MINOR.
+
+Two more rules come from the review evidence itself:
+
+- **Gate result.** At phase completion the report's `gate_result` must be `PASS` and `open_requests` empty. A report without `gate_result` is refused with a message to re-record it with `--gate-result` before closeout.
+- **Required review profiles.** `required_review_profiles` maps the receipt's `changed_paths`, cumulative from the merge base, to profiles. Test surfaces are checked first: a path under `tests/` or a file named `test_*.py`, `*_test.py`, or `conftest.py` needs `tests`. Otherwise a `control-plane` or `generator` path, or a dependency file (`DEPENDENCY_FILES`, `pyproject.toml`, `requirements*.txt`, `requirements*.in`), needs `code`, `architecture`, `security`, `tests`, and `ponytail`; `.vscode/mcp.json` is a control-plane file. The gate also adds `ponytail` for a multi-file or otherwise high-risk diff. A missing profile is refused in one error, `findings report is missing required review profiles: …`, which keeps `this high-risk diff requires a fresh Ponytail review` when `ponytail` is missing.
+
+The commit gate (`exact`) always applies both rules; the profile rule applies to every commit there. The push gates (`ancestor`, `certified`) apply them only to reports with `schema_version` 2 or later, so a phase completed before these rules existed is never re-judged. A `schema_version` that is not an integer below 2 counts as 2 or later.
 
 With the `exact` relation the gate also enforces the verification-items contract with these prefixes:
 

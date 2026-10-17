@@ -3269,8 +3269,8 @@ def test_ponytail_upstream_describes_the_real_fork_divergence() -> None:
         REPO_ROOT / "shared" / "third_party" / "ponytail" / "UPSTREAM.md"
     ).read_text(encoding="utf-8")
     normalized = " ".join(text.split())
-    assert "72 lines against upstream" in normalized
-    assert "38 lines against upstream" in normalized
+    assert "73 lines against upstream" in normalized
+    assert "40 lines against upstream" in normalized
     assert "limited to formatting, the bootstrap's required" not in normalized
 
 
@@ -3310,9 +3310,9 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # equals today's dist/sidecar/ byte for byte." Any edit to one of the four
 # shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
 # changes this hash and needs the same re-capture; the last one was the
-# engineering-workflow-improvements Phase A debug-investigator step.
+# gate-repair Phase E ponytail-review description step.
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "a00e2ef4e7f1d6fa132455c9bc5d4336c3073904bd030fcc7c552053a857d985"
+    "e646f36864fa4d86608e708ee34c81f4531938e548aee3f64a4c23096aab5867"
 )
 
 

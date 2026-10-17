@@ -21,7 +21,7 @@ sources:
 generated: { by: "claude-code", at: "2026-10-02T11:00:38.908Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T11:00:38.908Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:6431967345f884c63355ebebb9a37781f915b696d5242a4b0d67f6584c1eee6b",
+  "pageVersion": "sha256:5dac62364c4049250a34b5b76bcbea101bcf9cfcc7eada8133d5d3235efda1b5",
   "claims": [
     {
       "id": "claim_b1af9741cfc242439d4d2f5655e2f681",
@@ -387,10 +387,24 @@
           "version": "repo-lines-v1:sha256:9961b9a65576cad15f4c900d6b7b2e585116b7580ec75cf7e7ae44173b85497c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMDJkNWI2ZTAzMjgzMTAxNzc4MWE0MDRhN2NkNjM4NTljN2Y2NWM0ODVkZjYzYmJhN2VjYzRiNGFiNzE4ZDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZkMmI4OWM0MzU5ZGYxMzZlM2IxZmE1M2FhNzBkMGUwY2U1ZjQ3NGRkNjM5YTA3Nzc3Mzk1NDgzYjdkMWZhOTMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFkMDJhMWM0OTRkYTdlNzIyZjIzODA5NzEyMzY2MmYwYWYwYThkMmUzYWRiZTE0OTU0OGRkMzJmNWE3ZTBjNzUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBmYzdkODdlMjRiMDk4YmIxMmU2MGVjYTgyZTdjYmEwNGE0Mjk1MWMyMzFmOGY1YWFiN2VmZGI0MzliZmM2MWYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_6fb7ef93d7554b61a9360444a30f5950",
+      "statement": "The verifier's control-plane provenance requires each live root adapter to equal its mirror under .claude/bootstrap-root/, so an edit to a tracked root adapter makes verify.py report invalid control-plane provenance until install_bootstrap.py's populate_bootstrap_root refreshes the mirror.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/install_bootstrap.py#L1028-L1060",
+          "version": "repo-lines-v1:sha256:17227c2fe633c72599bf6d12daabce6292462997fdad0302f75082b261c0aba0:eyJzZWxlY3RlZExpbmVDb3VudCI6MzMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA2OTE1YmVjZDFmZWU1YzI1OGRmNzYyOWJmOTZmZWQwYjcwMDBmM2FmMWMwOGEzNDNiOWQzNTY5Mzk5MzQzMjgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijg0NmQ4N2ZiZWU1ZTg4MmVmZTVhNzQ3NGZkODc5ZDZhNjFkYThjMmU4NDRjNzJjYmYzOWI5MzkwMDcyMzQ5NDMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBlNDdmY2U0ZGM3Y2QxMjlkOTE5ODcxZGY4OTE5Yzk3M2I5YTM1NjAwNzE4NjVhYTcwYmYwMmMwODI5Y2U2NGEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY0Yzk0YTdhZWM0N2Y1MDI0ZTRkNjFkM2NiZWU0MzM5YjdjOTQ1ZWE3MmU5YTY4YTA1NmViMGJkMmU5ZTgwMTIifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L913-L963",
+          "version": "repo-lines-v1:sha256:b8ee5b28615340a055bf7ca8bd9f0bd6eae319fb18838bf4a93cf5f84c6f0c8b:eyJzZWxlY3RlZExpbmVDb3VudCI6NTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjY0NWY2NTFjOGFjMzZiMzE5ODViMTA1Y2IwZTc3OGI3YjgyYzc3YWJmZjE2NmE3NDIzMzI2ZmQwZWVlZmQyMmEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjVhMTNkODlkODIyNjU5OTdiMTZkMTYxNWUyOGFmZGFiNjQzMzg4MWU5NDQ1OTY4ZmRkYTEzOGE4MWI2NjliMWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjUwZjFlNDI4MjIyNTVlMmNjY2M4YmY5OWRlOGNkYWFkMmMzZDg2Njc5OTQwMjdkYjE1NWQxMTk2ZDYxM2IyNjcifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-10-02T10:43:27.367Z"
+    "at": "2026-10-17T10:05:00.756Z"
   }
 }
