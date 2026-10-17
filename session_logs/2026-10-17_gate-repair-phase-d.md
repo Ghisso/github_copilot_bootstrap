@@ -95,6 +95,22 @@ remove the stale agent schema (GR-011).
   file with an unchanged hash, `verify.py phase` PASS (pytest 2695 passed,
   1 skipped), `validate_targets.py` PASS. Same reviewer asked to confirm.
 
+- **13:55** - Review round 2: all four round-1 fixes confirmed. Gate Result
+  `WARN`: one new MINOR (docs say three warnings; a fourth, informational
+  "restored local settings.local.json …" warning exists) and one open
+  request: does Copilot's native read of a protected config ask? Probe run
+  by the orchestrator with `shared/hooks/scripts/protect-files.sh
+  github-copilot` and payloads from files (`tool_name: read_file`,
+  `tool_input.filePath`): `.vscode/settings.json`, `.mcp.json`, and the
+  previously protected `.claude/settings.json` all return `ask` with the
+  reason "Editing hook files requires approval"; `README.md` returns no
+  decision. Pre-existing for Copilot (the guard runs on every Copilot tool
+  call and treats any path key as a write), now wider. Related question
+  raised: the shell guards recognize a terminal command only for tool names
+  containing `bash`/`shell` or equal to `execute`; whether VS Code's
+  terminal tool name reaches them is unknown in this repository. Research
+  agent asked for the documented VS Code hook `tool_name` values.
+
 ## [LEARN] Entries
 
 ## Verification
