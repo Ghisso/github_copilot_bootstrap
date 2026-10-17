@@ -30,7 +30,10 @@ function sanitizeHookOutput(raw) {
   const specific = parsed?.hookSpecificOutput;
   if (!specific || typeof specific !== "object") return "";
   const { hookEventName, additionalContext } = specific;
-  if (typeof hookEventName !== "string" || typeof additionalContext !== "string") return "";
+  // The event name is copied verbatim, so it gets the same fail-closed scrutiny
+  // as the text: a plain word, never a tool name or free text.
+  if (typeof hookEventName !== "string" || !/^[A-Za-z]+$/.test(hookEventName)) return "";
+  if (typeof additionalContext !== "string") return "";
   const text = ADVICE_BLOCKS.reduce((rest, block) => rest.replace(block, ""), additionalContext);
   const names = text.match(/ctx_[A-Za-z0-9_]+/g) ?? [];
   if (text.includes(PLUGIN_PREFIX) || names.some((name) => !ALLOWED_TOOLS.has(name))) return "";
