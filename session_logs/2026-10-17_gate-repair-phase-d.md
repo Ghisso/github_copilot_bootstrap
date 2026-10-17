@@ -76,6 +76,16 @@ remove the stale agent schema (GR-011).
   `docs/runtime-checks.md`, and `README.md`; one stale README intro count
   sent back.
 
+- **12:45** - Review round 1: Gate Result `PASS`, no CRITICAL or MAJOR, four
+  MINOR: (1) `restore_local_settings` reverts a legitimate concurrent write
+  made during the pull window (real data-safety issue); (2) state-sync
+  change undocumented; (3) docs omit that any non-read command naming a
+  protected config is denied on all clients, including an inline PR body;
+  (4) branch-gate error loop can be an array slice. All four sent back:
+  coder (restore only when missing or equal to git's blob, loop shrink,
+  lock-in test), documenter (state-sync paragraph, naming-deny sentence
+  with the `--body-file` advice).
+
 ## [LEARN] Entries
 
 ## Verification
