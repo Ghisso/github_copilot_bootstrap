@@ -60,6 +60,13 @@ tests (GR-003), and post-closeout drift (GR-004).
   policy, comment; documenter for README, runtime-checks, smoke-tests.
   Reviewer confirmed no push or PR path re-judges a pre-upgrade phase.
 
+- **06:05** - All six MINOR fixes landed (coder: schema test values with a
+  bool negative control, reviewer prompt, policy text, comment; documenter:
+  README, runtime-checks table row, smoke-tests). Re-ran generation,
+  self-install, `check_runtime.py` PASS, `validate_targets.py` PASS,
+  `verify.py phase` PASS (pytest 2378 passed). Fresh reviewer (round 2) on
+  the full 15-file diff.
+
 ## [LEARN] Entries
 
 ## Verification
