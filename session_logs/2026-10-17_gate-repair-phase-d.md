@@ -3,7 +3,7 @@
 **Date:** 2026-10-17
 **Plan:** .claude/plans/2026-10-17_phase-D-guard-coverage.md
 **Parent plan:** .claude/plans/gate-repair.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -227,6 +227,17 @@ remove the stale agent schema (GR-011).
   `shared/` script copy.
 
 ## Verification
+
+- PASS        0.3s  uv run python scripts/generate_targets.py --all
+- PASS       43.8s  uv run python scripts/validate_targets.py
+- PASS      110.3s  uv run pytest tests/test_hook_gates.py tests/test_protect_files_scoping.py tests/test_branch_state.py tests/test_state_sync.py tests/test_lifecycle_hooks.py tests/test_validate_targets.py -q
+- PASS        0.8s  uv run python scripts/check_runtime.py
+- PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+- PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+
+Phase receipt: `verify.py phase --format json --persist` PASS. Findings
+report: `.claude/quality_reports/findings-2026-10-17_phase-D-guard-coverage.json`
+(0 findings, `gate_result: PASS`, six profiles).
 
 - optional 1: NOT RUN — the native Claude Code checks (an agent edit of `.claude/settings.local.json` prompting, and a "don't ask again" approval still saving) are user-run host checks; protect-files returns `ask` for `claude-code` in the offline tests.
 - optional 2: NOT RUN — a native Codex edit of `.codex/hooks.json` is a user-run host check; the `openai-codex` deny is covered offline.
