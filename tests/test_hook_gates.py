@@ -1492,14 +1492,16 @@ def test_record_branch_state_writes_nothing_for_a_foreign_branch_creation(
 
 
 def _run_protect_files(
-    payload: dict, repo_root: Path | None = None
+    payload: dict,
+    repo_root: Path | None = None,
+    target_id: str = "openai-codex",
 ) -> subprocess.CompletedProcess[str]:
     root = repo_root if repo_root is not None else REPO_ROOT
     scripts_dir = (
         _isolated_hook_scripts_dir(root) if repo_root is not None else SCRIPT_SRC
     )
     return subprocess.run(
-        ["bash", str(scripts_dir / "protect-files.sh"), "openai-codex"],
+        ["bash", str(scripts_dir / "protect-files.sh"), target_id],
         cwd=root,
         input=json.dumps(payload),
         text=True,
@@ -1508,7 +1510,7 @@ def _run_protect_files(
         env={
             **os.environ,
             "REPO_ROOT": str(root),
-            "TARGET_ID": "openai-codex",
+            "TARGET_ID": target_id,
             "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", "/tmp/uv-cache"),
         },
     )
@@ -3227,6 +3229,544 @@ def test_antigravity_pretool_fails_closed_for_raw_malformed_json(
     assert process.returncode == 0
     assert json.loads(process.stdout)["decision"] == "deny"
     assert "WARN antigravity-pretool:" in process.stderr
+
+
+# --------------------------------------------------------------------------
+# GR-008: every client's in-repository hook- and server-launching config gets
+# the hook-config decision (Claude and Copilot ask; Codex and Antigravity
+# deny), whichever way the write arrives.
+# --------------------------------------------------------------------------
+
+HOOK_AND_SERVER_CONFIGS = (
+    ".claude/settings.local.json",
+    ".agents/hooks.json",
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".agents/mcp_config.json",
+    ".vscode/settings.json",
+    ".github/copilot/settings.json",
+    ".github/copilot/settings.local.json",
+)
+CLIENT_CONFIG_DECISIONS = (
+    pytest.param("claude-code", "ask", id="claude-code"),
+    pytest.param("openai-codex", "deny", id="openai-codex"),
+    pytest.param("github-copilot", "ask", id="github-copilot"),
+    pytest.param("google-antigravity", "deny", id="google-antigravity"),
+)
+SELF_INSTALL_COMMANDS = (
+    "uv run python scripts/install_bootstrap.py . --allow-self --local-only",
+    "uv run python scripts/generate_targets.py --all",
+)
+
+
+def _client_edit_payload(target_id: str, relative_path: str) -> dict:
+    """The native edit payload shape each client sends to ``protect-files``."""
+    if target_id == "openai-codex":
+        patch = f"*** Begin Patch\n*** Update File: {relative_path}\n@@\n x\n*** End Patch\n"
+        return {"tool_name": "apply_patch", "tool_input": {"command": patch}}
+    if target_id == "github-copilot":
+        return {"toolName": "edit", "toolArgs": json.dumps({"path": relative_path})}
+    return {"tool_name": "Write", "tool_input": {"file_path": relative_path}}
+
+
+def _client_bash_payload(target_id: str, command: str) -> dict:
+    """The Bash payload shape each client sends to the safety guards."""
+    if target_id == "github-copilot":
+        return {"toolName": "bash", "toolArgs": json.dumps({"command": command})}
+    return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def _protect_decision(process: subprocess.CompletedProcess[str]) -> str:
+    """The ``permissionDecision`` a guard printed, or ``allow`` for no output."""
+    assert process.returncode == 0, process.stderr
+    if not process.stdout.strip():
+        return "allow"
+    return json.loads(process.stdout)["hookSpecificOutput"]["permissionDecision"]
+
+
+def _antigravity_bridge_repo(repo_root: Path) -> Path:
+    """Give ``repo_root`` the installed ``.claude/hooks/scripts`` the
+    Antigravity bridge runs, symlinked to the real shared script bytes."""
+    scripts_dir = repo_root / ".claude" / "hooks" / "scripts"
+    if not scripts_dir.exists():
+        scripts_dir.parent.mkdir(parents=True, exist_ok=True)
+        scripts_dir.symlink_to(SCRIPT_SRC, target_is_directory=True)
+    (repo_root / ".claude" / "session_logs").mkdir(parents=True, exist_ok=True)
+    return repo_root
+
+
+@pytest.mark.parametrize("operation", ("edit", "redirect"))
+@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_gates_hook_and_server_configs_per_client(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str, operation: str
+) -> None:
+    payload = (
+        _client_edit_payload(target_id, relative_path)
+        if operation == "edit"
+        else _client_bash_payload(target_id, f"echo x > {relative_path}")
+    )
+
+    process = _run_protect_files(payload, tmp_path, target_id)
+
+    assert _protect_decision(process) == expected, process.stdout
+    if expected != "allow":
+        assert relative_path in process.stdout
+
+
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+def test_pretool_bash_guard_gates_hook_and_server_config_redirects(
+    tmp_path: Path, target_id: str, relative_path: str
+) -> None:
+    """Claude and Codex reach ``protect-files`` for Bash through the ordered
+    ``pretool-bash-guard.sh`` chain, so that is where the redirect is judged."""
+    scripts_dir = _isolated_hook_scripts_dir(tmp_path)
+    process = subprocess.run(
+        ["bash", str(scripts_dir / "pretool-bash-guard.sh"), target_id],
+        cwd=tmp_path,
+        input=json.dumps(_client_bash_payload(target_id, f"echo x > {relative_path}")),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    expected = "deny" if target_id == "openai-codex" else "ask"
+    assert _protect_decision(process) == expected, process.stdout
+
+
+@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("operation", ("write_to_file", "run_command"))
+def test_antigravity_bridge_denies_hook_and_server_config_writes(
+    tmp_path: Path, relative_path: str, operation: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+    args = (
+        {"TargetFile": relative_path}
+        if operation == "write_to_file"
+        else {"CommandLine": f"echo x > {relative_path}", "Cwd": str(root)}
+    )
+
+    process = _run_antigravity_pretool(
+        {"toolCall": {"name": operation, "args": args}}, root
+    )
+
+    assert process.returncode == 0, process.stderr
+    response = json.loads(process.stdout)
+    assert response["decision"] == "deny"
+    assert relative_path in response["reason"]
+
+
+@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_protect_files_allows_reading_hook_and_server_configs(
+    tmp_path: Path, target_id: str, expected: str, relative_path: str
+) -> None:
+    """Only writes are gated. ``expected`` is unused: reads are always allowed."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, f"cat {relative_path}"), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("target_id", ("claude-code", "openai-codex"))
+@pytest.mark.parametrize(
+    "command, relative_path",
+    (
+        pytest.param("ls .mcp.json", ".mcp.json", id="ls"),
+        pytest.param(
+            "test -f .vscode/settings.json", ".vscode/settings.json", id="test"
+        ),
+    ),
+)
+def test_protect_files_denies_a_command_that_only_names_a_hook_config(
+    tmp_path: Path, target_id: str, command: str, relative_path: str
+) -> None:
+    """Existing rule, locked in for the new names: a command that is not on the
+    read-only list is denied when it names a protected config, even though it
+    may only read it, because the guard cannot tell. `cat` stays allowed."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert relative_path in process.stdout
+
+    read = _run_protect_files(
+        _client_bash_payload(target_id, f"cat {relative_path}"), tmp_path, target_id
+    )
+    assert _protect_decision(read) == "allow", read.stdout
+
+
+@pytest.mark.parametrize("relative_path", HOOK_AND_SERVER_CONFIGS)
+def test_antigravity_bridge_allows_reading_hook_and_server_configs(
+    tmp_path: Path, relative_path: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+
+    for name, args in (
+        ("run_command", {"CommandLine": f"cat {relative_path}", "Cwd": str(root)}),
+        ("view_file", {"AbsolutePath": str(root / relative_path)}),
+    ):
+        process = _run_antigravity_pretool(
+            {"toolCall": {"name": name, "args": args}}, root
+        )
+        assert process.returncode == 0, process.stderr
+        assert json.loads(process.stdout) == {"decision": "allow"}, name
+
+
+@pytest.mark.parametrize("command", SELF_INSTALL_COMMANDS)
+@pytest.mark.parametrize("target_id, expected", CLIENT_CONFIG_DECISIONS)
+def test_self_install_command_line_passes_the_bash_guard(
+    tmp_path: Path, target_id: str, expected: str, command: str
+) -> None:
+    """The installer writes these configs from Python without naming them, so
+    the command that runs it must stay allowed. ``expected`` is unused."""
+    process = _run_protect_files(
+        _client_bash_payload(target_id, command), tmp_path, target_id
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("command", SELF_INSTALL_COMMANDS)
+def test_antigravity_bridge_allows_the_self_install_command_line(
+    tmp_path: Path, command: str
+) -> None:
+    root = _antigravity_bridge_repo(tmp_path)
+
+    process = _run_antigravity_pretool(
+        {
+            "toolCall": {
+                "name": "run_command",
+                "args": {"CommandLine": command, "Cwd": str(root)},
+            }
+        },
+        root,
+    )
+
+    assert process.returncode == 0, process.stderr
+    assert json.loads(process.stdout) == {"decision": "allow"}
+
+
+# --------------------------------------------------------------------------
+# VS Code's Local harness (the supported Copilot client) sends PreToolUse as
+# {"tool_name": <model-facing name>, "tool_input": {...}}. Its terminal tools
+# are run_in_terminal and send_to_terminal; its read tools never write.
+# --------------------------------------------------------------------------
+
+TERMINAL_TOOL_NAMES = ("run_in_terminal", "send_to_terminal")
+# Each read-only tool with the input key the VS Code documentation gives it.
+READ_ONLY_TOOL_INPUTS = (
+    pytest.param("read_file", "filePath", id="read_file"),
+    pytest.param("view_image", "filePath", id="view_image"),
+    pytest.param("list_dir", "path", id="list_dir"),
+    pytest.param("file_search", "query", id="file_search"),
+    pytest.param("grep_search", "includePattern", id="grep_search"),
+    pytest.param("semantic_search", "query", id="semantic_search"),
+    pytest.param("view", "path", id="view"),
+    pytest.param("grep", "path", id="grep"),
+    pytest.param("rg", "path", id="rg"),
+    pytest.param("glob", "path", id="glob"),
+)
+
+
+def _local_payload(tool_name: str, tool_input: dict) -> dict:
+    """A PreToolUse payload in the VS Code Local harness shape."""
+    return {
+        "timestamp": "2026-10-17T00:00:00.000Z",
+        "cwd": "/workspace",
+        "sessionId": "session-1",
+        "hookEventName": "PreToolUse",
+        "tool_name": tool_name,
+        "tool_input": tool_input,
+        "tool_use_id": "tool-use-1",
+    }
+
+
+def _local_terminal_payload(tool_name: str, command: str) -> dict:
+    tool_input: dict = {"command": command}
+    if tool_name == "send_to_terminal":
+        tool_input["id"] = "terminal-1"
+    return _local_payload(tool_name, tool_input)
+
+
+def _run_shared_guard(
+    script: str, payload: dict, cwd: Path, target_id: str = "github-copilot"
+) -> subprocess.CompletedProcess[str]:
+    """Run one shared guard from ``cwd``, which must hold the isolated
+    ``shared/hooks/scripts`` directory (see ``_isolated_hook_scripts_dir``)."""
+    return subprocess.run(
+        ["bash", str(cwd / "shared" / "hooks" / "scripts" / script), target_id],
+        cwd=cwd,
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "tool_name, expected",
+    (
+        ("run_in_terminal", True),
+        ("send_to_terminal", True),
+        ("Bash", True),
+        ("run_command", False),
+        ("manage_todo_list", False),
+        ("read_file", False),
+    ),
+)
+def test_is_bash_tool_payload_recognises_the_vs_code_terminal_tools(
+    tool_name: str, expected: bool
+) -> None:
+    payload = json.dumps(_local_terminal_payload(tool_name, "git status"))
+    result = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"is_bash_tool_payload {shlex.quote(payload)}; printf '%s' $?",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == ("0" if expected else "1")
+    command = _bash_source(
+        SCRIPT_SRC / "_lib-frontmatter.sh",
+        f"hook_command {shlex.quote(payload)}",
+    )
+    assert command.stdout.strip() == "git status"
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_commit_gate_denies_a_copilot_terminal_commit_without_a_closeout_receipt(
+    tmp_path: Path, tool_name: str
+) -> None:
+    _commit_gate_repo(tmp_path, branch="foo_implementation")
+
+    result = _run_shared_guard(
+        "enforce-commit-gate.sh",
+        _local_terminal_payload(tool_name, 'git commit -m "feat: x"'),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "commit gate failed for github-copilot" in result.stdout
+    assert "closeout receipt" in result.stdout
+
+
+def test_commit_gate_ignores_a_tool_that_is_not_a_shell(tmp_path: Path) -> None:
+    """A tool that is neither a shell nor a terminal tool is not a command,
+    even when its input carries a `command` key."""
+    _commit_gate_repo(tmp_path, branch="foo_implementation")
+
+    result = _run_shared_guard(
+        "enforce-commit-gate.sh",
+        _local_payload("manage_todo_list", {"command": 'git commit -m "feat: x"'}),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_git_protection_denies_a_dangerous_git_command_from_a_copilot_terminal(
+    tmp_path: Path, tool_name: str
+) -> None:
+    _isolated_hook_scripts_dir(tmp_path)
+
+    result = _run_shared_guard(
+        "git-protection.sh",
+        _local_terminal_payload(tool_name, "git reset --hard"),
+        tmp_path,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout
+    assert "Blocked dangerous git operation" in result.stdout
+
+
+@pytest.mark.parametrize("tool_name", TERMINAL_TOOL_NAMES)
+def test_protect_files_gates_a_copilot_terminal_redirect_into_a_hook_config(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_terminal_payload(tool_name, "echo x > .github/hooks/hooks.json"),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
+    assert ".github/hooks/hooks.json" in process.stdout
+
+
+def test_protect_files_does_not_read_a_command_key_of_a_non_terminal_tool(
+    tmp_path: Path,
+) -> None:
+    process = _run_protect_files(
+        _local_payload("manage_todo_list", {"command": "echo x > .mcp.json"}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize("relative_path", (".vscode/settings.json", ".mcp.json"))
+@pytest.mark.parametrize("tool_name, path_key", READ_ONLY_TOOL_INPUTS)
+def test_protect_files_allows_copilot_read_tools_on_hook_configs(
+    tmp_path: Path, tool_name: str, path_key: str, relative_path: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {path_key: relative_path}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name", [case.values[0] for case in READ_ONLY_TOOL_INPUTS]
+)
+def test_protect_files_read_exemption_covers_every_name_even_with_a_path_key(
+    tmp_path: Path, tool_name: str
+) -> None:
+    """Three of the documented read tools take a search query, not a path, so
+    they were never checked; this pins the exemption itself for each name."""
+    process = _run_protect_files(
+        _local_payload(tool_name, {"path": ".mcp.json"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+@pytest.mark.parametrize(
+    "secret_path", (".env", ".env.local", "keys/server.pem", "uv.lock")
+)
+def test_protect_files_still_denies_a_copilot_read_of_a_secret_file(
+    tmp_path: Path, secret_path: str
+) -> None:
+    """The read exemption covers hook configs only. A secret-shaped file keeps
+    the deny it had before, whatever the tool."""
+    process = _run_protect_files(
+        _local_payload("read_file", {"filePath": secret_path}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+    assert "Protected file blocked by policy" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name", [case.values[0] for case in READ_ONLY_TOOL_INPUTS]
+)
+def test_protect_files_denies_every_copilot_read_tool_on_a_secret_file(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {"path": ".env"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+@pytest.mark.parametrize("tool_name", ("create_file", "replace_string_in_file"))
+def test_protect_files_keeps_denying_copilot_edit_tools_on_a_secret_file(
+    tmp_path: Path, tool_name: str
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, {"filePath": ".env"}), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "deny", process.stdout
+
+
+# Built in two pieces so this file never holds an unterminated patch marker.
+UNTERMINATED_PATCH = "*** Begin " + "Patch\n"
+
+
+def test_protect_files_does_not_scan_read_tool_text_for_patches(
+    tmp_path: Path,
+) -> None:
+    """Searching the code for the patch marker is an ordinary read, not an
+    unterminated patch to fail closed on."""
+    process = _run_protect_files(
+        _local_payload("grep_search", {"query": UNTERMINATED_PATCH}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "allow", process.stdout
+
+
+def test_protect_files_still_scans_edit_tool_text_for_patches(tmp_path: Path) -> None:
+    """The same text in an edit tool is an unterminated patch and fails closed."""
+    process = _run_protect_files(
+        _local_payload("apply_patch", {"input": UNTERMINATED_PATCH}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert process.returncode == 2, process.stderr
+    assert '"permissionDecision":"deny"' in process.stdout
+    assert "unterminated apply_patch request" in process.stdout
+
+
+@pytest.mark.parametrize(
+    "tool_name, tool_input",
+    (
+        pytest.param("create_file", {"filePath": ".mcp.json"}, id="create_file"),
+        pytest.param(
+            "replace_string_in_file",
+            {"filePath": ".mcp.json", "oldString": "a", "newString": "b"},
+            id="replace_string_in_file",
+        ),
+        pytest.param(
+            "multi_replace_string_in_file",
+            {"replacements": [{"filePath": ".mcp.json", "oldString": "a"}]},
+            id="multi_replace_string_in_file",
+        ),
+        pytest.param(
+            "insert_edit_into_file",
+            {"filePath": ".mcp.json", "code": "{}"},
+            id="insert_edit_into_file",
+        ),
+        pytest.param(
+            "apply_patch",
+            {
+                "input": "*** Begin Patch\n*** Update File: .mcp.json\n@@\n x\n"
+                "*** End Patch\n"
+            },
+            id="apply_patch",
+        ),
+        pytest.param(
+            "create_directory",
+            {"dirPath": ".github/hooks/extra"},
+            id="create_directory",
+        ),
+    ),
+)
+def test_protect_files_still_asks_for_copilot_edit_tools_on_hook_configs(
+    tmp_path: Path, tool_name: str, tool_input: dict
+) -> None:
+    process = _run_protect_files(
+        _local_payload(tool_name, tool_input), tmp_path, "github-copilot"
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
+
+
+def test_protect_files_read_exemption_is_exact_names_only(tmp_path: Path) -> None:
+    """A name that merely resembles a read tool is still checked."""
+    process = _run_protect_files(
+        _local_payload("read_file_and_write", {"filePath": ".mcp.json"}),
+        tmp_path,
+        "github-copilot",
+    )
+
+    assert _protect_decision(process) == "ask", process.stdout
 
 
 if __name__ == "__main__":

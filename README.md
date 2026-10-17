@@ -353,14 +353,28 @@ and closeout sequence above.
 More gates can newly block a first refresh — invalid plan status, an open
 MAJOR finding, a missing final-phase stale-claims section, and more. See
 [Other gates that newly block a refresh](docs/runtime-checks.md#other-gates-that-newly-block-a-refresh)
-for the full table and recovery commands. The two most likely to surprise an
-operator, and two practical notes worth knowing before you refresh:
+for the full table and recovery commands. These are the gates most likely to
+surprise an operator, plus practical notes worth knowing before you refresh:
 
 - **Plan status.** A tracked plan with an invalid `status` blocks the next
   commit. Valid small-plan values: `planned`, `in-progress`, `paused`,
   `complete`, `cancelled` (new small-plan files default to `planned` for a
   phase that has not started yet). Valid big-plan values: `planning`,
   `in-progress`, `complete`, `cancelled`.
+- **Protected configs and branch-time plan check.** An agent edit of
+  `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`,
+  `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json`,
+  `.github/copilot/settings.json`, or `.github/copilot/settings.local.json`
+  now asks (Claude, Copilot) or is denied (Codex, Antigravity), and
+  any command outside the guard's read-only list that merely names one of
+  them is denied on all four clients (`ls`, `jq`, `test -f`, `git add <file>`,
+  an inline `gh pr create --body "..."`). Inspect them with `cat` or the
+  native read tool, stage with `git add -u`, and pass PR text with
+  `--body-file`. Creating an implementation branch also validates the big
+  plan's frontmatter and its listed phase files. After an upgrade, the first
+  state-sync checkpoint untracks `settings.local.json` in the nested `ai-state`
+  repository (the local file stays); `docs/runtime-checks.md` describes the
+  copy-and-restore behavior and the recovery after a killed sync.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container

@@ -382,9 +382,12 @@ re-judged.
 
 ### Enforcement
 
-Three scripts enforce this contract, at three different times. At plan
-approval, `scripts/validate_plan_frontmatter.py` rejects the plan text
-itself. At phase closeout, `verify.py closeout` refuses to persist a
+Three scripts enforce this contract, at three different times.
+`scripts/validate_plan_frontmatter.py` rejects the plan text itself when an
+implementation branch is created and again at commit. The branch-creation
+hook checks only the big plan and the phase files it lists, so an unrelated
+draft cannot block the branch. The commit gate checks every plan file. At
+phase closeout, `verify.py closeout` refuses to persist a
 receipt whenever a required item is not `PASS`; this refusal has no message
 prefix, because it is `verify.py closeout`'s own ordinary failure path, not
 a named lint or gate rule. At commit, `verify.py gate` blocks the commit,
@@ -392,10 +395,10 @@ and only when the plan and the receipt have an `exact` head relation.
 
 | When | Script | Message prefix | Refuses when |
 |---|---|---|---|
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L1 verification-block-missing:` | the `## Verification` section has no `bash` or `sh` fenced block |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L2 hedged-verification:` | text matches a hedge pattern; the message quotes the matched text |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L3 unfailable-verification:` | a required item contains `\|\| true` or `\|\| :`, so it can never fail |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L4 self-listed-closeout:` | a required item lists `verify.py closeout` |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L1 verification-block-missing:` | the `## Verification` section has no `bash` or `sh` fenced block |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L2 hedged-verification:` | text matches a hedge pattern; the message quotes the matched text |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L3 unfailable-verification:` | a required item contains `\|\| true` or `\|\| :`, so it can never fail |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L4 self-listed-closeout:` | a required item lists `verify.py closeout` |
 | Commit, `exact` relation only | `verify.py gate` | `G1 verification-results-missing:` | the receipt has no `extensions.verification_items` |
 | Commit, `exact` relation only | `verify.py gate` | `G2 verification-item-unrun:` | a required item in the plan has no result in the receipt |
 | Commit, `exact` relation only | `verify.py gate` | `G3 verification-item-failed:` | a recorded result's `status` is not `PASS` |

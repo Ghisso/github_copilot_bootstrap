@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -97,6 +98,7 @@ from validate_targets import (  # noqa: E402
     tool_routing_recommendation_errors,
     documenter_humanize_errors,
     execution_defaults_policy_errors,
+    failure_masking_command_errors,
     humanize_contract_errors,
     planner_supervision_contract_errors,
     reporting_policy_errors,
@@ -3046,6 +3048,200 @@ def test_run_tests_e2e_step_propagates_failure_instead_of_masking_it() -> None:
     # a real failure must never be reported as an absent script.
     assert "No E2E scripts" in text
     assert '"No E2E scripts FAILED"' not in text
+
+
+DEPRECATION_CHECK_STEPS = (
+    pytest.param("run-tests", "## Step 5: Deprecation Check", id="run-tests"),
+    pytest.param("add-dependency", "## Step 5: Check for Issues", id="add-dependency"),
+)
+DEPRECATION_LINE = "DeprecationWarning: old_call is deprecated"
+
+
+def _first_bash_block(skill: str, heading: str) -> str:
+    text = (REPO_ROOT / "shared" / "skills" / skill / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    section = text.split(heading, 1)[1]
+    match = re.search(r"```bash\n(.*?)\n```", section, re.DOTALL)
+    assert match is not None, f"{skill}: no bash block under {heading}"
+    return match.group(1)
+
+
+def _run_with_fake_uv(
+    tmp_path: Path,
+    snippet: str,
+    pytest_status: int,
+    pytest_output: str,
+    python_status: int = 0,
+) -> subprocess.CompletedProcess[str]:
+    """Run a skill's shell block with a fake `uv` standing in for pytest and
+    for `uv run python`, so the block's own exit handling is what is tested."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_uv = fake_bin / "uv"
+    fake_uv.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "$2" == "pytest" ]]; then\n'
+        '  printf "%s\\n" "$FAKE_PYTEST_OUTPUT"\n'
+        '  exit "$FAKE_PYTEST_STATUS"\n'
+        "fi\n"
+        'exit "$FAKE_PYTHON_STATUS"\n',
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    return subprocess.run(
+        ["bash", "-c", snippet],
+        text=True,
+        capture_output=True,
+        check=False,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            "FAKE_PYTEST_OUTPUT": pytest_output,
+            "FAKE_PYTEST_STATUS": str(pytest_status),
+            "FAKE_PYTHON_STATUS": str(python_status),
+        },
+    )
+
+
+@pytest.mark.parametrize("skill, heading", DEPRECATION_CHECK_STEPS)
+@pytest.mark.parametrize(
+    "pytest_status, pytest_output, expect_deprecation",
+    (
+        pytest.param(3, "FAILED tests/test_x.py::test_y\n1 failed", False, id="fails"),
+        pytest.param(1, f"{DEPRECATION_LINE}\n1 failed", True, id="fails-deprecated"),
+        pytest.param(0, "1 passed", False, id="passes"),
+        pytest.param(0, f"{DEPRECATION_LINE}\n1 passed", True, id="passes-deprecated"),
+    ),
+)
+def test_deprecation_check_steps_keep_pytests_exit_status(
+    tmp_path: Path,
+    skill: str,
+    heading: str,
+    pytest_status: int,
+    pytest_output: str,
+    expect_deprecation: bool,
+) -> None:
+    """GR-010: the deprecation step used to end in `|| echo "Clean"`, which
+    printed "Clean" and exited 0 when pytest itself failed."""
+    snippet = _first_bash_block(skill, heading)
+
+    result = _run_with_fake_uv(tmp_path, snippet, pytest_status, pytest_output)
+
+    assert result.returncode == pytest_status, result.stderr
+    assert "Clean" not in result.stdout
+    if expect_deprecation:
+        assert DEPRECATION_LINE in result.stdout
+        assert "No deprecation warnings" not in result.stdout
+    else:
+        assert "No deprecation warnings" in result.stdout
+
+
+def test_add_dependency_step_fails_when_the_import_check_fails(tmp_path: Path) -> None:
+    snippet = _first_bash_block("add-dependency", "## Step 5: Check for Issues")
+
+    result = _run_with_fake_uv(tmp_path, snippet, 0, "1 passed", python_status=1)
+
+    assert result.returncode == 1, result.stderr
+
+
+def _write_shared_markdown(root: Path, relative: str, text: str) -> None:
+    path = root / "shared" / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def test_failure_masking_check_reports_each_masked_check_with_file_and_line(
+    tmp_path: Path,
+) -> None:
+    """GR-010 positive case: every shape the rule names, in a `bash` and a `sh`
+    block, across all five shipped source directories."""
+    _write_shared_markdown(
+        tmp_path,
+        "skills/demo/SKILL.md",
+        "# Demo\n"
+        "```bash\n"
+        "uv run pytest tests/ || true\n"
+        "uv run mypy src || :\n"
+        'uv run ruff check . || echo "lint failed"\n'
+        "uv run python .claude/scripts/verify.py fast || true\n"
+        "```\n"
+        "```sh\n"
+        'uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i deprecat || echo "Clean"\n'
+        "```\n",
+    )
+    for directory in ("policies", "agents/demo", "templates", "sidecar"):
+        _write_shared_markdown(
+            tmp_path,
+            f"{directory}/note.md",
+            "```bash\nuv run pytest tests/ || true\n```\n",
+        )
+
+    errors = failure_masking_command_errors(tmp_path)
+
+    assert [error.split(": ", 1)[0] for error in errors] == [
+        "shared/skills/demo/SKILL.md:3",
+        "shared/skills/demo/SKILL.md:4",
+        "shared/skills/demo/SKILL.md:5",
+        "shared/skills/demo/SKILL.md:6",
+        "shared/skills/demo/SKILL.md:9",
+        "shared/policies/note.md:2",
+        "shared/agents/demo/note.md:2",
+        "shared/templates/note.md:2",
+        "shared/sidecar/note.md:2",
+    ]
+    assert all("hides a failed check" in error for error in errors)
+
+
+def test_failure_masking_check_accepts_commands_that_keep_their_status(
+    tmp_path: Path,
+) -> None:
+    """GR-010 negative case: a check that fails stays failed, and masked text
+    that is not a fenced shell line or does not run a check is not flagged."""
+    _write_shared_markdown(
+        tmp_path,
+        "skills/demo/SKILL.md",
+        "# Demo\n"
+        "Run `uv run pytest tests/ || true` is shown here as prose.\n"
+        "uv run pytest tests/ || true\n"
+        "```bash\n"
+        "uv run pytest tests/ -q\n"
+        "uv run pytest tests/ || exit 1\n"
+        "uv run ruff check . && uv run mypy src\n"
+        'status=$?; printf "%s" "$out" | grep -i deprecat || echo "none"\n'
+        "rg pattern . || true\n"
+        "pytest_cache_dir=1 || true\n"
+        "```\n"
+        "```text\n"
+        "uv run pytest tests/ || true\n"
+        "```\n",
+    )
+
+    assert failure_masking_command_errors(tmp_path) == []
+
+
+def test_shipped_shared_text_has_no_failure_masking_check() -> None:
+    assert failure_masking_command_errors(REPO_ROOT) == []
+
+
+def test_validate_skills_and_paths_runs_the_failure_masking_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GR-010: the check is wired into the generated-target validator with the
+    authoring repository root."""
+    calls: list[Path] = []
+
+    def record(root: Path) -> list[str]:
+        calls.append(root)
+        return ["masked check"]
+
+    monkeypatch.setattr(target_validator, "failure_masking_command_errors", record)
+    errors: list[str] = []
+
+    target_validator.validate_skills_and_paths(errors)
+
+    assert "masked check" in errors
+    assert calls == [REPO_ROOT]
 
 
 def test_code_review_skill_keeps_a_surviving_minor_advisory() -> None:

@@ -3698,15 +3698,34 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "openai-codex",
         ),
         (
-            # `.agents/hooks.json` is not in protect-files.py's HOOK_CONFIGS,
-            # but the shared `.claude/hooks/scripts/` tree every client
-            # bridges into is protected regardless of which native config
-            # names it, so Google Antigravity's copy is exercised the same
-            # way as the other three clients.
+            # The shared `.claude/hooks/scripts/` tree every client bridges
+            # into is protected regardless of which native config names it,
+            # so Google Antigravity's copy is exercised the same way as the
+            # other three clients.
             TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             ".claude/hooks/scripts/guard.sh",
             "deny",
             "google-antigravity",
+        ),
+        (
+            # GR-008: Antigravity's own hook config and the MCP configs that
+            # launch server commands are protected in the generated copy too.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".agents/hooks.json",
+            "deny",
+            "google-antigravity",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".mcp.json",
+            "ask",
+            "claude-code",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".vscode/mcp.json",
+            "ask",
+            "github-copilot",
         ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
@@ -3722,6 +3741,35 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         check(
             f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect {protected_path} with {expected_decision}: {script}",
+            errors,
+        )
+
+    # VS Code's Local harness (the supported Copilot client) names its terminal
+    # tool `run_in_terminal` and its read tool `read_file`.
+    copilot_protect_files = (
+        TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh"
+    )
+    for tool_name, tool_input, expected in (
+        (
+            "run_in_terminal",
+            {"command": "echo x > .github/hooks/hooks.json"},
+            '"permissionDecision":"ask"',
+        ),
+        ("read_file", {"filePath": ".mcp.json"}, ""),
+    ):
+        returncode, stdout, stderr = run_hook(
+            copilot_protect_files,
+            {"tool_name": tool_name, "tool_input": tool_input},
+            "github-copilot",
+        )
+        check(
+            returncode == 0,
+            f"Copilot Local {tool_name} guardrail failed to run: {stderr}",
+            errors,
+        )
+        check(
+            expected in stdout if expected else stdout == "",
+            f"Copilot Local {tool_name} guardrail returned unexpected output: {stdout!r}",
             errors,
         )
 
@@ -7750,7 +7798,46 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
     return errors
 
 
+# Shared text that ships to agents. A fenced shell line that runs a check and
+# ends in `|| true`, `|| :`, or `|| echo ...` reports success when the check
+# fails, so an agent that copies it hides the failure.
+FAILURE_MASK_SOURCE_DIRS = ("skills", "policies", "agents", "templates", "sidecar")
+CHECK_COMMAND_PATTERN = re.compile(
+    r"(?<![\w./-])(?:pytest|mypy|ruff)(?![\w.-])|verify\.py"
+)
+FAILURE_MASK_PATTERN = re.compile(r"\|\|\s*(?:true|:|echo\b.*)\s*$")
+
+
+def failure_masking_command_errors(repo_root: Path) -> list[str]:
+    """Return one file:line failure per shipped shell line that hides a failed check.
+
+    ponytail: physical lines only. A command continued with a backslash, or
+    masked through `; true`, is not detected; the review `tests` profile asks
+    whether a shipped check can fail.
+    """
+    errors: list[str] = []
+    for directory in FAILURE_MASK_SOURCE_DIRS:
+        for path in sorted((repo_root / "shared" / directory).rglob("*.md")):
+            language: str | None = None
+            for number, line in enumerate(read(path).splitlines(), start=1):
+                fence = re.match(r"^\s*```(\w*)", line)
+                if fence:
+                    language = None if language is not None else fence.group(1)
+                    continue
+                if (
+                    language in {"bash", "sh"}
+                    and CHECK_COMMAND_PATTERN.search(line)
+                    and FAILURE_MASK_PATTERN.search(line)
+                ):
+                    errors.append(
+                        f"{path.relative_to(repo_root).as_posix()}:{number}: "
+                        f"shipped shell line hides a failed check: {line.strip()}"
+                    )
+    return errors
+
+
 def validate_skills_and_paths(errors: list[str]) -> None:
+    errors.extend(failure_masking_command_errors(REPO_ROOT))
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)

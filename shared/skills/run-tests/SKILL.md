@@ -63,8 +63,13 @@ then report exactly one of: absent, passed, or failed.
 
 ## Step 5: Deprecation Check
 ```bash
-uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i deprecat || echo "Clean"
+output="$(uv run pytest tests/ -W default::DeprecationWarning 2>&1)"
+status=$?
+printf '%s\n' "$output" | grep -i deprecat || echo "No deprecation warnings"
+exit "$status"
 ```
+Show the deprecation lines, or "No deprecation warnings". Keep pytest's own
+exit status: a failing run must stay a failure, never print as clean.
 
 ## Report
 

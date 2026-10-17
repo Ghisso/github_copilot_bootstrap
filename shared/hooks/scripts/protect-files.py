@@ -12,11 +12,47 @@ import shlex
 import sys
 
 
+# Repository files that run, disable, or redirect hooks or server commands.
+# `PROTECTED_PATH_LITERAL` below is built from this set, so a name added here
+# is also found in Bash text.
 HOOK_CONFIGS = {
     ".github/hooks/hooks.json",
     ".claude/settings.json",
+    # Claude local settings can add hooks or turn them off.
+    ".claude/settings.local.json",
     ".codex/config.toml",
     ".codex/hooks.json",
+    # Antigravity's only hook config.
+    ".agents/hooks.json",
+    # MCP configs launch server commands.
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".agents/mcp_config.json",
+    # VS Code workspace settings (`chat.useHooks`, `chat.hookFilesLocations`,
+    # `chat.useClaudeHooks`) and Copilot settings (`disableAllHooks`, inline
+    # `hooks`) can turn hooks off or move them.
+    ".vscode/settings.json",
+    ".github/copilot/settings.json",
+    ".github/copilot/settings.local.json",
+}
+# Tools whose input is a shell command line (`tool_input.command`). A name that
+# ends in `bash` or an empty name is also treated as a shell command in `main`.
+TERMINAL_TOOLS = {"bash", "shell", "run_in_terminal", "send_to_terminal"}
+# Native tools that only read. A hook-config path argument is never a write for
+# them, so it gets no decision; a secret-shaped file (`.env*`, `uv.lock`,
+# credentials, keys) is still denied, and their text is not scanned for patches.
+# Exact lowercase names only; anything else is checked in full.
+READ_ONLY_TOOLS = {
+    "read_file",
+    "view_image",
+    "list_dir",
+    "file_search",
+    "grep_search",
+    "semantic_search",
+    "view",
+    "grep",
+    "rg",
+    "glob",
 }
 PATH_KEYS = {
     "path",
@@ -77,7 +113,7 @@ QUOTED_VARIABLE_MARKER = re.compile(
 # or following identifier character (letter, digit, `_`, `.`, `-`), so
 # `os.environ` no longer yields `.env` and `myuv.lock` no longer yields
 # `uv.lock`, while `.env.local` and `foo/.env.production` still match in
-# full. The three control-plane alternatives (hooks-dir paths and the
+# full. The two control-plane alternatives (hooks-dir paths and the
 # `HOOK_CONFIGS` filenames) additionally capture the **whole** path token
 # via an explicit, optional `(?:[^\s'\"]*/)?` directory-prefix group, rather
 # than only the fixed repository-relative-looking tail: `/tmp/scratch/
@@ -90,8 +126,9 @@ PROTECTED_PATH_LITERAL = re.compile(
     r"(?<![\w.-])credentials[-_.][\w.-]+|"
     r"[^\s/'\"]+\.(?:pem|key)(?![\w.-])|"
     r"(?<![\w./-])(?:[^\s'\"]*/)?(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?\.claude/settings\.json|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?\.codex/(?:config\.toml|hooks\.json))",
+    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
+    + "|".join(map(re.escape, sorted(HOOK_CONFIGS)))
+    + r"))",
     re.IGNORECASE,
 )
 OPAQUE_WRITE_PATH = re.compile(
@@ -1397,27 +1434,37 @@ def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
     return confirmed, uncertain
 
 
-def native_targets(value: object, paths: list[str], key: str | None = None) -> None:
+def native_targets(
+    value: object,
+    paths: list[str],
+    key: str | None = None,
+    read_only: bool = False,
+) -> None:
     if isinstance(value, dict):
         for child_key, child_value in value.items():
-            native_targets(child_value, paths, str(child_key).lower())
+            native_targets(child_value, paths, str(child_key).lower(), read_only)
         return
     if isinstance(value, list):
         for child in value:
-            native_targets(child, paths, key)
+            native_targets(child, paths, key, read_only)
         return
     if not isinstance(value, str):
         return
-    add_patch_paths(value, paths)
+    if not read_only:
+        add_patch_paths(value, paths)
     if key in PATH_KEYS:
         paths.append(value)
 
 
 def emit(
-    target_id: str, repo_root: str, paths: list[str], uncertain: list[str]
+    target_id: str,
+    repo_root: str,
+    paths: list[str],
+    uncertain: list[str],
+    read_only: bool = False,
 ) -> None:
     hits = [result for path in paths if (result := protected(path, repo_root))]
-    hooks = sorted({path for path, is_hook in hits if is_hook})
+    hooks = [] if read_only else sorted({path for path, is_hook in hits if is_hook})
     sensitive = sorted({path for path, is_hook in hits if not is_hook})
     uncertain_hits = sorted(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
@@ -1469,17 +1516,18 @@ def main() -> int:
         tool_input = json.loads(tool_input)
     if not isinstance(tool_input, dict):
         raise AmbiguousCommand("tool input is not an object")
+    read_only = tool_name in READ_ONLY_TOOLS
     paths: list[str] = []
     uncertain: list[str] = []
-    if tool_name in {"bash", "shell"} or tool_name.endswith("bash") or not tool_name:
+    if tool_name in TERMINAL_TOOLS or tool_name.endswith("bash") or not tool_name:
         command = tool_input.get("command")
         if not isinstance(command, str):
             raise AmbiguousCommand("Bash payload has no command")
         confirmed, uncertain = shell_targets(command, repo_root)
         paths.extend(confirmed)
     else:
-        native_targets(tool_input, paths)
-    emit(target_id, repo_root, paths, uncertain)
+        native_targets(tool_input, paths, read_only=read_only)
+    emit(target_id, repo_root, paths, uncertain, read_only)
     return 0
 
 
