@@ -5,6 +5,12 @@ offline structural validation cannot observe. It prioritizes Codex; Claude is
 the second supported native client. GitHub Copilot remains covered by the
 deterministic generated-target checks, not this native-client command.
 
+The [2026-10-06 behavioral pilot evidence](2026-10-06-behavioral-pilot-evidence.md)
+stopped after one role-loading output and four unavailable case runs. It is
+advisory host evidence for one fixture, not a deterministic gate or a general
+quality claim. Its role-loading result is recorded as “consistent with” the
+reviewer role, and no case sensitivity result was established.
+
 ## Client Version Requirements
 
 | Client | Minimum | Verified against |

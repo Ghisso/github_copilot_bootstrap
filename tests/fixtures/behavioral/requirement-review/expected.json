@@ -1,0 +1,14 @@
+{
+  "approved-change": {
+    "detection_expected": false
+  },
+  "defective": {
+    "detection_expected": true
+  },
+  "repaired": {
+    "detection_expected": false
+  },
+  "valid-alternative": {
+    "detection_expected": false
+  }
+}

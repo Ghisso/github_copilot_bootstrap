@@ -5,8 +5,14 @@ description: How the bootstrap defines each specialist agent once under shared/a
 tags: [agents, skills, prompts, review-profiles, generation, validation]
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T14:20:50.150Z
+    at: 2026-10-06T09:13:17.144Z
 sources:
+  - id: openwiki-source-5939cd6c98209174dac35ee6
+    resource: repo://docs/2026-10-06-behavioral-pilot-evidence.md
+  - id: openwiki-source-e906ba2cd4e6b1fa9d29837e
+    resource: repo://docs/evidence/behavioral-pilot/phase-a/judgments.json
+  - id: openwiki-source-0538e0ce41cc304631959580
+    resource: repo://docs/native-client-acceptance.md
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
   - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
@@ -17,6 +23,10 @@ sources:
     resource: repo://shared/agents/coder/agent.yaml
   - id: openwiki-source-b397cd38b7af4d0c49c77993
     resource: repo://shared/agents/coder/prompt.md
+  - id: openwiki-source-2ecfe4e1486974f80a2d694d
+    resource: repo://shared/agents/coder/workflow-prompt.md
+  - id: openwiki-source-81d06f6df789e809d2030469
+    resource: repo://shared/agents/documenter/agent.yaml
   - id: openwiki-source-5cc3c80e7d4c70a9288dc99f
     resource: repo://shared/agents/luna_coder/agent.yaml
   - id: openwiki-source-4e810ead2bce9272eff7a8fa
@@ -25,10 +35,14 @@ sources:
     resource: repo://shared/agents/orchestrator/prompt.md
   - id: openwiki-source-869fc2d8dd56f006523bcc67
     resource: repo://shared/agents/orchestrator/workflow-prompt.md
+  - id: openwiki-source-95a2e6bcad4566751b64db47
+    resource: repo://shared/agents/planner/agent.yaml
   - id: openwiki-source-ba6a39790d4410301d299af2
     resource: repo://shared/agents/planner/prompt.md
   - id: openwiki-source-277d57d25696ddfa72249dd2
     resource: repo://shared/agents/planner/workflow-prompt.md
+  - id: openwiki-source-3a29083bf22166dd3523b85e
+    resource: repo://shared/agents/reviewer/agent.yaml
   - id: openwiki-source-fd43a5fc69056375b46b4386
     resource: repo://shared/agents/reviewer/prompt.md
   - id: openwiki-source-ed5529d66aa4a666e3003ed9
@@ -49,7 +63,7 @@ sources:
     resource: repo://shared/templates/skill-template.md
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-10-02T14:20:50.150Z" }
+generated: { by: "codex", at: "2026-10-06T09:06:27.232Z" }
 ---
 
 # Agent roster, prompts, and the skill library
@@ -101,9 +115,9 @@ Five canonical agents are eligible everywhere and each has its own `prompt.md`.
 | Agent | Role | Visibility | Note |
 | --- | --- | --- | --- |
 | `orchestrator` | main-thread lifecycle driver | public | the only agent with `delegates`: `planner`, `coder`, `reviewer`, `documenter` |
-| `planner` | phased implementation plans | hidden | |
+| `planner` | phased implementation plans | public | |
 | `coder` | implementation and focused verification | hidden | its Codex `model_intent` names `sol_coder` as the escalation target |
-| `reviewer` | profile-driven review in two passes | hidden | |
+| `reviewer` | profile-driven review in two passes | public | |
 | `documenter` | README and docs updates | hidden | |
 
 Three more agents exist for one provider each and are derived from `coder` through `prompt_base`:
@@ -131,6 +145,8 @@ Composition is one level deep, and `validate_prompt_composition` enforces it. Th
 - **OpenAI Codex.** `render_codex_agent_adapter` emits TOML with `name`, `description`, optional `model` and `model_reasoning_effort`, a `sandbox_mode` derived from capabilities, and the composed prompt as `developer_instructions`.
 - **Google Antigravity.** `render_antigravity_agent_adapter` writes `.agents/agents/<id>/agent.md` with `mainAgent: false`, `subagent: true` for every agent except the orchestrator, the provider model, and `inheritMcp: true` for subagents.
 
+The sidecar planner uses different status lists for big and small plans. Big plans use `planning`, `in-progress`, `complete`, or `cancelled`; small plans use `planned`, `in-progress`, `paused`, `complete`, or `cancelled`. These labels are descriptive and do not gate a sidecar commit.
+
 ## Review profiles
 
 The `reviewer` carries no checklists in its prompt. It loads one or more profiles from `shared/review-profiles/`, each with its own `## Severity` section, then runs a primary pass and a verification pass that tries to refute each finding. It repeats verification until two passes in a row change nothing, or after at most three rounds.
@@ -155,13 +171,15 @@ The approved plan or spec, its non-goals, and its approved scope-change records 
 
 Section-scoped key-phrase tests in `tests/test_validate_targets.py` check that this guidance ships in the shared source and in the generated Claude Code, Codex, and sidecar output. They prove the text is present, not that a model follows it.
 
+The [2026-10-06 behavioral pilot](../../docs/2026-10-06-behavioral-pilot-evidence.md) is dated advisory host evidence for one synthetic review fixture. One repaired-packet output was consistent with reviewer loading; four scheduled case runs were unavailable. The pilot stopped without establishing case sensitivity or running a before/after comparison. It adds no deterministic gate and supports no general quality claim.
+
 ## The skill library
 
 Skills live under `shared/skills/<name>/SKILL.md`. At the time of writing there are 55: 40 with `visibility: public` and 15 with `visibility: background`.
 
 - Public skills are invoked by name.
 - Background skills are loaded by matching their `description`, which is why two skills may not share a description.
-- `shared/templates/skill-template.md` is the starting shape: `name`, `visibility`, `description`, an optional `argument-hint`, then Problem, Trigger Conditions, and Solution sections.
+- `shared/templates/skill-template.md` is the starting shape: `name`, `visibility`, `description`, an optional `argument-hint`, then Problem, Trigger Conditions, and Solution sections. Its path guidance distinguishes authoring under `shared/skills/` from installed skills under `.claude/skills/`.
 
 Two skills are special:
 

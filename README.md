@@ -1388,6 +1388,11 @@ For real native execution, first prepare a dedicated stable workspace with
 rerun with the same `--workspace`; the default temporary mode intentionally
 does not launch either client. The runner never mutates trust.
 
+The [2026-10-06 behavioral pilot evidence](docs/2026-10-06-behavioral-pilot-evidence.md)
+stopped after one role-loading output and four unavailable case runs. It is
+advisory host evidence for one fixture, not a deterministic gate or a general
+quality claim.
+
 ## How To Use This Bootstrap In Another Project
 
 1. Regenerate the installable output with `uv run python scripts/generate_targets.py --all`.

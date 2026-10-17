@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import stat
 import subprocess
 import sys
@@ -25,6 +26,36 @@ EXPECTED_CURRENT_CODEX_ROLES = {
     "luna_coder": ("coder", "gpt-5.6-luna", "xhigh"),
     "sol_coder": ("coder", "gpt-5.6-sol", "xhigh"),
 }
+
+
+def test_requirement_review_prompt_fixed_wording_avoids_answer_leakage() -> None:
+    """Keep the review request neutral outside the supplied task material."""
+    prompt = (
+        Path(__file__).parent
+        / "fixtures"
+        / "behavioral"
+        / "requirement-review"
+        / "prompt.md"
+    ).read_text(encoding="utf-8")
+    before_requirements, after_requirements = prompt.split("{requirements}", 1)
+    before_scope_change, after_scope_change = after_requirements.split(
+        "{scope_change}", 1
+    )
+    before_diff, after_diff = after_scope_change.split("{diff}", 1)
+    fixed_request = "".join(
+        (before_requirements, before_scope_change, before_diff, after_diff)
+    ).casefold()
+
+    for forbidden in (
+        "check requirements",
+        "consistency review",
+        "duplicate",
+        "defect",
+    ):
+        assert forbidden not in fixed_request
+    assert re.search(r"\b[A-Z][A-Z0-9_]*-\d+\b", fixed_request, re.IGNORECASE) is None
+    assert "expected.json" not in prompt
+    assert "rubric.md" not in prompt
 
 
 def observation() -> dict[str, bool]:

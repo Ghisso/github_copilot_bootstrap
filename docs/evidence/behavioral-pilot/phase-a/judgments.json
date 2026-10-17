@@ -1,0 +1,63 @@
+{
+  "rubric": "tests/fixtures/behavioral/requirement-review/rubric.md",
+  "rubric_changed": false,
+  "role_loading": "consistent with",
+  "decision": "stop",
+  "reason": "BEP-002 is unproven: all four case runs are unavailable.",
+  "judgments": [
+    {
+      "run": "role-loading",
+      "variant": "repaired",
+      "output_valid": true,
+      "detection": false,
+      "control_false_positive": false,
+      "reason_quote": "REQ-001, REQ-002, and REQ-003 all remain satisfied; this is a valid alternative implementation, not a deviation.",
+      "reason": "The repaired packet received no finding. The report heading and parseable empty findings list support role consistency, not client-confirmed agent selection. This is the role probe, not a replacement for an unavailable scheduled case run."
+    },
+    {
+      "run": "defective",
+      "variant": "defective",
+      "output_valid": null,
+      "detection": null,
+      "control_false_positive": null,
+      "reason": "Unavailable: nonzero_client_exit; no final task output saved."
+    },
+    {
+      "run": "repaired",
+      "variant": "repaired",
+      "output_valid": null,
+      "detection": null,
+      "control_false_positive": null,
+      "reason": "Unavailable: nonzero_client_exit; no final task output saved."
+    },
+    {
+      "run": "valid-alternative",
+      "variant": "valid-alternative",
+      "output_valid": null,
+      "detection": null,
+      "control_false_positive": null,
+      "reason": "Unavailable: nonzero_client_exit; no final task output saved."
+    },
+    {
+      "run": "approved-change",
+      "variant": "approved-change",
+      "output_valid": null,
+      "detection": null,
+      "control_false_positive": null,
+      "reason": "Unavailable: nonzero_client_exit; no final task output saved."
+    }
+  ],
+  "counts": {
+    "scheduled_native_runs": 5,
+    "saved_outputs": 1,
+    "unavailable_runs": 4,
+    "invalid_outputs": 0,
+    "missing_judgments": 0,
+    "valid_defective_case_runs": 0,
+    "defective_detections": 0,
+    "valid_control_case_runs": 0,
+    "control_case_false_positives": 0,
+    "valid_repaired_role_probes": 1,
+    "role_probe_false_positives": 0
+  }
+}
