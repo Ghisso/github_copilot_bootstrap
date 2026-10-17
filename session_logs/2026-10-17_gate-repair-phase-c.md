@@ -3,7 +3,7 @@
 **Date:** 2026-10-17
 **Plan:** .claude/plans/2026-10-17_phase-C-mcp-surface-parity.md
 **Parent plan:** .claude/plans/gate-repair.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -136,6 +136,17 @@ Antigravity MCP reachability from documentation (GR-006).
   `.claude/bootstrap-root/` with the self-install before `verify.py`.
 
 ## Verification
+
+- PASS        0.3s  uv run python scripts/generate_targets.py --all
+- PASS       43.6s  uv run python scripts/validate_targets.py
+- PASS       76.9s  uv run pytest tests/test_validate_targets.py tests/test_context_mode_mcp_filter.py tests/test_hook_gates.py -q
+- PASS        0.8s  uv run python scripts/check_runtime.py
+- PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+- PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+
+Phase receipt: `verify.py phase --format json --persist` PASS. Findings
+report: `.claude/quality_reports/findings-2026-10-17_phase-C-mcp-surface-parity.json`
+(0 findings, `gate_result: PASS`, six profiles).
 
 - optional 1: NOT RUN — a new native Claude Code session and a reviewer-subagent tool probe in a disposable generated install are user-run host checks; the validator checks the root route offline, and the 2026-10-17 probe in this session already showed server-level MCP grants reach Claude subagents.
 - optional 2: NOT RUN — a native Codex tool-list check is a user-run host check; the root Codex config was already guarded and validator-checked before this phase.
