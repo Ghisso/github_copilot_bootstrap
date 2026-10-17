@@ -61,10 +61,10 @@ for it unless the user asked for implementation.
   unrelated work. Exclude a description whose breadth matches a mandate the
   repository actually states. Worked example: `ponytail`'s "Use on ANY coding
   task" is accurate, not over-broad, because `CLAUDE.md` requires loading it
-  in `full` mode before every coding task, and
-  `shared/skills/ponytail/SKILL.md` makes its final diff review mandatory.
-  Find the equivalent stated mandate before flagging any other description as
-  too broad.
+  in `full` mode before every coding task, and the review-routing table in
+  `shared/policies/workspace.instructions.md` says when its review profile
+  runs. Find the equivalent stated mandate before flagging any other
+  description as too broad.
 - **Duplicated normative policy.** A skill restates a canonical policy's
   rules instead of referencing `shared/policies/` or a generated
   `.claude/instructions/*.instructions.md` adapter. Prefer a reference over a

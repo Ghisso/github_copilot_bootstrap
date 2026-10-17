@@ -15,11 +15,11 @@
 The two skill files are a reduced local fork of upstream, not a faithful
 import. Local changes go well beyond formatting and frontmatter:
 
-- `shared/skills/ponytail/SKILL.md` is 72 lines against upstream `v4.8.4`'s
+- `shared/skills/ponytail/SKILL.md` is 73 lines against upstream `v4.8.4`'s
   120. The `## Output`, `## Intensity`, and `## When NOT to be lazy`
   sections were dropped, and `## Boundaries` was renamed to
   `## Safety boundaries`.
-- `shared/skills/ponytail-review/SKILL.md` is 38 lines against upstream's
+- `shared/skills/ponytail-review/SKILL.md` is 40 lines against upstream's
   57, with a comparable amount of upstream review ceremony removed.
 - Both files' `description:` frontmatter was rewritten in this bootstrap's
   own wording (not just the required `visibility` field added), and both
@@ -34,8 +34,8 @@ imported skill files further.
 
 ## Local allowlist hashes
 
-- `shared/skills/ponytail/SKILL.md`: `sha256:9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3`
-- `shared/skills/ponytail-review/SKILL.md`: `sha256:bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656`
+- `shared/skills/ponytail/SKILL.md`: `sha256:7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1`
+- `shared/skills/ponytail-review/SKILL.md`: `sha256:0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8`
 - `shared/third_party/ponytail/LICENSE`: `sha256:fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4`
 
 Ponytail's plugin hooks, status line, benchmarks, and runtime mode files are

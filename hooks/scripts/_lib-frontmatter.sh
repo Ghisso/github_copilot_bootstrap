@@ -830,10 +830,10 @@ diff_requires_ponytail() {
 # files, named verbatim by `shared/policies/workspace.instructions.md`'s
 # control-plane definition ("Control-plane files include `.claude/hooks/`,
 # `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
-# `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by root guidance
-# itself (`CLAUDE.md`'s own "Safety And Control Plane" section). This is the
-# same canonical control-plane set `diff_requires_ponytail` above already
-# encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
+# `.vscode/mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by
+# root guidance itself (`CLAUDE.md`'s own "Safety And Control Plane" section).
+# This is the same canonical control-plane set `diff_requires_ponytail` above
+# already encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
 # `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
 # `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
 # cannot drift from each other. A bash `case` pattern cannot glob "every

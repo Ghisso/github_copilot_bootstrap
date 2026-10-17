@@ -22,7 +22,8 @@ code is the code never written.
 
 Stay active for the entire coding task. This bootstrap defaults to **full**.
 The user can explicitly request `lite`, `ultra`, or normal mode for a task, but
-the workflow's final Ponytail diff review remains mandatory.
+the `ponytail` review profile still runs wherever the review-routing table or
+the commit gate requires it.
 
 ## The ladder
 
