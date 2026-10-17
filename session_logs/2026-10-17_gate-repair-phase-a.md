@@ -21,7 +21,9 @@ tests (GR-003), and post-closeout drift (GR-004).
   big plan `in-progress` and Phase A `in-progress` (`started_at`
   2026-10-17T04:58:19Z).
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready; no planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass.
+- [x] IMPLEMENT/VERIFY/REVIEW — three review rounds; final Gate Result `PASS`
+  with no findings.
+- [ ] CLOSEOUT
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -33,12 +35,10 @@ tests (GR-003), and post-closeout drift (GR-004).
   adversarial suite with `tests/test_validate_targets.py` as its pytest
   entrypoint; `CHECK_IDS` must not change; findings reports bind the staged
   index; interrupted self-installs need nested-state inspection.
-
 - **05:05** - Before delegation, extended the option (b) schema-version rule
   to GR-002 as well (push gates must not re-judge pre-upgrade reports for
   missing profiles either). Delegated steps 1–4 and step 5 guidance text to
   the coder with the verified line references.
-
 - **05:30** - Coder finished steps 1–4 and step 5 guidance text (12 files).
   Deviations accepted: `tests/test_install_bootstrap.py` fixture and the
   `validate_targets.py` smoke default now carry the new fields and five
@@ -51,34 +51,76 @@ tests (GR-003), and post-closeout drift (GR-004).
   Documenter updated `README.md` and `docs/runtime-checks.md`;
   `validate_targets.py` PASS afterwards. Diff sent to a fresh reviewer with
   profiles code, architecture, security, tests, ponytail, documentation.
-
 - **05:50** - Review round 1: Gate Result `PASS`, no CRITICAL or MAJOR, six
   MINOR (malformed-schema test values; reviewer prompt MINOR wording;
   upgrade notes and refresh-gate table; policy profile-rule precision;
   smoke-tests bullet; a comment's character count). All six sent back for
-  fixing (FIX LOOP) rather than dispositioned: coder for test, prompt,
-  policy, comment; documenter for README, runtime-checks, smoke-tests.
-  Reviewer confirmed no push or PR path re-judges a pre-upgrade phase.
-
-- **06:05** - All six MINOR fixes landed (coder: schema test values with a
-  bool negative control, reviewer prompt, policy text, comment; documenter:
-  README, runtime-checks table row, smoke-tests). Re-ran generation,
-  self-install, `check_runtime.py` PASS, `validate_targets.py` PASS,
-  `verify.py phase` PASS (pytest 2378 passed). Fresh reviewer (round 2) on
-  the full 15-file diff.
-
+  fixing (FIX LOOP) rather than dispositioned. Reviewer confirmed no push or
+  PR path re-judges a pre-upgrade phase.
+- **06:05** - All six MINOR fixes landed. Re-ran generation, self-install,
+  `check_runtime.py` PASS, `validate_targets.py` PASS, `verify.py phase`
+  PASS (pytest 2378 passed). Fresh reviewer (round 2) on the full diff.
 - **06:20** - Review round 2: all six round-1 fixes confirmed. Gate Result
   `WARN`: one open request (negative-control evidence for the new
   installed-hook smoke cases and the GR-004 test, which the round-2 packet
   omitted) and two MINOR documentation findings (a README link into the
   gitignored `.claude/`; "phase diff" should say branch diff from the
-  merge-base). Doc fixes sent to the documenter; the open request will be
-  answered with the coder's round-1 negative-control results.
+  merge-base).
+- **06:30** - Documenter fixed both; `validate_targets.py` PASS. Open request
+  answered with the coder's round-1 negative-control results. Same reviewer,
+  final: open request closed (stated as an unverified limitation: relayed,
+  not re-run by the reviewer), both MINORs resolved, Gate Result `PASS`,
+  findings `[]`.
+
+### Phase-boundary summary
+
+- **Objective and change:** gates now read the reviewer's gate result and
+  open requests, and require review profiles by changed path; see the plan
+  and the diff (15 files, +773/-32).
+- **Deviations from the plan:** GR-002 also uses the schema-version rule at
+  push gates (approved option b, extended before delegation);
+  `tests/test_install_bootstrap.py` fixture updated; no pre-push
+  installed-hook WARN case (unit tests cover the push gates).
+- **Checks:** see `## Verification` below and the receipts under
+  `.claude/quality_reports/` for this phase.
+- **Open findings:** none.
+- **Next operation:** Phase B, the Context Mode hook sanitizer.
+
+### Requirement mapping
+
+- GR-001: `tests/test_verify.py` (`test_commit_gate_blocks_an_unclean_gate_result`,
+  `test_commit_gate_accepts_a_pass_with_no_open_request`,
+  `test_gate_result_is_not_required_outside_phase_completion`,
+  `test_push_gates_do_not_rejudge_a_schema_1_report`,
+  `test_push_gates_apply_the_gate_result_to_schema_2_reports`);
+  `tests/test_commit_closeout.py` recorder tests; `scripts/validate_targets.py`
+  recorder smoke and installed commit-msg hook WARN case.
+- GR-002: `test_required_review_profiles_by_changed_surface` (18 cases from
+  the plan table), gate tests for tests-profile, five-profile, docs-only, and
+  push schema rule; installed-hook missing-`tests` case.
+- GR-003: `test_report_requires_a_fresh_ponytail_review_when_the_gate_says_so`;
+  existing installed-hook Ponytail smoke plus the two new cases.
+- GR-004: `test_staged_documentation_change_after_closeout_makes_final_state_stale`;
+  comment at the `tracked_state_hash` writer.
+- GR-013: no `CHECK_IDS` or receipt-schema change; no model call; no network.
 
 ## [LEARN] Entries
 
+- [LEARN:review] A fresh re-review packet must carry every earlier
+  verification result, negative controls included; otherwise the reviewer
+  answers `WARN` with an open request, which now blocks the commit.
+- [LEARN:verification] Before calling a gate path untested, search
+  `scripts/validate_targets.py` as well as `tests/`; its installed-hook smoke
+  already covered the required-Ponytail block (audit D4 was wrong).
+- [LEARN:workflow] A change to `record_findings.py` arguments or report
+  fields must also update the recorder smoke and completion fixtures in
+  `scripts/validate_targets.py` and the lifecycle fixture in
+  `tests/test_install_bootstrap.py`.
+
 ## Verification
+
+- optional 1: NOT RUN — the native Claude Code and Codex commit attempt with a `WARN` report in a disposable clone is a user-run host check; the installed commit-msg hook smoke in `scripts/validate_targets.py` exercises the same shared `assert_commit_invariants` path and denies a `WARN` report.
 
 ## Open Questions / Next Steps
 
-- Delegate steps 1–4 to the coder.
+- Next: Phase B, `2026-10-17_phase-B-context-mode-hook-sanitizer`.

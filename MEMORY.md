@@ -1443,3 +1443,17 @@
   `openwiki/.claims/**` for its path and keep the edit outside every cited
   range, or plan a second refresh; a one-line comment edit inside a
   frontmatter range (`skill-template.md#L1-L14`) staled a claim.
+- [LEARN:review] A fresh re-review packet must carry every earlier
+  verification result, negative controls included. A fresh reviewer cannot
+  see earlier rounds; under the `--gate-result` rule it answers `WARN` with
+  an open request for missing evidence, and `WARN` blocks the commit
+  (gate-repair Phase A, round 2).
+- [LEARN:verification] Before calling a gate path untested, search
+  `scripts/validate_targets.py` as well as `tests/`. Its installed-hook smoke
+  already covered the required-Ponytail block that an audit grep of `tests/`
+  reported as untested (2026-10-17 backlog audit, D4).
+- [LEARN:workflow] A change to `record_findings.py` arguments or report
+  fields must also update the recorder smoke and every completion findings
+  fixture in `scripts/validate_targets.py`, and the lifecycle fixture in
+  `tests/test_install_bootstrap.py`. The validator consumes the recorder
+  directly, so pytest alone does not show the break.

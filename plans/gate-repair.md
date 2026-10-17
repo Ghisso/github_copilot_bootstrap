@@ -182,7 +182,7 @@ IDs are prose references for this plan only.
 
 ## Phases
 
-- [ ] `2026-10-17_phase-A-review-gate-integrity` — gate result with schema version, required profiles, unit and installed-hook tests, post-closeout drift test
+- [x] `2026-10-17_phase-A-review-gate-integrity` — complete: gate result with schema version, required profiles, unit and installed-hook tests, post-closeout drift test. See `.claude/session_logs/2026-10-17_gate-repair-phase-a.md`.
 - [ ] `2026-10-17_phase-B-context-mode-hook-sanitizer` — capture upstream hook output in isolation, then forward only allowlisted advice fields
 - [ ] `2026-10-17_phase-C-mcp-surface-parity` — guarded root MCP adapters, validator rule, Context7 grant, Codex and Antigravity MCP evidence
 - [ ] `2026-10-17_phase-D-guard-coverage` — hook- and server-config protection, untracked local settings, branch-time plan checks, failure-hiding commands, stale schema

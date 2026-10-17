@@ -3,8 +3,8 @@ name: 2026-10-17_phase-A-review-gate-integrity
 type: small-plan
 parent_plan: gate-repair
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-17_gate-repair-phase-a.md
 ---
 
 # Small Plan: Review Gate Integrity
@@ -24,7 +24,7 @@ later phase of this plan is reviewed under the repaired gate.
 
 ## Steps
 
-- [ ] **1. Record and enforce the reviewer's gate result (GR-001).**
+- [x] **1. Record and enforce the reviewer's gate result (GR-001).**
   **Owner:** coder.
   **Files:** modify `shared/scripts/record_findings.py`,
   `shared/scripts/verify.py` (`report_errors`, line 2227, and its callers),
@@ -58,7 +58,7 @@ later phase of this plan is reviewed under the repaired gate.
   already-completed phase is re-judged. A self-reported `PASS` is still a
   recorded claim, not proof (see the big plan's risks).
 
-- [ ] **2. Require review profiles by changed surface (GR-002).**
+- [x] **2. Require review profiles by changed surface (GR-002).**
   **Owner:** coder.
   **Files:** modify `shared/scripts/verify.py` (`gate_receipt_errors`,
   about line 2011; `CONTROL_PLANE_FILES`; the dependency-file set).
@@ -94,7 +94,7 @@ later phase of this plan is reviewed under the repaired gate.
   none. Gate tests: a test-file diff whose report lacks `tests` blocks; a
   five-profile report passes a `scripts/` diff.
 
-- [ ] **3. Add the missing unit and installed-hook tests (GR-003).**
+- [x] **3. Add the missing unit and installed-hook tests (GR-003).**
   **Owner:** coder.
   **Files:** modify `tests/test_verify.py` and `scripts/validate_targets.py`
   (the installed-hook smoke that already covers Ponytail near lines
@@ -111,7 +111,7 @@ later phase of this plan is reviewed under the repaired gate.
   new case fails when the check it covers is removed; do not commit that
   experiment.
 
-- [ ] **4. Prove post-closeout drift blocks the commit (GR-004).**
+- [x] **4. Prove post-closeout drift blocks the commit (GR-004).**
   **Owner:** coder.
   **Files:** modify `tests/test_verify.py`; add one comment next to the
   `tracked_state_hash` writer in `shared/scripts/verify.py` (line 1707).
@@ -125,7 +125,7 @@ later phase of this plan is reviewed under the repaired gate.
   `tracked_state_hash` is informational and `tree_sha` is the binding
   check. No receipt schema change.
 
-- [ ] **5. Update guidance, regenerate, review, document, close out.**
+- [x] **5. Update guidance, regenerate, review, document, close out.**
   **Owner:** coder for guidance text; orchestrator for generation,
   self-install, and closeout; fresh reviewer; documenter after review.
   **Files:** modify `shared/agents/reviewer/prompt.md` (Gate Result mapping:
@@ -182,11 +182,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
