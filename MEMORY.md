@@ -1518,9 +1518,12 @@
   run in the same step as `openwiki_submit_page`, not from an earlier read
   or a subagent report. Two ranges cited from an earlier read were about 40
   lines off and needed a corrective run (gate-repair Phase E).
-- [LEARN:verification] Editing a vendored Ponytail skill (`ponytail`,
-  `ponytail-review`, `deep-audit`) moves three pins: the hash in
-  `scripts/validate_targets.py`, the "Local allowlist hashes" in
-  `shared/third_party/ponytail/UPSTREAM.md`, and, for skills the sidecar
-  ships, `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` and the line counts in
-  `tests/test_validate_targets.py` (gate-repair Phase E).
+- [LEARN:verification] Editing a pinned Ponytail skill (`ponytail` or
+  `ponytail-review`) moves these pins: the hash in
+  `scripts/validate_targets.py`; the hash in "Local allowlist hashes" and the
+  "N lines against upstream" text in
+  `shared/third_party/ponytail/UPSTREAM.md`; the matching line-count
+  literals and, for a skill the sidecar ships,
+  `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` in
+  `tests/test_validate_targets.py`. `deep-audit` has no pin (gate-repair
+  Phase E).

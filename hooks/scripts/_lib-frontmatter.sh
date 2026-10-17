@@ -832,14 +832,14 @@ diff_requires_ponytail() {
 # `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
 # `.vscode/mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by
 # root guidance itself (`CLAUDE.md`'s own "Safety And Control Plane" section).
-# This is the same canonical control-plane set `diff_requires_ponytail` above
-# already encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
-# `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
-# `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
-# cannot drift from each other. A bash `case` pattern cannot glob "every
-# root file the policy calls control-plane" the way a directory prefix can,
-# so root files are named explicitly and stay in lockstep with that same
-# short, already-tracked list `diff_requires_ponytail` names.
+# `diff_requires_ponytail` above encodes the same set for a related purpose
+# (`.claude/hooks/*`, `.claude/settings.json`, `.github/hooks/*`, `.codex/*`,
+# `.mcp.json`, `.devcontainer/*`, `AGENTS.md`, `CLAUDE.md`) minus
+# `.vscode/mcp.json`, which `required_review_profiles` in `verify.py` covers;
+# this bypass needs no entry for it because it admits only `*.md` paths. A
+# bash `case` pattern cannot glob "every root file the policy calls
+# control-plane" the way a directory prefix can, so root files are named
+# explicitly, matching the short list `diff_requires_ponytail` names.
 typo_bypass_diff_allowed() {
   local repo_root="$1"
   local diff_ref="${2:-}"

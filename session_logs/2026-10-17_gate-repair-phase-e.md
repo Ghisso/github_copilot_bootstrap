@@ -102,7 +102,15 @@ The sweep ran read-only at HEAD `bac1d59` against `git diff dev...HEAD`
   `generate_targets.py` quoted the control-plane sentence word for word;
   updated with it. Fixed.
 - **Templates, agents, review profiles.** Reviewer prompt already maps
-  PASS/WARN/FAIL and qualifies `[]`; no stale claim found. No change.
+  PASS/WARN/FAIL and qualifies `[]`. No change. Left on purpose:
+  `shared/agents/coder/prompt.md` lists the control-plane files without
+  `.vscode/mcp.json`, because `tests/test_validate_targets.py` forbids
+  "vscode" in the rendered Antigravity adapter.
+- **Hook classifier.** `diff_requires_ponytail` in `_lib-frontmatter.sh`
+  omits `.vscode/mcp.json`. Left on purpose: `required_review_profiles` in
+  `verify.py` requires all five profiles for it. The comment above
+  `typo_bypass_diff_allowed` had claimed the two lists match; it now names
+  the gap (review round 1 finding).
 - **State READMEs.** `.claude/quality_reports/README.md` is not wrong. No
   change.
 - **`.claude/MEMORY.md`.** Subagent MCP-grant entry superseded by the
@@ -125,7 +133,8 @@ The sweep ran read-only at HEAD `bac1d59` against `git diff dev...HEAD`
 ## Phase Summary
 
 Phase E changed no executable behavior. It aligned root guidance, docs,
-policies, three hash-pinned skills, and MEMORY with Phases A–D, completed
+policies, three Ponytail-related skills (two of them hash-pinned), and
+MEMORY with Phases A–D, completed
 the client parity table with evidence, recorded the open follow-ups where
 the next planner reads them, and refreshed ten OpenWiki pages.
 
@@ -140,7 +149,7 @@ the next planner reads them, and refreshed ten OpenWiki pages.
 | GR-005 | C (`4103933`) | `root_mcp_adapter_errors` over three root adapters; `tests/test_validate_targets.py` |
 | GR-006 | C | `mcp__context7` in `CLAUDE_TOOL_MAP["search"]`; Codex and Antigravity evidence and gaps in `docs/target-mapping.md` |
 | GR-007 | B (`de5a2f8`) | Field allowlist filter; 32 fixtures under `tests/fixtures/context_mode_hook/1.0.169/`; real-binary check |
-| GR-008 | D (`bac1d59`) | Eight configs in `HOOK_CONFIGS`; `settings.local.json` untracked with preserve/restore; `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `tests/test_state_sync.py` |
+| GR-008 | D (`bac1d59`) | Eight configs added to `HOOK_CONFIGS` (twelve total); `settings.local.json` untracked with preserve/restore; `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `tests/test_state_sync.py` |
 | GR-009 | D | Branch gate runs the plan validator on the big plan and listed phases; `tests/test_branch_state.py` |
 | GR-010 | D | Deprecation steps keep pytest's status; `failure_masking_command_errors` check |
 | GR-011 | D | `shared/schemas/agent.schema.json` deleted; only `native-client-observation.schema.json` remains |
@@ -153,12 +162,15 @@ the next planner reads them, and refreshed ten OpenWiki pages.
   run in the same step as `openwiki_submit_page`, not from an earlier read
   or a subagent report. Two ranges cited from an earlier read were about 40
   lines off and needed a corrective run (gate-repair Phase E).
-- [LEARN:verification] Editing a vendored Ponytail skill
-  (`ponytail`, `ponytail-review`, `deep-audit`) moves three pins: the hash in
-  `scripts/validate_targets.py`, the "Local allowlist hashes" in
-  `shared/third_party/ponytail/UPSTREAM.md`, and, for skills the sidecar
-  ships, `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` and the line counts in
-  `tests/test_validate_targets.py` (gate-repair Phase E).
+- [LEARN:verification] Editing a pinned Ponytail skill (`ponytail` or
+  `ponytail-review`) moves these pins: the hash in
+  `scripts/validate_targets.py`; the hash in "Local allowlist hashes" and the
+  "N lines against upstream" text in
+  `shared/third_party/ponytail/UPSTREAM.md`; the matching line-count
+  literals and, for a skill the sidecar ships,
+  `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` in
+  `tests/test_validate_targets.py`. `deep-audit` has no pin (gate-repair
+  Phase E).
 
 ## Verification
 
