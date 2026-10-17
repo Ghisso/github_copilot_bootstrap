@@ -74,6 +74,24 @@ no native client.
   to `<context_window_protection>` and `<session_search>`; the safety net
   still drops any field left with a blocked or plugin-prefixed name.
 
+- **07:40** - Coder finished step 2: `run_upstream_hook` in the dispatcher,
+  `--hook-output` mode in the filter, 32-fixture dispatcher test, filter unit
+  tests, opt-in real-binary test. Negative controls failed as expected for
+  every rule. Accepted limits (documented): fail-closed drop of a restored
+  block that mentions a non-allowlisted `ctx_` name; unclosed advice tags
+  rely on the safety net; no `exec`, so a timed-out dispatcher can leave the
+  upstream child running.
+- **07:45** - Self-install; `check_runtime.py` PASS. Live check: the
+  installed hook now forwards nothing for WebFetch and Bash curl (before:
+  deny). `verify.py phase` PASS (pytest 2452 passed, 1 skipped);
+  `CONTEXT_MODE_REAL=1 ... -k real_upstream` 1 passed.
+- **07:50** - Documenter: `docs/smoke-tests.md`, `docs/runtime-checks.md`,
+  `docs/target-mapping.md` (new parity section). `validate_targets.py` PASS.
+  `shared/policies/tool-routing.instructions.md:28` is silent about the
+  filter (not contradicted); deferred to Phase E's stale-claims audit.
+  Fresh reviewer started with the full evidence packet, including negative
+  controls (lesson from Phase A round 2).
+
 ## [LEARN] Entries
 
 ## Verification
