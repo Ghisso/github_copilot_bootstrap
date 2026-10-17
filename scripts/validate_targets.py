@@ -2460,18 +2460,19 @@ def validate_agents(errors: list[str]) -> None:
             (line for line in text.splitlines() if line.startswith("tools:")), ""
         )
         # An agent told to route through tool-routing.instructions.md (which
-        # names Semble and Context Mode) but whose own tools: allowlist
-        # omits the matching mcp__ wildcard physically cannot follow that
-        # instruction — tools: is an explicit allowlist, not additive to
+        # names Semble, Context Mode, and Context7) but whose own tools:
+        # allowlist omits the matching mcp__ wildcard physically cannot follow
+        # that instruction — tools: is an explicit allowlist, not additive to
         # defaults. Caught this exact bug once already (every generated
         # subagent had the instruction but not the tool); guard against it
-        # regenerating.
+        # regenerating. One check per server, so each fails on its own.
         if "tool-routing.instructions.md" in text:
-            check(
-                "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
-                f"Claude agent must allow both Semble and Context Mode MCP: {path}",
-                errors,
-            )
+            for server in ("mcp__semble", "mcp__context-mode", "mcp__context7"):
+                check(
+                    server in tools_line,
+                    f"Claude agent must allow {server} MCP: {path}",
+                    errors,
+                )
         # Unlike the Semble/Context-Mode check above, this must run for every
         # agent regardless of whether its prompt happens to mention
         # tool-routing.instructions.md — tool-name validity has nothing to do
@@ -2705,7 +2706,8 @@ def validate_agents(errors: list[str]) -> None:
         # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
         # reflow wrapping the invocation across a line break.
         # The bound must clear the canonical long-form invocation documented in
-        # quality-and-testing.instructions.md, whose flag run is 132 characters.
+        # quality-and-testing.instructions.md, whose flag run stays under the gap
+        # bound in the regex below.
         if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
             check(
                 path.stem == "orchestrator",
@@ -2899,6 +2901,31 @@ def mcp_server_parity_errors(
     return errors
 
 
+# Tracked root MCP adapters of this authoring repository, each read with its
+# own server key. All three must carry the shared guarded Context Mode route.
+ROOT_MCP_ADAPTERS = (
+    (".mcp.json", "mcpServers", json.loads),
+    (".vscode/mcp.json", "servers", json.loads),
+    (".codex/config.toml", "mcp_servers", tomllib.loads),
+)
+
+
+def root_mcp_adapter_errors(
+    repo_root: Path, shared_mcp: dict[str, object]
+) -> list[str]:
+    """Return one failure per root MCP adapter that does not carry the guarded route."""
+    errors: list[str] = []
+    for relative, key, parse in ROOT_MCP_ADAPTERS:
+        servers = parse(read(repo_root / relative)).get(key)
+        entry = servers.get("context-mode") if isinstance(servers, dict) else None
+        check(
+            entry == shared_mcp["context-mode"],
+            f"root {relative} {key} context-mode must match the guarded shared route",
+            errors,
+        )
+    return errors
+
+
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
@@ -3012,16 +3039,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             require_agent_settings=False,
         )
     )
-    authoring_codex_servers = authoring_config.get("mcp_servers", {})
-    if isinstance(authoring_codex_servers, dict):
-        check(
-            authoring_codex_servers.get("context-mode")
-            == shared_mcp.get("context-mode"),
-            "authoring Codex Context Mode MCP server must match the guarded shared route",
-            errors,
-        )
-    else:
-        errors.append("authoring Codex config mcp_servers must be a table")
+    errors.extend(root_mcp_adapter_errors(REPO_ROOT, shared_mcp))
     check(
         "[mcp_servers.semble]" in codex_config,
         "Codex config missing Semble MCP server",
@@ -3680,15 +3698,34 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             "openai-codex",
         ),
         (
-            # `.agents/hooks.json` is not in protect-files.py's HOOK_CONFIGS,
-            # but the shared `.claude/hooks/scripts/` tree every client
-            # bridges into is protected regardless of which native config
-            # names it, so Google Antigravity's copy is exercised the same
-            # way as the other three clients.
+            # The shared `.claude/hooks/scripts/` tree every client bridges
+            # into is protected regardless of which native config names it,
+            # so Google Antigravity's copy is exercised the same way as the
+            # other three clients.
             TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
             ".claude/hooks/scripts/guard.sh",
             "deny",
             "google-antigravity",
+        ),
+        (
+            # GR-008: Antigravity's own hook config and the MCP configs that
+            # launch server commands are protected in the generated copy too.
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".agents/hooks.json",
+            "deny",
+            "google-antigravity",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".mcp.json",
+            "ask",
+            "claude-code",
+        ),
+        (
+            TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh",
+            ".vscode/mcp.json",
+            "ask",
+            "github-copilot",
         ),
     )
     for script, protected_path, expected_decision, target_id in hook_cases:
@@ -3704,6 +3741,35 @@ def validate_hook_guardrails(errors: list[str]) -> None:
         check(
             f'"permissionDecision":"{expected_decision}"' in stdout,
             f"hook guardrail did not protect {protected_path} with {expected_decision}: {script}",
+            errors,
+        )
+
+    # VS Code's Local harness (the supported Copilot client) names its terminal
+    # tool `run_in_terminal` and its read tool `read_file`.
+    copilot_protect_files = (
+        TARGET_ROOT / ".claude" / "hooks" / "scripts" / "protect-files.sh"
+    )
+    for tool_name, tool_input, expected in (
+        (
+            "run_in_terminal",
+            {"command": "echo x > .github/hooks/hooks.json"},
+            '"permissionDecision":"ask"',
+        ),
+        ("read_file", {"filePath": ".mcp.json"}, ""),
+    ):
+        returncode, stdout, stderr = run_hook(
+            copilot_protect_files,
+            {"tool_name": tool_name, "tool_input": tool_input},
+            "github-copilot",
+        )
+        check(
+            returncode == 0,
+            f"Copilot Local {tool_name} guardrail failed to run: {stderr}",
+            errors,
+        )
+        check(
+            expected in stdout if expected else stdout == "",
+            f"Copilot Local {tool_name} guardrail returned unexpected output: {stdout!r}",
             errors,
         )
 
@@ -4635,6 +4701,9 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         def findings_report(**overrides: object) -> dict[str, object]:
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -5902,11 +5971,20 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             head_sha: str, content_hash_value: str, **overrides: object
         ) -> dict[str, object]:
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
                 "ponytail_findings": 0,
-                "profiles_reviewed": ["code", "ponytail"],
+                "profiles_reviewed": [
+                    "architecture",
+                    "code",
+                    "ponytail",
+                    "security",
+                    "tests",
+                ],
                 "branch": "foo_implementation",
                 "phase": "phase-one",
                 "generated_at": "2099-01-01T00:00:00Z",
@@ -6091,6 +6169,29 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         if result.returncode == 0:
             git(repo, "reset", "--soft", "HEAD~1")
 
+        # GR-002: a test-file diff needs the `tests` profile. Ponytail ran
+        # (a two-file diff requires it), so `tests` is the only profile missing.
+        write(repo / "tests" / "test_work.py", "def test_work() -> None:\n    pass\n")
+        git(repo, "add", "tests/test_work.py")
+        head_sha, content_hash = head_and_hash()
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                profiles_reviewed=["code", "ponytail"],
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0
+            and "missing required review profiles: tests" in result.stderr,
+            "commit-msg hook must require the tests profile for a test-file diff",
+            errors,
+        )
+        git(repo, "rm", "--cached", "-q", "tests/test_work.py")
+        (repo / "tests" / "test_work.py").unlink()
+        (repo / "tests").rmdir()
+
         write(repo / ".codex" / "config.toml", "[features]\n")
         write(
             repo / ".claude" / "bootstrap-root" / ".codex" / "config.toml",
@@ -6108,6 +6209,23 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             result.returncode != 0
             and "requires a fresh Ponytail review" in result.stderr,
             "commit-msg hook must require Ponytail metadata for control-plane work",
+            errors,
+        )
+
+        # GR-001: a reviewer result of WARN (an open request) cannot complete
+        # a phase, even though every profile and count is otherwise clean.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                gate_result="WARN",
+                open_requests=["show the original reproduction"],
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0 and "gate_result is 'WARN'" in result.stderr,
+            "commit-msg hook must block a findings report recorded as WARN",
             errors,
         )
 
@@ -6395,6 +6513,9 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
             merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -6814,6 +6935,9 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             )
             merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -7103,6 +7227,9 @@ def validate_completed_phase_stale_receipt_rejection(errors: list[str]) -> None:
 
         metadata = verification.state_metadata(repo, "dev", "phase-one")
         report = {
+            "schema_version": 2,
+            "gate_result": "PASS",
+            "open_requests": [],
             "findings": [],
             "counts": {"critical": 0, "major": 0, "minor": 0},
             "ponytail_reviewed": True,
@@ -7214,6 +7341,9 @@ def validate_single_phase_big_plan_terminal_publication(errors: list[str]) -> No
         )
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
         report = {
+            "schema_version": 2,
+            "gate_result": "PASS",
+            "open_requests": [],
             "findings": [],
             "counts": {"critical": 0, "major": 0, "minor": 0},
             "ponytail_reviewed": True,
@@ -7422,6 +7552,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "validator",
                 "--base-ref",
                 "dev",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(report_path),
             ],
@@ -7453,6 +7585,13 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "record_findings must persist sorted reviewed profiles",
                 errors,
             )
+            check(
+                report.get("schema_version") == 2
+                and report.get("gate_result") == "PASS"
+                and report.get("open_requests") == [],
+                "record_findings must persist schema_version 2, gate_result, and open_requests",
+                errors,
+            )
 
         legacy_path = Path(temp_dir) / "legacy-ponytail-findings.json"
         legacy = subprocess.run(
@@ -7466,6 +7605,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "validator",
                 "--base-ref",
                 "dev",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(legacy_path),
             ],
@@ -7500,6 +7641,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "README.md",
                 "--phase",
                 "validator",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(Path(temp_dir) / "no-profile.json"),
             ],
@@ -7525,6 +7668,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "code",
                 "--phase",
                 "validator",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(Path(temp_dir) / "missing-finding-profile.json"),
             ],
@@ -7538,6 +7683,37 @@ def validate_generated_scripts(errors: list[str]) -> None:
             missing_finding_profile.returncode != 0
             and "non-empty profile" in missing_finding_profile.stderr,
             "record_findings must reject findings without a reviewed profile",
+            errors,
+        )
+
+        pass_with_request_path = Path(temp_dir) / "pass-with-request.json"
+        pass_with_request = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "code",
+                "--phase",
+                "validator",
+                "--gate-result",
+                "PASS",
+                "--open-request",
+                "show the original reproduction",
+                "--out",
+                str(pass_with_request_path),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            pass_with_request.returncode == 1
+            and "cannot be recorded with --open-request" in pass_with_request.stderr
+            and not pass_with_request_path.exists(),
+            "record_findings must refuse PASS with an open request and write nothing",
             errors,
         )
 
@@ -7622,7 +7798,46 @@ def stale_skill_contract_errors(skill_root: Path, label: str) -> list[str]:
     return errors
 
 
+# Shared text that ships to agents. A fenced shell line that runs a check and
+# ends in `|| true`, `|| :`, or `|| echo ...` reports success when the check
+# fails, so an agent that copies it hides the failure.
+FAILURE_MASK_SOURCE_DIRS = ("skills", "policies", "agents", "templates", "sidecar")
+CHECK_COMMAND_PATTERN = re.compile(
+    r"(?<![\w./-])(?:pytest|mypy|ruff)(?![\w.-])|verify\.py"
+)
+FAILURE_MASK_PATTERN = re.compile(r"\|\|\s*(?:true|:|echo\b.*)\s*$")
+
+
+def failure_masking_command_errors(repo_root: Path) -> list[str]:
+    """Return one file:line failure per shipped shell line that hides a failed check.
+
+    ponytail: physical lines only. A command continued with a backslash, or
+    masked through `; true`, is not detected; the review `tests` profile asks
+    whether a shipped check can fail.
+    """
+    errors: list[str] = []
+    for directory in FAILURE_MASK_SOURCE_DIRS:
+        for path in sorted((repo_root / "shared" / directory).rglob("*.md")):
+            language: str | None = None
+            for number, line in enumerate(read(path).splitlines(), start=1):
+                fence = re.match(r"^\s*```(\w*)", line)
+                if fence:
+                    language = None if language is not None else fence.group(1)
+                    continue
+                if (
+                    language in {"bash", "sh"}
+                    and CHECK_COMMAND_PATTERN.search(line)
+                    and FAILURE_MASK_PATTERN.search(line)
+                ):
+                    errors.append(
+                        f"{path.relative_to(repo_root).as_posix()}:{number}: "
+                        f"shipped shell line hides a failed check: {line.strip()}"
+                    )
+    return errors
+
+
 def validate_skills_and_paths(errors: list[str]) -> None:
+    errors.extend(failure_masking_command_errors(REPO_ROOT))
     shared_skill_count = count_skills(REPO_ROOT / "shared" / "skills")
     skill_root = TARGET_ROOT / ".claude" / "skills"
     count = count_skills(skill_root)
@@ -7746,12 +7961,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             / "shared"
             / "skills"
             / "ponytail"
-            / "SKILL.md": "9e2611144a8da730f110af6f789fd4dc9f6574f7fbff1fd5be7220b0b30a6fc3",
+            / "SKILL.md": "7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1",
             REPO_ROOT
             / "shared"
             / "skills"
             / "ponytail-review"
-            / "SKILL.md": "bf0f50e5a406c8c1587ab4a69340369bf0293ef1022450cb9142468aa15f8656",
+            / "SKILL.md": "0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8",
             REPO_ROOT
             / "shared"
             / "third_party"
@@ -8923,7 +9138,8 @@ def _sidecar_skills_profile_cases(good_root: Path, errors: list[str]) -> None:
     write(
         skill_md,
         original_skill
-        + "\nthe workflow's final Ponytail diff review remains mandatory.\n",
+        + "\nthe `ponytail` review profile still runs wherever the review-routing table or\n"
+        "the commit gate requires it.\n",
     )
     check(
         any(
@@ -11511,7 +11727,8 @@ def validate_typo_bypass_path_restriction(errors: list[str]) -> None:
         # verbatim by shared/policies/workspace.instructions.md's
         # control-plane definition ("Control-plane files include
         # .claude/hooks/, .claude/settings.json, .github/hooks/, .codex/,
-        # .mcp.json, .devcontainer/, CLAUDE.md, and AGENTS.md") must also be
+        # .mcp.json, .vscode/mcp.json, .devcontainer/, CLAUDE.md, and
+        # AGENTS.md") must also be
         # excluded - a docs(typo): commit must never rewrite root guidance
         # or the .codex/.devcontainer control-plane surfaces unreviewed.
         for relative_path in (

@@ -1,0 +1,19 @@
+{
+  "client_id": "github-copilot",
+  "event": "pretooluse",
+  "case": "ctx-execute",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "tool_name": "mcp_context-mode_ctx_execute",
+    "tool_input": {
+      "language": "shell",
+      "code": "ls"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}

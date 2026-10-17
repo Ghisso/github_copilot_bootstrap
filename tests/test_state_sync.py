@@ -572,6 +572,351 @@ def test_remote_tracked_cache_is_untracked_after_every_successful_reconcile(
     assert _remote_show(remote, cache_rel) == ""
 
 
+SETTINGS_LOCAL = "settings.local.json"
+
+
+def _commit_tracked_settings(writer: Path, content: str, *, push: bool = False) -> None:
+    """Track ``settings.local.json`` the way an install from before the
+    untrack change did (a forced add: the nested ``.gitignore`` lists it)."""
+    _write(writer, SETTINGS_LOCAL, content)
+    nested = writer / ".claude"
+    assert _git(nested, "add", "-f", SETTINGS_LOCAL).returncode == 0
+    commit = _git(
+        nested,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-qm",
+        "legacy tracked local settings",
+    )
+    assert commit.returncode == 0, commit.stderr
+    if push:
+        assert _git(nested, "push", "-q").returncode == 0
+
+
+def test_checkpoint_untracks_previously_committed_local_settings_without_deleting_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """GR-008: the nested index stops tracking ``settings.local.json`` while
+    the local file keeps its exact bytes (including CRLF and non-ASCII)."""
+    remote = _bare_remote(tmp_path)
+    writer = _new_writer(script, tmp_path, remote, "tracked-local-settings")
+    nested = writer / ".claude"
+    _commit_tracked_settings(writer, '{"committed": true}\n', push=True)
+    assert _remote_show(remote, SETTINGS_LOCAL) == '{"committed": true}\n'
+    local = nested / SETTINGS_LOCAL
+    local.write_bytes('{"local": "edited é"}\r\n'.encode())
+    before = local.read_bytes()
+
+    result = _sync(script, writer, remote, "checkpoint")
+
+    assert result.returncode == 0, result.stderr
+    assert local.read_bytes() == before
+    assert _git(nested, "ls-files", SETTINGS_LOCAL).stdout == ""
+    assert _git(nested, "status", "--porcelain").stdout == ""
+    assert _sync(script, writer, remote, "publish").returncode == 0
+    assert _remote_show(remote, SETTINGS_LOCAL) == ""
+
+
+def test_second_clone_keeps_its_local_settings_when_it_pulls_the_untrack_commit(
+    script: Path, tmp_path: Path
+) -> None:
+    """GR-008 data-loss guard. Clone B has an unpushed commit that still
+    tracks ``settings.local.json`` and a newer local edit; clone A publishes
+    the untrack commit. Replaying B's commits through trees that track and
+    then untrack the file makes git delete B's working copy. The control
+    clone proves that, so the assertion below is not vacuous."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "settings-a")
+    _commit_tracked_settings(clone_a, "from-A\n", push=True)
+    clone_b = _new_writer(script, tmp_path, remote, "settings-b")
+    nested_b = clone_b / ".claude"
+    _commit_tracked_settings(clone_b, "B-committed\n")
+    local_b = nested_b / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-local-final\r\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+    assert _remote_show(remote, SETTINGS_LOCAL) == ""
+
+    # Control: the same git steps the script runs, minus the preserved copy.
+    control = tmp_path / "settings-b-control"
+    shutil.copytree(clone_b, control, symlinks=True)
+    identity = ("-c", "user.name=Test", "-c", "user.email=test@example.com")
+    nested_control = control / ".claude"
+    assert (
+        _git(
+            nested_control, "rm", "-f", "-q", "--cached", "--", SETTINGS_LOCAL
+        ).returncode
+        == 0
+    )
+    assert _git(nested_control, *identity, "commit", "-qm", "untrack").returncode == 0
+    _git(nested_control, *identity, "pull", "--rebase", "origin", "ai-state")
+    assert not (nested_control / SETTINGS_LOCAL).exists(), (
+        "fixture must reach git's deletion path"
+    )
+
+    result = _sync(script, clone_b, remote, "pull")
+
+    assert local_b.read_bytes() == b"B-local-final\r\n", result.stderr
+    assert "restored local settings.local.json" in result.stderr
+    assert _git(nested_b, "ls-files", SETTINGS_LOCAL).stdout == ""
+    assert _no_active_rebase_or_merge(clone_b)
+    assert list((nested_b / ".git").glob("settings.local.json.*")) == []
+    assert _sync(script, clone_b, remote, "publish").returncode == 0
+    assert _remote_show(remote, SETTINGS_LOCAL) == ""
+
+
+def test_conflicted_pull_keeps_the_local_settings_it_aborts_around(
+    script: Path, tmp_path: Path
+) -> None:
+    """GR-008: when the pull aborts on a real conflict, the rebase has already
+    replayed B's commit that tracked the file, so the abort must still leave
+    B's own bytes in place."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "conflict-settings-a")
+    _write(clone_a, "plans/x.md", "base\n")
+    _commit_tracked_settings(clone_a, "from-A\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+    clone_b = _new_writer(script, tmp_path, remote, "conflict-settings-b")
+    nested_b = clone_b / ".claude"
+    _commit_tracked_settings(clone_b, "B-committed\n")
+    _write(clone_b, "plans/x.md", "from-B\n")
+    assert _git(nested_b, "add", "plans/x.md").returncode == 0
+    assert (
+        _git(
+            nested_b,
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "B edits the plan",
+        ).returncode
+        == 0
+    )
+    local_b = nested_b / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-local-final\n")
+    _write(clone_a, "plans/x.md", "from-A\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+
+    result = _sync(script, clone_b, remote, "pull")
+
+    assert "reconciliation with origin/ai-state failed" in result.stderr
+    assert local_b.read_bytes() == b"B-local-final\n"
+    assert _no_active_rebase_or_merge(clone_b)
+    assert list((nested_b / ".git").glob("settings.local.json.*")) == []
+
+
+def test_conflicted_merge_keeps_the_local_settings_it_aborts_around(
+    script: Path, tmp_path: Path
+) -> None:
+    """GR-008: an unrelated-history merge that conflicts is aborted. The merge
+    had already written the remote's copy of the file, so the abort path must
+    put B's own bytes back too."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "merge-conflict-a")
+    _write(clone_a, "plans/x.md", "from-A\n")
+    assert _git(clone_a / ".claude", "add", "plans/x.md").returncode == 0
+    _commit_tracked_settings(clone_a, "from-A\n", push=True)
+    clone_b = tmp_path / "merge-conflict-b"
+    _write(clone_b, "plans/x.md", "from-B\n")
+    local_b = clone_b / ".claude" / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-fresh\n")
+
+    result = _sync(script, clone_b, remote, "setup")
+
+    assert "could not be merged automatically" in result.stderr
+    assert local_b.read_bytes() == b"B-fresh\n"
+    assert _no_active_rebase_or_merge(clone_b)
+    assert list((clone_b / ".claude" / ".git").glob("settings.local.json.*")) == []
+
+
+def test_fresh_clone_keeps_its_local_settings_when_origin_still_tracks_them(
+    script: Path, tmp_path: Path
+) -> None:
+    """GR-008 data-loss guard for the unrelated-history merge: origin's tip
+    still tracks the file, and the merge would replace the fresh clone's own
+    bytes with the remote's."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "fresh-settings-a")
+    _commit_tracked_settings(clone_a, "from-A\n", push=True)
+    assert _remote_show(remote, SETTINGS_LOCAL) == "from-A\n"
+    clone_b = tmp_path / "fresh-settings-b"
+    # A tracked file only B has keeps B's first commit different from A's, so
+    # the histories stay unrelated and the merge path runs every time.
+    _write(clone_b, "plans/b-only.md", "B\n")
+    local_b = clone_b / ".claude" / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-fresh\r\n")
+
+    result = _sync(script, clone_b, remote, "setup")
+
+    assert result.returncode == 0, result.stderr
+    assert local_b.read_bytes() == b"B-fresh\r\n"
+    assert "restored local settings.local.json" in result.stderr
+    assert _git(clone_b / ".claude", "ls-files", SETTINGS_LOCAL).stdout == ""
+    assert list((clone_b / ".claude" / ".git").glob("settings.local.json.*")) == []
+
+
+@pytest.mark.parametrize("shape", ["unrelated", "common-history"])
+def test_reconciliation_is_skipped_when_local_settings_cannot_be_preserved(
+    script: Path, tmp_path: Path, shape: str
+) -> None:
+    """If the byte copy cannot be made, git is not allowed to touch the tree:
+    no merge or rebase runs, and the file keeps its bytes."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, f"unsafe-a-{shape}")
+    _write(clone_a, "plans/from-a.md", "A\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+    if shape == "common-history":
+        clone_b = _new_writer(script, tmp_path, remote, f"unsafe-b-{shape}")
+        _write(clone_a, "plans/second-from-a.md", "A2\n")
+        assert _sync(script, clone_a, remote, "push").returncode == 0
+        expected_missing = "plans/second-from-a.md"
+    else:
+        clone_b = tmp_path / f"unsafe-b-{shape}"
+        _write(clone_b, "plans/b-only.md", "B\n")
+        expected_missing = "plans/from-a.md"
+    local_b = clone_b / ".claude" / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-only\n")
+    fake_bin = tmp_path / f"failing-cp-{shape}"
+    fake_bin.mkdir()
+    (fake_bin / "cp").write_text("#!/usr/bin/env bash\nexit 1\n")
+    (fake_bin / "cp").chmod(0o755)
+
+    result = _sync(
+        script,
+        clone_b,
+        remote,
+        "setup" if shape == "unrelated" else "pull",
+        extra_env={"PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+
+    assert "could not keep a copy of local settings.local.json" in result.stderr
+    assert local_b.read_bytes() == b"B-only\n"
+    assert not (clone_b / ".claude" / expected_missing).exists()
+    assert _no_active_rebase_or_merge(clone_b)
+
+
+def _concurrent_settings_write(
+    tmp_path: Path, git_command: str, target: Path, content: str
+) -> dict[str, str]:
+    """Environment whose `git` writes ``content`` to ``target`` right after the
+    real ``git <git_command>`` finishes: a stand-in for Claude Code or another
+    session saving ``settings.local.json`` while state sync is running."""
+    real_git = shutil.which("git")
+    assert real_git is not None
+    fake_bin = tmp_path / f"concurrent-write-{git_command}-bin"
+    fake_bin.mkdir()
+    fake_git = fake_bin / "git"
+    fake_git.write_text(
+        "#!/usr/bin/env bash\n"
+        '"$REAL_GIT" "$@"\n'
+        "status=$?\n"
+        'if [[ "${3:-}" == "$CONCURRENT_AFTER" ]]; then\n'
+        '  printf "%s" "$CONCURRENT_CONTENT" > "$CONCURRENT_TARGET"\n'
+        "fi\n"
+        'exit "$status"\n'
+    )
+    fake_git.chmod(0o755)
+    return {
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "REAL_GIT": real_git,
+        "CONCURRENT_AFTER": git_command,
+        "CONCURRENT_TARGET": str(target),
+        "CONCURRENT_CONTENT": content,
+    }
+
+
+def test_pull_keeps_a_settings_write_made_while_it_ran(
+    script: Path, tmp_path: Path
+) -> None:
+    """A write that lands after git deleted the file is newer than the byte
+    copy, so it is kept and the copy stays for manual recovery."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "concurrent-pull-a")
+    _commit_tracked_settings(clone_a, "from-A\n", push=True)
+    clone_b = _new_writer(script, tmp_path, remote, "concurrent-pull-b")
+    nested_b = clone_b / ".claude"
+    _commit_tracked_settings(clone_b, "B-committed\n")
+    local_b = nested_b / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-local-final\r\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+
+    result = _sync(
+        script,
+        clone_b,
+        remote,
+        "pull",
+        extra_env=_concurrent_settings_write(
+            tmp_path, "pull", local_b, '{"approved": "Bash(ls)"}\n'
+        ),
+    )
+
+    assert local_b.read_bytes() == b'{"approved": "Bash(ls)"}\n', result.stderr
+    backups = list((nested_b / ".git").glob("settings.local.json.*"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == b"B-local-final\r\n"
+    assert f"kept at {backups[0]}" in result.stderr
+    assert "written while state sync ran" in result.stderr
+    assert "restored local settings.local.json" not in result.stderr
+    assert _git(nested_b, "ls-files", SETTINGS_LOCAL).stdout == ""
+    assert _no_active_rebase_or_merge(clone_b)
+
+
+def test_merge_keeps_a_settings_write_made_while_it_ran(
+    script: Path, tmp_path: Path
+) -> None:
+    """Same rule for the unrelated-history merge: after git wrote origin's
+    copy, newer bytes that are not that copy are kept, not reverted."""
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "concurrent-merge-a")
+    _commit_tracked_settings(clone_a, "from-A\n", push=True)
+    clone_b = tmp_path / "concurrent-merge-b"
+    _write(clone_b, "plans/b-only.md", "B\n")
+    nested_b = clone_b / ".claude"
+    local_b = nested_b / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-fresh\r\n")
+
+    result = _sync(
+        script,
+        clone_b,
+        remote,
+        "setup",
+        extra_env=_concurrent_settings_write(
+            tmp_path, "merge", local_b, '{"approved": "Bash(ls)"}\n'
+        ),
+    )
+
+    assert local_b.read_bytes() == b'{"approved": "Bash(ls)"}\n', result.stderr
+    backups = list((nested_b / ".git").glob("settings.local.json.*"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == b"B-fresh\r\n"
+    assert "written while state sync ran" in result.stderr
+    assert _git(nested_b, "ls-files", SETTINGS_LOCAL).stdout == ""
+
+
+def test_pull_that_leaves_the_settings_file_alone_removes_its_byte_copy(
+    script: Path, tmp_path: Path
+) -> None:
+    remote = _bare_remote(tmp_path)
+    clone_a = _new_writer(script, tmp_path, remote, "untouched-a")
+    clone_b = _new_writer(script, tmp_path, remote, "untouched-b")
+    nested_b = clone_b / ".claude"
+    local_b = nested_b / SETTINGS_LOCAL
+    local_b.write_bytes(b"B-local\r\n")
+    _write(clone_a, "plans/from-a.md", "A\n")
+    assert _sync(script, clone_a, remote, "push").returncode == 0
+
+    result = _sync(script, clone_b, remote, "pull")
+
+    assert (nested_b / "plans" / "from-a.md").read_text() == "A\n"
+    assert local_b.read_bytes() == b"B-local\r\n"
+    assert list((nested_b / ".git").glob("settings.local.json.*")) == []
+    assert "settings.local.json" not in result.stderr
+
+
 def _install_dispatcher(root: Path) -> Path:
     """Copy the real context-mode dispatcher into a writer's ``.claude/``."""
     scripts = root / ".claude" / "hooks" / "scripts"

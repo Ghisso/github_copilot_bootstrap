@@ -4,22 +4,24 @@ title: "Quickstart: where to look for what"
 description: A routing map from common tasks in the github_copilot_bootstrap repository to the wiki page that explains the mechanism and the source files that are authoritative for it.
 tags: [quickstart, routing, navigation, authority]
 sources:
+  - id: openwiki-source-df8f0c6d7ed23c271434d0c4
+    resource: repo://docs/smoke-tests.md
+  - id: openwiki-source-7aaa88e66a4141ea24c14706
+    resource: repo://docs/target-mapping.md
   - id: openwiki-source-23775c3de52f3ab95a13cb8b
     resource: repo://README.md
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
   - id: openwiki-source-7c162969a98fb2f3fa853ffc
     resource: repo://scripts/install_bootstrap.py
-  - id: openwiki-source-71fc4d2e4c5527b7b8a068ba
-    resource: repo://scripts/validate_targets.py
   - id: openwiki-source-9fa38289fd921baabf765923
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-09-27T14:43:37.947Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-09-27T14:43:37.947Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Quickstart: where to look for what
@@ -54,7 +56,8 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
 | install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](/openwiki/operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |
 | understand or debug AI-state sync, the nested repository, or a stale root adapter | [Git-backed AI-state sync](/openwiki/operations/git-backed-ai-state-sync.md) | `shared/hooks/scripts/state-sync.sh`, `tests/test_state_sync.py` |
-| understand the Context Mode pin, tool filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs` |
+| understand the Context Mode pin, tool filter, hook-output filter, or cache quarantine | [Context Mode dispatcher](/openwiki/operations/context-mode-dispatcher.md) | `shared/hooks/scripts/context-mode-dispatch.sh`, `shared/hooks/scripts/context-mode-mcp-filter.mjs`, `tests/fixtures/context_mode_hook/` |
+| check which guard or capability each client (Claude Code, Codex, GitHub Copilot, Antigravity) actually gets, and the recorded gaps | [Hook dispatcher and guardrail scripts](/openwiki/architecture/hooks-and-guardrails.md), then [Agent roster, prompts, and the skill library](/openwiki/architecture/agents-and-skills.md) | `docs/target-mapping.md` ("Gate-Repair Client Parity"), `shared/hooks/scripts/protect-files.py` |
 | refresh this wiki | the `knowledge-refresh` skill, then OpenWiki's own `openwiki` skill | `shared/skills/knowledge-refresh/SKILL.md`, `shared/hooks/scripts/openwiki-guard.py` |
 
 ## Commands you will run most

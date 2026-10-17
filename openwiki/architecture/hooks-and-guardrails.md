@@ -3,9 +3,6 @@ type: architecture
 title: Hook dispatcher and guardrail scripts
 description: How each host's hook configuration dispatches into the shared guardrail scripts, what runs on each event, the ordered Bash safety lane, what every guard denies or records and how to recover, the Git hook layer, and where hook errors are logged.
 tags: [hooks, guardrails, safety, git, dispatcher, pretooluse, lifecycle]
-verified:
-  - by: openwiki/0.5.2
-    at: 2026-09-21T05:37:12.382Z
 sources:
   - id: openwiki-source-aedfa38e00652688559a19c4
     resource: repo://scripts/generate_targets.py
@@ -53,7 +50,10 @@ sources:
     resource: repo://shared/hooks/scripts/state-sync.sh
   - id: openwiki-source-ac71b7b5ed0ae12dcdfb1f63
     resource: repo://tests/test_openwiki_guard.py
-generated: { by: "claude-code", at: "2026-09-21T05:37:12.382Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
+verified:
+  - by: openwiki/0.5.2
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Hook dispatcher and guardrail scripts
@@ -90,7 +90,9 @@ Two per-host differences matter:
 - Claude Code fires `PostToolUseFailure` when an MCP tool returns an error, so `openwiki-guard.sh post` is wired there too.
 - Codex fires nothing on an MCP tool error, so its Stop also runs a payload-free `openwiki-guard.sh post`. Codex additionally runs `state-sync.sh push` and `reporting-reminder.sh prompt` on `UserPromptSubmit`, and `state-sync.sh checkpoint` on `SessionEnd`.
 
-GitHub Copilot's configuration has no matchers, so it lists the five Bash guards individually under `PreToolUse`. Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
+GitHub Copilot's configuration has no matchers, so it lists the five Bash guards individually under `PreToolUse`, and each guard runs on every Copilot tool call. Antigravity wires only a `*` PreToolUse bridge and, on purpose, no lifecycle hooks.
+
+A guard decides whether a payload is a terminal command from its tool name. `is_bash_tool_payload` in `_lib-frontmatter.sh` accepts an empty name, any name containing `bash` or `shell`, `execute`, and VS Code's Local-harness terminal tools `run_in_terminal` and `send_to_terminal`, whose command is `tool_input.command`. `protect-files.py` uses the same names in `TERMINAL_TOOLS`. Before VS Code's names were added, Copilot terminal commands skipped the branch, commit, and PR gates and the protected-file shell analysis; `git-protection.sh` already read any `command`.
 
 ## The ordered Bash safety lane
 
@@ -114,17 +116,17 @@ flowchart LR
 
 ## The guards
 
-- **`protect-files.sh` and `protect-files.py`** (PreToolUse on Edit, Write, and Bash). Classifies mutations of protected files: credential-shaped names (`.env`, `.env.*`, `credentials*`), `uv.lock`, and the four hook configuration files (`.github/hooks/hooks.json`, `.claude/settings.json`, `.codex/config.toml`, `.codex/hooks.json`). It understands edit payloads, patch blocks, shell redirects, simple mutators such as `rm` and `tee`, and variable tricks. A protected mutation is denied on Codex and Antigravity and becomes an `ask` on other hosts. The wrapper runs the classifier with plain `python3`, not `uv run`, so protection works before a project environment exists. Recovery: a compound command that merely names a protected path can be refused; split it into simple commands or use the editor tool.
+- **`protect-files.sh` and `protect-files.py`** (PreToolUse on Edit, Write, and Bash; every tool call on Copilot). Classifies mutations of protected files: credential-shaped names (`.env`, `.env.*`, `credentials*`, `*.pem`, `*.key`), `uv.lock`, and the hook- and server-launching configs in `HOOK_CONFIGS`: `.github/hooks/hooks.json`, `.claude/settings.json`, `.claude/settings.local.json`, `.codex/config.toml`, `.codex/hooks.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, and the documented Copilot hook switches `.vscode/settings.json`, `.github/copilot/settings.json`, and `.github/copilot/settings.local.json`. The Bash literal matcher is built from the same set. It understands edit payloads, patch blocks, shell redirects, simple mutators such as `rm` and `tee`, and variable tricks. A protected hook-config mutation is denied on Codex and Antigravity and becomes an `ask` on other hosts. Any command outside the read-only list (`cat`, `rg`, `grep`, `head`, `tail`, `sed`, `wc`, `stat`, read-only Git) that merely names a protected config, such as `ls .mcp.json`, `git add <file>`, or an inline PR body, is denied on every host. Native read-only tools (`read_file`, `view_image`, `list_dir`, `file_search`, `grep_search`, `semantic_search`, and the Copilot SDK harness's `view`, `grep`, `rg`, `glob`) read hook configs without a decision, still get the secret-file deny, and are not scanned for patch text. The wrapper runs the classifier with plain `python3`, not `uv run`, so protection works before a project environment exists. Recovery: inspect protected configs with `cat` or a native read tool, stage with `git add -u`, pass PR text with `--body-file`, and split compound commands.
 - **`git-protection.sh`** (PreToolUse on Bash). Denies destructive Git forms anywhere in the command: `git reset --hard`, force pushes (`-f`, `--force`, `--force-with-lease`), `git push --mirror`, `git checkout --`, `git restore --source`, `git clean` with both `f` and `d`, and deleting `main` or `master`. It tokenizes each `git` clause up to the next unquoted shell operator and lowercases tokens. Recovery: use `git restore -- <path>` where you would reach for `git checkout -- <path>`.
-- **`enforce-branch-state.sh`** (PreToolUse on Bash). Gates branch creation. The branch must be named `<plan_name>_implementation`, be created from a clean `dev`, and have `.claude/plans/<plan_name>.md` with `type: big-plan`, exactly one `status`, and a status of `planning` or `in-progress`. A branch created in another repository through `-C`, `--git-dir`, or `--work-tree` is judged by that repository.
-- **`enforce-commit-gate.sh`** (PreToolUse on Bash). Gates `git commit`. It stands down for commits aimed at the nested `.claude` repository or at another repository; a compound command that mixes those with an outer commit is still gated. It requires an implementation branch and, for an ordinary commit, `assert_commit_invariants`: a passing closeout receipt, a findings report, LEARN evidence, and the closeout session log. Bypass subjects (`fixup!`, `squash!`, and `chore(typo):` or `docs(typo):` over eligible documentation paths) skip the ceremony but not the branch check and are ledgered. Recovery: the reason names the missing artifact; produce it and retry the commit alone.
+- **`enforce-branch-state.sh`** (PreToolUse on Bash). Gates branch creation. The branch must be named `<plan_name>_implementation`, be created from a clean `dev`, and have `.claude/plans/<plan_name>.md` with `type: big-plan`, exactly one `status`, and a status of `planning` or `in-progress`. It then runs the plan-frontmatter validator on the big plan and the small-plan files its `phases:` list names, passed as explicit paths so an unrelated draft cannot block the branch, and denies with the first three errors (rules L1 to L4 included). A listed phase with an unsafe name is denied; a listed phase without a file is skipped, as at commit. A branch created in another repository through `-C`, `--git-dir`, or `--work-tree` is judged by that repository.
+- **`enforce-commit-gate.sh`** (PreToolUse on Bash). Gates `git commit`. It stands down for commits aimed at the nested `.claude` repository or at another repository; a compound command that mixes those with an outer commit is still gated. It requires an implementation branch and, for an ordinary commit, `assert_commit_invariants`: a passing closeout receipt, a findings report that carries every review profile the changed paths require (and, at phase completion, the reviewer's recorded gate result `PASS` with no open request), LEARN evidence, and the closeout session log. Bypass subjects (`fixup!`, `squash!`, and `chore(typo):` or `docs(typo):` over eligible documentation paths) skip the ceremony but not the branch check and are ledgered. Recovery: the reason names the missing artifact; produce it and retry the commit alone.
 - **`enforce-pr-gate.sh`** (PreToolUse on Bash). Gates `git push` and `gh pr create`. A push aimed at the nested or another repository stands down; a pull request never does, because `gh -R` names an owner and repository, not a path. Pushes need an implementation branch and `assert_push_invariants`; pull requests also need `--base dev` and `assert_closeout_invariants`. A chained commit-and-push is refused with an explanation, because the gate evaluates the HEAD that exists before the command runs.
 - **`openwiki-guard.sh` and `openwiki-guard.py`** (PreToolUse and PostToolUse on `openwiki_begin`). `pre` denies `mode: "init"`, a root outside this repository, and a repository without `openwiki/INSTRUCTIONS.md`; otherwise it snapshots root `AGENTS.md`, `CLAUDE.md`, and the OpenWiki workflow path under `.claude/.cache/openwiki-guard/`. `post` restores them byte for byte, removes an adapter that did not exist before, refuses a symlinked path, and exits 2 without touching a file that changed concurrently. Recovery: `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null`.
 - **`reporting-reminder.sh`** (PostToolUse on Bash; Codex prompt submit). Advisory only. It fails open on any internal error and adds reminder context about user-facing reporting.
 
 ## Recording hooks
 
-- `record-branch-state.sh` runs after every Bash call. When a branch was just created it writes `originating_branch`, `implementation_branch`, `started_at`, and `current_phase` into the big plan and flips the first `planned` phase to `in-progress`. An unsafe value or unexpected status is reported, not written.
+- `record-branch-state.sh` runs after every Bash call (including Copilot's `run_in_terminal` and `send_to_terminal`). When a branch was just created it writes `originating_branch`, `implementation_branch`, `started_at`, and `current_phase` into the big plan and flips the first `planned` phase to `in-progress`. An unsafe value or unexpected status is reported, not written.
 - `record-commit-closeout.sh` runs from the Git `post-commit` hook. It advances `current_phase` after a completed-phase commit and ledgers bypass commits in `.claude/session_logs/hooks-bypass.log`. A merge never infers a phase transition.
 - `session-log.sh` appends session events to `.claude/session_logs/hooks-sessions.log`, translating between Claude Code's snake_case and Codex's camelCase payload keys.
 

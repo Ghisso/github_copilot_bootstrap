@@ -441,3 +441,176 @@ def test_pending_tools_list_capacity_fails_closed_without_untracking(
     assert "too many pending" in response["error"]["message"]  # type: ignore[index]
     assert not trace.exists()
     process.terminate()
+
+
+def _hook_output(stdin: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["node", str(FILTER), "--hook-output"],
+        input=stdin,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+
+
+def _advice(context: object, **extra: object) -> str:
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": context,
+                **extra,
+            }
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "stdin",
+    [
+        "",
+        "   \n",
+        "not json",
+        '{"hookSpecificOutput": {"hookEventName"',
+        "[]",
+        "null",
+        "{}",
+        '{"hookSpecificOutput": null}',
+        '{"hookSpecificOutput": {"hookEventName": "SessionStart"}}',
+        '{"hookSpecificOutput": {"additionalContext": "advice"}}',
+        _advice(["advice"]),
+        _advice(""),
+        _advice(" \n\t "),
+        _advice("<context_window_protection>only advice</context_window_protection>"),
+    ],
+    ids=[
+        "empty",
+        "blank",
+        "text",
+        "truncated",
+        "array",
+        "null",
+        "empty-object",
+        "null-specific",
+        "no-context",
+        "no-event-name",
+        "non-string-context",
+        "empty-context",
+        "blank-context",
+        "only-advice-block",
+    ],
+)
+def test_hook_output_mode_prints_nothing_and_exits_zero_without_usable_advice(
+    stdin: str,
+) -> None:
+    result = _hook_output(stdin)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+def test_hook_output_mode_copies_only_the_event_name_and_advice_text() -> None:
+    stdin = json.dumps(
+        {
+            "decision": "block",
+            "permissionDecision": "deny",
+            "systemMessage": "m",
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "r",
+                "updatedInput": {"command": "c"},
+                "tool_input": {"command": "c"},
+                "unknown": "field",
+                "additionalContext": "Keep notes short.",
+            },
+        }
+    )
+
+    result = _hook_output(stdin)
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": "Keep notes short.",
+        }
+    }
+
+
+def test_hook_output_mode_removes_advice_blocks_with_attributes_and_keeps_the_rest() -> (
+    None
+):
+    kept = '\nrestored <session_guide a="1">\n- decision: x\n</session_guide>\n'
+    context = (
+        '<context_window_protection source="x">\nuse ctx_batch_execute\n</context_window_protection>'
+        + kept
+        + '<context_guidance level="1"><tip>ctx_execute</tip></context_guidance>'
+        + '<session_search kind="y">ctx_index() </session_search >'
+        + "tail ctx_stats"
+    )
+
+    result = _hook_output(_advice(context))
+
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["hookSpecificOutput"] == {
+        "hookEventName": "SessionStart",
+        "additionalContext": kept + "tail ctx_stats",
+    }
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        "x mcp__plugin_context-mode_context-mode__ctx_search",
+        "x ctx_execute",
+        "x ctx_unknown_tool",
+        "x ctx_search and ctx_purge",
+        "<context_guidance><tip>ok</tip>x ctx_fetch_and_index",
+    ],
+    ids=["plugin-prefix", "blocked", "unknown", "mixed", "unclosed-block"],
+)
+def test_hook_output_mode_drops_the_whole_field_when_a_forbidden_name_survives(
+    context: str,
+) -> None:
+    result = _hook_output(_advice(context))
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    ["ctx_execute", "mcp__plugin_context-mode_x", "Session Start", "", 7, None],
+    ids=["tool-name", "plugin-prefix", "space", "empty", "number", "null"],
+)
+def test_hook_output_mode_prints_nothing_for_an_event_name_that_is_not_a_plain_word(
+    event_name: object,
+) -> None:
+    stdin = json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": event_name,
+                "additionalContext": "Keep notes short.",
+            }
+        }
+    )
+
+    result = _hook_output(stdin)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_hook_output_mode_keeps_allowlisted_tool_advice_with_the_correct_prefix() -> (
+    None
+):
+    advice = "Use mcp__context-mode__ctx_search, ctx_index, ctx_stats, or ctx_doctor."
+
+    result = _hook_output(_advice(advice))
+
+    assert (
+        json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"] == advice
+    )

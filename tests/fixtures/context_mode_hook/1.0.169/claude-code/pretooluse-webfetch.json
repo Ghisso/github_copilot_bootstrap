@@ -1,0 +1,19 @@
+{
+  "client_id": "claude-code",
+  "event": "pretooluse",
+  "case": "webfetch",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "tool_name": "WebFetch",
+    "tool_input": {
+      "url": "https://example.com",
+      "prompt": "x"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: WebFetch redirected. Call mcp__plugin_context-mode_context-mode__ctx_fetch_and_index(url: \\\"https://example.com\\\", source: \\\"...\\\") to fetch + index the page, then mcp__plugin_context-mode_context-mode__ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call mcp__plugin_context-mode_context-mode__ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).\"}}\n",
+  "stderr_tail": []
+}

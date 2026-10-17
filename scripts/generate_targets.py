@@ -85,6 +85,13 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # server only ever advertises its filtered ctx_index/ctx_search/ctx_stats/
 # ctx_doctor allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
 # granting the whole server here cannot expose a blocked tool.
+# mcp__context7 is granted for the same reason: tool-routing.instructions.md
+# tells every subagent to use Context7 for external library documentation, and
+# Context7 is read-only documentation lookup, so the server-level grant adds
+# no write or execute capability. Copilot already lists context7/*.
+# Antigravity agent files declare inheritMcp: true, which is not a documented
+# field, so Antigravity subagent MCP access is unverified (see
+# docs/target-mapping.md).
 #
 # `todo` has no entry here: confirmed against the installed Claude Code
 # binary and the documented tool table (code.claude.com/docs/en/
@@ -101,7 +108,7 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # `.get(capability, [])` default, so no other generator change is needed.
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
-    "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode"],
+    "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode", "mcp__context7"],
     "edit": ["Edit", "Write"],
     "execute": ["Bash"],
     "delegate": ["Agent"],
@@ -181,7 +188,8 @@ SIDECAR_TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
         SIDECAR_HUMANIZE_CREDIT,
     ),
     (
-        "the workflow's final Ponytail diff review remains mandatory.",
+        "the `ponytail` review profile still runs wherever the review-routing table or\n"
+        "the commit gate requires it.",
         "running `ponytail-review` on any non-trivial diff remains expected.",
     ),
     (
@@ -1333,7 +1341,7 @@ def render_root_guidance(target: str) -> str:
         title = "AI Coding Agent Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, `.agents/`, "
-            "`.mcp.json`, and `.devcontainer/`"
+            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
         )
         runtime_note = (
             "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and `.codex/agents/*.toml` "
@@ -1345,7 +1353,7 @@ def render_root_guidance(target: str) -> str:
         title = "Claude Code Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, "
-            "`.mcp.json`, and `.devcontainer/`"
+            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
         )
         runtime_note = (
             "Claude Code uses `.claude/settings.json`, `.claude/agents/`, and "
@@ -1355,7 +1363,7 @@ def render_root_guidance(target: str) -> str:
         title = "OpenAI Codex Project Guidance"
         control_plane_paths = (
             "root guidance, `.claude/hooks/`, `.github/hooks/`, `.codex/`, "
-            "`.mcp.json`, and `.devcontainer/`"
+            "`.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`"
         )
         runtime_note = (
             "Codex uses `.codex/config.toml`, `.codex/hooks.json`, and "
@@ -1400,7 +1408,7 @@ This is the repository entrypoint for Python AI engineering guidance. `.claude/`
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Run focused and fast checks during implementation, then profile-driven review until clean. CLOSEOUT updates required documentation and final plan/log/learning state, explicitly stages intended files, persists findings, then runs `verify phase` and `verify closeout`.
-- Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
+- Commit each completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the recorded review gate result is `PASS` with no open request, every review profile the changed paths require is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
 
 ## Exact Commands

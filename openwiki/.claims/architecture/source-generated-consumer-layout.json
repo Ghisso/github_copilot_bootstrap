@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:7601e6f5f098cc6841a1da4cb879b87220987efb9762cf943f410753c625e582",
+  "pageVersion": "sha256:ec1901e32f5356fc3d0ec7aa317b3dd21085f3a5532e47dfd596ac157a25a1e5",
   "claims": [
     {
       "id": "claim_8c95339bcd2a421fb59848cad3c15947",
@@ -155,20 +155,20 @@
       "statement": "render_sidecar(target_root, profile) refuses an unknown profile, copies each skill of the profile whole (SIDECAR_SKILLS for skills, SIDECAR_WORKFLOW_SKILLS for workflow) into both sidecar write roots (.claude/skills and .agents/skills), rewrites each SKILL.md through SIDECAR_TEXT_REPLACEMENTS (plus the workflow state-path replacements for the workflow profile), copies the vendored Ponytail LICENSE into ponytail and ponytail-review, and then renders either the two SIDECAR_BRIDGES files from shared/sidecar/bridge.md (skills) or the workflow units through render_sidecar_workflow_units (workflow).",
       "evidence": [
         {
-          "resource": "repo://scripts/generate_targets.py#L168-L191",
-          "version": "repo-lines-v1:sha256:d0228d869e31f5a94d93c3ac066702f24e2b32898f81add716e6cfc9b1163399:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE1MTMyZjdkYzAzZTU1ZTIxMjE2MThlYzJhMTk5ZDc3Yzk2NjJhMGVlYjZhODRlNmRmZTBlZmY0NjhjZDgxMGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkyMGZjNDRkMzIyZjlmY2MxMGQyYWI0YjVlZWU0ZTcyZTI1NTc3ZDZkNGEyZTA3ZTU5MjZjODc1YzRkZTRmMWMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM5NmZlNTk5N2RlYjRmNGMxZDgyNTM4NzZmOTQ3ZmJiMzhlNDc1NDNiMzkzZmMzY2JjMTNmMDU1MTg1MjhlYWQifQ"
+          "resource": "repo://scripts/generate_targets.py#L183-L199",
+          "version": "repo-lines-v1:sha256:1f4339f86a4a405709a6cfedc7840f9ccc4d0f7b1d21fc107120761b01747b6e:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4YzliOGZhYjA2YmI4NzBmYjUyOWNmODEzZGUyZGMzMmQwMGY1YzFiNzhkNjJhZGQ5NWQ5MzI3MmI5Y2ExNTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZhZmJhMDUyN2MzOTUzYzRiNmUwZTViNTczOWJhODM2MTJmODA1M2JjZGM5NDY2NzMwMTkzY2QxZDU5MGI0MDgiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJkZjQ1MjAyYWFkNzZhMDhjNTE0YzdkNTRjZGQ5YmQ3MWI0NWM1MmRjMjA5Zjk3NGE4ZTFhYzViZmUxNzExY2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1YWVjOWE3Yzk4NTJmMTYwMTE2OWY5YTgwN2FjMDhiNzI3ZmFkMWVjODdkMWVjNDIyMDYyYzk5ZjI2YzRjMWUifQ"
         },
         {
-          "resource": "repo://scripts/generate_targets.py#L1920-L1963",
-          "version": "repo-lines-v1:sha256:48e130a81800e7630a3c881935b06fd574f16b823748dceea2e7c16da9807b0b:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiMDU1ODQzZDQ1MmQ0M2M2Yjg5OGQ0OTQ3NTQ4ZjUzYTRlOTk5OThkYTY5MzIzNTNlMDAwNTI3Mjg4YzY3ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE2ZTNiZTc2ZWVlZmQwNjcxNDgxNWI0ODRkMzQwZjBhYzUwYzE1NmU2ZjFmOGJjNTM2ZjYxOTA4YjIwODVmODEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImZmZWMzYzViOTBjZWRhNzc2ZGJlOTJiZDJhODczYzY4MjhlYjU3OTkzZjA0OGY4ZDY2NjhlY2M3ZWI0NzY4NmIifQ"
+          "resource": "repo://scripts/generate_targets.py#L1928-L1973",
+          "version": "repo-lines-v1:sha256:8768e5b366a36f2380c0e20fcc90de45891ee536e7ede98a1af3bbb09458a863:eyJzZWxlY3RlZExpbmVDb3VudCI6NDYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjFiMDU1ODQzZDQ1MmQ0M2M2Yjg5OGQ0OTQ3NTQ4ZjUzYTRlOTk5OThkYTY5MzIzNTNlMDAwNTI3Mjg4YzY3ZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY3ZWU5ZjNlYzM3MDNiZDhkOWYwNmQ2ODc5ZDIzMjAzMzI1ZDNjOGJhYjJhNDcwNmRlZmM2MTZkYThiOGJlZmUifQ"
         },
         {
           "resource": "repo://scripts/runtime_ownership.py#L132-L189",
           "version": "repo-lines-v1:sha256:301f713b2c7ede511df383d1bd8ed42eec496f3de7317078a7d38c267e1fa3cb:eyJzZWxlY3RlZExpbmVDb3VudCI6NTgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MTFmYTJhZDBiMDdhNzY0NTRlZmJhY2Y2M2I1NWMzZTYxMTE1YzYwMDZjYjNkNjBiYjkwMDZlM2ExMWRhMGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImVmMGI2NjY3ZmQwYjhhNGQ2YjA3ZjE1ZTQxMzgzYzk3YWM4MmNiYTRiOWJlMGNiMWYyNjA2Mzk2MDZlNDk4YjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQwNmQ1ODUyY2ViMWRmYzFmNzg1MWYwYjg1YmE3NzhjMmE2MzI4Yjk5ZTdjMWFhNTZlZTJiNDU1OTAxM2NkYTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBhY2JlNzU1MDZkMDc0M2JlMDE1Y2VhNzNlMmNhNTJkNTc4MDAwNWU3YmRiMWViMTBmNjdkYTNmZDZhYWMyZTQifQ"
         },
         {
-          "resource": "repo://scripts/runtime_ownership.py#L93-L107",
-          "version": "repo-lines-v1:sha256:61bcfcadf79dda2258d7f9a3f5cfb2b4406f3daf2ef89dd6861d1ed193d6ab69:eyJzZWxlY3RlZExpbmVDb3VudCI6MTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImI4NjczY2RkYWMwYTQ4ZTUyNjc3NDY4MGRiNmZiYzJmMDk2MDQ5NTRiYWFjZDBjODk0N2VmNmI4ZDViNzk4ZDAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMWVhMWJhNzNhODdiN2EzZTI2M2JiYjA4YjkxYzkwNzI1MWNmOTIzYjdlYjVmYzI2M2ZhN2RhYTdhYWI0M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjU2MDY2YTIxMjU1NzZjOTBlMTU1MWNjYjFkMGU0MTM5OTVhYjU3YTExOWUzNjdjODYwMWU1YmUxNzhlNTk5MmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1MDIyOTE0ODFlZWI0Y2VhYWM3YmZmNjU1Nzk4MDg1ZTAzNDdkZGQxZmMxZDQ3MDc4MjgxMDE2ZGRjMGNmYWIifQ"
+          "resource": "repo://scripts/runtime_ownership.py#L94-L107",
+          "version": "repo-lines-v1:sha256:342942ce7bd3a0743b045a5dc575550a79235c68f7f8efaa88bc3646b7518826:eyJzZWxlY3RlZExpbmVDb3VudCI6MTQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjZWY5NTM0MzYwMjVhMzQyNTVkZDg2MWMzNDdhYzhlYTk4NjgyZmY5MzE5NzkyNzc0MGU5ZWYwMzc4NzU2MjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzMWVhMWJhNzNhODdiN2EzZTI2M2JiYjA4YjkxYzkwNzI1MWNmOTIzYjdlYjVmYzI2M2ZhN2RhYTdhYWI0M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA2OWY3YTAyNDgzNmY2ZTk1ZmU2MzdhMWIxN2IyODZmYjhiYjYxZjg5NjNmOWMzNTAxNzgxNDExZjBjNjdjZjkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImY1MDIyOTE0ODFlZWI0Y2VhYWM3YmZmNjU1Nzk4MDg1ZTAzNDdkZGQxZmMxZDQ3MDc4MjgxMDE2ZGRjMGNmYWIifQ"
         }
       ]
     },
@@ -227,10 +227,24 @@
           "version": "repo-lines-v1:sha256:8f5aea34ed0171fab4dc9d3bb1ce2832330eb74b92e103480cd5cf07b4714885:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQwOTM3YTBmZmU1YTgxNjk0ODBlMTcxMmE4ZTIzNWEwOTZhMGYyMzRiZjdjYWMzMzhhMDUxODdjY2YwOTBlMjYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjliZjIzOWJhYTIwNDA1NDYzNjFkNDgzYzdlOGFhZGFjN2FhNjY2YTg1OTZiN2FhNTQ5YzYxYzc3NGM0ZjJmZTYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjAxMDY3MzZiMmJlMGIxYjVjZGE4NWZjZmIwYmViOGQ4MzRmZmJmYzkyYWY1MjU5OTgyMThjMTEzMWJhZTAxN2YiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjZhN2Q2OGEyYTA3NmFhZDNmY2JhMDQ4MTUzOWNjNWY4NWNjODYyNDUwYjJmYmNlN2RlYmZjZGJjZTIxZTBmYzYifQ"
         }
       ]
+    },
+    {
+      "id": "claim_4780d85854404cdabc41a8050e18010d",
+      "statement": "This repository's tracked root MCP adapters (.mcp.json, .vscode/mcp.json, .codex/config.toml) start Context Mode only through the guarded dispatcher route from shared/mcp/servers.json, and root_mcp_adapter_errors reads each file with its own key and fails when its context-mode entry differs from that route.",
+      "evidence": [
+        {
+          "resource": "repo://scripts/validate_targets.py#L2906-L2928",
+          "version": "repo-lines-v1:sha256:e2666bd18f0a2f86c248e4b22d5b1353659df758590f52e6f9359639096b8e94:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIzYjFmOGY2OTY2ZGZhZjk0ZGI3ZjhmYjJmM2UxMmU5MmRhZDhmMjE4MjM4NTIwNzVjYzZiYTliYTA3MTk3NWIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjY0ZmI3OTY4YTg0ODYwNDg5NDAyNGU2ODlmYTRiZTkxOTkyNjE3MmVmYWQyYmRiYTY3OWI4NWI4YWQwYmJiNDEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjU0NGNhYzYzZGRjZjEzYTFlM2JhOWEzMmVhMjAxOTRjNjRjZmFlYjBiMjBiOTM1ODZlYTNmNmI2YzdiOGQwNzYifQ"
+        },
+        {
+          "resource": "repo://shared/mcp/servers.json",
+          "version": "repo-file-v1:sha256:68fb8cd4eef9f81333919a26086020be564dd6b433d240fa652f609eba783e87"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-10-02T10:43:27.367Z"
+    "at": "2026-10-17T10:05:00.756Z"
   }
 }

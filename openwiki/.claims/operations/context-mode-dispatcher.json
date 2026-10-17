@@ -1,32 +1,24 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:095c81cc9f432098cefe4d02c763688847c80e6c609ea42bf4b39a7ddb220695",
+  "pageVersion": "sha256:2337b482dd1bb9f2efd5a44551a465677b0bf7781b81f544d70e558a8fe0a674",
   "claims": [
     {
       "id": "claim_577776e0370d47099f04fb101b4060e5",
-      "statement": "context-mode-dispatch.sh has two modes: server mode, launched from the MCP configurations, execs context-mode-mcp-filter.mjs under Node in front of the pinned Context Mode; hook mode maps the host name to Context Mode's target (github-copilot to vscode-copilot, openai-codex to codex) and runs context-mode hook <target> <event>.",
+      "statement": "context-mode-dispatch.sh has two modes: server mode, launched from the MCP configurations, execs context-mode-mcp-filter.mjs under Node in front of the pinned Context Mode; hook mode maps the host name to Context Mode's target (github-copilot to vscode-copilot, openai-codex to codex), runs context-mode hook <target> <event> as a child rather than exec, and passes its output through the filter's --hook-output mode.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L330",
-          "version": "repo-lines-v1:sha256:1166c1ae674af69d31198d53818c5e62c6113c7eb4ac7a8fc5bf85af646292ea:eyJzZWxlY3RlZExpbmVDb3VudCI6NDMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNGEwYzQ4OTcyYTJlZDk4MGJjYWI5MDcwZGE3MTE3Y2U1N2Y0MDZjMzAyZTMzNWNiYmU1NWU4MjEwMzhlMTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L358",
+          "version": "repo-lines-v1:sha256:4cb9b15bfeb1254f581176ea933ecab0c25c8aca63f1d8df42eaa22492c354ff:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
     },
     {
       "id": "claim_ee848aeb09444f659c02cce859a8a3a5",
-      "statement": "Hook mode fails open (warn and exit 0) when storage is unavailable or when neither a pinned context-mode binary nor npx is available, and never checks for Node; server mode prints an ERROR context-mode-dispatch line and exits non-zero under those same two conditions and additionally when Node or the filter script is missing.",
+      "statement": "Hook mode always exits 0: it warns and skips when storage or both a pinned context-mode binary and npx are unavailable, logs a nonzero upstream exit once and still filters its output, exits at once on empty output, and warns and drops the output when Node or the filter is missing or the filter fails; server mode prints an ERROR context-mode-dispatch line and exits non-zero when storage or the binary is unavailable or Node or the filter script is missing.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L307",
-          "version": "repo-lines-v1:sha256:2067673403f45411153800159ad7175337109780a2db189228d24c7cb87368a4:eyJzZWxlY3RlZExpbmVDb3VudCI6MjAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImQzYTkwZTU2NTFlZmNkZWMzZmI2MzM3ZWM4NmI2MTIzZjgxMTM5NTg4OGI0OWY4MWIxMDI4YjQxMTcwOGE1MzgifQ"
-        },
-        {
-          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L309-L318",
-          "version": "repo-lines-v1:sha256:221338df76de15992b148c3aa9fd1575004709966f3f9dbf231b54d9a35ce72f:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM0ZjJmOWIyYzE0YzFkZThhODRlOTU2MGZhZTEwYmQxZWUyOTI4MjVjMmYxYzQwOTJkNmI1ODFmNGYyNWM5NzgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3NjlkMjM3Y2Q0MjBiOWQzOGI5ODFhMGE0ZjY3NzAxOTBhNGE4M2RjYTFmZTU2YzRmNWJhMWUyY2JjMGVmNzYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM0MzVkYmMxOGI5Mjc2NGQyOGI1ZjdhMGY2NzZmNzVmYzgxZGI2MTg5NDA1NmVkMTcxZGYzMjA5Y2NjNmU4OGUifQ"
-        },
-        {
-          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L320-L330",
-          "version": "repo-lines-v1:sha256:97837674bcef934a03a92ca52ea4489652e4367661782764784f329fe2b19613:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ3Y2YyOTNiMzVmZjdjNjkyZTk4OTZkYjg0OGFiMTIwOGFmYTBiNzQwY2ZiNGEyMDY4ZWJkZDUxMDY0MGVmMzciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNGEwYzQ4OTcyYTJlZDk4MGJjYWI5MDcwZGE3MTE3Y2U1N2Y0MDZjMzAyZTMzNWNiYmU1NWU4MjEwMzhlMTkiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBhODI2M2UzOTEwZTk4YjYzNGY3MjNlYWQ1Y2Y1MTE2M2Y4MTYzOWU4ZTZjMDM1N2YwYjBjOWFmMTYwYzg0ZmUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+          "resource": "repo://shared/hooks/scripts/context-mode-dispatch.sh#L288-L358",
+          "version": "repo-lines-v1:sha256:4cb9b15bfeb1254f581176ea933ecab0c25c8aca63f1d8df42eaa22492c354ff:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImYyMWU3ZTQ0ZDYwZmU5NTc3MDBmNzMyMjU0OWRhNmE3MGJhY2EyMmY3ZTgyNDM4MWQ0NTI2MWI2MTgyZTU4MzYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI4ZDNiOWU4ODBhNzc5NzU0OTNkYzdlMzU5MTQ0YzAyOTVhNGY2OTRjZmUwYWY0ZjkyOGMyMjMwN2JjNWMzMjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdkMmQxYjIwZDNjYjJiODMxMjViOWJjN2MyM2NkM2QzZWVjODk0ZWRiMGI2MWY2NjkyNDMxMGY4MDY0YjU0NTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
         }
       ]
     },
@@ -63,16 +55,16 @@
       "statement": "context-mode-mcp-filter.mjs advertises and allows exactly four tools (ctx_index, ctx_search, ctx_stats, ctx_doctor), answers every other tool call locally with a JSON-RPC error and never forwards it, exposes no tools when serverInfo.version does not match the pin, and filters tools/list responses by counted request id so a reused id cannot leak the unfiltered list.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L1-L40",
-          "version": "repo-lines-v1:sha256:6fb14a92cff0f06841babcfa5f9594d0aa40416f6969f2ef47914e4b20b890d9:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1MWIwNTZhZjc2OGRmYTU2MDk1M2I1MjAzOGI4ZWUzYmQ0YzIxMzI2MThjMzg4NjdjNDgxM2NiMWI5MWNiY2UiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE0OTRmYTQ3ODkzZmE1ZWZkODJjMDM3MjUwNGZlY2U4NTBkY2ZiYzg3YmNhMDkzOTkzZjM4NDhjZGEzMjYxY2UifQ"
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L1-L12",
+          "version": "repo-lines-v1:sha256:e67c969ec7a09a61bdc6336bde552e7c7b4db4ff16c92292c9470ca0e36d0e64:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE1OWM0Nzg3MmI3MWYxMjU4OTk0Mjg5MjQ2NGU3NjRjMGRiMzUwYzIwYjcyMjI4NjQ1NjE1Y2MzNmUwYTA3MjUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhlNzA0YjRkNzdiN2VkZGU1Y2RlN2NlZTEzMzYyNzIzM2I4NDJmNTAxYjcxZjU1YjdlYzFmNWQ3YmQzY2NiZWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijc4MjFlOTUwMGQyZDJmYjdmNzk5ZjRlMTkwNjRmNTZjMjc3NGU3NmY5YTQwYjE5ZTU3ZmExZWViNWQ1YzMwYzIifQ"
         },
         {
-          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L130-L140",
-          "version": "repo-lines-v1:sha256:8d1d75c03240d395c5de5e8df97b2e896c2125bd2a7d6a495deceaf760960a9a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkxZjVkYzZlN2Q0MTQzZGFhNTM3ODk2YzgxMDVmYzBmZmU4NjY3ZmNkNmM2M2I4NjVmM2IxYjNkMmEwOGM4OGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzYTRlNDJjNTEyYjIwODEyOGVkYmQ5MjQwYzgxYmZmNmZlMjlmMjNmY2E3NTZkZmI1NTkwMDg2MjdjNWZmNDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA3Mjk2NDI3ZDM4ZTM0MWU1MjU3M2ZlN2YwMTcyZTc2ZDMzZTNkNTU1MWVkMTJiZDRjNmU2Y2ExOWJlYmJmMzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJmZDNiODNkM2ZjZmVjMTMzNWQ5OTI1ZGFmYjkyMThmZTNiZmQ1N2YxODMyZjQ1NjY1NGE1M2Y1ZDExNzJlMGYifQ"
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L170-L230",
+          "version": "repo-lines-v1:sha256:ba29b47f55cf824be65c371b4e3f0773c17b999d3928b23ce85275cbab881852:eyJzZWxlY3RlZExpbmVDb3VudCI6NjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ4OTNmNDBlMzc4MWViODk2YzgyZDA0NmEwODA2N2ExMWUzNWNkZjJmMWRmYWYyNmZlYTkwYjhkYjY2NzY0MTMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMxMWUxZWQ4MGQyYTI1NDZkMDg5YTY2YjI2NDE1ZDBhMmM1ZTljYmI5MDg2NmZlZWZhMzJkNWNmZTljNjU3OTAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjkzZTA1NGQ0NDc2MDRjOTg4OGZlZTljYjBlMDE4NzcwYWU3MTIyODlkMjBmNDM4NDY1YjE4ODQxOWI3YmZjNGMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVjODIyODgwMjU1OTZkMmE2OTM5M2Y3NzRjMWE4M2VlZjQyMDZjNjViNTU0ODE1NGZjOGEwOGQ5YmM2N2VhNzAifQ"
         },
         {
           "resource": "repo://tests/test_context_mode_mcp_filter.py",
-          "version": "repo-file-v1:sha256:f157760013fe630d9cd193fefb6f3d38a67dab5c0b0e10662bd66a05ae81cb2e"
+          "version": "repo-file-v1:sha256:e2f59c78cfdb2d01ec93618ca2d3f7193816f54934f5c673dadc16ce187e567d"
         }
       ]
     },
@@ -140,21 +132,45 @@
     },
     {
       "id": "claim_7de4142ca863474eaf7d79f6df54ef78",
-      "statement": "tests/test_context_mode_dispatch.py covers the storage override rules, the exact-pin version contract with npx fallback, the self-check fields, and server-mode failure messages, and tests/test_context_mode_mcp_filter.py covers the exact allowlist, no tools on version mismatch, blocked calls never reaching upstream, guarded ctx_index arguments, and duplicate-id leak cases.",
+      "statement": "tests/test_context_mode_dispatch.py covers the storage override rules, the exact-pin version contract with npx fallback, the self-check fields, server-mode failure messages, replay of every recorded upstream hook fixture through the real dispatcher, the fixture-version tie, and an opt-in real-binary test; tests/test_context_mode_mcp_filter.py covers the exact allowlist, no tools on version mismatch, blocked calls never reaching upstream, guarded ctx_index arguments, duplicate-id leak cases, and the --hook-output rules.",
       "evidence": [
         {
           "resource": "repo://tests/test_context_mode_dispatch.py",
-          "version": "repo-file-v1:sha256:aad7b9a11d8e79c083f3c53eea5ac9e29dee5fa9b4d135a042860408533e9e3b"
+          "version": "repo-file-v1:sha256:ba9420bfc8d45e4c8f0078a17f7d164cff9c9a53949d07b21b11b55483d03cae"
         },
         {
           "resource": "repo://tests/test_context_mode_mcp_filter.py",
-          "version": "repo-file-v1:sha256:f157760013fe630d9cd193fefb6f3d38a67dab5c0b0e10662bd66a05ae81cb2e"
+          "version": "repo-file-v1:sha256:e2f59c78cfdb2d01ec93618ca2d3f7193816f54934f5c673dadc16ce187e567d"
+        }
+      ]
+    },
+    {
+      "id": "claim_5ec961452d9541a0af904b7dbfe04e00",
+      "statement": "The filter's --hook-output mode builds a new object containing only hookSpecificOutput.hookEventName (which must be a plain word) and additionalContext, strips the context_window_protection, context_guidance, and session_search advice blocks, and drops the whole additionalContext when it still names a plugin-prefixed or non-allowlisted ctx_ tool, so no upstream decision or input rewrite reaches the host.",
+      "evidence": [
+        {
+          "resource": "repo://shared/hooks/scripts/context-mode-mcp-filter.mjs#L7-L50",
+          "version": "repo-lines-v1:sha256:6c941ed640aa0786d469f729e542008a529728dd638d2afec122784cd0d7b694:eyJzZWxlY3RlZExpbmVDb3VudCI6NDQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImNjYTNiZjdiYTViNjA5NDBiOTJhZWJkNDNiNmI3ODBmZDIzNGMyNTAwMTc2MjY5YmZmYWQ4NzMwMTM3MmJjNzAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjkzMzBlYWIzYjEyZGUyYTQ0ODMyNDkwMWE2MTZkYjliZjA0NmU5NWY4YjlmYjg0MDQ5MzMyMTRkMzI0YTI2NWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjIyOWZmOGIzNjJmODc5OGVmOGZlMDEzOWJhNWM1ODU0NmJkNDdlMTBhZTc4MWJlOThlNTZmOGQzZjE4MDE3OTkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjkxN2RmMGM4ZDNjZTQ5OGU3MmEzOGNiMjMwYjY1NzM4MWRmZGU4MDJhYjc5ZjI5ZjM4NTg3ZWRmMmY0MWU2ZDgifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_978422c02b844c929c216463e8ea3f1b",
+      "statement": "Recorded raw upstream hook outputs for the pinned 1.0.169 are kept under tests/fixtures/context_mode_hook/1.0.169/, re-recorded in isolation by tests/fixtures/context_mode_hook/capture.py, and a test ties the fixture directory name to PINNED_CONTEXT_MODE_VERSION.",
+      "evidence": [
+        {
+          "resource": "repo://tests/fixtures/context_mode_hook/capture.py#L1-L22",
+          "version": "repo-lines-v1:sha256:60a477b84ae1e3bfdfc8619d60032b9343bb7c854b50565948c2dba11a983301:eyJzZWxlY3RlZExpbmVDb3VudCI6MjIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjZjMzJmYjI0ZmFlOTk5OGRjODkyZWMzYTQwMmM3NDBjYTU5ZmU1YTJjMmVjZDQ2ZjY5NmVmMDQ2ZWRiNWU5NTUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzMDNlY2RkNGE0ZDEwZjE5YzczZmQ0MmZkMTI0MzdmZDMzNTRhODI2ODE2MDVkYTUyNTVhOTdhMzkwNjhkYmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM1YTUzOTAwZDI4Y2ZlNGEzOTU1MWVhOGJkMWY1OTUxMjQ3YTU5ZmEyOWE2ZDUxNzAwOTliYWYzZDE3NTE0Y2QifQ"
+        },
+        {
+          "resource": "repo://tests/test_context_mode_dispatch.py",
+          "version": "repo-file-v1:sha256:ba9420bfc8d45e4c8f0078a17f7d164cff9c9a53949d07b21b11b55483d03cae"
         }
       ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-21T06:07:33.954Z"
+    "at": "2026-10-17T10:05:00.756Z"
   }
 }

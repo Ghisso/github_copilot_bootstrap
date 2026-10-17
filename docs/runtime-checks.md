@@ -86,6 +86,25 @@ regenerate/reinstall command.
 Optional helpers:
 
 - `context-mode` (optional lifecycle hooks and the filtered `ctx_index`/`ctx_search`/`ctx_stats`/`ctx_doctor` MCP server, both routed through `context-mode-dispatch.sh` and pinned to `1.0.169`). The pin is enforced on both routes: the MCP filter checks `serverInfo.version` over stdio, and hook mode verifies a direct `context-mode` executable by resolving it and reading the owning package manifest's `name`/`version` before running it (1.0.169 has no working `--version` flag, and `doctor` is slow and hits the network). A binary that is not provably exactly `1.0.169`, including one whose version cannot be determined, is never executed; the pinned `npx context-mode@1.0.169` fallback is used instead when available, and otherwise hooks warn and fail open. `bash .claude/hooks/scripts/context-mode-dispatch.sh --self-check` reports `required-version`, `resolved-path`, `observed-version`, and a `version-contract` result.
+  Hook output is filtered before it reaches the client, so the lane stays advisory: only `hookEventName` and `additionalContext` pass, the `<context_window_protection>`, `<context_guidance>`, and `<session_search>` blocks are removed, and restored `<session_knowledge>`/`<session_guide>` data is kept. When you bump `PINNED_CONTEXT_MODE_VERSION`, re-capture the recorded upstream outputs under `tests/fixtures/context_mode_hook/<version>/`; a test ties that directory name to the pin. To do so:
+
+  1. Run `uv run python tests/fixtures/context_mode_hook/capture.py [--out-root DIR]`. It records raw upstream output, not filtered output, by running the pinned `context-mode hook <target> <event>` directly with the `CONTEXT_MODE_DIR` and `CONTEXT_MODE_PROJECT_ROOT` the dispatcher passes, in a temporary Git repository with a temporary `HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and a private `TMPDIR` (upstream keeps once-per-session tip files in the OS temp directory). It copies the hook scripts there only to run `--self-check` first, which asserts the direct pinned launcher. It reads the pinned version and client-to-target mapping from `shared/hooks/scripts/context-mode-dispatch.sh`, so run it in this authoring repository. It uses one session id per client, redacts temporary paths as `<TMP>`, and writes `<out-root>/<PINNED_CONTEXT_MODE_VERSION>/<client-id>/<event>-<case>.json` (default out-root: the fixture directory).
+  2. Review the new outputs for decisions, input rewrites, and advice blocks. Update the filter if a new shape appears.
+  3. Run the hook tests, including the real-binary test:
+
+  ```bash
+  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
+  ```
+
+  Known limits:
+
+  - A restored-data block that mentions any non-allowlisted `ctx_` name is dropped whole (fail-closed).
+  - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
+  - The event name must be a plain word (letters only), or nothing is forwarded.
+  - Codex and Copilot restore shapes were not observed.
+  - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
+  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
+  - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
 - `npx`
 - `gh`
 - `uv`
@@ -344,6 +363,15 @@ never round-trips through `ai-state`. `session_logs/hooks-bypass.log` is a
 separate file and stays tracked and union-merged like every other
 `session_logs/*.log`.
 
+`settings.local.json` is handled the same way. After an upgrade, the first sync checkpoint commits an untrack of `settings.local.json` in the nested `ai-state` repository (index only; the local file stays), and the next publish removes it from the shared remote. While a pull or merge runs, `state-sync.sh` keeps a byte copy at `.claude/.git/settings.local.json.<random suffix>`. After the pull or merge, it restores the copy only if `settings.local.json` is missing or its bytes equal the version on the remote (`origin/<branch>`). Otherwise it keeps the current file and the copy, and warns. A write that lands before git writes its version in the same window cannot be told apart from git's write, so the older copy is restored in that case. These messages can appear:
+
+- `restored local settings.local.json, which git replaced during reconciliation.`: informational. The file was put back and there is nothing to do. This is the most common one during an upgrade, when a second clone pulls the untrack commit.
+- `could not keep a copy ... skipped and will retry`: the pull or merge is skipped until the next sync.
+- `could not restore ... its bytes are kept at <path>`: copy the bytes back yourself.
+- `settings.local.json was written while state sync ran; kept the newer file. The copy taken before sync is kept at <path>.`: compare the two files and delete the copy when you no longer need it.
+
+If a sync is killed (for example by the hook timeout), the copy can be left under `.claude/.git/`. Copy it back to `.claude/settings.local.json` if that file is missing or wrong, then delete the copy.
+
 For generated Codex and Claude hooks, verify one runtime-specific Stop wrapper
 runs sequentially for each turn: session log, session-log check, `checkpoint`,
 then best-effort `publish`. Codex stdout must be exactly one valid JSON object;
@@ -461,6 +489,17 @@ regenerates a valid current-schema receipt at the same deterministic path.
 Before verification, confirm that nested `.claude` has a valid `HEAD` and a
 clean worktree.
 
+Re-record the current phase's findings report with `record_findings.py
+--gate-result PASS|WARN|FAIL` before closeout. A report without `gate_result`
+blocks the commit gate. A re-record is not always enough: the commit gate
+applies the path-based profile rule to any report. If the branch diff from the
+merge-base, including earlier phases, includes a test file and the report
+lacks the `tests` profile, or it includes a control-plane, generator, or dependency path and the report lacks any of
+`code`, `architecture`, `security`, `tests`, and `ponytail`, run a new review
+with those profiles. Phases completed before the upgrade stay valid at push:
+the push gates apply the `gate_result` and path-based profile rules only to
+reports with `schema_version >= 2`.
+
 Run focused and fast checks, then review. Update documentation, final plan,
 `[LEARN]`, and completed session-closeout evidence; explicitly stage intended
 outer files; persist findings; then persist `verify phase --persist` and
@@ -503,6 +542,16 @@ diagnosable. A consumer refreshed mid-plan whose tracked files are not yet
 formatted will newly fail `VFY-RUFF-001`'s format half; the recovery is
 `uv run ruff format` (see "Mid-plan consumer upgrade" above).
 
+`record_findings.py` requires `--gate-result PASS|WARN|FAIL`, accepts a
+repeatable `--open-request TEXT`, and writes `schema_version: 2`,
+`gate_result`, and `open_requests`. It refuses `PASS` while any open request
+exists. The commit gate passes a phase only when `gate_result` is `PASS` with
+no open request. The gates also require review profiles by changed path (test
+surfaces need `tests`; control-plane, generator, and dependency-file paths need
+`code`, `architecture`, `security`, `tests`, and `ponytail`), computed from the
+closeout receipt's `changed_paths`, cumulative from the merge-base. See
+`shared/policies/quality-and-testing.instructions.md`.
+
 When routing selects the `ponytail` profile, `record_findings.py --profile
 ponytail` always emits `ponytail_reviewed: true` and a numeric
 `ponytail_findings` count; a new unselected report omits both. Its content hash
@@ -526,13 +575,16 @@ of this changes what a gate checks, only what an operator should expect.
 | A big plan's `phases:` list may carry at most one unfinished dedicated final knowledge-refresh phase, and it must be last; an earlier knowledge-refresh phase is exempt once it has settled its identity — the big plan's own `name` is non-empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, whose frontmatter declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`; a plan that has any knowledge-refresh phase must still end with one | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh` and are not settled; `the knowledge-refresh phase must be the last phase in phases` blocks validation when an unsettled knowledge-refresh phase is not the last entry, or when every knowledge-refresh phase is settled but the plan's last phase does not itself end in `-knowledge-refresh` | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:`. To reopen a completed big plan, append one new `-knowledge-refresh` phase at the end of `phases:` (see "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`) |
 | A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
 | `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
+| `gate_result` and path-based review profiles (`record_findings.py`, commit gate; push gates only for `schema_version >= 2` reports) | The phase-completion commit blocks unless the findings report has `gate_result: PASS` and no open request. It also blocks when the report lacks a profile the changed paths require: `tests` for test files; `code`, `architecture`, `security`, `tests`, and `ponytail` for control-plane, generator, and dependency paths | Re-record with `record_findings.py ... --gate-result PASS\|WARN\|FAIL`, resolving or listing each open request (`PASS` is refused while one is open). If a required profile is missing, run a new review with the missing profiles; a re-record cannot add them |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
 | `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |
-| Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks approval when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
+| Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
 | `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
 | OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
+| More files are protected hook or server configs: `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json` | An agent edit of one asks on Claude and Copilot and is denied on Codex and Antigravity, including an ordinary `.vscode/settings.json` edit. Any command outside the guard's read-only list that merely names one of these files is denied on all four clients, including `ls`, `jq`, `test -f`, `git add <file>`, and an inline `gh pr create --body "..."` | Approve the prompt, or edit the file yourself outside the agent. Inspect with `cat` or the native read tool, stage with `git add -u` or a path that does not name the file, and pass PR text written with the native Write tool through `--body-file` |
+| Creating an implementation branch runs the plan-frontmatter validator on the big plan and its listed phase files | A branch-creation command is denied with the first validator errors when the big plan or a listed phase file is invalid. An unrelated draft plan does not block | Fix the reported frontmatter, then create the branch again |
 
 The reverse also holds: three gates in this table's family now stand down
 instead of newly blocking. The commit, push, and branch-creation gates skip a

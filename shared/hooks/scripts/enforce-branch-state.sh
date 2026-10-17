@@ -84,4 +84,34 @@ if [[ "$STATUS" != "planning" && "$STATUS" != "in-progress" ]]; then
   exit 0
 fi
 
+# Run the plan checks (frontmatter, status, and the L1-L4 verification rules)
+# on this plan and the phase files it lists, as explicit paths. An unrelated
+# draft elsewhere in .claude/plans/ must not block the branch. A phase file
+# that does not exist yet is skipped here; the commit gate requires the
+# current phase's file.
+PLAN_PATHS=(".claude/plans/$SLUG.md")
+while IFS= read -r PHASE; do
+  [[ -n "$PHASE" ]] || continue
+  if ! is_plan_slug "$PHASE"; then
+    deny_pretool "$BIG_PLAN lists a phase that is not a safe plan name: $PHASE"
+    exit 0
+  fi
+  if [[ -f "$REPO_ROOT/.claude/plans/$PHASE.md" ]]; then
+    PLAN_PATHS+=(".claude/plans/$PHASE.md")
+  fi
+done < <(fm_read_list "$BIG_PLAN" "phases")
+
+failures=()
+assert_plan_frontmatter "$REPO_ROOT" ${PLAN_PATHS[@]+"${PLAN_PATHS[@]}"}
+if [[ "${#failures[@]}" -gt 0 ]]; then
+  # Only runs with at least one failure, so the slice is never of an empty
+  # array (a Bash 3.2 hazard under set -u).
+  REASON="$(printf '%s; ' "${failures[@]:0:3}")"
+  if ((${#failures[@]} > 3)); then
+    REASON="$REASON(and $((${#failures[@]} - 3)) more); "
+  fi
+  deny_pretool "plan checks must pass before branch creation: $REASON"
+  exit 0
+fi
+
 exit 0

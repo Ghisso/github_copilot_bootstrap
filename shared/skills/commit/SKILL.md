@@ -54,8 +54,10 @@ For a normal completion commit, commit exactly one completed small plan after
 all gates pass: `status: complete`, a closeout log containing
 `**Status:** COMPLETED`, LEARN evidence, a `## Verification` section
 satisfying the Verification Evidence Contract in
-`.claude/instructions/workflow.instructions.md`, and a passing `verify
-phase`/`verify closeout` receipt matching the branch, phase, and HEAD.
+`.claude/instructions/workflow.instructions.md`, a findings report recorded
+with `record_findings.py --gate-result PASS` and no `--open-request`, and a
+passing `verify phase`/`verify closeout` receipt matching the branch, phase,
+and HEAD.
 
 For a paused checkpoint, commit only after the user explicitly asks to stop and
 resume later. The same small plan must be `status: paused` with `paused_at`,

@@ -24,10 +24,10 @@ sources:
     resource: repo://shared/mcp/servers.json
   - id: openwiki-source-d2aea9dc34db53f2030dc7a0
     resource: repo://tests/test_validate_targets.py
-generated: { by: "claude-code", at: "2026-10-02T10:43:27.367Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T10:43:27.367Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Source, generated output, consumer repo, and nested AI state
@@ -66,7 +66,7 @@ The authoring repository's root `.gitignore` states both boundaries: `dist/` is 
 
 Two facts about this repository do not carry over to consumers:
 
-- The tracked root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, and `.codex/config.toml` here are authoring versions, kept byte-stable across self-refreshes. In a consumer they are generated adapters that must not be hand-edited.
+- The tracked root `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.vscode/mcp.json`, and `.codex/config.toml` here are authoring versions, kept byte-stable across self-refreshes. In a consumer they are generated adapters that must not be hand-edited. All three tracked root MCP adapters start Context Mode only through the guarded `context-mode-dispatch.sh server` route from `shared/mcp/servers.json`; `root_mcp_adapter_errors` in `scripts/validate_targets.py` reads each file with its own key (`mcpServers`, `servers`, `mcp_servers`) and fails when its `context-mode` entry differs from that route. The root adapters carry no `context7` entry; generated targets do.
 - This repository installs its own generated output into itself with `scripts/install_bootstrap.py . --local-only --allow-self` so the whole lifecycle can be exercised end to end. A normal consumer never sees `shared/`; it receives only the rendered copy.
 
 ## What `shared/` contains

@@ -229,12 +229,17 @@ print(str(value).lower() if type(value) is bool else value)
 PY
 }
 
+# True for a tool call whose input is a shell command: any name containing
+# bash or shell, `execute`, and VS Code Copilot's terminal tools
+# (`run_in_terminal`, `send_to_terminal`), whose command is `tool_input.command`.
+# An empty name is treated as a shell command so an unnamed payload is still
+# inspected. protect-files.py keeps its own list (TERMINAL_TOOLS).
 is_bash_tool_payload() {
   local payload="$1"
   local tool
   tool="$(hook_tool_name_any "$payload")"
   tool="$(hook_to_lower "$tool")"
-  [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" ]]
+  [[ -z "$tool" || "$tool" == *bash* || "$tool" == *shell* || "$tool" == "execute" || "$tool" == "run_in_terminal" || "$tool" == "send_to_terminal" ]]
 }
 
 fm_read() {
@@ -825,16 +830,16 @@ diff_requires_ponytail() {
 # files, named verbatim by `shared/policies/workspace.instructions.md`'s
 # control-plane definition ("Control-plane files include `.claude/hooks/`,
 # `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`,
-# `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by root guidance
-# itself (`CLAUDE.md`'s own "Safety And Control Plane" section). This is the
-# same canonical control-plane set `diff_requires_ponytail` above already
-# encodes for a related purpose (`.claude/hooks/*`, `.claude/settings.json`,
-# `.github/hooks/*`, `.codex/*`, `.mcp.json`, `.devcontainer/*`, `AGENTS.md`,
-# `CLAUDE.md`), reused here rather than re-derived, so the two classifiers
-# cannot drift from each other. A bash `case` pattern cannot glob "every
-# root file the policy calls control-plane" the way a directory prefix can,
-# so root files are named explicitly and stay in lockstep with that same
-# short, already-tracked list `diff_requires_ponytail` names.
+# `.vscode/mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md`") and by
+# root guidance itself (`CLAUDE.md`'s own "Safety And Control Plane" section).
+# `diff_requires_ponytail` above encodes the same set for a related purpose
+# (`.claude/hooks/*`, `.claude/settings.json`, `.github/hooks/*`, `.codex/*`,
+# `.mcp.json`, `.devcontainer/*`, `AGENTS.md`, `CLAUDE.md`) minus
+# `.vscode/mcp.json`, which `required_review_profiles` in `verify.py` covers;
+# this bypass needs no entry for it because it admits only `*.md` paths. A
+# bash `case` pattern cannot glob "every root file the policy calls
+# control-plane" the way a directory prefix can, so root files are named
+# explicitly, matching the short list `diff_requires_ponytail` names.
 typo_bypass_diff_allowed() {
   local repo_root="$1"
   local diff_ref="${2:-}"
@@ -1317,9 +1322,13 @@ assert_completed_receipt() {
 # stdlib-only validator - the same authoritative source the authoring repo
 # uses, so consumers no longer get a weaker partial bash-only schema check.
 # Runs unconditionally (before the paused/complete/cancelled dispatch below)
-# so a paused checkpoint commit is still covered.
+# so a paused checkpoint commit is still covered. Optional extra arguments are
+# plan paths relative to the repository root; with none, every plan file is
+# checked. The branch-creation gate passes only its own plan files, so an
+# unrelated draft cannot block the branch.
 assert_plan_frontmatter() {
   local repo_root="$1"
+  shift
   local validator="$repo_root/.claude/scripts/validate_plan_frontmatter.py"
   if [[ ! -f "$validator" ]]; then
     failures+=("missing plan-frontmatter validator: .claude/scripts/validate_plan_frontmatter.py")
@@ -1330,7 +1339,7 @@ assert_plan_frontmatter() {
     return
   fi
   local output status=0
-  output="$(cd "$repo_root" && python3 "$validator" 2>&1)" || status=$?
+  output="$(cd "$repo_root" && python3 "$validator" "$@" 2>&1)" || status=$?
   if [[ "$status" -ne 0 ]]; then
     local line
     while IFS= read -r line; do

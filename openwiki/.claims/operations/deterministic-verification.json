@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:48e7d50bb02ed20a0bc782bd503ed77984ffc2a205c1c7f4f7ea823326aa1bab",
+  "pageVersion": "sha256:e90d38b3b4124b690d008989914ae12db748608358bf96ec6d2bcb2d7d444a54",
   "claims": [
     {
       "id": "claim_0b94d0a2c25644d6912b95fd89cbe5ed",
@@ -110,19 +110,19 @@
     },
     {
       "id": "claim_cabe98975553402cbc35b8cbe106525f",
-      "statement": "record_findings.py validates each finding's severity, title, and profile membership, writes counts, profiles_reviewed, findings, and Git metadata including dirty (true when tracked changes are unstaged) and content_hash, and adds ponytail_reviewed and ponytail_findings when the ponytail profile ran.",
+      "statement": "record_findings.py validates each finding's severity, title, and profile membership, requires --gate-result PASS|WARN|FAIL and accepts repeatable --open-request, refuses PASS with any open request, and writes schema_version 2, counts, profiles_reviewed, findings, gate_result, open_requests, and Git metadata including dirty (true when tracked changes are unstaged) and content_hash, adding ponytail_reviewed and ponytail_findings when the ponytail profile ran.",
       "evidence": [
         {
-          "resource": "repo://shared/scripts/record_findings.py#L1-L30",
-          "version": "repo-lines-v1:sha256:93246b1b5d01dbff8841dc94172ab04ee91f79453e82d00db6bad8f547820eba:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQxYmY1MWY4ZDhmYmIyMjVlMDU1YWQ0ZmI3NTAwYThhMTk3MTRiM2RjYmIzNjc2MzYxMjM5MjdmMTU5YjQ0ZmEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImIxYjdkMTg5ODNmZTU0OTAyNTk1NzE3ZjEzZWMxOGMxZmY2Y2FiNTJhZjVmNDYzZjdhMTkzNGMwZWQ5YzY0MTEifQ"
+          "resource": "repo://shared/scripts/record_findings.py#L1-L40",
+          "version": "repo-lines-v1:sha256:3a55e99ab5bf98b11d2311585a0490f0a5f10aa320c99ebce7e70e865c46a447:eyJzZWxlY3RlZExpbmVDb3VudCI6NDAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQ2ODJjYmRiNGM4YjA3NTE4YmY0ODZjNTg5OTBmYzM5MTc4M2FhMjBhOTE2YmZiMjdhZDIxMWViMWQ1YzM2NDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJhOGZmYmVjOGU2N2ZhMzYwZGE1ZWExMTkxNzRkNzExNzVkMDY0NDZhOGI2NjZjNGMwZWZmNmNjZWU5YzZmMDEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjowLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY5ZGM1ZWJhMmY5NWMwMDdhZDc0OGRkMTI0OGIxNDBlNjM4ZDNiMWY2ODQ4MjZiZWE0NWRkZWNiNzNmNGJmOTIifQ"
         },
         {
-          "resource": "repo://shared/scripts/record_findings.py#L120-L190",
-          "version": "repo-lines-v1:sha256:a431a08c50f00eb8af59854fc38255e6f3fb0c4ecc4e16be072ea7d740bb959a:eyJzZWxlY3RlZExpbmVDb3VudCI6NzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU2YjA0NDkxNDY5NzIyZTgzNjNhOTRlNDA0NDUzOGUwMTNhMmEyMTdlMzZiMWU1NjhiYTYwYWNiN2I0YzhmMmUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM4Y2I1MTZjN2Y5MjY1MDgzOTk1ZGNjMWYyMTM5ZDY0NjE1YzZiMTg5ODI2ODg5ZDI3MzlmYjhjYTE3NDgyZTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImFiNmU4ZWFlZmQ1NWI4ODU2OGFiNGI4NWRiZmRkM2JhOTJkOWZiNzFhMmE2ZTNmYjhmYmU0MTgyNDg1ZmJjZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0MjY2NDQ4YmUwYTM0N2U3ZTA0OTYyOTVmYmYwM2ZmMzU1OWMwYTZjOGM1YWIwMzY1ZTliN2FiNmY4MGJmNDIifQ"
+          "resource": "repo://shared/scripts/record_findings.py#L114-L166",
+          "version": "repo-lines-v1:sha256:42280cdce45826ec5ddc1a3f847b63fdc81bed94a37730323505f981b13979c5:eyJzZWxlY3RlZExpbmVDb3VudCI6NTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImE4MWIyNDgxYmE5ZTU5MDAwYTdkZTgyYTdiMjdmOTlmM2U4MWNkMGNiZTdlMWU0NmE3ZmM2M2U1MjhhYTkyODAiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjgzMDdiNDQ1NGE5NDUyMGE1ZTFlNjIyNzMzYjYxOGM4NTU4MjllODVlMWVhOGQ4ZGVmNDIxYmVhM2M4NWQyNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlNmM0MTYzYTE2MDVkN2RjOTZhZmVhZGYyMmE2YzJlZDE0NDI1OTNlMTRhZWVlYWZkMGQyOGMyNWYxZmM4YjcifQ"
         },
         {
-          "resource": "repo://shared/scripts/record_findings.py#L225-L265",
-          "version": "repo-lines-v1:sha256:f8fce0a94223e3a8e2bc6e0d23079abf2af42d90bdcc1fb7c597335ecbd24fed:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5ZGRmZjdhZTA1ZDlhM2Q2MjhlZjBhZjdmYmM4YjcyZGYyZTJlMTFkNDEzOTdkZDAwNDVkMDhmMWRkOTg2ZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5MDRkOWUxNjNiNGJjNzg4MzdlY2U5NDVlYjk4OWE1YThkYTNhMTJkZTJmOGY4Nzg4ZjEwMWZmZjRmYTk5YjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiMmU3ZDM3YzNlY2VhOTNhZTBhM2Y4NDVmMmQwOTU0YTQ2OTk2MDg0OGU2MWFjOTk4N2U1ODFjNzdkZTdkNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlMTY4ZDJlOWQ4ZjkyOWJhY2RiOWQ5MmU5MmFiMGNkYWU0ZDg0ZWM0N2Q5MmE5MDExM2NkNzBkMThiY2Q3MjIifQ"
+          "resource": "repo://shared/scripts/record_findings.py#L198-L290",
+          "version": "repo-lines-v1:sha256:17951af29b7d07bd56541fc1b98aa107fd2188e1f42af5cd78fa85002db8578b:eyJzZWxlY3RlZExpbmVDb3VudCI6OTMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjcwYmM1MTI2NWRhM2M0OTRiZGQyOTQwOGMwZTE3NzY2NWJmZWFkNmZkMjc5MzZmMDU5ZDJjNTU3YjE5YTNjZTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJkNmMzOTAzNDExMDdmMDk0ZmVjOTg3N2RkMWIyNzhkN2JhMTI3M2FlMGQwMzUyOTc4Y2EwYTZiYjk4NGJhMjIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjA5NjNkZmM5YzJiY2QwNDM2Y2NmMGFkOGExYmQwNDYwZGEzNDQ3ZjYyMzU1MDI1YmI4NDkzNjhiZjlmNzgzNmQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjcyNjFiOTM3YTc2MmMxOTI3NDFjYTBmNGIzYmNmNmUyMDcwY2RkOWRlODI3MmUxYjM2OTQ5YzZjM2I3NDBiZDkifQ"
         }
       ]
     },
@@ -156,15 +156,19 @@
     },
     {
       "id": "claim_16219a6897bb4fe682f5c8b738d5fd8e",
-      "statement": "A normal completion commit requires counts.critical == 0 and counts.major == 0 in the findings report with a disposition and reason on every surviving MINOR, and a multi-file or otherwise high-risk diff is refused with 'this high-risk diff requires a fresh Ponytail review' unless the report records ponytail_reviewed=true.",
+      "statement": "A normal completion commit requires counts.critical == 0 and counts.major == 0 in the findings report with a disposition and reason on every surviving MINOR, the recorded gate_result PASS with no open request, and every review profile the changed paths require; a multi-file or otherwise high-risk diff without the ponytail profile is refused with an error that includes 'this high-risk diff requires a fresh Ponytail review'.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L771-L890",
-          "version": "repo-lines-v1:sha256:d74e6be3fe05936b3b48564ccef139e1d888f69d4091bbabf64487064ae3483c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlYjM0ZWU4ZGMyMzQ3MjdhYTE3OTk2MGFiODAzMWRlZjU2MTBjNWIyYzQ4M2Q3ZWFjZDc1N2ExOTRmNWQ0YmQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxNWVmZWJiMTkzNjcwNmJiMmMxMzczYjFkMjU1NzY2NDEyYWY1MWNkMWU0NTI0M2E3NjZhOTZmNjkyZjk1MWUzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkNDMyOTQyMWJkZTU4ZmMxMWZjNTMzZmY4Yzc3OTAyZjI0M2ZjYjQyMDQ2OTg0MDNjY2UxNzQ4MWFhZjFkM2UyIn0"
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L776-L802",
+          "version": "repo-lines-v1:sha256:1fc136e7b6a4b0dbf0d328657fb62497fd66494a8782587e9426eec9059b4f91:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMzRlZThkYzIzNDcyN2FhMTc5OTYwYWI4MDMxZGVmNTYxMGM1YjJjNDgzZDdlYWNkNzU3YTE5NGY1ZDRiZDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1ZWZlYmIxOTM2NzA2YmIyYzEzNzNiMWQyNTU3NjY0MTJhZjUxY2QxZTQ1MjQzYTc2NmE5NmY2OTJmOTUxZTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1NzdjMTUxZTE4NjgwOWQ0YzgyYjIwNWZlYmI1YzdhNGZmZGMyMjIxZmVkN2FjNmQ0MTIyNTdhNWM5ZGUxMDIifQ"
         },
         {
-          "resource": "repo://shared/policies/workflow.instructions.md#L141-L150",
-          "version": "repo-lines-v1:sha256:aca24d5210aec42ea58ddd4170040a96f4a74553bd85516b77c7ed8c7fbb4d1a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjgxNjgwYzc0ZDk4ZDQ2NGU3NTc0MzkwODBlYWZhZGEzMGZkYzFkZjc5MmNlNGM1YWU3YzZlYjEzMzM4MGY4ZjMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImEzZTVlNGJjNGRkMmE1NDQ4ZGIzMWZmMzFlODk2YzcyNzVlY2VmYTVlYTAzOTFjZTEzNmJlYTc0Zjk4ZTg2MWEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjQxMGM3OWM4MjgzMjBjYmY0MDIyOTZhZTg5YTQ5ZDNjMDk1M2Q2NjdkNjYzMzg0NGViNTU0NDMwMWFkZGFhZDkiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjAwMWYyZWMxNzU5M2MxMDU0ZWI0NjM2N2Q4NDUzZWYyNGExNzNjZTk2YjcxMTdkOTFmOWE2OGQ0NGZlZjhiMDEifQ"
+          "resource": "repo://shared/policies/workflow.instructions.md#L181-L181",
+          "version": "repo-lines-v1:sha256:028c16b9371e6ad8ae7b2368f1017e5695ec809954b64fed026de0f30abb410f:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMDI4YzE2YjkzNzFlNmFkOGFlN2IyMzY4ZjEwMTdlNTY5NWVjODA5OTU0YjY0ZmVkMDI2ZGUwZjMwYWJiNDEwZiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMDI4YzE2YjkzNzFlNmFkOGFlN2IyMzY4ZjEwMTdlNTY5NWVjODA5OTU0YjY0ZmVkMDI2ZGUwZjMwYWJiNDEwZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMjgxNzA4YmQ4NGUzMDMzODZhN2NiZWEwYWM5NWI4NDU2YzI4YmY4MTE2ZjgxOGI4ODI0ZjA2ODdjODY5MTc3MiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMDAxZjJlYzE3NTkzYzEwNTRlYjQ2MzY3ZDg0NTNlZjI0YTE3M2NlOTZiNzExN2Q5MWY5YTY4ZDQ0ZmVmOGIwMSJ9"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L2428-L2475",
+          "version": "repo-lines-v1:sha256:75c04cff38564cd22c4b58a27a5ef7c3792b7d42d32ab42e3382f0ee9661a66a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhMWNlOTY3ZTZlMmFhODBjMzMyYTZjMzJhMzkyMzI5MDA2Zjc4MWMyYjIyYjNjMjVkZDQxMGViYWRiMThhMWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiYjE0Zjc5YzRkZTgwNjQwYjZiZTgzZDJjOGY0NmQ0MjViNzYzMmQ1MDg4YzFjZWRmMDg1YzlmNjJhMjJhNDUifQ"
         }
       ]
     },
@@ -217,10 +221,38 @@
           "version": "repo-lines-v1:sha256:5c64bbf3ceb88f95f5c1977b1ab8acbec8fe7368247550f60479eaa7f94bfadd:eyJzZWxlY3RlZExpbmVDb3VudCI6MTAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJiMzYwYzBlMDNmMDk2MzE2ZjU2YzdhZTM4YTIxOTc2ZDgwNmU0YTczYmU1MTc3OGJjM2RjMjMyODhkNGUyNGUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImExNDQ2ZTc1YWQ4NTllNTY5MjQ0MGNkYzk2Y2ZmY2FkYjc0MGVmZjA3ZGU3ZWVmYzdkMTY0ZDYyYzAyZWFhYzIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjYwMTg2Mzc4NTBkZmJiNTNmNzc5NWU0MjE0NWM0YWE5MDI2ODk3MWQ3OGZiODMyYTA1Y2ZmYWZiM2JjNTIzMTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM1ZGYyNGE0ZmI2OGUxOWZhNTcxODc4MmEwYjExODllNDJkN2JiNWNlYTE3ODZmNjI2MWU5ZmE0ODRlMjc0NGMifQ"
         }
       ]
+    },
+    {
+      "id": "claim_39bd5a16c32840519c4433ffc68fbec8",
+      "statement": "required_review_profiles checks test surfaces first (tests/ prefix, test_*.py, *_test.py, conftest.py require tests) and otherwise requires code, architecture, security, tests, and ponytail for control-plane, generator, and dependency paths, using the receipt's changed_paths; the commit gate always applies the gate-result and profile rules, while the ancestor and certified push gates apply them only to reports whose schema_version is not an integer below 2.",
+      "evidence": [
+        {
+          "resource": "repo://shared/scripts/verify.py#L2428-L2450",
+          "version": "repo-lines-v1:sha256:91a70ccd5fbce2d168ca40fc8a0410fbb99cb697db174a122b6a6299d4e30e67:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNlZjk3YjQwYTBhYWIyYTk4NDdkNWZkMGJmZjYzZjdmNWU2YTI1MGZkMjg1MGI3MmUzODBjMzEwZmYzY2IwNDIifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L748-L775",
+          "version": "repo-lines-v1:sha256:c4fe521dee7af4651c4ed83b3201a17b8a7eed003023da2ba77f32adeecf71bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzMjJjZTllNWNlMmJkYTc2NTkzOWMxNzFkM2NlNmY1NmM5YzE4MWMyZTIwMTE0MWI4ZDFlZjkyMjJiMDY0ZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBmMTI2YTNlNmRjMzlkOTU1OGZlMDljNzk4NDJmYThkYzUxMzU5MjgxNjIxOTdmZjAyODlmMDMxOTIzMjVhMzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhZTA5OWM0ZjdjOGU2YWU2MDEyYTNmNWFjNGFlNTE2YmY2MTk5NGQ2ZjM0ZTk2YTcwMmE1NDcwMDVhODQ4MWMifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_9977ed440e9a40bba4962dc20160a6de",
+      "statement": "tracked_state_hash is written into receipts but compared by no gate; at commit the closeout receipt's tree_sha must equal git write-tree, so a change staged after closeout, documentation included, makes the receipt stale.",
+      "evidence": [
+        {
+          "resource": "repo://shared/scripts/verify.py#L1735-L1745",
+          "version": "repo-lines-v1:sha256:78b293ddbc24aeeccf139b501f598052b1a78cbdedc3097f6cfdb50f3ac46d6a:eyJzZWxlY3RlZExpbmVDb3VudCI6MTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjA1YmQ1M2I2ZjkzYjRmZGEzZGJkZGY3Mjg3ZDE3MjdjNzBhODlmMTMzMGIwMWY1ZTYwYTRlNDFjMDhjZDczYTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjUxNjU3ODMxNmIxZTU3Y2YxNDgyNDdiOWFmYzI4MTRkMGE3YzFkNDhkYTQxNTczOWExMTQwYjkwYjg5OWVkNmMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjdmZGFhNGNmOThjZTIzZDFjMGEzZTJmNzdlMTZiZGVkOGUxMmUwOTA4MjIwOGYxZWUyOWM3MjU4ZmFkYTBhZDUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImU4Y2IwMDMwNzc1NTRhNTY4MGQ4MDEwZWVkZDg2YmU0MGMwNzdiOGE5YjJiZjZjODVhOTg5NmQ1YzUyOWNjM2MifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L2093-L2101",
+          "version": "repo-lines-v1:sha256:14ee8ef178f1b48707601ffaed86ab2d3ff899b348d98dbe7c0849c84e366b82:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjE0ZjE5MmJiODE2MzRkNTJjZTZlZDc2YTVhNDM5MjJhYjZkYjIxNGEyYmNjYjcwZTZiNTljMmU2MmRmYWIyMiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzU1NmQ3OThjZDM3Nzg1NzgwODY5NmMzMmNhMDYxNjdmYjQwNTkzNzNmYWM5ZmQ2MTE5ZDAyODdlYmRlOWQzYyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNzIxYzE3OTU5ZjNhODRlY2MwYjhmM2M0MzljYzQxNmY4MjNmMDdmNTRmYWZmN2E5NTQ0ZDg0OWZjNGQyMTVlZCIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiODgwMzYyOTdkNWQzZTk4MWU5NjU4ZDE1YjFjZWExYzgyYWRjYTM2MWIzMzU1OWFlNGFlMDYxZGU5YTQ0MzI2OSJ9"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-09-27T05:02:18.019Z"
+    "at": "2026-10-17T10:13:26.159Z"
   }
 }

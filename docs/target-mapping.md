@@ -85,6 +85,37 @@ GitHub Copilot (secondary compatibility adapter):
 
 Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
 
+## Gate-Repair Client Parity
+
+Per-client status for the `gate-repair` changes. Clients are listed in the order Claude Code, Codex, GitHub Copilot, Antigravity.
+
+| Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Context Mode hook lane is advisory only | Filtered | Filtered | Filtered | Context Mode hooks not wired, so no session continuity (recorded gap) | `tests/test_context_mode_dispatch.py`, `tests/fixtures/context_mode_hook/1.0.169/` |
+| Guarded Context Mode MCP server | Root `.mcp.json` guarded; generated targets guarded | Root and generated Codex config guarded | Root `.vscode/mcp.json` guarded; generated targets guarded | Installed and generated guarded, but the PreToolUse bridge denies MCP calls (gap) | `tests/test_validate_targets.py` |
+| Hook- and server-config protection (ask on Claude and Copilot, deny on Codex and Antigravity) | `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json` | `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` | `.github/hooks/`, `.vscode/mcp.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json`. Local harness: `run_in_terminal`/`send_to_terminal` gated; read tools allowed | `.agents/hooks.json`, `.agents/mcp_config.json` | `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`, `tests/test_state_sync.py` |
+| Plan checks at branch creation | Shared guard | Shared guard | Shared guard. Local harness: `run_in_terminal`/`send_to_terminal` gated | Antigravity bridge | `tests/test_branch_state.py` |
+| Review result and profile gate | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | Shared `verify.py` gate through `pretool-bash-guard.sh` and the installed Git hooks | `enforce-commit-gate.sh` listed directly; terminal commands covered since the `run_in_terminal`/`send_to_terminal` fix | Through the `antigravity-pretool.py` bridge; native deny never observed | `tests/test_verify.py`, `tests/test_commit_closeout.py`, `scripts/validate_targets.py` installed-hook smoke |
+| Shipped commands cannot hide test failures | Shared skills and a `validate_targets.py` check | Same | Same | Same | `tests/test_validate_targets.py` |
+| Context7 for subagents | Generated agents with the `search` capability list `mcp__context7` | Inherits session MCP servers ([official Codex subagents docs](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [`openai/codex` source `codex-rs/core/src/agent/role.rs`](https://github.com/openai/codex/blob/7ac954ea24116700632906d89715f7755cd3523e/codex-rs/core/src/agent/role.rs), read 2026-10-17; no native run) | `context7/*` | Unverified: `inheritMcp` is not a documented field | `tests/test_validate_targets.py` |
+
+"Filtered" means `context-mode-dispatch.sh` passes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
+
+The root `.mcp.json` and `.vscode/mcp.json` start Context Mode through `context-mode-dispatch.sh server`, like the root Codex config, and `scripts/validate_targets.py` fails if a root adapter's `context-mode` entry is not the shared guarded route. The root adapters do not carry Context7 (an authoring-repository choice); generated targets do.
+
+The Copilot Local-harness tool names above (`run_in_terminal`, `send_to_terminal`, and the read tools) come from VS Code's source (`microsoft/vscode` at `9a59550fc841805ebb44cfd5a09b92beed591d15`, read 2026-10-17) and the [VS Code hooks reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference).
+
+Recorded follow-ups:
+
+- The shell guards (branch, commit, PR) parse the payload VS Code's Local harness sends (the supported Copilot client): the model-facing tool name with an object `tool_input`. The Copilot SDK harness and Copilot CLI key casing (`toolName`, `toolArgs`) is not established from official sources. Copilot CLI is unsupported (see [runtime-checks.md](runtime-checks.md)), so this becomes work only if support for either is added.
+- Unverified: VS Code may have other command-running tools besides `run_in_terminal` and `send_to_terminal` (for example task tools such as `create_and_run_task`). The shell gates do not treat those as terminal commands. Check a source before changing anything.
+- `*.code-workspace` files and `.github/agents/*.agent.md` frontmatter hooks are not protected. The first is unverified. The second can only add hooks, and the most restrictive decision wins.
+- Codex ignores per-agent `sandbox_mode`, `mcp_servers`, and approval policy: a custom agent file cannot override them ([Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)). The `sandbox_mode = "read-only"` written into read-only Codex agent files therefore has no effect, and those agents run with the parent session's sandbox.
+- Agent definition files are unprotected in all four clients: `.claude/agents/`, `.codex/agents/*.toml`, `.github/agents/`, and `.agents/agents/`. The Codex `sandbox_mode` item above is one consequence.
+- Upstream Context Mode ships `antigravity-cli` hooks, but the bootstrap does not wire them, so Antigravity has no hook lane and no session continuity.
+- The commit gate enforces the Task Lanes five-profile review for control-plane, generator, and dependency paths, but not for every multi-file diff. A multi-file diff requires the Ponytail profile only.
+- Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
+
 ## Sidecar Overlay
 
 `dist/sidecar/` is a second generated target: a narrow, per-clone developer

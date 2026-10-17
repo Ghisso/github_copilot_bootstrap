@@ -93,6 +93,26 @@ _LITERAL_MUST_MATCH = (
     ),
     pytest.param("server.key", "server.key", id="key-bare"),
     pytest.param("cert.pem", "cert.pem", id="pem-bare"),
+    pytest.param(".mcp.json", ".mcp.json", id="mcp-bare"),
+    pytest.param("/repo/.mcp.json", "/repo/.mcp.json", id="mcp-directory-prefix"),
+    pytest.param(".vscode/mcp.json", ".vscode/mcp.json", id="vscode-mcp"),
+    pytest.param(
+        ".vscode/settings.json", ".vscode/settings.json", id="vscode-settings"
+    ),
+    pytest.param(".agents/hooks.json", ".agents/hooks.json", id="antigravity-hooks"),
+    pytest.param(
+        ".agents/mcp_config.json", ".agents/mcp_config.json", id="antigravity-mcp"
+    ),
+    pytest.param(
+        ".claude/settings.local.json",
+        ".claude/settings.local.json",
+        id="claude-local-settings",
+    ),
+    pytest.param(
+        ".github/copilot/settings.local.json",
+        ".github/copilot/settings.local.json",
+        id="copilot-local-settings",
+    ),
 )
 
 
@@ -110,12 +130,41 @@ _LITERAL_MUST_NOT_MATCH = (
     pytest.param("uv.lockfile", id="uv-lock-right-boundary"),
     pytest.param("mycredentials.json", id="credentials-left-boundary"),
     pytest.param("bundle.keys", id="key-right-boundary"),
+    pytest.param("foo.mcp.json", id="mcp-left-boundary"),
+    pytest.param("my-.mcp.json", id="mcp-left-boundary-hyphen"),
+    pytest.param("vscode/mcp.json", id="vscode-mcp-needs-leading-dot"),
+    pytest.param("other.vscode/settings.json", id="vscode-settings-left-boundary"),
 )
 
 
 @pytest.mark.parametrize("text", _LITERAL_MUST_NOT_MATCH)
 def test_protected_path_literal_rejects_embedded_near_misses(text: str) -> None:
     assert PROTECT_FILES.protected_path_literals(text) == []
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        ".claude/settings.local.json",
+        ".agents/hooks.json",
+        ".mcp.json",
+        ".vscode/mcp.json",
+        ".agents/mcp_config.json",
+        ".vscode/settings.json",
+        ".github/copilot/settings.json",
+        ".github/copilot/settings.local.json",
+    ),
+)
+def test_protect_files_finds_hook_and_server_configs_in_opaque_shell_text(
+    relative_path: str,
+) -> None:
+    """An interpreter string that names one of these configs is caught by the
+    literal extractor, the same way it catches the earlier hook configs."""
+    command = f"bash -c 'cat {relative_path} > /tmp/out'"
+    process = _run_protect_files(
+        {"tool_name": "Bash", "tool_input": {"command": command}}
+    )
+    assert _denied(process), process.stdout
 
 
 def test_protect_files_allows_python_heredoc_referencing_os_environ() -> None:
@@ -166,6 +215,14 @@ _CONTROL_PLANE_RELATIVE_PATHS = (
     pytest.param(".codex/hooks.json", id="codex-hooks"),
     pytest.param(".github/hooks/hooks.json", id="github-hooks-config"),
     pytest.param(".claude/hooks/run-hook.sh", id="claude-hooks-dir"),
+    pytest.param(".claude/settings.local.json", id="claude-local-settings"),
+    pytest.param(".agents/hooks.json", id="antigravity-hooks"),
+    pytest.param(".mcp.json", id="claude-mcp"),
+    pytest.param(".vscode/mcp.json", id="copilot-mcp"),
+    pytest.param(".agents/mcp_config.json", id="antigravity-mcp"),
+    pytest.param(".vscode/settings.json", id="vscode-settings"),
+    pytest.param(".github/copilot/settings.json", id="copilot-settings"),
+    pytest.param(".github/copilot/settings.local.json", id="copilot-local-settings"),
 )
 
 

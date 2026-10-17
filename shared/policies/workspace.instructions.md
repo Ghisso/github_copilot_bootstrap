@@ -91,7 +91,7 @@ orchestrated path for standard and control-plane/high-risk work:
 orchestrator -> [planner when needed] -> coder -> focused/fast verification -> reviewer -> closeout
 ```
 
-Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.
+Control-plane files include `.claude/hooks/`, `.claude/settings.json`, `.github/hooks/`, `.codex/`, `.mcp.json`, `.vscode/mcp.json`, `.devcontainer/`, `CLAUDE.md`, and `AGENTS.md` — the hook, agent, and config surfaces that affect every session in this project. They always use the full control-plane/high-risk lane.
 
 ## Ponytail Coding Rule
 
@@ -141,7 +141,10 @@ generalized infrastructure, configuration, execution paths, or behavior. It is
 optional for ordinary low-complexity work. An exemption is exactly one
 documentation OR one mutable workflow-state file, only when no
 control-plane/high-risk condition applies. Every multi-file diff is
-control-plane/high-risk and therefore is not exempt.
+control-plane/high-risk and therefore is not exempt. The commit gate enforces the
+deterministic part: every multi-file diff and any control-plane, generator, or
+dependency path. Complexity expansion in one ordinary file is the reviewer's
+call.
 
 ## Skills
 

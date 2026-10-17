@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:c27cb4c05d249f8e220190b26870731fa13f85bfe7158e7afea402dd3770e871",
+  "pageVersion": "sha256:35caddbf9666d3de00c10c71a7890c00cca8e459093c8a2222fd172070513a54",
   "claims": [
     {
       "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
@@ -166,25 +166,29 @@
     },
     {
       "id": "claim_8885ff4dc9bf4d03a3728eb202daa9b2",
-      "statement": "Review-profile selection is governed by the single routing table in workspace.instructions.md: hooks, scripts, generators, and control-plane code always receive code, architecture, security, tests, and ponytail, and Ponytail is required for every control-plane, high-risk, or multi-file diff.",
+      "statement": "Review-profile selection is governed by the single routing table in workspace.instructions.md: hooks, scripts, generators, and control-plane code always receive code, architecture, security, tests, and ponytail; Ponytail is required for every control-plane/high-risk diff, every multi-file diff, and every complexity-expanding diff, and is optional only for one low-complexity documentation or workflow-state file.",
       "evidence": [
         {
-          "resource": "repo://shared/policies/workspace.instructions.md#L121-L144",
-          "version": "repo-lines-v1:sha256:f56db69fb924b728d0fe1cb04820189f2debf062208ec7467466c205e930dc9f:eyJzZWxlY3RlZExpbmVDb3VudCI6MjQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjODU1ZGQ5ODMwNTY4N2FiNjM1ZGI1ZmVmYmMzN2I1NGYzZjMxMzkyMTQ1YjJkZTIxNjhmMTFlNGYzMTcyNzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE0ZWZiMTZmNDMxNmQ1MDhmYzc4N2ZiNTAwMWNmZjczZThkNTA5NmVkZmUwZDdiZDAwNmUxYzM5NmUzNmM5N2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyN2JhZWM2ZjE2ODlkYjg5NTkyMjU3YTBmMzliMWZhYjc5MzNiMzlmMWVlYjhhZWZhNDRlZWZhYzJiNGJkYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjBkOTM5MjJjZDMzOWY2MjNlMDczOGU5Mjg1MjNiMDFhMTkxOTY0NTBkMjc4YTIyNjkzN2FiYjJmZjYyYjI1OGEifQ"
+          "resource": "repo://shared/policies/workspace.instructions.md#L121-L148",
+          "version": "repo-lines-v1:sha256:35f0c2d642dc098c3e9e3bef86572812bcbba536e30eb9202d9a411388ff2198:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVjODU1ZGQ5ODMwNTY4N2FiNjM1ZGI1ZmVmYmMzN2I1NGYzZjMxMzkyMTQ1YjJkZTIxNjhmMTFlNGYzMTcyNzQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjEyN2JhZWM2ZjE2ODlkYjg5NTkyMjU3YTBmMzliMWZhYjc5MzNiMzlmMWVlYjhhZWZhNDRlZWZhYzJiNGJkYmYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVkZDliNGU3NmZmZDAwZDIyMGRiOWY5ZGRlOTg3NDE5MWJiMjUwMTExNWVjMzY2NWIxODZiMWNiNDE3ZWIzZTkifQ"
         }
       ]
     },
     {
       "id": "claim_ddf53d214e2f4bd9b28e3ed0618c3056",
-      "statement": "The commit gate enforces the Ponytail rule: a high-risk (multi-file) diff is refused with 'this high-risk diff requires a fresh Ponytail review' unless the findings report records ponytail_reviewed=true.",
+      "statement": "The commit gate enforces required review profiles: required_review_profiles maps test surfaces (checked first) to tests and control-plane, generator, and dependency paths to code, architecture, security, tests, and ponytail; the gate adds ponytail for a multi-file diff and refuses a findings report missing any required profile with one 'missing required review profiles' error that keeps the 'requires a fresh Ponytail review' wording when ponytail is missing.",
       "evidence": [
         {
-          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L771-L890",
-          "version": "repo-lines-v1:sha256:d74e6be3fe05936b3b48564ccef139e1d888f69d4091bbabf64487064ae3483c:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIwLCJmaXJzdFNlbGVjdGVkTGluZUhhc2giOiJlYjM0ZWU4ZGMyMzQ3MjdhYTE3OTk2MGFiODAzMWRlZjU2MTBjNWIyYzQ4M2Q3ZWFjZDc1N2ExOTRmNWQ0YmQ3IiwibGFzdFNlbGVjdGVkTGluZUhhc2giOiIwMWJhNDcxOWM4MGI2ZmU5MTFiMDkxYTdjMDUxMjRiNjRlZWVjZTk2NGUwOWMwNThlZjhmOTgwNWRhY2E1NDZiIiwicHJlY2VkaW5nQ29udGV4dExpbmVDb3VudCI6MywicHJlY2VkaW5nQ29udGV4dEhhc2giOiIxNWVmZWJiMTkzNjcwNmJiMmMxMzczYjFkMjU1NzY2NDEyYWY1MWNkMWU0NTI0M2E3NjZhOTZmNjkyZjk1MWUzIiwiZm9sbG93aW5nQ29udGV4dExpbmVDb3VudCI6MywiZm9sbG93aW5nQ29udGV4dEhhc2giOiJkNDMyOTQyMWJkZTU4ZmMxMWZjNTMzZmY4Yzc3OTAyZjI0M2ZjYjQyMDQ2OTg0MDNjY2UxNzQ4MWFhZjFkM2UyIn0"
+          "resource": "repo://shared/hooks/scripts/_lib-frontmatter.sh#L776-L802",
+          "version": "repo-lines-v1:sha256:1fc136e7b6a4b0dbf0d328657fb62497fd66494a8782587e9426eec9059b4f91:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImViMzRlZThkYzIzNDcyN2FhMTc5OTYwYWI4MDMxZGVmNTYxMGM1YjJjNDgzZDdlYWNkNzU3YTE5NGY1ZDRiZDciLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQxMmNhMzQ1Y2NmNzViZjljMDgwNmJjZTY5NWJlOGRlODA4Yjc5OTg0MjUxYTdhNTRkMjAyY2Y2MTAxZGQ0NTEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE1ZWZlYmIxOTM2NzA2YmIyYzEzNzNiMWQyNTU3NjY0MTJhZjUxY2QxZTQ1MjQzYTc2NmE5NmY2OTJmOTUxZTMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6Ijg1NzdjMTUxZTE4NjgwOWQ0YzgyYjIwNWZlYmI1YzdhNGZmZGMyMjIxZmVkN2FjNmQ0MTIyNTdhNWM5ZGUxMDIifQ"
         },
         {
-          "resource": "repo://shared/scripts/record_findings.py#L225-L265",
-          "version": "repo-lines-v1:sha256:f8fce0a94223e3a8e2bc6e0d23079abf2af42d90bdcc1fb7c597335ecbd24fed:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY5ZGRmZjdhZTA1ZDlhM2Q2MjhlZjBhZjdmYmM4YjcyZGYyZTJlMTFkNDEzOTdkZDAwNDVkMDhmMWRkOTg2ZWEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImU5MDRkOWUxNjNiNGJjNzg4MzdlY2U5NDVlYjk4OWE1YThkYTNhMTJkZTJmOGY4Nzg4ZjEwMWZmZjRmYTk5YjQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFiMmU3ZDM3YzNlY2VhOTNhZTBhM2Y4NDVmMmQwOTU0YTQ2OTk2MDg0OGU2MWFjOTk4N2U1ODFjNzdkZTdkNzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlMTY4ZDJlOWQ4ZjkyOWJhY2RiOWQ5MmU5MmFiMGNkYWU0ZDg0ZWM0N2Q5MmE5MDExM2NkNzBkMThiY2Q3MjIifQ"
+          "resource": "repo://shared/scripts/verify.py#L2428-L2450",
+          "version": "repo-lines-v1:sha256:91a70ccd5fbce2d168ca40fc8a0410fbb99cb697db174a122b6a6299d4e30e67:eyJzZWxlY3RlZExpbmVDb3VudCI6MjMsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNlZjk3YjQwYTBhYWIyYTk4NDdkNWZkMGJmZjYzZjdmNWU2YTI1MGZkMjg1MGI3MmUzODBjMzEwZmYzY2IwNDIifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L748-L775",
+          "version": "repo-lines-v1:sha256:c4fe521dee7af4651c4ed83b3201a17b8a7eed003023da2ba77f32adeecf71bb:eyJzZWxlY3RlZExpbmVDb3VudCI6MjgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImQzMjJjZTllNWNlMmJkYTc2NTkzOWMxNzFkM2NlNmY1NmM5YzE4MWMyZTIwMTE0MWI4ZDFlZjkyMjJiMDY0ZmMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjBmMTI2YTNlNmRjMzlkOTU1OGZlMDljNzk4NDJmYThkYzUxMzU5MjgxNjIxOTdmZjAyODlmMDMxOTIzMjVhMzEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImVhZTA5OWM0ZjdjOGU2YWU2MDEyYTNmNWFjNGFlNTE2YmY2MTk5NGQ2ZjM0ZTk2YTcwMmE1NDcwMDVhODQ4MWMifQ"
         }
       ]
     },
@@ -232,11 +236,11 @@
     },
     {
       "id": "claim_2f92f8a6311348398e1d9ff2d20b50e5",
-      "statement": "validate_skills_and_paths requires the generated skill count to equal the shared count, requires the generated ponytail and ponytail-review skills to ship public with license: MIT and the upstream LICENSE and provenance under .claude/third_party/ponytail/, requires the target to expose only humanize and never the upstream avoid-ai-writing name, and requires the generated documenter prompt to reference humanize.",
+      "statement": "validate_skills_and_paths first rejects shipped shell lines that hide a test, lint, or verify failure, then requires the generated skill count to equal the shared count, requires the generated ponytail and ponytail-review skills to ship public with license: MIT and the upstream LICENSE and provenance, requires the target to expose only humanize and never the upstream avoid-ai-writing name, and requires the generated documenter prompt to reference humanize.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L7625-L7716",
-          "version": "repo-lines-v1:sha256:4bc7e31869d4574fb0a51572e1a875c440cb95e2b600eb06aa7f5b8230be927e:eyJzZWxlY3RlZExpbmVDb3VudCI6OTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMjNkYjRjOWMwYzMyNTQwYTkwYTU5NWFlYjYwOThmYjA0ZTE1NDljYTgwMWM0NDhmMjRiZWVmYzVlNTI1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc5NDIxZWMzYWYxYTBlMmY2MWUwZjFmYWUyMzE1MmZjOGRiZGRhODhiNjM3Mzc3ZTYwZmU3MDU1OWJmY2I5N2YiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjYzOTczMzI4ODk1ZDJmYTU3ZWY5NmFjY2FiNWY4MDc5Yzc0MjQ5MmYyM2M1NmFhZTNhOGZlNTgzYjVlMzQ3YTcifQ"
+          "resource": "repo://scripts/validate_targets.py#L7839-L7915",
+          "version": "repo-lines-v1:sha256:f7b62de77140d8569501ae4bd6e38018913e9898b17724b7de04304ab743014c:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMjNkYjRjOWMwYzMyNTQwYTkwYTU5NWFlYjYwOThmYjA0ZTE1NDljYTgwMWM0NDhmMjRiZWVmYzVlNTI1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2ZWEwZjFhYzI5MDVmMjE0NTFjZjk1NjNlZjE2ZmQ2OTFmOWE5ZmE3YzFjOGVkYjE2ZjI2ZTBmNmU1MmE1NjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkMzE0NDYzYmQ1YTY5YTMwNTk5YjAxNjVjZGZmMDA2MTVjOGJlMDY1MTVmYWMwOTI2ZDU0NWE5ZTEwZmU4ZTkifQ"
         }
       ]
     },
@@ -431,10 +435,74 @@
           "version": "repo-lines-v1:sha256:0351380ffa8d40994df6351760f8cbc7dbed8e5958f994ef8a22b3d1a44364d3:eyJzZWxlY3RlZExpbmVDb3VudCI6NSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNDI1NmIxYmVkMmViMjVmYmQ0NmYzOWFjZjg2YTAzNTY4NThmZDg4YTQ0NDJkZWZmNTcwNjQ1MWQwYjQwZjFiOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzg2ZjNiNDViN2Q5YWU4MzQyNTM3NzYzOWJhMjcxNjhhY2RiMTAxYjgxYTRlMmQwYmYyZDIxMTI4Y2I1Nzk0ZSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTBkYWY4Njc4MmJmMTMyMWYxZWRmOWNkYjkzZTk2NzI3MjI0Mzc2OTY4ODE3ODYwZmFkZjc2NGE1OGExZDA5MSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzRhYzI1MmRhMDExZmRhNWNjNGRmYzI5NTRiZGI1NmQ1YzRlNjE2NzAyOGViNzA0MDQxNGQ2NDBmNTI5YjNjZiJ9"
         }
       ]
+    },
+    {
+      "id": "claim_6e5493c65bd54c0ca3823fb1d6fe2299",
+      "statement": "In generated Claude Code agents the search capability maps to Grep, Glob, and the server-level MCP grants mcp__semble, mcp__context-mode, and mcp__context7, so any agent that can search also gets Context7 documentation lookup.",
+      "evidence": [
+        {
+          "resource": "repo://docs/target-mapping.md#L100-L100",
+          "version": "repo-lines-v1:sha256:b0230ad57e802d1b2251b569fe65c0fcbe6de42b8dbdaecea8b1b2776aec0c2d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2EwY2QxMTI4ZTk1M2I3Mzc5NTllOGUzZTkwMjNmMTJjNzk3MzU2NTMxYzhiYjAyODQ1ZmJiNDE3YjI2MGMyYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjkzMGIwMTdmZDljNGUwODkxZmJjMTkxZmQ0YzI5NTc4MzQ1YTJlY2JkNzc3ZDhhODg1M2E2YTZhMWI1MzM3OCJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L109-L117",
+          "version": "repo-lines-v1:sha256:7f1f144f342afac5abc2a9e338ad0df350e093e4a583854e52c0687ac2af7c5c:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmZhNDhjOThkNTZiNjM3ZjIxZjlkMDYxYTdhZWRjOWZlNTQ1YmUzOWI5MDliOGQ4NzVkMDgwNzg5MGJjOTk4MiIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMjMyNDdiY2U2YjljZTMxYTVlNzBjMjgwNGZjYjA0OTViNzViNDU0MmRiNDc5NTVhY2UzYzNlMmVmOTA5YWI4YiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMTA1ZDM1NTA0YTc1MGJmY2Q0MDNiOTYwZjk3MjVmNmRiOWNhNzllZmI2NzQxMzVmZTA0NDIwMWI0ZGM0ZjgyYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiOTgzMDlmNmRkMWZmZDVlNTdkNDIyZDJhODQ4YzkxYzVmMmJjOGIxMGE5NGEwNDFmZTk5YTg1MTM2OWRhZDY5NCJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_7209955bacb44d2ea38d9068314f2a43",
+      "statement": "The Codex adapter emits a capability-derived sandbox_mode, but Codex custom agents inherit the parent session's MCP servers, sandbox, and approval policy and cannot override them, so the read-only sandbox_mode has no effect; this is a recorded follow-up.",
+      "evidence": [
+        {
+          "resource": "repo://docs/target-mapping.md#L100-L100",
+          "version": "repo-lines-v1:sha256:b0230ad57e802d1b2251b569fe65c0fcbe6de42b8dbdaecea8b1b2776aec0c2d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjAyMzBhZDU3ZTgwMmQxYjIyNTFiNTY5ZmU2NWMwZmNiZTZkZTQyYjhkYmRhZWNlYThiMWIyNzc2YWVjMGMyZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2EwY2QxMTI4ZTk1M2I3Mzc5NTllOGUzZTkwMjNmMTJjNzk3MzU2NTMxYzhiYjAyODQ1ZmJiNDE3YjI2MGMyYyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjkzMGIwMTdmZDljNGUwODkxZmJjMTkxZmQ0YzI5NTc4MzQ1YTJlY2JkNzc3ZDhhODg1M2E2YTZhMWI1MzM3OCJ9"
+        },
+        {
+          "resource": "repo://docs/target-mapping.md#L113-L114",
+          "version": "repo-lines-v1:sha256:4f1e0e196c51dd42a73636c6c34d1aba7c33ca8a366c430071ba02b6c57a7ecb:eyJzZWxlY3RlZExpbmVDb3VudCI6MiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiNTBiMzAyMzA1YWE5MjVlYWMyODBjNDczN2ZmN2NmYmZhNjhmZjBkZDM5NWJhZjYxNTFlNTRlZDQ2Zjg4OWU2MyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMWY1NzYyOWRiNjI1OGVjZmM5M2U1OGM3MzYxMDQ2ODZkNmRhN2IxNzlmNWY0ODIxMTIyNTZmZGYyYjAxYzhhNCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiODczZTU2NWVhYTdkMDNjODNjZjQzMzgwMGYxYTI2MTA4ZGJiZWUyMzYzNTg1ZjI3YzhlM2NjZDhkYzBlN2FhMyIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYmY1NDQ4Mjk1Y2EyZjNlZTI5ZDg1YzgzZjgzYTFiZTJlNWQ1MzVlMGVlMmQ5YzQ1NmQ4ODI5NGEyZDAzM2QwMCJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1731-L1760",
+          "version": "repo-lines-v1:sha256:16ef711f0a4267ee0407b3f8ecdfc9f7cec539bd9cc42f5da9f2caddd6293682:eyJzZWxlY3RlZExpbmVDb3VudCI6MzAsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImY2OGE3ZmI2NTQ2MGE1OGVkMGM4MDZkYTkzYmRhMzQ0MjFjMjE2N2ExOWE1ZDAyMTU4YWM0NDI3MTk4OGU1Y2UiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjI0NmQ2ZDg1MjVmZThjMDNmODM2NDE5MGJiODRlYmIzMjJmMWYwMjY3OTBlM2Q5YmU2MzQ4OTcxMGU3ZWZlZGUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_8bdacfc697c14c19ac13ade2f7d91323",
+      "statement": "The Antigravity adapter writes inheritMcp: true for subagents, but inheritMcp is not a documented Antigravity field, so Antigravity subagent MCP access is unverified.",
+      "evidence": [
+        {
+          "resource": "repo://docs/target-mapping.md#L117-L117",
+          "version": "repo-lines-v1:sha256:bcb37887a0ccd9a3e0990ceb9fd560cb11b09b56bcb2ede6f14982a552c7134d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI0MDNhMDk4MzRiZDZmZDQ2Njk5YmIyZjI2NDlhN2U4YTU0NzAzNjNlYjEzMzdlOGYzZTIzZTBkZGFkNWE0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzZiOWE2YjcwMWY2ZmZlYWEyYWFjZTM4MWQ5ZDI1OGZhZTBhYzljNzQ0ZmI4OTkzYWI4YTA4MTIyNzg4OTE4MiJ9"
+        },
+        {
+          "resource": "repo://scripts/generate_targets.py#L1807-L1823",
+          "version": "repo-lines-v1:sha256:de0f29bc163fa6668fefb4ecd6319f4ce604d38f11a55600dc3ba1efba6a8bd3:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImIwY2I5MDJiNmU0ZmMwYTY5MDZmYzgxYjg4MmQwYzI2YzdiMGQxMWQ4MDg1ZjA2ZjBmZTFlMDQ3OGJhODMwZDQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjczNzZiY2ZlN2M4ZDdlZWM4NTVlMDE5NzJjOTUwYzIyZWJmMDg4Yjc0MzE4ZDQ1MTQwYzEwZWRjOGY0MzBjZjciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImIzZGYyYWNmMDZlOGMzZjAzYzcxMzVjNmU4YWM1YTljYTU0MzJhYmUwNmE3NGFjYTBmZGQ5YTUzYTAwOGY5ODciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjFkYTZhZjE1MWYzZmQ5MjJjZDA3NDc4M2Y2NzQ5MzRlYjhkNjk1ZTVmZDRmMzAxYjNiOTUyNTA1ZWVkODc0MTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_f095fe6167bc4916948f7fb1f9b23887",
+      "statement": "The reviewer ends with FAIL when a CRITICAL or MAJOR finding survives, WARN when a request is open, and otherwise PASS; the orchestrator records that value with record_findings.py --gate-result and open requests with --open-request, and the commit gate refuses a phase-completion commit unless the recorded result is PASS with no open request.",
+      "evidence": [
+        {
+          "resource": "repo://shared/agents/reviewer/prompt.md#L82-L90",
+          "version": "repo-lines-v1:sha256:9dc0d2d879bba52007ad83da86460ddff18a432cb1907a2eb91e0468262a899e:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiN2YwMDRlNjkwNDFiYmY5OGI2MmMyNjgzZmY1YzYyOGQ3N2FjMzJlZjM2ZjYyYWU0NmIwZDFiMjNmNGNlNDk4ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiOGE3Mzc2MWNkZTg4ZWQ0ZTRjNDkyN2MxM2FkMjhmYjg3NGVhMzEyN2Y4NTU3Zjg3NzdiYzFjZjM2ODVjMjVjOCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiNWFmYjIyMzdhZDQ1NTNmMTg4OTgxMDU0YWFmMTQ2ODI4NmQ0OWM1ODU5MTE1YzZmOWViM2YwYTUwODIwZjYzZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMzc1OWQxOGVmMDA3NzlmMmI5MTc5NDc3NjMxMTc0MDBmYzZkZjIxYmMyNTFkZTYzYjQ1Y2ZiOGNkMzBhYTEwNCJ9"
+        },
+        {
+          "resource": "repo://shared/scripts/record_findings.py#L217-L265",
+          "version": "repo-lines-v1:sha256:bfeb33323f13fe9042f17f7e88371947c2a44c68ecb975d45c045ff0d3b1e5d0:eyJzZWxlY3RlZExpbmVDb3VudCI6NDksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZmMDYwNTAxOWQ4OTMwZTAyZGI5NzU0YmY2OWJiYWI1MDAyNjcxM2RlNTMzYzg2MDU0MmEwYWZmMzgyYTNjNTEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhiMDU1ZjY4YjU5NWE3MjllYTM3YjNkZTFmODUxMzEyOGI3YjZkMjA3NWViMWZjNjYwM2FlOTgzNDZmMTNmYzciLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjRlNWQ2Zjc5MTVmMDI0MWY1ZDY2Njk3OTE4YTdmZGE0N2QwMjk2NmNjMmNhMDY4MjAxMmI4ZGM1OWQ3NjZiZTciLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjM1ZjhhZTZjNDY2MDZiM2E0MjI2ZmMzZGNiNGY0YTIxZWM5ODJkYjdmOThiN2NlZjc5ODI3ODlmMzhlODViOWUifQ"
+        },
+        {
+          "resource": "repo://shared/scripts/verify.py#L2428-L2475",
+          "version": "repo-lines-v1:sha256:75c04cff38564cd22c4b58a27a5ef7c3792b7d42d32ab42e3382f0ee9661a66a:eyJzZWxlY3RlZExpbmVDb3VudCI6NDgsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc1NzU1MTY2NDJhMzFiNDdhNzM3OGEwNGE5NTM2MWFiN2Y3ODYxZDJjOTUwMWY0Yjc2NDJkZWRhNjUwYTlkNGMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImFhMWNlOTY3ZTZlMmFhODBjMzMyYTZjMzJhMzkyMzI5MDA2Zjc4MWMyYjIyYjNjMjVkZDQxMGViYWRiMThhMWYiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEyZWEyZWYwNTkyYjg1NzYxMDQ2OTI4ZWMyYzZmNTNmZDZmN2E2OTY0MTMyM2IyZDBlZjE4YjZhY2Y4MDYwMjUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJiYjE0Zjc5YzRkZTgwNjQwYjZiZTgzZDJjOGY0NmQ0MjViNzYzMmQ1MDg4YzFjZWRmMDg1YzlmNjJhMjJhNDUifQ"
+        }
+      ]
     }
   ],
   "verification": {
     "by": "openwiki/0.5.2",
-    "at": "2026-10-06T09:13:17.144Z"
+    "at": "2026-10-17T10:05:00.756Z"
   }
 }

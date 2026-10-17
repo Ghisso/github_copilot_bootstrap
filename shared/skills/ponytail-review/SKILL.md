@@ -5,8 +5,10 @@ description: |
   Reviews a code diff exclusively for over-engineering and identifies what to
   delete or shrink: reinvented standard library, avoidable dependencies,
   speculative abstractions, dead flexibility, and unnecessary boilerplate.
-  Use after every coding task and whenever the user asks for a simplification
-  or over-engineering review. Complements correctness and security review.
+  Use after a coding task whose diff is control-plane or high-risk, multi-file,
+  dependency-, script-, or generator-related, or complexity-expanding, and
+  whenever the user asks for a simplification or over-engineering review.
+  Complements correctness and security review.
 license: MIT
 ---
 

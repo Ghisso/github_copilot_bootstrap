@@ -6,6 +6,8 @@ tags: [workflow, lifecycle, task-lanes, plans, closeout, verification, pause, ca
 sources:
   - id: openwiki-source-cdb6e91f0fa049994704c487
     resource: repo://scripts/validate_plan_frontmatter.py
+  - id: openwiki-source-fd43a5fc69056375b46b4386
+    resource: repo://shared/agents/reviewer/prompt.md
   - id: openwiki-source-6aab0600aa722da66b818111
     resource: repo://shared/hooks/scripts/enforce-branch-state.sh
   - id: openwiki-source-fdc3f9ee55dbca2819c00001
@@ -20,10 +22,10 @@ sources:
     resource: repo://shared/templates/plan-small.md
   - id: openwiki-source-a4eba4a0a79b0b185ca39ae9
     resource: repo://tests/test_validate_plan_frontmatter.py
-generated: { by: "claude-code", at: "2026-10-02T14:20:50.150Z" }
+generated: { by: "claude-code", at: "2026-10-17T10:05:00.756Z" }
 verified:
   - by: openwiki/0.5.2
-    at: 2026-10-02T14:20:50.150Z
+    at: 2026-10-17T10:05:00.756Z
 ---
 
 # Task lanes and the enforced lifecycle
@@ -72,7 +74,7 @@ flowchart LR
     C -->|fail| I
 ```
 
-- **PRE-FLIGHT and BRANCH.** Work starts from a clean `dev`; each big plan gets exactly one branch named `<plan_name>_implementation`. `enforce-branch-state.sh` denies a misnamed branch, a dirty or non-`dev` start, or a missing big plan with the wrong type or status. `record-branch-state.sh` then writes the branch metadata and flips the first `planned` phase to `in-progress`.
+- **PRE-FLIGHT and BRANCH.** Work starts from a clean `dev`; each big plan gets exactly one branch named `<plan_name>_implementation`. `enforce-branch-state.sh` denies a misnamed branch, a dirty or non-`dev` start, or a missing big plan with the wrong type or status, and then runs `validate_plan_frontmatter.py` on the big plan and its listed phase files, denying on any frontmatter or verification-contract error. `record-branch-state.sh` then writes the branch metadata and flips the first `planned` phase to `in-progress`.
 - **IMPLEMENT.** Delegated to `coder`, which applies the `ponytail` skill once in `full` mode. Policy text.
 - **VERIFY.** `verify.py fast` during implementation and `verify.py phase --persist` before review. The verifier is code.
 - **REVIEW.** Delegated to `reviewer` with profiles from the routing table; findings return as JSON and are not yet persisted. Policy text, but the commit gate later requires the persisted report.
@@ -88,7 +90,7 @@ The policy fixes eight steps because each reads what the previous one produced.
 1. **Documentation.** Update `README.md` and `docs/` for changed public behavior; on the big plan's last phase, also run the stale-claims audit.
 2. **Final AI state.** Small plan `status: complete` with `closeout_session_log` filled and steps ticked; big-plan phase ticked; `[LEARN]` entries or the no-lessons marker in the log and `MEMORY.md`.
 3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit`. The verifier refuses to run closeout while the big plan is not retrievable from nested Git.
-4. **Stage, findings, phase receipt, closeout dry run**, in one Bash command with no `git commit`: explicit `git add` of the intended files, a `disposition` and `reason` on every surviving MINOR, `record_findings.py` with one `--profile` per reviewed profile (including `ponytail` for any multi-file diff), `verify.py phase --persist`, then `verify.py closeout --format text`, whose summary lines go into the log with `**Status:** COMPLETED`.
+4. **Stage, findings, phase receipt, closeout dry run**, in one Bash command with no `git commit`: explicit `git add` of the intended files, a `disposition` and `reason` on every surviving MINOR, `record_findings.py` with one `--profile` per reviewed profile (every profile the changed paths require, including `ponytail` for any multi-file diff), the reviewer's `--gate-result`, and one `--open-request` per open request, `verify.py phase --persist`, then `verify.py closeout --format text`, whose summary lines go into the log with `**Status:** COMPLETED`.
 5. **Second nested checkpoint**, because the closeout receipt hashes the session log.
 6. **Closeout receipt.** `verify.py closeout --format json --persist`.
 7. **Commit**, in its own Bash command. The `post-commit` Git hook advances `current_phase` and publishes nested state.
@@ -105,7 +107,8 @@ The commit gate requires, for an ordinary commit on an implementation branch:
 
 - a passing closeout receipt whose `head_sha` and `tree_sha` match HEAD and the index;
 - a findings report for the same phase with `counts.critical == 0` and `counts.major == 0` and a disposition on every MINOR;
-- `ponytail_reviewed=true` in that report for a multi-file or high-risk diff;
+- every review profile the changed paths require in that report (test surfaces need `tests`; control-plane, generator, and dependency paths need `code`, `architecture`, `security`, `tests`, and `ponytail`; any multi-file diff needs `ponytail`);
+- at phase completion, the reviewer's recorded `gate_result` of `PASS` with no open request (the reviewer answers `FAIL` when a CRITICAL or MAJOR survives and `WARN` while a request is open);
 - the closeout session log with LEARN evidence;
 - a small plan whose frontmatter validates.
 
@@ -115,7 +118,7 @@ CRITICAL and MAJOR findings block the completion commit itself, not only the pus
 
 - A small plan's `## Verification` section holds fenced `bash` or `sh` blocks whose non-comment lines are required items. `verify.py closeout` runs them and records the results; the commit gate refuses a plan item without a result, a failed item, or an optional item without an outcome line.
 - `## Optional Verification` holds numbered bullets for anything conditional or interactive. Each needs `- optional <n>: PASS|FAIL|NOT RUN — <detail>` in the log.
-- At plan approval, `validate_plan_frontmatter.py` refuses a live plan (status `planned`, `in-progress`, or `paused`, dated on or after 2026-09-19) with no fenced block (`L1 verification-block-missing:`), hedged prose that makes a check conditional (`L2 hedged-verification:`), an item that cannot fail such as `|| true` (`L3 unfailable-verification:`), or an item that lists `verify.py closeout` (`L4 self-listed-closeout:`). Completed and cancelled plans are never re-judged.
+- When an implementation branch is created, and again at commit, `validate_plan_frontmatter.py` refuses a live plan (status `planned`, `in-progress`, or `paused`, dated on or after 2026-09-19) with no fenced block (`L1 verification-block-missing:`), hedged prose that makes a check conditional (`L2 hedged-verification:`), an item that cannot fail such as `|| true` (`L3 unfailable-verification:`), or an item that lists `verify.py closeout` (`L4 self-listed-closeout:`). Completed and cancelled plans are never re-judged.
 
 ## Pause and cancel
 

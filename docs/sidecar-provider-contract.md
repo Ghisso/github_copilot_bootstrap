@@ -674,6 +674,8 @@ field the bootstrap might ship?**
   `sandbox_mode`, `mcp_servers`, and `skills.config`" — an unsupported key's
   handling is not stated (`documented` for the allowed-keys list;
   undocumented for an unsupported one).
+
+  Errata 2026-10-17: Codex ignores per-agent `sandbox_mode` and `mcp_servers` in custom agent files; agents inherit them from the parent session. See [target-mapping](target-mapping.md#gate-repair-client-parity).
 - Copilot in VS Code and Antigravity: not found in today's fetch, carried
   over as undocumented from the existing skills section's answer to
   Question 5.

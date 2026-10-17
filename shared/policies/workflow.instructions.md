@@ -178,7 +178,7 @@ tracked outer-repository work. Do not run this branch merely because a gate
 failed. The checkpoint leaves the phase active; on resume, reopen that same
 small plan and run the full loop before its normal completion commit.
 
-**A passing `verify phase`/`verify closeout` receipt plus a matching findings report with `counts.critical == 0` and `counts.major == 0`, and an explicit disposition and non-empty reason on every surviving MINOR, is required before a normal completion commit; the same contract is re-checked across every completed phase at PR/push closeout. An intermediate commit while the phase is still in progress is not blocked merely because an unresolved MAJOR exists. An explicitly evidenced paused checkpoint follows its separate non-final path. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
+**A passing `verify phase`/`verify closeout` receipt plus a matching findings report with `counts.critical == 0` and `counts.major == 0`, and an explicit disposition and non-empty reason on every surviving MINOR, plus the reviewer's recorded `gate_result` of `PASS` with no open request and every review profile the changed paths require, is required before a normal completion commit; the same contract is re-checked across every completed phase at PR/push closeout. An intermediate commit while the phase is still in progress is not blocked merely because an unresolved MAJOR exists. An explicitly evidenced paused checkpoint follows its separate non-final path. When the conditional `ponytail` profile ran, its metadata is recorded; when it did not run, metadata is optional and legacy reports remain compatible. Ponytail findings use these ordinary severity gates; there is no separate zero-Ponytail gate.**
 
 ---
 
@@ -191,7 +191,7 @@ Do these steps in this order. Each step's position exists because the step after
 3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`. *Why here:* `verify closeout` refuses to run at all while the big plan's bytes are not retrievable from nested Git.
 4. **Stage, findings, phase receipt, closeout dry run.** In one Bash command that contains no `git commit`:
    - `git add` the intended outer files (never `git add -A`; never `openwiki/.run.json`) and inspect `git diff --cached`. *Why before findings:* the findings report records `dirty: true` when any tracked change is unstaged, and receipts bind `git write-tree` on the index.
-   - Give every surviving MINOR an explicit `disposition` and non-empty `reason`, then `record_findings.py . --findings-json - --phase <current_phase> --profile <name>... --out .claude/quality_reports/findings-<current_phase>.json`, one `--profile` per reviewed profile.
+   - Give every surviving MINOR an explicit `disposition` and non-empty `reason`, then `record_findings.py . --findings-json - --phase <current_phase> --profile <name>... --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json`, one `--profile` per reviewed profile, the reviewer's Gate Result as `--gate-result`, and one `--open-request` per open request. The recorder refuses `PASS` with an open request, and the commit gate accepts only `PASS` with no open request.
    - `uv run python .claude/scripts/verify.py phase --format json --persist`.
    - `uv run python .claude/scripts/verify.py closeout --format text` **without** `--persist`. It needs the findings report and the phase receipt to exist, runs the plan's required `## Verification` items, and prints one summary line per item. Paste those lines into the session log's `## Verification` section and set `**Status:** COMPLETED`. If any item is not `PASS`, return to IMPLEMENT.
 5. **Second nested checkpoint.** Same command as step 3. *Why here:* the closeout receipt hashes the session log, so the log must be final and checkpointed before the receipt exists. Findings and receipt files are not provenance-bound, so having them in this checkpoint is expected.
@@ -382,9 +382,12 @@ re-judged.
 
 ### Enforcement
 
-Three scripts enforce this contract, at three different times. At plan
-approval, `scripts/validate_plan_frontmatter.py` rejects the plan text
-itself. At phase closeout, `verify.py closeout` refuses to persist a
+Three scripts enforce this contract, at three different times.
+`scripts/validate_plan_frontmatter.py` rejects the plan text itself when an
+implementation branch is created and again at commit. The branch-creation
+hook checks only the big plan and the phase files it lists, so an unrelated
+draft cannot block the branch. The commit gate checks every plan file. At
+phase closeout, `verify.py closeout` refuses to persist a
 receipt whenever a required item is not `PASS`; this refusal has no message
 prefix, because it is `verify.py closeout`'s own ordinary failure path, not
 a named lint or gate rule. At commit, `verify.py gate` blocks the commit,
@@ -392,10 +395,10 @@ and only when the plan and the receipt have an `exact` head relation.
 
 | When | Script | Message prefix | Refuses when |
 |---|---|---|---|
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L1 verification-block-missing:` | the `## Verification` section has no `bash` or `sh` fenced block |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L2 hedged-verification:` | text matches a hedge pattern; the message quotes the matched text |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L3 unfailable-verification:` | a required item contains `\|\| true` or `\|\| :`, so it can never fail |
-| Plan approval | `scripts/validate_plan_frontmatter.py` | `L4 self-listed-closeout:` | a required item lists `verify.py closeout` |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L1 verification-block-missing:` | the `## Verification` section has no `bash` or `sh` fenced block |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L2 hedged-verification:` | text matches a hedge pattern; the message quotes the matched text |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L3 unfailable-verification:` | a required item contains `\|\| true` or `\|\| :`, so it can never fail |
+| Branch creation and commit | `scripts/validate_plan_frontmatter.py` | `L4 self-listed-closeout:` | a required item lists `verify.py closeout` |
 | Commit, `exact` relation only | `verify.py gate` | `G1 verification-results-missing:` | the receipt has no `extensions.verification_items` |
 | Commit, `exact` relation only | `verify.py gate` | `G2 verification-item-unrun:` | a required item in the plan has no result in the receipt |
 | Commit, `exact` relation only | `verify.py gate` | `G3 verification-item-failed:` | a recorded result's `status` is not `PASS` |
@@ -493,10 +496,10 @@ Entries` evidence requirement next to it.
 ```text
 [ ] On dev before branch creation
 [ ] Working tree clean before branch creation
-[ ] Big plan and current small plan saved under .claude/plans/
+[ ] Big plan and current small plan saved under .claude/plans/; the big plan and its listed phase files pass the plan checks (L1-L4)
 [ ] Task tracking reflects canonical workflow and current loop
 [ ] Verification passed (pytest + mypy + ruff via `verify phase`)
-[ ] Review passed; findings persisted via record_findings.py (including Ponytail metadata when the profile was required)
+[ ] Review passed with gate result PASS and no open request; findings persisted via record_findings.py with every profile the changed paths require (including Ponytail metadata when required)
 [ ] Docs updated or explicitly skipped as pure-internal
 [ ] Learn entries flushed or explicit no-lessons marker recorded
 [ ] Closeout session log has Status: COMPLETED
@@ -526,9 +529,9 @@ Some behaviors are automated by hooks. Others are still manual.
 **Automated via hooks:**
 - Protected file edits are denied.
 - Dangerous git commands are denied.
-- Implementation branch creation is gated on dev + clean tree + matching big plan.
-- Commit closeout is gated on small-plan completion, a passing `verify phase`/`verify closeout` receipt, a matching findings report with `counts.critical == 0` and `counts.major == 0` plus an explicit disposition and non-empty reason on every surviving MINOR, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
-- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. A normal completed-phase commit may also be pushed after post-commit advances `current_phase`, but only when its receipt and findings directly certify that exact commit; later in-progress work cannot publish under that authority. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and a valid historical receipt chain across every completed phase, each with `counts.critical == 0` and `counts.major == 0`.
+- Implementation branch creation is gated on dev + clean tree + matching big plan, and the big plan and the phase files it lists must pass the plan checks (L1-L4).
+- Commit closeout is gated on small-plan completion, a passing `verify phase`/`verify closeout` receipt, a matching findings report with `counts.critical == 0` and `counts.major == 0` plus an explicit disposition and non-empty reason on every surviving MINOR, the reviewer's recorded `gate_result` of `PASS` with no open request, every review profile the changed paths require, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
+- A valid paused checkpoint commit may be pushed as a remote backup while the big plan remains `in-progress` and the same phase remains current. A normal completed-phase commit may also be pushed after post-commit advances `current_phase`, but only when its receipt and findings directly certify that exact commit; later in-progress work cannot publish under that authority. PR creation and final push closeout are gated on every small plan being complete or fully evidenced as cancelled, at least one completed phase, one commit per completed phase, bypass acknowledgement, required Ponytail review evidence where applicable, and a valid historical receipt chain across every completed phase, each with `counts.critical == 0` and `counts.major == 0`. The recorded `gate_result` and required review profiles apply at these push gates to schema-2 findings reports only.
 - Session start/end events are logged to `.claude/session_logs/hooks-sessions.log`.
 - Session start pulls mutable AI state on the git-backed `ai-state` branch (`.claude/` is its own nested git repo; see `state-sync.sh`). Codex and Claude Stop each use one sequential log/check/checkpoint/publish wrapper; Codex returns JSON-only stdout and Claude emits no wrapper stdout. Both retry compatible `push` at `UserPromptSubmit` (60 seconds). Codex delayed SessionEnd and Claude StopFailure checkpoint locally only; Claude SessionEnd uses compatible `push` (60 seconds). Timeout or network failure preserves the local commit for retry; inspect `state-sync.sh status` and `.claude/session_logs/hooks-errors.log`. Closing a browser or editor tab is not a guaranteed lifecycle event, so do not rely on it for durability. The durable checkpoint-and-publish paths remain the `post-commit` git hook (after every outer-repo commit) and the explicit "AI state: push" VS Code task (manual, for state between commits).
 - After an actual install or update, Codex for VS Code may require renewed review of content/hash-bound `.codex/hooks.json`. Reopen/reload the repository and approve project hooks only when Codex prompts; installers report this boundary but never approve hooks or mutate user trust settings.

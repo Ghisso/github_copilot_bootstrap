@@ -10,7 +10,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 
 - Installed canonical guidance, skills, agents, hooks, templates, and mutable AI state live under `.claude/`.
 - Put repository-specific facts in `.claude/instructions/project-context.instructions.md`; preserve consumer-owned memory, plans, explorations, session logs, and quality reports during refreshes.
-- Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode for large outputs or compaction-safe continuity. Missing optional retrieval helpers are warnings, not hard failures.
+- Use direct reads for known files, `rg` for exact literals, Semble for semantic repository discovery, and context-mode (`ctx_index`, `ctx_search`) to index and search large content, with session continuity from its wired hooks. Missing optional retrieval helpers are warnings, not hard failures.
 - An optional OpenWiki knowledge layer, when `openwiki/INSTRUCTIONS.md` exists, is just-in-time repository context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per `.claude/skills/knowledge-refresh/SKILL.md`; never hand-edit a generated page or commit OpenWiki's own root snippet.
 - For every user-facing message, use clear, direct language with short sentences and common precise words. Avoid unnecessary jargon, buzzwords, and idioms. Define uncommon terms when needed, retain precise technical terms, and do not use `caveman full` with the user. Compact internal agent handoffs may still use `caveman full`. See `.claude/instructions/agent-reporting.instructions.md` for the complete policy.
 
@@ -30,7 +30,7 @@ This is the entrypoint for a reusable multi-agent bootstrap for Python AI engine
 - Before non-trivial work, read `.claude/MEMORY.md`, save the approved plan under `.claude/plans/`, and create one `<plan_name>_implementation` branch from a clean `dev` branch.
 - Load `.claude/skills/ponytail/SKILL.md` in `full` mode before every coding task. Search and reuse before adding code.
 - Run VERIFY with the canonical checks, then profile-driven review until clean. CLOSEOUT updates required documentation, persists findings, records learning and the completed session log, then runs the closeout checks.
-- Commit each completed small plan only after `verify phase` reports PASS, critical findings are zero, required Ponytail review evidence is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
+- Commit each completed small plan only after `verify phase` reports PASS, critical and major findings are zero, the recorded review gate result is `PASS` with no open request, every review profile the changed paths require is present, reusable lessons are recorded in `.claude/MEMORY.md`, and the closeout session log is complete. Ponytail findings follow the ordinary severity gates.
 - After every successful outer-repository commit, the orchestrator attempts one normal non-force push: use the branch upstream when configured, otherwise `origin`; set `GIT_TERMINAL_PROMPT=0`. A missing remote or authentication/network failure is a warning that preserves the local commit. This does not apply to nested `.claude` AI-state sync, PR creation, or merges. The user owns PR and merge decisions.
 
 ## Exact Commands
@@ -64,7 +64,7 @@ Use `uv run` for project Python entrypoints and tooling; never substitute bare `
 ## Safety And Control Plane
 
 - Keep hook guardrails enabled. Never hand-edit `.env*`, private keys, credentials, secret-bearing files, or `uv.lock`; never run destructive Git commands such as force-push, hard reset, or cleaning untracked files without explicit safe authorization.
-- Control-plane files include root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, `.mcp.json`, and `.devcontainer/`. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
+- Control-plane files include root guidance, `.claude/hooks/`, `.github/hooks/`, `.claude/settings.json`, `.mcp.json`, `.vscode/mcp.json`, and `.devcontainer/`. They require a full plan and `code`, `architecture`, `security`, `tests`, and `ponytail` review profiles.
 - Keep `.claude/` as the canonical runtime basis. Bootstrap maintainers own authoring and regeneration; consumers should customize only their project context and consumer-owned state.
 
 ## Map

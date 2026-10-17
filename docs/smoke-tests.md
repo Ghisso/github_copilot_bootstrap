@@ -114,10 +114,12 @@ Expected:
 
 Expected:
 
-- GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`).
+- Generated GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`). This repository's tracked root adapters (`.mcp.json`, `.vscode/mcp.json`) carry `semble` and the guarded `context-mode` (and `openwiki` in `.mcp.json`), but not `context7`.
 - Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context7]`, and `[mcp_servers.context-mode]`, all three targets sharing the same dispatcher route.
 - Antigravity `.agents/mcp_config.json` uses the same canonical server registry.
-  Its presence is structural evidence only; an optional local server that is
+  Its presence is structural evidence only: the Antigravity bridge denies MCP
+  tool calls and subagent MCP access is unverified (see the
+  [parity section](target-mapping.md#gate-repair-client-parity)). An optional local server that is
   unavailable follows the normal fallback behavior.
 - The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`; every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
 - Tool-routing policy preserves:
@@ -206,7 +208,9 @@ Expected:
 - `pretool-bash-guard.sh` runs protected-file, dangerous-Git, branch, commit, then PR guards in that exact order and returns the first safety decision. A guard failure or malformed safety output fails closed.
 - The branch, commit, and push guards stand down for an invocation that carries an explicit `-C <dir>`, `--git-dir <dir>`, or `--work-tree <dir>` redirect resolving to a repository other than this checkout, so `git -C <dir> switch -c`, `git -C <dir> commit`, and `git -C <dir> push` are the supported ways to act on another repository from here. An undeterminable redirect, an unresolvable target, or a `cd` into another directory beforehand keeps the full gate. `gh pr create` is never scoped this way: it is always checked against this checkout, whatever repository `-R` names, because comparing remote URLs to decide otherwise could wrongly let a real pull request skip this repository's closeout ceremony. `git branch foo`, which creates a branch without switching to it, is not covered by the branch guard at all, unchanged.
 - Hook config edits through native tools, Bash redirection, or in-place edits are protected, with Codex denying and Claude asking for approval. Missing redirect targets and ambiguous commands fail closed.
-- Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation.
+- Copilot terminal calls (`run_in_terminal` and `send_to_terminal` in VS Code's Local harness) go through the same shell guards as Bash: protected-file analysis and the branch, commit, and PR gates. Copilot's read-only tools (`read_file`, `view_image`, `list_dir`, `file_search`, `grep_search`, `semantic_search`, and in the Copilot SDK harness `view`, `grep`, `rg`, `glob`) may read the protected hook and server configs without a prompt. Secret-shaped files (`.env*`, `uv.lock`, `credentials*`, `*.pem`, `*.key`) stay denied for read tools, and edit tools still ask.
+- The protected hook and server configs include `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json` (it holds the Copilot hook switches `chat.useHooks`, `chat.hookFilesLocations`, and `chat.useClaudeHooks`), `.github/copilot/settings.json`, and `.github/copilot/settings.local.json` (`disableAllHooks`, inline `hooks`). An agent edit of any of them asks on Claude and Copilot and is denied on Codex and Antigravity, so this includes an ordinary `.vscode/settings.json` edit. Besides edits, any command that is not on the guard's read-only list and merely names one of these files is denied on all four clients (the existing prose-literal floor), including `ls`, `jq`, `test -f`, `git add <file>`, and a PR body passed inline to `gh pr create --body "..."`. Inspect these files with `cat` or the native read tool; stage with `git add -u` or a path that does not name the file; write PR text with the native Write tool and pass it with `--body-file`.
+- Wildcard context-mode observability is separate from the safety lane and makes no safety decision or mutation. The dispatcher enforces this: it pipes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`, which forwards only `hookSpecificOutput.hookEventName` and `additionalContext`, strips the advice blocks, drops the whole field if it still names a non-allowlisted `ctx_` or plugin-prefixed tool, and never forwards a decision (`deny`, `ask`, `allow`) or an input rewrite (`updatedInput`, `tool_input`). Hook modes always exit 0.
 - Hook configs invoke `.claude/hooks/scripts/` and pass an explicit target id.
 - Generated `run-hook.sh` is executable because Claude and Codex hook commands call it directly.
 - Generated `.agents/hooks.json` contains only the named `bootstrap-safety` configuration and one catch-all `PreToolUse` matcher (`*`). It calls the direct Python 3.9 standard-library `antigravity-pretool.py` bridge; this is intentionally the only provider hook that does not call `run-hook.sh`.
@@ -261,7 +265,8 @@ It does not prove model tier or the formal automatic escalation contract.
 tier proof, bounded Flash-only task, skill discovery or use, specialist MCP,
 or PreToolUse hard-deny execution was completed. This remains an external
 acceptance gap/blocker.
-- Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms.
+- Branch creation is allowed only from clean `dev` into `<plan_name>_implementation`, including `checkout -b`/`-B` and `switch -c`/`-C`/`--create`/`--create=<branch>` forms. Creating an implementation branch also runs the plan-frontmatter validator on the big plan and its listed phase files, and denies with the first errors; an unrelated draft plan does not block.
+- The `run-tests` and `add-dependency` deprecation checks keep pytest's exit status, and `scripts/validate_targets.py` rejects shipped `pytest`, `mypy`, `ruff`, or `verify.py` lines that end in `|| true`, `|| :`, or `|| echo`.
 - Normal commits are blocked until the current small plan is complete, the session closeout log is completed, `[LEARN]` evidence exists, and a fresh findings report matches the branch, phase, base ref, merge-base SHA, HEAD SHA, target, dirty flag, and changed-files metadata.
 - Native `post-commit` closeout derives state from the created `HEAD`, advances only one eligible completed phase, and runs before AI-state synchronization.
 - PR creation uses `--base dev`. The orchestrator attempts one normal non-force outer-repository push after every successful commit, using the branch upstream or `origin`; missing remote configuration and authentication/network failures warn and preserve the local commit. PRs and merges remain user-requested.
@@ -308,8 +313,10 @@ acceptance gap/blocker.
 - Completed gates use only the exact findings path and SHA-256 hash recorded by the final closeout receipt; an extra newer or lexically-later report cannot replace it.
 - A findings report with `counts.critical == 0` but `counts.major > 0` blocks the phase-completion commit, naming a `MAJOR` finding. It does not block an intermediate commit made while the small plan is still `in-progress`.
 - A surviving `MINOR` finding without an explicit `disposition`, or with an empty `reason`, blocks the phase-completion commit.
+- With `core.hooksPath` set to the generated `git-hooks` directory, a findings report recorded with `--gate-result WARN` is denied by the `commit-msg` hook on the phase-completion commit.
+- With the same hook configuration, a diff that includes a test file is denied when its findings report lacks the `tests` profile.
 - A findings report generated pre-commit (its `head_sha` is the completion commit's parent) satisfies an intermediate completed-phase push only when it directly certifies that one commit. At final closeout, `pre-push` accepts an ancestor of the pushed commit rather than requiring an exact match.
-- All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.
+- All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push only when the report also has `gate_result: PASS`, no open request, and every review profile its changed paths require. A zero-count report with a missing `gate_result`, a `WARN` or `FAIL` result, an open request, or a missing required profile is blocked; the push gates apply these checks only to reports with `schema_version >= 2`.
 
 ## Devcontainer And Git-Backed State Sync
 

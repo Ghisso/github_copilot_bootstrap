@@ -1,0 +1,19 @@
+{
+  "client_id": "openai-codex",
+  "event": "pretooluse",
+  "case": "ctx-execute",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-openai-codex",
+    "cwd": "<TMP>/repo",
+    "tool_name": "mcp__context-mode__ctx_execute",
+    "tool_input": {
+      "language": "shell",
+      "code": "ls"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\"}}\n",
+  "stderr_tail": []
+}
