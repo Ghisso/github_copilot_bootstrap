@@ -1317,9 +1317,13 @@ assert_completed_receipt() {
 # stdlib-only validator - the same authoritative source the authoring repo
 # uses, so consumers no longer get a weaker partial bash-only schema check.
 # Runs unconditionally (before the paused/complete/cancelled dispatch below)
-# so a paused checkpoint commit is still covered.
+# so a paused checkpoint commit is still covered. Optional extra arguments are
+# plan paths relative to the repository root; with none, every plan file is
+# checked. The branch-creation gate passes only its own plan files, so an
+# unrelated draft cannot block the branch.
 assert_plan_frontmatter() {
   local repo_root="$1"
+  shift
   local validator="$repo_root/.claude/scripts/validate_plan_frontmatter.py"
   if [[ ! -f "$validator" ]]; then
     failures+=("missing plan-frontmatter validator: .claude/scripts/validate_plan_frontmatter.py")
@@ -1330,7 +1334,7 @@ assert_plan_frontmatter() {
     return
   fi
   local output status=0
-  output="$(cd "$repo_root" && python3 "$validator" 2>&1)" || status=$?
+  output="$(cd "$repo_root" && python3 "$validator" "$@" 2>&1)" || status=$?
   if [[ "$status" -ne 0 ]]; then
     local line
     while IFS= read -r line; do

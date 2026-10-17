@@ -12,11 +12,28 @@ import shlex
 import sys
 
 
+# Repository files that run, disable, or redirect hooks or server commands.
+# `PROTECTED_PATH_LITERAL` below is built from this set, so a name added here
+# is also found in Bash text.
 HOOK_CONFIGS = {
     ".github/hooks/hooks.json",
     ".claude/settings.json",
+    # Claude local settings can add hooks or turn them off.
+    ".claude/settings.local.json",
     ".codex/config.toml",
     ".codex/hooks.json",
+    # Antigravity's only hook config.
+    ".agents/hooks.json",
+    # MCP configs launch server commands.
+    ".mcp.json",
+    ".vscode/mcp.json",
+    ".agents/mcp_config.json",
+    # VS Code workspace settings (`chat.useHooks`, `chat.hookFilesLocations`,
+    # `chat.useClaudeHooks`) and Copilot settings (`disableAllHooks`, inline
+    # `hooks`) can turn hooks off or move them.
+    ".vscode/settings.json",
+    ".github/copilot/settings.json",
+    ".github/copilot/settings.local.json",
 }
 PATH_KEYS = {
     "path",
@@ -77,7 +94,7 @@ QUOTED_VARIABLE_MARKER = re.compile(
 # or following identifier character (letter, digit, `_`, `.`, `-`), so
 # `os.environ` no longer yields `.env` and `myuv.lock` no longer yields
 # `uv.lock`, while `.env.local` and `foo/.env.production` still match in
-# full. The three control-plane alternatives (hooks-dir paths and the
+# full. The two control-plane alternatives (hooks-dir paths and the
 # `HOOK_CONFIGS` filenames) additionally capture the **whole** path token
 # via an explicit, optional `(?:[^\s'\"]*/)?` directory-prefix group, rather
 # than only the fixed repository-relative-looking tail: `/tmp/scratch/
@@ -90,8 +107,9 @@ PROTECTED_PATH_LITERAL = re.compile(
     r"(?<![\w.-])credentials[-_.][\w.-]+|"
     r"[^\s/'\"]+\.(?:pem|key)(?![\w.-])|"
     r"(?<![\w./-])(?:[^\s'\"]*/)?(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?\.claude/settings\.json|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?\.codex/(?:config\.toml|hooks\.json))",
+    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
+    + "|".join(map(re.escape, sorted(HOOK_CONFIGS)))
+    + r"))",
     re.IGNORECASE,
 )
 OPAQUE_WRITE_PATH = re.compile(

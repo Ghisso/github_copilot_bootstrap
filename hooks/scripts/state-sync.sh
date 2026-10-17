@@ -124,6 +124,47 @@ untrack_error_log() {
   git -C "$CLAUDE_DIR" rm -f -q --cached --ignore-unmatch -- session_logs/hooks-errors.log
 }
 
+untrack_local_settings() {
+  # `settings.local.json` is machine-local: Claude Code writes permission
+  # approvals there, and it can add or turn off hooks, so it must never sync
+  # (see write_nested_gitignore). Upgraded nested repositories may already
+  # track it. Remove only its index entry; the local file on disk is untouched.
+  git -C "$CLAUDE_DIR" rm -f -q --cached --ignore-unmatch -- settings.local.json
+}
+
+# Git may delete or overwrite the ignored, untracked settings.local.json while
+# a merge or rebase moves between trees that track it and trees that do not
+# (a remote that still tracks it, or an unpushed local commit that touched it).
+# Losing it was unrecoverable once, so keep a byte copy under .git/ while git
+# runs and put it back if the working file changed or disappeared.
+LOCAL_SETTINGS_BACKUP=""
+
+preserve_local_settings() {
+  LOCAL_SETTINGS_BACKUP=""
+  local file="$CLAUDE_DIR/settings.local.json" backup
+  [[ -f "$file" ]] || return 0
+  backup="$(mktemp "$CLAUDE_DIR/.git/settings.local.json.XXXXXX")" || return 1
+  if ! cp -p "$file" "$backup"; then
+    rm -f "$backup"
+    return 1
+  fi
+  LOCAL_SETTINGS_BACKUP="$backup"
+}
+
+restore_local_settings() {
+  local backup="$LOCAL_SETTINGS_BACKUP" file="$CLAUDE_DIR/settings.local.json"
+  [[ -n "$backup" ]] || return 0
+  LOCAL_SETTINGS_BACKUP=""
+  if ! cmp -s "$backup" "$file"; then
+    if ! cp -p "$backup" "$file"; then
+      warn "could not restore local settings.local.json after reconciliation; its bytes are kept at $backup."
+      return 1
+    fi
+    warn "restored local settings.local.json, which git replaced during reconciliation."
+  fi
+  rm -f "$backup"
+}
+
 # Multi-writer conflict policy (big plan: state-sync-durability). Append-only
 # machine logs auto-reconcile via git's built-in `union` merge driver, so two
 # sessions writing separate lines never conflict during rebase. Narrative
@@ -180,6 +221,9 @@ commit_local_state() {
     return 1
   fi
   if ! untrack_error_log; then
+    return 1
+  fi
+  if ! untrack_local_settings; then
     return 1
   fi
   if ! git -C "$CLAUDE_DIR" add -A; then
@@ -414,6 +458,10 @@ reconcile_committed_state() {
   fi
 
   if ! git -C "$CLAUDE_DIR" merge-base HEAD "origin/$BRANCH" >/dev/null 2>&1; then
+    if ! preserve_local_settings; then
+      warn "could not keep a copy of local settings.local.json; merge with origin/$BRANCH skipped and will retry on the next sync."
+      return 1
+    fi
     set +e
     output="$(git -C "$CLAUDE_DIR" merge -q --allow-unrelated-histories -m "bootstrap: merge existing ai-state" "origin/$BRANCH" 2>&1)"
     status=$?
@@ -421,8 +469,12 @@ reconcile_committed_state() {
     if [[ $status -ne 0 ]]; then
       conflicts="$(git -C "$CLAUDE_DIR" diff --name-only --diff-filter=U 2>/dev/null || true)"
       git -C "$CLAUDE_DIR" merge --abort 2>/dev/null || true
+      restore_local_settings || true
       append_error_output "$output"
       warn "local .claude/ content conflicts with origin/$BRANCH and could not be merged automatically. Conflicting file(s): ${conflicts:-see $ERROR_LOG}. Resolve manually: cd $CLAUDE_DIR && git merge --allow-unrelated-histories origin/$BRANCH, fix conflicts, commit, then git push origin $BRANCH."
+      return 1
+    fi
+    if ! restore_local_settings; then
       return 1
     fi
     if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then
@@ -446,6 +498,10 @@ reconcile_committed_state() {
     return 1
   fi
 
+  if ! preserve_local_settings; then
+    warn "could not keep a copy of local settings.local.json; pull from origin/$BRANCH skipped and will retry on the next sync."
+    return 1
+  fi
   set +e
   # Git's autostash mode writes rebase metadata before discovering renewed log
   # churn; without it, this residual race fails cleanly and retries next sync.
@@ -460,8 +516,12 @@ reconcile_committed_state() {
         warn "leftover rebase state from a failed reconciliation could not be cleared. Resolve manually: git -C $CLAUDE_DIR rebase --quit"
       fi
     fi
+    restore_local_settings || true
     warn "reconciliation with origin/$BRANCH failed; local state left untouched. Conflicting file(s): ${conflicts:-see output below}. Resolve manually: cd $CLAUDE_DIR && git pull --rebase origin $BRANCH, fix conflicts, git add <files>, git rebase --continue, then git push origin $BRANCH."
     printf '%s\n' "$output" >&2
+    return 1
+  fi
+  if ! restore_local_settings; then
     return 1
   fi
   if ! commit_local_state "maintenance: remove derived context cache from ai-state"; then

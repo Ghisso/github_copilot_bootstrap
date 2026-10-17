@@ -43,12 +43,18 @@ uv run pytest tests/ -q
 
 ## Step 5: Check for Issues
 ```bash
-# Check for deprecation warnings
-uv run pytest tests/ -W default::DeprecationWarning 2>&1 | grep -i deprecat || echo "Clean"
+# Check for deprecation warnings (keeps pytest's own exit status)
+output="$(uv run pytest tests/ -W default::DeprecationWarning 2>&1)"
+status=$?
+printf '%s\n' "$output" | grep -i deprecat || echo "No deprecation warnings"
 
 # Verify import works
-uv run python -c "import [package]; print('Import OK')"
+uv run python -c "import [package]; print('Import OK')" || status=1
+
+exit "$status"
 ```
+Show the deprecation lines, or "No deprecation warnings". A failing test run or
+a failing import must stay a failure.
 
 ## Step 6: Report
 ```
