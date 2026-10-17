@@ -8,7 +8,46 @@ const ALLOWED_TOOLS = new Set(["ctx_index", "ctx_search", "ctx_stats", "ctx_doct
 const INDEX_ARGS = new Set(["content", "path", "source"]);
 const MAX_SOURCE_LENGTH = 200;
 const MAX_PENDING_LIST_IDS = 256;
+// Advice blocks observed in upstream 1.0.169 hook output. Restored session
+// data (the session_guide inside session_knowledge) is not advice and is kept.
+const ADVICE_TAGS = ["context_window_protection", "context_guidance", "session_search"];
+const ADVICE_BLOCKS = ADVICE_TAGS.map(
+  (tag) => new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}\\s*>`, "g"),
+);
+const PLUGIN_PREFIX = "mcp__plugin_context-mode_";
+
+// Hook-output mode: reads one upstream hook stdout on stdin and prints a new
+// advisory-only hook object, or nothing. Only the event name and the filtered
+// additionalContext are ever copied; every decision, input rewrite, and other
+// field upstream returns is dropped by construction (GR-007).
+function sanitizeHookOutput(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return "";
+  }
+  const specific = parsed?.hookSpecificOutput;
+  if (!specific || typeof specific !== "object") return "";
+  const { hookEventName, additionalContext } = specific;
+  if (typeof hookEventName !== "string" || typeof additionalContext !== "string") return "";
+  const text = ADVICE_BLOCKS.reduce((rest, block) => rest.replace(block, ""), additionalContext);
+  const names = text.match(/ctx_[A-Za-z0-9_]+/g) ?? [];
+  if (text.includes(PLUGIN_PREFIX) || names.some((name) => !ALLOWED_TOOLS.has(name))) return "";
+  if (!text.trim()) return "";
+  return `${JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext: text } })}\n`;
+}
+
 const argv = process.argv.slice(2);
+if (argv[0] === "--hook-output") {
+  let raw = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) raw += chunk;
+  const output = sanitizeHookOutput(raw);
+  // Exit here so the MCP proxy below never starts in this mode.
+  if (output) await new Promise((resolve) => process.stdout.write(output, resolve));
+  process.exit(0);
+}
 const separator = argv.indexOf("--");
 if (separator < 0 || separator === argv.length - 1) {
   process.stderr.write("context-mode-filter: missing upstream command\n");
