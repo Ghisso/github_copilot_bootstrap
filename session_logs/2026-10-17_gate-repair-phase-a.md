@@ -52,6 +52,14 @@ tests (GR-003), and post-closeout drift (GR-004).
   `validate_targets.py` PASS afterwards. Diff sent to a fresh reviewer with
   profiles code, architecture, security, tests, ponytail, documentation.
 
+- **05:50** - Review round 1: Gate Result `PASS`, no CRITICAL or MAJOR, six
+  MINOR (malformed-schema test values; reviewer prompt MINOR wording;
+  upgrade notes and refresh-gate table; policy profile-rule precision;
+  smoke-tests bullet; a comment's character count). All six sent back for
+  fixing (FIX LOOP) rather than dispositioned: coder for test, prompt,
+  policy, comment; documenter for README, runtime-checks, smoke-tests.
+  Reviewer confirmed no push or PR path re-judges a pre-upgrade phase.
+
 ## [LEARN] Entries
 
 ## Verification
