@@ -53,6 +53,29 @@ remove the stale agent schema (GR-011).
     hooks (add-only; most restrictive wins); `*.code-workspace` (unverified).
     Sent to the coder as an addition to step 1.
 
+- **12:10** - Coder finished steps 1, 2, 4, 5, 6 (plus the three Copilot
+  hook-switch files). `PROTECTED_PATH_LITERAL` is now built from
+  `HOOK_CONFIGS`. State-sync preserves `settings.local.json` around pulls and
+  unrelated-history merges (the deletion path needed an unpushed tracking
+  commit or a merge to be reached; both tested with controls). Branch gate
+  validates the big plan plus its listed phase files. Negative controls
+  failed as expected for every guard. Accepted: a listed phase without a
+  file is skipped at branch creation (matches the commit gate); an upgraded
+  nested `.gitignore` without the `settings.local.json` line could re-track
+  it (the template always had it). Recorded follow-up, not fixed: shell
+  guards parse the Claude-compatible payload VS Code sends, not the Copilot
+  CLI shape (`toolName` + `toolArgs` string); Copilot CLI is unsupported per
+  `docs/runtime-checks.md:170`.
+- **12:20** - Self-install; `check_runtime.py` PASS. Ran the installed
+  `state-sync.sh checkpoint`: the nested repository no longer tracks
+  `settings.local.json` (commit `3315617`), and the file's Git object hash
+  is unchanged (`1af9b5fb38cf…`) before and after. The new protection now
+  applies to the orchestrator too (a compound command naming the file was
+  refused). `verify.py phase` PASS (pytest 2688 passed, 1 skipped).
+  Documenter updated `docs/smoke-tests.md`, `docs/target-mapping.md`,
+  `docs/runtime-checks.md`, and `README.md`; one stale README intro count
+  sent back.
+
 ## [LEARN] Entries
 
 ## Verification
