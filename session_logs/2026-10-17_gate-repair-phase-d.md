@@ -111,6 +111,25 @@ remove the stale agent schema (GR-011).
   terminal tool name reaches them is unknown in this repository. Research
   agent asked for the documented VS Code hook `tool_name` values.
 
+- **14:20** - VS Code tool-name research (WebFetch of the hooks pages, last
+  updated 10/14/2026; raw sources microsoft/vscode-docs
+  `adb70b57fc27a9a6b9f6d99ef2f1eceb7d9bad8d` and microsoft/vscode
+  `9a59550fc841805ebb44cfd5a09b92beed591d15`): Local-harness hooks receive
+  the model-facing tool name with an object `tool_input`; terminal is
+  `run_in_terminal` (`command`), plus `send_to_terminal`; reads are
+  `read_file`, `view_image`, `list_dir`, `file_search`, `grep_search`,
+  `semantic_search`; edits use case-variant path keys already matched.
+  Copilot SDK harness names: `bash`/`powershell`, `view`, `grep`, `rg`,
+  `glob`; its file-hook key casing is not established. Consequence: Copilot
+  terminal commands skipped every shell guard (commit, branch, PR,
+  git-protection, protected-file shell analysis). Recorded a scope change in
+  the big plan (within approved goals: GR-008/GR-009 were false for
+  Copilot) and sent the fix to the coder: recognize `run_in_terminal` and
+  `send_to_terminal`; exempt the listed read-only tools from the
+  protected-file path check. The SDK harness and Copilot CLI key casing
+  stay a follow-up. Documenter fixed the warning count (lead-in without a
+  count; informational "restored …" bullet added).
+
 ## [LEARN] Entries
 
 ## Verification

@@ -305,6 +305,29 @@ extra-high effort, devils-advocate skill). Outcome:
   consumers mid-plan.
 - Plan approved by the user on 2026-10-17 with these decisions.
 
+### Scope-change records
+
+- **2026-10-17, Phase D (orchestrator, within approved goals):** VS Code's
+  Local harness sends the terminal tool as `run_in_terminal` (and
+  `send_to_terminal`) with `tool_input.command`, and reads as `read_file`,
+  `view_image`, `list_dir`, `file_search`, `grep_search`, `semantic_search`
+  (microsoft/vscode `9a59550fc841805ebb44cfd5a09b92beed591d15`:
+  `chatHookService.ts`, `toolCalling.tsx`, `toolsService.ts`,
+  `terminalToolIds.ts`; hooks reference at
+  https://code.visualstudio.com/docs/agents/reference/hooks-reference).
+  The shell guards recognized only names containing `bash`/`shell` or equal
+  to `execute`, so Copilot terminal commands skipped the commit, branch,
+  PR, git-protection, and protected-file shell checks, and Copilot native
+  reads of protected configs asked for approval. Phase D therefore also
+  recognizes `run_in_terminal` and `send_to_terminal` as terminal commands
+  in the shared shell guards and `protect-files.py`, and exempts the listed
+  Local read-only tools (and the Copilot-harness read tools `view`, `grep`,
+  `rg`, `glob`) from the protected-file path check. Without this, GR-008 and
+  GR-009 are false for GitHub Copilot. Not changed: the Copilot SDK harness
+  and Copilot CLI payload key casing (`toolName`/`toolArgs`) is not
+  established from allowed sources; recorded as a follow-up. Reported to
+  the user at the Phase D boundary.
+
 ## Verification
 
 ```bash
