@@ -67,6 +67,14 @@ tests (GR-003), and post-closeout drift (GR-004).
   `verify.py phase` PASS (pytest 2378 passed). Fresh reviewer (round 2) on
   the full 15-file diff.
 
+- **06:20** - Review round 2: all six round-1 fixes confirmed. Gate Result
+  `WARN`: one open request (negative-control evidence for the new
+  installed-hook smoke cases and the GR-004 test, which the round-2 packet
+  omitted) and two MINOR documentation findings (a README link into the
+  gitignored `.claude/`; "phase diff" should say branch diff from the
+  merge-base). Doc fixes sent to the documenter; the open request will be
+  answered with the coder's round-1 negative-control results.
+
 ## [LEARN] Entries
 
 ## Verification
