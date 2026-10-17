@@ -92,6 +92,17 @@ no native client.
   Fresh reviewer started with the full evidence packet, including negative
   controls (lesson from Phase A round 2).
 
+- **08:00** - Review round 1: Gate Result `PASS`, no CRITICAL or MAJOR, five
+  MINOR (real-binary test could pass vacuously; unclosed/nested/cased tag
+  limit undocumented and one smoke-tests sentence inaccurate; re-capture
+  rule had no committed procedure or pin tie; `hookEventName` unchecked; no
+  test for advice forwarded after a nonzero exit). Reviewer probed leak
+  shapes (arrays, `__proto__`, non-string fields, BOM, split names) and found
+  none; fixtures hold no private data (about 56 KB of content). All five
+  sent back for fixing: coder (tests, capture script committed as
+  `tests/fixtures/context_mode_hook/capture.py`, pin-tie test, event-name
+  check), documenter (limits, wording, procedure pointer).
+
 ## [LEARN] Entries
 
 ## Verification
