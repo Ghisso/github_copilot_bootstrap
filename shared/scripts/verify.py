@@ -99,7 +99,7 @@ CONTROL_PLANE_PREFIXES = (
     ".github/",
     ".devcontainer/",
 )
-CONTROL_PLANE_FILES = {"AGENTS.md", "CLAUDE.md", ".mcp.json"}
+CONTROL_PLANE_FILES = {"AGENTS.md", "CLAUDE.md", ".mcp.json", ".vscode/mcp.json"}
 # OpenWiki managed-state backstop (Phase G, Step G2): the same marker
 # openwiki-guard.py restores on "post"; a live block here means openwiki_begin
 # ran without the guard cleaning up after it.
@@ -122,6 +122,9 @@ DEPENDENCY_FILES = {
     "uv.lock",
     "yarn.lock",
 }
+HIGH_RISK_REVIEW_PROFILES = frozenset(
+    {"code", "architecture", "security", "tests", "ponytail"}
+)
 AUTHORING_RUNTIME_MARKERS = (
     "shared/scripts/verify.py",
     "shared/policies/workspace.instructions.md",
@@ -740,6 +743,34 @@ def classify_path(path: str) -> str:
 def scoped_paths(paths: list[str]) -> list[str]:
     """Select evidence-relevant paths; ordinary documentation stays reusable."""
     return [path for path in paths if classify_path(path) != "documentation-only"]
+
+
+def required_review_profiles(paths: list[str]) -> frozenset[str]:
+    """Return the review profiles the changed paths require.
+
+    Test surfaces are checked first and require only ``tests``. Control-plane,
+    generator, and dependency paths require the full high-risk set. Anything
+    else, including documentation, requires none; the multi-file Ponytail rule
+    is applied separately by the commit and push gates.
+    """
+    required: set[str] = set()
+    for path in paths:
+        name = Path(path).name
+        if (
+            path.startswith("tests/")
+            or (name.startswith("test_") and name.endswith(".py"))
+            or name.endswith("_test.py")
+            or name == "conftest.py"
+        ):
+            required.add("tests")
+        elif (
+            classify_path(path) in {"control-plane", "generator"}
+            or name in DEPENDENCY_FILES
+            or name == "pyproject.toml"
+            or (name.startswith("requirements") and name.endswith((".txt", ".in")))
+        ):
+            required |= HIGH_RISK_REVIEW_PROFILES
+    return frozenset(required)
 
 
 def existing_paths(root: Path, paths: list[str]) -> list[str]:
@@ -1704,6 +1735,8 @@ def state_metadata(
         "merge_base_sha": merge_base,
         "tree_sha": git_output(["write-tree"], root),
         "content_hash": hash_paths(root, relevant),
+        # Informational only: the gates never compare this value. ``tree_sha``
+        # (git write-tree) is the binding check for staged changes.
         "tracked_state_hash": hash_paths(root, paths),
         "changed_paths": paths,
         "relevant_paths": relevant,
@@ -2164,6 +2197,7 @@ def gate_receipt_errors(
                 root=root,
                 require_major=require_major,
                 require_ponytail=require_ponytail,
+                required_profiles=required_review_profiles(metadata["changed_paths"]),
                 verify_current_content=(
                     enforce_final_state or head_relation == "certified"
                 ),
@@ -2236,6 +2270,7 @@ def report_errors(
     require_major: bool,
     require_ponytail: bool,
     verify_current_content: bool,
+    required_profiles: frozenset[str] = frozenset(),
 ) -> list[str]:
     """Validate the findings report without provider-specific policy.
 
@@ -2244,6 +2279,11 @@ def report_errors(
     explicit, non-empty ``disposition``/``reason`` pair. Intermediate,
     non-completion validation passes ``require_major=False`` and skips both
     checks; the gate never asserts the disposition is *true*, only present.
+
+    The reviewer's ``gate_result`` (completion only) and the profiles in
+    ``required_profiles`` apply at the commit gate (``exact``) always, and at
+    the push gates only to ``schema_version >= 2`` reports, so phases recorded
+    before the upgrade are never re-judged. Both remain recorded claims.
     """
     label = "findings report"
     try:
@@ -2385,9 +2425,51 @@ def report_errors(
             errors.append("Ponytail finding count does not match findings")
     elif ponytail_reviewed is not None or ponytail_findings is not None:
         errors.append("unselected Ponytail review must omit Ponytail metadata")
-    if require_ponytail and not ponytail_selected:
-        errors.append("this high-risk diff requires a fresh Ponytail review")
+    schema_version = report.get("schema_version", 1)
+    gate_evidence_applies = head_relation == "exact" or not (
+        type(schema_version) is int and schema_version < 2
+    )
+    if gate_evidence_applies and require_major:
+        gate_error = gate_result_error(report)
+        if gate_error:
+            errors.append(gate_error)
+    required = set(required_profiles) if gate_evidence_applies else set()
+    if require_ponytail:
+        required.add("ponytail")
+    missing = sorted(required - set(profiles))
+    if missing:
+        errors.append(
+            "findings report is missing required review profiles: "
+            + ", ".join(missing)
+            + (
+                "; this high-risk diff requires a fresh Ponytail review"
+                if "ponytail" in missing
+                else ""
+            )
+        )
     return errors
+
+
+def gate_result_error(report: dict[str, object]) -> str | None:
+    """Return why the reviewer's recorded gate result blocks completion."""
+    gate_result = report.get("gate_result")
+    if gate_result is None:
+        return (
+            "findings report has no gate_result; re-record it with "
+            "record_findings.py --gate-result before closeout"
+        )
+    open_requests = report.get("open_requests")
+    if not isinstance(open_requests, list) or not all(
+        isinstance(request, str) and request.strip() for request in open_requests
+    ):
+        return "findings report open_requests must be a list of non-empty strings"
+    if gate_result != "PASS" or open_requests:
+        requests = "; ".join(open_requests) or "none"
+        return (
+            f"findings report gate_result is {gate_result!r} (open requests: "
+            f"{requests}); phase completion needs PASS and no open request"
+        )
+    return None
 
 
 def content_hash_for(root: Path, merge_base: str, ref: str) -> str:

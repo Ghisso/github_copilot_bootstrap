@@ -626,6 +626,8 @@ def test_record_findings_warns_only_for_untracked_target_files(
             "src",
             "--profile",
             "code",
+            "--gate-result",
+            "PASS",
             "--out",
             str(report),
         ],
@@ -669,6 +671,8 @@ def test_record_findings_uses_lexical_paths_and_escapes_controls(
             "src",
             "--profile",
             "code",
+            "--gate-result",
+            "PASS",
             "--out",
             "report.json",
         ],
@@ -683,3 +687,108 @@ def test_record_findings_uses_lexical_paths_and_escapes_controls(
     assert "src/new\\nfile.py" in result.stderr
     assert "src/link" in result.stderr
     assert str(outside) not in result.stderr
+
+
+def run_record_findings(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run the recorder on an empty findings list from a throwaway repository."""
+    return subprocess.run(
+        [sys.executable, str(RECORD_FINDINGS), "src", "--profile", "code", *args],
+        cwd=root,
+        input="[]",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def test_record_findings_requires_a_gate_result(tmp_path: Path) -> None:
+    """GR-001: a report cannot be recorded without the reviewer's gate result."""
+    report = tmp_path / "findings.json"
+
+    result = run_record_findings(tmp_path, "--out", str(report))
+
+    assert result.returncode == 2
+    assert "--gate-result" in result.stderr
+    assert not report.exists()
+
+
+def test_record_findings_refuses_pass_with_an_open_request(tmp_path: Path) -> None:
+    """GR-001: PASS with an open request is refused and nothing is written."""
+    report = tmp_path / "findings.json"
+
+    result = run_record_findings(
+        tmp_path,
+        "--gate-result",
+        "PASS",
+        "--open-request",
+        "show the original reproduction",
+        "--out",
+        str(report),
+    )
+
+    assert result.returncode == 1
+    assert "cannot be recorded with --open-request" in result.stderr
+    assert not report.exists()
+
+
+def test_record_findings_rejects_an_empty_open_request(tmp_path: Path) -> None:
+    """GR-001: open_requests holds only non-empty strings."""
+    report = tmp_path / "findings.json"
+
+    result = run_record_findings(
+        tmp_path,
+        "--gate-result",
+        "WARN",
+        "--open-request",
+        "  ",
+        "--out",
+        str(report),
+    )
+
+    assert result.returncode == 1
+    assert "--open-request must not be empty" in result.stderr
+    assert not report.exists()
+
+
+def test_record_findings_writes_schema_gate_result_and_open_requests(
+    tmp_path: Path,
+) -> None:
+    """GR-001: the report carries schema_version 2, gate_result, open_requests."""
+    report = tmp_path / "findings.json"
+
+    result = run_record_findings(
+        tmp_path,
+        "--gate-result",
+        "WARN",
+        "--open-request",
+        "show the original reproduction",
+        "--open-request",
+        "add a negative control",
+        "--out",
+        str(report),
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["schema_version"] == 2
+    assert data["gate_result"] == "WARN"
+    assert data["open_requests"] == [
+        "show the original reproduction",
+        "add a negative control",
+    ]
+
+
+def test_record_findings_records_a_clean_pass_with_no_open_requests(
+    tmp_path: Path,
+) -> None:
+    """GR-001 negative control: PASS with no open request is the clean report."""
+    report = tmp_path / "findings.json"
+
+    result = run_record_findings(
+        tmp_path, "--gate-result", "PASS", "--out", str(report)
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["gate_result"] == "PASS"
+    assert data["open_requests"] == []

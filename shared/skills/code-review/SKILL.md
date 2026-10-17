@@ -30,9 +30,11 @@ Select profiles from the single authoritative routing table in `.claude/instruct
 
 ## Reporting Findings
 
-In lifecycle mode (the orchestrator's canonical loop), return findings to the
-orchestrator; it persists them via `record_findings.py --out
-.claude/quality_reports/findings-<current_phase>.json` per
+In lifecycle mode (the orchestrator's canonical loop), return findings, your
+Gate Result (`FAIL` when a CRITICAL or MAJOR survives, `WARN` when a request is
+open, otherwise `PASS`), and any open requests to the orchestrator; it persists
+them via `record_findings.py --gate-result <PASS|WARN|FAIL> [--open-request
+"<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json` per
 `.claude/instructions/workflow.instructions.md`. Do not write a separate report
 file in that mode.
 

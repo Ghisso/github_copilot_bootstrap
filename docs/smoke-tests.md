@@ -308,8 +308,10 @@ acceptance gap/blocker.
 - Completed gates use only the exact findings path and SHA-256 hash recorded by the final closeout receipt; an extra newer or lexically-later report cannot replace it.
 - A findings report with `counts.critical == 0` but `counts.major > 0` blocks the phase-completion commit, naming a `MAJOR` finding. It does not block an intermediate commit made while the small plan is still `in-progress`.
 - A surviving `MINOR` finding without an explicit `disposition`, or with an empty `reason`, blocks the phase-completion commit.
+- With `core.hooksPath` set to the generated `git-hooks` directory, a findings report recorded with `--gate-result WARN` is denied by the `commit-msg` hook on the phase-completion commit.
+- With the same hook configuration, a diff that includes a test file is denied when its findings report lacks the `tests` profile.
 - A findings report generated pre-commit (its `head_sha` is the completion commit's parent) satisfies an intermediate completed-phase push only when it directly certifies that one commit. At final closeout, `pre-push` accepts an ancestor of the pushed commit rather than requiring an exact match.
-- All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push.
+- All-zero findings counts (`critical`, `major`, `minor` all `0`) allow both the commit and the push only when the report also has `gate_result: PASS`, no open request, and every review profile its changed paths require. A zero-count report with a missing `gate_result`, a `WARN` or `FAIL` result, an open request, or a missing required profile is blocked; the push gates apply these checks only to reports with `schema_version >= 2`.
 
 ## Devcontainer And Git-Backed State Sync
 

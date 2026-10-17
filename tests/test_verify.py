@@ -794,7 +794,12 @@ def _findings_report(**updates: object) -> dict[str, object]:
 
 
 def _findings_errors(
-    tmp_path: Path, report: dict[str, object], *, require_major: bool = False
+    tmp_path: Path,
+    report: dict[str, object],
+    *,
+    require_major: bool = False,
+    require_ponytail: bool = False,
+    head_relation: str = "exact",
 ) -> list[str]:
     """Persist and validate one focused findings fixture."""
     path = tmp_path / "findings.json"
@@ -804,11 +809,11 @@ def _findings_errors(
         branch="verification-test",
         phase="phase-one",
         head="head",
-        head_relation="exact",
+        head_relation=head_relation,
         expected_base="base",
         root=tmp_path,
         require_major=require_major,
-        require_ponytail=False,
+        require_ponytail=require_ponytail,
         verify_current_content=False,
     )
 
@@ -904,6 +909,167 @@ def test_forged_counts_inconsistent_with_findings_are_rejected(tmp_path: Path) -
     )
     errors = _findings_errors(tmp_path, report, require_major=True)
     assert "findings report counts do not match findings" in errors
+
+
+@pytest.mark.parametrize(
+    ("updates", "expected"),
+    (
+        ({"gate_result": "WARN", "open_requests": []}, "gate_result is 'WARN'"),
+        ({"gate_result": "FAIL", "open_requests": []}, "gate_result is 'FAIL'"),
+        (
+            {"gate_result": "PASS", "open_requests": ["show the reproduction"]},
+            "show the reproduction",
+        ),
+        ({}, "re-record it with record_findings.py --gate-result before closeout"),
+        ({"gate_result": "PASS"}, "open_requests must be a list of non-empty strings"),
+    ),
+    ids=("warn", "fail", "pass-with-open-request", "missing-field", "missing-requests"),
+)
+def test_commit_gate_blocks_an_unclean_gate_result(
+    tmp_path: Path, updates: dict[str, object], expected: str
+) -> None:
+    """GR-001: phase completion needs PASS with no open request; a report
+    recorded before the field existed is told to re-record."""
+    errors = _findings_errors(tmp_path, _findings_report(**updates), require_major=True)
+    assert any(expected in error for error in errors)
+
+
+def test_commit_gate_accepts_a_pass_with_no_open_request(tmp_path: Path) -> None:
+    """GR-001 negative control: the clean schema-2 report raises no gate error."""
+    report = _findings_report(schema_version=2, gate_result="PASS", open_requests=[])
+    errors = _findings_errors(tmp_path, report, require_major=True)
+    assert errors == []
+
+
+def test_gate_result_is_not_required_outside_phase_completion(tmp_path: Path) -> None:
+    """GR-001: intermediate validation (require_major=False) skips the fields."""
+    errors = _findings_errors(tmp_path, _findings_report(), require_major=False)
+    assert not any("gate_result" in error for error in errors)
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+def test_push_gates_do_not_rejudge_a_schema_1_report(
+    tmp_path: Path, head_relation: str
+) -> None:
+    """GR-001: a phase recorded before the upgrade (no schema_version, no
+    gate_result) stays valid at the push gates."""
+    errors = _findings_errors(
+        tmp_path, _findings_report(), require_major=True, head_relation=head_relation
+    )
+    assert not any("gate_result" in error for error in errors)
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+@pytest.mark.parametrize(
+    ("updates", "expected"),
+    (
+        (
+            {"schema_version": 2, "gate_result": "WARN", "open_requests": ["x"]},
+            "gate_result is 'WARN'",
+        ),
+        ({"schema_version": 2}, "has no gate_result"),
+        *(
+            (
+                {
+                    "schema_version": malformed,
+                    "gate_result": "WARN",
+                    "open_requests": ["x"],
+                },
+                "gate_result is 'WARN'",
+            )
+            for malformed in ("1", True, 1.0, None)
+        ),
+    ),
+    ids=(
+        "schema-2-warn",
+        "schema-2-missing-field",
+        "malformed-schema-string",
+        "malformed-schema-bool",
+        "malformed-schema-float",
+        "malformed-schema-null",
+    ),
+)
+def test_push_gates_apply_the_gate_result_to_schema_2_reports(
+    tmp_path: Path, head_relation: str, updates: dict[str, object], expected: str
+) -> None:
+    """GR-001: from schema 2 on, the push gates apply the same rule."""
+    errors = _findings_errors(
+        tmp_path,
+        _findings_report(**updates),
+        require_major=True,
+        head_relation=head_relation,
+    )
+    assert any(expected in error for error in errors)
+
+
+def test_report_requires_a_fresh_ponytail_review_when_the_gate_says_so(
+    tmp_path: Path,
+) -> None:
+    """GR-003: a high-risk diff (require_ponytail) with no ponytail profile in
+    the report is refused; a report that ran Ponytail is not."""
+    refused = _findings_errors(tmp_path, _findings_report(), require_ponytail=True)
+    assert any("requires a fresh Ponytail review" in error for error in refused)
+
+    reviewed = _findings_report(
+        profiles_reviewed=["code", "ponytail"],
+        ponytail_reviewed=True,
+        ponytail_findings=0,
+    )
+    accepted = _findings_errors(tmp_path, reviewed, require_ponytail=True)
+    assert not any("Ponytail" in error for error in accepted)
+
+
+_ALL_FIVE_PROFILES = {"code", "architecture", "security", "tests", "ponytail"}
+
+
+@pytest.mark.parametrize(
+    ("paths", "expected"),
+    (
+        (["docs/guide.md", "README.md"], set()),
+        (["src/pkg/mod.py"], set()),
+        (["tests/test_x.py"], {"tests"}),
+        (["tests/fixtures/x.json"], {"tests"}),
+        (["tests/fixtures/behavioral/requirement-review/requirements.md"], {"tests"}),
+        (["pkg/conftest.py"], {"tests"}),
+        (["pkg/mod_test.py"], {"tests"}),
+        (["scripts/test_helper.py"], {"tests"}),
+        (["scripts/x.py"], _ALL_FIVE_PROFILES),
+        (["shared/x.md"], _ALL_FIVE_PROFILES),
+        ([".mcp.json"], _ALL_FIVE_PROFILES),
+        ([".vscode/mcp.json"], _ALL_FIVE_PROFILES),
+        (["uv.lock"], _ALL_FIVE_PROFILES),
+        (["pyproject.toml"], _ALL_FIVE_PROFILES),
+        (["services/api/requirements-dev.txt"], _ALL_FIVE_PROFILES),
+        (["requirements.in"], _ALL_FIVE_PROFILES),
+        (["docs/guide.md", "tests/test_x.py"], {"tests"}),
+        (["tests/test_x.py", "scripts/x.py"], _ALL_FIVE_PROFILES),
+    ),
+    ids=(
+        "docs-only",
+        "ordinary-code",
+        "test-file",
+        "test-fixture-json",
+        "test-fixture-markdown",
+        "conftest",
+        "suffix-test-file",
+        "test-file-in-scripts-is-checked-first",
+        "scripts",
+        "shared",
+        "claude-mcp",
+        "copilot-mcp",
+        "lockfile",
+        "pyproject",
+        "requirements-txt",
+        "requirements-in",
+        "docs-plus-test",
+        "test-plus-script",
+    ),
+)
+def test_required_review_profiles_by_changed_surface(
+    paths: list[str], expected: set[str]
+) -> None:
+    """GR-002: expected profiles come from the plan's table, not the code."""
+    assert verify.required_review_profiles(paths) == frozenset(expected)
 
 
 def _git(args: list[str], cwd: Path) -> str:
@@ -5522,6 +5688,147 @@ def _run_gate(
     }
     kwargs.update(overrides)
     return verify.gate_receipt_errors(tmp_path, **kwargs)  # type: ignore[arg-type]
+
+
+def _gate_errors_with_findings(
+    tmp_path: Path,
+    report: dict[str, object],
+    changed_paths: list[str],
+    **overrides: object,
+) -> list[str]:
+    """Run the gate over a closeout receipt whose findings artifact exists and
+    whose machine-produced ``changed_paths`` are the given paths."""
+    findings = tmp_path / ".claude/quality_reports/findings-phase-one.json"
+    findings.parent.mkdir(parents=True, exist_ok=True)
+    findings.write_text(json.dumps(report), encoding="utf-8")
+    receipt = _closeout_receipt()
+    receipt["metadata"]["changed_paths"] = changed_paths  # type: ignore[index]
+    receipt["artifacts"]["findings"] = {  # type: ignore[index]
+        "path": ".claude/quality_reports/findings-phase-one.json",
+        "sha256": hashlib.sha256(findings.read_bytes()).hexdigest(),
+    }
+    return _run_gate(tmp_path, receipt, **overrides)
+
+
+_CLEAN_V2 = {"schema_version": 2, "gate_result": "PASS", "open_requests": []}
+
+
+def _five_profile_report(**updates: object) -> dict[str, object]:
+    """A clean schema-2 report that ran all five high-risk review profiles."""
+    return _findings_report(
+        **{
+            **_CLEAN_V2,
+            "profiles_reviewed": sorted(_ALL_FIVE_PROFILES),
+            "ponytail_reviewed": True,
+            "ponytail_findings": 0,
+            **updates,
+        }
+    )
+
+
+def test_gate_blocks_a_test_file_diff_whose_report_lacks_the_tests_profile(
+    tmp_path: Path,
+) -> None:
+    """GR-002: a test-file diff needs `tests` in the reviewed profiles."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["tests/test_x.py"]
+    )
+    assert any("missing required review profiles: tests" in e for e in errors)
+
+    reviewed = _findings_report(**_CLEAN_V2, profiles_reviewed=["code", "tests"])
+    accepted = _gate_errors_with_findings(tmp_path, reviewed, ["tests/test_x.py"])
+    assert not any("required review profiles" in e for e in accepted)
+
+
+def test_gate_requires_all_five_profiles_for_a_scripts_diff(tmp_path: Path) -> None:
+    """GR-002: a generator path needs the five high-risk profiles; the full
+    five-profile report passes the profile rule."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["scripts/x.py"]
+    )
+    assert any(
+        "missing required review profiles: architecture, ponytail, security, tests" in e
+        for e in errors
+    )
+
+    accepted = _gate_errors_with_findings(
+        tmp_path, _five_profile_report(), ["scripts/x.py"]
+    )
+    assert not any("required review profiles" in e for e in accepted)
+
+
+def test_gate_requires_no_extra_profile_for_a_documentation_only_diff(
+    tmp_path: Path,
+) -> None:
+    """GR-002 negative control: a documentation-only first phase needs nothing."""
+    errors = _gate_errors_with_findings(
+        tmp_path, _findings_report(**_CLEAN_V2), ["docs/guide.md"]
+    )
+    assert not any("required review profiles" in e for e in errors)
+
+
+def test_gate_reports_profile_and_ponytail_requirements_in_one_error(
+    tmp_path: Path,
+) -> None:
+    """GR-002: the path rule joins the multi-file Ponytail rule, and every
+    missing profile is named in a single error."""
+    errors = _gate_errors_with_findings(
+        tmp_path,
+        _findings_report(**_CLEAN_V2),
+        ["tests/test_x.py"],
+        require_ponytail=True,
+    )
+    profile_errors = [e for e in errors if "required review profiles" in e]
+    assert len(profile_errors) == 1
+    assert "ponytail, tests" in profile_errors[0]
+    assert "requires a fresh Ponytail review" in profile_errors[0]
+
+
+@pytest.mark.parametrize("head_relation", ("ancestor", "certified"))
+def test_push_gates_apply_required_profiles_only_to_schema_2_reports(
+    tmp_path: Path, head_relation: str
+) -> None:
+    """GR-002: a pre-upgrade (schema 1) report is not re-judged at push; the
+    same profiles on a schema-2 report are."""
+    legacy = _findings_report()
+    legacy_errors = _gate_errors_with_findings(
+        tmp_path, legacy, ["scripts/x.py"], head_relation=head_relation
+    )
+    assert not any("required review profiles" in e for e in legacy_errors)
+
+    current = _findings_report(**_CLEAN_V2)
+    current_errors = _gate_errors_with_findings(
+        tmp_path, current, ["scripts/x.py"], head_relation=head_relation
+    )
+    assert any("required review profiles" in e for e in current_errors)
+
+
+def test_staged_documentation_change_after_closeout_makes_final_state_stale(
+    tmp_path: Path,
+) -> None:
+    """GR-004: ``tree_sha`` (git write-tree) binds the index, so a docs-only
+    change staged after the closeout receipt blocks the commit gate."""
+    _init_repo(tmp_path)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    head = _commit_all(tmp_path, "base")
+    _git(["branch", "dev"], tmp_path)
+    (tmp_path / "work.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(["add", "work.py"], tmp_path)
+    receipt = _closeout_receipt()
+    receipt["metadata"].update(  # type: ignore[attr-defined]
+        {"head_sha": head, "tree_sha": _git(["write-tree"], tmp_path)}
+    )
+    stale = "closeout receipt final tracked state is stale"
+
+    assert stale not in _run_gate(
+        tmp_path, receipt, head=head, enforce_final_state=True
+    )
+
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("late edit\n", encoding="utf-8")
+    _git(["add", "docs/guide.md"], tmp_path)
+
+    assert stale in _run_gate(tmp_path, receipt, head=head, enforce_final_state=True)
 
 
 def test_gate_g1_flags_a_receipt_with_no_verification_items(tmp_path: Path) -> None:

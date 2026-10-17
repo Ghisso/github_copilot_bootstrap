@@ -461,6 +461,17 @@ regenerates a valid current-schema receipt at the same deterministic path.
 Before verification, confirm that nested `.claude` has a valid `HEAD` and a
 clean worktree.
 
+Re-record the current phase's findings report with `record_findings.py
+--gate-result PASS|WARN|FAIL` before closeout. A report without `gate_result`
+blocks the commit gate. A re-record is not always enough: the commit gate
+applies the path-based profile rule to any report. If the branch diff from the
+merge-base, including earlier phases, includes a test file and the report
+lacks the `tests` profile, or it includes a control-plane, generator, or dependency path and the report lacks any of
+`code`, `architecture`, `security`, `tests`, and `ponytail`, run a new review
+with those profiles. Phases completed before the upgrade stay valid at push:
+the push gates apply the `gate_result` and path-based profile rules only to
+reports with `schema_version >= 2`.
+
 Run focused and fast checks, then review. Update documentation, final plan,
 `[LEARN]`, and completed session-closeout evidence; explicitly stage intended
 outer files; persist findings; then persist `verify phase --persist` and
@@ -503,6 +514,16 @@ diagnosable. A consumer refreshed mid-plan whose tracked files are not yet
 formatted will newly fail `VFY-RUFF-001`'s format half; the recovery is
 `uv run ruff format` (see "Mid-plan consumer upgrade" above).
 
+`record_findings.py` requires `--gate-result PASS|WARN|FAIL`, accepts a
+repeatable `--open-request TEXT`, and writes `schema_version: 2`,
+`gate_result`, and `open_requests`. It refuses `PASS` while any open request
+exists. The commit gate passes a phase only when `gate_result` is `PASS` with
+no open request. The gates also require review profiles by changed path (test
+surfaces need `tests`; control-plane, generator, and dependency-file paths need
+`code`, `architecture`, `security`, `tests`, and `ponytail`), computed from the
+closeout receipt's `changed_paths`, cumulative from the merge-base. See
+`shared/policies/quality-and-testing.instructions.md`.
+
 When routing selects the `ponytail` profile, `record_findings.py --profile
 ponytail` always emits `ponytail_reviewed: true` and a numeric
 `ponytail_findings` count; a new unselected report omits both. Its content hash
@@ -526,6 +547,7 @@ of this changes what a gate checks, only what an operator should expect.
 | A big plan's `phases:` list may carry at most one unfinished dedicated final knowledge-refresh phase, and it must be last; an earlier knowledge-refresh phase is exempt once it has settled its identity — the big plan's own `name` is non-empty, and the sibling small-plan file named after the phase slug is a regular file, not a symlink, whose frontmatter declares `type: small-plan`, a `name` equal to the phase slug, a `parent_plan` equal to the big plan's `name`, and `status: complete` or `status: cancelled`; a plan that has any knowledge-refresh phase must still end with one | `at most one knowledge-refresh phase is allowed` blocks validation when two or more phases end in `-knowledge-refresh` and are not settled; `the knowledge-refresh phase must be the last phase in phases` blocks validation when an unsettled knowledge-refresh phase is not the last entry, or when every knowledge-refresh phase is settled but the plan's last phase does not itself end in `-knowledge-refresh` | Remove the duplicate `-knowledge-refresh` phase, or move the remaining one to the end of `phases:`. To reopen a completed big plan, append one new `-knowledge-refresh` phase at the end of `phases:` (see "Reopening a completed big plan" in `shared/policies/workflow.instructions.md`) |
 | A big plan's final phase must record a stale-claims audit | The final phase's closeout log needs a non-empty `## Stale-claims surfaces checked` section, or the phase-completion commit blocks | Add `## Stale-claims surfaces checked` to that phase's closeout log, recording the documentation, memory, and LEARN surfaces checked |
 | `MEMORY.md`'s mtime is not accepted as `[LEARN]` evidence | A closeout log that relied on a fresh `MEMORY.md` timestamp no longer satisfies the commit gate | Add a `## [LEARN] Entries` section to the closeout log with real entries, or the exact sanctioned no-lessons marker |
+| `gate_result` and path-based review profiles (`record_findings.py`, commit gate; push gates only for `schema_version >= 2` reports) | The phase-completion commit blocks unless the findings report has `gate_result: PASS` and no open request. It also blocks when the report lacks a profile the changed paths require: `tests` for test files; `code`, `architecture`, `security`, `tests`, and `ponytail` for control-plane, generator, and dependency paths | Re-record with `record_findings.py ... --gate-result PASS\|WARN\|FAIL`, resolving or listing each open request (`PASS` is refused while one is open). If a required profile is missing, run a new review with the missing profiles; a re-record cannot add them |
 | An open MAJOR finding blocks the phase-completion commit, not intermediate ones; a surviving MINOR finding needs an explicit disposition | A findings report with an unresolved MAJOR, or a MINOR with no `disposition`/`reason`, blocks the phase-completion commit | Resolve the MAJOR. Give each surviving MINOR a non-empty `disposition` and `reason` |
 | `chore(typo):`/`docs(typo):` bypass only covers documentation content outside runtime/execution directories | A typo-subject commit that touches any runtime or execution path no longer bypasses the commit ceremony | Use the normal commit ceremony for that change instead of a typo-subject commit |
 | `.claude/plans/README.md`, `.claude/session_logs/README.md`, `.claude/quality_reports/README.md`, and `.claude/explorations/README.md` are bootstrap-owned | A refresh always overwrites these four files, even a hand-edited one | None needed — treat them as generated, not editable |

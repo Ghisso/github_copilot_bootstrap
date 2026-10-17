@@ -181,7 +181,17 @@ def _write_lifecycle_reports(consumer: Path, metadata: dict[str, object]) -> Non
         json.dumps(
             {
                 **report_fields,
-                "profiles_reviewed": ["code", "ponytail"],
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
+                # The installed runtime is control-plane work: all five profiles.
+                "profiles_reviewed": [
+                    "architecture",
+                    "code",
+                    "ponytail",
+                    "security",
+                    "tests",
+                ],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,

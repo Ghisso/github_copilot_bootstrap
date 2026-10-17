@@ -330,6 +330,17 @@ governing plan or runtime do make it stale and require the affected evidence
 to be regenerated before continuing. If a governing plan or runtime change
 occurs during the upgrade, rerun the verification and closeout sequence.
 
+Re-record the current phase's findings report with `--gate-result` before
+closeout (step 4); a report written before the upgrade has no `gate_result`
+and blocks the commit gate. A re-record is not always enough: the commit gate
+applies the path-based profile rule to any report. If the branch diff from the
+merge-base, including earlier phases, includes a test file and the report
+lacks the `tests` profile, or it includes a control-plane, generator, or dependency path and the report lacks any of
+`code`, `architecture`, `security`, `tests`, and `ponytail`, run a new review
+with those profiles. Phases completed before the upgrade stay valid at push,
+because the push gates apply the `gate_result` and path-based profile rules
+only to reports with `schema_version >= 2`.
+
 `verify phase`/`verify closeout` also measure `ruff format --check`, folded
 into the existing `VFY-RUFF-001` check rather than a new check ID (a new ID
 would invalidate every already-persisted receipt, since the gate validates
@@ -1312,13 +1323,17 @@ Expected verification commands after implementation:
 - uv run python .claude/scripts/verify.py fast --format json
 - uv run python .claude/scripts/verify.py phase --format json --persist
 - uv run python .claude/scripts/verify.py closeout --format json --persist [--documentation-na "<reason>"]
-- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
+- uv run python .claude/scripts/record_findings.py src/ --profile code --profile security [--profile ponytail] --phase <current_phase> --base-ref dev --gate-result PASS|WARN|FAIL [--open-request "<text>"] --findings-json <path-or-stdin> --out .claude/quality_reports/findings-<current_phase>.json
 
 `fast` gives focused feedback during IMPLEMENT, `phase` persists reusable
 evidence once ordinary checks are clean, and `closeout` reuses that fresh
 evidence and binds the final tracked state during final closeout. A normal
 completion commit requires a passing receipt, zero open CRITICAL or MAJOR
-findings, and an explicit disposition and reason on every surviving MINOR;
+findings, and an explicit disposition and reason on every surviving MINOR. A
+clean review is a findings report with `gate_result: PASS` and no open
+request; `record_findings.py` refuses `PASS` while any `--open-request` is
+set. Changed paths also decide which review profiles must be present (see
+[quality and testing](shared/policies/quality-and-testing.instructions.md));
 PR/push closeout re-checks that same contract across every completed
 phase. See [Deterministic verification: verify.py modes, receipts, and
 findings](openwiki/operations/deterministic-verification.md) for the full

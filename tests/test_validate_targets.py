@@ -2092,6 +2092,7 @@ def test_validate_agents_rejects_codex_agent_local_override(
         "uv run python .claude/scripts/record_findings.py src/ --profile code"
         " --profile security [--profile ponytail] --phase <current_phase>"
         " --base-ref dev --findings-json <path-or-stdin>"
+        ' --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...]'
         " --out .claude/quality_reports/findings-<current_phase>.json",
     ),
     ids=("same-line", "reflowed-newline", "canonical-long-form"),

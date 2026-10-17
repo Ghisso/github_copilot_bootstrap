@@ -2705,7 +2705,8 @@ def validate_agents(errors: list[str]) -> None:
         # The bounded `[\s\S]{0,120}?` gap (not `[^\n]*`) tolerates a markdown
         # reflow wrapping the invocation across a line break.
         # The bound must clear the canonical long-form invocation documented in
-        # quality-and-testing.instructions.md, whose flag run is 132 characters.
+        # quality-and-testing.instructions.md, whose flag run stays under the gap
+        # bound in the regex below.
         if re.search(r"record_findings\.py[\s\S]{0,240}?--out\b", text):
             check(
                 path.stem == "orchestrator",
@@ -4635,6 +4636,9 @@ def validate_lifecycle_hook_guardrails(errors: list[str]) -> None:
 
         def findings_report(**overrides: object) -> dict[str, object]:
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -5902,11 +5906,20 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             head_sha: str, content_hash_value: str, **overrides: object
         ) -> dict[str, object]:
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
                 "ponytail_findings": 0,
-                "profiles_reviewed": ["code", "ponytail"],
+                "profiles_reviewed": [
+                    "architecture",
+                    "code",
+                    "ponytail",
+                    "security",
+                    "tests",
+                ],
                 "branch": "foo_implementation",
                 "phase": "phase-one",
                 "generated_at": "2099-01-01T00:00:00Z",
@@ -6091,6 +6104,29 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
         if result.returncode == 0:
             git(repo, "reset", "--soft", "HEAD~1")
 
+        # GR-002: a test-file diff needs the `tests` profile. Ponytail ran
+        # (a two-file diff requires it), so `tests` is the only profile missing.
+        write(repo / "tests" / "test_work.py", "def test_work() -> None:\n    pass\n")
+        git(repo, "add", "tests/test_work.py")
+        head_sha, content_hash = head_and_hash()
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                profiles_reviewed=["code", "ponytail"],
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0
+            and "missing required review profiles: tests" in result.stderr,
+            "commit-msg hook must require the tests profile for a test-file diff",
+            errors,
+        )
+        git(repo, "rm", "--cached", "-q", "tests/test_work.py")
+        (repo / "tests" / "test_work.py").unlink()
+        (repo / "tests").rmdir()
+
         write(repo / ".codex" / "config.toml", "[features]\n")
         write(
             repo / ".claude" / "bootstrap-root" / ".codex" / "config.toml",
@@ -6108,6 +6144,23 @@ def validate_commit_msg_git_hook(errors: list[str]) -> None:
             result.returncode != 0
             and "requires a fresh Ponytail review" in result.stderr,
             "commit-msg hook must require Ponytail metadata for control-plane work",
+            errors,
+        )
+
+        # GR-001: a reviewer result of WARN (an open request) cannot complete
+        # a phase, even though every profile and count is otherwise clean.
+        write_findings(
+            findings_report(
+                head_sha,
+                content_hash,
+                gate_result="WARN",
+                open_requests=["show the original reproduction"],
+            )
+        )
+        result = git(repo, "commit", "-m", "phase 1 closeout")
+        check(
+            result.returncode != 0 and "gate_result is 'WARN'" in result.stderr,
+            "commit-msg hook must block a findings report recorded as WARN",
             errors,
         )
 
@@ -6395,6 +6448,9 @@ def validate_pre_push_git_hook(errors: list[str]) -> None:
             head_sha = git(repo, "rev-parse", "HEAD").stdout.strip()
             merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -6814,6 +6870,9 @@ def validate_end_to_end_receipt_chain_lifecycle(errors: list[str]) -> None:
             )
             merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
             report: dict[str, object] = {
+                "schema_version": 2,
+                "gate_result": "PASS",
+                "open_requests": [],
                 "findings": [],
                 "counts": {"critical": 0, "major": 0, "minor": 0},
                 "ponytail_reviewed": True,
@@ -7103,6 +7162,9 @@ def validate_completed_phase_stale_receipt_rejection(errors: list[str]) -> None:
 
         metadata = verification.state_metadata(repo, "dev", "phase-one")
         report = {
+            "schema_version": 2,
+            "gate_result": "PASS",
+            "open_requests": [],
             "findings": [],
             "counts": {"critical": 0, "major": 0, "minor": 0},
             "ponytail_reviewed": True,
@@ -7214,6 +7276,9 @@ def validate_single_phase_big_plan_terminal_publication(errors: list[str]) -> No
         )
         merge_base = git(repo, "merge-base", "dev", "HEAD").stdout.strip()
         report = {
+            "schema_version": 2,
+            "gate_result": "PASS",
+            "open_requests": [],
             "findings": [],
             "counts": {"critical": 0, "major": 0, "minor": 0},
             "ponytail_reviewed": True,
@@ -7422,6 +7487,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "validator",
                 "--base-ref",
                 "dev",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(report_path),
             ],
@@ -7453,6 +7520,13 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "record_findings must persist sorted reviewed profiles",
                 errors,
             )
+            check(
+                report.get("schema_version") == 2
+                and report.get("gate_result") == "PASS"
+                and report.get("open_requests") == [],
+                "record_findings must persist schema_version 2, gate_result, and open_requests",
+                errors,
+            )
 
         legacy_path = Path(temp_dir) / "legacy-ponytail-findings.json"
         legacy = subprocess.run(
@@ -7466,6 +7540,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "validator",
                 "--base-ref",
                 "dev",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(legacy_path),
             ],
@@ -7500,6 +7576,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "README.md",
                 "--phase",
                 "validator",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(Path(temp_dir) / "no-profile.json"),
             ],
@@ -7525,6 +7603,8 @@ def validate_generated_scripts(errors: list[str]) -> None:
                 "code",
                 "--phase",
                 "validator",
+                "--gate-result",
+                "PASS",
                 "--out",
                 str(Path(temp_dir) / "missing-finding-profile.json"),
             ],
@@ -7538,6 +7618,37 @@ def validate_generated_scripts(errors: list[str]) -> None:
             missing_finding_profile.returncode != 0
             and "non-empty profile" in missing_finding_profile.stderr,
             "record_findings must reject findings without a reviewed profile",
+            errors,
+        )
+
+        pass_with_request_path = Path(temp_dir) / "pass-with-request.json"
+        pass_with_request = subprocess.run(
+            [
+                sys.executable,
+                str(findings_script),
+                "README.md",
+                "--profile",
+                "code",
+                "--phase",
+                "validator",
+                "--gate-result",
+                "PASS",
+                "--open-request",
+                "show the original reproduction",
+                "--out",
+                str(pass_with_request_path),
+            ],
+            cwd=REPO_ROOT,
+            input="[]",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(
+            pass_with_request.returncode == 1
+            and "cannot be recorded with --open-request" in pass_with_request.stderr
+            and not pass_with_request_path.exists(),
+            "record_findings must refuse PASS with an open request and write nothing",
             errors,
         )
 
