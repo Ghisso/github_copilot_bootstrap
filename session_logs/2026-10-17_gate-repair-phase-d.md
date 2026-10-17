@@ -130,6 +130,21 @@ remove the stale agent schema (GR-011).
   stay a follow-up. Documenter fixed the warning count (lead-in without a
   count; informational "restored …" bullet added).
 
+- **14:50** - Coder implemented the scope change: `is_bash_tool_payload` and
+  `protect-files.py` `TERMINAL_TOOLS` accept `run_in_terminal` and
+  `send_to_terminal`; `READ_ONLY_TOOLS` exempts the documented read tools;
+  git-protection already read any `command` (lock-in test added);
+  `record-branch-state.sh` now records Copilot terminal branch creation.
+  Negative controls caught every change, including one dropped read name.
+  Self-install; re-probe: Copilot `read_file` of `.vscode/settings.json`,
+  `.mcp.json`, `.claude/settings.json` now returns no decision.
+  `check_runtime.py` PASS; `verify.py phase` PASS (pytest 2749 passed,
+  1 skipped). Documenter: Copilot notes in smoke-tests and target-mapping
+  (with a source paragraph), "native read tool" wording, follow-up widened
+  to the SDK harness and Copilot CLI key casing. `validate_targets.py` PASS.
+  Same reviewer asked for a full review of the scope change plus the two
+  confirmations.
+
 ## [LEARN] Entries
 
 ## Verification
