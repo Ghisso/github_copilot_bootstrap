@@ -3,8 +3,8 @@ name: 2026-10-17_phase-C-mcp-surface-parity
 type: small-plan
 parent_plan: gate-repair
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-17_gate-repair-phase-c.md
 ---
 
 # Small Plan: MCP Surface Parity
@@ -28,7 +28,7 @@ question is recorded as unverified with no code change.
 
 ## Steps
 
-- [ ] **1. Guard the root Claude and Copilot MCP adapters (GR-005).**
+- [x] **1. Guard the root Claude and Copilot MCP adapters (GR-005).**
   **Owner:** coder.
   **Files:** modify root `.mcp.json` and root `.vscode/mcp.json`;
   modify `scripts/validate_targets.py` (the authoring-config check near the
@@ -48,7 +48,7 @@ question is recorded as unverified with no code change.
   **Tests:** for each of the three root files, a direct `context-mode`
   command fails validation and the guarded route passes.
 
-- [ ] **2. Grant Context7 to Claude subagents (GR-006, Claude).**
+- [x] **2. Grant Context7 to Claude subagents (GR-006, Claude).**
   **Owner:** coder.
   **Files:** modify `scripts/generate_targets.py` (`CLAUDE_TOOL_MAP`
   `search`, about line 104, and its comment), `scripts/validate_targets.py`
@@ -63,7 +63,7 @@ question is recorded as unverified with no code change.
   **Tests:** every generated Claude agent with `search` lists
   `mcp__context7`; agents without `search` do not.
 
-- [ ] **3. Settle Codex MCP inheritance from documentation (GR-006, Codex).**
+- [x] **3. Settle Codex MCP inheritance from documentation (GR-006, Codex).**
   **Owner:** coder.
   **Files:** modify `docs/target-mapping.md`; modify the Codex agent
   renderer in `scripts/generate_targets.py` and its tests only for a
@@ -77,7 +77,7 @@ question is recorded as unverified with no code change.
   required, render it for agents with the `search` capability and test it.
   Otherwise record "inherits session MCP servers" in the parity table.
 
-- [ ] **4. Settle Antigravity MCP reachability from documentation (GR-006, Antigravity).**
+- [x] **4. Settle Antigravity MCP reachability from documentation (GR-006, Antigravity).**
   **Owner:** coder.
   **Files:** modify `docs/target-mapping.md` and `docs/runtime-checks.md`;
   modify `shared/hooks/scripts/antigravity-pretool.py`, the Antigravity MCP
@@ -98,7 +98,7 @@ question is recorded as unverified with no code change.
   denied. Without documented answers, change no code and record the gap and
   its evidence.
 
-- [ ] **5. Regenerate, refresh, document, review, close out.**
+- [x] **5. Regenerate, refresh, document, review, close out.**
   **Owner:** orchestrator; fresh reviewer; documenter after review.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
@@ -148,11 +148,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

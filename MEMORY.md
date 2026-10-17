@@ -1468,3 +1468,21 @@
   (`context-mode-guidance-s-<session>`). Captures and tests that reuse a
   session id must set a private `TMPDIR`, or tips silently disappear on the
   second run.
+- [LEARN:tooling] Codex custom agent files cannot override `sandbox_mode`,
+  approval policy, or `mcp_servers`: agents inherit them from the parent
+  session, and only instructions, model, effort, summary, verbosity,
+  personality, service tier, and `features.*` disables apply (official
+  subagents docs and `openai/codex` `codex-rs/core/src/agent/role.rs`,
+  2026-10-17). The `sandbox_mode = "read-only"` the bootstrap writes is
+  ignored.
+- [LEARN:tooling] Antigravity's documented workspace MCP file is
+  `.agents/mcp_config.json`, but `inheritMcp` is not a documented subagent
+  field (the docs list `mcpServers: object[]`) and the MCP tool-name format
+  in PreToolUse `toolCall.name` is undocumented (antigravity.google docs,
+  2026-10-17). Do not claim Antigravity subagent MCP access without a logged
+  native run.
+- [LEARN:workflow] After editing a tracked root adapter (`.mcp.json`,
+  `.vscode/mcp.json`), `verify.py` fails with "control-plane provenance is
+  invalid" until the self-install repopulates `.claude/bootstrap-root/`.
+  Refresh with `install_bootstrap.py . --allow-self --local-only` before
+  verifying.
