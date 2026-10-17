@@ -2460,18 +2460,19 @@ def validate_agents(errors: list[str]) -> None:
             (line for line in text.splitlines() if line.startswith("tools:")), ""
         )
         # An agent told to route through tool-routing.instructions.md (which
-        # names Semble and Context Mode) but whose own tools: allowlist
-        # omits the matching mcp__ wildcard physically cannot follow that
-        # instruction — tools: is an explicit allowlist, not additive to
+        # names Semble, Context Mode, and Context7) but whose own tools:
+        # allowlist omits the matching mcp__ wildcard physically cannot follow
+        # that instruction — tools: is an explicit allowlist, not additive to
         # defaults. Caught this exact bug once already (every generated
         # subagent had the instruction but not the tool); guard against it
-        # regenerating.
+        # regenerating. One check per server, so each fails on its own.
         if "tool-routing.instructions.md" in text:
-            check(
-                "mcp__semble" in tools_line and "mcp__context-mode" in tools_line,
-                f"Claude agent must allow both Semble and Context Mode MCP: {path}",
-                errors,
-            )
+            for server in ("mcp__semble", "mcp__context-mode", "mcp__context7"):
+                check(
+                    server in tools_line,
+                    f"Claude agent must allow {server} MCP: {path}",
+                    errors,
+                )
         # Unlike the Semble/Context-Mode check above, this must run for every
         # agent regardless of whether its prompt happens to mention
         # tool-routing.instructions.md — tool-name validity has nothing to do
@@ -2900,6 +2901,31 @@ def mcp_server_parity_errors(
     return errors
 
 
+# Tracked root MCP adapters of this authoring repository, each read with its
+# own server key. All three must carry the shared guarded Context Mode route.
+ROOT_MCP_ADAPTERS = (
+    (".mcp.json", "mcpServers", json.loads),
+    (".vscode/mcp.json", "servers", json.loads),
+    (".codex/config.toml", "mcp_servers", tomllib.loads),
+)
+
+
+def root_mcp_adapter_errors(
+    repo_root: Path, shared_mcp: dict[str, object]
+) -> list[str]:
+    """Return one failure per root MCP adapter that does not carry the guarded route."""
+    errors: list[str] = []
+    for relative, key, parse in ROOT_MCP_ADAPTERS:
+        servers = parse(read(repo_root / relative)).get(key)
+        entry = servers.get("context-mode") if isinstance(servers, dict) else None
+        check(
+            entry == shared_mcp["context-mode"],
+            f"root {relative} {key} context-mode must match the guarded shared route",
+            errors,
+        )
+    return errors
+
+
 def validate_mcp_and_hooks(errors: list[str]) -> None:
     github_mcp = json.loads(read(TARGET_ROOT / ".vscode" / "mcp.json"))
     claude_mcp = json.loads(read(TARGET_ROOT / ".mcp.json"))
@@ -3013,16 +3039,7 @@ def validate_mcp_and_hooks(errors: list[str]) -> None:
             require_agent_settings=False,
         )
     )
-    authoring_codex_servers = authoring_config.get("mcp_servers", {})
-    if isinstance(authoring_codex_servers, dict):
-        check(
-            authoring_codex_servers.get("context-mode")
-            == shared_mcp.get("context-mode"),
-            "authoring Codex Context Mode MCP server must match the guarded shared route",
-            errors,
-        )
-    else:
-        errors.append("authoring Codex config mcp_servers must be a table")
+    errors.extend(root_mcp_adapter_errors(REPO_ROOT, shared_mcp))
     check(
         "[mcp_servers.semble]" in codex_config,
         "Codex config missing Semble MCP server",

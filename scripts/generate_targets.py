@@ -85,6 +85,13 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # server only ever advertises its filtered ctx_index/ctx_search/ctx_stats/
 # ctx_doctor allowlist (shared/hooks/scripts/context-mode-mcp-filter.mjs), so
 # granting the whole server here cannot expose a blocked tool.
+# mcp__context7 is granted for the same reason: tool-routing.instructions.md
+# tells every subagent to use Context7 for external library documentation, and
+# Context7 is read-only documentation lookup, so the server-level grant adds
+# no write or execute capability. Copilot already lists context7/*.
+# Antigravity agent files declare inheritMcp: true, which is not a documented
+# field, so Antigravity subagent MCP access is unverified (see
+# docs/target-mapping.md).
 #
 # `todo` has no entry here: confirmed against the installed Claude Code
 # binary and the documented tool table (code.claude.com/docs/en/
@@ -101,7 +108,7 @@ SHARED_BASIS_NAMESPACE = ".claude"
 # `.get(capability, [])` default, so no other generator change is needed.
 CLAUDE_TOOL_MAP = {
     "read": ["Read"],
-    "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode"],
+    "search": ["Grep", "Glob", "mcp__semble", "mcp__context-mode", "mcp__context7"],
     "edit": ["Edit", "Write"],
     "execute": ["Bash"],
     "delegate": ["Agent"],

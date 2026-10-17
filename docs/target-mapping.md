@@ -92,8 +92,17 @@ Per-client status for the `gate-repair` changes. Clients are listed in the order
 | Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity |
 | --- | --- | --- | --- | --- |
 | Context Mode hook lane is advisory only | Filtered | Filtered | Filtered | Context Mode hooks not wired, so no session continuity (recorded gap) |
+| Guarded Context Mode MCP server | Root `.mcp.json` guarded; generated targets guarded | Root and generated Codex config guarded | Root `.vscode/mcp.json` guarded; generated targets guarded | Installed and generated guarded, but the PreToolUse bridge denies MCP calls (gap) |
+| Context7 for subagents | Generated agents with the `search` capability list `mcp__context7` | Inherits session MCP servers ([official Codex subagents docs](https://learn.chatgpt.com/docs/agent-configuration/subagents) and [`openai/codex` source `codex-rs/core/src/agent/role.rs`](https://github.com/openai/codex/blob/7ac954ea24116700632906d89715f7755cd3523e/codex-rs/core/src/agent/role.rs), read 2026-10-17; no native run) | `context7/*` | Unverified: `inheritMcp` is not a documented field |
 
 "Filtered" means `context-mode-dispatch.sh` passes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
+
+The root `.mcp.json` and `.vscode/mcp.json` start Context Mode through `context-mode-dispatch.sh server`, like the root Codex config, and `scripts/validate_targets.py` fails if a root adapter's `context-mode` entry is not the shared guarded route. The root adapters do not carry Context7 (an authoring-repository choice); generated targets do.
+
+Recorded follow-ups:
+
+- Codex ignores per-agent `sandbox_mode`, `mcp_servers`, and approval policy: a custom agent file cannot override them ([Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)). The `sandbox_mode = "read-only"` written into read-only Codex agent files therefore has no effect, and those agents run with the parent session's sandbox.
+- Antigravity needs a logged native run for two open questions. The MCP tool-name format inside a PreToolUse `toolCall.name` is undocumented ([hooks](https://antigravity.google/docs/hooks)), so the bridge keeps denying MCP calls. Subagent MCP access is unverified: the docs describe `mcpServers: object[]` ([subagents](https://antigravity.google/docs/subagents)), not the `inheritMcp: true` the bootstrap writes. A 2026-08 native run reported `agy mcp list` as "No MCP servers configured", and the docs do not explain it. The documented workspace config is `.agents/mcp_config.json` ([MCP](https://antigravity.google/docs/mcp)).
 
 ## Sidecar Overlay
 

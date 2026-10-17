@@ -114,10 +114,12 @@ Expected:
 
 Expected:
 
-- GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`).
+- Generated GitHub and Claude JSON MCP files include `semble`, `context7`, and `context-mode` (routed through `bash .claude/hooks/scripts/context-mode-dispatch.sh server`). This repository's tracked root adapters (`.mcp.json`, `.vscode/mcp.json`) carry `semble` and the guarded `context-mode` (and `openwiki` in `.mcp.json`), but not `context7`.
 - Codex config includes `[mcp_servers.semble]`, `[mcp_servers.context7]`, and `[mcp_servers.context-mode]`, all three targets sharing the same dispatcher route.
 - Antigravity `.agents/mcp_config.json` uses the same canonical server registry.
-  Its presence is structural evidence only; an optional local server that is
+  Its presence is structural evidence only: the Antigravity bridge denies MCP
+  tool calls and subagent MCP access is unverified (see the
+  [parity section](target-mapping.md#gate-repair-client-parity)). An optional local server that is
   unavailable follows the normal fallback behavior.
 - The filtered Context Mode MCP surface advertises exactly `ctx_index`, `ctx_search`, `ctx_stats`, and `ctx_doctor`; every other tool (`ctx_execute`, `ctx_execute_file`, `ctx_batch_execute`, `ctx_fetch_and_index`, `ctx_upgrade`, `ctx_purge`, `ctx_insight`, and any unknown tool) is filtered out of `tools/list` and rejected locally before reaching upstream.
 - Tool-routing policy preserves:

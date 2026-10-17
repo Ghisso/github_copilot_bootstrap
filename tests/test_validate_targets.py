@@ -89,6 +89,7 @@ from validate_targets import (  # noqa: E402
     readme_agent_contract_errors,
     reviewer_diff_evidence_contract_errors,
     root_guidance_errors,
+    root_mcp_adapter_errors,
     sidecar_allowed_relative_path,
     sidecar_forbidden_text_tokens,
     sidecar_target_errors,
@@ -2192,8 +2193,56 @@ def test_render_claude_tools_skips_todo_and_maps_delegate_to_agent() -> None:
         "todo",
     ]
     assert target_generator.render_claude_tools(orchestrator["capabilities"]) == (
-        "Agent, Edit, Write, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode"
+        "Agent, Edit, Write, Bash, Read, Grep, Glob, "
+        "mcp__semble, mcp__context-mode, mcp__context7"
     )
+
+
+def test_claude_agents_list_context7_exactly_when_they_have_search() -> None:
+    """GR-006: every generated Claude agent with the `search` capability grants
+    `mcp__context7`; an agent without `search` does not."""
+    agents_dir = REPO_ROOT / "dist" / "multi-agent" / ".claude" / "agents"
+    searching = [
+        agent
+        for agent, _agent_dir in shared_agents("claude-code")
+        if "search" in agent["capabilities"]
+    ]
+    assert searching
+    for agent in searching:
+        tools_line = next(
+            line
+            for line in (agents_dir / f"{agent['id']}.md")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith("tools:")
+        )
+        assert "mcp__context7" in tools_line.split(", "), agent["id"]
+
+    no_search = {"id": "reader", "description": "d", "capabilities": ["read", "edit"]}
+    frontmatter = claude_agent_frontmatter(no_search)
+    assert "tools: Read, Edit, Write" in frontmatter
+    assert "mcp__context7" not in "\n".join(frontmatter)
+
+
+def test_claude_agent_grant_check_requires_context7(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GR-006: a generated Claude agent that loses `mcp__context7` is reported,
+    and only that grant."""
+    target_root = tmp_path / "multi-agent"
+    shutil.copytree(REPO_ROOT / "dist" / "multi-agent", target_root)
+    agent_path = target_root / ".claude" / "agents" / "coder.md"
+    text = agent_path.read_text(encoding="utf-8")
+    assert ", mcp__context7" in text
+    agent_path.write_text(text.replace(", mcp__context7", "", 1), encoding="utf-8")
+    monkeypatch.setattr(target_validator, "TARGET_ROOT", target_root)
+
+    errors: list[str] = []
+    target_validator.validate_agents(errors)
+
+    assert f"Claude agent must allow mcp__context7 MCP: {agent_path}" in errors
+    assert not any("must allow mcp__semble" in error for error in errors)
+    assert not any("must allow mcp__context-mode" in error for error in errors)
 
 
 def test_claude_role_agents_emit_nonempty_tools_line() -> None:
@@ -2323,6 +2372,98 @@ def test_mcp_server_parity_errors_fail_independently() -> None:
     ) == ["target MCP server drifted from shared source: context-mode"]
 
     assert mcp_server_parity_errors(shared_mcp, shared_mcp, "target") == []
+
+
+ROOT_MCP_ADAPTER_PATHS = (".mcp.json", ".vscode/mcp.json", ".codex/config.toml")
+
+
+def write_root_mcp_adapters(root: Path, entries: dict[str, dict[str, Any]]) -> None:
+    """Write the three root MCP adapters, each with its own Context Mode entry."""
+    (root / ".vscode").mkdir(exist_ok=True)
+    (root / ".codex").mkdir(exist_ok=True)
+    (root / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"context-mode": entries[".mcp.json"]}}),
+        encoding="utf-8",
+    )
+    (root / ".vscode" / "mcp.json").write_text(
+        json.dumps({"servers": {"context-mode": entries[".vscode/mcp.json"]}}),
+        encoding="utf-8",
+    )
+    codex = entries[".codex/config.toml"]
+    lines = ["[mcp_servers.context-mode]", f"command = {json.dumps(codex['command'])}"]
+    if "args" in codex:
+        lines.append(f"args = {json.dumps(codex['args'])}")
+    (root / ".codex" / "config.toml").write_text("\n".join(lines), encoding="utf-8")
+
+
+@pytest.mark.parametrize("direct_path", ROOT_MCP_ADAPTER_PATHS)
+def test_root_mcp_adapters_reject_a_direct_context_mode_start(
+    tmp_path: Path, direct_path: str
+) -> None:
+    """GR-005: each tracked root adapter must carry the shared guarded route; a
+    direct `context-mode` command in any one of them fails on its own."""
+    shared_mcp = target_generator.shared_mcp_servers()
+    guarded = shared_mcp["context-mode"]
+    entries = {path: guarded for path in ROOT_MCP_ADAPTER_PATHS}
+
+    write_root_mcp_adapters(tmp_path, entries)
+    assert root_mcp_adapter_errors(tmp_path, shared_mcp) == []
+
+    write_root_mcp_adapters(
+        tmp_path, entries | {direct_path: {"command": "context-mode"}}
+    )
+    errors = root_mcp_adapter_errors(tmp_path, shared_mcp)
+    assert len(errors) == 1
+    assert direct_path in errors[0]
+
+
+@pytest.mark.parametrize(
+    ("path", "wrong_key"),
+    [(".mcp.json", "servers"), (".vscode/mcp.json", "mcpServers")],
+)
+def test_root_mcp_adapters_read_each_file_with_its_own_key(
+    tmp_path: Path, path: str, wrong_key: str
+) -> None:
+    """GR-005: the guarded route under another client's key does not count."""
+    shared_mcp = target_generator.shared_mcp_servers()
+    guarded = shared_mcp["context-mode"]
+    write_root_mcp_adapters(
+        tmp_path, {adapter: guarded for adapter in ROOT_MCP_ADAPTER_PATHS}
+    )
+    (tmp_path / path).write_text(
+        json.dumps({wrong_key: {"context-mode": guarded}}), encoding="utf-8"
+    )
+
+    errors = root_mcp_adapter_errors(tmp_path, shared_mcp)
+
+    assert len(errors) == 1
+    assert path in errors[0]
+
+
+def test_validate_mcp_and_hooks_runs_the_root_adapter_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GR-005: the root adapter check is wired into the generated-target
+    validator with the authoring repository root and the shared servers, not
+    the generated target root."""
+    calls: list[tuple[Path, dict[str, Any]]] = []
+
+    def record(root: Path, servers: dict[str, Any]) -> list[str]:
+        calls.append((root, servers))
+        return ["root adapter drift"]
+
+    monkeypatch.setattr(target_validator, "root_mcp_adapter_errors", record)
+    errors: list[str] = []
+
+    target_validator.validate_mcp_and_hooks(errors)
+
+    assert "root adapter drift" in errors
+    assert len(calls) == 1
+    root, servers = calls[0]
+    assert root == REPO_ROOT
+    assert (
+        servers["context-mode"] == target_generator.shared_mcp_servers()["context-mode"]
+    )
 
 
 def test_context_mode_tool_surface_is_exactly_four_tools_everywhere() -> None:

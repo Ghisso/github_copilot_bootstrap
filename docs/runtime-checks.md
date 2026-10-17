@@ -102,6 +102,8 @@ Optional helpers:
   - Unclosed, nested, or differently cased advice tags are not stripped. For such text only the name safety net applies: the whole field is dropped if it still names a plugin-prefixed or non-allowlisted `ctx_` tool, otherwise the leftover text is forwarded.
   - The event name must be a plain word (letters only), or nothing is forwarded.
   - Codex and Copilot restore shapes were not observed.
+  - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
+  - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
 - `npx`
 - `gh`
