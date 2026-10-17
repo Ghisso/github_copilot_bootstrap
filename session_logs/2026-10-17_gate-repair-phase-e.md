@@ -26,6 +26,20 @@ plan's boundaries held (GR-013), and refresh the OpenWiki knowledge layer.
   fixes follow, then one OpenWiki refresh after all source edits (MEMORY
   lesson: later source edits can stale cited claim ranges).
 
+- **16:10** - Sweep results (read-only agent, HEAD `bac1d59`): no live claim
+  contradicted by the plan's code; several incomplete or outdated
+  statements and three missing follow-ups. Fixes split: coder (Ponytail
+  "mandatory" wording in three skills with hash pins; `.vscode/mcp.json` in
+  the control-plane list in policy, generator, quoted copies, and root
+  guidance; root `CLAUDE.md` commit rule; workflow enforcement summary;
+  tool-routing filtered-hook sentence; root `AGENTS.md` Context Mode line),
+  documenter (parity table rows, Evidence column, follow-ups, runtime-checks
+  line, sidecar-contract errata, README Copilot note), orchestrator (MEMORY
+  entries at the MCP-grant and Ponytail-gate lessons; MEMORY file-protection
+  lesson corrected after a probe showed `grep` naming a protected path is
+  allowed while a heredoc is still denied; Phase E plan line pointed at the
+  target-mapping follow-ups).
+
 ## Stale-claims surfaces checked
 
 ## [LEARN] Entries

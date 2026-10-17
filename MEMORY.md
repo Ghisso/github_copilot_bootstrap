@@ -1164,11 +1164,13 @@
   fingerprint broke the first time the bundle existed. When adding an
   ownership category to `runtime_ownership.py`, grep every consumer of that
   module and apply the rule in each.
-- [LEARN:planning] A step that calls a project MCP server needs a session
-  boundary in the plan: a running Claude Code session does not discover a
-  server added to `.mcp.json`, and subagent tool lists exclude project MCP
-  servers, so such steps run on the main thread in a session started after
-  the server is configured.
+- [LEARN:planning] A step that calls a newly added project MCP server needs
+  a session boundary in the plan: a running Claude Code session does not
+  discover a server added to `.mcp.json`. Servers present at session start
+  do reach subagents through a server-level `mcp__<server>` grant: on
+  2026-10-17 a `reviewer` with `mcp__semble, mcp__context-mode` listed every
+  tool of both (model-reported list). Supersedes the earlier "subagent tool
+  lists exclude project MCP servers" wording.
 - [LEARN:tooling] OpenWiki 0.5.2: `mode: "update"` on an empty wiki performs
   a first generation; the page queue is served alphabetically by path;
   `openwiki_submit_page` rejects evidence citing `.openwikiignore`-excluded
@@ -1189,7 +1191,10 @@
   demands `ponytail_reviewed=true` in the findings report, documentation-only
   diffs included. Run the `ponytail` profile in the same review round as
   `documentation` whenever more than one file changes, or the first commit
-  attempt fails and steps 4 to 7 of closeout must be redone.
+  attempt fails and steps 4 to 7 of closeout must be redone. Path rules also
+  apply since gate-repair GR-002: test files need `tests`; control-plane,
+  generator, and dependency paths need code, architecture, security, tests,
+  and ponytail.
 - [LEARN:documentation] OpenWiki fixes structure, claims, and validation;
   the writing agent fixes page style. A style change goes in the brief's
   `## Page style` section, and applying it to existing pages needs a
@@ -1348,10 +1353,13 @@
   rounds of the supplement approach kept finding dangling references
   (workflow profile Phase A). A complete prompt is shorter, and one grep
   over it proves it clean.
-- [LEARN:tooling] The file-protection hook rejects any Bash command whose
-  text names a protected path pattern, even inside a grep regex or a
-  heredoc. Put such checks in a script file under the scratchpad and run
-  it with a plain command.
+- [LEARN:tooling] The file-protection hook rejects a Bash command that
+  names a protected path pattern unless the command is on its read-only
+  list (`cat`, `rg`, `grep`, `head`, `tail`, `sed`, `wc`, `stat`, read-only
+  git), including text inside a heredoc or interpreter code (re-checked
+  2026-10-17: `grep -n "uv.lock" README.md` allowed; a heredoc printing
+  `.env` denied). Put such checks in a script or payload file under the
+  scratchpad and run it with a plain command.
 - [LEARN:tooling] `claude -p` on an older installed CLI can refuse the
   default model (`Claude Code 2.1.226 does not support this model`) while
   the `system`/`init` event still works; pass `--model` with an older

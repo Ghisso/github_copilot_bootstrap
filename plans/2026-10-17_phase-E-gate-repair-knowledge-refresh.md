@@ -43,8 +43,8 @@ Copilot, Antigravity.
     `shared/policies/quality-and-testing.instructions.md` agree with Phases
     A–D;
   - the follow-ups this plan left open are recorded where the next planner
-    will find them (the audit exploration's "out of scope" list or a new
-    dated note): agent definition files are unprotected in all four clients,
+    will find them (the "Recorded follow-ups" list in
+    `docs/target-mapping.md`): agent definition files are unprotected in all four clients,
     including Codex `sandbox_mode` in `.codex/agents/*.toml`, which Codex ignores entirely (official Codex subagents docs and source, 2026-10-17), so the read-only Codex roles run with the parent session's sandbox; upstream's
     `antigravity-cli` Context Mode hooks are not wired; GR-002 enforces the
     Task Lanes profiles for control-plane paths but not for every multi-file
