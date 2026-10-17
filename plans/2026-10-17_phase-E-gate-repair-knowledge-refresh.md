@@ -3,8 +3,8 @@ name: 2026-10-17_phase-E-gate-repair-knowledge-refresh
 type: small-plan
 parent_plan: gate-repair
 phase_index: 5
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-17_gate-repair-phase-e.md
 ---
 
 # Small Plan: Gate Repair Knowledge Refresh
@@ -20,7 +20,7 @@ Copilot, Antigravity.
 
 ## Steps
 
-- [ ] **1. Run the final stale-claims audit (GR-012).**
+- [x] **1. Run the final stale-claims audit (GR-012).**
   **Owner:** orchestrator, with a documenter for prose changes.
   **Files:** as the audit finds; at least `docs/target-mapping.md`,
   `shared/skills/ponytail/SKILL.md`,
@@ -53,7 +53,7 @@ Copilot, Antigravity.
   2026-10-17 audit exploration) unchanged. Record every surface and its
   outcome under `## Stale-claims surfaces checked` in the closeout log.
 
-- [ ] **2. Refresh the OpenWiki knowledge layer.**
+- [x] **2. Refresh the OpenWiki knowledge layer.**
   **Owner:** orchestrator on the main thread, as the knowledge-refresh
   skill requires.
   **Required Skills:** `shared/skills/knowledge-refresh/SKILL.md` and
@@ -61,7 +61,7 @@ Copilot, Antigravity.
   Run one managed refresh after all source edits. Inspect the generated diff.
   Never hand-edit generated pages or Claims sidecars.
 
-- [ ] **3. Review, verify, close out.**
+- [x] **3. Review, verify, close out.**
   **Owner:** orchestrator; fresh reviewer.
   **Required Skills:** `shared/skills/code-review/SKILL.md`.
   Map GR-001 to GR-013 to evidence in the closeout log.
@@ -94,11 +94,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

@@ -16,7 +16,7 @@ plan's boundaries held (GR-013), and refresh the OpenWiki knowledge layer.
   activated Phase E. OpenWiki last refreshed at `f3a8337` (2026-10-06), so
   Phases A–D and the behavioral pilot's later commits are not in the wiki.
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready.
-- [ ] IMPLEMENT (audit, fixes, OpenWiki refresh)/VERIFY/REVIEW/CLOSEOUT
+- [x] IMPLEMENT (audit, fixes, OpenWiki refresh)/VERIFY/REVIEW/CLOSEOUT
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -50,6 +50,19 @@ plan's boundaries held (GR-013), and refresh the OpenWiki knowledge layer.
   that claim's evidence to `verify.py#L1735-L1745` and `#L2093-L2101`, and
   finished `complete`. Root `AGENTS.md` and `CLAUDE.md` blobs are unchanged
   by both runs (`2a0f2f64…`, `f39e62b0…`); no `openwiki/.run.json` remains.
+
+- **19:45** - Review round 1 (fresh reviewer; documentation, code,
+  architecture, security, tests, ponytail): PASS, no CRITICAL or MAJOR,
+  seven MINORs. Fixed four: the GR-008 count in this log, the Ponytail pin
+  LEARN entry (`deep-audit` has no pin), two unrecorded `.vscode/mcp.json`
+  leftovers added to the surfaces list, and a false "cannot drift" comment
+  in `_lib-frontmatter.sh` (same line count, so no wiki range moved).
+  Regenerated, self-installed, and re-ran the checks and `verify.py phase`
+  (PASS, 2767 passed, 1 skipped). Round 2: PASS, no new findings, no open
+  request. Three MINORs carry dispositions: the `ponytail-review`
+  description (accepted), and the parity-row `.claude/hooks/` gap and the
+  wiki "always applies both rules" wording (deferred to the next managed
+  OpenWiki refresh).
 
 ## Stale-claims surfaces checked
 
@@ -174,7 +187,15 @@ the next planner reads them, and refreshed ten OpenWiki pages.
 
 ## Verification
 
+- optional 1: PASS — OpenWiki runs `c04b431e-b61c-4d1f-82f6-5327b4a15671` and `10546fdb-a37d-4f48-94ad-4b937e92ce4c` returned `complete` from `openwiki_finish`; reviewed pages: `architecture/agents-and-skills.md`, `architecture/hooks-and-guardrails.md`, `architecture/source-generated-consumer-layout.md`, `operations/context-mode-dispatcher.md`, `operations/deterministic-verification.md`, `operations/git-backed-ai-state-sync.md`, `operations/install-ownership-and-runtime-checks.md`, `operations/sidecar-overlay.md`, `quickstart.md`, `workflows/lifecycle-and-task-lanes.md`.
+
 ## Open Questions / Next Steps
 
-- Regenerate, self-install, run the runtime and target checks and
-  `verify.py phase`, then a fresh review of the whole Phase E diff.
+- The big plan is complete after this commit. Opening a pull request from
+  `gate-repair_implementation` to `dev` is the user's decision.
+- Next managed OpenWiki refresh: add `.claude/hooks/` to the Claude Code
+  cell of the parity table's config-protection row, and scope the
+  deterministic-verification page's "always applies both rules" sentence
+  to phase completion.
+- Open follow-ups are listed under "Recorded follow-ups" in
+  `docs/target-mapping.md`.
