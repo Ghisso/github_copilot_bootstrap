@@ -1,7 +1,7 @@
 ---
 name: planner
 description: "Planning specialist for implementation work. Produces phased plans with ownership, risks, verification commands, required skills, and review profiles."
-tools: Agent, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, WebFetch, WebSearch
+tools: Agent, Bash, Read, Grep, Glob, mcp__semble, mcp__context-mode, mcp__context7, WebFetch, WebSearch
 model: opus
 effort: xhigh
 agents: []
