@@ -19,7 +19,11 @@ remove the stale agent schema (GR-011).
   root `.mcp.json` and `.vscode/mcp.json` that step 1 now protects (the
   intended order). No planner needed.
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass.
+- [x] IMPLEMENT/VERIFY/REVIEW — four review rounds (same reviewer for
+  confirmations; round 3 a full review of the scope change); final Gate
+  Result `PASS` with no findings.
+- [x] CLOSEOUT: final AI state, checkpoint, staged index, findings, phase
+  receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -157,10 +161,77 @@ remove the stale agent schema (GR-011).
   PASS, `verify.py phase` PASS (pytest 2767 passed, 1 skipped). Same
   reviewer asked to confirm.
 
+- **15:35** - Review round 4 (same reviewer, scoped to the fix): Gate Result
+  `PASS`, findings `[]`. Every finding and request from rounds 1–3 closed.
+
+### Phase-boundary summary
+
+- **Objective and change:** eight more hook- and server-launching configs
+  are protected for all four clients; the nested ai-state repository no
+  longer tracks `settings.local.json` and keeps a second clone's copy;
+  branch creation runs the plan validator on the plan's own files; shipped
+  deprecation checks keep pytest's exit status, with a validator check;
+  the unused agent schema is gone.
+- **Deviations from the plan (scope change, reported to the user):** VS
+  Code's Local harness sends the terminal tool as `run_in_terminal` /
+  `send_to_terminal`, so Copilot terminal commands had skipped the commit,
+  branch, and PR gates and the protected-file shell analysis. The shared
+  shell guards and `protect-files.py` now recognize both names, and
+  Copilot's documented read-only tools read hook configs without a prompt
+  (secret-shaped files stay denied). Recorded in the big plan's
+  "Scope-change records". Also added: the three documented Copilot hook
+  switch files to the protection list.
+- **Checks:** see `## Verification` below.
+- **Open findings:** none. Follow-ups recorded in `docs/target-mapping.md`:
+  Copilot SDK harness and Copilot CLI payload key casing; other VS Code
+  command-running tools (for example `create_and_run_task`), unverified;
+  `*.code-workspace` and `.agent.md` frontmatter hooks not protected.
+  Accepted limits: a listed phase without a file is skipped at branch
+  creation; an old nested `.gitignore` without the `settings.local.json`
+  line could re-track it; a settings write that lands before git's own
+  write in the same window restores the older copy.
+- **Next operation:** Phase E, knowledge refresh and final audit.
+
+### Requirement mapping
+
+- GR-008: `test_protect_files_gates_hook_and_server_configs_per_client`,
+  `test_pretool_bash_guard_gates_hook_and_server_config_redirects`,
+  `test_antigravity_bridge_denies_hook_and_server_config_writes`, read and
+  self-install allowance tests, `test_protect_files_denies_a_command_that_only_names_a_hook_config`,
+  scoping tests in `tests/test_protect_files_scoping.py`, the Copilot
+  terminal and read-tool tests (including the secret-file read deny), and
+  the state-sync tests (`test_checkpoint_untracks_previously_committed_local_settings_without_deleting_it`,
+  `test_second_clone_keeps_its_local_settings_when_it_pulls_the_untrack_commit`,
+  `test_pull_keeps_a_settings_write_made_while_it_ran`, and the merge,
+  conflict, and skip variants). Live: this repository's nested repository
+  no longer tracks the file; its Git hash is unchanged.
+- GR-009: branch-gate tests in `tests/test_branch_state.py` for all four
+  clients and both Copilot terminal tools.
+- GR-010: `test_deprecation_check_steps_keep_pytests_exit_status`,
+  `test_add_dependency_step_fails_when_the_import_check_fails`, the
+  failure-masking validator tests, and the shipped-text lint.
+- GR-011: `validate_targets.py` PASS; no reader remains.
+- GR-013: no model call; no version change; no network in required checks.
+
 ## [LEARN] Entries
+
+- [LEARN:security] Confirm a client's real hook tool names from source
+  before claiming a gate covers it; VS Code's `run_in_terminal` had skipped
+  every Copilot shell guard.
+- [LEARN:security] An exemption written as an early return skips every
+  later check; the Copilot read exemption first dropped the secret deny.
+- [LEARN:tooling] `.vscode/settings.json` and `.github/copilot/settings*.json`
+  can turn off Copilot hooks; protect them like hook configs.
+- [LEARN:workflow] After a self-install, new protect-files rules apply to
+  the orchestrator's own commands; probe with payload files and the
+  `shared/` script copy.
 
 ## Verification
 
+- optional 1: NOT RUN — the native Claude Code checks (an agent edit of `.claude/settings.local.json` prompting, and a "don't ask again" approval still saving) are user-run host checks; protect-files returns `ask` for `claude-code` in the offline tests.
+- optional 2: NOT RUN — a native Codex edit of `.codex/hooks.json` is a user-run host check; the `openai-codex` deny is covered offline.
+- optional 3: NOT RUN — a native Antigravity write to `.agents/hooks.json` in a disposable install is a user-run host check; the bridge deny is covered offline.
+
 ## Open Questions / Next Steps
 
-- Await coder and research results.
+- Next: Phase E, `2026-10-17_phase-E-gate-repair-knowledge-refresh`.

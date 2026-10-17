@@ -1486,3 +1486,23 @@
   invalid" until the self-install repopulates `.claude/bootstrap-root/`.
   Refresh with `install_bootstrap.py . --allow-self --local-only` before
   verifying.
+- [LEARN:security] VS Code's Local harness sends hooks the model-facing tool
+  name with an object `tool_input`: terminal `run_in_terminal` /
+  `send_to_terminal`, reads `read_file`, `list_dir`, `grep_search`, ...
+  (microsoft/vscode `chatHookService.ts`, 2026-10-17). Shell guards keyed on
+  `bash`/`shell` names had silently skipped every Copilot terminal command.
+  Confirm a client's real hook tool names from source before claiming a
+  gate covers that client.
+- [LEARN:security] An exemption implemented as an early return skips every
+  check after it. The Copilot read-tool exemption first dropped the
+  secret-file deny along with the hook-config prompt; exempt only the
+  specific hit class and test the checks that must still apply.
+- [LEARN:tooling] Copilot hooks can be turned off from the repository:
+  `.vscode/settings.json` (`chat.useHooks`, `chat.hookFilesLocations`,
+  `chat.useClaudeHooks`) and `.github/copilot/settings*.json`
+  (`disableAllHooks`). Protect them like other hook configs.
+- [LEARN:workflow] After a self-install, new protect-files rules apply to the
+  orchestrator's own Bash commands. A command that names a protected config
+  or loops over an installed hook script is refused; probe with
+  `git -C .claude hash-object`/`ls-files`, payload files, and the
+  `shared/hooks/scripts/` copy instead.

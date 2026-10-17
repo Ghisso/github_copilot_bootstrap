@@ -185,7 +185,7 @@ IDs are prose references for this plan only.
 - [x] `2026-10-17_phase-A-review-gate-integrity` — complete: gate result with schema version, required profiles, unit and installed-hook tests, post-closeout drift test. See `.claude/session_logs/2026-10-17_gate-repair-phase-a.md`.
 - [x] `2026-10-17_phase-B-context-mode-hook-sanitizer` — complete: capture upstream hook output in isolation, then forward only allowlisted advice fields. See `.claude/session_logs/2026-10-17_gate-repair-phase-b.md`.
 - [x] `2026-10-17_phase-C-mcp-surface-parity` — complete: guarded root MCP adapters, validator rule, Context7 grant, Codex and Antigravity MCP evidence. See `.claude/session_logs/2026-10-17_gate-repair-phase-c.md`.
-- [ ] `2026-10-17_phase-D-guard-coverage` — hook- and server-config protection, untracked local settings, branch-time plan checks, failure-hiding commands, stale schema
+- [x] `2026-10-17_phase-D-guard-coverage` — complete: hook- and server-config protection (plus Copilot hook switches), untracked local settings, branch-time plan checks, Copilot terminal and read tools, failure-hiding commands, stale schema. See `.claude/session_logs/2026-10-17_gate-repair-phase-d.md`.
 - [ ] `2026-10-17_phase-E-gate-repair-knowledge-refresh` — OpenWiki refresh and final audit
 
 Phase A comes first, so every later phase is reviewed under the repaired

@@ -3,8 +3,8 @@ name: 2026-10-17_phase-D-guard-coverage
 type: small-plan
 parent_plan: gate-repair
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-17_gate-repair-phase-d.md
 ---
 
 # Small Plan: Guard Coverage
@@ -26,7 +26,7 @@ only on documentation evidence. Phase C has already updated the root
 
 ## Steps
 
-- [ ] **1. Protect hook- and server-launching configs (GR-008).**
+- [x] **1. Protect hook- and server-launching configs (GR-008).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/protect-files.py` (`HOOK_CONFIGS`,
   lines 15–20, and the `PROTECTED_PATH_LITERAL` capture of those names);
@@ -46,7 +46,7 @@ only on documentation evidence. Phase C has already updated the root
   scoping rule). The self-install command, which writes these files from
   Python without naming them, still passes the Bash guard.
 
-- [ ] **2. Stop syncing `settings.local.json` through ai-state (GR-008).**
+- [x] **2. Stop syncing `settings.local.json` through ai-state (GR-008).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/state-sync.sh` (add an untrack
   helper beside `untrack_nested_cache` and `untrack_error_log`, called from
@@ -64,7 +64,7 @@ only on documentation evidence. Phase C has already updated the root
   `settings.local.json` and the local file is unchanged; a second clone that
   pulls the untrack commit keeps its local file byte for byte.
 
-- [ ] **3. Settle Copilot workspace hook settings from documentation (GR-008, Copilot).**
+- [x] **3. Settle Copilot workspace hook settings from documentation (GR-008, Copilot).**
   **Owner:** coder.
   **Files:** modify `docs/target-mapping.md`; modify
   `shared/hooks/scripts/protect-files.py` and its tests only for a
@@ -79,7 +79,7 @@ only on documentation evidence. Phase C has already updated the root
   Otherwise change no code and record "not documented" with the link, or
   "unverified".
 
-- [ ] **4. Run plan checks at branch creation (GR-009).**
+- [x] **4. Run plan checks at branch creation (GR-009).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/enforce-branch-state.sh` and
   `shared/policies/workflow.instructions.md` (the "Plan approval" rows of
@@ -100,7 +100,7 @@ only on documentation evidence. Phase C has already updated the root
   guard chain and the Copilot direct hook; one case through the Antigravity
   bridge.
 
-- [ ] **5. Keep test failures visible in shipped commands (GR-010).**
+- [x] **5. Keep test failures visible in shipped commands (GR-010).**
   **Owner:** coder.
   **Files:** modify `shared/skills/run-tests/SKILL.md` (Step 5, line 66) and
   `shared/skills/add-dependency/SKILL.md` (line 47); modify
@@ -119,14 +119,14 @@ only on documentation evidence. Phase C has already updated the root
   `test_run_tests_e2e_step_propagates_failure_instead_of_masking_it` (or add
   a sibling) for Step 5; one positive and one negative validator case.
 
-- [ ] **6. Remove the stale agent schema (GR-011).**
+- [x] **6. Remove the stale agent schema (GR-011).**
   **Owner:** coder.
   **Files:** delete `shared/schemas/agent.schema.json`.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full).
   Nothing reads it and it is not shipped. Leave the dated reference in
   `plans/plan-agent-model-effort-tiers.md` unchanged.
 
-- [ ] **7. Regenerate, refresh, document, review, close out.**
+- [x] **7. Regenerate, refresh, document, review, close out.**
   **Owner:** orchestrator; fresh reviewer; documenter after review.
   Untrack `settings.local.json` in this repository's nested ai-state through
   the new state-sync path (a checkpoint), not by hand. Run
@@ -174,11 +174,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
