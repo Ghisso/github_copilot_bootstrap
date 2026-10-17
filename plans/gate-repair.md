@@ -317,8 +317,10 @@ extra-high effort, devils-advocate skill). Outcome:
   https://code.visualstudio.com/docs/agents/reference/hooks-reference).
   The shell guards recognized only names containing `bash`/`shell` or equal
   to `execute`, so Copilot terminal commands skipped the commit, branch,
-  PR, git-protection, and protected-file shell checks, and Copilot native
-  reads of protected configs asked for approval. Phase D therefore also
+  and PR gates and the protected-file shell analysis (the git-protection
+  guard already read any `command`), and Copilot native reads of protected
+  configs asked for approval. The read exemption covers hook-config hits
+  only; secret-shaped files stay denied for read tools. Phase D therefore also
   recognizes `run_in_terminal` and `send_to_terminal` as terminal commands
   in the shared shell guards and `protect-files.py`, and exempts the listed
   Local read-only tools (and the Copilot-harness read tools `view`, `grep`,
