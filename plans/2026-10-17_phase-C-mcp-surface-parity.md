@@ -3,7 +3,7 @@ name: 2026-10-17_phase-C-mcp-surface-parity
 type: small-plan
 parent_plan: gate-repair
 phase_index: 3
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
