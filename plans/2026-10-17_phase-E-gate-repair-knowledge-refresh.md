@@ -41,7 +41,14 @@ Copilot, Antigravity.
     present at session start are granted);
   - `docs/smoke-tests.md`, `shared/policies/tool-routing.instructions.md`, and
     `shared/policies/quality-and-testing.instructions.md` agree with Phases
-    A–D.
+    A–D;
+  - the follow-ups this plan left open are recorded where the next planner
+    will find them (the audit exploration's "out of scope" list or a new
+    dated note): agent definition files are unprotected in all four clients,
+    including Codex `sandbox_mode` in `.codex/agents/*.toml`; upstream's
+    `antigravity-cli` Context Mode hooks are not wired; GR-002 enforces the
+    Task Lanes profiles for control-plane paths but not for every multi-file
+    diff.
   Leave dated records (archived plans, dated docs, closed session logs, the
   2026-10-17 audit exploration) unchanged. Record every surface and its
   outcome under `## Stale-claims surfaces checked` in the closeout log.

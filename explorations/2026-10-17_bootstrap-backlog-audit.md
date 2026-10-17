@@ -158,6 +158,31 @@ hook dispatcher and one subagent tool-list probe during planning.
 
 ---
 
+### Corrections from the devil's advocate review (same day)
+
+An independent read-only review of the `gate-repair` plan (Opus,
+extra-high effort) re-checked these rows against the code:
+
+- **D4 was wrong as written.** The required-Ponytail blocking path *is*
+  tested through the installed commit-msg and pre-push hooks in
+  `scripts/validate_targets.py:6098-6112` and `:6580-6600`. Only a unit test
+  in `tests/test_verify.py` is missing. (The original search covered
+  `tests/` only.)
+- **D1 is wider.** Upstream `context-mode hook` can also return `allow` with
+  a rewritten tool input (`updatedInput`, for example a changed subagent
+  prompt): upstream `hooks/core/formatters.mjs:23-77`. The dispatcher
+  `exec`s upstream, so upstream's exit status reaches the client too.
+- **D3 is wider.** `.mcp.json`, `.vscode/mcp.json`, and
+  `.agents/mcp_config.json` launch server commands but are not protected
+  either. The nested ai-state repository here still tracks
+  `settings.local.json` (commits `3cb99a2`, `db082f3`, `8f51c51`) although
+  `.claude/.gitignore` lists it.
+- **D2 detail.** Push gates re-check the last completed phase's findings with
+  the strict completion rule (`_lib-frontmatter.sh:1541`, `:1756`). The
+  historical chain checks only artifact hashes, not `report_errors`.
+- **Antigravity protect decision.** `protect-files.py:1427` itself denies for
+  `google-antigravity`; the bridge's ask-to-deny conversion is a backstop.
+
 ## 6. Reported but not defects, or out of scope
 
 - `protect-files.sh` denies `python3 -c "...open(path)..."` and commands with

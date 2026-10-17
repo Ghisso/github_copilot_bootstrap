@@ -11,88 +11,104 @@ closeout_session_log:
 
 ## Scope
 
-Stop the Context Mode hook lane from advising or forcing tools that the
-repository's own MCP filter blocks (GR-007). Today the dispatcher forwards
-upstream `context-mode hook` output unchanged. At the pinned `1.0.169` that
-output names blocked tools, and it denies WebFetch and plain `curl` in favour
-of blocked tools. The lane is documented as one that "makes no safety
-decision". This phase first records what upstream actually emits for each
-wired client, then filters the output in the dispatcher. Clients in priority
-order: Claude Code (`claude-code`), Codex (`codex`), GitHub Copilot
-(`vscode-copilot`). Antigravity has no Context Mode hooks wired, so it has
-nothing to sanitize; that gap is recorded, not changed.
+Make the Context Mode hook lane advisory only, as `docs/smoke-tests.md`
+already says it is: "no safety decision or mutation" (GR-007). Today the
+dispatcher `exec`s upstream `context-mode hook`, so upstream output and exit
+status reach the client unchanged. At the pinned `1.0.169` that output names
+blocked tools, denies WebFetch and plain `curl`, and can return `allow` with
+a rewritten tool input (`updatedInput`). This phase first records what
+upstream emits for each wired client, in isolation, then forwards only an
+allowlist of advice fields. Clients in priority order: Claude Code
+(`claude-code`), Codex (`openai-codex`), GitHub Copilot (`github-copilot`);
+the dispatcher maps these client ids to upstream targets. Upstream also
+ships `antigravity-cli` hooks, but the bootstrap does not wire Context Mode
+hooks for Antigravity; that gap is recorded, not changed.
 
 ## Steps
 
-- [ ] **1. Capture upstream hook output (evidence only, no production code).**
+- [ ] **1. Capture upstream hook output in isolation (evidence only, no production code).**
   **Owner:** orchestrator.
-  **Files:** add `tests/fixtures/context_mode_hook/1.0.169/<target>/<event>.json`
-  (recorded outputs) and a short capture note in the phase session log.
+  **Files:** add `tests/fixtures/context_mode_hook/1.0.169/<client-id>/<event>-<case>.json`
+  (recorded stdout, exit code, and stderr summary) and a capture table in
+  the phase session log.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/ponytail/SKILL.md` (full).
-  For each target `claude-code`, `codex`, `vscode-copilot`, pipe fixed
-  synthetic payloads through
-  `.claude/hooks/scripts/run-hook.sh context-mode-dispatch.sh <client-id> <event>`
-  with one throwaway session id: `sessionstart` (startup), `pretooluse`
-  (Bash `ls`, Bash `curl -s https://example.com`, Read, Grep, the client's
-  web-fetch tool), `posttooluse` (one Bash call), `precompact`, then
-  `sessionstart` with source `compact` for the same session id. Replace
-  absolute user paths with a placeholder before saving. Record a table: per
-  target and event, the output fields, any decision, the tool names
-  mentioned, and whether restore content is present and separable (by which
-  block or field).
-  **Question:** can continuity content be kept while every blocked-tool
-  mention and every upstream decision is removed?
-  **Stop rule:** if, for any target, restore content cannot be separated from
-  blocked-tool advice, stop before step 2 and ask the user to choose: drop
-  that target's session-start output (lose restore) or keep it with the
-  advice.
+  Copy the dispatcher into a temporary Git repository (the existing
+  `installed_dispatcher` test pattern) and run it with a temporary `HOME`,
+  `CLAUDE_CONFIG_DIR`, and `CODEX_HOME`, so no user-level file (for example
+  `~/.claude/CLAUDE.md`) reaches the session store or a fixture. First
+  confirm `--self-check` reports the direct pinned binary (no `npx`). For
+  each client id `claude-code`, `openai-codex`, `github-copilot`, use one
+  throwaway session id and these payloads: `sessionstart` (startup);
+  `pretooluse` for Bash `ls`, Bash `curl -s https://example.com`, Read,
+  Grep, the client's web-fetch tool, the client's subagent tool (Claude
+  `Agent`, Copilot subagent), and a `ctx_execute` shell call; `posttooluse`
+  (one Bash call); `precompact`; then `sessionstart` with source `compact`
+  for the same session id. Record per case: exit code, stderr summary, every
+  top-level and `hookSpecificOutput` field, any decision or input rewrite,
+  the tool names mentioned, and whether restore content is present and in
+  which field.
+  **Question:** can continuity content be forwarded while every decision,
+  every input rewrite, and every blocked-tool mention is dropped?
+  **Stop rule:** if, for any client, restore content and blocked-tool advice
+  share one field and cannot be separated by its observed structure, stop
+  before step 2 and ask the user to choose: drop that client's session-start
+  output (lose restore) or keep it with the advice.
   **Limits:** one pinned version, synthetic payloads, no native client run.
 
-- [ ] **2. Sanitize hook output in the dispatcher (GR-007).**
+- [ ] **2. Forward only allowlisted advice fields (GR-007).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/context-mode-dispatch.sh` (hook
-  modes stop `exec`-ing upstream; they run it and pass its stdout through
-  the sanitizer) and `shared/hooks/scripts/context-mode-mcp-filter.mjs` (add
-  a hook-output mode that reuses its existing four-tool allowlist constant).
-  Do not write a second hand-maintained tool list.
+  modes run upstream instead of `exec`-ing it, capture its stdout and exit
+  status, and pass stdout through the filter) and
+  `shared/hooks/scripts/context-mode-mcp-filter.mjs` (add a hook-output mode
+  that reuses its existing four-tool allowlist constant). Do not write a
+  second hand-maintained tool list.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
   `shared/skills/code-style/SKILL.md`,
   `shared/skills/testing-patterns/SKILL.md`,
   `shared/skills/integration-gate-spike/SKILL.md`.
-  Rules, applied to the JSON upstream prints:
-  1. Remove any upstream `deny` or `ask` decision and its reason, in each
-     client's captured shape. This lane makes no safety decision; the
-     bootstrap's own guards do.
-  2. Remove the advice blocks step 1 identified, by their observed block or
-     field boundaries.
-  3. Safety net: after steps 1–2, drop any remaining string field that still
-     contains `mcp__plugin_context-mode_` or a `ctx_` tool name outside the
+  Rules:
+  1. Build a new output object containing only the event name and the
+     advice text field(s) step 1 identified for that client and event.
+     Drop every other field, including any decision value,
+     `permissionDecisionReason`, `updatedInput`, `tool_input`, `decision`,
+     `continue`, `stopReason`, and `systemMessage`.
+  2. Inside each kept text field, remove the advice blocks step 1
+     identified. Then drop the field entirely if it still contains
+     `mcp__plugin_context-mode_` or a `ctx_` tool name outside the
      allowlist.
-  4. Empty or unparseable output: emit nothing, exit 0, and write one
-     warning through the dispatcher's existing `warn` path.
+  3. Emit nothing when no field survives, or when upstream output is empty
+     or unparseable.
+  4. Hook modes always exit 0. A nonzero upstream exit is logged once
+     through the dispatcher's existing `warn` path.
   Upstream still runs, so its own side effects (event capture, compaction
-  snapshot) are unchanged. Hook modes keep exit status 0 and the existing
-  missing-binary and timeout behavior. Server mode is unchanged.
+  snapshot) are unchanged. The dispatcher adds no timeout of its own; the
+  client hook timeout still applies. Server mode is unchanged.
   **Tests:** in `tests/test_context_mode_dispatch.py`, feed every recorded
-  fixture through the sanitizer and assert: no blocked or plugin-prefixed
-  name, no `deny` or `ask`, separable restore content kept byte for byte,
-  allowlisted `ctx_search` advice with the correct prefix kept, malformed
-  output yields nothing. Add one real-binary test selected by
-  `-k real_upstream`. With `CONTEXT_MODE_REAL=1` it requires the pinned
-  binary (it fails, not skips, when the binary is absent). It runs WebFetch,
-  `curl`, and session-start payloads for `claude-code` through the real
-  dispatcher and asserts the same rules. Without the variable it skips.
+  fixture through the filter and assert: no decision, no input rewrite, no
+  blocked or plugin-prefixed name; a Copilot or Codex `allow` plus
+  `updatedInput` fixture comes out with at most the advice field; separable
+  restore content kept byte for byte; allowlisted `ctx_search` advice with
+  the correct prefix kept; malformed output yields nothing; a nonzero
+  upstream exit yields exit 0. Add one real-binary test selected by
+  `-k real_upstream`. With `CONTEXT_MODE_REAL=1` it first asserts that
+  `context-mode-dispatch.sh --self-check` reports `launcher=context-mode`
+  and `version-contract=pinned-direct-binary`, failing otherwise (no `npx`
+  download). It then runs WebFetch, `curl`, Agent, and session-start
+  payloads for `claude-code` through the real dispatcher in an isolated
+  temporary `HOME` and repository, and asserts the same rules. Without the
+  variable it skips.
 
 - [ ] **3. Document the lane and its version tie.**
   **Owner:** documenter after review.
-  **Files:** modify `docs/smoke-tests.md` (the "makes no safety decision"
-  statement is now enforced, and how), `docs/runtime-checks.md` (bumping
-  `PINNED_CONTEXT_MODE_VERSION` requires re-capturing the fixtures),
-  `docs/target-mapping.md` (start the per-client parity table: this row, plus
-  the Antigravity "no Context Mode hooks, no continuity" gap). Change
-  `shared/policies/tool-routing.instructions.md` only when its text
-  conflicts with the result.
+  **Files:** modify `docs/smoke-tests.md` (the "no safety decision or
+  mutation" statement is now enforced, and how), `docs/runtime-checks.md`
+  (bumping `PINNED_CONTEXT_MODE_VERSION` requires re-capturing the
+  fixtures), `docs/target-mapping.md` (start the per-client parity table:
+  this row, plus the Antigravity "Context Mode hooks not wired, no
+  continuity" gap). Change `shared/policies/tool-routing.instructions.md`
+  only when its text conflicts with the result.
   **Required Skills:** `shared/skills/documentation/SKILL.md`.
 
 - [ ] **4. Regenerate, refresh the installed runtime, review, close out.**
@@ -115,10 +131,9 @@ uv run python .claude/scripts/verify.py fast --format json
 
 ## Optional Verification
 
-- Claude Code: in a new session in this repository, call WebFetch on a
-  public page and record that no Context Mode deny appears. The user-level
-  `context-mode@context-mode` plugin, if still enabled, has its own hooks;
-  record its effect separately.
+- Claude Code: with the user-level `context-mode@context-mode` plugin off,
+  start a new session in this repository, call WebFetch on a public page,
+  and record that no Context Mode deny appears.
 - Codex: in a new session, fetch a public page with the native web tool and
   record the result.
 - GitHub Copilot: in VS Code agent mode, fetch a public page and record the

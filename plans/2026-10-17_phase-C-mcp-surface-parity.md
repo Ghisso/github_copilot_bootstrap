@@ -20,7 +20,11 @@ tracked root `.mcp.json` (Claude) and `.vscode/mcp.json` (Copilot) start
 `context-mode` directly. The root `.codex/config.toml`, the installed
 `.agents/mcp_config.json`, and every generated target already use the
 guarded dispatcher. Context7 stays a generated-target capability; it is not
-added to this repository's root adapters (big-plan non-goal).
+added to the tracked root adapters (big-plan non-goal). This phase changes
+the root `.mcp.json` and `.vscode/mcp.json` before Phase D protects them.
+Documentation lookups follow the big plan's fallback order: WebFetch or
+Context7, then `gh api` on the official repositories or WebSearch, else the
+question is recorded as unverified with no code change.
 
 ## Steps
 
@@ -66,10 +70,10 @@ added to this repository's root adapters (big-plan non-goal).
   documented gap.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/ponytail/SKILL.md` (full).
-  Use Context7 or WebFetch (working after Phase B) on the official Codex
-  documentation and source for custom agents in `.codex/agents/*.toml`.
+  Read the official Codex documentation and source (`openai/codex`) for
+  custom agents in `.codex/agents/*.toml`, using the lookup fallback order.
   Question: do spawned agents get the session's `mcp_servers`? Record the
-  answer with links. When the documentation shows a per-agent setting is
+  answer with links, or record it as unverified. When the documentation shows a per-agent setting is
   required, render it for agents with the `search` capability and test it.
   Otherwise record "inherits session MCP servers" in the parity table.
 
@@ -82,7 +86,8 @@ added to this repository's root adapters (big-plan non-goal).
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
   `shared/skills/ponytail/SKILL.md` (full),
   `shared/skills/testing-patterns/SKILL.md`.
-  Two questions from the official Antigravity documentation: where `agy`
+  Two questions for the official Antigravity documentation, using the
+  lookup fallback order: where `agy`
   reads workspace MCP servers (a 2026-08 run reported `No MCP servers
   configured` for `.agents/mcp_config.json`), and what `toolCall.name` an MCP
   call carries in a PreToolUse payload. The bridge denies unknown tools today,
