@@ -11,7 +11,7 @@ phases:
   - 2026-10-17_phase-C-mcp-surface-parity
   - 2026-10-17_phase-D-guard-coverage
   - 2026-10-17_phase-E-gate-repair-knowledge-refresh
-current_phase: 2026-10-17_phase-D-guard-coverage
+current_phase: 2026-10-17_phase-E-gate-repair-knowledge-refresh
 ---
 
 # Big Plan: Gate Repair
