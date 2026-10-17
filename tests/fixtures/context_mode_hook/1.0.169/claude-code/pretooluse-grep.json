@@ -1,0 +1,18 @@
+{
+  "client_id": "claude-code",
+  "event": "pretooluse",
+  "case": "grep",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "tool_name": "Grep",
+    "tool_input": {
+      "pattern": "x"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"<context_guidance>\\n  <tip>\\n    Grep results may be larger than you expect. When you intend to count, filter, or aggregate matches (not just spot-check one), run the search through mcp__plugin_context-mode_context-mode__ctx_execute(language: \\\"javascript\\\", code: \\\"...\\\") — the raw match list stays in the sandbox and only your derived answer enters your conversation. Use language: \\\"shell\\\" only when the code matches the host shell (PowerShell on Windows, POSIX shell on Unix).\\n  </tip>\\n</context_guidance>\"}}\n",
+  "stderr_tail": []
+}

@@ -1,0 +1,18 @@
+{
+  "client_id": "github-copilot",
+  "event": "pretooluse",
+  "case": "subagent",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "tool_name": "runSubagent",
+    "tool_input": {
+      "prompt": "Summarize README.md"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}

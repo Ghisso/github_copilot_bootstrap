@@ -1,0 +1,22 @@
+{
+  "client_id": "claude-code",
+  "event": "posttooluse",
+  "case": "bash",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "ls"
+    },
+    "tool_response": {
+      "stdout": "README.md\n",
+      "stderr": ""
+    },
+    "hook_event_name": "PostToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}

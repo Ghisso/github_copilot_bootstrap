@@ -1,0 +1,18 @@
+{
+  "client_id": "github-copilot",
+  "event": "pretooluse",
+  "case": "terminal-curl",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "tool_name": "run_in_terminal",
+    "tool_input": {
+      "command": "curl -s https://example.com"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"Routed to context-mode sandbox\",\"updatedInput\":{\"command\":\"echo \\\"context-mode: curl/wget redirected. Call context-mode_ctx_execute(language, code) to fetch the URL, derive your answer in code, and print only the result — the raw HTTP body stays in the sandbox instead of entering your conversation. Or call context-mode_ctx_fetch_and_index(url, source) when you want to query the response later via context-mode_ctx_search. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).\\\"\"}}}\n",
+  "stderr_tail": []
+}

@@ -1,0 +1,19 @@
+{
+  "client_id": "github-copilot",
+  "event": "posttooluse",
+  "case": "terminal",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "tool_name": "run_in_terminal",
+    "tool_input": {
+      "command": "ls"
+    },
+    "tool_response": "README.md\n",
+    "hook_event_name": "PostToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}

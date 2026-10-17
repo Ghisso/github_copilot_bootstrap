@@ -1,0 +1,15 @@
+{
+  "client_id": "claude-code",
+  "event": "precompact",
+  "case": "manual",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "hook_event_name": "PreCompact",
+    "trigger": "manual"
+  },
+  "exit_code": 0,
+  "stdout": "{}\n",
+  "stderr_tail": []
+}

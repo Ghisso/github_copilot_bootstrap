@@ -1,0 +1,18 @@
+{
+  "client_id": "claude-code",
+  "event": "pretooluse",
+  "case": "bash-ls",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "ls"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}

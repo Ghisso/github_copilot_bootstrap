@@ -1,0 +1,20 @@
+{
+  "client_id": "github-copilot",
+  "event": "pretooluse",
+  "case": "fetch",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "tool_name": "fetch",
+    "tool_input": {
+      "urls": [
+        "https://example.com"
+      ]
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"context-mode: WebFetch redirected. Call context-mode_ctx_fetch_and_index(url: \\\"\\\", source: \\\"...\\\") to fetch + index the page, then context-mode_ctx_search(queries: [...]) to query the indexed content — the raw page bytes stay in storage instead of entering your conversation. Or call context-mode_ctx_execute(language, code) when you want to derive your answer in one round trip (parse, extract, count) without persisting the response. Both have full network access. Retry the same call on a transient DNS error (EAI_AGAIN, ETIMEDOUT, ENETUNREACH).\"}\n",
+  "stderr_tail": []
+}

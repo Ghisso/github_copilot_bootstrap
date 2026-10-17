@@ -1,0 +1,18 @@
+{
+  "client_id": "claude-code",
+  "event": "pretooluse",
+  "case": "read",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-claude-code",
+    "cwd": "<TMP>/repo",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "README.md"
+    },
+    "hook_event_name": "PreToolUse"
+  },
+  "exit_code": 0,
+  "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"<context_guidance>\\n  <tip>\\n    Reading to Edit the file? Read is correct — Edit needs the exact bytes in your conversation to match against.\\n    Reading to analyze, summarize, or extract from the file? Use mcp__plugin_context-mode_context-mode__ctx_execute_file(path, language, code) — the bytes stay in the sandbox and only what your code prints enters your conversation.\\n  </tip>\\n</context_guidance>\"}}\n",
+  "stderr_tail": []
+}

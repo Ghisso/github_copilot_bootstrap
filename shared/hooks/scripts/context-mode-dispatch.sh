@@ -324,7 +324,35 @@ case "$MODE" in
   *) CONTEXT_MODE_TARGET="$MODE" ;;
 esac
 
-if [[ "$command_path" == "npx" ]]; then
-  exec npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" hook "$CONTEXT_MODE_TARGET" "$@"
+run_upstream_hook() {
+  if [[ "$command_path" == "npx" ]]; then
+    npx -y "context-mode@$PINNED_CONTEXT_MODE_VERSION" hook "$CONTEXT_MODE_TARGET" "$@"
+  else
+    "$command_path" hook "$CONTEXT_MODE_TARGET" "$@"
+  fi
+}
+
+# The hook lane is advisory only: run upstream (its own side effects, such as
+# event capture and the compaction snapshot, are unchanged), keep only its
+# stdout, and forward just the filtered advice text. Upstream decisions, input
+# rewrites, and blocked-tool advice never reach the client, and hook modes
+# always exit 0. No timeout is added; the client's hook timeout still applies.
+upstream_status=0
+upstream_output="$(run_upstream_hook "$@")" || upstream_status=$?
+if ((upstream_status != 0)); then
+  warn "upstream hook $CONTEXT_MODE_TARGET exited with status $upstream_status; its output is still filtered"
 fi
-exec "$command_path" hook "$CONTEXT_MODE_TARGET" "$@"
+[[ -n "$upstream_output" ]] || exit 0
+
+if [[ ! -f "$FILTER_SCRIPT" ]] || ! command -v node >/dev/null 2>&1; then
+  warn "MCP filter or Node runtime unavailable; dropping hook output"
+  exit 0
+fi
+# The filter output is captured first so a failed filter can never leave a
+# partial object on stdout.
+if ! filtered_output="$(printf '%s' "$upstream_output" | node "$FILTER_SCRIPT" --hook-output)"; then
+  warn "hook output filter failed; dropping hook output"
+  exit 0
+fi
+[[ -z "$filtered_output" ]] || printf '%s\n' "$filtered_output"
+exit 0

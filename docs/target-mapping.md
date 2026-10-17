@@ -85,6 +85,16 @@ GitHub Copilot (secondary compatibility adapter):
 
 Copilot files are native adapters; agent wrappers preserve Copilot frontmatter and point to `.claude/agents/`, and Copilot generates only the five universal agents.
 
+## Gate-Repair Client Parity
+
+Per-client status for the `gate-repair` changes. Clients are listed in the order Claude Code, Codex, GitHub Copilot, Antigravity. Later phases add rows.
+
+| Change | Claude Code (`claude-code`) | Codex (`openai-codex`) | GitHub Copilot (`github-copilot`) | Antigravity |
+| --- | --- | --- | --- | --- |
+| Context Mode hook lane is advisory only | Filtered | Filtered | Filtered | Context Mode hooks not wired, so no session continuity (recorded gap) |
+
+"Filtered" means `context-mode-dispatch.sh` passes upstream hook output through `context-mode-mcp-filter.mjs --hook-output`. See [runtime-checks.md](runtime-checks.md) for the pin and known limits.
+
 ## Sidecar Overlay
 
 `dist/sidecar/` is a second generated target: a narrow, per-clone developer

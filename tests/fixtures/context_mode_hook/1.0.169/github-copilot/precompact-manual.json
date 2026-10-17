@@ -1,0 +1,15 @@
+{
+  "client_id": "github-copilot",
+  "event": "precompact",
+  "case": "manual",
+  "context_mode_version": "1.0.169",
+  "input": {
+    "session_id": "gate-repair-capture-github-copilot",
+    "cwd": "<TMP>/repo",
+    "hook_event_name": "PreCompact",
+    "trigger": "manual"
+  },
+  "exit_code": 0,
+  "stdout": "",
+  "stderr_tail": []
+}
