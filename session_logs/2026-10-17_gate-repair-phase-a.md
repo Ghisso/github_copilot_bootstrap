@@ -39,6 +39,19 @@ tests (GR-003), and post-closeout drift (GR-004).
   missing profiles either). Delegated steps 1–4 and step 5 guidance text to
   the coder with the verified line references.
 
+- **05:30** - Coder finished steps 1–4 and step 5 guidance text (12 files).
+  Deviations accepted: `tests/test_install_bootstrap.py` fixture and the
+  `validate_targets.py` smoke default now carry the new fields and five
+  profiles; orchestrator prompts needed no change; sidecar text untouched
+  (no recorder there). Negative controls: every new check, when removed,
+  failed its covering tests. A pre-push installed-hook WARN case was not
+  added; unit tests cover the push gates, which the plan accepts.
+- **05:35** - Self-install refreshed `.claude/`; `check_runtime.py` PASS.
+  `verify.py phase --format text` PASS (Ruff 0, mypy 0, pytest 2372 passed).
+  Documenter updated `README.md` and `docs/runtime-checks.md`;
+  `validate_targets.py` PASS afterwards. Diff sent to a fresh reviewer with
+  profiles code, architecture, security, tests, ponytail, documentation.
+
 ## [LEARN] Entries
 
 ## Verification
