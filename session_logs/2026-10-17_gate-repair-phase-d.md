@@ -86,6 +86,15 @@ remove the stale agent schema (GR-011).
   lock-in test), documenter (state-sync paragraph, naming-deny sentence
   with the `--body-file` advice).
 
+- **13:30** - All four fixes landed. Restore now keeps a newer file unless
+  it is missing or equals `origin/$BRANCH:settings.local.json`; branch-gate
+  loop is an array slice; lock-in test for name-only denial. Docs state the
+  exact restore rule, its one limit (a write before git's own write in the
+  same window), three warnings, and the `--body-file` guidance. Regenerate,
+  self-install, `check_runtime.py` PASS, nested repo still untracks the
+  file with an unchanged hash, `verify.py phase` PASS (pytest 2695 passed,
+  1 skipped), `validate_targets.py` PASS. Same reviewer asked to confirm.
+
 ## [LEARN] Entries
 
 ## Verification
