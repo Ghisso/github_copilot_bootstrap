@@ -3,7 +3,7 @@ name: 2026-10-17_phase-D-guard-coverage
 type: small-plan
 parent_plan: gate-repair
 phase_index: 4
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
