@@ -18,7 +18,10 @@ blocked-tool name, for client ids `claude-code`, `openai-codex`,
   activated Phase B. No material impact from Phase A on this phase.
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready; no planner.
 - [x] Step 1 capture (orchestrator): done; stop rule not triggered.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass.
+- [x] IMPLEMENT/VERIFY/REVIEW — three review rounds (same reviewer for
+  confirmations); final Gate Result `PASS` with no findings.
+- [x] CLOSEOUT: final AI state, checkpoint, staged index, findings, phase
+  receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -115,10 +118,60 @@ no native client.
   Signal forwarding on timeout stays out of scope (documented limit).
   Same reviewer asked to confirm, with the full fix evidence.
 
+- **08:45** - Review round 2: all five fixes confirmed; one new MINOR from my
+  own corrective wording (the capture script reads the pin from `shared/`,
+  not from the temporary copy). Applied the reviewer's exact sentence.
+  Round 3 (same reviewer, scoped to that sentence): Gate Result `PASS`,
+  findings `[]`.
+
+### Phase-boundary summary
+
+- **Objective and change:** the Context Mode hook lane now forwards only
+  filtered advice text for `claude-code`, `openai-codex`, `github-copilot`;
+  upstream decisions and input rewrites never reach the client. In this
+  repository the installed hook no longer denies WebFetch or `curl`.
+- **Deviations from the plan:** the capture script is committed as
+  `tests/fixtures/context_mode_hook/capture.py` and records raw upstream
+  output directly (review finding); `hookEventName` must be a plain word;
+  `<context_guidance>` added to the stripped advice blocks.
+- **Checks:** see `## Verification` below.
+- **Open findings:** none. Accepted, documented limits: fail-closed drop of
+  a restored block naming a non-allowlisted `ctx_` tool; unclosed, nested,
+  or cased advice tags rely on the name safety net; no signal forwarding on
+  client timeout; Codex and Copilot restore shapes unobserved.
+- **Next operation:** Phase C, MCP surface parity.
+
+### Requirement mapping
+
+- GR-007: `test_recorded_upstream_output_is_reduced_to_advice_only` (32
+  recorded fixtures through the real dispatcher),
+  `test_decisions_and_rewrites_are_dropped_but_advice_text_survives`,
+  `test_nonzero_upstream_exit_is_logged_once_and_the_hook_exits_zero`,
+  `test_nonzero_upstream_exit_still_forwards_the_filtered_advice`,
+  `test_the_client_hook_payload_reaches_upstream_on_stdin`,
+  `test_fixture_directory_is_named_after_the_pinned_version`, the
+  `--hook-output` unit tests in `tests/test_context_mode_mcp_filter.py`
+  (including the plain-word event name), and the opt-in
+  `test_real_upstream_hook_output_is_advisory_only`.
+- GR-013: no model call; no version change; the real-binary check refuses
+  an `npx` download.
+
 ## [LEARN] Entries
+
+- [LEARN:security] Upstream `context-mode hook` output is not advisory: at
+  1.0.169 it denies fetches and returns `allow` with `updatedInput` that
+  rewrites commands and subagent prompts. Forwarding must allowlist fields,
+  not strip known decisions.
+- [LEARN:tooling] Upstream Context Mode tip throttling uses files in the OS
+  temporary directory; captures and tests that reuse a session id need a
+  private `TMPDIR`.
 
 ## Verification
 
+- optional 1: NOT RUN — a new native Claude Code session with the user-level `context-mode@context-mode` plugin turned off is a user-run host check; instead the installed hook in this repository was run directly with `claude-code` WebFetch and Bash `curl` PreToolUse payloads and produced no output with exit 0 (before the change: deny).
+- optional 2: NOT RUN — a native Codex fetch is a user-run host check; the `openai-codex` recorded fixtures cover the hook output offline.
+- optional 3: NOT RUN — a native GitHub Copilot fetch in VS Code is a user-run host check; the `github-copilot` recorded fixtures cover the hook output offline.
+
 ## Open Questions / Next Steps
 
-- Delegate step 2 (filter) to the coder with this table.
+- Next: Phase C, `2026-10-17_phase-C-mcp-surface-parity`.

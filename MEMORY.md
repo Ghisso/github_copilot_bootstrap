@@ -1457,3 +1457,14 @@
   fixture in `scripts/validate_targets.py`, and the lifecycle fixture in
   `tests/test_install_bootstrap.py`. The validator consumes the recorder
   directly, so pytest alone does not show the break.
+- [LEARN:security] Upstream `context-mode hook` output is not advisory. At
+  1.0.169 it denies WebFetch, `curl`, `web_fetch`, and `fetch`, and returns
+  `allow` with `updatedInput` that rewrites commands and subagent prompts.
+  A wrapper that forwards it must build a new object from an allowlist of
+  fields (`hookEventName`, filtered `additionalContext`), not strip known
+  decisions (gate-repair Phase B).
+- [LEARN:tooling] Upstream Context Mode hooks throttle once-per-session tips
+  with files in the OS temporary directory
+  (`context-mode-guidance-s-<session>`). Captures and tests that reuse a
+  session id must set a private `TMPDIR`, or tips silently disappear on the
+  second run.

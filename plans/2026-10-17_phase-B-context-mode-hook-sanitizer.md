@@ -3,8 +3,8 @@ name: 2026-10-17_phase-B-context-mode-hook-sanitizer
 type: small-plan
 parent_plan: gate-repair
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-17_gate-repair-phase-b.md
 ---
 
 # Small Plan: Context Mode Hook Sanitizer
@@ -26,7 +26,7 @@ hooks for Antigravity; that gap is recorded, not changed.
 
 ## Steps
 
-- [ ] **1. Capture upstream hook output in isolation (evidence only, no production code).**
+- [x] **1. Capture upstream hook output in isolation (evidence only, no production code).**
   **Owner:** orchestrator.
   **Files:** add `tests/fixtures/context_mode_hook/1.0.169/<client-id>/<event>-<case>.json`
   (recorded stdout, exit code, and stderr summary) and a capture table in
@@ -56,7 +56,7 @@ hooks for Antigravity; that gap is recorded, not changed.
   output (lose restore) or keep it with the advice.
   **Limits:** one pinned version, synthetic payloads, no native client run.
 
-- [ ] **2. Forward only allowlisted advice fields (GR-007).**
+- [x] **2. Forward only allowlisted advice fields (GR-007).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/context-mode-dispatch.sh` (hook
   modes run upstream instead of `exec`-ing it, capture its stdout and exit
@@ -100,7 +100,7 @@ hooks for Antigravity; that gap is recorded, not changed.
   temporary `HOME` and repository, and asserts the same rules. Without the
   variable it skips.
 
-- [ ] **3. Document the lane and its version tie.**
+- [x] **3. Document the lane and its version tie.**
   **Owner:** documenter after review.
   **Files:** modify `docs/smoke-tests.md` (the "no safety decision or
   mutation" statement is now enforced, and how), `docs/runtime-checks.md`
@@ -111,7 +111,7 @@ hooks for Antigravity; that gap is recorded, not changed.
   only when its text conflicts with the result.
   **Required Skills:** `shared/skills/documentation/SKILL.md`.
 
-- [ ] **4. Regenerate, refresh the installed runtime, review, close out.**
+- [x] **4. Regenerate, refresh the installed runtime, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
@@ -153,11 +153,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
