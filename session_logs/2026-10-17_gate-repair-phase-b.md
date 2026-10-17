@@ -3,7 +3,7 @@
 **Date:** 2026-10-17
 **Plan:** .claude/plans/2026-10-17_phase-B-context-mode-hook-sanitizer.md
 **Parent plan:** .claude/plans/gate-repair.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -167,6 +167,18 @@ no native client.
   private `TMPDIR`.
 
 ## Verification
+
+- PASS        0.3s  uv run python scripts/generate_targets.py --all
+- PASS       44.5s  uv run python scripts/validate_targets.py
+- PASS        8.5s  uv run pytest tests/test_context_mode_dispatch.py tests/test_context_mode_mcp_filter.py tests/test_lifecycle_hooks.py -q
+- PASS        0.8s  CONTEXT_MODE_REAL=1 uv run pytest tests/test_context_mode_dispatch.py -q -k real_upstream
+- PASS        0.8s  uv run python scripts/check_runtime.py
+- PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+- PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+
+Phase receipt: `verify.py phase --format json --persist` PASS. Findings
+report: `.claude/quality_reports/findings-2026-10-17_phase-B-context-mode-hook-sanitizer.json`
+(0 findings, `gate_result: PASS`, six profiles).
 
 - optional 1: NOT RUN — a new native Claude Code session with the user-level `context-mode@context-mode` plugin turned off is a user-run host check; instead the installed hook in this repository was run directly with `claude-code` WebFetch and Bash `curl` PreToolUse payloads and produced no output with exit 0 (before the change: deny).
 - optional 2: NOT RUN — a native Codex fetch is a user-run host check; the `openai-codex` recorded fixtures cover the hook output offline.
