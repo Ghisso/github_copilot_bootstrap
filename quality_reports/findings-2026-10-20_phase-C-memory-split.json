@@ -1,0 +1,67 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "Outcome line does not name the baseline commit (337cc538) or the sha256_12 hash recipe of the kept classification table",
+      "file": ".claude/explorations/2026-09-03_memory-md-size-reduction/evidence.md",
+      "line": 5,
+      "profile": "documentation",
+      "disposition": "fixed",
+      "reason": "The Outcome line now names nested commit 337cc538a200403b5f874ec5d386951f29152aec, the entry grammar, and the hash recipe (SHA-256 of the entry lines joined with newline plus one trailing newline, first 12 hex digits), verified against all 328 rows."
+    }
+  ],
+  "generated_at": "2026-10-20T22:03:42Z",
+  "branch": "backlog-followups_implementation",
+  "head_sha": "06eb8e0b32c9697fe4f66aec8db2976ea3ede12e",
+  "base_ref": "dev",
+  "merge_base_sha": "f964551136c283c86fd18d71ee50c1d9c5b5e725",
+  "phase": "2026-10-20_phase-C-memory-split",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "155a0b6d4eef21642197ae9a7af5d34f438b4af2",
+  "changed_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "docs/runtime-checks.md",
+    "openwiki/INSTRUCTIONS.md",
+    "scripts/check_runtime.py",
+    "scripts/generate_targets.py",
+    "scripts/runtime_ownership.py",
+    "scripts/validate_targets.py",
+    "shared/hooks/scripts/state-sync.sh",
+    "shared/policies/workflow.instructions.md",
+    "shared/scripts/verify.py",
+    "shared/skills/caveman-compress/SKILL.md",
+    "shared/skills/caveman-compress/scripts/detect.py",
+    "shared/skills/create-feature/SKILL.md",
+    "shared/skills/onboard/SKILL.md",
+    "shared/skills/setup-project/SKILL.md",
+    "shared/third_party/ponytail/LICENSE",
+    "shared/third_party/ponytail/UPSTREAM.md",
+    "tests/test_caveman_compress_detect.py",
+    "tests/test_install_bootstrap.py",
+    "tests/test_state_sync.py",
+    "tests/test_validate_plan_frontmatter.py",
+    "tests/test_validate_targets.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

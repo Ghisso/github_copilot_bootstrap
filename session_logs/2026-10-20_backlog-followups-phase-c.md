@@ -3,7 +3,7 @@
 **Date:** 2026-10-20
 **Plan:** .claude/plans/2026-10-20_phase-C-memory-split.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -99,8 +99,18 @@ BF-C2 delivered as evidence, BF-C4 and BF-C5 delivered.
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       43.9s  uv run python scripts/validate_targets.py
+PASS       54.6s  uv run pytest tests/test_caveman_compress_detect.py -q
+PASS        1.0s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
 ```
+
+Phase receipt: `.claude/quality_reports/verification-phase-2026-10-20_phase-C-memory-split.json`.
+Findings: `.claude/quality_reports/findings-2026-10-20_phase-C-memory-split.json`
+(1 MINOR, fixed; gate result `PASS`).
 
 - optional 1: PASS — the installed `detect.py` on a scratch
   `.claude/MEMORY.md` beside an `explorations` folder printed
