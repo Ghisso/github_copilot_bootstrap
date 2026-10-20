@@ -92,6 +92,21 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
   targets are only confirmed hits, any uncertain hit denies everywhere, and
   the `if not visible` guard goes if redundant. Sent to the coder; docs
   wording follows once the code is final.
+- **Later** - Coder: `without_redirects()` keeps redirect targets out of the
+  uncertain scan (also in the Git branch); `emit()` denies on any uncertain
+  hit; the same-name exemption and the `if not visible` guard are gone.
+  35-command probe: no loosening versus HEAD; tightenings listed. 12 of 40
+  new or changed rows failed before the change. Documenter aligned the docs.
+  `verify.py phase`: PASS (3155 passed).
+- **Later** - Review round 3: `FAIL`. Round-2 findings fixed. New MAJOR:
+  `emit()` ranks a confirmed hook-config hit above the secret-file rule, so
+  newly protected names turn existing secret denies into asks (for example
+  `cp .env .claude/agents/x.md`: deny at HEAD, ask now). MINORs: a leading
+  redirect (`> .claude/settings.json`) now denies instead of asking; the
+  redirect predicate has three copies. Decision: the secret-file rule
+  denies first; fix the leading redirect; one `is_redirect` helper; and a
+  required systematic battery (at least 200 commands, HEAD versus working
+  tree, all four clients) so no loosening reaches the next review.
 
 ## [LEARN] Entries
 
