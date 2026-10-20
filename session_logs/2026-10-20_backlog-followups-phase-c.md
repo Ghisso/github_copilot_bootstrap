@@ -66,6 +66,14 @@ cannot delete them (BF-C4), and mark the 2026-09-03 exploration decided
   evidence-only step 1 of Phases E (Ponytail 5 comparison) and F (isolated
   OpenWiki 0.7.2 spike) in the scratch folder while the Phase C decision is
   pending.
+- **Later** - Phase E step 1 evidence ready (`scratchpad/phase-e/evidence.md`):
+  `## Decision: PARTIAL ADOPT`, all table rows confirmed, no Q4 conflict.
+  Fixed a garbled Scope sentence and the stale R2 "open user decision"
+  note in the Phase E small plan. Phase F step 1 spike ready
+  (`scratchpad/phase-f/capture.md`): all eight stop conditions PASS, GO;
+  `0.7.2` has exactly the expected ten tools, the guard round trip restores
+  both adapters byte for byte offline, and an isolated integration install
+  leaves copies of the root MCP adapters unchanged.
 
 ## [LEARN] Entries
 
