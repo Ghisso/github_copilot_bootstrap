@@ -57,6 +57,15 @@ cannot delete them (BF-C4), and mark the 2026-09-03 exploration decided
   (`scratchpad/wt-phase-d`, at `06eb8e0`); nothing there touches this
   checkout or the phase machine. The diff will be applied here only after
   Phase C is committed, then verified and reviewed as Phase D.
+- **Later** - Phase D prep finished in the worktree (diff at
+  `scratchpad/phase-d/coder.diff`, 6 files, negative controls recorded).
+  Its one design choice is accepted: path tokens of unmodelled Git
+  subcommands are also resolved against the `-C`/`cd` directory as
+  confirmed targets, while the existing repository-root `uncertain` (deny)
+  rule stays, so no existing client decision is loosened. Started the
+  evidence-only step 1 of Phases E (Ponytail 5 comparison) and F (isolated
+  OpenWiki 0.7.2 spike) in the scratch folder while the Phase C decision is
+  pending.
 
 ## [LEARN] Entries
 
