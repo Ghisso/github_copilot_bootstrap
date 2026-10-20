@@ -346,14 +346,17 @@ The user approved this plan on 2026-10-20 with these decisions:
    unmodelled Git tokens against the `-C`/`cd` directory let a command that
    was denied at the start of this plan become "ask" (for example an
    absolute path under `git -C`, or the same hook file named in two
-   segments of one command line). The fix makes the guard fail closed: a
-   redirect target counts only as a confirmed target, and any "uncertain"
-   hit (a protected path the guard cannot judge) denies on every client.
+   segments of one command line, or a secret file beside a newly protected
+   agent path). The fix makes the guard fail closed: a redirect target
+   (also a leading one) counts only as a confirmed target, any "uncertain"
+   hit (a protected path the guard cannot judge) denies on every client,
+   and a secret-shaped target denies before the hook-config rule applies.
    This departs from Phase D's "the decision rule in `emit()` stays as it
-   is": it never loosens a decision, and it tightens some pre-existing mixed
-   commands from ask to deny (for example `git restore` of a protected
-   config chained with `rm` of it, or a settings edit whose heredoc body
-   names a hook script).
+   is": it never loosens a decision (a 3,114-command and 578-payload
+   comparison against the pre-plan guard found none), and it tightens some
+   pre-existing mixed commands from ask to deny (for example `git restore`
+   of a protected config chained with `rm` of it, `rm .env .mcp.json`, or
+   a settings edit whose heredoc body names a hook script).
 
 ## Verification
 

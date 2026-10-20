@@ -893,6 +893,11 @@ def command_name(
     return tokens[index], index + 1, prefix_assignments
 
 
+def is_redirect(token: str) -> bool:
+    """True for a redirection operator; the next token is its target."""
+    return token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit())
+
+
 def operands(tokens: list[str], value_options: set[str]) -> list[str]:
     """Return command operands, omitting redirections and option values."""
     result: list[str] = []
@@ -900,7 +905,7 @@ def operands(tokens: list[str], value_options: set[str]) -> list[str]:
     options_done = False
     while index < len(tokens):
         token = tokens[index]
-        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+        if is_redirect(token):
             index += 2
             continue
         if token == "--":
@@ -926,11 +931,10 @@ def without_redirects(tokens: list[str]) -> list[str]:
     result: list[str] = []
     index = 0
     while index < len(tokens):
-        token = tokens[index]
-        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+        if is_redirect(tokens[index]):
             index += 2
             continue
-        result.append(token)
+        result.append(tokens[index])
         index += 1
     return result
 
@@ -1195,7 +1199,7 @@ def segment_targets(
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+        if is_redirect(token):
             index += 1
             if index == len(tokens) or tokens[index] in REDIRECTS:
                 raise AmbiguousCommand("redirection has no target")
@@ -1226,6 +1230,12 @@ def segment_targets(
         return
     command, start, prefix_assignments = command_info
     args = tokens[start:]
+    # Redirect targets are confirmed above, so the argument scans below skip
+    # them. A leading redirect (`> file echo x`) makes the operator the command
+    # name, so its target is still the first of `args`.
+    plain_args = without_redirects(
+        tokens[start - 1 :] if is_redirect(command) else args
+    )
 
     for token in args:
         entry = heredocs.get(token)
@@ -1375,7 +1385,6 @@ def segment_targets(
         }:
             # For unmodelled mutating Git commands, inspect path-shaped
             # arguments only. Do not scan commit messages or other prose.
-            plain_args = without_redirects(args)
             uncertain.extend(
                 token for token in plain_args if protected(token, repo_root)
             )
@@ -1395,7 +1404,6 @@ def segment_targets(
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
         # Explicit paths remain covered by native edits and known mutators.
-        plain_args = without_redirects(args)
         uncertain.extend(token for token in plain_args if protected(token, repo_root))
         uncertain.extend(protected_path_literals(" ".join(plain_args)))
         uncertain.extend(opaque_write_paths(" ".join(plain_args)))
@@ -1526,9 +1534,10 @@ def emit(
     uncertain_hits = sorted(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
-    # Any uncertain hit denies on every client, so a confirmed hook hit
-    # elsewhere in the command must not turn that deny into ask.
-    if hooks and not uncertain_hits:
+    # A secret-file hit or any uncertain hit denies on every client, so a
+    # confirmed hook hit elsewhere in the command must not turn that deny into
+    # ask.
+    if hooks and not sensitive and not uncertain_hits:
         decision = (
             "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
