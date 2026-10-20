@@ -341,6 +341,19 @@ The user approved this plan on 2026-10-20 with these decisions:
    applied. Only 18 of 328 entries (6.11% of entry bytes) qualified under
    the approved rule; the user chose to skip the split for now rather than
    apply the small cut or build a topic-scoped live-advice archive.
+6. **Guard decision rule (Phase D), orchestrator decision 2026-10-21
+   within the approved goals:** two review rounds showed that resolving
+   unmodelled Git tokens against the `-C`/`cd` directory let a command that
+   was denied at the start of this plan become "ask" (for example an
+   absolute path under `git -C`, or the same hook file named in two
+   segments of one command line). The fix makes the guard fail closed: a
+   redirect target counts only as a confirmed target, and any "uncertain"
+   hit (a protected path the guard cannot judge) denies on every client.
+   This departs from Phase D's "the decision rule in `emit()` stays as it
+   is": it never loosens a decision, and it tightens some pre-existing mixed
+   commands from ask to deny (for example `git restore` of a protected
+   config chained with `rm` of it, or a settings edit whose heredoc body
+   names a hook script).
 
 ## Verification
 

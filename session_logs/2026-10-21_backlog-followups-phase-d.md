@@ -75,11 +75,23 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
   that across segments of one command line a confirmed hit beats an
   uncertain deny, so `git restore .claude/hooks/x && git -C .claude restore
   hooks/y` and `git restore .claude/hooks/x && rm -rf .claude/agents` would
-  go from deny at HEAD to ask, which the plan forbids. Chosen fix: `emit()`
-  decides on uncertain hits before confirmed ones (fail closed). Its only
-  other effect is tightening some pre-existing mixed commands from ask to
-  deny (for example `git restore` of a protected config chained with `rm`
-  of it). Sent to the coder with deny-everywhere tests.
+  go from deny at HEAD to ask, which the plan forbids. Asked the coder to
+  make uncertain hits decide first. A plain reorder broke 44 existing tests
+  (a redirect target is listed both as confirmed and as uncertain, so
+  `echo x > <hook config>` would go ask -> deny), so the coder exempted an
+  uncertain hit whose path a confirmed hit also names (12 new deny rows
+  failed first, then passed). Generate + validate PASS; `verify.py phase`
+  PASS (3135 passed). Added a target-mapping follow-up bullet on the rule
+  and the unchanged `rm .env .mcp.json` case.
+- **Later** - Review round 2: `FAIL`. Round-1 MAJOR 2 and both MINORs
+  fixed; MAJOR 1 fixed for the reported forms, but the same-name exemption
+  still lets `git restore .claude/hooks/x && git -C .claude restore hooks/x`
+  ask (deny at HEAD). MINOR: the `emit()` change departs from the plan text
+  and tightens more than disclosed. Decision (recorded as big-plan
+  "Decisions recorded" item 6): adopt the reviewer's single rule — redirect
+  targets are only confirmed hits, any uncertain hit denies everywhere, and
+  the `if not visible` guard goes if redundant. Sent to the coder; docs
+  wording follows once the code is final.
 
 ## [LEARN] Entries
 
