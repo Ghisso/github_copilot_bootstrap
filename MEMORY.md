@@ -1533,3 +1533,8 @@
   and only after the other has stopped editing `shared/`: the validator's
   determinism check regenerates and fails with "generated dist is not
   deterministic" when a source file changes between the two renders.
+- [LEARN:quality] In shell guards, `git check-ignore -q` needs `--no-index`
+  to judge the ignore rules for a file that is still tracked, and it exits
+  1 for "not ignored" but 128 when git itself fails (unsafe or broken
+  repository). Act only on status exactly 1; treating every non-zero status
+  as "not ignored" repeats the side effect on every run while git is broken.

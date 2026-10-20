@@ -3,8 +3,8 @@ name: 2026-10-20_phase-B-nested-state-files
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 2
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-20_backlog-followups-phase-b.md
 ---
 
 # Small Plan: Keep the Nested `.gitignore` and `.gitattributes` Across Refreshes
@@ -34,7 +34,7 @@ Phase C needs none.
 
 ## Steps
 
-- [ ] **1. Stop a refresh from deleting the nested `.gitignore` and `.gitattributes` (BF-B1).**
+- [x] **1. Stop a refresh from deleting the nested `.gitignore` and `.gitattributes` (BF-B1).**
   **Owner:** coder.
   **Files:** modify `scripts/runtime_ownership.py`,
   `scripts/check_runtime.py`, `scripts/validate_targets.py`,
@@ -85,7 +85,7 @@ Phase C needs none.
   `session_logs/*.log merge=union` plus a sentinel line, so step 2's append
   leaves it byte-identical.
 
-- [ ] **2. Restore the union-merge rule in existing nested repositories (BF-B2).**
+- [x] **2. Restore the union-merge rule in existing nested repositories (BF-B2).**
   **Owner:** coder (same coder as step 1; same files).
   **Files:** modify `shared/hooks/scripts/state-sync.sh`
   (`write_nested_gitattributes` and its callers) and
@@ -109,7 +109,7 @@ Phase C needs none.
   `test_append_only_log_union_merges` stays green.
 
 
-- [ ] **3. Regenerate, refresh, prove durability, document, review, close out.**
+- [x] **3. Regenerate, refresh, prove durability, document, review, close out.**
   **Owner:** orchestrator; fresh reviewer; documenter after review.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/code-review/SKILL.md`.
@@ -159,11 +159,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

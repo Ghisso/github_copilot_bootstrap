@@ -217,7 +217,7 @@ full acceptance text; this map is the index.
 ## Phases
 
 - [x] `2026-10-20_phase-A-status-and-wording-cleanup` — complete: stale statuses closed, one OpenWiki sentence, project-name advice in three skills, clean `verify closeout` message for missing evidence, verbatim Ponytail license. See `.claude/session_logs/2026-10-20_backlog-followups-phase-a.md`.
-- [ ] `2026-10-20_phase-B-nested-state-files` — keep the nested `.gitignore` and `.gitattributes` across refreshes
+- [x] `2026-10-20_phase-B-nested-state-files` — complete: a refresh keeps the nested `.gitignore` and `.gitattributes`; `state-sync.sh` appends `settings.local.json` and the union-merge rule only when missing. See `.claude/session_logs/2026-10-20_backlog-followups-phase-b.md`.
 - [ ] `2026-10-20_phase-C-memory-split` — lossless `MEMORY.md` split and durable `caveman-compress` backups
 - [ ] `2026-10-20_phase-D-agent-definition-protection` — agent folders, whole hook folders, workspace files, Codex `sandbox_mode`
 - [ ] `2026-10-20_phase-E-ponytail-5-adoption` — evaluate, then partial-adopt Ponytail `v5.3.2` (may cancel)
