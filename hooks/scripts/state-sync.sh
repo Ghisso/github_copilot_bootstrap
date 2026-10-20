@@ -106,7 +106,11 @@ EOF
   # `git add -A` right after, so a copy that no longer ignores local settings
   # would commit them. Ask git rather than match a line: it also sees a later
   # negation, and --no-index judges the rules even while the file is tracked.
-  if ! git -C "$CLAUDE_DIR" check-ignore -q --no-index -- settings.local.json; then
+  # Only status 1 means "not ignored"; 128 is a git failure (unsafe or broken
+  # repository), and appending then would add another block on every sync.
+  local ignore_status=0
+  git -C "$CLAUDE_DIR" check-ignore -q --no-index -- settings.local.json || ignore_status=$?
+  if [[ $ignore_status -eq 1 ]]; then
     printf '\n# Local client settings; never synced.\nsettings.local.json\n' >> "$CLAUDE_DIR/.gitignore"
   fi
   if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
