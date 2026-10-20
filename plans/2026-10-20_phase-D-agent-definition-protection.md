@@ -3,7 +3,7 @@ name: 2026-10-20_phase-D-agent-definition-protection
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 4
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
