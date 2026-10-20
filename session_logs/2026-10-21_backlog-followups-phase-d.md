@@ -40,6 +40,21 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
 - **Now** - Applied the worktree diff here (`git apply --check` clean;
   6 files) and removed the worktree. Delegated step 3 (docs) to a
   documenter.
+- **Later** - Docs done (target-mapping parity section and follow-ups,
+  smoke tests, runtime checks, README, File Protection Rules, commit skill
+  `--body-file`). Regenerated and self-installed; `verify.py phase`: PASS
+  (3074 passed). Live check: the installed guard now denies
+  `ls <repo>/.claude/agents` in this session.
+- **Later** - Review round 1: `FAIL`. MAJOR (security): resolving
+  unmodelled Git tokens against the `-C`/`cd` directory also adds tokens
+  that the repository-root rule already denies, and confirmed hits win in
+  `emit()`, so an absolute-path `git -C .claude restore ...` became ask
+  instead of deny on Claude Code and Copilot. MAJOR (documentation): the
+  docs said `rm -rf`, `mv`, `ln -s` on a whole folder are denied on all four
+  clients, but they ask on Claude Code and Copilot. MINORs: no mixed-case
+  workspace-name test; a confusing colon in the commit skill's PR example.
+  Sent the code fix to the coder and the docs fix to the documenter in
+  parallel (disjoint files).
 
 ## [LEARN] Entries
 
