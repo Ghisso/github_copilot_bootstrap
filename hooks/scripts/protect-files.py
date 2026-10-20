@@ -342,9 +342,21 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
         )
     else:
         normalized_paths.append((resolved.replace("\\", "/"), resolved))
+    forms = []
     for normalized, source in normalized_paths:
         normalized = posixpath.normpath(normalized).removeprefix("./")
-        base = posixpath.basename(normalized).lower()
+        forms.append((normalized, source, posixpath.basename(normalized).lower()))
+    # A secret-shaped name is tested first, in both forms, so a control-plane
+    # name (a protected folder, a workspace file, or a path whose symlink
+    # target is a secret) never softens the secret-file deny to ask or allow.
+    for normalized, _source, base in forms:
+        if (
+            base in {".env", ".env.local", "uv.lock"}
+            or base.startswith((".env.", "credentials"))
+            or base.endswith((".pem", ".key"))
+        ):
+            return normalized, False
+    for normalized, source, base in forms:
         is_control_plane_name = (
             normalized in HOOK_CONFIGS
             or any(normalized.endswith("/" + name) for name in HOOK_CONFIGS)
@@ -359,12 +371,6 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
         )
         if is_control_plane_name and _control_plane_in_repo_root(source, repo_root):
             return normalized, True
-        if (
-            base in {".env", ".env.local", "uv.lock"}
-            or base.startswith((".env.", "credentials"))
-            or base.endswith((".pem", ".key"))
-        ):
-            return normalized, False
     return None
 
 
