@@ -290,8 +290,9 @@ a `name` equal to the phase slug, a `parent_plan` equal to the big plan's
 diff, run the standing final-phase documentation/memory/LEARN audit already
 required below — the same `## Stale-claims surfaces checked` requirement;
 this phase is what satisfies it, not a second, competing one — then review,
-verify, and commit like any other phase. It does not carry a larger phase's
-transition scope.
+verify, and commit like any other phase. Setup work, such as enabling
+OpenWiki for the first time or upgrading it, belongs in an earlier phase, not
+in this one.
 
 **Failure.** A failed refresh blocks that phase's completion like any other
 failed phase, without fabricating a deterministic verification failure —

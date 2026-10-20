@@ -3309,10 +3309,12 @@ def test_data_analysis_skill_is_still_present_and_public() -> None:
 # `dist/sidecar/workflow/` split. Acceptance Criteria: "dist/sidecar/skills/
 # equals today's dist/sidecar/ byte for byte." Any edit to one of the four
 # shipped skills (debug-investigator, humanize, ponytail, ponytail-review)
-# changes this hash and needs the same re-capture; the last one was the
-# gate-repair Phase E ponytail-review description step.
+# changes this hash and needs the same re-capture, as does the vendored
+# Ponytail LICENSE (copied into both shipped ponytail skills); the last one
+# was the backlog-followups Phase A step 8 restoring that LICENSE verbatim
+# from upstream (`DietrichGebert`, one trailing newline).
 SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256 = (
-    "e646f36864fa4d86608e708ee34c81f4531938e548aee3f64a4c23096aab5867"
+    "07cf8e7865655239797775b93a8c699b24e7b34882ac28ce28fc9a1c55a750bd"
 )
 
 

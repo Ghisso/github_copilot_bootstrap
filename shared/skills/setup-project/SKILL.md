@@ -62,13 +62,9 @@ cp .env.example .env   # local-only; .env stays gitignored
 - `.env.example` holds placeholder names only (e.g. `API_KEY=` or
   `API_KEY=changeme`) — never real-looking values, since this file is
   tracked and reviewed. Real secrets go only in the gitignored `.env`.
-- Fill the `## Project State` slot in the installed
-  `.claude/instructions/workspace.instructions.md` (its `workspace.md`
-  alias carries the same content). This project has no `shared/policies/`
-  of its own — that canonical source lives only in the bootstrap
-  repository this scaffold was installed from. See `onboard`'s Project
-  State step for the full explanation of when to edit the canonical source
-  instead of the generated copy.
+- Put the project's one-line summary in
+  `.claude/instructions/project-context.instructions.md`, and leave the
+  generated `**Project:**` line alone; see `onboard` step 5.
 
 ## Step 5: pyproject.toml ruff config
 ```toml

@@ -7971,7 +7971,7 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             / "shared"
             / "third_party"
             / "ponytail"
-            / "LICENSE": "fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4",
+            / "LICENSE": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab",
         }
         for source, expected_hash in pinned_files.items():
             actual_hash = hashlib.sha256(source.read_bytes()).hexdigest()

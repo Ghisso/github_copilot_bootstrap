@@ -36,7 +36,7 @@ Four places hold different parts of the system. Keep them distinct:
 This repository also installs its own generated output into itself, to
 develop and test the bootstrap end to end (`scripts/install_bootstrap.py
 --allow-self`). Do not describe that self-install as how a normal consumer
-project works — a normal consumer only ever receives the generated copy,
+project works. A normal consumer only ever receives the generated copy,
 never `shared/`.
 
 ## What to prioritize
@@ -44,11 +44,11 @@ never `shared/`.
 Ground every page in what the current code and tests actually do, in this
 order of authority:
 
-1. `shared/`, `scripts/`, and `tests/` — the real source and its test
+1. `shared/`, `scripts/`, and `tests/`: the real source and its test
    coverage.
-2. `README.md` and `docs/architecture.md` — maintained, current
+2. `README.md` and `docs/architecture.md`: maintained, current
    human-authored explanation.
-3. `shared/policies/*.instructions.md` and `shared/skills/*/SKILL.md` — the
+3. `shared/policies/*.instructions.md` and `shared/skills/*/SKILL.md`: the
    normative rules and reusable workflows agents follow.
 
 Cover, at minimum:
@@ -151,11 +151,11 @@ Treat the following as evidence of past decisions only, never as a
 description of what the code currently does. Re-derive current behavior
 from `shared/`, `scripts/`, and `tests/` instead:
 
-- `.claude/plans/` and `.claude/session_logs/` — this checkout's own
+- `.claude/plans/` and `.claude/session_logs/`: this checkout's own
   completed and in-progress plans and session logs;
-- files under `docs/` named `docs/2026-*` — dated, point-in-time spikes and
+- files under `docs/` named `docs/2026-*`: dated, point-in-time spikes and
   review records;
-- the root-level `plans/` directory — architecture decision records and
+- the root-level `plans/` directory: architecture decision records and
   historical phase plans.
 
 A plan or session log can describe a decision a later phase reversed or
