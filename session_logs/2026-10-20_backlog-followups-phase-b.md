@@ -3,7 +3,7 @@
 **Date:** 2026-10-20
 **Plan:** .claude/plans/2026-10-20_phase-B-nested-state-files.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -87,8 +87,19 @@ merge=union` rule in existing nested repositories (BF-B2).
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       44.2s  uv run python scripts/validate_targets.py
+PASS       54.5s  uv run pytest tests/test_install_bootstrap.py tests/test_state_sync.py -q
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.0s  git -C .claude ls-files --error-unmatch .gitignore .gitattributes
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
 ```
+
+Phase receipt: `.claude/quality_reports/verification-phase-2026-10-20_phase-B-nested-state-files.json`.
+Findings: `.claude/quality_reports/findings-2026-10-20_phase-B-nested-state-files.json`
+(no findings; gate result `PASS`).
 
 - optional 1: PASS — throwaway consumer install: the consumer's
   `secret-notes/` line survived a re-install byte for byte and the ignored
