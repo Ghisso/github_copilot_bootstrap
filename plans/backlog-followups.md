@@ -356,7 +356,9 @@ The user approved this plan on 2026-10-20 with these decisions:
    guard is recorded in the Phase D closeout log), and it tightens some
    pre-existing mixed commands from ask to deny (for example `git restore`
    of a protected config chained with `rm` of it, `rm .env .mcp.json`, or
-   a settings edit whose heredoc body names a hook script).
+   a settings edit whose heredoc body names a hook script), and it denies
+   secret-shaped names inside the older hook folders (`.claude/hooks/.env`:
+   edit and `rm` asked and read tools were allowed before).
 
 ## Verification
 
