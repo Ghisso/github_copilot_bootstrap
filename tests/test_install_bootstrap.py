@@ -1373,6 +1373,39 @@ def test_refresh_preserves_local_context_mode_cache_bytes(tmp_path: Path) -> Non
     assert cache.read_bytes() == b"local-cache\x00bytes"
 
 
+def test_nested_state_sync_files_are_consumer_state() -> None:
+    """`state-sync.sh` writes the nested `.gitignore` and `.gitattributes` and a
+    consumer may extend them; only the top-level files are consumer state."""
+    from runtime_ownership import is_consumer_state_path
+
+    assert is_consumer_state_path(".gitignore")
+    assert is_consumer_state_path(".gitattributes")
+    assert not is_consumer_state_path("skills/example/.gitignore")
+
+
+def test_refresh_preserves_nested_gitignore_and_gitattributes(tmp_path: Path) -> None:
+    """BF-B1: the generated tree has neither file, so a refresh used to delete
+    both as obsolete owned files, losing a consumer's ignore lines. They must
+    survive byte for byte, CRLF and all."""
+    source = tmp_path / "generated"
+    target = tmp_path / "consumer"
+    (source / ".claude/hooks").mkdir(parents=True)
+    (source / ".claude/hooks/generated.txt").write_text("generated\n")
+    preserved = {
+        ".gitignore": b"settings.local.json\nconsumer-secret/\r\n",
+        ".gitattributes": b"session_logs/*.log merge=union\n*.md -diff\n",
+    }
+    (target / ".claude").mkdir(parents=True)
+    for name, content in preserved.items():
+        (target / ".claude" / name).write_bytes(content)
+
+    copy_generated_tree(source, target, dry_run=False)
+
+    assert (target / ".claude/hooks/generated.txt").is_file()
+    for name, content in preserved.items():
+        assert (target / ".claude" / name).read_bytes() == content
+
+
 def test_refresh_preserves_third_party_openwiki_skill_bundle(tmp_path: Path) -> None:
     """A refresh only preserves `.claude/skills/openwiki` and
     `.agents/skills/openwiki` once OpenWiki's own installer has claimed
@@ -1988,6 +2021,32 @@ def test_runtime_check_marker_gates_openwiki_skill_bundle_drift(
     )
     (target / ".agents/skills/openwiki/.openwiki-install.json").write_text(
         "{}", encoding="utf-8"
+    )
+    assert runtime_drift_errors(target, GENERATED) == []
+
+
+def test_runtime_check_reports_no_drift_for_nested_gitignore_and_gitattributes(
+    tmp_path: Path,
+) -> None:
+    """BF-B1: both nested files are consumer state, so the dogfood check does
+    not report them as unexpected installed files."""
+    target = tmp_path / "consumer"
+    target.mkdir()
+    assert _git(target, "init", "-q").returncode == 0
+
+    validate_agents_takeover(GENERATED, target)
+    copy_generated_tree(GENERATED, target, dry_run=False)
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        (target / name).write_bytes((REPO_ROOT / name).read_bytes())
+    assert _git(target, "add", "AGENTS.md", "CLAUDE.md").returncode == 0
+    populate_bootstrap_root(target, False, False)
+    assert runtime_drift_errors(target, GENERATED) == []
+
+    (target / ".claude/.gitignore").write_text(
+        "settings.local.json\nconsumer-secret/\n", encoding="utf-8"
+    )
+    (target / ".claude/.gitattributes").write_text(
+        "session_logs/*.log merge=union\n", encoding="utf-8"
     )
     assert runtime_drift_errors(target, GENERATED) == []
 

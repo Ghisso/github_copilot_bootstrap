@@ -9781,6 +9781,14 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
             "quality_reports/consumer.json": b'{"consumer": true}\n',
             "instructions/project-context.instructions.md": b"consumer project context\n",
             "settings.local.json": b'{"consumerLocal": true}\n',
+            # Built from the file the first temporary install wrote, so
+            # settings.local.json stays ignored, plus one consumer line that a
+            # rebuild from the state-sync.sh template would lose.
+            ".gitignore": (temp_repo / ".claude" / ".gitignore").read_bytes()
+            + b"consumer-ignore-sentinel/\n",
+            # The union rule is already present, so state sync appends nothing
+            # and the bytes must match after a repeat install.
+            ".gitattributes": b"session_logs/*.log merge=union\n*.sentinel -diff\n",
         }
         check(
             tuple(CONSUMER_STATE_PATHS)
@@ -9798,6 +9806,8 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 ".cache",
                 "instructions/project-context.instructions.md",
                 "settings.local.json",
+                ".gitignore",
+                ".gitattributes",
             ),
             "consumer-state fixture must cover every ownership-contract root",
             errors,

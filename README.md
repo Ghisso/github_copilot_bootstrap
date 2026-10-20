@@ -244,7 +244,8 @@ before replacing bootstrap-controlled files and creating its distinct
 commit to the nested `ai-state` remote.
 
 Files that exist only in the consumer repo — `MEMORY.md`, plans, session logs,
-quality reports, explorations — are never touched by the file-copy step. They
+quality reports, explorations, and the nested `.gitignore` and
+`.gitattributes` — are never touched by the file-copy step. They
 are state, tracked in git history rather than files a bucket pull could
 silently overwrite, so there is no backup/restore step to run around them.
 The generated `MEMORY.md` is a fresh-install seed only: if the consumer already

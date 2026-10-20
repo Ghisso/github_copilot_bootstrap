@@ -34,9 +34,14 @@ Never hand-copy `dist/` into place; always regenerate and install.
 
 Files under `.claude/` that the generated target does not contain are removed as
 obsolete owned files. Consumer state (`MEMORY.md`, `plans`, `explorations`,
-`session_logs`, `quality_reports`, `project-context.instructions.md`) is
+`session_logs`, `quality_reports`, `project-context.instructions.md`,
+`settings.local.json`, and the nested `.gitignore` and `.gitattributes`) is
 preserved, as are tracked authoring adapters such as `.codex/config.toml` and
-`AGENTS.md`.
+`AGENTS.md`. `state-sync.sh` keeps the two nested Git files current without
+overwriting them: it appends `settings.local.json` to `.gitignore` when that
+file would not be ignored, and `session_logs/*.log merge=union` to
+`.gitattributes` when the line is missing, so a consumer's own lines survive
+every refresh.
 
 `.claude/settings.local.json` is now consumer state and is preserved. It used
 to be deleted as an obsolete owned file on **every** install, in every consumer
@@ -77,8 +82,9 @@ It also performs a read-only, bidirectional dogfood drift check. Bootstrap-owned
 files in this source checkout must match freshly generated output (after the
 documented project-name substitution); unexpected obsolete owned files fail too.
 The check deliberately excludes consumer-owned `.claude` state: `MEMORY.md`,
-plans, explorations, session logs, quality reports, and explicit project-context
-customization. Tracked source adapters such as root `AGENTS.md` are checked for
+plans, explorations, session logs, quality reports, explicit project-context
+customization, `settings.local.json`, and the nested `.gitignore` and
+`.gitattributes`. Tracked source adapters such as root `AGENTS.md` are checked for
 their authoring invariants rather than byte-compared to a generated consumer
 adapter. A failure names the stale path, its authoritative source, and the
 regenerate/reinstall command.

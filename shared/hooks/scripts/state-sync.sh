@@ -102,6 +102,17 @@ __pycache__/
 .state_backups/
 EOF
   fi
+  # A refresh keeps this file as the consumer left it, and the installer runs
+  # `git add -A` right after, so a copy that no longer ignores local settings
+  # would commit them. Ask git rather than match a line: it also sees a later
+  # negation, and --no-index judges the rules even while the file is tracked.
+  # Only status 1 means "not ignored"; 128 is a git failure (unsafe or broken
+  # repository), and appending then would add another block on every sync.
+  local ignore_status=0
+  git -C "$CLAUDE_DIR" check-ignore -q --no-index -- settings.local.json || ignore_status=$?
+  if [[ $ignore_status -eq 1 ]]; then
+    printf '\n# Local client settings; never synced.\nsettings.local.json\n' >> "$CLAUDE_DIR/.gitignore"
+  fi
   if ! grep -Fqx '.cache/' "$CLAUDE_DIR/.gitignore"; then
     printf '\n# Derived local caches; never synced.\n.cache/\n' >> "$CLAUDE_DIR/.gitignore"
   fi
@@ -184,11 +195,20 @@ restore_local_settings() {
 # state (plans/**, MEMORY.md, session-log prose) is intentionally left on the
 # default conflict-and-abort path so genuine divergences get a manual semantic
 # merge instead of a silent ours/theirs.
+#
+# Like write_nested_gitignore, this runs for existing nested repositories too:
+# it never overwrites the file, so a consumer's own lines survive, and it adds
+# the union rule only when that exact line is missing.
 write_nested_gitattributes() {
-  cat > "$CLAUDE_DIR/.gitattributes" <<'EOF'
+  if [[ ! -f "$CLAUDE_DIR/.gitattributes" ]]; then
+    cat > "$CLAUDE_DIR/.gitattributes" <<'EOF'
 # See write_nested_gitattributes in state-sync.sh for the policy rationale.
 session_logs/*.log merge=union
 EOF
+  fi
+  if ! grep -Fqx 'session_logs/*.log merge=union' "$CLAUDE_DIR/.gitattributes"; then
+    printf '\n# Append-only machine logs union-merge (see state-sync.sh).\nsession_logs/*.log merge=union\n' >> "$CLAUDE_DIR/.gitattributes"
+  fi
 }
 
 # Creates the nested repo shell (git init, branch name, gitignore, remote
@@ -228,6 +248,9 @@ init_nested_repo() {
 commit_local_state() {
   local message="${1:-}"
   if ! write_nested_gitignore; then
+    return 1
+  fi
+  if ! write_nested_gitattributes; then
     return 1
   fi
   if ! untrack_nested_cache; then
@@ -394,7 +417,7 @@ configure_outer_hooks_path() {
 
 setup_local_state() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    write_nested_gitignore
+    write_nested_gitignore && write_nested_gitattributes
     return $?
   fi
   init_nested_repo
@@ -407,7 +430,7 @@ setup_local_state() {
 # setup reconciles once, while `pull` uses the local step once before its sync.
 cmd_setup() {
   if [[ -d "$CLAUDE_DIR/.git" ]]; then
-    write_nested_gitignore
+    write_nested_gitignore && write_nested_gitattributes
     return $?
   fi
   if ! setup_local_state; then
