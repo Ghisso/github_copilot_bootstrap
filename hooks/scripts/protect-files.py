@@ -35,6 +35,22 @@ HOOK_CONFIGS = {
     ".github/copilot/settings.json",
     ".github/copilot/settings.local.json",
 }
+# Folders whose files, and the folders themselves, are protected: hook scripts
+# and agent definitions (an agent file sets instructions and, in some clients,
+# tools, hooks, MCP servers, and permission mode). Not the parent folders
+# `.claude`, `.github`, `.codex`, `.agents` (that would block the nested
+# checkpoint `git -C .claude add -A`), skill folders, or `shared/agents/`.
+# `protected()` and `PROTECTED_PATH_LITERAL` both read this tuple, so they
+# cannot drift. A `*.code-workspace` file is protected by name in both too.
+CONTROL_PLANE_DIRS: tuple[str, ...] = (
+    ".github/hooks",
+    ".claude/hooks",
+    ".codex/hooks",
+    ".claude/agents",
+    ".codex/agents",
+    ".github/agents",
+    ".agents/agents",
+)
 # Tools whose input is a shell command line (`tool_input.command`). A name that
 # ends in `bash` or an empty name is also treated as a shell command in `main`.
 TERMINAL_TOOLS = {"bash", "shell", "run_in_terminal", "send_to_terminal"}
@@ -113,7 +129,8 @@ QUOTED_VARIABLE_MARKER = re.compile(
 # or following identifier character (letter, digit, `_`, `.`, `-`), so
 # `os.environ` no longer yields `.env` and `myuv.lock` no longer yields
 # `uv.lock`, while `.env.local` and `foo/.env.production` still match in
-# full. The two control-plane alternatives (hooks-dir paths and the
+# full. The three control-plane alternatives (`CONTROL_PLANE_DIRS` folders
+# with or without a path after them, `*.code-workspace` files, and the
 # `HOOK_CONFIGS` filenames) additionally capture the **whole** path token
 # via an explicit, optional `(?:[^\s'\"]*/)?` directory-prefix group, rather
 # than only the fixed repository-relative-looking tail: `/tmp/scratch/
@@ -125,7 +142,10 @@ PROTECTED_PATH_LITERAL = re.compile(
     r"(?<![\w.-])uv\.lock(?![\w.-])|"
     r"(?<![\w.-])credentials[-_.][\w.-]+|"
     r"[^\s/'\"]+\.(?:pem|key)(?![\w.-])|"
-    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:\.github|\.claude|\.codex)/hooks/[^\s'\"]+|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
+    + "|".join(map(re.escape, CONTROL_PLANE_DIRS))
+    + r")(?:/[^\s'\"]*)?(?![\w.-])|"
+    r"(?<![\w./-])(?:[^\s'\"]*/)?[^\s/'\"]*\.code-workspace(?![\w.-])|"
     r"(?<![\w./-])(?:[^\s'\"]*/)?(?:"
     + "|".join(map(re.escape, sorted(HOOK_CONFIGS)))
     + r"))",
@@ -324,19 +344,21 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
         normalized_paths.append((resolved.replace("\\", "/"), resolved))
     for normalized, source in normalized_paths:
         normalized = posixpath.normpath(normalized).removeprefix("./")
+        base = posixpath.basename(normalized).lower()
         is_control_plane_name = (
             normalized in HOOK_CONFIGS
             or any(normalized.endswith("/" + name) for name in HOOK_CONFIGS)
-            or normalized.startswith(
-                (".github/hooks/", ".claude/hooks/", ".codex/hooks/")
+            or any(
+                normalized == folder
+                or normalized.startswith(folder + "/")
+                or normalized.endswith("/" + folder)
+                or "/" + folder + "/" in normalized
+                for folder in CONTROL_PLANE_DIRS
             )
-            or "/.claude/hooks/" in normalized
-            or "/.github/hooks/" in normalized
-            or "/.codex/hooks/" in normalized
+            or base.endswith(".code-workspace")
         )
         if is_control_plane_name and _control_plane_in_repo_root(source, repo_root):
             return normalized, True
-        base = posixpath.basename(normalized).lower()
         if (
             base in {".env", ".env.local", "uv.lock"}
             or base.startswith((".env.", "credentials"))
@@ -1335,6 +1357,15 @@ def segment_targets(
             # For unmodelled mutating Git commands, inspect path-shaped
             # arguments only. Do not scan commit messages or other prose.
             uncertain.extend(token for token in args if protected(token, repo_root))
+            # Git reads its paths from the `-C` directory (or the `cd`
+            # directory), not the repository root, so resolve them there too,
+            # as `git mv` does. A path found only that way is new coverage and
+            # a confirmed target (ask on Claude Code and Copilot); a path
+            # visible from the repository root keeps the uncertain deny above.
+            offset_roots = [
+                root for root in git_roots if root != os.path.normpath(repo_root)
+            ]
+            confirmed.extend(resolve_from_directories(args, offset_roots, repo_root))
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
@@ -1474,9 +1505,10 @@ def emit(
             "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
         reason = (
-            "Editing hook files is blocked because PreToolUse cannot request approval: "
+            "Editing agent, hook, or server configuration is blocked because "
+            "PreToolUse cannot request approval: "
             if decision == "deny"
-            else "Editing hook files requires approval: "
+            else "Editing agent, hook, or server configuration requires approval: "
         ) + ", ".join(hooks)
     elif sensitive:
         decision, reason = (
