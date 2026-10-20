@@ -916,6 +916,25 @@ def operands(tokens: list[str], value_options: set[str]) -> list[str]:
     return result
 
 
+def without_redirects(tokens: list[str]) -> list[str]:
+    """Return tokens without redirection operators and their targets.
+
+    `segment_targets` already reports each redirect target as confirmed, so an
+    unmodelled command's argument scan must not list it a second time as
+    uncertain.
+    """
+    result: list[str] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token in REDIRECTS or (token.endswith(">") and token[:-1].isdigit()):
+            index += 2
+            continue
+        result.append(token)
+        index += 1
+    return result
+
+
 def target_directory(tokens: list[str]) -> str | None:
     for index, token in enumerate(tokens):
         if token in {"-t", "--target-directory"}:
@@ -1356,29 +1375,30 @@ def segment_targets(
         }:
             # For unmodelled mutating Git commands, inspect path-shaped
             # arguments only. Do not scan commit messages or other prose.
-            visible = [token for token in args if protected(token, repo_root)]
-            uncertain.extend(visible)
+            plain_args = without_redirects(args)
+            uncertain.extend(
+                token for token in plain_args if protected(token, repo_root)
+            )
             # Git reads its paths from the `-C` directory (or the `cd`
             # directory), not the repository root, so resolve them there too,
             # as `git mv` does. A path found only that way is new coverage and
-            # a confirmed target (ask on Claude Code and Copilot). When any
-            # path is already visible from the repository root, skip this:
-            # `emit()` prefers a confirmed hit, so it would turn that
-            # uncertain deny into ask.
-            if not visible:
-                offset_roots = [
-                    root for root in git_roots if root != os.path.normpath(repo_root)
-                ]
-                confirmed.extend(
-                    resolve_from_directories(args, offset_roots, repo_root)
-                )
+            # a confirmed target (ask on Claude Code and Copilot); a path
+            # visible from the repository root is uncertain above, and any
+            # uncertain hit denies in `emit()`.
+            offset_roots = [
+                root for root in git_roots if root != os.path.normpath(repo_root)
+            ]
+            confirmed.extend(
+                resolve_from_directories(plain_args, offset_roots, repo_root)
+            )
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
         # Explicit paths remain covered by native edits and known mutators.
-        uncertain.extend(token for token in args if protected(token, repo_root))
-        uncertain.extend(protected_path_literals(" ".join(args)))
-        uncertain.extend(opaque_write_paths(" ".join(args)))
+        plain_args = without_redirects(args)
+        uncertain.extend(token for token in plain_args if protected(token, repo_root))
+        uncertain.extend(protected_path_literals(" ".join(plain_args)))
+        uncertain.extend(opaque_write_paths(" ".join(plain_args)))
 
 
 def classify_command(
@@ -1506,13 +1526,9 @@ def emit(
     uncertain_hits = sorted(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
-    # An uncertain hit on a path no confirmed hit names denies on every client,
-    # so a confirmed hook hit elsewhere in the command must not turn that deny
-    # into ask. A path listed both ways is confirmed: a redirect of an
-    # unmodelled command (`echo x > file`) is scanned as an argument too.
-    confirmed_names = {path for path, _ in hits}
-    unconfirmed_hits = [name for name in uncertain_hits if name not in confirmed_names]
-    if hooks and not unconfirmed_hits:
+    # Any uncertain hit denies on every client, so a confirmed hook hit
+    # elsewhere in the command must not turn that deny into ask.
+    if hooks and not uncertain_hits:
         decision = (
             "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
