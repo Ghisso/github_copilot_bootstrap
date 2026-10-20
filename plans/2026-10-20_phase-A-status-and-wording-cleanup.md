@@ -3,7 +3,7 @@ name: 2026-10-20_phase-A-status-and-wording-cleanup
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 1
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

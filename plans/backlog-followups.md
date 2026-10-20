@@ -1,10 +1,10 @@
 ---
 name: backlog-followups
 type: big-plan
-status: planning
+status: in-progress
 originating_branch: dev
 implementation_branch: backlog-followups_implementation
-started_at:
+started_at: 2026-10-20T14:54:11Z
 phases:
   - 2026-10-20_phase-A-status-and-wording-cleanup
   - 2026-10-20_phase-B-nested-state-files
@@ -13,7 +13,7 @@ phases:
   - 2026-10-20_phase-E-ponytail-5-adoption
   - 2026-10-20_phase-F-openwiki-0.7-upgrade
   - 2026-10-20_phase-G-backlog-followups-knowledge-refresh
-current_phase:
+current_phase: 2026-10-20_phase-A-status-and-wording-cleanup
 ---
 
 # Big Plan: Backlog Follow-ups
@@ -320,27 +320,26 @@ extra-high effort, devils-advocate skill). Outcome:
 | Spike install needs network and runs dependency scripts | LOW | ACCEPT | Stated in F step 1 and the rollback note |
 | `.code-workspace` protection as YAGNI | LOW | KEEP | Matches `.vscode/settings.json` protection |
 
-## Decisions for the user
+## Decisions recorded
 
-1. **Behavioral evaluation retry (audit §7 item 4).** Recommended: keep it
-   parked. The 2026-10-06 pilot stopped because all four native case runs
-   failed with no captured error; a retry needs error capture for native
-   runs first, and no current failure calls for it. The alternative is an
-   eighth phase before G.
-2. **Memory archive location (Phase C).** Recommended: option (a), the
-   preserved `.claude/explorations/2026-10-20_memory-archive/` folder, with
-   no ownership change. Option (b) adds a dedicated `.claude/memory/` state
-   path for consumers too, with two more steps and about six more policy and
-   doc surfaces (delta recorded in the Phase C planning report).
-3. **`ponytail-review` scope (Phase E, row R2).** Recommended: keep it a
-   complexity-only review. Upstream v5 turns it into a full quality review,
-   which would duplicate the profile-based reviewer in full installs but
-   would help sidecar users who have no bootstrap reviewer.
-4. **Scope additions found during planning.** Whole-folder and `git -C`
-   protection and `.code-workspace` protection in Phase D, the verbatim
-   license in Phase A, and the stricter OpenWiki `mode` check in Phase F
-   were not in the original list. Each closes a confirmed defect in code the
-   same phase already changes.
+The user approved this plan on 2026-10-20 with these decisions:
+
+1. **Behavioral evaluation retry (audit §7 item 4):** parked. The
+   2026-10-06 pilot stopped because all four native case runs failed with no
+   captured error; a retry needs error capture for native runs first, and no
+   current failure calls for it.
+2. **Memory archive location (Phase C):** option (a), the preserved
+   `.claude/explorations/2026-10-20_memory-archive/` folder, with no
+   ownership change. Option (b), a dedicated `.claude/memory/` state path,
+   was declined.
+3. **`ponytail-review` scope (Phase E, row R2):** stays a complexity-only
+   review. Upstream v5's full quality review was declined because it would
+   duplicate the profile-based reviewer in full installs.
+4. **Scope additions found during planning:** approved. Whole-folder and
+   `git -C` protection and `.code-workspace` protection in Phase D, the
+   verbatim license in Phase A, and the stricter OpenWiki `mode` check in
+   Phase F each close a confirmed defect in code the same phase already
+   changes.
 
 ## Verification
 
