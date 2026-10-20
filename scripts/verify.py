@@ -3159,18 +3159,34 @@ def file_digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def relative_artifact(root: Path, path: Path) -> dict[str, str]:
-    """Bind one existing artifact by safe repository-relative path and bytes."""
+class MissingArtifactError(ValueError):
+    """A closeout artifact does not exist yet; the message names its creator."""
+
+
+def relative_artifact(root: Path, path: Path, created_by: str) -> dict[str, str]:
+    """Bind one existing artifact by safe repository-relative path and bytes.
+
+    Raises ``MissingArtifactError`` when nothing exists at ``path``, naming
+    ``created_by``. A path outside the repository, a symlink, and a
+    non-regular file raise a plain ``ValueError`` that says which.
+    """
     try:
-        relative = path.relative_to(root)
-        resolved = confined_path(root, relative.as_posix(), regular=True)
+        relative = path.relative_to(root).as_posix()
     except ValueError as error:
         raise ValueError(f"artifact is outside repository: {path}") from error
-    return {"path": relative.as_posix(), "sha256": file_digest(resolved)}
+    if not os.path.lexists(path):
+        raise MissingArtifactError(
+            f"closeout evidence is missing: {relative}; {created_by}"
+        )
+    try:
+        resolved = confined_path(root, relative, regular=True)
+    except ValueError as error:
+        raise ValueError(f"artifact {relative} is rejected: {error}") from error
+    return {"path": relative, "sha256": file_digest(resolved)}
 
 
-def closeout_log_path(root: Path, phase: str) -> Path:
-    """Return the exact closeout log selected by current phase frontmatter."""
+def closeout_log_reference(root: Path, phase: str) -> str:
+    """Return the safe closeout log path selected by phase frontmatter."""
     plan = root / ".claude/plans" / f"{phase}.md"
     try:
         text = plan.read_text(encoding="utf-8")
@@ -3181,7 +3197,12 @@ def closeout_log_path(root: Path, phase: str) -> Path:
     )
     if not match or not is_safe_relative_path(match.group(1)):
         raise ValueError("phase plan has no safe closeout_session_log")
-    return confined_path(root, match.group(1), regular=True)
+    return match.group(1)
+
+
+def closeout_log_path(root: Path, phase: str) -> Path:
+    """Return the exact closeout log selected by current phase frontmatter."""
+    return confined_path(root, closeout_log_reference(root, phase), regular=True)
 
 
 def documentation_only_paths(metadata: dict[str, object]) -> list[str]:
@@ -3270,7 +3291,10 @@ def unpublishable_closeout_reason(
 def closeout_artifacts(
     root: Path, metadata: dict[str, object], documentation_na: str = ""
 ) -> dict[str, object]:
-    """Capture the precise evidence set a completed-phase gate consumes."""
+    """Capture the precise evidence set a completed-phase gate consumes.
+
+    Raises ``MissingArtifactError`` for evidence nobody has created yet.
+    """
     branch = metadata.get("branch")
     phase = metadata.get("phase")
     if (
@@ -3286,11 +3310,21 @@ def closeout_artifacts(
             "closeout needs --documentation-na REASON when documentation was not updated"
         )
     return {
-        "phase_receipt": relative_artifact(root, receipt_path(root, "phase", phase)),
-        "findings": relative_artifact(
-            root, root / ".claude/quality_reports" / f"findings-{phase}.json"
+        "phase_receipt": relative_artifact(
+            root,
+            receipt_path(root, "phase", phase),
+            "run verify.py phase --format json --persist to create it",
         ),
-        "closeout_log": relative_artifact(root, closeout_log_path(root, phase)),
+        "findings": relative_artifact(
+            root,
+            root / ".claude/quality_reports" / f"findings-{phase}.json",
+            "run record_findings.py to create it",
+        ),
+        "closeout_log": relative_artifact(
+            root,
+            root / closeout_log_reference(root, phase),
+            "create it at the path the small plan's closeout_session_log names",
+        ),
         "documentation": (
             {"status": "UPDATED", "paths": documentation_paths}
             if documentation_paths
@@ -3787,11 +3821,13 @@ def main() -> int:
         if unpublishable_reason is not None:
             print(unpublishable_reason, file=sys.stderr)
             return 2
-    artifacts = (
-        closeout_artifacts(root, metadata, args.documentation_na)
-        if args.mode == "closeout"
-        else None
-    )
+    artifacts: dict[str, object] | None = None
+    if args.mode == "closeout":
+        try:
+            artifacts = closeout_artifacts(root, metadata, args.documentation_na)
+        except MissingArtifactError as error:
+            print(error, file=sys.stderr)
+            return 2
     extensions: dict[str, object] | None = (
         {"verification_items": verification_items}
         if verification_items is not None

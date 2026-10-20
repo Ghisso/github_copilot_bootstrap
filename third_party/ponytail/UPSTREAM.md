@@ -36,7 +36,7 @@ imported skill files further.
 
 - `shared/skills/ponytail/SKILL.md`: `sha256:7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1`
 - `shared/skills/ponytail-review/SKILL.md`: `sha256:0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8`
-- `shared/third_party/ponytail/LICENSE`: `sha256:fc5bd8de55887831701aa9b9da85925fe0a581680187a5e23f2cf74235aadcd4`
+- `shared/third_party/ponytail/LICENSE`: `sha256:fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab`
 
 Ponytail's plugin hooks, status line, benchmarks, and runtime mode files are
 not vendored. This bootstrap distributes the portable skill layer and applies

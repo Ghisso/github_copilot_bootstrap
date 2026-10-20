@@ -18,12 +18,14 @@ description: |
 Re-deriving project understanding (what does this repo do, how is it
 built, what's still prototype/unverified) from scratch every session
 wastes a full read-and-search pass, and whatever gets learned is easy to
-lose. `CLAUDE.md` and `AGENTS.md` at the repo root are **gitignored,
-regenerated artifacts** (confirm with `git check-ignore -v CLAUDE.md
-AGENTS.md`) — edits there are local-only and do not survive a fresh clone
-or the next bootstrap regen. The durable location is the `.claude/`
-nested git repo (its own git history, synced to the `ai-state` branch by
-session hooks).
+lose. In a normal consumer project, `CLAUDE.md` and `AGENTS.md` at the
+repo root are **gitignored, generated files** (confirm with `git
+check-ignore -v CLAUDE.md AGENTS.md`). Edits there are local-only and do
+not survive a fresh clone or the next bootstrap refresh. Where Git tracks
+them, as in the bootstrap authoring repository, they are hand-maintained
+files that the installer leaves untouched. The durable location for
+project facts is the `.claude/` nested git repo (its own git history,
+synced to the `ai-state` branch by session hooks).
 
 ## Steps
 
@@ -89,9 +91,8 @@ Cover:
 - Current status and any pre-production / pre-merge verification checklist
 - Explicit scope boundaries (what's deliberately out of scope, and why)
 
-This file is intentionally **not** part of the generated `shared/` output
-(cross-check against `.claude/bootstrap-root/`, the vendored template, if
-unsure) — safe to hand-edit and safe to re-run this skill against.
+This file is consumer state: a bootstrap refresh never overwrites it, so it
+is safe to hand-edit and safe to re-run this skill against.
 
 ### 4. Add or refresh the MEMORY.md pointer
 
@@ -101,34 +102,25 @@ In `.claude/MEMORY.md` under `## Domain-Specific`, add or update a single
 - Flags any generic-template guidance that doesn't apply here
 - Points to `.claude/instructions/project-context.instructions.md`
 
-### 5. Fill the Project State slot
+### 5. Place the project's one-line summary
 
-`CLAUDE.md`, `AGENTS.md`, and the generated
-`.claude/instructions/workspace.instructions.md` (its `workspace.md` alias
-carries the same content) each carry a `## Project State` section with a
-`**Project:** [TODO: project name and one-liner description]` fill-in slot.
-That slot — and only that slot — is a designated per-project customization
-point, not shared prose. Fill it with the one-liner plus a pointer to
-`project-context.instructions.md`.
+The installer writes the target directory name into the generated
+`**Project:**` line of root `CLAUDE.md`, root `AGENTS.md`,
+`.claude/instructions/workspace.instructions.md`, and its `workspace.md`
+alias. A refresh copies the generated files over the old ones and writes
+the name again, so a hand edit to those copies is lost.
 
-Where to make that edit depends on which repository this is:
-
-- **This is the bootstrap authoring repository itself** (a `shared/policies/`
-  directory exists): the slot's canonical source is
-  `shared/policies/workspace.instructions.md`. Edit it there and regenerate
-  with `uv run python scripts/generate_targets.py --all` — hand-editing the
-  generated `.claude/instructions/workspace.md` /
-  `workspace.instructions.md` directly is silently overwritten by the next
-  regeneration.
-- **This is an installed consumer project** (no `shared/policies/` present):
-  the delivered `.claude/instructions/workspace.instructions.md` /
-  `workspace.md` copies are the only copies this project has, so filling
-  the slot there is the correct, durable action.
-
-Remember: the root `CLAUDE.md`/`AGENTS.md` copies are gitignored, so editing
-them directly is a local convenience only, not the durable record. Any
-recurring project fact beyond this one-line slot belongs in
-`project-context.instructions.md`, not in the generated workspace file.
+- Put the project's one-line summary, and every other recurring project
+  fact, in `.claude/instructions/project-context.instructions.md` (step 3).
+  Do not edit the generated `**Project:**` line.
+- The exception is a root `CLAUDE.md` or `AGENTS.md` that Git tracks (the
+  bootstrap authoring repository). The installer leaves that file
+  untouched, so its `**Project:**` line is hand-maintained. Edit it
+  directly there.
+- Never fill the `**Project:** [TODO: project name and one-liner
+  description]` placeholder in `shared/policies/workspace.instructions.md`.
+  That file is the template every consumer receives, and the installer
+  fills the placeholder.
 
 ### 6. Verify persistence
 
@@ -144,6 +136,6 @@ Onboarding refreshed:
   Verified against code via: direct/rg reads ([N]), Semble ([N] queries)
   Findings: .claude/instructions/project-context.instructions.md
   MEMORY.md: [LEARN:domain] entry added/updated
-  Project State slot filled: CLAUDE.md, AGENTS.md, workspace.md, workspace.instructions.md
+  Project summary: .claude/instructions/project-context.instructions.md
   Mismatches found (docs vs code): [none | list]
 ```

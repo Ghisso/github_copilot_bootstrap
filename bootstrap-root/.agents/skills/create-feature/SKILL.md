@@ -116,12 +116,8 @@ class TestFeature:
    this repository's other configs.
 3. If the feature introduces a durable, project-wide fact (not an
    implementation detail), record it in
-   `.claude/instructions/project-context.instructions.md`. The canonical
-   source for the bootstrap's own `## Project State` slot is
-   `shared/policies/workspace.instructions.md`; edit that (and regenerate)
-   only when this repository *is* the bootstrap authoring repository —
-   never hand-edit the generated `.claude/instructions/workspace.md` /
-   `workspace.instructions.md` copy directly.
+   `.claude/instructions/project-context.instructions.md`, not in the
+   generated `**Project:**` line; see `onboard` step 5.
 
 ## Phase 5: Verify
 ```bash
