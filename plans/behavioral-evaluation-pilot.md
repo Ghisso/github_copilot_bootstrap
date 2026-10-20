@@ -169,7 +169,7 @@ prompt lists only big-plan statuses
 - [x] `2026-10-03_phase-A-behavioral-pilot-evidence` — frozen fixture and evidence complete; reviewer loading is consistent with the role, but four unavailable case runs trigger the stop rule. See `docs/2026-10-06-behavioral-pilot-evidence.md`.
 - [x] `2026-10-03_phase-B-behavioral-pilot-runner` — cancelled under the approved stop rule; Phase A did not establish case sensitivity. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
 - [x] `2026-10-03_phase-C-behavioral-pilot-comparison` — cancelled under the approved stop rule; no comparison was run. See `.claude/session_logs/2026-10-06_behavioral-pilot-cancellation.md`.
-- [ ] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` — audit, implementation, review and full phase verification passed; paused at the user's request before final closeout. Resume from `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d-paused.md`.
+- [x] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh` — complete. See `.claude/session_logs/2026-10-06_behavioral-pilot-phase-d.md`; merged into `dev` as PR #45 (`050a1de`).
 
 Stop rule: if Phase A cannot show role loading (BEP-001) or case
 sensitivity (BEP-002), cancel Phases B and C with the cancellation evidence

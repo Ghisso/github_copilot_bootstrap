@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-02
 **Author:** agent session (Claude Opus 5.5), read-only review requested by the maintainer
-**Status:** OPEN. Nothing below is fixed yet.
+**Status:** CLOSED on 2026-10-20. Findings 1-7 were fixed by `sidecar-workflow-repair` (PR #43, `1626364`); the evidence map is the "Findings to evidence" table in `.claude/session_logs/2026-10-02_sidecar-workflow-repair.md`. The findings below are the original 2026-10-02 record.
 **Code state:** branch `dev` at `a2c68b3` (merge of PR #42, `sidecar-workflow-profile_implementation`).
 **Plan under review:** `.claude/plans/sidecar-workflow-profile.md` and its phases
 `2026-09-27_phase-{A,B,C}-workflow-profile-*.md`.

@@ -5,8 +5,11 @@
 `2026-09-19_openwiki-knowledge-layer-integration` (branch
 `2026-09-19_openwiki-knowledge-layer-integration_implementation`, final commit
 `27c059d`, all 11 live phases complete, D and E cancelled).
-**Status:** OPEN. Nothing here blocks the PR to `dev`. Each item is small;
-together they fit one small plan.
+**Status:** CLOSED on 2026-10-20 by big plan `backlog-followups`. Items 1, 3,
+4, and 5 were fixed in its Phase A; item 8 was already resolved (no
+`openwiki_refresh` bytecode remains under `shared/scripts/__pycache__/`);
+item 6 moved to its Phase B, item 7 to its Phase F (optional evidence), and
+item 2 to its Phase G refresh. The items below are the original record.
 **Why an exploration and not a phase:** the big plan's last phase is
 `2026-09-19_phase-K-knowledge-refresh`. `scripts/validate_plan_frontmatter.py`
 requires a `-knowledge-refresh` phase to be the last phase and the only one,

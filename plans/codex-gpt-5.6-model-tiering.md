@@ -1,13 +1,13 @@
 ---
 name: codex-gpt-5.6-model-tiering
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: codex-gpt-5.6-model-tiering_implementation
 started_at: 2026-07-18T04:15:10Z
 phases:
   - 2026-07-18_phase-B-configure-codex-gpt-5.6
-current_phase: 2026-07-18_phase-B-configure-codex-gpt-5.6
+current_phase:
 ---
 
 # Big Plan: codex-gpt-5.6-model-tiering
@@ -35,7 +35,7 @@ model values, global effort pin, strict validation, and documentation.
 
 ## Phases
 
-- [ ] `2026-07-18_phase-B-configure-codex-gpt-5.6`
+- [x] `2026-07-18_phase-B-configure-codex-gpt-5.6` — merged into `dev` as PR #7 (`767fefc`) on 2026-07-18.
 
 ## Verification
 

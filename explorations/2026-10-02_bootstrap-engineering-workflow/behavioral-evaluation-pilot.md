@@ -1,6 +1,6 @@
 # Plan 2: Optional Behavioral Evaluation Pilot
 
-**Status:** Deferred proposal; not implementation-ready or activated.
+**Status:** Run as `.claude/plans/behavioral-evaluation-pilot.md` and stopped after Phase A under its stop rule, with no comparison result (PR #45; see `docs/2026-10-06-behavioral-pilot-evidence.md`). Status updated 2026-10-20; the proposal below is the original record.
 **Requirement:** REQ-006 from [the guidance plan](../../plans/engineering-workflow-improvements.md).
 **Dependency:** None for delivery of the guidance plan. Consider this separately
 after its changes and knowledge refresh are complete.

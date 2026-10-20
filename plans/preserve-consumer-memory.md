@@ -1,13 +1,13 @@
 ---
 name: preserve-consumer-memory
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: preserve-consumer-memory_implementation
 started_at: 2026-07-18T05:45:00Z
 phases:
   - 2026-07-18_phase-A-preserve-consumer-memory
-current_phase: 2026-07-18_phase-A-preserve-consumer-memory
+current_phase:
 ---
 
 # Big Plan: Preserve Consumer Memory
@@ -27,7 +27,7 @@ so refreshes replace accumulated consumer memory with the seed.
 
 ## Phases
 
-- [ ] `2026-07-18_phase-A-preserve-consumer-memory`
+- [x] `2026-07-18_phase-A-preserve-consumer-memory` — merged into `dev` as PR #8 (`ab87dd7`) on 2026-07-18.
 
 ## Verification
 

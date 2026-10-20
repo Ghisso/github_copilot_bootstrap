@@ -6,7 +6,7 @@
 
 **Current planning baseline:** `dev`, `1626364`, after sidecar repair PR #43.
 
-**Status:** Investigation complete. Plan 1 was approved for implementation on 2026-10-02 and moved to `.claude/plans/`; Plan 2 remains a deferred proposal.
+**Status:** Investigation complete. Plan 1 was approved for implementation on 2026-10-02 and moved to `.claude/plans/`. Plan 2 was approved later and run as `.claude/plans/behavioral-evaluation-pilot.md` (PR #45); it stopped after Phase A under its stop rule, with no comparison result (see `docs/2026-10-06-behavioral-pilot-evidence.md`). Status updated 2026-10-20.
 
 ## Recommendation
 
@@ -33,8 +33,9 @@ Align those instructions; do not treat requirement handoffs as wholly new.
 - [Phase A: review guidance and focused checks](../../plans/2026-10-02_phase-A-engineering-review-guidance.md).
 - [Phase B: planning, reporting, and learning guidance](../../plans/2026-10-02_phase-B-engineering-planning-guidance.md).
 - [Phase C: required knowledge refresh](../../plans/2026-10-02_phase-C-engineering-knowledge-refresh.md).
-- [Plan 2: optional behavioral pilot](behavioral-evaluation-pilot.md): deferred
-  design and evidence requirements; not implementation-ready.
+- [Plan 2: optional behavioral pilot](behavioral-evaluation-pilot.md): design and
+  evidence requirements; later run as `.claude/plans/behavioral-evaluation-pilot.md`
+  and stopped after Phase A (PR #45).
 
 Plan 1 and its three small plans were approved and moved together to
 `.claude/plans/` on 2026-10-02; the investigation, design, and optional pilot
