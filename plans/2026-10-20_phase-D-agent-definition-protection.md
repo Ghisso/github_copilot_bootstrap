@@ -111,6 +111,8 @@ sees, so installs and regeneration are unaffected.
   without a path after it, and `<name>.code-workspace`, keeping the existing
   left boundary and adding a right boundary that refuses `.claude/agents-old`
   and `.claude/agentsx`.
+  (Superseded in part by big-plan "Decisions recorded" item 6, 2026-10-21:
+  the guard now fails closed on uncertain hits and secret-shaped targets.)
   The decision rule in `emit()` stays as it is: Codex and Antigravity deny,
   Claude Code and Copilot ask; the read-tool exemption, the secret-file
   rules, and the uncertain-literal deny do not change. Reword the two

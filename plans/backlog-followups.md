@@ -352,8 +352,8 @@ The user approved this plan on 2026-10-20 with these decisions:
    hit (a protected path the guard cannot judge) denies on every client,
    and a secret-shaped target denies before the hook-config rule applies.
    This departs from Phase D's "the decision rule in `emit()` stays as it
-   is": it never loosens a decision (a 3,114-command and 578-payload
-   comparison against the pre-plan guard found none), and it tightens some
+   is": it never loosens a decision (the comparison against the pre-plan
+   guard is recorded in the Phase D closeout log), and it tightens some
    pre-existing mixed commands from ask to deny (for example `git restore`
    of a protected config chained with `rm` of it, `rm .env .mcp.json`, or
    a settings edit whose heredoc body names a hook script).
