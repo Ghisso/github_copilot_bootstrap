@@ -1,0 +1,2 @@
+# See write_nested_gitattributes in state-sync.sh for the policy rationale.
+session_logs/*.log merge=union
