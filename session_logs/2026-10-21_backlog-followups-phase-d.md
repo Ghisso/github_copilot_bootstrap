@@ -55,6 +55,31 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
   workspace-name test; a confusing colon in the commit skill's PR example.
   Sent the code fix to the coder and the docs fix to the documenter in
   parallel (disjoint files).
+- **Later** - Documenter: split the docs' edit sentence (agent edits and
+  `rm -rf`/`mv`/`ln -s` on a whole folder ask on Claude Code and Copilot,
+  deny on Codex and Antigravity) from the "merely names" sentence
+  (`ls`/`find`/`diff`/`cmp` denied everywhere) in runtime checks, smoke
+  tests, README, and target mapping; named all four clients for the
+  `git -C`/`cd` forms; fixed the commit skill colon. Generate + validate
+  PASS.
+- **Later** - Coder: offset-root resolution now runs only when no token of
+  that Git command is already protected from the repository root (stricter
+  than the reviewer's per-token suggestion, which would still soften a
+  mixed-token command). Probe of `git -C .claude restore <abs>/.claude/hooks/...`:
+  deny on all four clients at HEAD, ask on Claude Code and Copilot before
+  the fix, deny on all four after. New deny-everywhere test for five Git
+  forms (6 of its rows failed before the fix); `Team.CODE-WORKSPACE` added to
+  the scoping and per-client tests (negative controls without `.lower()`: 13
+  failures; without `re.IGNORECASE`: 2). 1179 targeted tests pass.
+- **Orchestrator decision (within approved goals)** - The coder also found
+  that across segments of one command line a confirmed hit beats an
+  uncertain deny, so `git restore .claude/hooks/x && git -C .claude restore
+  hooks/y` and `git restore .claude/hooks/x && rm -rf .claude/agents` would
+  go from deny at HEAD to ask, which the plan forbids. Chosen fix: `emit()`
+  decides on uncertain hits before confirmed ones (fail closed). Its only
+  other effect is tightening some pre-existing mixed commands from ask to
+  deny (for example `git restore` of a protected config chained with `rm`
+  of it). Sent to the coder with deny-everywhere tests.
 
 ## [LEARN] Entries
 
