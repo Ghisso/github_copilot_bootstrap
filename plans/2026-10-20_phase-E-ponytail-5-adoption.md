@@ -22,8 +22,8 @@ Step 1 gathers evidence only and decides the path (BF-E1). NO-GO cancels
 this phase with evidence and changes no outer file (BF-E2). ADOPT or PARTIAL
 ADOPT merges the upstream change into the two vendored skills by the
 three-way procedure in `shared/third_party/ponytail/UPSTREAM.md`, closes the
-same gap in the local prompts and profiles (BF-E3, BF-E4), restores a
-moves every skill pin (BF-E5), keeps both sidecar profiles
+same gap in the local prompts and profiles (BF-E3, BF-E4), moves every
+skill pin (BF-E5), keeps both sidecar profiles
 consistent (BF-E6), and vendors neither `ponytail-audit` nor any plugin
 runtime (BF-E7).
 
@@ -72,7 +72,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
 | P12 | `description:` rewrites in both skills | Decline | Upgrade procedure step 2 keeps local wording |
 | P13 | `ponytail` L44: never-cut list without root-cause and the meaningful check | Keep local | The fork's list is a superset |
 | R1 | `ponytail-review` L21-25: read the diff, then the code it touches (callers of every changed function, the functions it calls, the tests); search every caller when a signature, return value, or behavior changes | Adopt, adapted | A2 for this skill; name tests, fixtures, and config; drop the README item |
-| R2 | `ponytail-review` L11-14, L32-45: full quality review (bug, risk, scale, missing test, speed, lean) | Decline | The `code`, `security`, `performance`, and `tests` profiles own these; the fork's `## Boundaries` stays. Open user decision |
+| R2 | `ponytail-review` L11-14, L32-45: full quality review (bug, risk, scale, missing test, speed, lean) | Decline | The `code`, `security`, `performance`, and `tests` profiles own these; the fork's `## Boundaries` stays. Decided by the user on 2026-10-20 |
 | R3 | `ponytail-review` L48: `reuse:` tag naming the existing path | Adopt | Add it to `shared/review-profiles/ponytail.md` too |
 | R4 | `ponytail-review` L52-55: `merge:` and `split:` tags | Decline | The `code` profile covers duplication and single-purpose functions |
 | R5 | `ponytail-review` L59-64, `ponytail-audit` L61-62: a concrete case per finding; before `delete:`, search the whole tree (tests, fixtures, config, string or dynamic references); a marked shortcut is a decision | Adopt with the `ponytail:` marker | Stops `delete:` findings that break code outside the diff |
