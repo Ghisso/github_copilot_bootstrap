@@ -290,11 +290,8 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   G refreshes the OpenWiki pages that describe the Ponytail skills (for
   example `openwiki/architecture/agents-and-skills.md:191`). At LEARN,
   correct the Ponytail `[LEARN:architecture]` and `[LEARN:verification]`
-  pin entries only if they are still in the working `MEMORY.md`: their line
-  counts change, and the pin list now lives in `UPSTREAM.md`. Never edit
-  the Phase C archive; an archived entry stays a dated record (its header
-  says current source wins). When an archived lesson is still needed, add a
-  new working-file entry instead.
+  pin entries in `.claude/MEMORY.md` in place: their line counts change, and
+  the pin list now lives in `UPSTREAM.md`.
 
 ## Verification
 

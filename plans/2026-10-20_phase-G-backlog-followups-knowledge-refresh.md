@@ -23,16 +23,14 @@ OpenWiki corrections that `gate-repair` left for the next managed refresh.
   **Owner:** orchestrator, with a documenter for prose changes.
   **Files:** as the audit finds; at least `docs/target-mapping.md`,
   `.claude/instructions/project-context.instructions.md`, and
-  and the working `.claude/MEMORY.md`.
+  `.claude/MEMORY.md`.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/ponytail/SKILL.md` (full).
   Sweep root guidance, `docs/`, shared policies, skills, templates, agents,
-  review profiles, state READMEs, and the working `.claude/MEMORY.md` for
-  claims this plan or earlier work made false. The Phase C archive is a
-  dated record: never edit it, and do not re-run its `split_memory.py check`
-  as evidence here, because any later in-place correction of a kept entry
-  makes that check fail by design. When an archived lesson is now wrong and
-  still needed, add a corrected entry to the working file. Required items:
+  review profiles, state READMEs, and `.claude/MEMORY.md` for claims this
+  plan or earlier work made false. Phase C did not split `MEMORY.md` (user
+  decision 2026-10-20), so correct superseded entries in place, as the
+  live-advice rule requires. Required items:
   - the "Recorded follow-ups" list in `docs/target-mapping.md` no longer
     lists work Phases D–F finished, each remaining gap keeps its evidence,
     and the three follow-ups this plan carries without work stay listed:
@@ -42,18 +40,20 @@ OpenWiki corrections that `gate-repair` left for the next managed refresh.
   - every statement of the Ponytail version, rules, and review scope matches
     what Phase E shipped (or still says `v4.8.4` if Phase E was cancelled),
     including the `[LEARN:architecture]` and `[LEARN:verification]` Ponytail
-    pin entries if they are still in the working file (their line counts
+    pin entries (their line counts
     were already stale on 2026-10-20: they say 72 and 38 lines, the files
     have 73 and 40); if Phase E was cancelled, add audit gap A2 to the
     "Recorded follow-ups" list in `docs/target-mapping.md`;
   - every statement of the OpenWiki version and upgrade rule matches Phase F
     (or still says `0.5.2` if Phase F was cancelled), including the
-    `[LEARN:tooling]` OpenWiki entry if it is still in the working file;
+    `[LEARN:tooling]` OpenWiki entry;
   - `.claude/instructions/project-context.instructions.md` "Current status"
     and pinned-version lines match the shipped state;
-  - no `[LEARN]` entry in the working `MEMORY.md` contradicts a change in
-    this plan, and its `## Archived Lessons` index still points at the
-    archive.
+  - no `[LEARN]` entry in `MEMORY.md` contradicts a change in this plan,
+    including two the Phase C classification flagged: the entry saying a
+    small plan is set `complete` only after findings (CLOSEOUT step 2 sets
+    it before findings and receipts) and the entry naming the renamed
+    `state-sync.sh` function `commit_and_reconcile`.
   Leave dated records (archived plans, dated docs, closed session logs,
   dated explorations) unchanged. Record every surface and its outcome under
   `## Stale-claims surfaces checked` in the closeout log.

@@ -1,0 +1,329 @@
+ordinal	sha256_12	heading	tag	disposition	reason	evidence	summary
+1	acfd1a3eabe3	Domain-Specific	security	KEEP	-	-	- [LEARN:security] Shell mutation guards must track expansio
+2	58e9ff41f2ce	Domain-Specific	testing	KEEP	-	-	- [LEARN:testing] Pair newly allowed guard regressions with 
+3	ec801d2fa819	Domain-Specific	domain	KEEP	-	-	- [LEARN:domain] `github_copilot_bootstrap` generates a mult
+4	b5444f07973a	Workflow	validation	KEEP	-	-	- [LEARN:validation] A hand-parsed flat frontmatter contract
+5	e55a2a77142f	Workflow	verification	KEEP	-	-	- [LEARN:verification] In this authoring repository, `check_
+6	fa1420012a07	Workflow	verification	KEEP	-	-	- [LEARN:verification] Read a gate's exit status from the co
+7	90e24a39c953	Workflow	review	KEEP	-	-	- [LEARN:review] An audit finding is a hypothesis until re-v
+8	0526f56dd443	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] `shared/skills/ponytail/SKILL.md` and
+9	435d9894b64d	Workflow	review	KEEP	-	-	- [LEARN:review] Removing an unsafe default from a skill is 
+10	4e553ee95177	Workflow	verification	ARCHIVE	S	scripts/validate_targets.py::normalized_text	- [LEARN:verification] `scripts/validate_targets.py` normali
+11	eb01e96870d7	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Parallel coders in one working tree are s
+12	6e4f401b6626	Workflow	review	KEEP	-	-	- [LEARN:review] Scoping a policy means scoping the whole fi
+13	66eb30c78125	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Progressive disclosure changes what p
+14	a9dc22b87a8e	Workflow	review	KEEP	-	-	- [LEARN:review] Across two consecutive phases the orchestra
+15	cd6f8b9a63bc	Workflow	workflow	ARCHIVE	E	shared/hooks/scripts/enforce-branch-state.sh::missing big-plan file	- [LEARN:workflow] An implementation branch named `<slug>_im
+16	609a4579f72a	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Configuration and validator allow-list mi
+17	c51ded7d75e6	Workflow	quality	ARCHIVE	S	tests/test_validate_targets.py::test_validate_targets	- [LEARN:quality] The authoring repository uses `scripts/val
+18	331c91fa574d	Workflow	runtime	KEEP	-	-	- [LEARN:runtime] Codex 0.144.x MultiAgent V2 hides custom-a
+19	5c54e09d826b	Workflow	installer	KEEP	-	-	- [LEARN:installer] Generated seeds for consumer-owned mutab
+20	a6becbe6b37f	Workflow	installer	KEEP	-	-	- [LEARN:installer] A warn-never-fail sync hook cannot prove
+21	68193345dc52	Workflow	testing	KEEP	-	-	- [LEARN:testing] Cover state-sync entry points directly fro
+22	dbc94c0860fd	Workflow	quality	KEEP	-	-	- [LEARN:quality] The commit gate's `content_hash` is `git h
+23	ebea162f65b7	Workflow	domain	ARCHIVE	S	shared/hooks/scripts/state-sync.sh::cmd_pull	- [LEARN:domain] `state-sync.sh` `cmd_pull` must return non-
+24	8962142287a0	Workflow	security	KEEP	-	-	- [LEARN:security] Automated recovery must distinguish state
+25	4e3aa2259427	Workflow	testing	KEEP	-	-	- [LEARN:testing] A regression test must FAIL if the fix is 
+26	578dc2da68ca	Workflow	testing	KEEP	-	-	- [LEARN:testing] Recovery and control-flow regressions must
+27	95cc308e1761	Workflow	domain	ARCHIVE	S	shared/policies/workflow.instructions.md::Automatic Reminders	- [LEARN:domain] AI-state durability must not depend on a `S
+28	4a3c334dda25	Workflow	quality	KEEP	-	-	- [LEARN:quality] Structural checks over generated text must
+29	4002730136c1	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Never create a tracked worktree diagnosti
+30	44ec071057bf	Workflow	testing	KEEP	-	-	- [LEARN:testing] A no-I/O Git Trace2 test must first assert
+31	cbf8de9171a3	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A clean-only publication retry can deadlo
+32	1ffa1ce6323c	Workflow	testing	KEEP	-	-	- [LEARN:testing] Exact generated hook-schema validation mus
+33	09d76dde243c	Workflow	installer	KEEP	-	-	- [LEARN:installer] Dry-run output is part of the safety con
+34	4a4d033d6636	Workflow	quality	KEEP	-	-	- [LEARN:quality] Generator verification must run after conc
+35	0ce1ed5cad7d	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Phase closeout gates read the small-plan 
+36	05f7805e16fb	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] After an atomic phase commit lands, recon
+37	c35423d65361	Workflow	installer	KEEP	-	-	- [LEARN:installer] Runtime ownership metadata must be inert
+38	a73963575c19	Workflow	testing	KEEP	-	-	- [LEARN:testing] Ownership/pruning suites must cover equal 
+39	e4520e19219a	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Generated root guidance should be a c
+40	36a0d0471770	Workflow	testing	KEEP	-	-	- [LEARN:testing] Context-budget work needs structural regre
+41	207b9f254e16	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Cross-client policy portability needs
+42	476cf7cdfd59	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Describe structural adapter parity s
+43	63aadb8a958a	Workflow	codex	KEEP	-	-	- [LEARN:codex] Treat documented configuration syntax, parse
+44	e5df9aea5823	Workflow	testing	KEEP	-	-	- [LEARN:testing] Routing-shim removal and nesting-limit rem
+45	53327360e3b0	Workflow	codex	KEEP	-	-	- [LEARN:codex] Project custom-agent `developer_instructions
+46	dc737bed0146	Workflow	config	KEEP	-	-	- [LEARN:config] Omit per-agent MCP and skill tables when Co
+47	4c4632e77a26	Workflow	security	KEEP	-	-	- [LEARN:security] Phase F confirmed protected-file shell gu
+48	55b59a4f8b90	Workflow	testing	KEEP	-	-	- [LEARN:testing] A sequential safety wrapper needs two acce
+49	c3c4c93598e6	Workflow	workflow	ARCHIVE	S	shared/policies/workflow.instructions.md::Task Lanes	- [LEARN:workflow] Keep one normative task-lane table in the
+50	bc5af6b6de78	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Target-native path projection must pr
+51	94bd473dd401	Workflow	security	KEEP	-	-	- [LEARN:security] Portable project memory is curated, synce
+52	f6784e705563	Workflow	testing	KEEP	-	-	- [LEARN:testing] Consumer-owned memory preservation needs b
+53	2ee6323adeaf	Workflow	testing	KEEP	-	-	- [LEARN:testing] Native acceptance needs three distinct evi
+54	eafffe8abe3c	Workflow	testing	KEEP	-	-	- [LEARN:testing] Model prose cannot prove client routing me
+55	77d4fed78aa6	Workflow	security	KEEP	-	-	- [LEARN:security] Trusted-project probes need a stable, ope
+56	a5749260b486	Workflow	testing	KEEP	-	-	- [LEARN:testing] A/B acceptance must parse and compare cont
+57	83e61840cce3	Workflow	testing	KEEP	-	-	- [LEARN:testing] A probe that never executed against its re
+58	f85d17407cd6	Workflow	testing	KEEP	-	-	- [LEARN:testing] Mapping every non-zero exit to a single di
+59	8c77814f4521	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Verify client provenance and version befor
+60	6e98015c23ba	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Variadic CLI options silently consume posi
+61	f4d8bd0768d9	Workflow	testing	KEEP	-	-	- [LEARN:testing] A check that asks every target the same qu
+62	c5bf2e12b18b	Workflow	testing	KEEP	-	-	- [LEARN:testing] Non-deterministic model output is a sympto
+63	03ade41ba431	Workflow	testing	KEEP	-	-	- [LEARN:testing] "Cannot be measured" is a finding, not a f
+64	2c73a7b615f0	Workflow	testing	KEEP	-	-	- [LEARN:testing] Never write a parser for an event shape yo
+65	fcc3b9c4f1bb	Workflow	config	KEEP	-	-	- [LEARN:config] A config key can be silently inert. Codex 0
+66	c0b4ad2113dd	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Least-privilege flags can preclude the beh
+67	4a0d2ed62f0e	Workflow	testing	KEEP	-	-	- [LEARN:testing] Twelve Codex child agents each misreported
+68	2157521d8ea0	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] A diagnostic that prints an inapplicable r
+69	05664722187d	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] `codex exec` has no persistent thread
+70	5e8f826aef98	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Appending phases to a plan's frontma
+71	c7b46130cff5	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] A wrong mechanism claim propagates a
+72	0f40b7b23182	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] `install_bootstrap.py --allow-self` refres
+73	ae9d90a165eb	Workflow	security	KEEP	-	-	- [LEARN:security] Check the nested `.claude/.gitignore` bef
+74	3fc17478fd08	Workflow	testing	KEEP	-	-	- [LEARN:testing] Running the installer once exposed three b
+75	e0da5142668e	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] The fail-closed shell guard recursively cl
+76	8902f5f5547f	Workflow	security	KEEP	-	-	- [LEARN:security] The shell guard never recursively parses 
+77	1c8b688ff4be	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] A file living only in the generated `
+78	e91a51cc9b02	Workflow	testing	KEEP	-	-	- [LEARN:testing] Authoring-adapter preservation needs separ
+79	9e2b4577791b	Workflow	security	KEEP	-	-	- [LEARN:security] Native probes need explicit human authori
+80	9aafc8dd6eb9	Workflow	testing	KEEP	-	-	- [LEARN:testing] Structured output is only transport validi
+81	7e942e968a6c	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Audience-aware writing rules need one
+82	ea7791a21b62	Workflow	testing	KEEP	-	-	- [LEARN:testing] Semantic prose validators should normalize
+83	934b042ab442	Workflow	security	KEEP	-	-	- [LEARN:security] Optional review metadata requires structu
+84	c1c8490708f7	Workflow	architecture	ARCHIVE	E	shared/hooks/scripts/_lib-frontmatter.sh::diff_requires_ponytail	- [LEARN:architecture] Conditional review routing needs dete
+85	0d29bedf790f	Workflow	testing	KEEP	-	-	- [LEARN:testing] Exemption tests must start from a clean fi
+86	080b185b3926	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] An AST symbol graph answers structura
+87	2adde56bb70a	Workflow	quality	KEEP	-	-	- [LEARN:quality] Score a candidate tool per question at its
+88	a6e7bb754700	Workflow	quality	KEEP	-	-	- [LEARN:quality] A gate result is stronger when it states i
+89	0ac3a880a19f	Workflow	security	KEEP	-	-	- [LEARN:security] Prove a sandbox boundary with a positive 
+90	f523c6752db9	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Never write a cleanup or completion claim
+91	6d04af0f5949	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] The fail-closed Bash guard still can't mod
+92	1b95f993fbe4	Workflow	shell	KEEP	-	-	- [LEARN:shell] Bash `errexit` isn't reliable inside a funct
+93	b90dde53a95d	Workflow	testing	KEEP	-	-	- [LEARN:testing] When a fix moves an operation past an old 
+94	90b5ea03614c	Workflow	diagnostics	KEEP	-	-	- [LEARN:diagnostics] Follow-on warnings must describe the b
+95	3c00d3c62aba	Workflow	security	KEEP	-	-	- [LEARN:security] Hand-parsed YAML-like lifecycle frontmatt
+96	921bea89b0a7	Workflow	quality	KEEP	-	-	- [LEARN:quality] Treat cancellation evidence as an untruste
+97	d2283e9e7121	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Lifecycle templates and policies mus
+98	3b77ee8ec81c	Workflow	security	KEEP	-	-	- [LEARN:security] Action-time gates must revalidate mutable
+99	a9514ce554af	Workflow	security	KEEP	-	-	- [LEARN:security] When lifecycle state crosses multiple par
+100	e94349e580e7	Workflow	security	KEEP	-	-	- [LEARN:security] A gate that delegates validation to a run
+101	42e82e62f6a1	Workflow	recovery	KEEP	-	-	- [LEARN:recovery] A recovery that swallows its own failure 
+102	18e0124a0a9e	Workflow	recovery	KEEP	-	-	- [LEARN:recovery] `--autostash` isn't free insurance. It ca
+103	75e70ae0e7ed	Workflow	observability	KEEP	-	-	- [LEARN:observability] A warn-never-fail subsystem needs a 
+104	47bb75ab9a41	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A lifecycle vocabulary gap forces falsifi
+105	959a448010e0	Workflow	security	KEEP	-	-	- [LEARN:security] Relaxing a gate is safe only when paired 
+106	848b29adf290	Workflow	planning	KEEP	-	-	- [LEARN:planning] A NO-GO gate is a valid final result. Low
+107	3a481091c8c1	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Reconstruct incident duration from d
+108	78d96b5fe704	Workflow	security	KEEP	-	-	- [LEARN:security] A protocol allowlist must key on the meth
+109	7d79cf509c23	Workflow	security	KEEP	-	-	- [LEARN:security] Bounding a security-relevant tracking map
+110	c7916d4d8d16	Workflow	security	KEEP	-	-	- [LEARN:security] Anti-forgery state must live outside ever
+111	2349814629e2	Workflow	tests	KEEP	-	-	- [LEARN:tests] An assertion that cannot fail is worse than 
+112	7c92a0611d58	Workflow	tests	KEEP	-	-	- [LEARN:tests] When a regression's failure mode is a silent
+113	d1918b1f808c	Workflow	verification	KEEP	-	-	- [LEARN:verification] Reconcile agent claims against the ar
+114	57aad32209b2	Workflow	security	KEEP	-	-	- [LEARN:security] `trap ... RETURN INT TERM` in one bash ca
+115	6c5eff350d4a	Workflow	tests	KEEP	-	-	- [LEARN:tests] A comment asserting that a test guards an in
+116	693f37d43334	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Duplication between shipped and autho
+117	77f33f03399c	Workflow	security	KEEP	-	-	- [LEARN:security] Enforcing a version pin on one transport 
+118	8e67b94f5566	Workflow	security	KEEP	-	-	- [LEARN:security] A tool-call argument allow-list doesn't c
+119	782ce0ace358	Workflow	security	KEEP	-	-	- [LEARN:security] A self-check that restates configuration 
+120	7ec79ed3bc21	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Ownership follows the destructive ope
+121	032940815177	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] A canonical metadata loader is author
+122	a24977518623	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] When a custom Codex agent must pin a 
+123	a41d88bd304a	Workflow	tests	KEEP	-	-	- [LEARN:tests] Prompt-policy validation must exercise seman
+124	7b66092bc91b	Workflow	tests	KEEP	-	-	- [LEARN:tests] An exact policy-list contract must consume i
+125	c3ad99b054c4	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Machine-checked documentation needs 
+126	4cacdaca020a	Workflow	verification	KEEP	-	-	- [LEARN:verification] A self-install blocked by protected-f
+127	6c1c85328d36	Workflow	security	KEEP	-	-	- [LEARN:security] Antigravity CLI can reuse a persisted pro
+128	a350b06c1fc6	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] In `agy` 1.1.17, the default native a
+129	5f2afa8014bc	Workflow	security	KEEP	-	-	- [LEARN:security] A relaxed lifecycle gate must validate th
+130	11bcde2b4dff	Workflow	tests	KEEP	-	-	- [LEARN:tests] A checkpoint lifecycle regression must exerc
+131	ca0e71762c35	Workflow	security	KEEP	-	-	- [LEARN:security] Matching content in an outer generated di
+132	dd67df8318bb	Workflow	verification	KEEP	-	-	- [LEARN:verification] Freshness inventories must fail close
+133	2a8eaec87bd3	Workflow	verification	KEEP	-	-	- [LEARN:verification] When a generated verifier imports ano
+134	d117ff013360	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Role retirement must separate current
+135	2c1956c05f04	Workflow	runtime	KEEP	-	-	- [LEARN:runtime] Managed runtime scripts that import siblin
+136	74da89345264	Workflow	verification	ARCHIVE	E	tests/test_verify.py::test_consumer_mypy_scope_skips_non_mypy_config_files	- [LEARN:verification] Match Mypy native config discovery pr
+137	60d1a529a7f9	Workflow	security	KEEP	-	-	- [LEARN:security] Nested provenance must bind relevant Git 
+138	cb4ef581d4fd	Workflow	verification	KEEP	-	-	- [LEARN:verification] Record nested HEAD for audit, but com
+139	41391c3bdfac	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A final-phase receipt necessarily predate
+140	de7a62f2c900	Workflow	security	KEEP	-	-	- [LEARN:security] `sys.dont_write_bytecode` prevents cache 
+141	1bd25d5bc86a	Workflow	security	KEEP	-	-	- [LEARN:security] A generated verifier must load its owners
+142	8954b1e49dd5	Workflow	testing	KEEP	-	-	- [LEARN:testing] Historical upgrade regressions must vendor
+143	c951e0706653	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Final quality and findings reports bind t
+144	ed6ba906304e	Workflow	verification	KEEP	-	-	- [LEARN:verification] Clean-checkpoint terminal provenance 
+145	ffd473f4bfcc	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A big plan's `phases:` list and `current_
+146	ec055cbad830	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] When deleting a cross-cutting concept, "s
+147	375b5f8b4a08	Workflow	review	KEEP	-	-	- [LEARN:review] A sweep authored by the agent that wrote th
+148	0d4439a406ea	Workflow	verification	KEEP	-	-	- [LEARN:verification] Size a bounded guard regex against th
+149	4100fdcfeb91	Workflow	verification	KEEP	-	-	- [LEARN:verification] Keep a detail-string enricher off the
+150	d37ea80b338e	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Advance completed phases from the native 
+151	9279935802ae	Workflow	review	KEEP	-	-	- [LEARN:review] A phase that changes documented behavior ow
+152	0c569f921afa	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] When a delegated agent dies mid-task, fil
+153	662c940ec3c1	Workflow	verification	KEEP	-	-	- [LEARN:verification] Retiring a test because "a unit test 
+154	4922eaad3d6d	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A gate flag derived from plan status at g
+155	b6594c4c3fdd	Workflow	verification	KEEP	-	-	- [LEARN:verification] A closeout receipt's `head_sha` is th
+156	da1f67366916	Workflow	verification	KEEP	-	-	- [LEARN:verification] A changed-path set legitimately inclu
+157	fd95283f3389	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A small plan's `name:` frontmatter must e
+158	2a40db195bef	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] `update_consumers.py --allow-self` remove
+159	1944c2617c26	Workflow	security	KEEP	-	-	- [LEARN:security] A path-based bypass allowlist must be der
+160	3713f56b174f	Workflow	verification	KEEP	-	-	- [LEARN:verification] Replacing a hollow gate can produce a
+161	70abcc853323	Workflow	testing	KEEP	-	-	- [LEARN:testing] A test reproducing an exploit must reprodu
+162	539d10cbf5ff	Workflow	review	KEEP	-	-	- [LEARN:review] Ask for execution, not inspection, on any g
+163	019cf4f2aae3	Workflow	verification	KEEP	-	-	- [LEARN:verification] A gate that picks one item from an or
+164	942fff23a803	Workflow	review	KEEP	-	-	- [LEARN:review] A dispositioned MINOR isn't necessarily a s
+165	8871d73d8112	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Fixing a finding can create one. Improvin
+166	86e917542461	Workflow	code	KEEP	-	-	- [LEARN:code] Prefer an explicit `\r\n|\r|\n` alternation o
+167	bd7c43d92574	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] To extend a big plan that already reached
+168	84bcb25be621	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Editing a big plan after its final phase 
+169	90ccda02a956	Workflow	code	KEEP	-	-	- [LEARN:code] `Path.is_file()` isn't a readability check — 
+170	40871e41ca76	Workflow	verification	KEEP	-	-	- [LEARN:verification] A fix that removes an exception can l
+171	f4370526bba2	Workflow	testing	KEEP	-	-	- [LEARN:testing] Gate a permission-dependent test on `os.ge
+172	84bb7b6eb3f7	Workflow	code	KEEP	-	-	- [LEARN:code] When a guard duplicates a condition a downstr
+173	c2ee55381160	Workflow	verification	ARCHIVE	S	shared/scripts/verify.py::phase_checks	- [LEARN:verification] The documented canonical `mypy src/` 
+174	a96835c17e3f	Workflow	verification	KEEP	-	-	- [LEARN:verification] `CHECK_IDS` is part of the receipt sc
+175	5b1866f4b9ad	Workflow	testing	KEEP	-	-	- [LEARN:testing] **The highest-yield test smell in this rep
+176	54cbeadafa30	Workflow	verification	KEEP	-	-	- [LEARN:verification] A flag valid on one Ruff subcommand m
+177	6023961eef93	Workflow	review	KEEP	-	-	- [LEARN:review] Validate against artifacts actually on disk
+178	5b34a9b41508	Workflow	verification	KEEP	-	-	- [LEARN:verification] A documented requirement that nothing
+179	ac1c8735baef	Workflow	installer	ARCHIVE	E	scripts/validate_targets.py::STATE_DIR_OWNED_README_PATHS	- [LEARN:installer] Bootstrap-owned documentation seeded ins
+180	e743f4c06a19	Workflow	review	KEEP	-	-	- [LEARN:review] Auditing a canonical source isn't auditing 
+181	efb276009363	Workflow	review	KEEP	-	-	- [LEARN:review] A plausible analogy to a real lesson is a g
+182	239b7c5a550b	Workflow	verification	ARCHIVE	S	shared/scripts/verify.py::closeout_log_errors	- [LEARN:verification] `closeout_log_errors` is the schema-f
+183	120ba1c70edc	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A gate a phase adds must be satisfied by 
+184	d840be404ef7	Workflow	testing	KEEP	-	-	- [LEARN:testing] A hook that needs committed AI state must 
+185	c8b6e4b8e4ae	Workflow	testing	KEEP	-	-	- [LEARN:testing] Review shell hooks by executing them, not 
+186	d82b7fd3501a	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Do not add outcome gating to an advis
+187	ad9ef3291917	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A PAUSED session log's remaining-work lis
+188	6d043efcbbdc	Workflow	testing	KEEP	-	-	- [LEARN:testing] The repository's own branch guard and comm
+189	09dc3fcf3d27	Workflow	runtime	KEEP	-	-	- [LEARN:runtime] A Claude Code tool name that the generator
+190	2c725eb1c988	Workflow	runtime	KEEP	-	-	- [LEARN:runtime] Claude Code task tracking is conditional, 
+191	829a52d62cb8	Workflow	quality	KEEP	-	-	- [LEARN:quality] A generated-output allowlist must be sourc
+192	7b397b44912e	Workflow	testing	KEEP	-	-	- [LEARN:testing] A guard nested inside an unrelated conditi
+193	50f7570613f2	Workflow	review	KEEP	-	-	- [LEARN:review] Extracting a shared helper can silently dro
+194	5a363d54ed88	Workflow	testing	KEEP	-	-	- [LEARN:testing] When a repair step only adds and overwrite
+195	f613a614e0ad	Workflow	testing	KEEP	-	-	- [LEARN:testing] An assertion placed after a step is only p
+196	5a66fd0ca950	Workflow	runtime	KEEP	-	-	- [LEARN:runtime] This repository declares Bash 3.2 (stock m
+197	0ad2804120c0	Workflow	review	KEEP	-	-	- [LEARN:review] When a reported defect is one instance of a
+198	5dd4f6428dbb	Workflow	review	KEEP	-	-	- [LEARN:review] Replacing an abort with a silent zero-itera
+199	7fcc1f59f66c	Workflow	quality	KEEP	-	-	- [LEARN:quality] A regression check that claims to prevent 
+200	cbc41687a5c2	Workflow	security	KEEP	-	-	- [LEARN:security] When a refactor starts using an existing 
+201	32e8b977643f	Workflow	testing	KEEP	-	-	- [LEARN:testing] Prove a security regression test is load-b
+202	b017ebf9a24e	Workflow	quality	KEEP	-	-	- [LEARN:quality] A prose-validation check with no negation 
+203	fb741e332509	Workflow	security	KEEP	-	-	- [LEARN:security] Write the negative controls before relaxi
+204	909fd1e608f2	Workflow	review	KEEP	-	-	- [LEARN:review] Verify a reported reproduction before imple
+205	d5f24abfde5a	Workflow	review	KEEP	-	-	- [LEARN:review] A test corpus that shares a formatting conv
+206	c1a39c6ce7e0	Workflow	review	KEEP	-	-	- [LEARN:review] Before-and-after comparison proves a delta,
+207	8cc723719b8f	Workflow	security	KEEP	-	-	- [LEARN:security] Replacing a hard failure with a silent sk
+208	2b775cdbb301	Workflow	review	KEEP	-	-	- [LEARN:review] When two gate functions enforce the same se
+209	1ca0d3d1df73	Workflow	testing	KEEP	-	-	- [LEARN:testing] A direct-parent check needs a merge-commit
+210	be506ccf958a	Workflow	quality	KEEP	-	-	- [LEARN:quality] Tighten a test assertion to the mechanism 
+211	bad3435b3711	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Guidance that is both generated and hand-
+212	61dd2d6e1bff	Workflow	security	KEEP	-	-	- [LEARN:security] A receipt must only bind bytes that Git a
+213	c8b5b4a7b939	Workflow	workflow	ARCHIVE	S	shared/policies/workflow.instructions.md::Reopening a completed big plan	- [LEARN:workflow] Adding a phase to a big plan defers the s
+214	7980e6f7e1b3	Workflow	review	KEEP	-	-	- [LEARN:review] `git -C <dir> rev-parse HEAD` walks up the 
+215	70e4b216de96	Workflow	testing	KEEP	-	-	- [LEARN:testing] A fixture that works around a hazard inste
+216	304d11d747f4	Workflow	review	KEEP	-	-	- [LEARN:review] `git -C <dir>` is never a repository test, 
+217	3e54ab46bf94	Workflow	testing	KEEP	-	-	- [LEARN:testing] A fail-open reproduction must include the 
+218	92e3f783e6ce	Workflow	review	KEEP	-	-	- [LEARN:review] Before ruling that a fix would break a docu
+219	ee35653e901f	Workflow	quality	KEEP	-	-	- [LEARN:quality] `uv run <tool>` with the tool missing from
+220	19eca334ddb4	Workflow	quality	KEEP	-	-	- [LEARN:quality] A receipt check that can newly resolve to 
+221	5814095b29b6	Workflow	testing	KEEP	-	-	- [LEARN:testing] A repository scan that can be blocked by p
+222	da75142cb713	Workflow	testing	ARCHIVE	E	tests/conftest.py::_live_error_log_must_stay_untouched	- [LEARN:testing] Hook scripts derive `REPO_ROOT` from their
+223	37bfca6e9e00	Workflow	quality	KEEP	-	-	- [LEARN:quality] Do not assert byte-identical content on a 
+224	af3d53e68926	Workflow	review	KEEP	-	-	- [LEARN:review] Two validator functions asserting one invar
+225	f0e1ae9cc1fe	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] When a coder attributes the only validato
+226	fd56867ce25a	Workflow	quality	KEEP	-	-	- [LEARN:quality] Check a persist path's ordering against it
+227	91809dad6983	Workflow	quality	KEEP	-	-	- [LEARN:quality] `git ls-files --others --ignored --exclude
+228	449d4a8bb4fe	Workflow	review	KEEP	-	-	- [LEARN:review] Do not build a detection rule from a denyli
+229	25abb03bcd89	Workflow	quality	KEEP	-	-	- [LEARN:quality] A check that fails on ordinary activity ge
+230	31bcfbf27440	Workflow	review	KEEP	-	-	- [LEARN:review] When narrowing behaviour on a name, validat
+231	17aeabea8394	Workflow	quality	KEEP	-	-	- [LEARN:quality] A test whose fixture points a symlink at a
+232	f1ca7a1e00f0	Workflow	quality	KEEP	-	-	- [LEARN:quality] Editing a live root adapter desynchronizes
+233	a6ad0383bad0	Workflow	review	KEEP	-	-	- [LEARN:review] When one sentence must appear in two files,
+234	da8b95384df5	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Give a contract that must appear in many 
+235	47c5638ac4de	Workflow	review	KEEP	-	-	- [LEARN:review] A wrapper, its tests, and its fakes can be 
+236	1c9c46d0d945	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A plan step phrased "run this check when 
+237	278896b75083	Workflow	quality	KEEP	-	-	- [LEARN:quality] State a tool's limitations only from somet
+238	3a6df8b8d655	Workflow	review	KEEP	-	-	- [LEARN:review] "Something fires afterwards" is not the sam
+239	53564fd987bf	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Before planning a phase that probes a thi
+240	52ce81a18611	Workflow	review	KEEP	-	-	- [LEARN:review] Evidence pasted by a human into the session
+241	71bda19b31b0	Workflow	quality	KEEP	-	-	- [LEARN:quality] A guard that people routinely route around
+242	0c1281c68286	Workflow	verification	KEEP	-	-	- [LEARN:verification] A gate that reads a claim out of a lo
+243	da28255bc9f4	Workflow	security	KEEP	-	-	- [LEARN:security] A substring test on shell text is not a g
+244	a1ef12ef5998	Workflow	testing	KEEP	-	-	- [LEARN:testing] When a new commit or push gate lands, ever
+245	a1064338790f	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] `check_runtime.py` compares the installed
+246	be491d8b888e	Workflow	quality	KEEP	-	-	- [LEARN:quality] Measure a text-pattern lint on the real co
+247	d3789845fea1	Workflow	security	KEEP	-	-	- [LEARN:security] When a containment check compares a candi
+248	eeba0cda54dd	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A plan can encode a wrong assumption abou
+249	3907fd638321	Workflow	testing	KEEP	-	-	- [LEARN:testing] A legacy test that asserts a guard fires o
+250	bc7ae716aec9	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Two coders can share a phase safely when 
+251	6032b7dbd85b	Workflow	security	KEEP	-	-	- [LEARN:security] Carried from the retired Phase A runner s
+252	c876867aae85	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Ownership of a directory two parties writ
+253	52974df2467f	Workflow	testing	KEEP	-	-	- [LEARN:testing] A validator that treats every backticked r
+254	faffd97a05c8	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A required real-binary check needs the bi
+255	07218514b406	Workflow	planning	KEEP	-	-	- [LEARN:planning] Re-read a small plan's factual claims aga
+256	77b507221650	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] The self overlay refresh (`install_bootst
+257	8dcafcaeb5b3	Workflow	planning	KEEP	-	-	- [LEARN:planning] A plan that requires prose to name a path
+258	a2b502da98b2	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] An ownership rule added to one checker mu
+259	8970b6dca530	Workflow	planning	KEEP	-	-	- [LEARN:planning] A step that calls a newly added project M
+260	1c7229b7fe55	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] OpenWiki 0.5.2: `mode: "update"` on an emp
+261	2461a2f8f3f6	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Before shortening a human doc agains
+262	89034b453409	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] A disposition review must check what
+263	4c517f8ac255	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] The commit gate treats any multi-file dif
+264	6f725a88288d	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] OpenWiki fixes structure, claims, an
+265	17d34ac1f294	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Cite the script or test that impleme
+266	10aac28b5cb2	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A generated wiki page is fixed through a 
+267	5675b59d3350	Workflow	testing	KEEP	-	-	- [LEARN:testing] Native discovery probes need evidence the 
+268	fb3aff652611	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] Sidecar discovery, native runs 2026-0
+269	1ffc4e6c9caa	Workflow	architecture	ARCHIVE	S	scripts/generate_targets.py::runtime_ownership.py	- [LEARN:architecture] `scripts/runtime_ownership.py` is cop
+270	6ad4b983656a	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Two coders can work in parallel in one wo
+271	f08ff4f949d6	Workflow	testing	KEEP	-	-	- [LEARN:testing] Assert on report output, not only on actio
+272	89ef29768a7a	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Pass `record_findings.py` only the findin
+273	26d7976e6946	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] `git rev-parse --git-path info/exclude` re
+274	41dd3ff7ffdb	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A new installer refusal can break `script
+275	e4970124837c	Workflow	testing	KEEP	-	-	- [LEARN:testing] A test for a destructive branch needs fixt
+276	fb5931de8b84	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] The `protect-files.sh` hook denies compoun
+277	f7cf3d24410e	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A coder and a documenter can run one phas
+278	902d3d343d13	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Only the main session has the `openwiki` 
+279	e7df0a9093b1	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] `.openwikiignore` excludes `CLAUDE.m
+280	351f1d106f09	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] The protected-file guard refuses any Bash 
+281	1514ad9e8aa4	Workflow	testing	KEEP	-	-	- [LEARN:testing] A test that injects gathered data into a p
+282	06430f4b32ae	Workflow	review	KEEP	-	-	- [LEARN:review] When review keeps finding defects in one co
+283	672ac64454a9	Workflow	verification	KEEP	-	-	- [LEARN:verification] Run `verify.py phase` and closeout st
+284	143165b16a52	Workflow	review	KEEP	-	-	- [LEARN:review] A matrix cell that a reviewer traces "by re
+285	be77f53f4903	Workflow	testing	KEEP	-	-	- [LEARN:testing] To prove a new test fails on an older comm
+286	66385a1d3b89	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Do not let another agent edit tracked file
+287	0f893e34d89c	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] OpenWiki flags a claim only when its
+288	102249b2377b	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] For a follow-up phase that fixes confirme
+289	86172eaf12df	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Do not transport a proven scratch tree as 
+290	016e5b678417	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] When two coders work in parallel on disjo
+291	f8f9db03f7f2	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] `verify.py phase` runs the whole suite und
+292	e0c440f3a5b8	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Before submitting an OpenWiki page, 
+293	ba0bf6594c99	Workflow	architecture	KEEP	-	-	- [LEARN:architecture] When adapting the canonical agent pro
+294	c015cb91068a	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] The file-protection hook rejects a Bash co
+295	2508eb58e65e	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] `claude -p` on an older installed CLI can 
+296	2e94ac3716df	Workflow	workflow	ARCHIVE	S	scripts/sidecar_overlay.py::_entry_id	- [LEARN:workflow] A "same name takes the unit" rule across 
+297	93bb46f16a23	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Check a new standalone CLI action against
+298	e05ab5b4c6ea	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A coder's open findings go in its report 
+299	a33f38387fd5	Workflow	tooling	ARCHIVE	S	scripts/sidecar_overlay.py::state_backup_slug	- [LEARN:tooling] A preserved-copy name built from a per-sec
+300	fb03c0cbbf48	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Make the stale-claims audit's commen
+301	395b16096589	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] An OpenWiki page job lists only stale or u
+302	f229d5730c3d	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Quote an OpenWiki page's `description:` wh
+303	0e5ab20b80f4	Workflow	verification	KEEP	-	-	- [LEARN:verification] A native evidence gate must exercise 
+304	6c2490d9f1c6	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] In auto mode the safety classifier has de
+305	cff400a20adf	Workflow	review	KEEP	-	-	- [LEARN:review] Before a prompt states what a role can or c
+306	421f45316ac4	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] A review finding on a just-refreshed OpenW
+307	051bcdfb1014	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] Run `git checkout -b <plan>_implementatio
+308	31eee5407b09	Workflow	review	KEEP	-	-	- [LEARN:review] Before claiming an agent handoff omits a fi
+309	c8c00fc95a3a	Workflow	review	KEEP	-	-	- [LEARN:review] Review fix rounds on prompt prose keep prod
+310	25732873136f	Workflow	testing	KEEP	-	-	- [LEARN:testing] Section-scoped guidance tests drift toward
+311	704c7fac3596	Workflow	review	KEEP	-	-	- [LEARN:review] Audit shipped surfaces by grepping the gene
+312	e9228e281d76	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] After an OpenWiki refresh, any further so
+313	61d09fc3989e	Workflow	review	KEEP	-	-	- [LEARN:review] A fresh re-review packet must carry every e
+314	6dcd816a54f8	Workflow	verification	KEEP	-	-	- [LEARN:verification] Before calling a gate path untested, 
+315	161e27273022	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] A change to `record_findings.py` argument
+316	7a227526bccb	Workflow	security	KEEP	-	-	- [LEARN:security] Upstream `context-mode hook` output is no
+317	ac261525d925	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Upstream Context Mode hooks throttle once-
+318	6b9dd34e8785	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Codex custom agent files cannot override `
+319	e3a3f93452b4	Workflow	tooling	KEEP	-	-	- [LEARN:tooling] Antigravity's documented workspace MCP fil
+320	92fa141f4792	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] After editing a tracked root adapter (`.m
+321	496f8f32ecf2	Workflow	security	KEEP	-	-	- [LEARN:security] VS Code's Local harness sends hooks the m
+322	5ab742d7fb0d	Workflow	security	KEEP	-	-	- [LEARN:security] An exemption implemented as an early retu
+323	ef2869b21dc6	Workflow	tooling	ARCHIVE	E	shared/hooks/scripts/protect-files.py::HOOK_CONFIGS	- [LEARN:tooling] Copilot hooks can be turned off from the r
+324	84f1c66e0ffb	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] After a self-install, new protect-files r
+325	723ad43c59c1	Workflow	documentation	KEEP	-	-	- [LEARN:documentation] Take every OpenWiki claim's line ran
+326	5d5706e013e4	Workflow	verification	ARCHIVE	E	scripts/validate_targets.py::Ponytail allowlist hash changed without a provenance update	- [LEARN:verification] Editing a pinned Ponytail skill (`pon
+327	c7bfd42e76f1	Workflow	workflow	KEEP	-	-	- [LEARN:workflow] When two coders work in parallel in this 
+328	b4871b72d298	Workflow	quality	KEEP	-	-	- [LEARN:quality] In shell guards, `git check-ignore -q` nee

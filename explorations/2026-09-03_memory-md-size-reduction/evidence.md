@@ -1,14 +1,19 @@
 # Exploration — Reducing `.claude/MEMORY.md` Session Cost
 
 **Date:** 2026-09-03
-**Status:** IN PROGRESS since 2026-10-20 — lever B (split) chosen, with the archive in a preserved folder
-**Outcome so far (2026-10-20):** the user chose lever B with option (a) in
-big plan `backlog-followups` Phase C. Classifying all 328 entries against
-the memory admission rule found only 18 to archive (6.1% of entry bytes),
-which hit that plan's 25% stop condition; the user's decision is pending
-(see `.claude/session_logs/2026-10-20_backlog-followups-phase-c.md`). The
-`caveman-compress` backup defect from §6 is fixed in that phase. The text
-below is the original 2026-09-03 record.
+**Status:** DECIDED on 2026-10-20 — split measured and not applied for now
+**Outcome (2026-10-20):** in big plan `backlog-followups` Phase C, the user
+chose lever B with the archive in a preserved folder, under the memory
+admission rule (archive an entry only when a named check enforces it, the
+source already shows it, or it only records finished work). Classifying all
+328 entries found only 18 that qualify (6.11% of entry bytes; the working
+file would shrink about 5%), below that plan's 25% stop condition, so the
+user decided not to split for now. The classification is kept beside this
+file as `2026-10-20_classification.tsv` for a later attempt; a bigger cut
+would need a topic-scoped archive of live advice, which needs its own
+preserved path and a policy change. The `caveman-compress` backup defect
+from §6 is fixed in that phase. The text below is the original 2026-09-03
+record.
 **Trigger:** after `verification-gate-semantic-hardening` closed (7 phases,
 commits `2af3df7`…`d2d0847`), the user observed that `.claude/MEMORY.md` and
 its LEARN entries "got too big now" and asked for compression.

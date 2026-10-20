@@ -64,6 +64,18 @@ where `onboard` step 4 writes (`shared/skills/onboard/SKILL.md:96-102`). The Pha
 audit treats the working file as live advice and the archive as a dated
 record.
 
+## Scope-change record
+
+**2026-10-20, user decision at the step 1 stop condition:** do not apply the
+split. Step 1 classified all 328 entries under the rule above and found only
+18 to archive (E=7, S=11, H=0; 6,505 of 106,520 entry bytes, 6.11%, below
+the 25% stop threshold); applying it would have cut the working file by
+about 5% while adding an archive, an index, and a check script. The user
+chose to skip the split for now. Consequences: step 3 is not run; BF-C1 and
+BF-C3 are not delivered (`MEMORY.md` keeps every entry); BF-C2 is delivered
+as evidence only (the classification table is kept beside the 2026-09-03
+exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
+
 ## Steps
 
 - [ ] **1. Record the baseline and classify every entry (BF-C2).**
@@ -139,7 +151,8 @@ record.
   - It must not edit, merge, reorder, or re-tag any entry. Tag cleanup
     (`tests` versus `testing`) is out of scope.
 
-- [ ] **3. Apply the split (BF-C1, BF-C3).**
+- [ ] **3. Apply the split (BF-C1, BF-C3).** Not run: dropped by the
+  2026-10-20 scope change above.
   **Owner:** orchestrator, in the main thread. Claude Code treats every path
   under `.claude/` as a sensitive file, so a background subagent cannot get
   write approval there (MEMORY `[LEARN:verification]` on the 2026-10-02
@@ -163,9 +176,10 @@ record.
   `.claude/explorations/2026-09-03_memory-md-size-reduction/evidence.md`.
   Its line `**Status:** OPEN — paused for a later decision by the user` now
   misleads a reader into redoing the work. Change it to a decided status and
-  add one `**Outcome (2026-10-20):**` line naming lever B, the archive path,
-  and the `caveman-compress` fix. Leave the rest of this dated record
-  unchanged.
+  add one `**Outcome (2026-10-20):**` line naming the measured result (6.11%
+  under the rule), the user's decision not to split for now, where the
+  classification table is kept, and the `caveman-compress` fix. Leave the
+  rest of this dated record unchanged.
 
 - [ ] **5. Keep `caveman-compress` backups where a refresh cannot delete them (BF-C4).**
   **Owner:** coder. Steps 1-2 and this step touch disjoint files, so
@@ -219,12 +233,10 @@ record.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
   before verification. When auto mode denies the refresh, hand it to the
-  user. The refresh must keep the archive; the `check` item below runs
-  after it, so it proves that. The `caveman-compress` skill text is the
-  backup change's documentation; no other surface describes the backup
-  location. The reviewer gets the classification table with its counts,
-  the tool, the files before and after, and the outer diff; it reads every
-  `ARCHIVE` row and at least 20 `KEEP` rows against the rule.
+  user. The `caveman-compress` skill text is the backup change's
+  documentation; no other surface describes the backup location. The
+  reviewer gets the outer diff, the nested diff of the 2026-09-03
+  exploration, and the scope-change record.
 
 ## Verification
 
@@ -234,18 +246,13 @@ uv run python scripts/validate_targets.py
 uv run pytest tests/test_caveman_compress_detect.py -q
 uv run python scripts/check_runtime.py
 uv run python scripts/validate_plan_frontmatter.py
-uv run python .claude/explorations/2026-10-20_memory-archive/split_memory.py check
-uv run python .claude/explorations/2026-10-20_memory-archive/split_memory.py selftest
 uv run python .claude/scripts/verify.py fast --format json
 ```
 
 ## Optional Verification
 
-- Claude Code: in a fresh session, ask a question that one archived `E`
-  entry answers (for example why a named gate exists). Record whether the
-  agent reached the entry through the `## Archived Lessons` index.
-- Codex: ask the same question in a fresh Codex session and record the
-  result.
+- Run the generated `detect.py` on a scratch `.claude/MEMORY.md` beside an
+  `explorations` folder and record the printed `Backup:` path.
 
 
 ## Review Profiles
@@ -254,10 +261,8 @@ Use `.claude/review-profiles/code.md`, `.claude/review-profiles/architecture.md`
 `.claude/review-profiles/security.md`, `.claude/review-profiles/tests.md`,
 `.claude/review-profiles/ponytail.md`, and
 `.claude/review-profiles/documentation.md`. Give the reviewer the
-exploration `2026-09-03_memory-md-size-reduction` (§4 lever B, §5, §6),
-BF-C1 to BF-C5, the classification table with its counts,
-`split_memory.py`, the before and after `MEMORY.md`, and the final outer
-diff.
+exploration `2026-09-03_memory-md-size-reduction` (§5, §6), BF-C4 and
+BF-C5, the scope-change record, and the final outer diff.
 
 ## Closeout Checklist
 

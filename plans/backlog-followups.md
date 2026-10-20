@@ -109,7 +109,7 @@ claiming parity.
 | --- | --- |
 | A. Status and wording cleanup | Small, and its `verify closeout` fix helps every later closeout |
 | B. Nested state files | Security fix: a refresh can commit and push files a consumer ignored. Every later phase refreshes the installed copy |
-| C. Memory split | Lowers the session cost for the rest of the plan; independent of B for correctness |
+| C. Memory split | Lowers the session cost for the rest of the plan; independent of B for correctness. Split not applied after the step 1 stop condition (user decision 2026-10-20); only the `caveman-compress` fix and the measurement ship |
 | D. Agent definition protection | Security gap. After D, commands that name an agent file or protected folder outside the read-only list are denied, so later phases use `cat`, `rg --files`, `git diff --no-index`, `check_runtime.py`, and file-based findings and PR bodies |
 | E. Ponytail 5 | Evaluation-gated; may cancel. Edits `shared/agents/` (source), which D leaves editable |
 | F. OpenWiki 0.7 | Spike-gated; may stop at `0.5.2` or cancel. Runs last before G, so G's refresh uses the new version |
@@ -118,7 +118,8 @@ claiming parity.
 ### Gates that can stop or cancel a phase
 
 - **C, step 1:** if the classified archive holds less than 25% of the entry
-  bytes, stop and ask the user whether to accept the smaller cut.
+  bytes, stop and ask the user whether to accept the smaller cut. Hit on
+  2026-10-20 (6.11%); the user chose not to split.
 - **E, step 1:** a recorded comparison decides ADOPT, PARTIAL ADOPT, or
   NO-GO. NO-GO cancels Phase E with evidence (E step 2); no outer commit.
 - **F, steps 1 and 4:** an isolated `0.7.2` spike (scratch folder, no
@@ -149,10 +150,9 @@ table against the shipped state.
 - Phases D and E name the generated OpenWiki pages Phase G must refresh.
 - Phase E's NO-GO path hands audit gap A2 to Phase G's "Recorded
   follow-ups" update.
-- After Phase C, later phases correct `[LEARN]` entries only in the working
-  `MEMORY.md`. The archive is a dated record and is never edited; its header
-  says current source wins. A still-needed archived lesson that became
-  wrong gets a new, corrected working-file entry.
+- Phase C did not split `MEMORY.md` (user decision 2026-10-20), so later
+  phases correct superseded `[LEARN]` entries in place, as the workflow's
+  live-advice rule requires.
 
 ### Decisive assumptions
 
@@ -187,11 +187,11 @@ full acceptance text; this map is the index.
 | BF-A7 | The vendored Ponytail `LICENSE` is byte-identical to upstream (sha256 `fb1bc690…`), with its pin moved in `UPSTREAM.md` and `scripts/validate_targets.py` | same | `sha256sum -c` item; `validate_targets.py` |
 | BF-B1 | A refresh never deletes or rewrites the nested `.gitignore` or `.gitattributes` (both join `CONSUMER_STATE_PATHS`); `write_nested_gitignore` adds `settings.local.json` when missing, so the installer's `git add -A` never commits local settings | `2026-10-20_phase-B-nested-state-files` | `tests/test_install_bootstrap.py` (fails first on current code); `tests/test_state_sync.py`; `validate_targets.py` repeat-install fixture built from the temporary install; `git -C .claude ls-files` after the refresh |
 | BF-B2 | Existing nested repositories gain `session_logs/*.log merge=union` when missing; user lines are kept; repeat runs change nothing | same | `tests/test_state_sync.py` |
-| BF-C1 | Working `MEMORY.md` keeps its headings, the kept entries in order, and a `## Archived Lessons` index; `.claude/explorations/2026-10-20_memory-archive/archive.md` holds the archived entries byte-identical; every baseline entry is in exactly one file | `2026-10-20_phase-C-memory-split` | `split_memory.py check` and `selftest`, after the refresh |
-| BF-C2 | One classification row per entry: `KEEP`, or `ARCHIVE` with reason `E` (enforced), `S` (source fact), or `H` (historical) and resolvable evidence; unclear cases and command-recovery lessons stay; under 25% moved means ask the user | same | `split_memory.py check`; reviewer reads every `ARCHIVE` row and 20 `KEEP` rows |
-| BF-C3 | No gate, hook, skill, or root-guidance check breaks; no policy text changes | same | `verify phase`; `validate_targets.py` |
+| BF-C1 | Dropped by the 2026-10-20 scope change: the split was not applied, so `MEMORY.md` keeps every entry | `2026-10-20_phase-C-memory-split` | scope-change record in the small plan |
+| BF-C2 | Delivered as evidence: one classification row per entry (18 `ARCHIVE`, 310 `KEEP`, 6.11% of entry bytes); the 25% stop condition fired and the user decided not to split | same | the table kept beside the 2026-09-03 exploration; session log |
+| BF-C3 | Dropped with BF-C1 (no split, so nothing to break) | same | scope-change record |
 | BF-C4 | `caveman-compress` writes its backup at a `Backup:` path a refresh cannot delete; sidecar output still passes its forbidden-token scan | same | `tests/test_caveman_compress_detect.py`; `validate_targets.py` |
-| BF-C5 | The 2026-09-03 exploration's status says decided, with one outcome line | same | reviewer diff |
+| BF-C5 | The 2026-09-03 exploration's status says decided, with one outcome line naming the measurement and the decision | same | reviewer diff |
 | BF-D1 | An agent write to `.claude/agents/`, `.codex/agents/`, `.github/agents/`, or `.agents/agents/` asks on Claude Code and Copilot and is denied on Codex and Antigravity; reads, `shared/agents/`, foreign checkouts, and the installer stay allowed | `2026-10-20_phase-D-agent-definition-protection` | `tests/test_hook_gates.py`; `tests/test_protect_files_scoping.py`; installed-hook smoke |
 | BF-D2 | The three hook folders and four agent folders are protected as whole folders (`rm -rf`, `mv`, `ln -s`, interpreter removal, `cd` then remove, and unmodelled Git subcommands under `git -C`); parent folders stay unprotected | same | folder cases with a recorded negative control |
 | BF-D3 | `*.code-workspace` files in the repository get the hook-config decision | same | scoping and hook tests |
@@ -218,7 +218,7 @@ full acceptance text; this map is the index.
 
 - [x] `2026-10-20_phase-A-status-and-wording-cleanup` — complete: stale statuses closed, one OpenWiki sentence, project-name advice in three skills, clean `verify closeout` message for missing evidence, verbatim Ponytail license. See `.claude/session_logs/2026-10-20_backlog-followups-phase-a.md`.
 - [x] `2026-10-20_phase-B-nested-state-files` — complete: a refresh keeps the nested `.gitignore` and `.gitattributes`; `state-sync.sh` appends `settings.local.json` and the union-merge rule only when missing. See `.claude/session_logs/2026-10-20_backlog-followups-phase-b.md`.
-- [ ] `2026-10-20_phase-C-memory-split` — lossless `MEMORY.md` split and durable `caveman-compress` backups
+- [ ] `2026-10-20_phase-C-memory-split` — durable `caveman-compress` backups; `MEMORY.md` split measured and not applied (user decision)
 - [ ] `2026-10-20_phase-D-agent-definition-protection` — agent folders, whole hook folders, workspace files, Codex `sandbox_mode`
 - [ ] `2026-10-20_phase-E-ponytail-5-adoption` — evaluate, then partial-adopt Ponytail `v5.3.2` (may cancel)
 - [ ] `2026-10-20_phase-F-openwiki-0.7-upgrade` — spike, then pin `0.7.2` (may stop at `0.5.2` or cancel)
@@ -283,9 +283,6 @@ lists. Every phase uses the `code`, `architecture`, `security`, `tests`, and
   install breaks the smoke test in any other checkout still pinned to
   `0.5.2`. Phase G starts in a new session so the OpenWiki server runs
   `0.7.2`.
-- **Hidden lesson.** The memory split moves some "why this gate exists"
-  lessons out of the default read. The index tells agents to search the
-  archive before weakening a gate.
 - **Auto-mode classifier.** It has denied the self-install refresh before;
   the orchestrator then hands that one command to the user.
 
@@ -340,6 +337,10 @@ The user approved this plan on 2026-10-20 with these decisions:
    verbatim license in Phase A, and the stricter OpenWiki `mode` check in
    Phase F each close a confirmed defect in code the same phase already
    changes.
+5. **Memory split (Phase C), 2026-10-20 at the stop condition:** not
+   applied. Only 18 of 328 entries (6.11% of entry bytes) qualified under
+   the approved rule; the user chose to skip the split for now rather than
+   apply the small cut or build a topic-scoped live-advice archive.
 
 ## Verification
 
