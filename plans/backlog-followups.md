@@ -218,7 +218,7 @@ full acceptance text; this map is the index.
 
 - [x] `2026-10-20_phase-A-status-and-wording-cleanup` — complete: stale statuses closed, one OpenWiki sentence, project-name advice in three skills, clean `verify closeout` message for missing evidence, verbatim Ponytail license. See `.claude/session_logs/2026-10-20_backlog-followups-phase-a.md`.
 - [x] `2026-10-20_phase-B-nested-state-files` — complete: a refresh keeps the nested `.gitignore` and `.gitattributes`; `state-sync.sh` appends `settings.local.json` and the union-merge rule only when missing. See `.claude/session_logs/2026-10-20_backlog-followups-phase-b.md`.
-- [ ] `2026-10-20_phase-C-memory-split` — durable `caveman-compress` backups; `MEMORY.md` split measured and not applied (user decision)
+- [x] `2026-10-20_phase-C-memory-split` — complete: `caveman-compress` backups now land where a refresh keeps them; the `MEMORY.md` split was measured (6.11%) and not applied by user decision. See `.claude/session_logs/2026-10-20_backlog-followups-phase-c.md`.
 - [ ] `2026-10-20_phase-D-agent-definition-protection` — agent folders, whole hook folders, workspace files, Codex `sandbox_mode`
 - [ ] `2026-10-20_phase-E-ponytail-5-adoption` — evaluate, then partial-adopt Ponytail `v5.3.2` (may cancel)
 - [ ] `2026-10-20_phase-F-openwiki-0.7-upgrade` — spike, then pin `0.7.2` (may stop at `0.5.2` or cancel)

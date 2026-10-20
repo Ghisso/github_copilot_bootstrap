@@ -1538,3 +1538,8 @@
   1 for "not ignored" but 128 when git itself fails (unsafe or broken
   repository). Act only on status exactly 1; treating every non-zero status
   as "not ignored" repeats the side effect on every run while git is broken.
+- [LEARN:planning] When a plan's payoff depends on a classification or
+  measurement nobody has run yet (for example how many `MEMORY.md` entries a
+  rule would archive), make that measurement the first step and give it a
+  numeric stop threshold. The Phase C split stopped at 6.11% against a 25%
+  threshold before any archive, index, or tool landed in the repository.

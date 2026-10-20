@@ -9,7 +9,12 @@ source already shows it, or it only records finished work). Classifying all
 328 entries found only 18 that qualify (6.11% of entry bytes; the working
 file would shrink about 5%), below that plan's 25% stop condition, so the
 user decided not to split for now. The classification is kept beside this
-file as `2026-10-20_classification.tsv` for a later attempt; a bigger cut
+file as `2026-10-20_classification.tsv` for a later attempt. Its rows follow
+`.claude/MEMORY.md` at nested commit
+`337cc538a200403b5f874ec5d386951f29152aec` in file order; an entry is a
+line starting `- [LEARN` plus its following two-space-indented lines, and
+`sha256_12` is the first 12 hex digits of the SHA-256 of those lines joined
+with `\n` plus one trailing `\n` (all 328 rows verified). A bigger cut
 would need a topic-scoped archive of live advice, which needs its own
 preserved path and a policy change. The `caveman-compress` backup defect
 from §6 is fixed in that phase. The text below is the original 2026-09-03

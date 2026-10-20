@@ -11,14 +11,19 @@ Move the `MEMORY.md` entries that fail the current admission rule into a
 dated archive without losing any (BF-C1, BF-C2), keep every gate, hook, and
 skill working (BF-C3), keep `caveman-compress` backups where a refresh
 cannot delete them (BF-C4), and mark the 2026-09-03 exploration decided
-(BF-C5).
+(BF-C5). After the step 1 stop condition, the user decided not to apply the
+split (scope-change record in the small plan): BF-C1 and BF-C3 dropped,
+BF-C2 delivered as evidence, BF-C4 and BF-C5 delivered.
 
 ## Task Tracking
 
 - [x] PRE-FLIGHT: Phase B committed (`06eb8e0`) and pushed; Phase C is the
   current phase. Phase B outcomes do not affect Phase C (the archive lives in
   `explorations`, already preserved); no planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] IMPLEMENT/VERIFY/REVIEW — stop condition at step 1; user decision
+  (skip the split); one review round, Gate Result `PASS`, one MINOR (fixed).
+- [x] CLOSEOUT: documentation, final AI state, checkpoint, staged index,
+  findings, phase receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -52,37 +57,57 @@ cannot delete them (BF-C4), and mark the 2026-09-03 exploration decided
   preserved path and a policy change. Coder flags for the Phase G audit:
   entry 35 (status `complete` only after findings) appears to contradict
   CLOSEOUT step 2; entry 23 names a renamed `state-sync.sh` function.
-- **16:35** - While waiting for the user, Phase D steps 1-2 are being
-  prepared by a coder in a detached scratch worktree
-  (`scratchpad/wt-phase-d`, at `06eb8e0`); nothing there touches this
-  checkout or the phase machine. The diff will be applied here only after
-  Phase C is committed, then verified and reviewed as Phase D.
-- **Later** - Phase D prep finished in the worktree (diff at
-  `scratchpad/phase-d/coder.diff`, 6 files, negative controls recorded).
-  Its one design choice is accepted: path tokens of unmodelled Git
-  subcommands are also resolved against the `-C`/`cd` directory as
-  confirmed targets, while the existing repository-root `uncertain` (deny)
-  rule stays, so no existing client decision is loosened. Started the
-  evidence-only step 1 of Phases E (Ponytail 5 comparison) and F (isolated
-  OpenWiki 0.7.2 spike) in the scratch folder while the Phase C decision is
-  pending.
-- **Later** - Phase E step 1 evidence ready (`scratchpad/phase-e/evidence.md`):
-  `## Decision: PARTIAL ADOPT`, all table rows confirmed, no Q4 conflict.
-  Fixed a garbled Scope sentence and the stale R2 "open user decision"
-  note in the Phase E small plan. Phase F step 1 spike ready
-  (`scratchpad/phase-f/capture.md`): all eight stop conditions PASS, GO;
-  `0.7.2` has exactly the expected ten tools, the guard round trip restores
-  both adapters byte for byte offline, and an isolated integration install
-  leaves copies of the root MCP adapters unchanged.
+- **16:35** - While waiting for the user, Phase D steps 1-2 were prepared
+  by a coder in a detached scratch worktree (`scratchpad/wt-phase-d`, at
+  `06eb8e0`); nothing there touched this checkout or the phase machine.
+  The diff (`scratchpad/phase-d/coder.diff`, 6 files, negative controls
+  recorded) will be applied here after this commit and then verified and
+  reviewed as Phase D. Its one design choice is accepted: path tokens of
+  unmodelled Git subcommands are also resolved against the `-C`/`cd`
+  directory as confirmed targets, while the existing repository-root
+  `uncertain` (deny) rule stays, so no existing client decision is loosened.
+- **Later** - Evidence-only step 1 of Phases E and F, run in the scratch
+  folder: Phase E `## Decision: PARTIAL ADOPT` (`scratchpad/phase-e/evidence.md`,
+  all rows confirmed, no Q4 conflict); Phase F spike GO
+  (`scratchpad/phase-f/capture.md`, all eight stop conditions PASS: exactly
+  ten tools, offline guard round trip byte-identical, isolated integration
+  install leaves copies of the root MCP adapters unchanged). Fixed a garbled
+  Scope sentence and the stale R2 note in the Phase E small plan.
+- **User decision** - Option 2: skip the split for now. Recorded a
+  scope-change record in the small plan and the big plan (Design table,
+  gates, hand-offs, Requirement Map rows BF-C1 to BF-C3 and BF-C5, phase
+  list, risks, Decisions recorded item 5); removed the archive assumptions
+  from Phases E and G (later phases correct superseded `MEMORY.md` entries
+  in place); added the two flagged MEMORY entries to Phase G's required
+  audit items. Kept the classification table beside the 2026-09-03
+  exploration (`2026-10-20_classification.tsv`) and rewrote its Outcome
+  line to the final decision. `split_memory.py` was not kept (no split).
+- **Later** - Refresh, `verify.py phase`: PASS (2797 passed). Review (six
+  profiles, commit gate): `PASS`, one MINOR: the Outcome line did not name
+  the table's baseline commit or hash recipe. Verified the recipe directly
+  (SHA-256 of the entry lines joined with `\n` plus a trailing `\n`, first
+  12 hex digits; all 328 rows match) and added both to the Outcome line.
 
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:planning] When a plan's payoff depends on a classification or
+  measurement nobody has run yet (for example how many `MEMORY.md` entries a
+  rule would archive), make that measurement the first step and give it a
+  numeric stop threshold. The Phase C split stopped at 6.11% against a 25%
+  threshold before any archive, index, or tool landed in the repository.
 
 ## Verification
 
-To be written at closeout.
+```text
+# verify closeout --format text summary lines
+```
+
+- optional 1: PASS — the installed `detect.py` on a scratch
+  `.claude/MEMORY.md` beside an `explorations` folder printed
+  `Backup: .../.claude/explorations/caveman-compress-backups/MEMORY.original.md`
+  and exited 0.
 
 ## Open Questions / Next Steps
 
-- Phase D follows: agent definition protection.
+- Phase D follows: apply the prepared worktree diff, add the docs step,
+  verify, and review.

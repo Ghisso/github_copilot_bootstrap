@@ -3,8 +3,8 @@ name: 2026-10-20_phase-C-memory-split
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 3
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-20_backlog-followups-phase-c.md
 ---
 
 # Small Plan: MEMORY.md Split and caveman-compress Backup
@@ -78,7 +78,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
 
 ## Steps
 
-- [ ] **1. Record the baseline and classify every entry (BF-C2).**
+- [x] **1. Record the baseline and classify every entry (BF-C2).**
   **Owner:** coder. It works in the session scratch folder and writes
   nothing under `.claude/`.
   **Files:** create `classification.tsv` in the scratch folder.
@@ -103,7 +103,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
   topic-scoped lessons would make the archive live advice, which needs its
   own preserved path and a policy change; that is a separate decision.
 
-- [ ] **2. Write the split-and-check tool (BF-C1).**
+- [x] **2. Write the split-and-check tool (BF-C1).**
   **Owner:** coder (scratch folder).
   **Files:** create `split_memory.py` (standard library only). It will live
   beside `archive.md` and `classification.tsv` and runs from the repository
@@ -151,7 +151,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
   - It must not edit, merge, reorder, or re-tag any entry. Tag cleanup
     (`tests` versus `testing`) is out of scope.
 
-- [ ] **3. Apply the split (BF-C1, BF-C3).** Not run: dropped by the
+- [x] **3. Apply the split (BF-C1, BF-C3).** Not run: dropped by the
   2026-10-20 scope change above.
   **Owner:** orchestrator, in the main thread. Claude Code treats every path
   under `.claude/` as a sensitive file, so a background subagent cannot get
@@ -170,7 +170,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
   `git -C .claude show <sha>:MEMORY.md > .claude/MEMORY.md` and run `write`
   again; never edit the two files by hand.
 
-- [ ] **4. Mark the 2026-09-03 exploration decided (BF-C5).**
+- [x] **4. Mark the 2026-09-03 exploration decided (BF-C5).**
   **Owner:** orchestrator.
   **Files:** modify
   `.claude/explorations/2026-09-03_memory-md-size-reduction/evidence.md`.
@@ -181,7 +181,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
   classification table is kept, and the `caveman-compress` fix. Leave the
   rest of this dated record unchanged.
 
-- [ ] **5. Keep `caveman-compress` backups where a refresh cannot delete them (BF-C4).**
+- [x] **5. Keep `caveman-compress` backups where a refresh cannot delete them (BF-C4).**
   **Owner:** coder. Steps 1-2 and this step touch disjoint files, so
   separate coders may run them in parallel.
   **Files:** modify `shared/skills/caveman-compress/scripts/detect.py`,
@@ -226,7 +226,7 @@ exploration for a later attempt); BF-C4 and BF-C5 are delivered as planned.
   ownership change fails here first.
 
 
-- [ ] **6. Regenerate, refresh, prove durability, review, close out.**
+- [x] **6. Regenerate, refresh, prove durability, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   **Required Skills:** `shared/skills/documentation/SKILL.md`,
   `shared/skills/code-review/SKILL.md`.
@@ -270,11 +270,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
