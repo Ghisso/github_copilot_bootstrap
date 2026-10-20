@@ -1356,16 +1356,22 @@ def segment_targets(
         }:
             # For unmodelled mutating Git commands, inspect path-shaped
             # arguments only. Do not scan commit messages or other prose.
-            uncertain.extend(token for token in args if protected(token, repo_root))
+            visible = [token for token in args if protected(token, repo_root)]
+            uncertain.extend(visible)
             # Git reads its paths from the `-C` directory (or the `cd`
             # directory), not the repository root, so resolve them there too,
             # as `git mv` does. A path found only that way is new coverage and
-            # a confirmed target (ask on Claude Code and Copilot); a path
-            # visible from the repository root keeps the uncertain deny above.
-            offset_roots = [
-                root for root in git_roots if root != os.path.normpath(repo_root)
-            ]
-            confirmed.extend(resolve_from_directories(args, offset_roots, repo_root))
+            # a confirmed target (ask on Claude Code and Copilot). When any
+            # path is already visible from the repository root, skip this:
+            # `emit()` prefers a confirmed hit, so it would turn that
+            # uncertain deny into ask.
+            if not visible:
+                offset_roots = [
+                    root for root in git_roots if root != os.path.normpath(repo_root)
+                ]
+                confirmed.extend(
+                    resolve_from_directories(args, offset_roots, repo_root)
+                )
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
@@ -1500,7 +1506,13 @@ def emit(
     uncertain_hits = sorted(
         {result[0] for path in uncertain if (result := protected(path, repo_root))}
     )
-    if hooks:
+    # An uncertain hit on a path no confirmed hit names denies on every client,
+    # so a confirmed hook hit elsewhere in the command must not turn that deny
+    # into ask. A path listed both ways is confirmed: a redirect of an
+    # unmodelled command (`echo x > file`) is scanned as an argument too.
+    confirmed_names = {path for path, _ in hits}
+    unconfirmed_hits = [name for name in uncertain_hits if name not in confirmed_names]
+    if hooks and not unconfirmed_hits:
         decision = (
             "deny" if target_id in {"openai-codex", "google-antigravity"} else "ask"
         )
