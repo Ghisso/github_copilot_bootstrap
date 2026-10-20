@@ -3,7 +3,7 @@ name: 2026-10-20_phase-B-nested-state-files
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 2
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
