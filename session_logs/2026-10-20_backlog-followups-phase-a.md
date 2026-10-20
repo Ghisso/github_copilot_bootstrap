@@ -25,7 +25,10 @@ vendored Ponytail `LICENSE` verbatim (BF-A7).
   set the big plan `in-progress` (`started_at` 2026-10-20T14:54:11Z) and
   Phase A `in-progress`.
 - [x] PLAN WHEN NEEDED: approved plan is implementation-ready; no planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] IMPLEMENT/VERIFY/REVIEW — one review round; Gate Result `PASS`, one
+  MINOR (fixed).
+- [x] CLOSEOUT: documentation, final AI state, checkpoint, staged index,
+  findings, phase receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -47,15 +50,65 @@ vendored Ponytail `LICENSE` verbatim (BF-A7).
 - **15:00** - Delegated steps 2 and 6 (tests and `verify.py`) and steps 3,
   4, 5, and 8 (generator, root guidance, policy, brief, three skills,
   license and pin) to two coders on disjoint files.
+- **15:05** - Coder 1: renamed the July lint test to
+  `test_pre_contract_july_bodies_pass_the_lint_because_of_their_date` (copies
+  the real files to `tmp_path` and swaps the status back). `verify.py`:
+  `relative_artifact` takes `created_by` and raises `MissingArtifactError`
+  only when nothing is at the path; `closeout_log_reference` split out of
+  `closeout_log_path`; `main` returns 2 with one stderr line for missing
+  evidence. Negative control: all 6 new tests failed on the old code (the
+  `main()` test with the original `artifact is outside repository`
+  traceback chain).
+- **15:06** - Coder 2: one OpenWiki sentence in the generator, `CLAUDE.md`,
+  `AGENTS.md`; Shape paragraph sentence replaced; seven em dashes removed
+  from `openwiki/INSTRUCTIONS.md`; onboard, setup-project, and
+  create-feature corrected; `LICENSE` copied byte for byte, pin moved in
+  `UPSTREAM.md` and `scripts/validate_targets.py`, sidecar skills-profile
+  snapshot recaptured after proving the `LICENSE` bytes alone changed it.
+  Negative control: `validate_targets.py` reported `FAIL Ponytail allowlist
+  hash changed without a provenance update: .../LICENSE` before the pin
+  moved.
+- **15:07** - Regenerated targets and ran the self-install refresh. Before
+  the refresh, `verify.py fast` stopped with `receipt metadata control-plane
+  provenance is invalid`: the edited root `CLAUDE.md` and `AGENTS.md`
+  differed from `.claude/bootstrap-root/`, which empties the root
+  fingerprint. This is the known behavior in MEMORY (`[LEARN:quality]` and
+  `[LEARN:workflow]` on root-adapter mirrors); after the refresh it passed.
+- **15:12** - `verify.py phase` (not persisted): PASS, 2773 passed,
+  1 skipped. All required plan checks passed.
+- **15:20** - Review (code, architecture, security, tests, ponytail,
+  documentation; commit gate): Gate Result `PASS`, no open request, one
+  MINOR: `.claude/instructions/project-context.instructions.md` still listed
+  the stale statuses and the onboard mismatch as open. Fixed in nested
+  state: the caveats now say Phase A closed them, keep the root-plans
+  `Proposed` caveat and the template rule, and add the mirror rule above.
+- **15:22** - Documentation: no `README.md` or `docs/` text described the
+  changed behavior (searched for the old messages and terms); the skill and
+  policy edits are this phase's documentation.
 
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:workflow] When two coders work in parallel in this repository, at
+  most one of them may run `generate_targets.py` and `validate_targets.py`,
+  and only after the other has stopped editing `shared/`: the validator's
+  determinism check regenerates and fails with "generated dist is not
+  deterministic" when a source file changes between the two renders.
 
 ## Verification
 
-To be written at closeout.
+```text
+# verify closeout --format text summary lines
+```
+
+- optional 1: PASS — the reviewer read the nested AI-state diff (nine files)
+  and confirmed only the named status lines, plan status fields, Resolution
+  notes, and the one pilot phase line changed, and that no session log,
+  findings report, or receipt changed.
 
 ## Open Questions / Next Steps
 
 - Phase B follows: nested `.gitignore` and `.gitattributes` preservation.
+- Known, unfixed: `verify.py` still stops with a traceback (not a FAIL check
+  that names the file and the remedy) while a root adapter differs from its
+  mirror. Already recorded in MEMORY `[LEARN:quality]`; candidate for a later
+  plan.

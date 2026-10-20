@@ -216,7 +216,7 @@ full acceptance text; this map is the index.
 
 ## Phases
 
-- [ ] `2026-10-20_phase-A-status-and-wording-cleanup` — stale statuses, one OpenWiki sentence, project-name advice in three skills, `verify closeout` traceback, verbatim Ponytail license
+- [x] `2026-10-20_phase-A-status-and-wording-cleanup` — complete: stale statuses closed, one OpenWiki sentence, project-name advice in three skills, clean `verify closeout` message for missing evidence, verbatim Ponytail license. See `.claude/session_logs/2026-10-20_backlog-followups-phase-a.md`.
 - [ ] `2026-10-20_phase-B-nested-state-files` — keep the nested `.gitignore` and `.gitattributes` across refreshes
 - [ ] `2026-10-20_phase-C-memory-split` — lossless `MEMORY.md` split and durable `caveman-compress` backups
 - [ ] `2026-10-20_phase-D-agent-definition-protection` — agent folders, whole hook folders, workspace files, Codex `sandbox_mode`

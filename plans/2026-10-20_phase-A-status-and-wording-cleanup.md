@@ -3,8 +3,8 @@ name: 2026-10-20_phase-A-status-and-wording-cleanup
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 1
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-20_backlog-followups-phase-a.md
 ---
 
 # Small Plan: Status and Wording Cleanup
@@ -34,7 +34,7 @@ Phase G refreshes the wiki after every source edit.
 
 ## Steps
 
-- [ ] **1. Close the stale AI-state statuses honestly (BF-A1).**
+- [x] **1. Close the stale AI-state statuses honestly (BF-A1).**
   **Owner:** orchestrator (nested AI-state writes).
   **Files (nested `.claude` repository only):**
   `plans/codex-gpt-5.6-model-tiering.md`,
@@ -86,7 +86,7 @@ Phase G refreshes the wiki after every source edit.
   passes, and the reviewer has read the nested diff for exactly these eight
   files.
 
-- [ ] **2. Keep the July-plan lint test meaningful (BF-A1).**
+- [x] **2. Keep the July-plan lint test meaningful (BF-A1).**
   **Owner:** coder.
   **Files:** modify `tests/test_validate_plan_frontmatter.py`
   (`test_pre_contract_july_in_progress_plans_pass_unchanged`, lines
@@ -102,7 +102,7 @@ Phase G refreshes the wiki after every source edit.
   date gate, not the status, is what lets these live-status bodies pass.
   Never edit the real plan files from a test.
 
-- [ ] **3. Use one OpenWiki sentence in the root guidance (BF-A2).**
+- [x] **3. Use one OpenWiki sentence in the root guidance (BF-A2).**
   **Owner:** coder.
   **Files:** modify `scripts/generate_targets.py` (`render_root_guidance`,
   line 1393), `CLAUDE.md` (line 14), and `AGENTS.md` (line 9).
@@ -127,7 +127,7 @@ Phase G refreshes the wiki after every source edit.
   (`scripts/install_bootstrap.py:560-571`), so regeneration changes only
   `dist/multi-agent/CLAUDE.md` and `dist/multi-agent/AGENTS.md`.
 
-- [ ] **4. Remove the undefined term and the brief's em dashes (BF-A3).**
+- [x] **4. Remove the undefined term and the brief's em dashes (BF-A3).**
   **Owner:** coder.
   **Files:** modify `shared/policies/workflow.instructions.md` (the
   Knowledge-Refresh Final Phase "Shape" paragraph, lines 288-294) and
@@ -144,7 +144,7 @@ Phase G refreshes the wiki after every source edit.
   semicolon, or period. The brief is human-authored, so a direct edit is
   correct; never edit a generated `openwiki/**` page.
 
-- [ ] **5. Correct the project-name guidance in three skills (BF-A4).**
+- [x] **5. Correct the project-name guidance in three skills (BF-A4).**
   **Owner:** coder.
   **Files:** modify `shared/skills/onboard/SKILL.md` (lines 21-26, 92-94,
   104-131, and the Output line 147), `shared/skills/setup-project/SKILL.md`
@@ -189,7 +189,7 @@ Phase G refreshes the wiki after every source edit.
   Must not: change `shared/policies/workspace.instructions.md`, the
   installer, or `check_runtime.py`.
 
-- [ ] **6. Replace the closeout traceback with a clear message (BF-A5).**
+- [x] **6. Replace the closeout traceback with a clear message (BF-A5).**
   **Owner:** coder.
   **Files:** modify `shared/scripts/verify.py` (`relative_artifact` at
   lines 3162-3169, `closeout_artifacts` at lines 3270-3300, and its call in
@@ -220,7 +220,7 @@ Phase G refreshes the wiki after every source edit.
   The existing symlink and unsafe-reference tests (lines 394 and 1589)
   must pass unchanged.
 
-- [ ] **7. Record an outcome for every 2026-09-21 follow-up (BF-A6).**
+- [x] **7. Record an outcome for every 2026-09-21 follow-up (BF-A6).**
   **Owner:** orchestrator.
   **Files:** nested
   `explorations/2026-09-21_openwiki-followups-and-instruction-alignment.md`
@@ -237,7 +237,7 @@ Phase G refreshes the wiki after every source edit.
   of the OpenWiki guard) to Phase F as an optional item. Name "carried,
   no owner" with the reason for any item the big plan does not assign.
 
-- [ ] **8. Restore the vendored Ponytail license verbatim (BF-A7).**
+- [x] **8. Restore the vendored Ponytail license verbatim (BF-A7).**
   **Owner:** coder; the orchestrator fetches the upstream file.
   **Files:** modify `shared/third_party/ponytail/LICENSE`,
   `shared/third_party/ponytail/UPSTREAM.md` (the `LICENSE` sha256 line,
@@ -259,7 +259,7 @@ Phase G refreshes the wiki after every source edit.
   value. **Negative control:** before the pin edit, `validate_targets.py`
   reports the `LICENSE` hash mismatch.
 
-- [ ] **9. Regenerate, refresh the installed runtime, review, close out.**
+- [x] **9. Regenerate, refresh the installed runtime, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   **Required Skills:** `shared/skills/code-review/SKILL.md`.
   Run `uv run python scripts/generate_targets.py --all` and
@@ -309,14 +309,14 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
 
 ## Pause Checkpoint
 

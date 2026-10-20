@@ -1528,3 +1528,8 @@
   `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` in
   `tests/test_validate_targets.py`. `deep-audit` has no pin (gate-repair
   Phase E).
+- [LEARN:workflow] When two coders work in parallel in this repository, at
+  most one of them may run `generate_targets.py` and `validate_targets.py`,
+  and only after the other has stopped editing `shared/`: the validator's
+  determinism check regenerates and fails with "generated dist is not
+  deterministic" when a source file changes between the two renders.

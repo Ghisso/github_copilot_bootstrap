@@ -153,19 +153,21 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
 
 ## Known documentation/status caveats
 
-- Stale statuses in AI state: big plans `codex-gpt-5.6-model-tiering` and
-  `preserve-consumer-memory` (and their phase files) still say `in-progress`
-  although they merged as PR #7 and PR #8. Exploration
-  `2026-10-02_sidecar-workflow-profile-hands-on-review.md` still says OPEN
-  although `sidecar-workflow-repair` (PR #43) fixed it. Some older files under
-  root `plans/` still say `Proposed`. Treat code and target validation as the
-  source of truth.
-- The `onboard` skill's generic wording does not fit this repository. Root
-  `CLAUDE.md` and `AGENTS.md` are tracked, hand-maintained maintainer guides
-  here, not gitignored generated files; `AGENTS.md` has no Project State slot
-  and must not get one. Do not fill the slot in
-  `shared/policies/workspace.instructions.md`: that file is the consumer
-  template, and the installer fills the slot per target. The installed
-  workspace copy already reads `**Project:** github_copilot_bootstrap`, and
+- Some older files under root `plans/` still say `Proposed`. Treat code and
+  target validation as the source of truth. (The stale July plan statuses and
+  the 2026-10-02 exploration statuses were closed by `backlog-followups`
+  Phase A on 2026-10-20.)
+- Root `CLAUDE.md` and `AGENTS.md` are tracked, hand-maintained maintainer
+  guides here, not gitignored generated files; `AGENTS.md` has no
+  `**Project:**` line and must not get one. Never fill the `**Project:**`
+  placeholder in `shared/policies/workspace.instructions.md`: that file is the
+  consumer template, and the installer fills the line per target. The
+  installed workspace copy reads `**Project:** github_copilot_bootstrap`, and
   `check_runtime.py` accepts only that exact substitution, so a longer
-  one-liner there would show as drift.
+  one-liner there would show as drift. The `onboard`, `setup-project`, and
+  `create-feature` skills say this since Phase A.
+- While tracked root `CLAUDE.md` or `AGENTS.md` differs from its mirror in
+  `.claude/bootstrap-root/`, `verify.py` cannot build a receipt and stops with
+  `receipt metadata control-plane provenance is invalid`. Run
+  `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
+  after editing either file.
