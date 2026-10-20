@@ -79,7 +79,10 @@ OpenWiki corrections that `gate-repair` left for the next managed refresh.
   (handed over by Phase A): the "refresh this wiki" row of
   `openwiki/quickstart.md` lists only `openwiki-guard.py` and must also name
   the guard's entry point `shared/hooks/scripts/openwiki-guard.sh`. The
-  refresh must also pick up Phase D (the protected-file list in
+  refresh must also pick up Phase B (the consumer-state list in
+  `openwiki/operations/install-ownership-and-runtime-checks.md` and the
+  sentence in `openwiki/operations/git-backed-ai-state-sync.md` saying
+  `setup` on an existing repository rewrites only `.gitignore`), Phase D (the protected-file list in
   `openwiki/architecture/hooks-and-guardrails.md` and the `sandbox_mode`
   sentence in `openwiki/architecture/agents-and-skills.md`) and Phase E (the
   pages that describe the Ponytail skills, for example
