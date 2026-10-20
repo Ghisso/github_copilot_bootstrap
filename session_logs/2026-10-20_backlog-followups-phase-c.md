@@ -30,9 +30,33 @@ cannot delete them (BF-C4), and mark the 2026-09-03 exploration decided
 - **16:11** - Delegated steps 1-2 (classification table and
   `split_memory.py`, scratch folder only) and step 5 (`caveman-compress`
   backup location) to two coders on disjoint files.
-- **16:12** - Step 4: the 2026-09-03 exploration's status line now says
-  DECIDED, with one Outcome line; the rest of that dated record is
-  unchanged.
+- **16:12** - Step 4: the 2026-09-03 exploration's status line updated,
+  with one Outcome line; the rest of that dated record is unchanged.
+- **16:25** - Step 5 done (coder): `detect.py` gains `backup_path()` and a
+  `backup_path` result field and prints `Backup:`; SKILL.md steps 4, 5, 8,
+  10 and its Verification list use that path. 15 new cases failed first
+  (`15 failed, 5 passed`), then 20 passed; `validate_targets.py` PASS
+  (sidecar forbidden-token scan clean); ruff, mypy clean; full pytest 2797
+  passed.
+- **16:31** - Steps 1-2 done (coder, scratch only): `classification.tsv`
+  and `split_memory.py` (stdlib; `write`, `check`, `selftest` proven in a
+  scratch clone). **Stop condition hit:** only 18 of 328 entries qualify
+  (E=7, S=11, H=0; 6,505 of 106,520 entry bytes = 6.11%, below the plan's
+  25%). Applying it would shrink the working file from 106,665 to 100,972
+  bytes (-5.3%). Per step 1 the split is not applied; the user is asked.
+  Widening data from the coder: 22 near-miss entries (7,026 B) would reach
+  about 12.7% but each has an instruction beyond its evidence; a
+  topic-scoped cut (OpenWiki, sidecar, Codex, Copilot/VS Code/Antigravity,
+  Context Mode, Graphify; 57 entries, 20.6 KB) would reach about 25.4% but
+  makes the archive live advice, which the plan says needs its own
+  preserved path and a policy change. Coder flags for the Phase G audit:
+  entry 35 (status `complete` only after findings) appears to contradict
+  CLOSEOUT step 2; entry 23 names a renamed `state-sync.sh` function.
+- **16:35** - While waiting for the user, Phase D steps 1-2 are being
+  prepared by a coder in a detached scratch worktree
+  (`scratchpad/wt-phase-d`, at `06eb8e0`); nothing there touches this
+  checkout or the phase machine. The diff will be applied here only after
+  Phase C is committed, then verified and reviewed as Phase D.
 
 ## [LEARN] Entries
 

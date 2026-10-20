@@ -1,13 +1,14 @@
 # Exploration — Reducing `.claude/MEMORY.md` Session Cost
 
 **Date:** 2026-09-03
-**Status:** DECIDED on 2026-10-20 — lever B (split), with the archive in a preserved folder
-**Outcome (2026-10-20):** the user chose lever B with option (a): big plan
-`backlog-followups` Phase C moved entries that fail the memory admission
-rule into `.claude/explorations/2026-10-20_memory-archive/archive.md`
-(lossless; `split_memory.py check` proves it), and fixed the
-`caveman-compress` backup defect from §6. The text below is the original
-2026-09-03 record.
+**Status:** IN PROGRESS since 2026-10-20 — lever B (split) chosen, with the archive in a preserved folder
+**Outcome so far (2026-10-20):** the user chose lever B with option (a) in
+big plan `backlog-followups` Phase C. Classifying all 328 entries against
+the memory admission rule found only 18 to archive (6.1% of entry bytes),
+which hit that plan's 25% stop condition; the user's decision is pending
+(see `.claude/session_logs/2026-10-20_backlog-followups-phase-c.md`). The
+`caveman-compress` backup defect from §6 is fixed in that phase. The text
+below is the original 2026-09-03 record.
 **Trigger:** after `verification-gate-semantic-hardening` closed (7 phases,
 commits `2af3df7`…`d2d0847`), the user observed that `.claude/MEMORY.md` and
 its LEARN entries "got too big now" and asked for compression.
