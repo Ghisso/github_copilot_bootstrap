@@ -1,0 +1,57 @@
+{
+  "schema_version": 2,
+  "gate_result": "PASS",
+  "open_requests": [],
+  "counts": {
+    "critical": 0,
+    "major": 0,
+    "minor": 1
+  },
+  "profiles_reviewed": [
+    "architecture",
+    "code",
+    "documentation",
+    "ponytail",
+    "security",
+    "tests"
+  ],
+  "findings": [
+    {
+      "severity": "MINOR",
+      "title": "project-context.instructions.md known-gaps bullets (stale AI-state statuses, onboard wording) are now false and were not updated in the nested diff",
+      "file": ".claude/instructions/project-context.instructions.md",
+      "line": 156,
+      "profile": "documentation",
+      "disposition": "fixed",
+      "reason": "Both caveat bullets were rewritten in nested AI state before closeout: they now say Phase A closed the stale statuses and corrected the three skills, and keep the still-true root-plans and template rules."
+    }
+  ],
+  "generated_at": "2026-10-20T15:19:19Z",
+  "branch": "backlog-followups_implementation",
+  "head_sha": "f964551136c283c86fd18d71ee50c1d9c5b5e725",
+  "base_ref": "dev",
+  "merge_base_sha": "f964551136c283c86fd18d71ee50c1d9c5b5e725",
+  "phase": "2026-10-20_phase-A-status-and-wording-cleanup",
+  "target": ".",
+  "dirty": false,
+  "content_hash": "f75893a0bab46ad198890a699d98359594b35188",
+  "changed_files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "openwiki/INSTRUCTIONS.md",
+    "scripts/generate_targets.py",
+    "scripts/validate_targets.py",
+    "shared/policies/workflow.instructions.md",
+    "shared/scripts/verify.py",
+    "shared/skills/create-feature/SKILL.md",
+    "shared/skills/onboard/SKILL.md",
+    "shared/skills/setup-project/SKILL.md",
+    "shared/third_party/ponytail/LICENSE",
+    "shared/third_party/ponytail/UPSTREAM.md",
+    "tests/test_validate_plan_frontmatter.py",
+    "tests/test_validate_targets.py",
+    "tests/test_verify.py"
+  ],
+  "ponytail_reviewed": true,
+  "ponytail_findings": 0
+}

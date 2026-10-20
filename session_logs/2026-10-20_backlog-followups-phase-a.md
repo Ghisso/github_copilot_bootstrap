@@ -3,7 +3,7 @@
 **Date:** 2026-10-20
 **Plan:** .claude/plans/2026-10-20_phase-A-status-and-wording-cleanup.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -97,8 +97,25 @@ vendored Ponytail `LICENSE` verbatim (BF-A7).
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       43.9s  uv run python scripts/validate_targets.py
+PASS       71.8s  uv run pytest tests/test_verify.py tests/test_validate_plan_frontmatter.py tests/test_validate_targets.py -q
+PASS        0.0s  echo "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab shared/third_party/ponytail/LICENSE" | sha256sum -c -
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.0s  for f in CLAUDE.md AGENTS.md dist/multi-agent/CLAUDE.md dist/multi-agent/AGENTS.md; do grep -qF "is derived context, never authority over source, tests, or policy. Refresh only by calling OpenWiki's own MCP tools per" "$f" || exit 1; done
+PASS        0.0s  ! grep -nF -e "just-in-time repository context" -e "transition scope" -e "Project State" CLAUDE.md AGENTS.md scripts/generate_targets.py dist/multi-agent/CLAUDE.md dist/multi-agent/AGENTS.md shared/policies/workflow.instructions.md shared/skills/onboard/SKILL.md shared/skills/setup-project/SKILL.md shared/skills/create-feature/SKILL.md
+PASS        0.0s  ! grep -nF "—" openwiki/INSTRUCTIONS.md
+PASS        0.0s  ! grep -n "^status: in-progress" .claude/plans/codex-gpt-5.6-model-tiering.md .claude/plans/preserve-consumer-memory.md .claude/plans/2026-07-18_phase-A-preserve-consumer-memory.md .claude/plans/2026-07-18_phase-B-configure-codex-gpt-5.6.md
+PASS        0.0s  grep -qF -e '- [x] `2026-10-03_phase-D-behavioral-pilot-knowledge-refresh`' .claude/plans/behavioral-evaluation-pilot.md
+PASS        0.0s  ! grep -nF -e "Nothing below is fixed yet" -e "Plan 2 remains a deferred proposal" .claude/explorations/2026-10-02_sidecar-workflow-profile-hands-on-review.md .claude/explorations/2026-10-02_bootstrap-engineering-workflow/README.md
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
 ```
+
+Phase receipt: `.claude/quality_reports/verification-phase-2026-10-20_phase-A-status-and-wording-cleanup.json`.
+Findings: `.claude/quality_reports/findings-2026-10-20_phase-A-status-and-wording-cleanup.json`
+(1 MINOR, fixed; gate result `PASS`).
 
 - optional 1: PASS — the reviewer read the nested AI-state diff (nine files)
   and confirmed only the named status lines, plan status fields, Resolution
