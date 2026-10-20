@@ -7,88 +7,122 @@ description: "Always-on: what this specific repo is and how it's built. Not part
 ## What this project is
 
 `github_copilot_bootstrap` is a reusable, multi-target agent-workflow bootstrap
-for other repositories. It is a source-of-truth repository plus a generated
-installable target; it is not an application and has no runtime inference,
+for other repositories. It is a source-of-truth repository plus two generated
+installable targets; it is not an application and has no runtime inference,
 API-service, or UI product of its own.
 
 The generic workspace guidance mentions Hydra, BentoML, Haystack, and Gradio
 because consumer repositories may use them. Those frameworks do not apply to
-this repository's bootstrap scripts, shell hooks, or generated adapters.
+this repository's bootstrap scripts, shell hooks, or generated adapters. There
+is no `src/` and no `pyproject.toml` here; tooling comes from the devcontainer
+image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 
 ## Layout
 
-- `README.md`: product intent, install/update workflow, architecture, and gates.
-- `docs/`: architecture, deterministic commit-gate, runtime, smoke-test, and
-  target-mapping documentation.
-- `shared/policies/`: source instruction files, including workflow, quality,
-  tool-routing, and workspace rules.
-- `shared/skills/`: reusable public/background skills; `onboard` is one of them.
+- `README.md`: product intent, full and sidecar install/update, architecture,
+  hooks, and gates.
+- `docs/`: architecture, deterministic commit gate, runtime checks, smoke
+  tests, sidecar provider contract, native-client acceptance, dated evidence
+  notes, and `target-mapping.md` (per-client adapters, the gate-repair parity
+  table, and the recorded follow-ups list).
+- `openwiki/`: generated OpenWiki knowledge layer (descriptive, never
+  authority; refresh only through the `knowledge-refresh` skill).
+- `shared/policies/`: source instruction files (workflow, quality,
+  tool-routing, workspace, agent reporting).
+- `shared/skills/`: 55 reusable skills; `onboard` is one of them.
 - `shared/agents/`: canonical agent metadata and target-neutral prompts.
 - `shared/review-profiles/`: profile checklists used by the unified reviewer.
-- `shared/hooks/`: lifecycle configuration and shell guardrails.
+- `shared/hooks/`: lifecycle configuration and shell/Python guardrails,
+  including `context-mode-dispatch.sh` (pins Context Mode `1.0.169`).
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly four guarded tools).
-- `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader.
-- `shared/scripts/` and `shared/templates/`: shared scoring, findings, and
-  workflow artifacts rendered into targets.
-- `scripts/generate_targets.py`: renders both `dist/multi-agent/` (the full
-  bootstrap) and `dist/sidecar/<profile>/` (the personal per-clone overlay).
+- `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader
+  (pins OpenWiki `0.5.2`).
+- `shared/third_party/ponytail/`: vendored Ponytail `v4.8.4` with provenance.
+- `shared/sidecar/`: sources for the personal sidecar overlay.
+- `shared/schemas/`: only `native-client-observation.schema.json` (the stale
+  agent schema was removed by gate-repair).
+- `shared/scripts/` and `shared/templates/`: `verify.py`,
+  `record_findings.py`, plan templates, and other rendered workflow artifacts.
+- `scripts/generate_targets.py`: renders `dist/multi-agent/` (the full
+  bootstrap) and `dist/sidecar/<profile>/` (the personal per-clone overlay,
+  profiles `skills` and `workflow`).
 - `scripts/install_bootstrap.py`: installs generated output into a consumer,
   in `full` mode (a takeover, including a nested `.claude` `ai-state`
   repository) or `sidecar` mode (a private overlay inside a team-owned
-  harness), chosen by `--mode` or auto-detected from the target.
-- `scripts/update_consumers.py`: regenerates and updates consumer repositories
-  in a batch that may mix full and sidecar targets; it finishes every target
-  even when one fails.
-- `scripts/validate_targets.py`: structural and behavioral target validator.
-- `scripts/check_runtime.py`: runtime-file and optional-helper checker.
-- `scripts/check_native_clients.py`: runs optional native-client probes and
-  records evidence for Claude Code, Codex, Copilot, and Google Antigravity.
-- `plans/`: ADRs, implementation plans, closeouts, and architecture reviews.
-- `dist/multi-agent/`: generated and gitignored; never hand-edit it.
+  harness), chosen by `--mode` or auto-detected. It fills the Project State
+  slot with the target directory name.
+- `scripts/runtime_ownership.py`: which installed paths the bootstrap owns and
+  which are consumer state (`CONSUMER_STATE_PATHS`); anything else under
+  `.claude/` that the target lacks is deleted on refresh.
+- `scripts/sidecar_overlay.py`: sidecar install, update, and uninstall engine.
+- `scripts/update_consumers.py`: batch regenerate/update of mixed full and
+  sidecar consumers; it finishes every target even when one fails.
+- `scripts/validate_targets.py`: structural and behavioral target validator,
+  including installed Git-hook smoke runs.
+- `scripts/validate_plan_frontmatter.py`: plan frontmatter and L1–L4
+  Verification-block checks (run at branch creation and at commit).
+- `scripts/check_runtime.py`: runtime-file drift and optional-helper checker.
+- `scripts/check_native_clients.py`: optional native-client probes and
+  evidence (Claude Code and Codex only).
+- `tests/`: pytest suite for hooks, gates, verifier, installer, sidecar,
+  state sync, and Context Mode dispatch (recorded hook fixtures).
+- `.github/workflows/validate.yml`: CI for generation and target validation
+  on Ubuntu and macOS plus Python 3.9 hook compatibility. It does not run the
+  full pytest, Ruff, or Mypy suite.
+- `plans/`: older ADRs, implementation plans, closeouts, and architecture
+  reviews. Current plans live in `.claude/plans/`.
+- `dist/`: generated and gitignored; never hand-edit it.
 
 ## Pipeline / data flow
 
 ```text
 shared/ source files
     -> generate_targets.py
-dist/multi-agent/ generated bundle
-    -> install_bootstrap.py
-consumer repo: Copilot + Claude Code + Codex + Antigravity adapters
-    + .claude shared basis
-    -> hooks and state-sync.sh
-consumer workflow: plan -> implement -> verify -> review -> score -> document
-    -> learn/session log -> gated commit or PR
+dist/multi-agent/            dist/sidecar/{skills,workflow}/
+    -> install_bootstrap.py --mode full | --mode sidecar
+consumer repo (full): Claude Code + Codex + Copilot + Antigravity adapters
+    + .claude shared basis (nested ai-state repo) + Git hooks
+consumer repo (sidecar): ignored skills/rules (+ agents and .ai-bootstrap/
+    state for the workflow profile); no hooks, no receipts
+    -> full-install workflow: plan -> implement -> verify -> review
+       -> record findings (gate result + profiles) -> closeout receipt
+       -> gated commit -> push
 ```
 
 ## Design decisions
 
-- One shared basis produces thin Copilot, Claude Code, Codex, and Google
+- One shared basis produces thin Claude Code, Codex, Copilot, and Google
   Antigravity adapters so workflow semantics stay aligned while each target
-  keeps native wiring.
+  keeps native wiring. Client priority for parity work is Claude Code, Codex,
+  GitHub Copilot, Antigravity; a gap in a lower client is recorded in
+  `docs/target-mapping.md`, not hidden.
 - Ponytail is vendored as portable skills so coding/review behavior does not
   depend on a per-user plugin or network availability.
 - Guardrails are shared shell scripts, while commit/push invariants also run as
   real Git hooks; this closes tool-layer and human/IDE bypasses where possible.
+- The commit gate trusts only what it checks: the findings report records the
+  reviewer's `gate_result` and open requests (schema version 2), and the gate
+  requires the review profiles the branch's changed paths call for. Reports
+  written before schema version 2 stay valid at push.
+- The Context Mode hook lane is advisory only: the dispatcher forwards an
+  allowlist of advice fields and never forwards a decision or input rewrite.
 - Consumer `.claude/` state is a nested `ai-state` Git repository so mutable
-  plans, memory, logs, and bootstrap files have an auditable history and can
-  use the code remote or an explicitly configured private remote.
+  plans, memory, logs, and bootstrap files have an auditable history.
 - Semble is for semantic code discovery. context-mode is optional; when it is
   unavailable or blocked, direct reads and `rg` are the supported fallback.
+- Tests, hooks, and `verify.py` make no model call.
 
 ## Current status and verification
 
-Onboarding was refreshed on `dev` on 2026-09-23 from clean outer and nested
-worktrees. `UV_CACHE_DIR=/tmp/github-copilot-bootstrap-uv-cache uv run python
-scripts/validate_targets.py` passed with `PASS generated target is structurally
-valid`. `scripts/check_runtime.py` was also run; after this source-policy edit it
-reports the expected stale self-installed workspace copies until the bootstrap
-is reinstalled into this authoring repository with
-`uv run python scripts/install_bootstrap.py . --allow-self --local-only`. The
-structural validator checks generation, determinism, hooks, adapters, lifecycle
-contracts, and its regression suite. It is not proof that every supported native
-client routed every role at runtime; use the optional
-`scripts/check_native_clients.py` release probe when that evidence is needed.
+Onboarding was refreshed on `dev` at `f964551` on 2026-10-20, after the
+`gate-repair` big plan merged (PR #46). `uv run python scripts/check_runtime.py`
+reported only PASS lines. `dev` is 273 commits ahead of `origin/main`, which
+was last updated 2026-05-24; releasing `dev` to `main` is the user's call.
+
+Pinned versions versus upstream on 2026-10-20: Context Mode `1.0.169`
+(current), OpenWiki `0.5.2` (upstream `0.7.2`), Ponytail `v4.8.4` (upstream
+`v5.3.2`).
 
 Before merging bootstrap changes, run:
 
@@ -96,9 +130,11 @@ Before merging bootstrap changes, run:
 2. `uv run python scripts/validate_targets.py`
 3. `uv run python scripts/check_runtime.py`
 4. relevant tests/lint/type checks and the profile-driven review
-5. score and findings gates, documentation updates, `[LEARN]` capture, and a
-   session closeout before commit/PR
+5. findings gate, documentation updates, `[LEARN]` capture, and a session
+   closeout before commit/PR
 
+After a `shared/` change, refresh the installed copy here with
+`uv run python scripts/install_bootstrap.py . --allow-self --local-only`.
 The local environment may require `UV_CACHE_DIR` to point at a writable path.
 Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
 
@@ -112,16 +148,24 @@ Optional Semble/context-mode binaries warn and do not invalidate the bootstrap.
   checks; local direct-read/`rg` behavior must remain viable.
 - Consumer-specific state belongs in the consumer's nested `.claude` repo, not
   in shared source templates or generated output.
+- A new file under `.claude/` survives a self-refresh only inside a
+  `CONSUMER_STATE_PATHS` entry; elsewhere the installer deletes it.
 
-## Known documentation/status caveat
+## Known documentation/status caveats
 
-Some older plan files still say `Proposed` even though the corresponding
-implementation and documentation are present (notably state-sync and
-post-review hardening). Treat code and generated-target validation as the
-current source of truth, and refresh plan status when the next related change
-touches those plans.
-
-The `onboard` skill's generic consumer-project wording assumes both root
-entrypoints have a Project State slot. This authoring repository instead keeps
-the tracked root `AGENTS.md` as its maintainer guide, without that slot; do not
-add one there. Its generated consumer adapter is validated separately.
+- Stale statuses in AI state: big plans `codex-gpt-5.6-model-tiering` and
+  `preserve-consumer-memory` (and their phase files) still say `in-progress`
+  although they merged as PR #7 and PR #8. Exploration
+  `2026-10-02_sidecar-workflow-profile-hands-on-review.md` still says OPEN
+  although `sidecar-workflow-repair` (PR #43) fixed it. Some older files under
+  root `plans/` still say `Proposed`. Treat code and target validation as the
+  source of truth.
+- The `onboard` skill's generic wording does not fit this repository. Root
+  `CLAUDE.md` and `AGENTS.md` are tracked, hand-maintained maintainer guides
+  here, not gitignored generated files; `AGENTS.md` has no Project State slot
+  and must not get one. Do not fill the slot in
+  `shared/policies/workspace.instructions.md`: that file is the consumer
+  template, and the installer fills the slot per target. The installed
+  workspace copy already reads `**Project:** github_copilot_bootstrap`, and
+  `check_runtime.py` accepts only that exact substitution, so a longer
+  one-liner there would show as drift.

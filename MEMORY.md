@@ -12,9 +12,10 @@
   mutations, then run adversarial refutation; happy-path glob tests alone do
   not establish a fail-closed operation classifier.
 
-- [LEARN:domain] `github_copilot_bootstrap` generates one multi-target coding
-  agent workflow bootstrap from `shared/` into `dist/multi-agent/`; it is not a
-  Hydra/BentoML/Haystack/Gradio application. Durable project context:
+- [LEARN:domain] `github_copilot_bootstrap` generates a multi-target coding
+  agent workflow bootstrap from `shared/` into `dist/multi-agent/` (full) and
+  `dist/sidecar/` (personal overlay); it is not a Hydra/BentoML/Haystack/Gradio
+  application. Durable project context:
   `.claude/instructions/project-context.instructions.md`.
 
 ## Workflow
