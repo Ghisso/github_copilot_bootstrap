@@ -104,9 +104,11 @@ Each phase's own log carries its detailed evidence.
 
 ## [LEARN] Entries
 
-- No new lessons: the Phase H and I lessons (systematic sweeps, the
-  review acceptance bar, guessed expansion values, never editing existing
-  test inputs) are already in `MEMORY.md`.
+[LEARN] none - no new lessons this session
+
+The Phase H and I lessons (systematic sweeps, the review acceptance bar,
+guessed expansion values, never editing existing test inputs) are already
+in `MEMORY.md`.
 
 ## Verification
 
