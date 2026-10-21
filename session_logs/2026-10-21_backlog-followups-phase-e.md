@@ -3,7 +3,7 @@
 **Date:** 2026-10-21
 **Plan:** .claude/plans/2026-10-20_phase-E-ponytail-5-adoption.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -68,8 +68,19 @@ both sidecar profiles consistent (BF-E6), and no plugin runtime or
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.0s  grep -Eq '^## Decision: (ADOPT|PARTIAL ADOPT)$' .claude/explorations/2026-10-20_ponytail-5-evaluation/evidence.md
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       44.9s  uv run python scripts/validate_targets.py
+PASS      145.6s  uv run pytest tests/test_validate_targets.py tests/test_install_bootstrap.py tests/test_sidecar_install.py tests/test_sidecar_update.py tests/test_sidecar_uninstall.py tests/test_sidecar_overlay.py -q
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
 ```
+
+Phase receipt: `.claude/quality_reports/verification-phase-2026-10-20_phase-E-ponytail-5-adoption.json`.
+Findings: `.claude/quality_reports/findings-2026-10-20_phase-E-ponytail-5-adoption.json`
+(1 MINOR, fixed; gate result `PASS`).
 
 - optional 1: NOT RUN — the one-run-per-arm behavioral spot-check needs
   fresh interactive coder and reviewer sessions (the user was away); it is
