@@ -204,6 +204,20 @@ the user runs them (BF-I1 to BF-I7).
   than Phase H, a hole Phase I introduced, or a false or missing docs
   statement about what is checked. Any other pre-existing gap goes to the
   docs' not-yet-checked list and the recorded follow-up to split the hook.
+- **Coder round 4 fixes** - assignment values read after substitution,
+  with fragment defaults kept (`MAYBE_KEY`, ignored by "assigned twice");
+  shells fed by a heredoc, a here-string, or a pipe from literal
+  `echo`/`printf`/`cat <<` read as child-shell scripts in any spelling
+  and behind runners that start a shell (`PREFIX_RUNNERS`); a command name
+  held in a variable is re-read. Spelling sweep (`spelling-sweep.txt`): 69
+  names x 24 spellings = 4,249 rows; 600 under-protected rows on the
+  round-4 guard, 0 now. 321 probe cases, 0 bypass; sweep 40,620 runs, 381
+  gaps, all recorded; differential vs Phase H 0 under-protected, vs round
+  4 189 looser (variable-held read-only commands now allowed like the
+  plain name, config writes now ask/deny), 0 under-protected. Bash cases,
+  scanner oracle, and the three Python versions agree; slowest 2.27 s.
+  Regenerated, self-installed; `validate_targets.py` and
+  `check_runtime.py` PASS. Docs fifth pass started.
 
 ## [LEARN] Entries
 
