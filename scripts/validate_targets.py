@@ -3840,6 +3840,30 @@ def validate_hook_guardrails(errors: list[str]) -> None:
             errors,
         )
 
+        # BF-H1: a comment line must not hide the write on the next line, a
+        # quoted operator must not split one command into two, and the words
+        # after an unquoted `$( )` belong to the same command.
+        for hidden_write in (
+            "# note\ntouch .env",
+            "tee '|' cat .env",
+            "tee $(true) .env",
+        ):
+            returncode, stdout, stderr = run_hook(
+                hook_root / "protect-files.sh",
+                {"tool_name": "Bash", "tool_input": {"command": hidden_write}},
+                target_id,
+            )
+            check(
+                returncode == 0,
+                f"Bash hidden-write guardrail failed to run: {hook_root}: {stderr}",
+                errors,
+            )
+            check(
+                '"permissionDecision":"deny"' in stdout,
+                f"protected-file guardrail did not deny {hidden_write!r}: {hook_root}",
+                errors,
+            )
+
         returncode, stdout, stderr = run_hook(
             hook_root / "git-protection.sh",
             {"tool_name": "Bash", "tool_input": {"command": "git reset --hard HEAD"}},

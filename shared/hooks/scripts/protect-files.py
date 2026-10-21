@@ -8,7 +8,7 @@ import json
 import os
 import posixpath
 import re
-import shlex
+import signal
 import sys
 
 
@@ -88,6 +88,22 @@ PATCH_PREFIXES = (
     "*** Move to: ",
 )
 OPERATORS = {";", "&&", "||", "|", "&", "(", ")"}
+# Characters that end a shell word: blanks (space, tab, newline; a carriage
+# return is an ordinary character) and the operator characters.
+PUNCTUATION = ";&|<>()"
+WORD_BREAKS = " \t\n" + PUNCTUATION
+# Bash's operator tokens, longest first, so a run of operator characters is read
+# by longest match (`&&(` is `&&` then `(`). Only `OPERATORS` split a command
+# into segments. The others are words here: the redirects as before, and the
+# grouped forms `|&`, `&>>`, `>&`, `<>`, `<&`, `;&`, `;;&`, `;;` keep their old
+# reading until Phase I gives them their meaning.
+SHELL_OPERATORS = sorted(
+    ";;& &>> <<< <<- ;; ;& && || |& << <& <> >> >& >| &> ; & | ( ) < >".split(),
+    key=len,
+    reverse=True,
+)
+# Operators that need a command after them, even past a newline.
+BINARY_OPERATORS = {"&&", "||", "|"}
 REDIRECTS = {">", ">>", ">|", "&>", "1>", "1>>", "2>", "2>>"}
 SIMPLE_MUTATORS = {"rm", "rmdir", "touch", "mkdir", "truncate", "tee", "ln"}
 READ_ONLY = {"cat", "wc", "rg", "grep", "head", "tail", "sed", "stat"}
@@ -113,15 +129,32 @@ GIT_READ_ONLY_SUBCOMMANDS = {
 GIT_GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree"}
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
-QUOTED_GLOB = re.compile(r"(?<![=\w])(['\"])([^'\"]*[?*[][^'\"]*)\1")
-QUOTED_BRACE = re.compile(r"(['\"])([^'\"]*(?<!\$)\{[^'\"]+\}[^'\"]*)\1")
-QUOTED_VARIABLE = re.compile(r"(['\"])\$(?:\{)?([A-Za-z_][A-Za-z0-9_]*)(?:\})?\1")
-QUOTED_VARIABLE_AFFIX = re.compile(
-    r"(['\"])([^'\"]*)\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))([^'\"]*)\1"
+# The start of an array assignment: `NAME=` or `NAME+=` right before a `(`.
+ARRAY_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+# A glob character: in a quoted word, the word may be a pattern (see
+# `QUOTED_PATTERN_PREFIX`). A brace list is not one: `find -name '{a,b}'` never
+# expands it.
+QUOTED_GLOB = re.compile(r"[?*[]")
+# Quoted text that must not be expanded again: a glob, a brace list, or a
+# variable reference (`$NAME`, `${NAME}`). A word holding such a quoted part is
+# returned by the scanner with `QUOTED_VALUE_PREFIX`.
+QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|(?<!\$)\{[^{}]+\}|\$\{?[A-Za-z_]")
+# `NAME:-word` and its relatives inside `${ }`: what the expansion may become.
+DEFAULT_EXPANSION = re.compile(
+    r"(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?!$-])(?::?[-=+])(.*)", re.S
 )
-QUOTED_VARIABLE_MARKER = re.compile(
-    r"^__PROTECT_FILES_QUOTED_VARIABLE_([A-Za-z_][A-Za-z0-9_]*)__$"
+QUOTE_IN_QUOTED_EXPANSION = (
+    "a single quote inside a double-quoted parameter expansion is read "
+    "differently by Bash and by POSIX shells"
 )
+# An extended glob operator: `@( )`, `*( )`, `+( )`, `?( )`, `!( )`.
+EXTENDED_GLOB = re.compile(r"[@*+?!]\(")
+# The word `case` followed by a blank, as a word of its own. Any such word is
+# taken for the start of a case statement, wherever it stands: Bash reads `case`
+# as one after `!`, `time`, `coproc`, `function NAME`, a reserved word, and an
+# operator, and a list of those places is a list that can miss one. Searched in
+# text with its quotes removed.
+CASE_WORD = re.compile(r"(?:^|[\s;&|(){}!])case(?=[ \t\n])")
 # Every alternative below is a *candidate* generator for `protected()`, not
 # the decider (see `protected_path_literals`'s docstring). Each one carries
 # word/token boundaries so it cannot extract a false-positive fragment out of
@@ -151,6 +184,33 @@ PROTECTED_PATH_LITERAL = re.compile(
     + r"))",
     re.IGNORECASE,
 )
+# Matching `PROTECTED_PATH_LITERAL` takes time quadratic in the length of a word
+# (80 KB took 8 s and 200 KB minutes; the hook times out at 10 s, and a timeout
+# lets the command through). Every alternative holds one of these names, so a
+# word without one has no literal. `protected_path_literals` skips such a word
+# when it is longer than `LONG_WORD` (no real file name is) and fails closed on
+# a long word that does hold a name.
+PROTECTED_NAME = re.compile(
+    "|".join(
+        map(
+            re.escape,
+            (
+                ".env",
+                "uv.lock",
+                "credentials",
+                ".pem",
+                ".key",
+                ".code-workspace",
+                *CONTROL_PLANE_DIRS,
+                *sorted(HOOK_CONFIGS),
+            ),
+        )
+    ),
+    re.IGNORECASE,
+)
+LONG_WORD = 512
+# Seconds the whole classifier may run (see the end of the file).
+CLASSIFIER_SECONDS = 4
 OPAQUE_WRITE_PATH = re.compile(
     r"(?:write_text|write_bytes)\(\s*['\"]([^'\"]+)['\"]",
     re.IGNORECASE,
@@ -211,7 +271,28 @@ WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
     "command": {"-p", "-v", "-V"},
 }
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
+# A word that is one quoted glob (`'*.pem'`) is a pattern, not a file name:
+# `find` and `ls` match it, they do not write to it. It starts with
+# `QUOTED_VALUE_PREFIX`, so every check for that prefix also finds it.
+QUOTED_PATTERN_PREFIX = QUOTED_VALUE_PREFIX + "PATTERN__"
+# Commands that run their arguments, or hand them to another command, so a
+# quoted word after them is text they interpret, never a pattern for them to
+# match: `bash -c '{rm,.env}'` expands the list and runs `rm`.
+RUNNERS = frozenset(
+    (
+        "bash sh zsh dash ksh ash fish csh tcsh busybox eval exec source . builtin "
+        "command xargs env sudo doas nohup timeout time nice ionice setsid stdbuf "
+        "watch perl ruby node nodejs php awk gawk mawk lua tclsh deno bun"
+    ).split()
+)
+RUNNER_PATTERN = re.compile(r"python[0-9.]*")
+# Text a pattern word cannot hold: a quoted word with a space, an operator
+# character, or a quote is a script or a sentence (`bash -c 'cmd > f; echo *'`),
+# which must still be read for what it names.
+PATTERN_UNSAFE = re.compile(r"[\s;|&<>'\"\\]")
 PROCESS_SUB_PREFIX = "__PROTECT_FILES_PROCSUB_"
+# A placeholder for `$( )`, `$(( ))`, `<( )`, or `>( )` left inside a word.
+SUBSTITUTION_PLACEHOLDER = re.compile(re.escape(PROCESS_SUB_PREFIX) + r"\d+__")
 HEREDOC_PREFIX = "__PROTECT_FILES_HEREDOC_"
 HEREDOC_WORD = re.compile(
     r"[ \t]*(?:'([A-Za-z0-9_]+)'|\"([A-Za-z0-9_]+)\"|([A-Za-z0-9_]+))"
@@ -220,6 +301,15 @@ HEREDOC_WORD = re.compile(
 # script-file argument) is the script they actually execute, so it is
 # recursively classified rather than merely scanned as literal text.
 SHELL_INTERPRETERS = {"bash", "sh", "zsh"}
+# Work allowed for reading one command: this many units per character of the
+# command, plus a floor. Every re-scan of the same text is charged to one
+# budget (see `_charge`), so a crafted command that makes the guard scan the
+# same text over and over fails closed instead of running past the hook
+# timeout and being let through.
+WORK_PER_CHARACTER = 50
+MINIMUM_WORK = 10_000
+# Work left for the `shell_targets` call that is running, or None outside one.
+_work_left: list[int] | None = None
 
 
 class AmbiguousCommand(ValueError):
@@ -233,11 +323,11 @@ class AmbiguousCommand(ValueError):
 
 class UnparseableCommand(ValueError):
     """The shell text itself could not be tokenized (e.g. an unterminated
-    quote, an unbalanced process substitution, or a heredoc with no
+    quote, an unbalanced substitution, or a heredoc with no
     delimiter word or no terminator line).
 
     Deliberately a sibling of AmbiguousCommand, not a subclass: recursive
-    classification of a process substitution or a bare shell heredoc runs
+    classification of a substitution or a bare shell heredoc runs
     inside an `except AmbiguousCommand` fallback (see `classify_command`), so
     genuinely malformed nested syntax must keep propagating to the top-level
     fail-closed exit instead of being caught there and downgraded to a soft,
@@ -245,9 +335,16 @@ class UnparseableCommand(ValueError):
     """
 
 
+def strip_quoted_prefix(value: str) -> str:
+    """`value` without the scanner's quoted-word prefix, of either kind."""
+    if value.startswith(QUOTED_PATTERN_PREFIX):
+        return value[len(QUOTED_PATTERN_PREFIX) :]
+    return value.removeprefix(QUOTED_VALUE_PREFIX)
+
+
 def normalize(path: str, repo_root: str) -> str:
     value = path.strip().strip("\"'").replace("\\", "/")
-    value = value.removeprefix(QUOTED_VALUE_PREFIX)
+    value = strip_quoted_prefix(value)
     if value.startswith("file://"):
         value = value[7:]
     if repo_root and value.startswith(repo_root.rstrip("/") + "/"):
@@ -313,6 +410,94 @@ def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
     return lexically_inside or really_inside
 
 
+def _default_word(body: str) -> str:
+    """What `${NAME:-word}` may expand to when `NAME` is unset: `word` (also for
+    `-`, `:=`, `=`, `:+`, `+`), with quotes removed; nothing for any other form."""
+    match = DEFAULT_EXPANSION.fullmatch(body)
+    if match is None:
+        return ""
+    return re.sub(r"[\"']", "", _replace_expansions(match.group(1), True))
+
+
+def _expansion_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each `${ }` in `text`, found as Bash finds it (see
+    `_matching_brace`). A `${` after an odd number of `$` is the process id and
+    `{`, not an expansion; an unterminated one ends the search."""
+    spans: list[tuple[int, int]] = []
+    index = 0
+    while True:
+        start = text.find("${", index)
+        if start == -1:
+            return spans
+        run = 0
+        while start - run > 0 and text[start - run - 1] == "$":
+            run += 1
+        if run % 2:
+            index = start + 2
+            continue
+        end = _matching_brace(text, start)
+        if end == -1:
+            return spans
+        spans.append((start, end))
+        index = end
+
+
+def _replace_expansions(text: str, defaults: bool) -> str:
+    """`text` with each `${ }` removed, or replaced by its default word when
+    `defaults` is set."""
+    pieces: list[str] = []
+    index = 0
+    for start, end in _expansion_spans(text):
+        pieces.append(text[index:start])
+        if defaults:
+            pieces.append(_default_word(text[start + 2 : end - 1]))
+        index = end
+    pieces.append(text[index:])
+    return "".join(pieces)
+
+
+def _brace_list(path: str) -> tuple[int, int, list[str]] | None:
+    """The first brace list `{a,b}` in `path` that is not part of a `${ }`, as
+    (start, end, options), or None. Commas and braces inside a `${ }` do not
+    count."""
+    masked = path
+    for start, end in reversed(_expansion_spans(path)):
+        masked = masked[:start] + "\0" * (end - start) + masked[end:]
+    match = re.search(r"\{([^{}]+)\}", masked)
+    if match is None:
+        return None
+    options = []
+    offset = match.start(1)
+    for piece in masked[match.start(1) : match.end(1)].split(","):
+        options.append(path[offset : offset + len(piece)])
+        offset += len(piece) + 1
+    return match.start(), match.end(), options
+
+
+def without_expansions(text: str) -> str:
+    """`text` without its substitution placeholders, its `${ }` expansions, and
+    its unresolved `$NAME` references: each may expand to nothing, so a protected
+    name may be only what is left."""
+    text = _replace_expansions(SUBSTITUTION_PLACEHOLDER.sub("", text), False)
+    return VARIABLE_REFERENCE.sub("", text)
+
+
+def expansion_defaults(text: str) -> str:
+    """Like `without_expansions`, but each `${NAME:-word}` becomes its `word`: the
+    name it may expand to (`${X:-.env}`, `.e${x:-n}v`)."""
+    text = _replace_expansions(SUBSTITUTION_PLACEHOLDER.sub("", text), True)
+    return VARIABLE_REFERENCE.sub("", text)
+
+
+def _expansion_variants(text: str) -> list[str]:
+    """The other texts `text` may stand for once its expansions are resolved to
+    nothing or to their default words; empty for text with no expansion."""
+    if "$" not in text and PROCESS_SUB_PREFIX not in text:
+        return []
+    variants = dict.fromkeys((without_expansions(text), expansion_defaults(text)))
+    return [variant for variant in variants if variant != text]
+
+
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     """Classify one path as an in-repository control-plane file, an
     anywhere-protected secret-shaped file, or unprotected.
@@ -324,7 +509,14 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     repository's to govern. The secret-shaped clause is unconditionally
     global, because a credential-shaped file is harmful to mutate or
     exfiltrate in any tree.
+
+    A substitution or an unresolved variable glued to a name (`.env$(true)`,
+    `$X.env`) may expand to nothing, so the name without it is checked too.
     """
+    for variant in _expansion_variants(path):
+        hit = protected(variant, repo_root)
+        if hit:
+            return hit
     raw = normalize(path, repo_root)
     candidate = path.strip().strip("\"'").replace("\\", "/")
     if candidate.startswith("file://"):
@@ -382,19 +574,24 @@ def resolve_operands(
     resolved: list[str] = []
     for path in paths:
         quoted_value = path.startswith(QUOTED_VALUE_PREFIX)
-        path = path.removeprefix(QUOTED_VALUE_PREFIX)
-        brace = re.search(r"\{([^{}]+)\}", path)
+        path = strip_quoted_prefix(path)
+        brace = None if quoted_value else _brace_list(path)
         if brace:
-            for option in brace.group(1).split(","):
+            brace_start, brace_end, options = brace
+            for option in options:
                 resolved.extend(
                     resolve_operands(
-                        [path[: brace.start()] + option + path[brace.end() :]],
+                        [path[:brace_start] + option + path[brace_end:]],
                         base_dir,
                         display_root,
                     )
                 )
             continue
-        if "@(" in path or "!(" in path or "+(" in path:
+        if EXTENDED_GLOB.search(path):
+            if not quoted_value:
+                # With `shopt -s extglob` Bash expands it to files the guard
+                # cannot list, a secret file among them: refuse, do not guess.
+                raise UnparseableCommand("an extended glob in a write operand")
             resolved.append(path)
             resolved.extend(protected_path_literals(path))
             continue
@@ -430,7 +627,22 @@ def resolve_from_directories(
 
 def protected_path_literals(value: str) -> list[str]:
     """Extract explicit high-confidence paths from opaque interpreter text."""
-    return [match.rstrip(",;:)") for match in PROTECTED_PATH_LITERAL.findall(value)]
+    literals: list[str] = []
+    # No alternative reaches across whitespace, so the words can be read one by
+    # one with the same result as the whole text. A word is read as it is, without
+    # its substitutions, and without those and its variables too: each may
+    # expand to nothing, and what is left may need the other's neighbours.
+    for word in value.split():
+        no_substitution = SUBSTITUTION_PLACEHOLDER.sub("", word)
+        for text in dict.fromkeys((word, no_substitution, *_expansion_variants(word))):
+            if len(text) <= LONG_WORD:
+                literals.extend(PROTECTED_PATH_LITERAL.findall(text))
+            elif PROTECTED_NAME.search(text):
+                raise UnparseableCommand(
+                    "a word of %d characters is too long to check for a "
+                    "protected name" % len(text)
+                )
+    return [match.rstrip(",;:)") for match in literals]
 
 
 def opaque_write_paths(value: str) -> list[str]:
@@ -467,35 +679,222 @@ def add_patch_paths(value: str, paths: list[str]) -> None:
                 break
 
 
-def protect_quoted_globs(command: str) -> str:
-    """Hide quoted glob characters so only shell-expanded patterns are resolved."""
-    count = 0
+def _charge(work: int) -> None:
+    """Charge `work` units to the budget of the command being read; fail closed
+    once it is spent. Does nothing outside `shell_targets`."""
+    if _work_left is not None:
+        _work_left[0] -= work
+        if _work_left[0] < 0:
+            raise UnparseableCommand("shell command is too complex to read")
 
-    def replace(match: re.Match[str]) -> str:
-        nonlocal count
-        value = match.group(2)
-        if any(character.isspace() or character in ";|&<>" for character in value):
-            return match.group(0)
-        marker = f"__PROTECT_FILES_QUOTED_GLOB_{count}__"
-        count += 1
-        return marker
 
-    command = QUOTED_GLOB.sub(replace, command)
-    command = QUOTED_BRACE.sub(replace, command)
-    command = QUOTED_VARIABLE.sub(
-        lambda match: f"__PROTECT_FILES_QUOTED_VARIABLE_{match.group(2)}__",
-        command,
-    )
-    return QUOTED_VARIABLE_AFFIX.sub(
-        lambda match: (
-            QUOTED_VALUE_PREFIX
-            + match.group(2)
-            + "${"
-            + (match.group(3) or match.group(4))
-            + "}"
-            + match.group(5)
-        ),
-        command,
+def _starts_word(text: str, index: int) -> bool:
+    """True when `text[index]` begins a shell word, where a `#` is a comment.
+
+    A word begins after whitespace, a newline, or an operator character, unless
+    a backslash escapes that character: an odd run of backslashes before it
+    makes a space or operator part of the word and a newline a line
+    continuation, which Bash removes before it reads words.
+    """
+    if index == 0:
+        return True
+    slashes = 0
+    while index - 2 - slashes >= 0 and text[index - 2 - slashes] == "\\":
+        slashes += 1
+    return slashes % 2 == 0 and text[index - 1] in WORD_BREAKS
+
+
+_DOUBLE_QUOTE_SPECIAL = re.compile(r'[\\"$`]')
+_BACKTICK_SPECIAL = re.compile(r"[\\`]")
+_ANSI_C_SPECIAL = re.compile(r"[\\']")
+
+
+def _skip_double_quoted(text: str, cursor: int) -> int:
+    """Return the index just past the `"` that closes the double-quoted string
+    whose body starts at `text[cursor]`, or -1 if the text ends first.
+
+    A backslash escapes the next character. `$( )` and backtick command
+    substitutions are code, so their own quotes nest and the closing quote is
+    the first one outside them. The scan is charged to the command's budget.
+    """
+    start = cursor
+    while True:
+        match = _DOUBLE_QUOTE_SPECIAL.search(text, cursor)
+        if match is None:
+            _charge(len(text) - start)
+            return -1
+        cursor = match.start()
+        char = text[cursor]
+        if char == '"':
+            _charge(cursor - start)
+            return cursor + 1
+        if char == "\\":
+            cursor += 2
+        elif char == "$" and text[cursor + 1 : cursor + 2] == "$":
+            cursor += 2  # the process id: a `(` or `{` after it opens nothing
+        elif char == "$" and text[cursor + 1 : cursor + 2] == "(":
+            # ponytail: a here-document body inside this substitution is not
+            # parsed, so an apostrophe or `)` in it makes the nesting fail and
+            # the scan falls back to the next `"` (what the old lexer did).
+            # Phase I classifies substitutions and can parse the body.
+            end = _matching_paren(text, cursor + 1)
+            cursor = end if end != -1 else cursor + 1
+        elif char == "$" and text[cursor + 1 : cursor + 2] == "{":
+            end = _matching_brace(text, cursor, True)
+            cursor = end if end != -1 else cursor + 1
+        elif char == "`":
+            end = _skip_backticks(text, cursor)
+            cursor = end if end != -1 else cursor + 1
+        else:
+            cursor += 1
+
+
+def _skip_backticks(text: str, index: int) -> int:
+    """Return the index just past the backtick that closes the one at
+    `text[index]`, or -1. A backslash escapes the next character; quotes do not
+    protect a backtick, as in Bash."""
+    end = index + 1
+    while True:
+        found = _BACKTICK_SPECIAL.search(text, end)
+        if found is None:
+            _charge(len(text) - index)
+            return -1
+        if found.group() == "`":
+            _charge(found.end() - index)
+            return found.end()
+        end = found.start() + 2
+
+
+def _matching_brace(
+    text: str, dollar_index: int, in_double_quotes: bool = False
+) -> int:
+    """Return the index just past the `}` that closes the `${` at
+    `text[dollar_index]`, or -1 when it never closes.
+
+    Bash's rules (checked on 5.2): a backslash escapes the next character;
+    `'...'`, `"..."`, `$'...'`, `$"..."`, `$( )`, `$(( ))`, backticks, and a nested
+    `${ }` each hide a `}` or a `)` inside them; a plain `{` does not nest; the
+    first other `}` closes. A `#` inside is text, not a comment.
+
+    Inside double quotes, shells disagree about a single quote in the `${ }`:
+    Bash 5.2 starts a quote at it, but `bash --posix` and dash take it for a
+    plain character, so a `}` or a `;` after it ends the expansion or the
+    command. The client may run either, so `in_double_quotes` fails closed on a
+    `'` or `$'` there.
+    """
+    index = dollar_index + 2
+    length = len(text)
+    while index < length:
+        _charge(1)
+        char = text[index]
+        if char == "}":
+            return index + 1
+        if char == "\\":
+            index += 2
+        elif char == "'":
+            if in_double_quotes:
+                raise UnparseableCommand(QUOTE_IN_QUOTED_EXPANSION)
+            end = text.find("'", index + 1)
+            _charge((length if end == -1 else end) - index)
+            if end == -1:
+                return -1
+            index = end + 1
+        elif char == '"':
+            end = _skip_double_quoted(text, index + 1)
+            if end == -1:
+                return -1
+            index = end
+        elif char == "`":
+            end = _skip_backticks(text, index)
+            if end == -1:
+                return -1
+            index = end
+        elif char == "$":
+            following = text[index + 1 : index + 2]
+            if following == "(":
+                end = _matching_paren(text, index + 1)
+            elif following == "{":
+                end = _matching_brace(text, index, in_double_quotes)
+            elif following == "$":
+                end = index + 2
+            elif following == "'":
+                if in_double_quotes:
+                    raise UnparseableCommand(QUOTE_IN_QUOTED_EXPANSION)
+                end = _skip_literal(text, index)
+            elif following == '"':
+                end = _skip_double_quoted(text, index + 2)
+            else:
+                end = index + 1
+            if end == -1:
+                return -1
+            index = end
+        else:
+            index += 1
+    return -1
+
+
+def _skip_literal(text: str, index: int, comments: bool = True) -> int:
+    """Return the index just past the quoted, escaped, or comment text that
+    starts at `text[index]`, or `index` itself when none starts there. -1 means
+    the text ends first: an unterminated quote, expansion, or a trailing
+    backslash.
+
+    Bash's rules, outside a here-document body: a backslash makes the next
+    character literal; `'...'` is literal; in `$'...'` a backslash escapes the
+    next character, `'` included; `"..."` and `$"..."` are double-quoted
+    strings (see `_skip_double_quoted`); `$$` is the process id, so what follows
+    it is not an expansion; `${ ... }` is one unit up to its own `}` (see
+    `_matching_brace`); a `#` that starts a word begins a comment that runs up
+    to the next newline (`comments=False` inside `${ }`, where it is text).
+    """
+    char = text[index]
+    if char == "\\":
+        return index + 2 if index + 1 < len(text) else -1
+    if char == "'":
+        end = text.find("'", index + 1)
+        _charge((len(text) if end == -1 else end) - index)
+        return -1 if end == -1 else end + 1
+    if char == "#":
+        if not comments or not _starts_word(text, index):
+            return index
+        end = text.find("\n", index)
+        return len(text) if end == -1 else end
+    following = text[index + 1 : index + 2]
+    if char == "$" and following == "$":
+        return index + 2
+    if char == "$" and following == "{":
+        return _matching_brace(text, index)
+    if char == "$" and following == "'":
+        cursor = index + 2
+        while True:
+            match = _ANSI_C_SPECIAL.search(text, cursor)
+            if match is None:
+                _charge(len(text) - index)
+                return -1
+            if match.group() == "'":
+                _charge(match.end() - index)
+                return match.end()
+            cursor = match.start() + 2
+    if char == '"':
+        return _skip_double_quoted(text, index + 1)
+    if char == "$" and following == '"':
+        return _skip_double_quoted(text, index + 2)
+    return index
+
+
+def _unquote(span: str) -> str:
+    """The text a quoted or escaped span (see `_skip_literal`) stands for."""
+    if span[0] == "\\":
+        return span[1:]
+    if span[0] == "'":
+        return span[1:-1]
+    if span.startswith("$'"):
+        return re.sub(r"\\(['\"\\])", r"\1", span[2:-1])
+    body = span[2:-1] if span[0] == "$" else span[1:-1]
+    return re.sub(
+        r"\\([$`\"\\]|\n)",
+        lambda match: "" if match.group(1) == "\n" else match.group(1),
+        body,
     )
 
 
@@ -504,83 +903,138 @@ def _matching_paren(text: str, open_index: int) -> int:
     honoring nested parens and quotes. Returns -1 when never closed."""
     depth = 0
     index = open_index
-    quote: str | None = None
     length = len(text)
     while index < length:
+        _charge(1)
+        end = _skip_literal(text, index)
+        if end == -1:
+            return -1
+        if end > index:
+            index = end
+            continue
         char = text[index]
-        if quote:
-            if char == quote and text[index - 1] != "\\":
-                quote = None
-            index += 1
-            continue
-        if char in ("'", '"'):
-            quote = char
-            index += 1
-            continue
         if char == "(":
             depth += 1
         elif char == ")":
             depth -= 1
             if depth == 0:
                 return index + 1
+        elif char == "`":
+            end = _skip_backticks(text, index)
+            if end == -1:
+                return -1
+            index = end
+            continue
         index += 1
     return -1
 
 
-def extract_process_substitutions(command: str) -> tuple[str, dict[str, str]]:
-    """Replace every <( ) / >( ) construct with an inert placeholder so outer
-    tokenization sees a plain word, returning the substituted text and a
-    placeholder -> inner-command mapping for recursive classification.
+def _refuse_case_statement(inner: str) -> None:
+    """Fail closed when the text of a substitution holds the word `case`.
 
-    The placeholder is padded with a space on both sides regardless of what
-    was originally adjacent. `<` and `>` are shell metacharacters that do
-    not require surrounding whitespace (`cat<(...)` is valid bash - it word-
-    glues, exactly like `$( )`, so the process substitution still forks and
-    executes even though the resulting word is unlikely to be a real
-    command), but `shlex` has no such rule: with no separator it would merge
-    the placeholder into an adjacent word, and the substitution's own
-    placeholder token - the only thing `segment_targets` can look up in
-    `process_subs` - would vanish. The single extra space is always safe:
-    `whitespace_split=True` collapses any run of whitespace, so it can never
-    change how an already-separated case tokenizes.
-
-    A construct inside a quoted string is left untouched (quoting suppresses
-    process substitution in real shells too). An unbalanced construct is
-    genuinely malformed shell syntax, not merely unmodeled, so it fails
-    closed rather than being silently dropped.
+    A case pattern ends with an unmatched `)` (`case a in a) tee f;; esac`), so
+    `_matching_paren` closes the substitution there, and the rest of the
+    statement would be read as arguments of the outer command. Following
+    `case ... esac` the way Bash does would take a second parser that must agree
+    with Bash; refusing is smaller and cannot be wrong in the open direction.
+    The price is an over-block for a harmless `case` word (`$(grep case f)`).
+    Quoted text, escapes, and comments are not searched. The text may be the part
+    up to that first `)`, which still holds the `case` word.
     """
-    pieces: list[str] = []
+    text = inner.replace("\\\n", "")
+    _charge(len(text))
+    parts: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        end = _skip_literal(text, index)
+        if end == index:
+            parts.append(text[index])
+            index += 1
+            continue
+        if end == -1:
+            break
+        if text[index] != "#":  # a comment is dropped; a quoted word is one word
+            parts.append("x")
+        index = end
+    if CASE_WORD.search("".join(parts)):
+        raise UnparseableCommand("a case statement inside a substitution")
+
+
+def extract_substitutions(command: str) -> tuple[str, dict[str, str]]:
+    """Replace every unquoted `$( )`, `$(( ))`, `<( )`, and `>( )` with an inert
+    placeholder, returning the new text and a placeholder -> inner-command
+    mapping for recursive classification.
+
+    A `$( )` or `$(( ))` stays inside its word, as in Bash: `$(pwd)/x` becomes
+    `<placeholder>/x`, and a word after the closing `)` is an operand, not a
+    new command. A `<( )` or `>( )` is a word of its own (`cat<(...)` is valid:
+    `<` ends the word before it), so it gets a space before it; text glued after
+    its `)` stays in the word, as in Bash. The scanner reads the placeholder as
+    ordinary word text, and `segment_targets` finds each placeholder inside a
+    word to classify its inner command.
+
+    `$(( ))` is arithmetic: there is no command to classify, only the `$( )`
+    that its expression may hold. Text inside quotes, behind a backslash, or in
+    a comment is left untouched (quoting suppresses substitution in real shells
+    too). An unbalanced construct is genuinely malformed shell syntax, not
+    merely unmodeled, so it fails closed rather than being silently dropped.
+    """
     inner_by_placeholder: dict[str, str] = {}
+    return _extract(command, inner_by_placeholder), inner_by_placeholder
+
+
+def _extract(
+    command: str, inner_by_placeholder: dict[str, str], in_expansion: bool = False
+) -> str:
+    """The text of `extract_substitutions` for `command`, adding each inner
+    command to `inner_by_placeholder`. A `${ }` is walked into, not skipped: its
+    default word is expanded and may hold a substitution, and a `#` in it is
+    text (`in_expansion`)."""
+    pieces: list[str] = []
     index = 0
     length = len(command)
-    quote: str | None = None
-    count = 0
     while index < length:
-        char = command[index]
-        if quote:
-            pieces.append(char)
-            if char == quote and command[index - 1] != "\\":
-                quote = None
-            index += 1
-            continue
-        if char in ("'", '"'):
-            quote = char
-            pieces.append(char)
-            index += 1
-            continue
-        if char in ("<", ">") and command[index + 1 : index + 2] == "(":
-            end = _matching_paren(command, index + 1)
+        if command.startswith("${", index):
+            end = _matching_brace(command, index)
             if end == -1:
-                raise UnparseableCommand("unbalanced process substitution")
-            placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, count)
-            count += 1
-            inner_by_placeholder[placeholder] = command[index + 2 : end - 1]
-            pieces.append(" " + placeholder + " ")
+                raise UnparseableCommand("unbalanced parameter expansion")
+            pieces.append("${")
+            pieces.append(
+                _extract(command[index + 2 : end - 1], inner_by_placeholder, True)
+            )
+            pieces.append("}")
             index = end
             continue
-        pieces.append(char)
-        index += 1
-    return "".join(pieces), inner_by_placeholder
+        end = _skip_literal(command, index, comments=not in_expansion)
+        if end != index:
+            # Quoted or escaped text or a comment; text that never ends is left
+            # for `split_segments`, which fails closed on it.
+            end = length if end == -1 else end
+            pieces.append(command[index:end])
+            index = end
+            continue
+        opener = command[index : index + 2]
+        if opener not in ("<(", ">(", "$("):
+            pieces.append(command[index])
+            index += 1
+            continue
+        end = _matching_paren(command, index + 1)
+        if end == -1:
+            raise UnparseableCommand("unbalanced substitution")
+        inner = command[index + 2 : end - 1]
+        _refuse_case_statement(inner)
+        if (
+            opener == "$("
+            and inner.startswith("(")
+            and _matching_paren(command, index + 2) == end - 1
+        ):
+            inner = "\n".join(extract_substitutions(inner[1:-1])[1].values())
+        placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, len(inner_by_placeholder))
+        inner_by_placeholder[placeholder] = inner
+        pieces.append(placeholder if opener == "$(" else " " + placeholder)
+        index = end
+    return "".join(pieces)
 
 
 def _find_unquoted_heredoc(text: str) -> int | None:
@@ -594,21 +1048,16 @@ def _find_unquoted_heredoc(text: str) -> int | None:
     is arithmetic, not a heredoc redirect, even though a *single*-paren
     construct like `$( )` or `( )` can legitimately contain a real heredoc.
     """
-    quote: str | None = None
+    _charge(len(text))
     index = 0
     length = len(text)
     arithmetic_depth = 0
     while index < length:
+        end = _skip_literal(text, index)
+        if end != index:
+            index = length if end == -1 else end
+            continue
         char = text[index]
-        if quote:
-            if char == quote and text[index - 1] != "\\":
-                quote = None
-            index += 1
-            continue
-        if char in ("'", '"'):
-            quote = char
-            index += 1
-            continue
         if char == "(" and text[index + 1 : index + 2] == "(":
             arithmetic_depth += 1
             index += 2
@@ -655,13 +1104,13 @@ def extract_heredocs(
     The placeholder is padded with a space on both sides regardless of what
     was originally adjacent. `<<` is a shell metacharacter that terminates
     the preceding word even with no space (`bash<<'EOF'` is valid bash,
-    equivalent to `bash <<'EOF'`), but `shlex` has no such rule: with no
-    separator it would merge the placeholder into an adjacent word, and
-    neither `command_name` nor the redirect-target/operand lookups that key
-    off an exact placeholder token would ever see it as its own token again.
-    The single extra space is always safe: `whitespace_split=True` collapses
-    any run of whitespace, so it can never change how an already-separated
-    case tokenizes.
+    equivalent to `bash <<'EOF'`), but the word scanner splits only on
+    whitespace and operator characters: with no separator it would merge the
+    placeholder into an adjacent word, and neither `command_name` nor the
+    redirect-target/operand lookups that key off an exact placeholder token
+    would ever see it as its own token again. The single extra space is
+    always safe: the scanner collapses any run of whitespace, so it can never
+    change how an already-separated case tokenizes.
 
     A missing delimiter word or a body that never reaches its terminator
     line is genuinely malformed shell syntax and fails closed rather than
@@ -745,6 +1194,7 @@ def heredoc_command_substitutions(body: str) -> list[str]:
             end = _matching_paren(body, index + 1)
             if end == -1:
                 raise UnparseableCommand("unbalanced command substitution")
+            _refuse_case_statement(body[index + 2 : end - 1])
             inner_commands.append(body[index + 2 : end - 1])
             index = end
             continue
@@ -759,27 +1209,177 @@ def heredoc_command_substitutions(body: str) -> list[str]:
     return inner_commands
 
 
-def split_segments(command: str) -> list[list[str]]:
-    command = command.replace("\\\n", "")
-    command = protect_quoted_globs(command)
-    try:
-        lexer = shlex.shlex(
-            command.replace("\n", ";"), posix=True, punctuation_chars=";&|<>()"
-        )
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except ValueError as error:
-        raise UnparseableCommand("shell command could not be parsed") from error
-    if not tokens:
-        return []
-    segments: list[list[str]] = [[]]
-    for token in tokens:
-        if token in OPERATORS:
-            if not segments[-1]:
-                raise AmbiguousCommand("empty shell command segment")
-            segments.append([])
+def _read_group_word(
+    command: str, index: int, parts: list[str], before: str
+) -> int | None:
+    """If the `(` at `command[index]` continues the word as an array assignment
+    (`a=(x y)`) or an extended glob (`@(a|b)`), add its text to `parts` and
+    return the index after its `)`; None when it does not, so the word ends.
+
+    Bash keeps a `#` glued after an array's `)` in the word (`a=(x)#c`), but the
+    other scans in this file take a `#` after any `)` for a comment, so that form
+    fails closed instead of being read two ways.
+    """
+    if before == "=" and ARRAY_ASSIGNMENT.fullmatch("".join(parts)):
+        kind = "array assignment"
+    elif before and (before in "@*+?" or (before == "!" and parts != ["!"])):
+        kind = "extended glob"
+    else:
+        return None
+    end = _matching_paren(command, index)
+    if end == -1:
+        raise UnparseableCommand("unbalanced " + kind)
+    if kind == "array assignment" and command[end : end + 1] == "#":
+        raise UnparseableCommand("a # right after an array assignment")
+    parts.append(command[index:end])
+    return end
+
+
+def _quoted_part(span: str, before: str) -> tuple[str, bool, bool]:
+    """(value, magic, glob) of a quoted or escaped span of a word: its text with
+    the quotes removed, whether it holds quoted magic that must not be expanded
+    again (`QUOTED_MAGIC`), and whether that magic includes a glob character.
+    A part glued to a name or to `=` (`NAME='*'`, `--opt="$X"`) is not magic."""
+    value = _unquote(span)
+    # An escaped character (`"\\$a"`) is literal, so it is not magic.
+    literal = value if span[0] == "'" else re.sub(r"\\.", "", span, flags=re.S)
+    if (
+        span[0] != "\\"
+        and QUOTED_MAGIC.search(literal)
+        and not (before.isalnum() or before in ("_", "="))
+    ):
+        return value, True, bool(QUOTED_GLOB.search(literal))
+    return value, False, False
+
+
+def _mark_quoted_word(text: str, parts: list[str], glob: bool) -> str:
+    """`text` of a word with quoted magic, marked with `QUOTED_PATTERN_PREFIX`
+    when the word is only one quoted glob (a brace list does not count) and with
+    `QUOTED_VALUE_PREFIX` otherwise."""
+    pattern = glob and len(parts) == 1 and not PATTERN_UNSAFE.search(text)
+    return (QUOTED_PATTERN_PREFIX if pattern else QUOTED_VALUE_PREFIX) + text
+
+
+def _read_word(command: str, index: int) -> tuple[str, bool, int]:
+    """Read the word that starts at `command[index]`, which is not whitespace,
+    a newline, or an operator character. Returns (text, quoted, end): the word
+    with its quotes and escapes removed, whether it used any, and the index
+    after it. A backslash-newline joins the lines and is not part of a word.
+
+    A quoted part that holds magic (see `_quoted_part`) gives the word a prefix
+    (see `_mark_quoted_word`). A `(` right after `NAME=` or `NAME+=` opens an
+    array assignment: the list and what is glued after its `)` stay in the word
+    (`a=(x)b`). A `(` glued right after `@`, `*`, `+`, `?`, or a `!` that follows
+    other text opens an extended glob (`@(a|b)`), which is one word too; without
+    `shopt -s extglob` it is a syntax error in Bash, so it is never a group. A
+    `!(` at the start of a word may be a negated group and stays one. A `${ }`
+    and the process id `$$` are kept in the word as they are.
+    """
+    parts: list[str] = []
+    quoted = False
+    magic = False
+    glob = False  # a magic part holds a glob character
+    before = ""  # the last character of the word so far
+    length = len(command)
+    while index < length:
+        if command[index] in WORD_BREAKS:
+            end = None
+            if command[index] == "(":
+                end = _read_group_word(command, index, parts, before)
+            if end is None:
+                break
+            before = ")"
+            index = end
+            continue
+        end = _skip_literal(command, index)
+        if end == -1:
+            raise UnparseableCommand("shell command could not be parsed")
+        if end == index:
+            before = command[index]
+            parts.append(before)
+            index += 1
+            continue
+        span = command[index:end]
+        if span.startswith("${") or span == "$$":
+            parts.append(span)
+            before = "}" if span[1] == "{" else "$"
+        elif span != "\\\n":
+            value, part_magic, part_glob = _quoted_part(span, before)
+            magic = magic or part_magic
+            glob = glob or part_glob
+            parts.append(value)
+            before = value[-1:] or before
+            quoted = True
+        index = end
+    text = "".join(parts)
+    return (_mark_quoted_word(text, parts, glob) if magic else text), quoted, index
+
+
+def _shell_tokens(command: str) -> list[tuple[str, bool]]:
+    """Read one shell command line the way Bash does, outside here-document
+    bodies, as (text, is_operator) pairs: words with their quotes and escapes
+    removed, comments dropped, and an unquoted newline as the operator "\\n".
+
+    A run of unquoted `;&|<>()` characters is split into Bash's operators by
+    longest match (`SHELL_OPERATORS`). Only the segment operators are returned
+    as operators; the others, such as `>>` and `|&`, come back as words. A word
+    that was quoted or escaped and reads as an operator or a redirect is
+    returned with `QUOTED_VALUE_PREFIX`, so later stages never take it for one.
+    """
+    tokens: list[tuple[str, bool]] = []
+    index = 0
+    length = len(command)
+    while index < length:
+        char = command[index]
+        if char in " \t":
+            index += 1
+        elif char == "\n":
+            tokens.append(("\n", True))
+            index += 1
+        elif char in PUNCTUATION:
+            operator = next(
+                op for op in SHELL_OPERATORS if command.startswith(op, index)
+            )
+            tokens.append((operator, operator in OPERATORS))
+            index += len(operator)
+        elif char == "#" and _starts_word(command, index):
+            index = _skip_literal(command, index)  # a comment: up to the newline
         else:
-            segments[-1].append(token)
+            text, quoted, index = _read_word(command, index)
+            if text or quoted:
+                if quoted and (text in OPERATORS or is_redirect(text)):
+                    text = QUOTED_VALUE_PREFIX + text
+                tokens.append((text, False))
+    return tokens
+
+
+def split_segments(command: str) -> list[list[str]]:
+    """Split one command line into segments of words at its operators and
+    newlines. A blank line and a newline after an operator add no segment. A
+    group may open at any command and close after a newline, `;`, `&`, or `(`;
+    an operator may follow a `)`. Any other empty segment fails closed."""
+    segments: list[list[str]] = [[]]
+    last = ""  # the operator the next command follows; "\n" after a newline
+    for text, is_operator in _shell_tokens(command):
+        if not is_operator:
+            segments[-1].append(text)
+            last = ""
+        elif text == "\n":
+            if segments[-1]:
+                segments.append([])
+            if last not in BINARY_OPERATORS and last != "(":
+                last = "\n"
+        elif segments[-1]:
+            segments.append([])
+            last = text
+        elif (
+            text == "("
+            or last == ")"
+            or (text == ")" and last in (";", "&", "(", "\n"))
+        ):
+            last = text
+        else:
+            raise AmbiguousCommand("empty shell command segment")
     if not segments[-1]:
         # A trailing separator ("rg foo .;") is valid Bash, not an error.
         segments.pop()
@@ -807,10 +1407,6 @@ def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
     """Replace whole-token `$NAME`/`${NAME}` references with tracked values."""
     resolved = []
     for token in tokens:
-        quoted = QUOTED_VARIABLE_MARKER.fullmatch(token)
-        if quoted and quoted.group(1) in variables:
-            resolved.append(QUOTED_VALUE_PREFIX + variables[quoted.group(1)])
-            continue
         replaced = VARIABLE_REFERENCE.sub(
             lambda match: variables.get(match.group(1), match.group(0)), token
         )
@@ -1172,6 +1768,32 @@ def heredoc_targets(
     uncertain.extend(opaque_write_paths(body))
 
 
+def classify_substitutions(
+    token: str,
+    process_subs: dict[str, str],
+    repo_root: str,
+    variables: dict[str, str],
+    working_directories: list[str],
+    confirmed: list[str],
+    uncertain: list[str],
+    heredocs: dict[str, tuple[str, bool]],
+) -> None:
+    """Classify the inner command of every substitution placeholder in `token`.
+    A placeholder may sit anywhere in a word (`$(pwd)/x`)."""
+    for placeholder in SUBSTITUTION_PLACEHOLDER.findall(token):
+        inner = process_subs.get(placeholder)
+        if inner is not None:
+            classify_command(
+                inner,
+                repo_root,
+                dict(variables),
+                list(working_directories),
+                confirmed,
+                uncertain,
+                heredocs,
+            )
+
+
 def segment_targets(
     tokens: list[str],
     variables: dict[str, str],
@@ -1216,21 +1838,21 @@ def segment_targets(
             )
         index += 1
 
-    # A process substitution always runs, regardless of which command (or
-    # none) receives its /dev/fd path, so it is recursively classified
-    # unconditionally - never merely because the outer command looks unsafe.
+    # A command or process substitution always runs, regardless of which
+    # command (or none) receives its output or /dev/fd path, so it is
+    # recursively classified unconditionally - never merely because the outer
+    # command looks unsafe.
     for token in tokens:
-        inner = process_subs.get(token)
-        if inner is not None:
-            classify_command(
-                inner,
-                repo_root,
-                dict(variables),
-                list(working_directories),
-                confirmed,
-                uncertain,
-                heredocs,
-            )
+        classify_substitutions(
+            token,
+            process_subs,
+            repo_root,
+            variables,
+            working_directories,
+            confirmed,
+            uncertain,
+            heredocs,
+        )
 
     if command_info is None:
         return
@@ -1409,10 +2031,22 @@ def segment_targets(
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
-        # Explicit paths remain covered by native edits and known mutators.
-        uncertain.extend(token for token in plain_args if protected(token, repo_root))
-        uncertain.extend(protected_path_literals(" ".join(plain_args)))
-        uncertain.extend(opaque_write_paths(" ".join(plain_args)))
+        # Explicit paths remain covered by native edits and known mutators. A
+        # word that is one quoted glob is a pattern for the command to match
+        # (`find . -name '*.pem'`), not a file it writes, so it is not scanned,
+        # unless the command runs its arguments (see `RUNNERS`).
+        runs_arguments = (
+            posixpath.basename(command) in RUNNERS
+            or RUNNER_PATTERN.fullmatch(posixpath.basename(command)) is not None
+        )
+        scanned = [
+            token
+            for token in plain_args
+            if runs_arguments or not token.startswith(QUOTED_PATTERN_PREFIX)
+        ]
+        uncertain.extend(token for token in scanned if protected(token, repo_root))
+        uncertain.extend(protected_path_literals(" ".join(scanned)))
+        uncertain.extend(opaque_write_paths(" ".join(scanned)))
 
 
 def classify_command(
@@ -1427,13 +2061,13 @@ def classify_command(
     """Classify one shell command line, appending its mutation targets into
     `confirmed`/`uncertain`. The sole recursion point for process
     substitutions and bare shell heredocs, so nesting composes: each level
-    extracts its own heredocs and process substitutions before tokenizing.
+    extracts its own heredocs and substitutions before tokenizing.
 
     `heredocs` is one mapping shared (by reference, never copied) across the
     whole recursive call tree for a single top-level command, with new
     placeholders numbered above whatever it already holds. A heredoc found
     while scanning an outer level can end up embedded, as an inert
-    placeholder, inside a process substitution or a bare shell heredoc body
+    placeholder, inside a substitution or a bare shell heredoc body
     that only a *recursive* call ever tokenizes; without a shared mapping
     that recursive call could never resolve it back to its real body, and
     the mutation inside would go unclassified.
@@ -1447,9 +2081,10 @@ def classify_command(
     caught here: it propagates to the top-level fail-closed exit even when
     raised deep inside a recursive call.
     """
+    _charge(len(command))
     command, found_heredocs = extract_heredocs(command, start_count=len(heredocs))
     heredocs.update(found_heredocs)
-    command, process_subs = extract_process_substitutions(command)
+    command, process_subs = extract_substitutions(command)
     for segment in split_segments(command):
         try:
             segment_targets(
@@ -1479,17 +2114,16 @@ def classify_command(
             # same conservative floor an unmodeled command's own arguments
             # already get.
             for token in resolved:
-                inner = process_subs.get(token)
-                if inner is not None:
-                    classify_command(
-                        inner,
-                        repo_root,
-                        dict(variables),
-                        list(working_directories),
-                        confirmed,
-                        uncertain,
-                        heredocs,
-                    )
+                classify_substitutions(
+                    token,
+                    process_subs,
+                    repo_root,
+                    variables,
+                    working_directories,
+                    confirmed,
+                    uncertain,
+                    heredocs,
+                )
                 entry = heredocs.get(token)
                 if entry is not None:
                     body, _quoted = entry
@@ -1499,9 +2133,16 @@ def classify_command(
 
 def shell_targets(command: str, repo_root: str) -> tuple[list[str], list[str]]:
     """Return (confirmed_targets, uncertain_targets) for a whole command line."""
+    global _work_left
     confirmed: list[str] = []
     uncertain: list[str] = []
-    classify_command(command, repo_root, {}, [repo_root], confirmed, uncertain, {})
+    _work_left = [WORK_PER_CHARACTER * len(command) + MINIMUM_WORK]
+    try:
+        classify_command(command, repo_root, {}, [repo_root], confirmed, uncertain, {})
+    except RecursionError as error:
+        raise UnparseableCommand("shell command is nested too deeply") from error
+    finally:
+        _work_left = None
     return confirmed, uncertain
 
 
@@ -1607,6 +2248,16 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # A backstop for any input that is slow to classify: the default action of
+    # SIGALRM ends the process, and the hook script treats a failed exit as a
+    # denial, so a timeout of the hook (which lets a command through) never
+    # decides. A signal handler cannot do this: on Python 3.9 a regex match
+    # cannot be interrupted. Real commands classify in well under a second. A
+    # parent may have started this process with SIGALRM ignored, and an ignored
+    # signal stays ignored across `exec`, so the default action is put back.
+    if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)
+        signal.alarm(CLASSIFIER_SECONDS)
     try:
         raise SystemExit(main())
     except (AmbiguousCommand, ValueError, json.JSONDecodeError) as error:

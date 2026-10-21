@@ -258,7 +258,61 @@ in-place targets, and ambiguous shell syntax must fail closed. The classifier
 must preserve the proven read-only path while checking both source and
 destination operands of copy/install/move operations, so a protected source
 cannot be exfiltrated through a write-bearing command. Resolve supported
-wildcards, `cd`, Git `-C`, and symlink targets without executing a shell. For
+wildcards, `cd`, Git `-C`, and symlink targets without executing a shell.
+The classifier reads shell text with one scanner that follows Bash's rules for
+quotes, escapes, comments, and line breaks. It no longer uses `shlex`.
+A backslash outside quotes makes the next character literal.
+`'...'` is literal. `$'...'` allows backslash escapes. `$"..."` is read like `"..."`.
+Inside `"..."`, a backslash escapes only `$`, a backtick, `"`, `\`, and a newline.
+Unquoted `$( )` and `$(( ))` stay part of their word, and the command inside `$( )` is checked on its own.
+A substitution glued to a file name counts as empty, so `tee .env$(true)` is a write of `.env`.
+An unset variable glued to a file name counts as empty, so `tee .env$X` and `tee "$X".env` are writes of `.env`.
+A `#` starts a comment at the start of a word outside quotes.
+A carriage return is an ordinary character, as in Bash.
+An unquoted newline separates commands.
+Blank lines, and a newline after `;`, `&&`, `||`, `|`, or `&`, add no empty segment.
+A leading `(` opens a group, an operator may follow `)`, and a `)` may close a group on its own line.
+A run of operator characters is split by longest match, so `cat x;(tee .env)` is denied.
+A quoted or escaped operator is part of a word and is marked so later stages do not read it as an operator or redirect.
+So `grep '>' .env` is a read and `tee '|' cat .env` writes `.env`.
+Quoted glob, brace, or variable text is kept as written.
+A word that is exactly one quoted glob (it holds `*`, `?`, or `[`) is a pattern, so `find . -name '*.pem'` and `ls '*.key'` are allowed.
+Brace lists such as `'{a,b}.pem'` are not patterns.
+In a command that changes files, `rm 'credentials*'` still treats it as a file name.
+No pattern exemption applies when the command, after `sudo`, `env`, or `command`, is a shell, interpreter, or runner such as `bash -c`, `eval`, `xargs`, `python3 -c`, `timeout`, or `nohup`.
+An unquoted word `case` followed by a blank, inside an unquoted `$( )`, `<( )`, or `>( )`, fails closed, because the guard does not follow `case` patterns there.
+Quoting the word avoids this.
+Outside double quotes, a `${ ... }` expansion is read as one unit, the way Bash does: its own quotes, `)`, `#`, and nested `$( )` or `${ }` stay inside it.
+Inside double quotes, a single quote or `$'` inside a `${ }` fails closed, because Bash and POSIX shells (`sh`, `bash --posix`) read it differently.
+The rules follow Bash 5.2. For the forms its tests check, where Bash and POSIX `sh` read the same text differently, the guard either denies or fails closed.
+Commands run by zsh are not modelled.
+A default word (`${x:-word}`) is checked like the word itself, so `tee ${x:-.env}` is a write of `.env`.
+A `${ }` that never closes fails closed.
+An extended glob (`@( )`, `*( )`, `+( )`, `?( )`, or `!( )` glued to text) is one word, and an extended glob in a write operand fails closed.
+An array assignment `NAME=(...)` is read as one word, and a `#` right after its `)` fails closed.
+All four clients share this classifier.
+These cases fail closed: a truly empty segment (`| head`, `a && && b`), an unterminated quote, and a command nested too deeply.
+Each command gets one work budget, and a command too complex to read fails closed ("shell command is too complex to read").
+A word longer than 512 characters that holds a protected name also fails closed ("a word of N characters is too long to check for a protected name").
+The classifier stops itself after 4 seconds with a process alarm, and the hook treats that as a denial, so the hook's own 10-second timeout, which would let the command through, never decides.
+Ordinary commands are very unlikely to be affected by these limits.
+The guard blocks a few harmless commands on purpose: `rm 'credentials*'`, `git add '*.pem'`, `echo $X.env`, `find . -name '{a,b}.pem'`, `bash -c '*.pem'`, and `timeout 5 find . -name '*.pem'` are denied.
+`echo ${x:- ; tee .env }` and `echo ${X:-.env}` are denied.
+`echo $(case a in a) echo hi;; esac)`, `echo $(grep -c case README.md)`, `echo ${x:-"a}"`, `rm @(a|b)`, `echo "${x%'}'}"`, and `x="${y:-'a'}"` fail closed.
+A word over 512 characters that contains a protected name also fails closed.
+The guard does not yet check these forms, so a write through them is allowed:
+zsh-only syntax, such as glob qualifiers that run code (`*(e:'...':)`, `*(+func)`) and `=(...)`;
+backtick bodies (including inside `${ }` or `$( )`);
+`$( )` inside double quotes;
+grouped operators `|&`, `&>>`, `>&`, and `<>`;
+`shopt -s dotglob` and a glob glued to a variable (`"$X".e*`);
+names built by a command (`$(echo .e)nv`), ANSI-C escapes in a name (`$'\x2eenv'`), and expansion operators whose result depends on the variable (`${!x}`, `${x/#/.env}`);
+array elements (`${a[0]}`);
+`find -delete` and `find -exec rm {} +`;
+shell functions or aliases defined elsewhere;
+`$IFS` word splitting;
+and heredoc delimiters that are read short.
+For
 opaque command or interpreter syntax, verify conservative high-confidence path
 coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
 paths, agent definition paths, `*.code-workspace` files, and protected hook
