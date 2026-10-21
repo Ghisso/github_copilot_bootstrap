@@ -13,9 +13,10 @@ phases:
   - 2026-10-20_phase-E-ponytail-5-adoption
   - 2026-10-20_phase-F-openwiki-0.7-upgrade
   - 2026-10-20_phase-G-backlog-followups-knowledge-refresh
-  - 2026-10-21_phase-H-guard-quoting-and-restore-messages
-  - 2026-10-21_phase-I-guard-quoting-knowledge-refresh
-current_phase: 2026-10-21_phase-H-guard-quoting-and-restore-messages
+  - 2026-10-21_phase-H-guard-shell-scanner
+  - 2026-10-21_phase-I-guard-substitutions-and-restore-messages
+  - 2026-10-21_phase-J-guard-hardening-knowledge-refresh
+current_phase: 2026-10-21_phase-H-guard-shell-scanner
 ---
 
 # Big Plan: Backlog Follow-ups
@@ -56,13 +57,18 @@ An independent devil's-advocate review checked the assembled plan against
 the code on 2026-10-20; its changes are folded in (see "Devil's advocate").
 
 **Reopened 2026-10-21** after Phase G, at the user's request. A denied
-read-only command led to a parsing defect in the file-protection guard: a
-quoted or escaped shell operator splits one command into two, which lets
-some writes to protected files through and denies some harmless commands.
-The defect predates this plan (`240fe2d`). Phase H fixes it and the
-OpenWiki restore messages (both follow-ups of the Phase G closeout log);
-Phase I is the new final knowledge refresh, with the wiki style follow-up.
-Evidence: `.claude/quality_reports/2026-10-21_backlog-followups-reopen-findings.md`.
+read-only command led to a parsing defect in the file-protection guard. It
+reads shell text with Python's `shlex` after turning newlines into `;`, so
+comments, blank lines, and quoted or escaped operators hide or split
+commands. That lets writes to protected files through on every client
+(rated CRITICAL: an ordinary `#` comment line is enough) and denies some
+harmless commands. A devil's-advocate review of the first draft found
+more write paths the guard misses. The defect predates this plan
+(`240fe2d`). Phase H replaces `shlex` with a Bash scanner; Phase I closes
+the remaining write paths and fixes the OpenWiki restore messages (a
+Phase G follow-up); Phase J is the new final knowledge refresh, with the
+wiki style follow-up. Evidence:
+`.claude/quality_reports/2026-10-21_backlog-followups-reopen-findings.md`.
 
 ## Goals
 
@@ -80,10 +86,10 @@ Evidence: `.claude/quality_reports/2026-10-21_backlog-followups-reopen-findings.
   either way (Phase F).
 - Finish with the required stale-claims audit and OpenWiki refresh
   (Phase G).
-- After the reopen: parse quoted and escaped shell operators as words in
-  the file-protection guard, and make the OpenWiki restore messages tell
-  an agent to ask the user (Phase H); refresh the wiki again and shorten
-  its long sentences (Phase I).
+- After the reopen: make the file-protection guard read shell text as Bash
+  does (Phase H); close the remaining write paths it misses and make the
+  OpenWiki restore messages say the user runs them (Phase I); refresh the
+  wiki again and shorten its long sentences (Phase J).
 
 Work and verify clients in this order: Claude Code, Codex, GitHub Copilot,
 Antigravity. Record each remaining gap with its evidence instead of
@@ -129,8 +135,9 @@ claiming parity.
 | E. Ponytail 5 | Evaluation-gated; may cancel. Edits `shared/agents/` (source), which D leaves editable |
 | F. OpenWiki 0.7 | Spike-gated; may stop at `0.5.2` or cancel. Runs last before G, so G's refresh uses the new version |
 | G. Knowledge refresh | Required final phase (Knowledge-Refresh Final Phase rule) |
-| H. Guard quoting and restore messages | Added at the 2026-10-21 reopen. Security fix first, so Phase I documents the shipped behavior |
-| I. Knowledge refresh | New required final phase after the reopen |
+| H. Guard shell scanner | Added at the 2026-10-21 reopen. Closes the CRITICAL comment and blank-line holes first; Phase I builds on its scanner |
+| I. Guard substitutions and restore messages | Remaining write paths, which need H's scanner, plus the restore-message follow-up |
+| J. Knowledge refresh | New required final phase after the reopen |
 
 ### Gates that can stop or cancel a phase
 
@@ -230,12 +237,17 @@ full acceptance text; this map is the index.
 | BF-F7 | This checkout runs `0.7.2` (user-run install), both installed skill receipts read `0.7.2`, root MCP adapters unchanged, rollback recorded | same, used by Phase G | session log; smoke test |
 | BF-G1 | Final stale-claims audit across all live-advice surfaces and the working `MEMORY.md` (the archive stays a dated record); the carried follow-ups stay listed; OpenWiki refresh including the hand-offs from A, D, E, and the two `gate-repair` leftovers | `2026-10-20_phase-G-backlog-followups-knowledge-refresh` | `## Stale-claims surfaces checked`; OpenWiki completion; `test ! -e openwiki/.run.json` |
 | BF-G2 | Boundaries held: no model call in tests, hooks, or `verify.py`; no network download in required checks; Context Mode still `1.0.169`; dated records unchanged except the status changes Phases A and C name | all phases | review and existing tests |
-| BF-H1 | A quoted or escaped operator character, or a quoted line break, is a word to the guard, as in Bash: it never splits a command or acts as a redirect; real operators still split; a truly empty segment still fails closed | `2026-10-21_phase-H-guard-quoting-and-restore-messages` | new hook and scoping tests, each failing on the old guard first |
-| BF-H2 | No guard decision loosens outside the intended classes | same | differential check, old guard against new, recorded in the closeout log |
-| BF-H3 | Every message that names `openwiki-guard.sh post` says the user runs it | same | new `tests/test_verify.py` and `tests/test_openwiki_guard.py` assertions |
-| BF-H4 | Docs and one parity row describe the change | same | `documentation` review |
-| BF-I1 | Stale-claims audit of Phase H's changes; one managed OpenWiki refresh; the `MEMORY.md` defect entry says fixed | `2026-10-21_phase-I-guard-quoting-knowledge-refresh` | `## Stale-claims surfaces checked`; OpenWiki completion; `test ! -e openwiki/.run.json` |
-| BF-I2 | Long sentences split in the pages the refresh rewrites, including the two named bullets | same | reviewer read of the page diff |
+| BF-H1 | The guard splits and tokenizes shell text as Bash does (quotes, escapes, comments, newlines, the heredoc and process-substitution scanners); every required deny and allow case holds | `2026-10-21_phase-H-guard-shell-scanner` | new hook and scoping tests, each failing on the old guard first; Bash stand-in readings |
+| BF-H2 | No guard decision loosens outside the intended classes | same | differential check with a substitution set, looser changes listed one by one |
+| BF-H3 | Docs, one parity row, and a recorded follow-up for Bash reads of secret files | same | `documentation` review |
+| BF-I1 | Command substitution inside double quotes and backticks is classified | `2026-10-21_phase-I-guard-substitutions-and-restore-messages` | new hook tests |
+| BF-I2 | `\|&` is a pipe; `&>>`, `<>`, and `>&` with a word are write redirects | same | new hook tests |
+| BF-I3 | Inline `sed` write scripts give a write target | same | new hook tests |
+| BF-I4 | Unmodelled commands after `cd` resolve against the `cd` folder | same | new hook tests |
+| BF-I5 | Every message that names `openwiki-guard.sh post` says the user runs it in their own shell | same | new `tests/test_verify.py` and `tests/test_openwiki_guard.py` assertions |
+| BF-I6 | No decision loosens; docs and parity rows describe the change | same | differential check; `documentation` review |
+| BF-J1 | Stale-claims audit of Phases H and I; one managed OpenWiki refresh | `2026-10-21_phase-J-guard-hardening-knowledge-refresh` | `## Stale-claims surfaces checked`; OpenWiki completion; `test ! -e openwiki/.run.json` |
+| BF-J2 | Long sentences split in the pages the refresh rewrites, including the named bullets | same | reviewer read of the page diff |
 
 ## Phases
 
@@ -246,8 +258,9 @@ full acceptance text; this map is the index.
 - [x] `2026-10-20_phase-E-ponytail-5-adoption` — complete: partial adopt of Ponytail `v5.3.2` (callers, tests, fixtures, and config outside the diff for the coder and the review); `ponytail-review` stays complexity-only. See `.claude/session_logs/2026-10-21_backlog-followups-phase-e.md`.
 - [x] `2026-10-20_phase-F-openwiki-0.7-upgrade` — complete: OpenWiki pinned to `0.7.2` after an isolated spike; the guard allows only `mode: "update"`; real-binary round-trip test; upgrade procedure documented. See `.claude/session_logs/2026-10-21_backlog-followups-phase-f.md`.
 - [x] `2026-10-20_phase-G-backlog-followups-knowledge-refresh` — complete: final stale-claims audit fixed live advice in docs, policies, skills, project context, and `MEMORY.md`; OpenWiki refreshed on `0.7.2` (8 pages) and a link-only run made 63 wiki links relative. See `.claude/session_logs/2026-10-21_backlog-followups-phase-g.md`.
-- [ ] `2026-10-21_phase-H-guard-quoting-and-restore-messages` — quoted and escaped shell operators are words to the file-protection guard; OpenWiki restore messages say the user runs them
-- [ ] `2026-10-21_phase-I-guard-quoting-knowledge-refresh` — final stale-claims audit and OpenWiki refresh after the reopen, with the long-sentence style pass
+- [ ] `2026-10-21_phase-H-guard-shell-scanner` — the file-protection guard reads shell text as Bash does (replaces `shlex`)
+- [ ] `2026-10-21_phase-I-guard-substitutions-and-restore-messages` — command substitution in quotes, grouped operators, inline `sed` writes, the `cd`-folder gap; OpenWiki restore messages say the user runs them
+- [ ] `2026-10-21_phase-J-guard-hardening-knowledge-refresh` — final stale-claims audit and OpenWiki refresh after the reopen, with the long-sentence style pass
 
 ## Ownership and Required Skills
 
@@ -283,13 +296,21 @@ lists. Every phase uses the `code`, `architecture`, `security`, `tests`, and
   harnesses, synthetic repositories for the OpenWiki spike.
 - **Independent expected values:** from policy tables, upstream sources, and
   the evidence files, never from the implementation.
+- **After the reopen (Phases H and I):** comment, blank-line, line-end,
+  quoted, escaped, ANSI-C, substitution, grouped-operator, `sed`, and
+  `cd` write forms are denied; harmless pipelines with quoted operators,
+  `find -exec ... \;`, and commented read-only commands are allowed. Each
+  expected value comes from Bash's own reading with a harmless stand-in.
+  A differential check against the previous guard lists every looser
+  change one by one.
 - **No available verification:** whether models follow the new Ponytail
   text (optional spot-check only); native Antigravity enforcement; Copilot
   behavior inside VS Code. Docs must say so.
 
 ## Risks and Dependencies
 
-- **Size and waiting.** Seven phases, one branch, one PR. Each phase is one
+- **Size and waiting.** Ten phases (three added at the 2026-10-21
+  reopen), one branch, one PR. Each phase is one
   commit and can be reviewed alone. Phases E and F can wait on the user (a
   scope question, a user-run install, a new session). When one stalls, the
   orchestrator offers to cancel it with evidence so B and D are not held
@@ -342,6 +363,26 @@ extra-high effort, devils-advocate skill). Outcome:
 | Spike install needs network and runs dependency scripts | LOW | ACCEPT | Stated in F step 1 and the rollback note |
 | `.code-workspace` protection as YAGNI | LOW | KEEP | Matches `.vscode/settings.json` protection |
 
+Reopen review on 2026-10-21 (same setup) of the first two-phase draft.
+Outcome:
+
+| Concern | Risk | Recommendation | Applied |
+| --- | --- | --- | --- |
+| Comments, blank lines, and line-end operators hide later lines (newline turned into `;` before `shlex`) | HIGH | CHANGE | New finding R5 (CRITICAL); Phase H scanner rules and cases |
+| Command substitution inside double quotes or backticks never checked | HIGH | CHANGE | New finding R6; Phase I (BF-I1) |
+| Marker design copied from `protect_quoted_globs` is unsound (redirects come back, literal matcher loses paths, quoted-variable rewrite bypass) | HIGH | CHANGE | Phase H replaces `shlex` with a Bash scanner (user decision); markers restored before return; quoted operator tokens keep `QUOTED_VALUE_PREFIX` |
+| Escaped quote confuses the heredoc and process-substitution scanners | MED | CHANGE | Phase H uses the scanner there too |
+| `#` in a word, escaped backslash before newline, ANSI-C quoting | MED | CHANGE | Phase H cases |
+| Grouped operators `\|&`, `&>>`, `>&`, `<>` | MED | CHANGE | Phase I (BF-I2) |
+| Differential check approves any change to a command with a quoted operator | MED | CHANGE | Changes sorted by direction, looser ones listed; substitution set; exit 2 counted |
+| Findings report understated the defect | MED | CHANGE | R5 to R8 added |
+| Restore wording "the guard does not let an agent run a hook script" is false (`cd` form allowed) | LOW | CHANGE | Phase I wording; the `cd` gap closed in BF-I4 |
+| Under-specified cases and order; `MEMORY.md` correction assigned twice; "Seven phases" | LOW | CHANGE | Pinned in Phase H; correction in H only; Risks updated |
+| Allowing `grep '>' .env` | LOW | ACCEPT | Matches `cat .env`; secret-read policy recorded as a follow-up |
+| Phase J shape and style pass | LOW | KEEP | Named `agents-and-skills.md` bullet only if that page is planned |
+| Full-hook run for every case | LOW | CHANGE | `shell_targets` for every case; full hook for one deny case per client |
+| Inline `sed` write and `cd`-folder resolution (found along the way) | MED | CHANGE | New finding R8; Phase I (BF-I3, BF-I4) |
+
 ## Decisions recorded
 
 The user approved this plan on 2026-10-20 with these decisions:
@@ -384,6 +425,14 @@ The user approved this plan on 2026-10-20 with these decisions:
    a settings edit whose heredoc body names a hook script), and it denies
    secret-shaped names inside the older hook folders (`.claude/hooks/.env`:
    edit and `rm` asked and read tools were allowed before).
+7. **Reopen (Phases H to J), user decisions 2026-10-21:** the user asked
+   for a plan that fixes the guard defect and does the two Phase G
+   follow-ups. After the reopen devil's-advocate review, the user chose:
+   two code phases (H: the Bash scanner; I: substitutions, grouped
+   operators, `sed` writes, the `cd` gap, and the restore messages) before
+   the refresh; a dedicated Bash scanner instead of workarounds on top of
+   `shlex`; and to keep Bash reads of secret-shaped files (`cat .env`)
+   allowed for now, recorded as a follow-up for a later policy decision.
 
 ## Verification
 
@@ -397,7 +446,7 @@ uv run python .claude/scripts/verify.py fast --format json
 Each phase's closeout log maps its BF IDs to tests or evidence. Phase G's
 log maps every BF ID through BF-G2, including any phase cancelled with
 evidence, and records the audit under `## Stale-claims surfaces checked`.
-After the 2026-10-21 reopen, Phase I is the final phase: its log maps
-BF-H1 to BF-I2 and records its own audit the same way. Each completed
+After the 2026-10-21 reopen, Phase J is the final phase: its log maps
+BF-H1 to BF-J2 and records its own audit the same way. Each completed
 phase gets one commit and one normal push attempt. PR creation and merge
 stay the user's decision.

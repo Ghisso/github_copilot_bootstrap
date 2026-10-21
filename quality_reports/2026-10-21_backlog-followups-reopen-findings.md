@@ -158,7 +158,14 @@ not a parsing defect.
 
 ## Disposition
 
-- R1 to R3 and R5 to R8: Phase H and later code phases, split per the
-  user's scope decision (pending, 2026-10-21).
-- R4 and the wiki pages the code phases change: the final knowledge-refresh
-  phase.
+User decisions on 2026-10-21: two code phases, a dedicated Bash scanner,
+and secret-file Bash reads kept as a follow-up.
+
+- R1, R2, R5, and R7 (except grouped operators): Phase H
+  (`2026-10-21_phase-H-guard-shell-scanner`).
+- R3, R6, R7 grouped operators, and R8: Phase I
+  (`2026-10-21_phase-I-guard-substitutions-and-restore-messages`).
+- R4 and the wiki pages Phases H and I change: Phase J
+  (`2026-10-21_phase-J-guard-hardening-knowledge-refresh`).
+- Secret-file Bash reads: a "Recorded follow-ups" bullet in
+  `docs/target-mapping.md` (Phase H step 3).
