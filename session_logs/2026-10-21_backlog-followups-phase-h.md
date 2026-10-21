@@ -106,6 +106,20 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   `PROTECTED_PATH_LITERAL` is quadratic (80 KB word 8 s, 160 KB over 30 s;
   the hook timeout is 10 s). Asked the coder to apply its linear form in
   this phase.
+- **Long-word timeout fix** - the coder rejected the suggested regex
+  (other alternatives stay quadratic; it would also loosen
+  `/foreign/.claude/settings.json,x.pem`). Instead `protected_path_literals`
+  reads word by word: words up to `LONG_WORD = 512` go to the unchanged
+  regex; a longer word with no protected name (`PROTECTED_NAME`) is
+  skipped; a longer word with one fails closed. A process alarm
+  (`CLASSIFIER_SECONDS = 4`, default action, so it also works on 3.9)
+  ends any other slow classification as a denial, before the 10 s hook
+  timeout. The `QUOTED_MAGIC` brace part no longer backtracks. 200 KB
+  words: 51 s or more before, about 0.005 s after. Literal lists identical
+  on 1,202,329 texts; no decision changed on 131,666 commands. Regenerated,
+  self-installed; `validate_targets.py` and `check_runtime.py` PASS.
+  Documenter asked to redo the docs for review findings 6 and 14 and the
+  new behavior.
 
 ## [LEARN] Entries
 
