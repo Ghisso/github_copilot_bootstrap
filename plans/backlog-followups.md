@@ -220,7 +220,7 @@ full acceptance text; this map is the index.
 - [x] `2026-10-20_phase-B-nested-state-files` — complete: a refresh keeps the nested `.gitignore` and `.gitattributes`; `state-sync.sh` appends `settings.local.json` and the union-merge rule only when missing. See `.claude/session_logs/2026-10-20_backlog-followups-phase-b.md`.
 - [x] `2026-10-20_phase-C-memory-split` — complete: `caveman-compress` backups now land where a refresh keeps them; the `MEMORY.md` split was measured (6.11%) and not applied by user decision. See `.claude/session_logs/2026-10-20_backlog-followups-phase-c.md`.
 - [x] `2026-10-20_phase-D-agent-definition-protection` — complete: agent folders, whole hook folders, and workspace files protected; the guard fails closed on uncertain hits and secret-shaped targets (decision 6); Codex `sandbox_mode` removed. See `.claude/session_logs/2026-10-21_backlog-followups-phase-d.md`.
-- [ ] `2026-10-20_phase-E-ponytail-5-adoption` — evaluate, then partial-adopt Ponytail `v5.3.2` (may cancel)
+- [x] `2026-10-20_phase-E-ponytail-5-adoption` — complete: partial adopt of Ponytail `v5.3.2` (callers, tests, fixtures, and config outside the diff for the coder and the review); `ponytail-review` stays complexity-only. See `.claude/session_logs/2026-10-21_backlog-followups-phase-e.md`.
 - [ ] `2026-10-20_phase-F-openwiki-0.7-upgrade` — spike, then pin `0.7.2` (may stop at `0.5.2` or cancel)
 - [ ] `2026-10-20_phase-G-backlog-followups-knowledge-refresh` — final stale-claims audit and OpenWiki refresh
 

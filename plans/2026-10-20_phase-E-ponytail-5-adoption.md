@@ -3,8 +3,8 @@ name: 2026-10-20_phase-E-ponytail-5-adoption
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 5
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-21_backlog-followups-phase-e.md
 ---
 
 # Small Plan: Ponytail 5 Adoption
@@ -83,7 +83,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
 
 ## Steps
 
-- [ ] **1. Evaluate Ponytail 5 against the fork (BF-E1).**
+- [x] **1. Evaluate Ponytail 5 against the fork (BF-E1).**
   **Owner:** orchestrator, evidence only; it may delegate the fetch and the
   row table to one read-only research agent.
   **Files:** create `.claude/explorations/2026-10-20_ponytail-5-evaluation/evidence.md`.
@@ -133,7 +133,8 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   `ponytail-audit`, or a newer baseline is a scope change: stop and ask the
   user.
 
-- [ ] **2. NO-GO path only: cancel this phase (BF-E2).**
+- [x] **2. NO-GO path only: cancel this phase (BF-E2).** Not run: step 1
+  decided PARTIAL ADOPT.
   **Owner:** orchestrator.
   **Files:** the Step 1 evidence file, this small plan, the big plan
   `backlog-followups.md`, and the Phase F small plan.
@@ -154,7 +155,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   repository. No outer commit, findings report, or closeout log. Skip
   Steps 3 to 8.
 
-- [ ] **3. Merge the coding skill (BF-E3).**
+- [x] **3. Merge the coding skill (BF-E3).**
   **Owner:** coder.
   **Files:** modify `shared/skills/ponytail/SKILL.md`.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
@@ -170,7 +171,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   literally; the 7-rung ladder; `## Safety boundaries` and every item on it;
   and the `ponytail:` marker.
 
-- [ ] **4. Merge the review skill (BF-E4).**
+- [x] **4. Merge the review skill (BF-E4).**
   **Owner:** coder.
   **Files:** modify `shared/skills/ponytail-review/SKILL.md`.
   **Required Skills:** `shared/skills/ponytail/SKILL.md` (full),
@@ -185,7 +186,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   Step 3. Keep the words `Return findings to the coder` on one line;
   `SIDECAR_TEXT_REPLACEMENTS` matches them literally.
 
-- [ ] **5. Close the gap in local prompts and profiles (BF-E3, BF-E4).**
+- [x] **5. Close the gap in local prompts and profiles (BF-E3, BF-E4).**
   **Owner:** coder.
   **Files:** modify `shared/agents/reviewer/prompt.md` (`## Review Flow`,
   step 2), `shared/agents/reviewer/workflow-prompt.md` (`## Review flow`,
@@ -210,7 +211,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   tests, fixtures, and config outside the diff; `ponytail.md` gets `reuse:`
   (name the existing path). Routing, severities, and gates do not change.
 
-- [ ] **6. Move every skill provenance pin (BF-E5, BF-E7).**
+- [x] **6. Move every skill provenance pin (BF-E5, BF-E7).**
   **Owner:** coder.
   **Files:** modify `shared/third_party/ponytail/UPSTREAM.md`,
   `scripts/validate_targets.py` (`:7937-7983` release, commit, and the two
@@ -242,7 +243,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   the merged skill makes `validate_targets.py` report "allowlist hash
   changed".
 
-- [ ] **7. Keep both sidecar profiles consistent; add text-ships rows (BF-E3, BF-E4, BF-E6).**
+- [x] **7. Keep both sidecar profiles consistent; add text-ships rows (BF-E3, BF-E4, BF-E6).**
   **Owner:** coder.
   **Files:** modify `tests/test_validate_targets.py`; modify
   `scripts/generate_targets.py` only to move a `SIDECAR_TEXT_REPLACEMENTS`
@@ -273,7 +274,7 @@ change that needs the user's approval. Line numbers are in the `v5.3.2` files.
   new row fails when its phrase is removed or moved (the pattern of
   `test_review_guidance_check_fails_when_text_is_removed_or_moved`).
 
-- [ ] **8. Regenerate, self-install, document, review, close out (BF-E7).**
+- [x] **8. Regenerate, self-install, document, review, close out (BF-E7).**
   **Owner:** orchestrator; documenter after review; fresh reviewer.
   **Files:** regenerate `dist/`; self-install `.claude/`; modify
   `docs/architecture.md` (`## Ponytail Integration`: `v4.8.4` at line 221
@@ -332,11 +333,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

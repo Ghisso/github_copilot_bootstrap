@@ -46,11 +46,12 @@
   cited line before planning work around it.
 - [LEARN:architecture] `shared/skills/ponytail/SKILL.md` and
   `ponytail-review/SKILL.md` are hash-pinned vendored MIT files, and the local
-  copies are a heavy fork, not a formatting-only import: 72 lines against
-  upstream's 120 with three sections dropped, and 38 against 57. Adjust
-  Ponytail behavior through `shared/policies/` and the review-routing table,
-  which already own lifecycle placement, rather than editing the vendored
-  files.
+  copies are a deliberate fork, not a formatting-only import: since the
+  2026-10-21 partial merge of upstream `v5.3.2`, 85 lines against upstream's
+  52 and 65 against 101, with the adopted and declined rows recorded in
+  `shared/third_party/ponytail/UPSTREAM.md`. Adjust Ponytail behavior through
+  `shared/policies/` and the review-routing table, which already own
+  lifecycle placement, rather than editing the vendored files.
 - [LEARN:review] Removing an unsafe default from a skill is incomplete while
   that skill still points at a policy which keeps it. The `bentoml-service`
   CORS fix moved the `["*"]` wildcard out of the skill but left it in
@@ -1527,7 +1528,8 @@
   literals and, for a skill the sidecar ships,
   `SIDECAR_SKILLS_PROFILE_SNAPSHOT_SHA256` in
   `tests/test_validate_targets.py`. `deep-audit` has no pin (gate-repair
-  Phase E).
+  Phase E). Since the `v5.3.2` merge the full pin checklist is in the
+  upgrade procedure of `shared/third_party/ponytail/UPSTREAM.md`.
 - [LEARN:workflow] When two coders work in parallel in this repository, at
   most one of them may run `generate_targets.py` and `validate_targets.py`,
   and only after the other has stopped editing `shared/`: the validator's
