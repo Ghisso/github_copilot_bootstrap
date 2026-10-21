@@ -58,6 +58,28 @@ only `mode: "update"` either way.
   the step 5 pin already moved, the smoke test fails only at the version
   assertion (`'0.5.2' == '0.7.2'`), as expected; the round-trip test passes
   on `0.5.2`; generate + validate PASS.
+- **Step 4, first attempt (user)** - After the user's run, a new session
+  showed a partial result: the only global install
+  (`~/.local/nodejs/node-v24.15.0-linux-x64/lib/node_modules/openwiki`)
+  still reported `0.5.2`; the Claude skill receipt said `0.7.2` (written
+  10:26:40); the Codex skill had been rewritten by `0.5.2` (10:27:31) and
+  `integrations list` showed `bob modified`; the root MCP adapters were
+  unchanged. Reported to the user, who approved the orchestrator running
+  the commands.
+- **Step 4, second attempt (orchestrator, user-approved)** -
+  `npm install -g openwiki@0.7.2`: exit 0 ("added 40 packages, and changed
+  292 packages"); the PATH binary now resolves to the same global package,
+  version `0.7.2`. `openwiki integrations install claude --project <root>`
+  and `... codex --project <root>` (no `--force`): both exit 0. Both
+  receipts now say `0.7.2`; `git status --porcelain` shows no change to the
+  root MCP adapters; `integrations list`: `claude installed`,
+  `codex installed`, every other host `not-installed` (`bob` no longer
+  `modified`). `uv run pytest tests/test_openwiki_cli_smoke.py
+  tests/test_openwiki_guard.py tests/test_lifecycle_hooks.py -q`: 78
+  passed; the smoke test also passes under `unshare -rn` (offline).
+  Rollback, if ever needed: `npm install -g openwiki@0.5.2` and the same
+  two install commands. This session's OpenWiki server was started on
+  `0.5.2` and is now stale; Phase G needs a reconnect or a new session.
 
 ## Step 1 capture table
 

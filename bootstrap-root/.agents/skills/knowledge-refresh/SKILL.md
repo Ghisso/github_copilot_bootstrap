@@ -15,7 +15,7 @@ description: |
 Two skills split this job. OpenWiki's own `openwiki` skill is the tool
 lifecycle and authoring contract — the exact MCP call sequence and what a
 generated page may contain. This skill is the lifecycle policy around it:
-when to refresh, how to enable it once per checkout, what the guard does,
+when to refresh, how to enable it and re-run the install after a pin change, what the guard does,
 who owns the result, how to rebaseline, and commit hygiene. Use this skill
 only for this repository's generated `openwiki/**` layer. Do not use it for
 README/docs writing, general documentation review, or any other wiki or
@@ -34,7 +34,7 @@ exists — a human-authored repository brief the maintainer writes once. Its
 presence is also the deterministic marker the hook guard checks. Do not
 create that file on a user's behalf unless asked to enable OpenWiki.
 
-## Enabling host integrations (once per checkout)
+## Enabling host integrations (once when enabling, once per pin change)
 
 A person, not an automated step, enables OpenWiki for a checkout:
 
@@ -47,7 +47,17 @@ A person, not an automated step, enables OpenWiki for a checkout:
    `installed` for both hosts.
 5. Commit the resulting `.mcp.json` and `.codex/config.toml` diffs.
 
-Never pass `--force`. If either command reports an unmanaged skill
+Never pass `--force`. After the pinned OpenWiki version changes, a person
+runs the two install commands once more, so the installed `openwiki` skill
+upgrades. Then check that `.mcp.json` and `.codex/config.toml` have no diff.
+A diff in either file is a stop: report it and edit nothing by hand.
+
+Install only the `claude` and `codex` integrations. OpenWiki offers other
+host integrations; never install any of them here. `copilot` targets GitHub
+Copilot CLI, which this bootstrap does not support. `antigravity` writes
+`.agents/mcp_config.json`, which the bootstrap owns.
+
+If either command reports an unmanaged skill
 directory already occupying the `openwiki` slot under `.claude/skills/` or
 `.agents/skills/`, that is a stale bootstrap copy from before this skill's
 rename to `knowledge-refresh`: confirm it has no `.openwiki-install.json`
@@ -57,8 +67,8 @@ marker, remove it, then re-run the install command.
 
 Call OpenWiki's own MCP tools directly — there is no bootstrap runner or
 child process. Start with `openwiki_begin`, always with `mode: "update"`.
-Never pass `mode: "init"`: a hook guard, `openwiki-guard.sh`, denies it
-before the tool runs, and it also denies an unenabled repository (no
+Never pass `mode: "init"`: a hook guard, `openwiki-guard.sh`, denies it,
+and every other mode except `update`, before the tool runs. It also denies an unenabled repository (no
 `openwiki/INSTRUCTIONS.md`) or a resolved root outside this repository.
 
 The guard snapshots root `AGENTS.md`, `CLAUDE.md`, and the OpenWiki workflow
@@ -81,6 +91,11 @@ bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null
 
 This is redundant but harmless when the host already restored automatically,
 and it is the only protection on a Codex tool-call error.
+
+The guard covers only `openwiki_begin`. OpenWiki's read-only tools
+(`openwiki_list_workspaces`, `openwiki_list_wikis`, `openwiki_search`,
+`openwiki_read`) start no run and write nothing in the repository, so there
+is nothing to restore after them.
 
 Run at most one refresh per checkout: the guard takes no lock, so avoid
 starting one while another session is writing to the same checkout. A
@@ -120,8 +135,9 @@ restore was missed.
   workflow for OpenWiki.
 - Never run the integration installer (`openwiki integrations install ...`)
   from a hook, `verify.py`, the bootstrap installer, state-sync, or CI, and
-  never run it as a step inside an ordinary refresh. It runs exactly once
-  per checkout, by a person deliberately enabling OpenWiki, never `--force`.
+  never run it as a step inside an ordinary refresh. It runs once when a
+  person deliberately enables OpenWiki for a checkout, and once more after
+  each change to the pinned version, never `--force`.
 - Supported hosts are Claude Code and Codex. Any other target can read
   `openwiki/**` but has no integration to refresh it.
 - Provider configuration is optional: OpenWiki's MCP tools run using the
