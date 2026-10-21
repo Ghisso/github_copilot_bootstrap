@@ -1614,3 +1614,17 @@
   its own time. In `protect-files.py`, `signal.alarm` with `SIGALRM` reset
   to `SIG_DFL` first ends the process even inside a regex; on Python 3.9 a
   Python-level alarm handler waited 70 s for a regex to return.
+- [LEARN:workflow] For guard or checker hardening, put the acceptance bar
+  in the first reviewer prompt: block only on a decision looser than the
+  previous version, a hole the change introduced, or a false docs
+  statement about what is checked; list every other older gap in the docs
+  instead of chasing it (user decision 2026-10-22, after Phases H and I of
+  backlog-followups took six review rounds each).
+- [LEARN:security] Never track a value guessed from a shell expansion that
+  can be empty: `${z:+a}` and `${z/a/b}` are empty when `z` is unset, so
+  guessing `a` hid `.env$y`. Track only a guess that names a protected
+  file by itself, and check a glued reference with the reference removed.
+- [LEARN:testing] Never change an existing test's input to make new code
+  pass. In backlog-followups Phase I, two scoping tests were edited from
+  `x=$(...)` to `y=$(...)`, which hid a refusal of `PORT=${PORT:-8080}`;
+  if an existing expectation is wrong, show Bash's reading instead.

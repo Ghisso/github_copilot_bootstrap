@@ -3,8 +3,8 @@ name: 2026-10-21_phase-I-guard-substitutions-and-restore-messages
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 9
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-21_backlog-followups-phase-i.md
 ---
 
 # Small Plan: Guard Substitutions and Restore Messages
@@ -55,7 +55,7 @@ full review profiles apply.
 
 ## Steps
 
-- [ ] **1. Close the remaining write paths (BF-I1 to BF-I4, BF-I7).**
+- [x] **1. Close the remaining write paths (BF-I1 to BF-I4, BF-I7).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/protect-files.py` (the scanner
   from Phase H, `OPERATORS`, `REDIRECTS`/`is_redirect`, the `sed` handling
@@ -107,7 +107,7 @@ full review profiles apply.
   read-only command list beyond the `sed` write forms; add a dependency or
   an option; break Python 3.9 compatibility.
 
-- [ ] **2. Make the restore messages say the user runs them (BF-I5).**
+- [x] **2. Make the restore messages say the user runs them (BF-I5).**
   **Owner:** coder.
   **Files:** modify `shared/scripts/verify.py` (the `openwiki-managed-state`
   message, near line 3083), `shared/hooks/scripts/openwiki-guard.py` (the
@@ -122,13 +122,13 @@ full review profiles apply.
   command that names a hook script. Add one assertion per message that
   fails on the current text. No other message changes.
 
-- [ ] **3. Prove no decision loosened (BF-I6).**
+- [x] **3. Prove no decision loosened (BF-I6).**
   **Owner:** coder; the orchestrator records the result.
   Repeat Phase H's differential check with the Phase H guard as the old
   guard, adding this phase's cases and the substitution set. Every looser
   change is listed with Bash's reading and must be a step 1 allow case.
 
-- [ ] **4. Document the change (BF-I6).**
+- [x] **4. Document the change (BF-I6).**
   **Owner:** documenter, after review of steps 1 to 3.
   **Files:** `docs/runtime-checks.md` (the shell-parsing paragraph and the
   Fix column of the OpenWiki managed-state row near line 602),
@@ -138,7 +138,7 @@ full review profiles apply.
   Keep the line count of paragraphs that wiki claims cite, or leave those
   claims to Phase J. Do not edit dated records.
 
-- [ ] **5. Regenerate, self-install, verify, review, close out.**
+- [x] **5. Regenerate, self-install, verify, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   Same procedure as Phase H step 4.
   **Required Skills:** `shared/skills/code-review/SKILL.md`.
@@ -174,11 +174,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

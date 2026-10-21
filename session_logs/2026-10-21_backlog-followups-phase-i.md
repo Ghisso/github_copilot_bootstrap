@@ -18,9 +18,9 @@ the user runs them (BF-I1 to BF-I7).
 - [x] PRE-FLIGHT: Phase H committed (`b0dc4c3`) and pushed; the commit hook
   advanced `current_phase` to this phase and set it `in-progress`. The user
   asked to continue to the end of the big plan. No planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
-- [ ] COMMIT
-- [ ] PUSH
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] COMMIT
+- [x] PUSH
 
 ## Work Log
 
@@ -252,14 +252,64 @@ the user runs them (BF-I1 to BF-I7).
   (4932 passed, 1 skipped). Short confirmation review (round 6)
   requested.
 
+## Review
+
+- Six rounds by one fresh reviewer (profiles code, architecture,
+  security, tests, ponytail, documentation). Rounds 1 to 5 failed: round
+  1 on holes Phase I introduced (the commit-message exemption with a pipe,
+  an `fnmatch`-based evaluator, raw-text `shopt`/`alias` checks, sampled
+  `find` patterns) plus cheap older gaps; rounds 2 to 4 on further
+  variable-tracking, `perl`, shell-spelling, and docs gaps; round 5 (under
+  the user's lighter bar) on one loosening from fragment tracking. Round
+  6: Gate Result PASS, 0 critical, 0 major, 1 minor (the docs said
+  "fragments" after fragment tracking was removed), fixed by the
+  orchestrator: "A value that is not tracked does not trigger 'assigned
+  twice'".
+- Each reported bypass was reproduced under plain Bash, `bash --posix`,
+  and dash before the fix.
+
+## Requirement Evidence
+
+| ID | Outcome | Evidence |
+| --- | --- | --- |
+| BF-I1 | Done | `extract_substitutions` classifies `$( )` and backticks inside double quotes and unquoted backticks; `tests/test_protect_files_substitutions.py` |
+| BF-I2 | Done | `\|&` is a pipe; `&>>`, `<>`, `>&` with a word are write redirects; the five strict xfails now pass as plain tests |
+| BF-I3 | Done | `sed_effects` (`w`, `W`, `s///w`; `e` and `s///e` fail closed; GNU `getopt` prefixes) |
+| BF-I4 | Done | `cd`, `pushd`, `builtin cd`, `env -C`, any `-C`/`--chdir`/`--directory`, and `eval`/`source` scripts change the folders used for operands; a computed `cd` folder is a listed gap |
+| BF-I5 | Done | Three one-line messages in `verify.py` and `openwiki-guard.py`; three failing-first assertions (`negative-control-messages.txt`) |
+| BF-I6 | Done | Differential against the Phase H guard: 5,509 looser commands, 0 under-protected; all 261 original Phase H exception commands blocked as required; docs and parity row updated |
+| BF-I7 | Done, with listed gaps | Closed: ANSI-C names, heredoc delimiters, same-line functions, `$IFS` splitting, names around a substitution, `find -delete`/`-exec rm {} +`, dotglob and zsh code-running qualifiers (fail closed), brace lists in the command word, heredoc and here-string shell scripts. Listed as not yet checked in `docs/runtime-checks.md`: whole-word command output, `xargs`-fed names, computed `cd`, loop and input variables, fragment values, pipes from other producers, and the rest of the list |
+
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:workflow] For guard or checker hardening, state the review
+  acceptance bar in the first reviewer prompt: block only on a looser
+  decision, a hole the change introduced, or a false docs statement, and
+  list other older gaps (user decision 2026-10-22, saved to `MEMORY.md`).
+- [LEARN:security] A value guessed from an expansion is wrong when the
+  expansion can be empty (`${z:+a}` is empty when `z` is unset). Track only
+  a guess that names a protected file by itself, and check a glued
+  reference with the reference removed (saved to `MEMORY.md`).
+- [LEARN:testing] Never change an existing test's input to make new code
+  pass: in round 1 two scoping tests were edited, which hid an over-block
+  of `PORT=${PORT:-8080}`; the reviewer caught it (saved to `MEMORY.md`).
 
 ## Verification
 
-To be written at closeout.
+Optional items:
+
+- optional 1: PASS
+- The differential was recorded each round in the session scratch folder
+  (`phase-i/diff-i`, `looser-listing.txt`, `looser-vs-round*.txt`) with
+  input counts per set, changes by direction, and every looser change run
+  under plain Bash, `bash --posix`, and dash with plain and hidden
+  stand-ins; summaries are in the Work Log.
+
+Required items (summary lines from `verify.py closeout`):
 
 ## Open Questions / Next Steps
 
 - Phase J (final knowledge refresh) follows.
+- Recorded follow-up: split or shrink `protect-files.py` (more than 3,000
+  lines); the not-yet-checked list in `docs/runtime-checks.md` is the
+  backlog for it.
