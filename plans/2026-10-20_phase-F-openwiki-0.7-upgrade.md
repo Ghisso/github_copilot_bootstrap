@@ -3,7 +3,7 @@ name: 2026-10-20_phase-F-openwiki-0.7-upgrade
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 6
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 
