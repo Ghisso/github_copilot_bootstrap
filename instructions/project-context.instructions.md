@@ -128,10 +128,12 @@ reopened with Phases H to J on 2026-10-21 and 2026-10-22) then ran on
 the user's decision. Phases H and I replaced `shlex` in the file-protection
 guard (`shared/hooks/scripts/protect-files.py`) with a Bash-rules scanner;
 `docs/runtime-checks.md` lists the forms it still does not check, and a
-recorded follow-up asks to split or shrink the hook. Pinned versions after it: Context Mode
-`1.0.169`, OpenWiki `0.7.2` (from `0.5.2`; the guard allows only
-`mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
-(from `v4.8.4`; `ponytail-review` stays complexity-only).
+recorded follow-up asks to split or shrink the hook.
+
+Pinned versions after the plan: Context Mode `1.0.169`, OpenWiki `0.7.2`
+(from `0.5.2`; the guard allows only `mode: "update"`), and Ponytail
+partially merged from upstream `v5.3.2` (from `v4.8.4`; `ponytail-review`
+stays complexity-only).
 
 Before merging bootstrap changes, run:
 

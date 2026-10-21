@@ -326,15 +326,16 @@
 - [LEARN:tooling] The fail-closed shell guard recursively classifies
   quote-aware heredocs and process substitutions (`<(...)`/`>(...)`) for
   nested protected writes instead of blanket-denying them; a malformed or
-  unterminated one still fails closed. Write targets built from shell
-  variables are still flagged uncertain. Use literal paths, or run a script
-  file for constructs the parser still can't model (loops, functions).
-- [LEARN:security] The shell guard never recursively parses `-c` script
-  content (`bash -c '...'`, `python3 -c '...'`): it only scans that text for
-  literal protected paths. `bash -c 'E=env; touch ".$E"'` is not detected;
-  `bash -c 'touch .env'` is, because the literal string appears. Pre-existing,
-  not a Phase D regression, and out of scope to fix (would need a recursive
-  parser per interpreter language) — recorded so it isn't rediscovered later.
+  unterminated one still fails closed. Since backlog-followups Phases H and
+  I, plain `$NAME` values set on the same line are read, and commands after
+  `do` and `then` are classified; loop variables and functions defined on
+  an earlier command line are not. Use literal paths, or run a script file.
+- [LEARN:security] Since backlog-followups Phase I the shell guard reads
+  `bash -c`, `sh -c`, and `eval` scripts as command lines with their
+  variables, so `bash -c 'E=env; touch ".$E"'` is detected. Other
+  interpreters' `-c`/`-e` text (`python3 -c '...'`, `node -e`) is only
+  scanned for literal protected paths: `python3 -c 'open(".en"+"v","w")'`
+  is not detected. A full parser per interpreter language is out of scope.
 - [LEARN:architecture] A file living only in the generated `.claude/` overlay is
   not content, it's pending deletion. Authored material belongs in `shared/`,
   where it regenerates; `check_runtime.py` naming a path "absent from generated
@@ -392,10 +393,12 @@
   defect.
 - [LEARN:tooling] The fail-closed Bash guard classifies the command after
   `then`, `do`, `else`, `{`, `!`, and `time` (backlog-followups Phase I), and
-  parses heredocs and process and command substitutions recursively; only
-  malformed or unterminated syntax raises `AmbiguousCommand`/
-  `UnparseableCommand` (exit 2). Loop variables are still not tracked; the
-  full list of unchecked forms is in `docs/runtime-checks.md`.
+  parses heredocs and process and command substitutions recursively. It
+  fails closed (exit 2) on malformed or unterminated syntax and also on
+  well-formed text it cannot follow: a variable assigned twice on one
+  line, `shopt -s dotglob`, a `case` inside `$( )`, or text too complex to
+  read. Loop variables are still not tracked; the full list of rules and
+  unchecked forms is in `docs/runtime-checks.md`.
   Put complex logic in a script file and invoke it as `bash script.sh`, which
   stays classifiable and keeps the guard active rather than routing around it.
 - [LEARN:shell] Bash `errexit` isn't reliable inside a function invoked from a

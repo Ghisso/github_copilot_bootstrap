@@ -45,6 +45,19 @@ the pages the refresh rewrites (BF-J2).
 - **Verify** - regenerated, self-installed; `verify.py phase` PASS (4932
   passed, 1 skipped). Fresh reviewer requested with the user's lighter
   bar.
+- **Review round 1** - Gate Result FAIL, 1 major and 4 minor, all
+  documentation. Fixed by the orchestrator: the `MEMORY.md` fail-closed
+  clause (major) and two older `MEMORY.md` entries; the README note now
+  says these commands are denied with no approval prompt (run them in your
+  own shell instead of "approve it yourself"); the project-context
+  paragraph split so "Pinned versions after the plan" is clear. For BF-J2
+  a second scoped OpenWiki `update` run
+  (`ae57b8ff-894c-443f-9cb9-f38939395f8a`, 1 page) restored the full
+  `HOOK_CONFIGS` and `CONTROL_PLANE_DIRS` lists and the modelled mutators
+  on `architecture/hooks-and-guardrails.md`, split the scanner paragraph
+  into short paragraphs, and split the long `openwiki-guard` and
+  `git-protection` sentences; no claim changed; `openwiki_finish`
+  returned `complete`; no stamp, adapters unchanged, no `.run.json`.
 
 ## Stale-claims surfaces checked
 
@@ -76,8 +89,16 @@ reading. Every live-advice surface and its outcome:
 - `.claude/MEMORY.md`: the `[LEARN:tooling]` entry saying the guard cannot
   model `for`/`while`/`{ }` compound commands was partly false after Phase I
   (commands after `then`, `do`, `else`, `{`, `!`, `time` are classified);
-  corrected in place. The `protect-files.sh` entry corrected in Phase H
-  still holds.
+  corrected in place, and after review round 1 its "only malformed syntax
+  fails closed" clause was corrected too (the guard also fails closed on a
+  variable assigned twice, `shopt -s dotglob`, a `case` inside `$( )`, and
+  text too complex to read). Review round 1 also found two older entries
+  the first pass missed: the one saying variable-built targets are only
+  flagged uncertain and loops and functions cannot be modelled, and the one
+  saying the guard never parses `bash -c` script content. Both corrected in
+  place (`bash -c`, `sh -c`, and `eval` are read since Phase I; other
+  interpreters' `-c` text is only literal-scanned, checked against the
+  guard). The `protect-files.sh` entry corrected in Phase H still holds.
 - `.claude/instructions/project-context.instructions.md`: the status
   paragraph named only Phases A to G; it now names the reopen (H to J), the
   scanner, the not-yet-checked list, and the split follow-up.
