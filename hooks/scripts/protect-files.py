@@ -143,6 +143,10 @@ QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|(?<!\$)\{[^{}]+\}|\$\{?[A-Za-
 DEFAULT_EXPANSION = re.compile(
     r"(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?!$-])(?::?[-=+])(.*)", re.S
 )
+QUOTE_IN_QUOTED_EXPANSION = (
+    "a single quote inside a double-quoted parameter expansion is read "
+    "differently by Bash and by POSIX shells"
+)
 # An extended glob operator: `@( )`, `*( )`, `+( )`, `?( )`, `!( )`.
 EXTENDED_GLOB = re.compile(r"[@*+?!]\(")
 # The word `case` followed by a blank, as a word of its own. Any such word is
@@ -736,7 +740,7 @@ def _skip_double_quoted(text: str, cursor: int) -> int:
             end = _matching_paren(text, cursor + 1)
             cursor = end if end != -1 else cursor + 1
         elif char == "$" and text[cursor + 1 : cursor + 2] == "{":
-            end = _matching_brace(text, cursor)
+            end = _matching_brace(text, cursor, True)
             cursor = end if end != -1 else cursor + 1
         elif char == "`":
             end = _skip_backticks(text, cursor)
@@ -761,15 +765,22 @@ def _skip_backticks(text: str, index: int) -> int:
         end = found.start() + 2
 
 
-def _matching_brace(text: str, dollar_index: int) -> int:
+def _matching_brace(
+    text: str, dollar_index: int, in_double_quotes: bool = False
+) -> int:
     """Return the index just past the `}` that closes the `${` at
     `text[dollar_index]`, or -1 when it never closes.
 
-    Bash's rules (checked on 5.2, also when the `${ }` is itself inside double
-    quotes): a backslash escapes the next character; `'...'`, `"..."`, `$'...'`,
-    `$"..."`, `$( )`, `$(( ))`, backticks, and a nested `${ }` each hide a `}` or
-    a `)` inside them; a plain `{` does not nest; the first other `}` closes. A
-    `#` inside is text, not a comment.
+    Bash's rules (checked on 5.2): a backslash escapes the next character;
+    `'...'`, `"..."`, `$'...'`, `$"..."`, `$( )`, `$(( ))`, backticks, and a nested
+    `${ }` each hide a `}` or a `)` inside them; a plain `{` does not nest; the
+    first other `}` closes. A `#` inside is text, not a comment.
+
+    Inside double quotes, shells disagree about a single quote in the `${ }`:
+    Bash 5.2 starts a quote at it, but `bash --posix` and dash take it for a
+    plain character, so a `}` or a `;` after it ends the expansion or the
+    command. The client may run either, so `in_double_quotes` fails closed on a
+    `'` or `$'` there.
     """
     index = dollar_index + 2
     length = len(text)
@@ -781,6 +792,8 @@ def _matching_brace(text: str, dollar_index: int) -> int:
         if char == "\\":
             index += 2
         elif char == "'":
+            if in_double_quotes:
+                raise UnparseableCommand(QUOTE_IN_QUOTED_EXPANSION)
             end = text.find("'", index + 1)
             _charge((length if end == -1 else end) - index)
             if end == -1:
@@ -801,10 +814,12 @@ def _matching_brace(text: str, dollar_index: int) -> int:
             if following == "(":
                 end = _matching_paren(text, index + 1)
             elif following == "{":
-                end = _matching_brace(text, index)
+                end = _matching_brace(text, index, in_double_quotes)
             elif following == "$":
                 end = index + 2
             elif following == "'":
+                if in_double_quotes:
+                    raise UnparseableCommand(QUOTE_IN_QUOTED_EXPANSION)
                 end = _skip_literal(text, index)
             elif following == '"':
                 end = _skip_double_quoted(text, index + 2)
@@ -1194,26 +1209,68 @@ def heredoc_command_substitutions(body: str) -> list[str]:
     return inner_commands
 
 
+def _read_group_word(
+    command: str, index: int, parts: list[str], before: str
+) -> int | None:
+    """If the `(` at `command[index]` continues the word as an array assignment
+    (`a=(x y)`) or an extended glob (`@(a|b)`), add its text to `parts` and
+    return the index after its `)`; None when it does not, so the word ends.
+
+    Bash keeps a `#` glued after an array's `)` in the word (`a=(x)#c`), but the
+    other scans in this file take a `#` after any `)` for a comment, so that form
+    fails closed instead of being read two ways.
+    """
+    if before == "=" and ARRAY_ASSIGNMENT.fullmatch("".join(parts)):
+        kind = "array assignment"
+    elif before and (before in "@*+?" or (before == "!" and parts != ["!"])):
+        kind = "extended glob"
+    else:
+        return None
+    end = _matching_paren(command, index)
+    if end == -1:
+        raise UnparseableCommand("unbalanced " + kind)
+    if kind == "array assignment" and command[end : end + 1] == "#":
+        raise UnparseableCommand("a # right after an array assignment")
+    parts.append(command[index:end])
+    return end
+
+
+def _quoted_part(span: str, before: str) -> tuple[str, bool, bool]:
+    """(value, magic, glob) of a quoted or escaped span of a word: its text with
+    the quotes removed, whether it holds quoted magic that must not be expanded
+    again (`QUOTED_MAGIC`), and whether that magic includes a glob character.
+    A part glued to a name or to `=` (`NAME='*'`, `--opt="$X"`) is not magic."""
+    value = _unquote(span)
+    # An escaped character (`"\\$a"`) is literal, so it is not magic.
+    literal = value if span[0] == "'" else re.sub(r"\\.", "", span, flags=re.S)
+    if (
+        span[0] != "\\"
+        and QUOTED_MAGIC.search(literal)
+        and not (before.isalnum() or before in ("_", "="))
+    ):
+        return value, True, bool(QUOTED_GLOB.search(literal))
+    return value, False, False
+
+
+def _mark_quoted_word(text: str, parts: list[str], glob: bool) -> str:
+    """`text` of a word with quoted magic, marked with `QUOTED_PATTERN_PREFIX`
+    when the word is only one quoted glob (a brace list does not count) and with
+    `QUOTED_VALUE_PREFIX` otherwise."""
+    pattern = glob and len(parts) == 1 and not PATTERN_UNSAFE.search(text)
+    return (QUOTED_PATTERN_PREFIX if pattern else QUOTED_VALUE_PREFIX) + text
+
+
 def _read_word(command: str, index: int) -> tuple[str, bool, int]:
     """Read the word that starts at `command[index]`, which is not whitespace,
     a newline, or an operator character. Returns (text, quoted, end): the word
     with its quotes and escapes removed, whether it used any, and the index
     after it. A backslash-newline joins the lines and is not part of a word.
 
-    A quoted part holding a glob, a brace list, or a variable reference
-    (`QUOTED_MAGIC`) must not be expanded again, so the word gets
-    `QUOTED_VALUE_PREFIX`, or `QUOTED_PATTERN_PREFIX` when the word is only one
-    quoted glob (a brace list does not count); a part glued to a name or to `=`
-    (`NAME='*'`, `--opt="$X"`) leaves the word as it is.
-
-    A `(` right after `NAME=` or `NAME+=` opens an array assignment: the list
-    and what is glued after its `)` stay in the word (`a=(x)b`). Bash keeps a
-    `#` glued there in the word too (`a=(x)#c` holds no comment), but the other
-    scans in this file take a `#` after any `)` for a comment, so that form
-    fails closed instead of being read two ways.
-
-    A `(` glued right after `@`, `*`, `+`, `?`, or a `!` that follows other text
-    opens an extended glob (`@(a|b)`), which is one word too; without
+    A quoted part that holds magic (see `_quoted_part`) gives the word a prefix
+    (see `_mark_quoted_word`). A `(` right after `NAME=` or `NAME+=` opens an
+    array assignment: the list and what is glued after its `)` stay in the word
+    (`a=(x)b`). A `(` glued right after `@`, `*`, `+`, `?`, or a `!` that follows
+    other text opens an extended glob (`@(a|b)`), which is one word too; without
     `shopt -s extglob` it is a syntax error in Bash, so it is never a group. A
     `!(` at the start of a word may be a negated group and stays one. A `${ }`
     and the process id `$$` are kept in the word as they are.
@@ -1226,20 +1283,11 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
     length = len(command)
     while index < length:
         if command[index] in WORD_BREAKS:
-            if command[index] != "(":
+            end = None
+            if command[index] == "(":
+                end = _read_group_word(command, index, parts, before)
+            if end is None:
                 break
-            if before == "=" and ARRAY_ASSIGNMENT.fullmatch("".join(parts)):
-                kind = "array assignment"
-            elif before and (before in "@*+?" or (before == "!" and parts != ["!"])):
-                kind = "extended glob"
-            else:
-                break
-            end = _matching_paren(command, index)
-            if end == -1:
-                raise UnparseableCommand("unbalanced " + kind)
-            if kind == "array assignment" and command[end : end + 1] == "#":
-                raise UnparseableCommand("a # right after an array assignment")
-            parts.append(command[index:end])
             before = ")"
             index = end
             continue
@@ -1255,29 +1303,16 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
         if span.startswith("${") or span == "$$":
             parts.append(span)
             before = "}" if span[1] == "{" else "$"
-            index = end
-            continue
-        if span != "\\\n":
-            value = _unquote(span)
-            # An escaped character (`"\\$a"`) is literal, so it is not magic.
-            literal = value if span[0] == "'" else re.sub(r"\\.", "", span, flags=re.S)
-            if (
-                span[0] != "\\"
-                and QUOTED_MAGIC.search(literal)
-                and not (before.isalnum() or before in ("_", "="))
-            ):
-                magic = True
-                glob = glob or bool(QUOTED_GLOB.search(literal))
+        elif span != "\\\n":
+            value, part_magic, part_glob = _quoted_part(span, before)
+            magic = magic or part_magic
+            glob = glob or part_glob
             parts.append(value)
             before = value[-1:] or before
             quoted = True
         index = end
     text = "".join(parts)
-    if not magic:
-        return text, quoted, index
-    pattern = glob and len(parts) == 1 and not PATTERN_UNSAFE.search(text)
-    prefix = QUOTED_PATTERN_PREFIX if pattern else QUOTED_VALUE_PREFIX
-    return prefix + text, quoted, index
+    return (_mark_quoted_word(text, parts, glob) if magic else text), quoted, index
 
 
 def _shell_tokens(command: str) -> list[tuple[str, bool]]:
