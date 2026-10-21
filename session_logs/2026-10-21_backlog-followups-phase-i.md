@@ -65,6 +65,22 @@ the user runs them (BF-I1 to BF-I7).
   Phase G cited text in `docs/runtime-checks.md` is now at 747-779 (Phase J
   refreshes those claims). `verify.py phase` PASS (4365 passed, 1 skipped;
   no xfails left). Sent to a fresh reviewer with six profiles.
+- **Review round 1** - Gate Result FAIL, 10 major and 5 minor. Sorted by
+  origin. Introduced by Phase I (must fix): the commit-message heredoc
+  exemption hides a write when piped into `sh`; the parameter-operation
+  evaluator uses `fnmatch`, not Bash rules (`[^...]`, `[[:upper:]]`, `@E`);
+  the dotglob and alias checks are raw-text regexes that quoting defeats;
+  the `find` narrowing tests patterns against 14 sample names.
+  Pre-existing and cheap to close: abbreviated `sed` long options, `sed 'e
+  cmd'` not actually denied, `cd` with a glob, `pushd`, `env -C`,
+  `CDPATH`, more shapes of names built around a substitution, and
+  assignments that do not run (conditional, prefix, subshell, pipeline).
+  To record as gaps unless cheap: whole-word command output as a name,
+  names fed to `xargs`, `perl -e`, `git -c alias.x='!...'`,
+  `rg --pre`. The reviewer's ponytail advice is taken: delete the
+  evaluator (about 300 lines) and fail closed on operations over variables
+  assigned on the same line. Also asked: re-check the original 261 Phase H
+  exception commands, and make the NUL-byte case an explicit rule.
 
 ## [LEARN] Entries
 
