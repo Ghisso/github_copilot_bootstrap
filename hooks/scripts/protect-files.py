@@ -178,16 +178,11 @@ ANSI_C_SIMPLE_ESCAPES = {
 # An unquoted `$IFS` or `${IFS}` expands to blanks, which split the word around it.
 IFS_REFERENCE = re.compile(r"\$(?:IFS(?![A-Za-z0-9_])|\{IFS[^{}]*\})")
 # `variables` also records, under these key prefixes: a name defined as a function
-# or an alias (it then shadows a command of that name), a name assigned at all or
-# assigned as an array, and the earlier values of a name (joined by `EARLIER_SEPARATOR`,
-# at most `MAX_EARLIER`). A key cannot clash with a variable name.
+# or an alias (it then shadows a command of that name), and a name assigned at all or
+# assigned as an array. A key cannot clash with a variable name.
 FUNCTION_KEY = "()"
 ARRAY_KEY = "[]"
 ASSIGNED_KEY = "="
-EARLIER_KEY = "<"
-EARLIER_SEPARATOR = "\x01"
-MAX_EARLIER = 4
-MAX_VARIANTS = 16
 SHADOWED = "(function)"
 FUNCTION_NAME = re.compile(
     r"(?:^|[\s;&|(){}])([A-Za-z_][\w.:+-]*)\s*\(\s*\)|\bfunction\s+([A-Za-z_][\w.:+-]*)"
@@ -214,6 +209,10 @@ ASSIGNED_EXPANSION = re.compile(r"\$\{(!?)([A-Za-z_][A-Za-z0-9_]*)([^}]*)")
 TRACKED_EXPANSION_REFUSAL = (
     "a parameter expansion on a variable assigned earlier on this command line "
     "(an operation, an array subscript, an indirection) is not read"
+)
+ASSIGNED_TWICE_REFUSAL = (
+    "a variable assigned twice on this command line with different values: the guard "
+    "cannot tell which assignment runs"
 )
 DOTGLOB_REFUSAL = (
     "a glob can match hidden files after shopt -s dotglob, GLOBIGNORE, "
@@ -261,6 +260,10 @@ SED_LONG_OPTIONS = {
     "version": 0,
 }
 SCRIPT_SHELLS = {"bash", "sh", "dash", "zsh", "ksh", "ash"}
+# perl flags that take the rest of the cluster (or the next word) as a value.
+PERL_VALUE_FLAGS = "eEIFMmCdDVx"
+# git subcommands whose `-m` value is a message.
+MESSAGE_SUBCOMMANDS = {"commit", "tag", "merge", "notes", "stash"}
 # Folder commands: where a following relative path is read from.
 FOLDER_COMMANDS = {"cd", "pushd"}
 PUSHD_ROTATION = re.compile(r"[+-][0-9]+")
@@ -1808,36 +1811,31 @@ def record_assignment(token: str, variables: dict[str, str]) -> None:
 
     A value that still holds an expansion once the tracked variables are put in
     (`$`, backticks) is not known, so the variable is left unresolved rather than
-    guessed. `NAME+=value` adds to the tracked value. An array assignment
-    (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing reads its elements.
-
-    A later assignment never makes the guard forget an earlier value (it may not
-    run, or run in a subshell, a pipeline, or a prefix): the earlier values stay
-    in `variables` under `EARLIER_KEY` and each reference is checked with them too.
+    guessed. The value is read before the assignment, so it may name the variable
+    (`PORT=${PORT:-8080}`). A name that holds a tracked value and is assigned a
+    different one again (`=` or `+=`, plain, conditional, prefix, subshell,
+    pipeline, background) is refused: the guard cannot tell which assignment runs.
+    An array assignment (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing
+    reads its elements.
     """
     match = ASSIGNMENT.match(token)
     if not match:
         return
     name, index, plus, value = match.groups()
-    variables[ASSIGNED_KEY + name] = ""
     if value and name == "GLOBIGNORE":
         raise UnparseableCommand(DOTGLOB_REFUSAL)
     if value and name == "CDPATH":
         raise UnparseableCommand(CDPATH_REFUSAL)
     if index is not None or (value.startswith("(") and value.endswith(")")):
+        variables[ASSIGNED_KEY + name] = ""
         variables[ARRAY_KEY + name] = ""
         variables.pop(name, None)
         return
     known = _known_value(value, variables)
     old = variables.get(name)
-    if plus:
-        known = old + known if old is not None and known is not None else None
-    if old is not None and old != known:
-        earlier = variables.get(EARLIER_KEY + name, "")
-        kept = dict.fromkeys(
-            [old, *earlier.split(EARLIER_SEPARATOR)] if earlier else [old]
-        )
-        variables[EARLIER_KEY + name] = EARLIER_SEPARATOR.join(list(kept)[:MAX_EARLIER])
+    if old is not None and (plus or known != old):
+        raise UnparseableCommand(ASSIGNED_TWICE_REFUSAL)
+    variables[ASSIGNED_KEY + name] = ""
     if known is None:
         variables.pop(name, None)
     else:
@@ -1858,28 +1856,6 @@ def _refuse_assigned_expansions(text: str, variables: dict[str, str]) -> None:
             raise UnparseableCommand(TRACKED_EXPANSION_REFUSAL)
 
 
-def _earlier_variants(token: str, variables: dict[str, str]) -> list[str]:
-    """`token` followed by one copy per earlier value of each variable it names, with
-    that value in place of the name: `x=.a; x=b; tee $x` checks `tee b` and `tee .a`."""
-    variants = [token]
-    for name in dict.fromkeys(
-        match.group(1) or match.group(2) for match in PLAIN_REFERENCE.finditer(token)
-    ):
-        earlier = variables.get(EARLIER_KEY + name)
-        for value in earlier.split(EARLIER_SEPARATOR) if earlier else ():
-            variants.append(_with_value(token, name, value))
-    return variants[:MAX_VARIANTS]
-
-
-def _with_value(token: str, name: str, value: str) -> str:
-    """`token` with each reference to `name` replaced by `value`."""
-
-    def replace(match: re.Match[str]) -> str:
-        return value if (match.group(1) or match.group(2)) == name else match.group(0)
-
-    return PLAIN_REFERENCE.sub(replace, token)
-
-
 def _blank_splitter(variables: dict[str, str]) -> re.Pattern[str]:
     """The characters that split an unquoted expansion into words: blanks and
     newlines, and what a tracked `IFS` adds."""
@@ -1889,34 +1865,38 @@ def _blank_splitter(variables: dict[str, str]) -> re.Pattern[str]:
     return re.compile("[ \t\n" + extra + "]+")
 
 
-def substitute(tokens: list[str], variables: dict[str, str]) -> list[str]:
+def substitute(
+    tokens: list[str], variables: dict[str, str], assignments: int = 0
+) -> list[str]:
     """Replace `$NAME` and `${NAME}` with tracked values. The value of an unquoted
     reference splits into words at blanks (and at a tracked `IFS`), as Bash does.
-    A variable that was given other values earlier adds a copy of the word per
-    earlier value (see `record_assignment`)."""
+    The first `assignments` tokens are the words before a command: an assignment
+    among them was already read before it took effect (`record_assignment`), so it
+    is not checked again against the variables it has just set."""
     resolved: list[str] = []
     splitter = _blank_splitter(variables)
-    for token in tokens:
-        _refuse_assigned_expansions(strip_quoted_prefix(token), variables)
+    for position, token in enumerate(tokens):
         # The value of an assignment (`b=$a`) is never split into words.
-        quoted = token.startswith((QUOTED_VALUE_PREFIX, QUOTED_PATTERN_PREFIX)) or bool(
-            ASSIGNMENT_WORD.match(token)
+        assignment = bool(ASSIGNMENT_WORD.match(token))
+        if not (assignment and position < assignments):
+            _refuse_assigned_expansions(strip_quoted_prefix(token), variables)
+        quoted = (
+            token.startswith((QUOTED_VALUE_PREFIX, QUOTED_PATTERN_PREFIX)) or assignment
         )
 
         def mark(text: str, quoted: bool = quoted) -> str:
             return text if quoted else splitter.sub("\0", text)
 
-        for variant in _earlier_variants(token, variables):
-            text = PLAIN_REFERENCE.sub(
-                lambda match: mark(
-                    variables.get(match.group(1) or match.group(2), match.group(0))
-                ),
-                variant,
-            )
-            if "\0" in text:
-                resolved.extend(word for word in text.split("\0") if word)
-            else:
-                resolved.append(text)
+        text = PLAIN_REFERENCE.sub(
+            lambda match: mark(
+                variables.get(match.group(1) or match.group(2), match.group(0))
+            ),
+            token,
+        )
+        if "\0" in text:
+            resolved.extend(word for word in text.split("\0") if word)
+        else:
+            resolved.append(text)
     return resolved
 
 
@@ -1964,8 +1944,10 @@ def command_name(
         index += 1
     if index == len(tokens):
         return None
-    while index < len(tokens) and tokens[index] in WRAPPER_VALUE_FLAGS:
-        wrapper = tokens[index]
+    while (
+        index < len(tokens) and posixpath.basename(tokens[index]) in WRAPPER_VALUE_FLAGS
+    ):
+        wrapper = posixpath.basename(tokens[index])
         value_flags = WRAPPER_VALUE_FLAGS[wrapper]
         no_value_flags = WRAPPER_NO_VALUE_FLAGS[wrapper]
         index += 1
@@ -2607,13 +2589,13 @@ def _message_indices(
     tokens: list[str], command_info: tuple[str, int, dict[str, str]] | None
 ) -> set[int]:
     """The indices of the tokens that hold the message of `git commit`, `git tag`,
-    or `git merge` (`-m TEXT`, `-mTEXT`, `-am TEXT`, `--message TEXT`,
-    `--message=TEXT`). A heredoc fed to `cat` inside such a value is the message
-    text, not a file the command writes."""
+    `git merge`, `git notes`, or `git stash` (`-m TEXT`, `-mTEXT`, `-am TEXT`,
+    `--message TEXT`, `--message=TEXT`). A heredoc fed to `cat` inside such a value
+    is the message text, not a file the command writes."""
     if command_info is None or command_info[0] != "git":
         return set()
     start = command_info[1]
-    if git_subcommand(tokens[start:]) not in {"commit", "tag", "merge"}:
+    if git_subcommand(tokens[start:]) not in MESSAGE_SUBCOMMANDS:
         return set()
     indices: set[int] = set()
     for index in range(start, len(tokens)):
@@ -2675,7 +2657,9 @@ def segment_targets(
     # otherwise a same-segment `TARGET=.env rm "$TARGET"` would substitute
     # "$TARGET" using not-yet-recorded variables and leave it unresolved.
     command_info = command_name(tokens, variables)
-    expanded = substitute(tokens, variables)
+    expanded = substitute(
+        tokens, variables, command_info[1] - 1 if command_info else len(tokens)
+    )
     if len(expanded) != len(tokens):
         # A value split into several words (`x="tee a"; $x`): read the command again.
         command_info = command_name(expanded, variables, record=False)
@@ -2712,24 +2696,31 @@ def segment_targets(
     # recursively classified unconditionally - never merely because the outer
     # command looks unsafe.
     message_values = _message_indices(tokens, command_info)
+    # A substitution in an assignment runs before that assignment takes effect, with
+    # the assignments to its left done: `x=$(cmd ${x:-d})` reads the old `x`.
+    prefix = command_info[1] - 1 if command_info else len(tokens)
+    scope = dict(outer_variables)
     for token_index, token in enumerate(tokens):
+        assigning = token_index < prefix and bool(ASSIGNMENT_WORD.match(token))
         classify_substitutions(
             token,
             process_subs,
             repo_root,
-            variables,
+            scope if assigning else variables,
             working_directories,
             confirmed,
             uncertain,
             heredocs,
             token_index in message_values,
         )
+        if assigning:
+            record_assignment(token, scope)
 
     if command_info is None:
         return
     command, start, prefix_assignments = command_info
     # `env -C DIR cmd` runs `cmd` in DIR: its operands are read from there too.
-    for folder in _wrapper_folders(tokens[: start - 1]):
+    for folder in _option_folders(tokens[: start - 1]):
         for candidate in _folders(folder, repo_root, working_directories):
             if candidate not in working_directories:
                 if len(working_directories) >= MAX_WORKING_DIRECTORIES:
@@ -2844,12 +2835,16 @@ def segment_targets(
             if sed_executes:
                 raise UnparseableCommand("a sed script runs a shell command")
         candidates = operands(args, OPTION_VALUES[command])
-        inplace = any(
-            arg == "-i"
-            or (arg.startswith("-") and "i" in arg[1:])
-            or arg == "--in-place"
-            or arg.startswith("--in-place=")
-            for arg in args
+        inplace = (
+            _perl_in_place(args)
+            if command == "perl"
+            else any(
+                arg == "-i"
+                or (arg.startswith("-") and "i" in arg[1:])
+                or arg == "--in-place"
+                or arg.startswith("--in-place=")
+                for arg in args
+            )
         )
         if inplace:
             required = 1 if command == "perl" else 2
@@ -2862,7 +2857,7 @@ def segment_targets(
                     repo_root,
                 )
             )
-        if command == "perl" and not inplace:
+        if command == "perl":
             _scan_unmodelled(
                 command,
                 plain_args,
@@ -2975,15 +2970,21 @@ def _scan_unmodelled(
         " ".join(strip_quoted_prefix(token) for token in scanned)
     ):
         raise UnparseableCommand(DOTGLOB_REFUSAL)  # `eval 'shopt -s dotglob'`
+    if posixpath.basename(command) in SCRIPT_SHELLS and _shell_enables_dotglob(
+        plain_args
+    ):
+        raise UnparseableCommand(DOTGLOB_REFUSAL)  # `bash -O dotglob -c '...'`
     script = _shell_script(command, plain_args)
     if script is not None:
-        # The script is a command line: read it as one, in a copy of this shell's
-        # folders and variables (a `cd` in it does not leave the child shell).
+        # The script is a command line: read it as one. `eval` runs in this shell, so
+        # what it sets stays (folders, variables, aliases, functions); `bash -c` runs a
+        # child shell, which gets a copy and leaves nothing behind.
+        current = posixpath.basename(command) == "eval"
         classify_command(
             script,
             repo_root,
-            dict(variables),
-            list(working_directories),
+            variables if current else dict(variables),
+            working_directories if current else list(working_directories),
             confirmed,
             uncertain,
             {},
@@ -3002,9 +3003,16 @@ def _scan_unmodelled(
     # protected-config decision (confirmed), but a file an interpreter or a
     # runner executes cannot be judged and denies (uncertain), like the same
     # path spelled from the root.
-    offset_roots = [
-        root for root in working_directories if root != os.path.normpath(repo_root)
-    ]
+    folders = list(working_directories)
+    for folder in _option_folders(
+        plain_args
+    ):  # `timeout 5 env -C DIR cmd`, `make -C DIR`
+        for candidate in _folders(folder, repo_root, working_directories):
+            if candidate not in folders:
+                if len(folders) >= MAX_WORKING_DIRECTORIES:
+                    raise UnparseableCommand("too many different folders to follow")
+                folders.append(candidate)
+    offset_roots = [root for root in folders if root != os.path.normpath(repo_root)]
     if offset_roots:
         # `--out=NAME` names a file too: its value is read from the folder.
         names = [
@@ -3038,6 +3046,50 @@ def _shell_script(command: str, args: list[str]) -> str | None:
         if word in ("-o", "+o", "-O", "+O"):
             index += 1  # the value of an option
     return None
+
+
+def _shell_enables_dotglob(args: list[str]) -> bool:
+    """True when the options of a shell command (`bash -O dotglob -c ...`, `zsh -o
+    glob_dots -c ...`) turn on a setting that lets a glob match hidden files."""
+    words = [strip_quoted_prefix(arg) for arg in args]
+    index = 0
+    while index < len(words):
+        word = words[index]
+        index += 1
+        if word == "--" or not word.startswith(("-", "+")):
+            break  # the script or the script file: what follows are its arguments
+        if word in ("-O", "-o", "+O", "+o") and index < len(words):
+            if word[0] == "-" and re.sub("[_-]", "", words[index]).lower() in (
+                "dotglob",
+                "globdots",
+            ):
+                return True
+            index += 1
+        elif word in ("--rcfile", "--init-file"):
+            index += 1
+    return False
+
+
+def _perl_in_place(args: list[str]) -> bool:
+    """True when a perl flag cluster has `-i`. A cluster is read up to the first letter
+    that takes the rest of it as a value (`-Mwarnings`, `-Ilib`, `-e'code'`), so the
+    `i` of a module name does not count; the script words themselves are always
+    scanned for names."""
+    index = 0
+    while index < len(args):
+        word = strip_quoted_prefix(args[index])
+        index += 1
+        if not word.startswith("-") or word.startswith("--") or word == "-":
+            break  # the first word that is not a flag cluster is the script file
+        cluster = word[1:]
+        for position, letter in enumerate(cluster):
+            if letter == "i":
+                return True
+            if letter in PERL_VALUE_FLAGS:
+                if letter in "eEIF" and position == len(cluster) - 1:
+                    index += 1  # the value is the next word
+                break
+    return False
 
 
 def _rg_runs_a_command(args: list[str]) -> bool:
@@ -3098,16 +3150,15 @@ def _follow_folder_change(
             working_directories.append(candidate)
 
 
-def _wrapper_folders(prefix: list[str]) -> list[str]:
-    """The folders `env -C DIR` or `env --chdir=DIR` among the wrapper words before a
-    command move it to."""
-    if "env" not in prefix:
-        return []
+def _option_folders(words: list[str]) -> list[str]:
+    """The folders named by `-C DIR`, `-CDIR`, `--chdir DIR`, `--chdir=DIR`,
+    `--directory DIR`, `--directory=DIR` among `words` (`env -C DIR cmd`, `make -C DIR`,
+    `tar -C DIR`): the command that gets the option works in that folder."""
     folders: list[str] = []
-    for index, word in enumerate(prefix):
-        if word in ("-C", "--chdir") and index + 1 < len(prefix):
-            folders.append(prefix[index + 1])
-        elif word.startswith("--chdir="):
+    for index, word in enumerate(words):
+        if word in ("-C", "--chdir", "--directory") and index + 1 < len(words):
+            folders.append(words[index + 1])
+        elif word.startswith(("--chdir=", "--directory=")):
             folders.append(word.partition("=")[2])
         elif word.startswith("-C") and len(word) > 2 and not word.startswith("--"):
             folders.append(word[2:])
