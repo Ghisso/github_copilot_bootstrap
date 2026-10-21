@@ -72,6 +72,20 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   follow-up; the wiki claim range L88-L135 shifts and is left to Phase J).
   No statement in `README.md`, `docs/architecture.md`, or the policies
   needed a change.
+- **Review round 1** (fresh reviewer, six profiles): Gate Result FAIL, 6
+  major and 8 minor. Confirmed by the orchestrator with the full hook
+  (old against new): `tee $((1)) .env` and `tee $(echo $(date)) .env`
+  went from deny to allow (words after the `)` of an unquoted `$( )`
+  became an unchecked command name); `rm $(git rev-parse
+  --show-toplevel)/.env`, `echo x > $(pwd)/.env`, `tee $(true) .env`, a
+  carriage return before `#`, `tee "$X(" cat .env`, and `tee $".env"` were
+  allowed by both guards. A crafted 100 KB input failed closed in 4.0 s,
+  close to the 10 s hook timeout. Other majors: the differential never
+  generated these shapes, and `docs/runtime-checks.md` stated absolute
+  rules the code did not meet. Sent all majors and minors 7, 10 to 13 back
+  to the coder; docs to be redone after. Pre-existing gaps the review
+  listed as information (shell functions or aliases, `$IFS` splitting,
+  heredoc delimiters read short) were added to Phase I.
 
 ## [LEARN] Entries
 

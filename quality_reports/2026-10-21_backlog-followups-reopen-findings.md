@@ -163,6 +163,13 @@ already allowed:
 - an operator run such as `;(` read as one word (`cat x;(tee .env)`),
   fixed in Phase H.
 
+The Phase H review added more pre-existing forms: words after the `)` of
+an unquoted `$( )` (`rm $(pwd)/.env`, `tee $(true) .env`), a carriage
+return before `#`, a quoted variable next to `(` or `)`
+(`tee "$X(" cat .env`), and `$"..."` locale quoting, all fixed in Phase H;
+and shell functions or aliases that hide a write, `$IFS` word splitting,
+and heredoc delimiters read short, left to Phase I.
+
 ### Outside this plan
 
 Bash reads of secret-shaped files (`cat .env`) are allowed while native

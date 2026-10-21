@@ -38,8 +38,11 @@ findings R3 (with its correction), R6, R7 (last bullet), and R8 in
   `tee "$X".env`), a parameter default that names one
   (`tee "${X:-.env}"`), ANSI-C escapes that spell one
   (`touch $'\x2eenv'`), a `#` inside `${ }` (`echo ${x:- #}; tee .env`),
-  and a heredoc body inside `"$( )"`. A form the guard cannot resolve
-  safely is an uncertain hit, which denies on every client.
+  and a heredoc body inside `"$( )"`. Added from the Phase H review: a
+  shell function or alias that hides a write (`cat() { tee "$@"; }; cat
+  .env`), `$IFS` word splitting (`tee$IFS.env`), and heredoc delimiters
+  the guard reads short (`<<EOF#x`, `<<END-OF-DATA`). A form the guard
+  cannot resolve safely is an uncertain hit, which denies on every client.
 
 This is control-plane work (`shared/hooks/scripts/`, `shared/scripts/`):
 full review profiles apply.
