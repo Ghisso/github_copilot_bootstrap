@@ -232,6 +232,21 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   readings, and split `_read_word`. New finding R10 (shell model): zsh
   glob qualifiers that run code (`cat *(e:'touch .env':)`, allowed before
   and after) go to Phase I.
+- **Coder round 5 fixes** - `_matching_brace` takes `in_double_quotes`
+  and fails closed on `'` or `$'` inside a double-quoted `${ }` ("read
+  differently by Bash and by POSIX shells"); `_read_word` split into
+  `_read_group_word`, `_quoted_part`, and `_mark_quoted_word` (with the fix
+  switched off, decisions identical to round 4 on 246,000 inputs). The
+  sweep now runs every command under plain Bash, `bash --posix`, and dash:
+  3,228 commands, 2,252 written by some reading; gaps HEAD 142, round 4
+  72, now 0 outside the accepted classes. The new 810-command group
+  (quotes in double-quoted `${ }` for 15 operators) fails closed in full.
+  Outside that group, POSIX readings add only dash-only forms the guard
+  already denies. 277 cases hold under the union of the three readings;
+  differential against round 4: 0 looser in every set; against HEAD, 99
+  commands some reading writes and the guard allows, 77 minimal causes,
+  all accepted classes. Regenerated, self-installed;
+  `validate_targets.py` and `check_runtime.py` PASS.
 
 ## [LEARN] Entries
 
