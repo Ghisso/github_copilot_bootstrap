@@ -244,6 +244,13 @@ the user runs them (BF-I1 to BF-I7).
   design); tests, ruff, mypy, 3.9, Bash check, and the three Python
   versions pass. Regenerated, self-installed; `validate_targets.py` and
   `check_runtime.py` PASS. Docs sixth pass started.
+- **Docs sixth pass** - fragment sentence removed; guesses tracked only
+  when they name a protected file; unresolved references glued to a name
+  are checked with the reference removed; pipes read only from `cat`
+  producers; the gap list gains fragment values and pipes from other
+  producers. Phase G cited text now at 790-822. `verify.py phase` PASS
+  (4932 passed, 1 skipped). Short confirmation review (round 6)
+  requested.
 
 ## [LEARN] Entries
 
