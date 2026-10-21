@@ -81,6 +81,30 @@ the user runs them (BF-I1 to BF-I7).
   evaluator (about 300 lines) and fail closed on operations over variables
   assigned on the same line. Also asked: re-check the original 261 Phase H
   exception commands, and make the NUL-byte case an explicit rule.
+- **Coder round 1 fixes** - every item reproduced first (116 cases under
+  three readings: 40 bypasses, 22 failed expectations before; 0 and 0
+  after, 3 recorded gaps). Commit-message exemption only for a lone `cat`
+  heredoc; evaluator deleted (operations, subscripts, indirection, and
+  arrays on same-line variables fail closed); `shopt`/`setopt`/`set`/
+  `alias`/`GLOBIGNORE=`/`CDPATH=` read from scanned words; `find` patterns
+  instantiated, `-path`/`-regex` never narrow; GNU `getopt` prefixes for
+  `sed`, and `sed` `e` fails closed; `cd` operands expanded, `pushd`,
+  `popd`, `builtin cd`, `env -C`, and `bash -c`/`sh -c`/`eval` scripts
+  followed; names continuing `.env.`/`credentials` around a substitution
+  flagged; earlier variable values kept and all checked; `perl`, `git -c`,
+  and `rg --pre` read as runners; NUL bytes cut or refused explicitly.
+  Test file renamed to `tests/test_protect_files_substitutions.py`.
+  Removed about 230 lines (evaluator, arrays, find samples); the file is
+  3,390 lines. All 261 original Phase H exception commands re-run: 257
+  denied on every client, 4 config writes at ask/deny, 0 defects. Sweep:
+  668 snippets x 30 contexts = 20,040 commands; gaps original 7,304, Phase
+  H 8,712, now 114 (the computed `cd` folder and whole-word or `xargs`-fed
+  names, all recorded). Differential vs Phase H: 5,175 looser, 0
+  under-protected; vs round 1: 655 looser, 0 defects. 589 Bash cases hold;
+  scanner vs Bash 30,000, 0 disagreements; 3.9, 3.12, and 3.13 identical
+  on 45,284 commands; slowest input 2.49 s. Regenerated, self-installed;
+  `validate_targets.py` and `check_runtime.py` PASS. Docs second pass
+  started.
 
 ## [LEARN] Entries
 
