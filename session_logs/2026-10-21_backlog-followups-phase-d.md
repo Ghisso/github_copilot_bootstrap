@@ -17,7 +17,11 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
 
 - [x] PRE-FLIGHT: Phase C committed (`69bdb64`) and pushed; Phase D is the
   current phase. Phase C outcomes do not affect Phase D; no planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] IMPLEMENT/VERIFY/REVIEW — six review rounds (FAIL, FAIL, FAIL, FAIL,
+  PASS with one MINOR, PASS clean); every MAJOR was a decision that
+  became looser than before the plan, each fixed and pinned by tests.
+- [x] CLOSEOUT: documentation, final AI state, checkpoint, staged index,
+  findings, phase receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -30,92 +34,104 @@ behavior, the recovery path, and the remaining gaps (BF-D5).
   workspace-file (40), bash-guard chain (10), Antigravity bridge (10),
   literal must-match (6), and in-repository name (7) cases failed; the
   `sandbox_mode` override case failed; the still-allowed, read, foreign
-  checkout, and near-miss cases passed. Final worktree checks: generate +
-  validate PASS, 1138 targeted tests and 579 adjacent tests passed, ruff,
-  format, mypy clean, `protect-files.py` parses and its tests pass under
-  Python 3.9.0. Design choice accepted: unmodelled Git subcommand tokens are
-  also resolved against the `-C`/`cd` directory as confirmed targets, and
-  the existing repository-root uncertain (deny) rule stays, so no existing
-  client decision is loosened.
-- **Now** - Applied the worktree diff here (`git apply --check` clean;
-  6 files) and removed the worktree. Delegated step 3 (docs) to a
-  documenter.
-- **Later** - Docs done (target-mapping parity section and follow-ups,
-  smoke tests, runtime checks, README, File Protection Rules, commit skill
-  `--body-file`). Regenerated and self-installed; `verify.py phase`: PASS
-  (3074 passed). Live check: the installed guard now denies
-  `ls <repo>/.claude/agents` in this session.
-- **Later** - Review round 1: `FAIL`. MAJOR (security): resolving
-  unmodelled Git tokens against the `-C`/`cd` directory also adds tokens
-  that the repository-root rule already denies, and confirmed hits win in
-  `emit()`, so an absolute-path `git -C .claude restore ...` became ask
-  instead of deny on Claude Code and Copilot. MAJOR (documentation): the
-  docs said `rm -rf`, `mv`, `ln -s` on a whole folder are denied on all four
-  clients, but they ask on Claude Code and Copilot. MINORs: no mixed-case
-  workspace-name test; a confusing colon in the commit skill's PR example.
-  Sent the code fix to the coder and the docs fix to the documenter in
-  parallel (disjoint files).
-- **Later** - Documenter: split the docs' edit sentence (agent edits and
-  `rm -rf`/`mv`/`ln -s` on a whole folder ask on Claude Code and Copilot,
-  deny on Codex and Antigravity) from the "merely names" sentence
-  (`ls`/`find`/`diff`/`cmp` denied everywhere) in runtime checks, smoke
-  tests, README, and target mapping; named all four clients for the
-  `git -C`/`cd` forms; fixed the commit skill colon. Generate + validate
-  PASS.
-- **Later** - Coder: offset-root resolution now runs only when no token of
-  that Git command is already protected from the repository root (stricter
-  than the reviewer's per-token suggestion, which would still soften a
-  mixed-token command). Probe of `git -C .claude restore <abs>/.claude/hooks/...`:
-  deny on all four clients at HEAD, ask on Claude Code and Copilot before
-  the fix, deny on all four after. New deny-everywhere test for five Git
-  forms (6 of its rows failed before the fix); `Team.CODE-WORKSPACE` added to
-  the scoping and per-client tests (negative controls without `.lower()`: 13
-  failures; without `re.IGNORECASE`: 2). 1179 targeted tests pass.
-- **Orchestrator decision (within approved goals)** - The coder also found
-  that across segments of one command line a confirmed hit beats an
-  uncertain deny, so `git restore .claude/hooks/x && git -C .claude restore
-  hooks/y` and `git restore .claude/hooks/x && rm -rf .claude/agents` would
-  go from deny at HEAD to ask, which the plan forbids. Asked the coder to
-  make uncertain hits decide first. A plain reorder broke 44 existing tests
-  (a redirect target is listed both as confirmed and as uncertain, so
-  `echo x > <hook config>` would go ask -> deny), so the coder exempted an
-  uncertain hit whose path a confirmed hit also names (12 new deny rows
-  failed first, then passed). Generate + validate PASS; `verify.py phase`
-  PASS (3135 passed). Added a target-mapping follow-up bullet on the rule
-  and the unchanged `rm .env .mcp.json` case.
-- **Later** - Review round 2: `FAIL`. Round-1 MAJOR 2 and both MINORs
-  fixed; MAJOR 1 fixed for the reported forms, but the same-name exemption
-  still lets `git restore .claude/hooks/x && git -C .claude restore hooks/x`
-  ask (deny at HEAD). MINOR: the `emit()` change departs from the plan text
-  and tightens more than disclosed. Decision (recorded as big-plan
-  "Decisions recorded" item 6): adopt the reviewer's single rule — redirect
-  targets are only confirmed hits, any uncertain hit denies everywhere, and
-  the `if not visible` guard goes if redundant. Sent to the coder; docs
-  wording follows once the code is final.
-- **Later** - Coder: `without_redirects()` keeps redirect targets out of the
-  uncertain scan (also in the Git branch); `emit()` denies on any uncertain
-  hit; the same-name exemption and the `if not visible` guard are gone.
-  35-command probe: no loosening versus HEAD; tightenings listed. 12 of 40
-  new or changed rows failed before the change. Documenter aligned the docs.
-  `verify.py phase`: PASS (3155 passed).
-- **Later** - Review round 3: `FAIL`. Round-2 findings fixed. New MAJOR:
-  `emit()` ranks a confirmed hook-config hit above the secret-file rule, so
-  newly protected names turn existing secret denies into asks (for example
-  `cp .env .claude/agents/x.md`: deny at HEAD, ask now). MINORs: a leading
-  redirect (`> .claude/settings.json`) now denies instead of asking; the
-  redirect predicate has three copies. Decision: the secret-file rule
-  denies first; fix the leading redirect; one `is_redirect` helper; and a
-  required systematic battery (at least 200 commands, HEAD versus working
-  tree, all four clients) so no loosening reaches the next review.
+  checkout, and near-miss cases passed. Worktree checks passed, including
+  the guard tests under Python 3.9.0.
+- **Start** - Applied the worktree diff here (`git apply --check` clean;
+  6 files) and removed the worktree. Documenter wrote step 3 (target
+  mapping parity section and follow-ups, smoke tests, runtime checks,
+  README, File Protection Rules, commit skill `--body-file`). Regenerated
+  and self-installed; `verify.py phase` PASS (3074 passed). Live check: the
+  installed guard denies `ls <repo>/.claude/agents` in this session.
+- **Review round 1: FAIL** - MAJOR (security): resolving unmodelled Git
+  tokens against the `-C`/`cd` directory let an absolute-path
+  `git -C .claude restore ...` ask instead of deny. MAJOR (docs): `rm -rf`,
+  `mv`, `ln -s` on a whole folder were documented as denied everywhere but
+  ask on Claude Code and Copilot. MINORs: no mixed-case workspace-name test;
+  a confusing colon in the commit skill. Fixed: offset resolution only when
+  no token is visible from the repository root (probe: deny at HEAD, ask
+  before the fix, deny after); docs split the edit sentence from the
+  "merely names" sentence; `Team.CODE-WORKSPACE` rows (negative controls:
+  13 failures without `.lower()`, 2 without `re.IGNORECASE`); skill colon.
+- **Review round 2: FAIL** - MAJOR: across segments of one command line a
+  confirmed hit beat an uncertain deny (same-file two-segment forms asked;
+  deny at HEAD). A plain reorder in `emit()` broke 44 existing redirect
+  tests, so an interim same-name exemption was tried; the reviewer showed it
+  still loosened. Final single rule (big-plan "Decisions recorded" item 6):
+  `without_redirects()`/`is_redirect()` keep redirect targets out of the
+  uncertain scan (also leading redirects), and any uncertain hit denies on
+  every client.
+- **Review round 3: FAIL** - MAJOR: a confirmed hook-config hit ranked
+  above the secret-file rule, so `cp .env .claude/agents/x.md` asked (deny
+  at HEAD). MINORs: leading redirect, three predicate copies. Fixed:
+  `emit()` checks secret hits first; leading redirects drop correctly; one
+  `is_redirect` helper. Required a systematic HEAD-versus-now battery.
+- **Review round 4: FAIL** - MAJOR (the battery's blind spot): a
+  secret-shaped name inside a newly protected folder (`.claude/agents/.env`)
+  was classified as a hook config, so edits asked and Copilot reads were
+  allowed (deny at HEAD). Fixed: `protected()` tests secret-shaped names
+  first, in both the lexical and the symlink-resolved path form. Docs: the
+  one-off battery counts moved out of the docs into this log; Phase D's
+  Step 1 note points to decision 6.
+- **Review round 5: PASS** - one MINOR: the tightening for secret names
+  inside the older hook folders was untested and undisclosed. Added
+  `.claude/hooks/.env` and `.github/hooks/credentials.json` test rows
+  (negative control against HEAD's guard: 18 of 58 failed, exactly the new
+  rows) and the disclosure in the docs and decision 6.
+- **Review round 6: PASS** - no findings, no open request.
+- **No-loosening evidence (session scratch folder `phase-d/`)** - Batteries
+  `battery.py`, `battery_native.py`, and `battery2.py` compare the guard as
+  it was at HEAD (`git archive HEAD`) with the working tree for all four
+  clients. Final extended run: shell 9,476 inputs (37,904 per-client
+  comparisons), native 5,685 payloads (22,740), Antigravity bridge 1,308 —
+  0 defects (no deny that became ask or allow, no ask that became allow),
+  0 errors. Changes versus HEAD: shell allow→ask 1,922, allow→deny 3,882,
+  ask→deny 2,770, unchanged 29,330; native allow→ask 488, allow→deny 4,112,
+  ask→deny 822, unchanged 17,318; bridge allow→deny 112, unchanged 1,196.
+  Allow→ask/deny is new coverage; ask→deny is tightening. Controls: the
+  same battery against the previous rounds' guards found 272 (round 4) and
+  9,768 (round 5) defects, so it detects the classes the reviews found.
+  Result files: `round6-shell-battery.txt`, `round6-*-results.tsv`,
+  `round6-summary.txt`, `round6-changes.txt`.
+- **Deviation to report at the phase boundary** - Decision 6 departs from
+  the plan's "the decision rule in `emit()` stays as it is": it never
+  loosens a decision, and it tightens several existing Claude Code and
+  Copilot asks to denies (for example `rm .env .mcp.json`,
+  `.claude/hooks/.env`, `git restore` of a protected config chained with
+  `rm` of it, and a settings edit whose heredoc body names a hook script).
 
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:security] When a guard change adds protected names or new ways to
+  reach a confirmed hit, prove "no decision loosened" with a generated
+  battery that runs the pre-change guard and the new guard on every target
+  kind (including secret names inside each newly protected folder and
+  symlinks), every command shape (redirects, heredocs, interpreters, Git
+  `-C`/`cd`, multi-segment `&&`), native and read-tool payloads, and every
+  client. Hand-picked probes missed four loosenings in a row in the
+  2026-10-21 Phase D review; a control run against the previous guard shows
+  the battery detects the class.
+- [LEARN:workflow] While a phase waits for a user decision, the next
+  phase's code can be prepared in a detached worktree in the scratch folder
+  (`git worktree add --detach <scratch> HEAD`), then applied with
+  `git apply` once the current phase commits. Plain `uv run` there lacks the
+  tools; use `VIRTUAL_ENV=<repo>/.venv uv run --active ...`.
 
 ## Verification
 
-To be written at closeout.
+```text
+# verify closeout --format text summary lines
+```
+
+- optional 1: NOT RUN — Claude Code interactive approval prompt for an
+  agent-file edit needs an attended session (the user was away); the hook
+  decision is covered by tests and the live `ls` denial above.
+- optional 2: NOT RUN — Codex native session not available here.
+- optional 3: NOT RUN — GitHub Copilot in VS Code (Local harness) session
+  not available here.
+- optional 4: NOT RUN — no disposable Antigravity install with a native
+  session available here.
 
 ## Open Questions / Next Steps
 
-- Phase E follows: Ponytail 5 partial adoption (step 1 evidence ready).
+- Phase E follows: Ponytail 5 partial adoption (step 1 evidence ready in
+  the scratch folder).

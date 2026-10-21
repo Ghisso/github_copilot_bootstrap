@@ -3,8 +3,8 @@ name: 2026-10-20_phase-D-agent-definition-protection
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 4
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-21_backlog-followups-phase-d.md
 ---
 
 # Small Plan: Agent Definition Protection
@@ -85,7 +85,7 @@ sees, so installs and regeneration are unaffected.
 
 ## Steps
 
-- [ ] **1. Protect agent folders, whole protected folders, and workspace files (BF-D1, BF-D2, BF-D3).**
+- [x] **1. Protect agent folders, whole protected folders, and workspace files (BF-D1, BF-D2, BF-D3).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/protect-files.py` (the hook-folder
   regex alternative at line 128, the folder checks in `protected()` at
@@ -180,7 +180,7 @@ sees, so installs and regeneration are unaffected.
     The agent-folder, whole-folder, and workspace-file cases must fail and
     the still-allowed cases must pass. Record both runs in the session log.
 
-- [ ] **2. Remove the dead Codex `sandbox_mode` key (BF-D4).**
+- [x] **2. Remove the dead Codex `sandbox_mode` key (BF-D4).**
   **Owner:** coder.
   **Files:** modify `scripts/generate_targets.py` (delete
   `codex_sandbox_mode`, lines 931–936, and its use in
@@ -205,7 +205,7 @@ sees, so installs and regeneration are unaffected.
   change and passes after it. `validate_targets.py` passes on the
   regenerated `dist/`, so no generated Codex agent carries the key.
 
-- [ ] **3. Document the protection and the remaining gaps (BF-D5).**
+- [x] **3. Document the protection and the remaining gaps (BF-D5).**
   **Owner:** documenter, after steps 1 and 2 pass `verify.py fast`, so the
   reviewer sees the docs with the `documentation` profile.
   **Files:** modify `docs/target-mapping.md` (create a `## Backlog-Followups Client Parity`
@@ -249,7 +249,7 @@ sees, so installs and regeneration are unaffected.
   (`docs/sidecar-provider-contract.md`, closed plans, session logs); claim a
   native run that did not happen.
 
-- [ ] **4. Regenerate, self-install, verify, review, close out.**
+- [x] **4. Regenerate, self-install, verify, review, close out.**
   **Owner:** orchestrator; fresh reviewer; documenter for review fixes.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
@@ -335,11 +335,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

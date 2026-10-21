@@ -1543,3 +1543,17 @@
   rule would archive), make that measurement the first step and give it a
   numeric stop threshold. The Phase C split stopped at 6.11% against a 25%
   threshold before any archive, index, or tool landed in the repository.
+- [LEARN:security] When a guard change adds protected names or new ways to
+  reach a confirmed hit, prove "no decision loosened" with a generated
+  battery that runs the pre-change guard and the new guard on every target
+  kind (including secret names inside each newly protected folder and
+  symlinks), every command shape (redirects, heredocs, interpreters, Git
+  `-C`/`cd`, multi-segment `&&`), native and read-tool payloads, and every
+  client. Hand-picked probes missed four loosenings in a row in the
+  2026-10-21 Phase D review; a control run against the previous guard shows
+  the battery detects the class.
+- [LEARN:workflow] While a phase waits for a user decision, the next
+  phase's code can be prepared in a detached worktree in the scratch folder
+  (`git worktree add --detach <scratch> HEAD`), then applied with
+  `git apply` once the current phase commits. Plain `uv run` there lacks the
+  tools; use `VIRTUAL_ENV=<repo>/.venv uv run --active ...`.
