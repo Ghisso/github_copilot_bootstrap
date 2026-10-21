@@ -41,8 +41,14 @@ findings R3 (with its correction), R6, R7 (last bullet), and R8 in
   and a heredoc body inside `"$( )"`. Added from the Phase H review: a
   shell function or alias that hides a write (`cat() { tee "$@"; }; cat
   .env`), `$IFS` word splitting (`tee$IFS.env`), and heredoc delimiters
-  the guard reads short (`<<EOF#x`, `<<END-OF-DATA`). A form the guard
-  cannot resolve safely is an uncertain hit, which denies on every client.
+  the guard reads short (`<<EOF#x`, `<<END-OF-DATA`). Added from the
+  Phase H round 2 coder report: a name built by a command
+  (`tee $(echo .e)nv`), array elements (`a=(.env); tee ${a[0]}`), a glob
+  glued to a variable (`tee "$X".e*`), and `find -delete` or
+  `find -exec rm {} +` with or without a pattern. A form the guard cannot
+  resolve safely is an uncertain hit, which denies on every client; where
+  a deny would block common harmless commands, record the gap with its
+  reason instead.
 
 This is control-plane work (`shared/hooks/scripts/`, `shared/scripts/`):
 full review profiles apply.

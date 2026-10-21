@@ -137,6 +137,26 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   default before the alarm, restoring the old allow for quoted search
   patterns (`find . -name '*.pem'`), and tests for substitution
   placeholders in `cd` and `git -C` operands; docs to follow.
+- **Coder round 2 fixes** - array assignments are one word and `)#` after
+  one fails closed; unresolved `$NAME`/`${NAME}` is stripped with
+  substitution placeholders in the bare-name checks (`tee .env$X` denied;
+  `cat .env$X` still a read); `SIGALRM` reset to its default before the
+  alarm (a test runs a child with `SIGALRM` ignored); a word that is
+  exactly one quoted glob or brace pattern gets `QUOTED_PATTERN_PREFIX` and
+  is skipped by the unknown-command scan, restoring the old allow for
+  `find . -name '*.pem'` and `ls '*.key'` (`rm 'credentials*'` and
+  `git add '*.pem'` stay denied). 197 cases agree with Bash; scoping tests
+  512 passed and 5 xfailed; 3.9, 3.12, and 3.13 decisions identical on
+  28,892 commands. Differential against the round-1 guard: every looser
+  result comes from the pattern skip or the array rule (checked by
+  switching each off); against HEAD, the 124 under-protected looser fuzz
+  commands reduce to 95 minimal causes, all in the accepted classes or a
+  stand-in artifact (`*` matching the stand-in but never a leading-dot
+  `.env`). The `minimal-reproducers.txt` "no class" entry was relabelled as
+  a glued quoted variable joined by a line continuation. More pre-existing
+  gaps (a name built by a command, array elements, a glob glued to a
+  variable, `find -delete`) were added to Phase I. Regenerated,
+  self-installed; `validate_targets.py` and `check_runtime.py` PASS.
 
 ## [LEARN] Entries
 
