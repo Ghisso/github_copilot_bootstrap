@@ -187,7 +187,7 @@ commit. Each phase's own session log carries its detailed evidence.
 
 Optional items:
 
-- OpenWiki completion: run `d1f285b5-4468-4e5a-89b6-d8acb60ab1fc`, finish
+- optional 1: PASS - OpenWiki completion: run `d1f285b5-4468-4e5a-89b6-d8acb60ab1fc`, finish
   `complete`, 8 pages (`architecture/agents-and-skills.md`,
   `architecture/hooks-and-guardrails.md`,
   `architecture/source-generated-consumer-layout.md`,
