@@ -3,7 +3,7 @@ name: 2026-10-21_phase-I-guard-substitutions-and-restore-messages
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 9
-status: planned
+status: in-progress
 closeout_session_log:
 ---
 

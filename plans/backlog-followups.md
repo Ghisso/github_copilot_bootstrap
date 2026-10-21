@@ -16,7 +16,7 @@ phases:
   - 2026-10-21_phase-H-guard-shell-scanner
   - 2026-10-21_phase-I-guard-substitutions-and-restore-messages
   - 2026-10-21_phase-J-guard-hardening-knowledge-refresh
-current_phase: 2026-10-21_phase-H-guard-shell-scanner
+current_phase: 2026-10-21_phase-I-guard-substitutions-and-restore-messages
 ---
 
 # Big Plan: Backlog Follow-ups
