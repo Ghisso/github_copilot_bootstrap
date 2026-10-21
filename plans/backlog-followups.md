@@ -1,7 +1,7 @@
 ---
 name: backlog-followups
 type: big-plan
-status: in-progress
+status: complete
 originating_branch: dev
 implementation_branch: backlog-followups_implementation
 started_at: 2026-10-20T14:54:11Z
@@ -13,7 +13,7 @@ phases:
   - 2026-10-20_phase-E-ponytail-5-adoption
   - 2026-10-20_phase-F-openwiki-0.7-upgrade
   - 2026-10-20_phase-G-backlog-followups-knowledge-refresh
-current_phase: 2026-10-20_phase-G-backlog-followups-knowledge-refresh
+current_phase: 
 ---
 
 # Big Plan: Backlog Follow-ups
