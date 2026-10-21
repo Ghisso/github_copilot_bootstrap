@@ -41,13 +41,16 @@ Real Bash passes these characters to the command as ordinary arguments.
 Classifier-only probe (the commands were never run; `shell_targets()` and
 the full `protect-files.py` decision were called with the text):
 
-| Command text | Guard result today | Correct result |
-| --- | --- | --- |
-| `tee '|' cat .env` | no target; hook allows | `.env` is a write target; deny |
-| `tee ';' cat .env`, `tee '&&' cat .env`, `tee '||' cat .env`, `tee '&' cat .env`, `tee '(' cat .env`, `tee "|" cat .env`, `tee '|''|' cat .env` | no target | `.env` is a write target |
-| `tee \| cat .env`, `tee \; cat .env` | no target | `.env` is a write target |
-| `tee '<newline>' cat .env` (a quoted line break) | no target | `.env` is a write target |
-| `tee '&&' cat .claude/settings.json` | no target; hook allows | protected config write; ask or deny by client |
+- `tee '|' cat .env`: no target, and the hook allows it. Correct: `.env`
+  is a write target, so deny.
+- The same with `';'`, `'&&'`, `'||'`, `'&'`, `'('`, `"|"`, or `'|''|'`
+  in place of `'|'`: no target. Correct: `.env` is a write target.
+- `tee \| cat .env` and `tee \; cat .env`: no target. Correct: `.env` is a
+  write target.
+- `tee`, a quoted line break, then `cat .env`: no target. Correct: `.env`
+  is a write target.
+- `tee '&&' cat .claude/settings.json`: no target, and the hook allows it.
+  Correct: a protected config write, so ask or deny by client.
 
 The flaw exists on `dev` since `240fe2d` (2026-08-08, "optimize safety
 routing"); this plan did not introduce it.
@@ -81,8 +84,81 @@ Some generated sentences are far over the 20-word target in
 the diff" bullet in `openwiki/architecture/agents-and-skills.md`. Only an
 OpenWiki run may change them.
 
+## Findings added by the plan's devil's-advocate review
+
+An independent read-only review (Opus, extra-high effort, devils-advocate
+skill) checked the draft plan against the code on 2026-10-21. It found that
+R1 is one symptom of a wider defect: `split_segments` turns every newline
+into `;` and then lexes with Python's `shlex`, which does not follow Bash's
+rules. The orchestrator re-ran the first seven forms below through the full
+`protect-files.py` decision for Claude Code and Codex: all were allowed
+(`tee .env` alone is denied). Every probe passed command text only; no
+write command was run. Bash's own reading was checked with harmless
+stand-ins (`echo RAN`).
+
+### R5 - CRITICAL (security): comments and blank lines hide the lines after them
+
+Once newlines become `;`, `shlex` treats a `#` as "skip to the next
+newline", and none are left, so everything after the first `#` is dropped.
+A blank line, or a line ending in `;`, `&&`, `||`, `|`, or `&`, glues into
+one unknown token (`;;`, `&&;`), so the next line joins the read-only
+command before it. No bad intent is needed: agents write multi-line
+commands with comments and blank lines.
+
+- `# step 1` then `tee .env` on the next line: allowed.
+- `ls # note` then `tee .env`: allowed.
+- `cat README.md`, a blank line, then `touch .env`: allowed.
+- `git status`, a blank line, then `git restore .env`: allowed.
+- `cat x &&` then `tee .env`: allowed (also `;`, `|`, `&` line ends).
+
+### R6 - MAJOR (security): command substitution inside double quotes or backticks is never checked
+
+`cat "$(tee .env)"` and `` cat `tee .env` `` are allowed; Bash runs the
+inner command. Only an unquoted `$(` is caught today.
+
+### R7 - MAJOR (security): other lexer mismatches
+
+- An escaped quote outside quotes confuses the heredoc and
+  process-substitution scanners: `cat \' <(tee .env)` is allowed.
+- A `#` inside a word (`cat x#y; tee .env`, `echo ${#X}; tee .env`), an
+  escaped backslash before a newline, and ANSI-C quoting
+  (`cat $'\'' ; tee .env ; cat \'`) are allowed.
+- `protect_quoted_globs` removes the quotes from a quoted value that holds
+  an operator and a variable: `tee "|cat $Y" .env` loses `.env`.
+- Grouped operators are one unknown word to `shlex`: `cat x |& tee .env`,
+  `cat x &>> .env`, `cat x >& .env`, and `cat x <> .env` are allowed.
+
+### R8 - MAJOR (security): two write paths outside the lexer
+
+- An inline `sed` write script is not checked: `sed -n 'w .env' README.md`
+  reports no target (the heredoc form is checked).
+- An unmodelled command after `cd` is resolved against the repository
+  root, not the `cd` folder.
+
+### Correction to R3
+
+An agent can still run the restore through `cd .claude/hooks/scripts &&
+bash openwiki-guard.sh post </dev/null` (that is R8's `cd` gap). The
+message wording should say that the guard denies an agent command that
+names a hook script, which is accurate, and that the user runs the command
+in their own shell.
+
+### Not bypasses today
+
+`tee $'|' cat .env`, `tee "\|" cat .env`, `tee a'|'b cat .env`,
+`{ cat x; tee .env; }`, and a `case` statement are denied. `eval`,
+`bash -c`, `xargs`, and `find -exec` forms are denied as uncertain. A
+single-line `;;` is a Bash syntax error, not a bypass.
+
+### Outside this plan
+
+Bash reads of secret-shaped files (`cat .env`) are allowed while native
+read tools on them are denied. That is a policy question for the user,
+not a parsing defect.
+
 ## Disposition
 
-- R1, R2, R3: Phase H (`2026-10-21_phase-H-guard-quoting-and-restore-messages`).
-- R4 and the wiki pages Phase H changes: Phase I
-  (`2026-10-21_phase-I-guard-quoting-knowledge-refresh`).
+- R1 to R3 and R5 to R8: Phase H and later code phases, split per the
+  user's scope decision (pending, 2026-10-21).
+- R4 and the wiki pages the code phases change: the final knowledge-refresh
+  phase.
