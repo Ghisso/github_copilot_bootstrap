@@ -49,7 +49,15 @@ only `mode: "update"` either way.
 - **Later** - Step 5 prepared by a coder ahead of step 4 (pin `0.7.2` in
   the Dockerfile and validator, ten tools in `EXPECTED_TOOLS`); the smoke
   test is expected to fail locally until the user's global install.
-  Asked the user to run step 4.
+  Asked the user to run step 4; the user chose to run the commands
+  themselves.
+- **Before step 4** - `command -v openwiki` = `/home/ghisso/.local/bin/openwiki`;
+  global package version `0.5.2`; both installed skill receipts
+  (`.claude/skills/openwiki/` and `.agents/skills/openwiki/`) say `0.5.2`;
+  `git status --porcelain` shows no change to the root MCP adapters. With
+  the step 5 pin already moved, the smoke test fails only at the version
+  assertion (`'0.5.2' == '0.7.2'`), as expected; the round-trip test passes
+  on `0.5.2`; generate + validate PASS.
 
 ## Step 1 capture table
 
