@@ -171,6 +171,24 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   quoted-pattern exemption covered interpreters and brace lists
   (`bash -c '{rm,.env}'`, allowed at HEAD too), a misplaced comment, a
   thin margin on the alarm tests, and docs. All sent to the coder.
+- **Coder round 3 fixes** - `_refuse_case_statement` fails closed on an
+  unquoted word `case` inside an unquoted `$( )`, `<( )`, or `>( )`, also
+  for substitutions inside unquoted heredoc bodies (a hole the coder found:
+  `cat <<EOF` with `$(case ...)` was allowed); top-level and group `case`
+  are read normally. Brace lists are no longer quoted patterns, and the
+  pattern exemption skips a new `RUNNERS` set (shells, interpreters,
+  wrappers such as `eval`, `xargs`, `timeout`). Alarm tests use 60,000
+  `open(` (24.7 to 29.3 s without the alarm, at least 6x the 4 s alarm).
+  220 cases agree with Bash; 3.9, 3.12, and 3.13 decisions identical on
+  29,450 commands. Differential against the round-2 guard: 0 looser in
+  every set. Against HEAD: 73 under-protected looser commands, 67 minimal
+  causes, all accepted classes or the stand-in artifact; in a new set of
+  4,068 `case` commands, every write Bash performs is blocked. Over-blocks:
+  `echo $(grep -c case README.md)`, `find . -name '{a,b}.pem'`, and runner
+  forms such as `bash -c '*.pem'`. Phase I gained a must-allow case so the
+  `case` refusal never reaches quoted heredoc bodies in commit messages.
+  Regenerated, self-installed; `validate_targets.py` and `check_runtime.py`
+  PASS.
 
 ## [LEARN] Entries
 
