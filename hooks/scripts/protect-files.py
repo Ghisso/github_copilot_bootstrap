@@ -139,6 +139,12 @@ QUOTED_GLOB = re.compile(r"[?*[]")
 # variable reference (`$NAME`, `${NAME}`). A word holding such a quoted part is
 # returned by the scanner with `QUOTED_VALUE_PREFIX`.
 QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|(?<!\$)\{[^{}]+\}|\$\{?[A-Za-z_]")
+# `NAME:-word` and its relatives inside `${ }`: what the expansion may become.
+DEFAULT_EXPANSION = re.compile(
+    r"(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?!$-])(?::?[-=+])(.*)", re.S
+)
+# An extended glob operator: `@( )`, `*( )`, `+( )`, `?( )`, `!( )`.
+EXTENDED_GLOB = re.compile(r"[@*+?!]\(")
 # The word `case` followed by a blank, as a word of its own. Any such word is
 # taken for the start of a case statement, wherever it stands: Bash reads `case`
 # as one after `!`, `time`, `coproc`, `function NAME`, a reserved word, and an
@@ -400,11 +406,92 @@ def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
     return lexically_inside or really_inside
 
 
+def _default_word(body: str) -> str:
+    """What `${NAME:-word}` may expand to when `NAME` is unset: `word` (also for
+    `-`, `:=`, `=`, `:+`, `+`), with quotes removed; nothing for any other form."""
+    match = DEFAULT_EXPANSION.fullmatch(body)
+    if match is None:
+        return ""
+    return re.sub(r"[\"']", "", _replace_expansions(match.group(1), True))
+
+
+def _expansion_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each `${ }` in `text`, found as Bash finds it (see
+    `_matching_brace`). A `${` after an odd number of `$` is the process id and
+    `{`, not an expansion; an unterminated one ends the search."""
+    spans: list[tuple[int, int]] = []
+    index = 0
+    while True:
+        start = text.find("${", index)
+        if start == -1:
+            return spans
+        run = 0
+        while start - run > 0 and text[start - run - 1] == "$":
+            run += 1
+        if run % 2:
+            index = start + 2
+            continue
+        end = _matching_brace(text, start)
+        if end == -1:
+            return spans
+        spans.append((start, end))
+        index = end
+
+
+def _replace_expansions(text: str, defaults: bool) -> str:
+    """`text` with each `${ }` removed, or replaced by its default word when
+    `defaults` is set."""
+    pieces: list[str] = []
+    index = 0
+    for start, end in _expansion_spans(text):
+        pieces.append(text[index:start])
+        if defaults:
+            pieces.append(_default_word(text[start + 2 : end - 1]))
+        index = end
+    pieces.append(text[index:])
+    return "".join(pieces)
+
+
+def _brace_list(path: str) -> tuple[int, int, list[str]] | None:
+    """The first brace list `{a,b}` in `path` that is not part of a `${ }`, as
+    (start, end, options), or None. Commas and braces inside a `${ }` do not
+    count."""
+    masked = path
+    for start, end in reversed(_expansion_spans(path)):
+        masked = masked[:start] + "\0" * (end - start) + masked[end:]
+    match = re.search(r"\{([^{}]+)\}", masked)
+    if match is None:
+        return None
+    options = []
+    offset = match.start(1)
+    for piece in masked[match.start(1) : match.end(1)].split(","):
+        options.append(path[offset : offset + len(piece)])
+        offset += len(piece) + 1
+    return match.start(), match.end(), options
+
+
 def without_expansions(text: str) -> str:
-    """`text` without its substitution placeholders and unresolved `$NAME` and
-    `${NAME}` references: each may expand to nothing, so a protected name may
-    be only what is left."""
-    return VARIABLE_REFERENCE.sub("", SUBSTITUTION_PLACEHOLDER.sub("", text))
+    """`text` without its substitution placeholders, its `${ }` expansions, and
+    its unresolved `$NAME` references: each may expand to nothing, so a protected
+    name may be only what is left."""
+    text = _replace_expansions(SUBSTITUTION_PLACEHOLDER.sub("", text), False)
+    return VARIABLE_REFERENCE.sub("", text)
+
+
+def expansion_defaults(text: str) -> str:
+    """Like `without_expansions`, but each `${NAME:-word}` becomes its `word`: the
+    name it may expand to (`${X:-.env}`, `.e${x:-n}v`)."""
+    text = _replace_expansions(SUBSTITUTION_PLACEHOLDER.sub("", text), True)
+    return VARIABLE_REFERENCE.sub("", text)
+
+
+def _expansion_variants(text: str) -> list[str]:
+    """The other texts `text` may stand for once its expansions are resolved to
+    nothing or to their default words; empty for text with no expansion."""
+    if "$" not in text and PROCESS_SUB_PREFIX not in text:
+        return []
+    variants = dict.fromkeys((without_expansions(text), expansion_defaults(text)))
+    return [variant for variant in variants if variant != text]
 
 
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
@@ -422,9 +509,8 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     A substitution or an unresolved variable glued to a name (`.env$(true)`,
     `$X.env`) may expand to nothing, so the name without it is checked too.
     """
-    bare = without_expansions(path)
-    if bare != path:
-        hit = protected(bare, repo_root)
+    for variant in _expansion_variants(path):
+        hit = protected(variant, repo_root)
         if hit:
             return hit
     raw = normalize(path, repo_root)
@@ -485,18 +571,23 @@ def resolve_operands(
     for path in paths:
         quoted_value = path.startswith(QUOTED_VALUE_PREFIX)
         path = strip_quoted_prefix(path)
-        brace = None if quoted_value else re.search(r"\{([^{}]+)\}", path)
+        brace = None if quoted_value else _brace_list(path)
         if brace:
-            for option in brace.group(1).split(","):
+            brace_start, brace_end, options = brace
+            for option in options:
                 resolved.extend(
                     resolve_operands(
-                        [path[: brace.start()] + option + path[brace.end() :]],
+                        [path[:brace_start] + option + path[brace_end:]],
                         base_dir,
                         display_root,
                     )
                 )
             continue
-        if "@(" in path or "!(" in path or "+(" in path:
+        if EXTENDED_GLOB.search(path):
+            if not quoted_value:
+                # With `shopt -s extglob` Bash expands it to files the guard
+                # cannot list, a secret file among them: refuse, do not guess.
+                raise UnparseableCommand("an extended glob in a write operand")
             resolved.append(path)
             resolved.extend(protected_path_literals(path))
             continue
@@ -539,7 +630,7 @@ def protected_path_literals(value: str) -> list[str]:
     # expand to nothing, and what is left may need the other's neighbours.
     for word in value.split():
         no_substitution = SUBSTITUTION_PLACEHOLDER.sub("", word)
-        for text in dict.fromkeys((word, no_substitution, without_expansions(word))):
+        for text in dict.fromkeys((word, no_substitution, *_expansion_variants(word))):
             if len(text) <= LONG_WORD:
                 literals.extend(PROTECTED_PATH_LITERAL.findall(text))
             elif PROTECTED_NAME.search(text):
@@ -635,6 +726,8 @@ def _skip_double_quoted(text: str, cursor: int) -> int:
             return cursor + 1
         if char == "\\":
             cursor += 2
+        elif char == "$" and text[cursor + 1 : cursor + 2] == "$":
+            cursor += 2  # the process id: a `(` or `{` after it opens nothing
         elif char == "$" and text[cursor + 1 : cursor + 2] == "(":
             # ponytail: a here-document body inside this substitution is not
             # parsed, so an apostrophe or `)` in it makes the nesting fail and
@@ -642,32 +735,102 @@ def _skip_double_quoted(text: str, cursor: int) -> int:
             # Phase I classifies substitutions and can parse the body.
             end = _matching_paren(text, cursor + 1)
             cursor = end if end != -1 else cursor + 1
+        elif char == "$" and text[cursor + 1 : cursor + 2] == "{":
+            end = _matching_brace(text, cursor)
+            cursor = end if end != -1 else cursor + 1
         elif char == "`":
-            end = cursor + 1
-            while True:
-                found = _BACKTICK_SPECIAL.search(text, end)
-                if found is None or found.group() == "`":
-                    break
-                end = found.start() + 2
-            if found is None:
-                _charge(len(text) - cursor)
-                cursor += 1
-            else:
-                cursor = found.end()
+            end = _skip_backticks(text, cursor)
+            cursor = end if end != -1 else cursor + 1
         else:
             cursor += 1
 
 
-def _skip_literal(text: str, index: int) -> int:
+def _skip_backticks(text: str, index: int) -> int:
+    """Return the index just past the backtick that closes the one at
+    `text[index]`, or -1. A backslash escapes the next character; quotes do not
+    protect a backtick, as in Bash."""
+    end = index + 1
+    while True:
+        found = _BACKTICK_SPECIAL.search(text, end)
+        if found is None:
+            _charge(len(text) - index)
+            return -1
+        if found.group() == "`":
+            _charge(found.end() - index)
+            return found.end()
+        end = found.start() + 2
+
+
+def _matching_brace(text: str, dollar_index: int) -> int:
+    """Return the index just past the `}` that closes the `${` at
+    `text[dollar_index]`, or -1 when it never closes.
+
+    Bash's rules (checked on 5.2, also when the `${ }` is itself inside double
+    quotes): a backslash escapes the next character; `'...'`, `"..."`, `$'...'`,
+    `$"..."`, `$( )`, `$(( ))`, backticks, and a nested `${ }` each hide a `}` or
+    a `)` inside them; a plain `{` does not nest; the first other `}` closes. A
+    `#` inside is text, not a comment.
+    """
+    index = dollar_index + 2
+    length = len(text)
+    while index < length:
+        _charge(1)
+        char = text[index]
+        if char == "}":
+            return index + 1
+        if char == "\\":
+            index += 2
+        elif char == "'":
+            end = text.find("'", index + 1)
+            _charge((length if end == -1 else end) - index)
+            if end == -1:
+                return -1
+            index = end + 1
+        elif char == '"':
+            end = _skip_double_quoted(text, index + 1)
+            if end == -1:
+                return -1
+            index = end
+        elif char == "`":
+            end = _skip_backticks(text, index)
+            if end == -1:
+                return -1
+            index = end
+        elif char == "$":
+            following = text[index + 1 : index + 2]
+            if following == "(":
+                end = _matching_paren(text, index + 1)
+            elif following == "{":
+                end = _matching_brace(text, index)
+            elif following == "$":
+                end = index + 2
+            elif following == "'":
+                end = _skip_literal(text, index)
+            elif following == '"':
+                end = _skip_double_quoted(text, index + 2)
+            else:
+                end = index + 1
+            if end == -1:
+                return -1
+            index = end
+        else:
+            index += 1
+    return -1
+
+
+def _skip_literal(text: str, index: int, comments: bool = True) -> int:
     """Return the index just past the quoted, escaped, or comment text that
     starts at `text[index]`, or `index` itself when none starts there. -1 means
-    the text ends first: an unterminated quote or a trailing backslash.
+    the text ends first: an unterminated quote, expansion, or a trailing
+    backslash.
 
     Bash's rules, outside a here-document body: a backslash makes the next
     character literal; `'...'` is literal; in `$'...'` a backslash escapes the
     next character, `'` included; `"..."` and `$"..."` are double-quoted
-    strings (see `_skip_double_quoted`); a `#` that starts a word begins a
-    comment that runs up to the next newline.
+    strings (see `_skip_double_quoted`); `$$` is the process id, so what follows
+    it is not an expansion; `${ ... }` is one unit up to its own `}` (see
+    `_matching_brace`); a `#` that starts a word begins a comment that runs up
+    to the next newline (`comments=False` inside `${ }`, where it is text).
     """
     char = text[index]
     if char == "\\":
@@ -677,11 +840,15 @@ def _skip_literal(text: str, index: int) -> int:
         _charge((len(text) if end == -1 else end) - index)
         return -1 if end == -1 else end + 1
     if char == "#":
-        if not _starts_word(text, index):
+        if not comments or not _starts_word(text, index):
             return index
         end = text.find("\n", index)
         return len(text) if end == -1 else end
     following = text[index + 1 : index + 2]
+    if char == "$" and following == "$":
+        return index + 2
+    if char == "$" and following == "{":
+        return _matching_brace(text, index)
     if char == "$" and following == "'":
         cursor = index + 2
         while True:
@@ -737,6 +904,12 @@ def _matching_paren(text: str, open_index: int) -> int:
             depth -= 1
             if depth == 0:
                 return index + 1
+        elif char == "`":
+            end = _skip_backticks(text, index)
+            if end == -1:
+                return -1
+            index = end
+            continue
         index += 1
     return -1
 
@@ -792,13 +965,33 @@ def extract_substitutions(command: str) -> tuple[str, dict[str, str]]:
     too). An unbalanced construct is genuinely malformed shell syntax, not
     merely unmodeled, so it fails closed rather than being silently dropped.
     """
-    pieces: list[str] = []
     inner_by_placeholder: dict[str, str] = {}
+    return _extract(command, inner_by_placeholder), inner_by_placeholder
+
+
+def _extract(
+    command: str, inner_by_placeholder: dict[str, str], in_expansion: bool = False
+) -> str:
+    """The text of `extract_substitutions` for `command`, adding each inner
+    command to `inner_by_placeholder`. A `${ }` is walked into, not skipped: its
+    default word is expanded and may hold a substitution, and a `#` in it is
+    text (`in_expansion`)."""
+    pieces: list[str] = []
     index = 0
     length = len(command)
-    count = 0
     while index < length:
-        end = _skip_literal(command, index)
+        if command.startswith("${", index):
+            end = _matching_brace(command, index)
+            if end == -1:
+                raise UnparseableCommand("unbalanced parameter expansion")
+            pieces.append("${")
+            pieces.append(
+                _extract(command[index + 2 : end - 1], inner_by_placeholder, True)
+            )
+            pieces.append("}")
+            index = end
+            continue
+        end = _skip_literal(command, index, comments=not in_expansion)
         if end != index:
             # Quoted or escaped text or a comment; text that never ends is left
             # for `split_segments`, which fails closed on it.
@@ -822,12 +1015,11 @@ def extract_substitutions(command: str) -> tuple[str, dict[str, str]]:
             and _matching_paren(command, index + 2) == end - 1
         ):
             inner = "\n".join(extract_substitutions(inner[1:-1])[1].values())
-        placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, count)
-        count += 1
+        placeholder = "%s%d__" % (PROCESS_SUB_PREFIX, len(inner_by_placeholder))
         inner_by_placeholder[placeholder] = inner
         pieces.append(placeholder if opener == "$(" else " " + placeholder)
         index = end
-    return "".join(pieces), inner_by_placeholder
+    return "".join(pieces)
 
 
 def _find_unquoted_heredoc(text: str) -> int | None:
@@ -1019,6 +1211,12 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
     `#` glued there in the word too (`a=(x)#c` holds no comment), but the other
     scans in this file take a `#` after any `)` for a comment, so that form
     fails closed instead of being read two ways.
+
+    A `(` glued right after `@`, `*`, `+`, `?`, or a `!` that follows other text
+    opens an extended glob (`@(a|b)`), which is one word too; without
+    `shopt -s extglob` it is a syntax error in Bash, so it is never a group. A
+    `!(` at the start of a word may be a negated group and stays one. A `${ }`
+    and the process id `$$` are kept in the word as they are.
     """
     parts: list[str] = []
     quoted = False
@@ -1028,16 +1226,18 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
     length = len(command)
     while index < length:
         if command[index] in WORD_BREAKS:
-            if (
-                command[index] != "("
-                or before != "="
-                or not ARRAY_ASSIGNMENT.fullmatch("".join(parts))
-            ):
+            if command[index] != "(":
+                break
+            if before == "=" and ARRAY_ASSIGNMENT.fullmatch("".join(parts)):
+                kind = "array assignment"
+            elif before and (before in "@*+?" or (before == "!" and parts != ["!"])):
+                kind = "extended glob"
+            else:
                 break
             end = _matching_paren(command, index)
             if end == -1:
-                raise UnparseableCommand("unbalanced array assignment")
-            if command[end : end + 1] == "#":
+                raise UnparseableCommand("unbalanced " + kind)
+            if kind == "array assignment" and command[end : end + 1] == "#":
                 raise UnparseableCommand("a # right after an array assignment")
             parts.append(command[index:end])
             before = ")"
@@ -1052,6 +1252,11 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
             index += 1
             continue
         span = command[index:end]
+        if span.startswith("${") or span == "$$":
+            parts.append(span)
+            before = "}" if span[1] == "{" else "$"
+            index = end
+            continue
         if span != "\\\n":
             value = _unquote(span)
             # An escaped character (`"\\$a"`) is literal, so it is not magic.

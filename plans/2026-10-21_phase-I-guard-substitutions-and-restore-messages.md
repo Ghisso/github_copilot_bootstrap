@@ -82,9 +82,14 @@ full review profiles apply.
     `echo '$(tee .env)'` (single quotes are literal);
     `cat x 2>&1 | head`, `cat x >&2`, `cat x |& head`;
     `sed -n '1p' README.md`, `sed 's/a/b/' README.md`.
-  - Must deny (BF-I7): `tee .env"$X"`, `tee "$X".env`,
-    `tee "${X:-.env}"`, `touch $'\x2eenv'`, `echo ${x:- #}; tee .env`, and
-    a `tee .env` line inside a heredoc body inside `"$( )"`.
+  - Must deny (BF-I7): `touch $'\x2eenv'`, a `tee .env` line inside a
+    heredoc body inside `"$( )"`, and the other forms listed in BF-I7.
+    Phase H already closed `tee .env"$X"`, `tee "$X".env`,
+    `tee "${X:-.env}"`, and `echo ${x:- #}; tee .env`; keep their tests
+    passing. Phase H's final not-yet-checked list also names
+    `shopt -s dotglob` (a glob that then matches `.env`) and expansion
+    operators whose result depends on the variable (`${!x}`,
+    `${x/#/.env}`); handle them like the other BF-I7 forms.
   - Must allow: `echo "$X"`, `echo "${X:-default}"`, and the usual
     `git commit -m "$(cat <<'EOF' ... EOF)"` form, including a message
     body whose prose contains the word `case` (Phase H refuses an unquoted
