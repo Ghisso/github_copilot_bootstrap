@@ -3,7 +3,7 @@
 **Date:** 2026-10-21
 **Plan:** .claude/plans/2026-10-21_phase-I-guard-substitutions-and-restore-messages.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -306,6 +306,23 @@ Optional items:
   stand-ins; summaries are in the Work Log.
 
 Required items (summary lines from `verify.py closeout`):
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       43.7s  uv run python scripts/validate_targets.py
+PASS      150.7s  uv run pytest tests/test_hook_gates.py tests/test_protect_files_scoping.py tests/test_openwiki_guard.py tests/test_verify.py tests/test_validate_targets.py tests/test_lifecycle_hooks.py -q
+PASS        0.8s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+VFY-FRESH-001: PASS - phase evidence matches relevant state
+VFY-FRESH-002: PASS - phase evidence matches governing control-plane provenance
+VFY-RECEIPT-001: PASS - reused successful phase receipt
+```
+
+Findings recorded: 1 finding (0 critical, 0 major, 1 minor, fixed);
+`ponytail_reviewed=true`; `gate_result=PASS`
+(`.claude/quality_reports/findings-2026-10-21_phase-I-guard-substitutions-and-restore-messages.json`).
 
 ## Open Questions / Next Steps
 
