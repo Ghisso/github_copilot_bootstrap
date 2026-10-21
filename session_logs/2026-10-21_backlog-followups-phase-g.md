@@ -126,9 +126,57 @@ its outcome:
   checked against source; only `commit_and_reconcile` was missing.
 - Generated `openwiki/**` pages: left to the managed refresh (step 2).
 
+## Requirement Evidence (BF-A1 to BF-G2)
+
+Phase commits on `backlog-followups_implementation`: A `f52a867`, B
+`06eb8e0`, C `69bdb64`, D `86756e0`, E `02e22de`, F `f05c3b3`, G this
+commit. Each phase's own session log carries its detailed evidence.
+
+| ID | Outcome | Evidence |
+| --- | --- | --- |
+| BF-A1 | Done | `f52a867`; `2026-10-20_backlog-followups-phase-a.md`; `validate_plan_frontmatter.py` |
+| BF-A2 | Done | `f52a867`; `validate_targets.py` |
+| BF-A3 | Done | `f52a867`; grep items in the Phase A log |
+| BF-A4 | Done | `f52a867`; three skills; `validate_targets.py` install run |
+| BF-A5 | Done | `f52a867`; new `tests/test_verify.py` cases |
+| BF-A6 | Done | 2026-09-21 exploration status line; item 2 closed here (quickstart row names `openwiki-guard.sh`) |
+| BF-A7 | Done | `f52a867`; `sha256sum -c` item; `validate_targets.py` pin |
+| BF-B1 | Done | `06eb8e0`; `tests/test_install_bootstrap.py`, `tests/test_state_sync.py` |
+| BF-B2 | Done | `06eb8e0`; `tests/test_state_sync.py` |
+| BF-C1 | Dropped (scope change, user decision 2026-10-20) | Phase C small plan scope-change record |
+| BF-C2 | Done as evidence (6.11%, below the 25% stop) | `.claude/explorations/2026-09-03_memory-md-size-reduction/2026-10-20_classification.tsv` |
+| BF-C3 | Dropped with BF-C1 | Phase C scope-change record |
+| BF-C4 | Done | `69bdb64`; `tests/test_caveman_compress_detect.py` |
+| BF-C5 | Done | 2026-09-03 exploration status and outcome line |
+| BF-D1 to BF-D5 | Done | `86756e0`; `tests/test_hook_gates.py`, `tests/test_protect_files_scoping.py`; generated battery with 0 defects; `docs/target-mapping.md` parity table |
+| BF-E1 | Done: PARTIAL ADOPT | `.claude/explorations/2026-10-20_ponytail-5-evaluation/evidence.md` |
+| BF-E2 | Not applicable (no NO-GO) | same evidence file |
+| BF-E3 to BF-E7 | Done | `02e22de`; guidance rows; hash pins; anchor test; `validate_targets.py` |
+| BF-F1 to BF-F7 | Done | `f05c3b3`; `2026-10-21_backlog-followups-phase-f.md` capture table; `tests/test_openwiki_cli_smoke.py`, `tests/test_openwiki_guard.py`; receipts at `0.7.2` |
+| BF-G1 | Done | "Stale-claims surfaces checked" above; OpenWiki runs `d1f285b5-...` and `0aaf238f-...` both `complete`; `test ! -e openwiki/.run.json` |
+| BF-G2 | Held | Phase G changes no hook, script, test, or `verify.py`; Context Mode pin `1.0.169` (`context-mode-dispatch.sh:11`); `git diff --name-only dev..HEAD` lists no `docs/2026-*` or `docs/evidence/**`; the nested diff since Phase A changes only the Phase C exploration status and new evidence files; reviewer confirmed |
+
+## Review
+
+- Round 1 (fresh reviewer, profiles documentation, code, architecture,
+  security, tests, ponytail): Gate Result PASS; 0 critical, 0 major, 1
+  minor. The minor finding: the repository-scope sentence in
+  `docs/runtime-checks.md` (and the same sentence in
+  `docs/architecture.md` and `docs/smoke-tests.md`) did not name agent
+  definition paths and workspace files. Fixed in all three, keeping the
+  cited wiki line ranges in place.
+- Also acted on two informational notes: `knowledge-refresh` now says the
+  `post` output is read once the user has run it, and
+  `openwiki/INSTRUCTIONS.md` tells page authors to write relative links.
+
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:tooling] OpenWiki `0.7.2` stamps root-absolute wiki links; fix
+  them with a link-only `update` run scoped to the stamped pages, never by
+  hand (saved to `MEMORY.md`).
+- [LEARN:tooling] Extended the existing `protect-files.sh` entry: since the
+  guard fails closed, a read-only command whose text names a protected
+  folder can be denied; search with a scratch Python script.
 
 ## Verification
 
@@ -138,3 +186,11 @@ To be written at closeout.
 
 - After closeout, the big plan is complete. Opening a pull request from
   `backlog-followups_implementation` to `dev` is the user's decision.
+- Follow-up (not in this plan's scope, executable text): the manual
+  OpenWiki restore command is printed as the fix by
+  `docs/runtime-checks.md` (troubleshooting table), `verify.py`, and
+  `openwiki-guard.py`. It is right for a person, but an agent cannot run
+  it. A later change could add "ask the user to run" to those messages.
+- Follow-up: generated pages carry some long sentences (for example the
+  `protect-files` bullet in `openwiki/architecture/hooks-and-guardrails.md`).
+  Worth a style pass at the next managed refresh.
