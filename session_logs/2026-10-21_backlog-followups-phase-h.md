@@ -157,6 +157,20 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   gaps (a name built by a command, array elements, a glob glued to a
   variable, `find -delete`) were added to Phase I. Regenerated,
   self-installed; `validate_targets.py` and `check_runtime.py` PASS.
+- **Docs third pass** - "Ordinary commands are very unlikely to be
+  affected"; the not-yet-checked list matches the coder's final list; rule
+  lines for arrays, unset glued variables, and quoted patterns; one
+  over-block sentence. `verify.py phase` PASS (3669 passed, 1 skipped, 5
+  xfailed). `MEMORY.md` `[LEARN:tooling]` `protect-files.sh` entry corrected
+  (plan step 4).
+- **Review round 3** - Gate Result FAIL on one major: a `case` statement
+  inside an unquoted `$( )` closes the substitution at the pattern's `)`,
+  so `cat $(case a in a) tee .env;; esac)`, the `git status` form, and the
+  array form went from deny (HEAD) to allow. Confirmed by the orchestrator
+  with the full hook and Bash (a stand-in prints `RAN`). Minor: the
+  quoted-pattern exemption covered interpreters and brace lists
+  (`bash -c '{rm,.env}'`, allowed at HEAD too), a misplaced comment, a
+  thin margin on the alarm tests, and docs. All sent to the coder.
 
 ## [LEARN] Entries
 
