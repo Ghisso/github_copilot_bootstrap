@@ -120,6 +120,23 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   self-installed; `validate_targets.py` and `check_runtime.py` PASS.
   Documenter asked to redo the docs for review findings 6 and 14 and the
   new behavior.
+- **Docs second pass** - `docs/runtime-checks.md` shell-parsing text split
+  into short lines (261-285) with no absolute wording, a "not yet checked"
+  list, the new behavior, and the fail-closed messages; its cited text
+  moved from 678-710 to 702-734 (Phase J refreshes those claims).
+  `docs/target-mapping.md` parity row now carries a caveat, and "No earlier
+  decision was loosened" is scoped to the agent-definition rows with a note
+  on the deliberate loosening. `verify.py phase` PASS (3573 passed, 1
+  skipped, 5 xfailed).
+- **Review round 2** - Gate Result WARN: every round-1 finding fixed, no
+  critical or major; six minor findings and two open requests. The
+  orchestrator confirmed finding 1 with Bash (`a=(x)#c; echo RAN` prints
+  `RAN`, so `#` after an array assignment's `)` is not a comment). Sent all
+  six minors back to the coder: array-assignment `#`, unquoted variables
+  glued to a protected name (`tee .env$X`), forcing `SIGALRM` to its
+  default before the alarm, restoring the old allow for quoted search
+  patterns (`find . -name '*.pem'`), and tests for substitution
+  placeholders in `cd` and `git -C` operands; docs to follow.
 
 ## [LEARN] Entries
 
