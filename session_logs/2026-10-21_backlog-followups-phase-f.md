@@ -3,7 +3,7 @@
 **Date:** 2026-10-21
 **Plan:** .claude/plans/2026-10-20_phase-F-openwiki-0.7-upgrade.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -257,8 +257,19 @@ tree shows neither file modified).
 ## Verification
 
 ```text
-# verify closeout --format text summary lines
+PASS        0.2s  uv run python scripts/generate_targets.py --all
+PASS       44.0s  uv run python scripts/validate_targets.py
+PASS        1.9s  uv run pytest tests/test_openwiki_cli_smoke.py -q
+PASS        6.1s  uv run pytest tests/test_openwiki_guard.py tests/test_lifecycle_hooks.py -q
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.3s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
 ```
+
+Phase receipt: `.claude/quality_reports/verification-phase-2026-10-20_phase-F-openwiki-0.7-upgrade.json`.
+Findings: `.claude/quality_reports/findings-2026-10-20_phase-F-openwiki-0.7-upgrade.json`
+(no findings; gate result `PASS`).
 
 - optional 1: NOT RUN — Claude Code `/mcp` and a read-only `openwiki_search`
   call need a session started on `0.7.2`; this session's server started on
