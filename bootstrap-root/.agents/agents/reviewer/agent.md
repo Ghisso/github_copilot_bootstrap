@@ -52,6 +52,8 @@ executes identically on every runtime.
    - Missing material behavior is an ordinary finding at the existing severity (put a requirement ID in the title when one exists). A style omission alone is not missing behavior.
    - Raise an ambiguous requirement as a finding and a missing one as an open request, never as a requirement you invent.
 
+   Read the code the change touches, not only the diff (callers of every changed function, signature, or return value; the tests and fixtures that exercise it; the config or exports that name it): a caller, test, fixture, or config entry outside the diff that the change breaks or leaves stale is an ordinary finding.
+
    Also check the tests: expected values must not be copied from the implementation's own output, and a bug fix must show the original reproduction now behaving correctly. You cannot run anything, so list missing execution evidence (a test run, an original-reproduction rerun, a negative control) as an open request.
 3. **Pass 2 (verification):** take Pass 1's findings as explicit input and attempt to *refute* each one. Re-read the cited location and decide whether the issue genuinely holds.
    - Drop any finding that does not survive re-verification — do **not** keep it as "disputed". Confidently fabricated findings are the documented failure mode of LLM reviewers, and this pass exists to catch them.
