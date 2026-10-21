@@ -16,9 +16,9 @@ the pages the refresh rewrites (BF-J2).
 - [x] PRE-FLIGHT: Phase I committed (`61c30d6`) and pushed; the commit hook
   advanced `current_phase` to this phase. The user asked to continue to the
   end of the big plan. No planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
-- [ ] COMMIT
-- [ ] PUSH
+- [x] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] COMMIT
+- [x] PUSH
 
 ## Work Log
 
@@ -131,11 +131,39 @@ The Phase H and I lessons (systematic sweeps, the review acceptance bar,
 guessed expansion values, never editing existing test inputs) are already
 in `MEMORY.md`.
 
+## Review
+
+- Fresh reviewer, six profiles, the user's lighter bar. Round 1: Gate
+  Result FAIL, 1 major (a `MEMORY.md` clause still said only malformed
+  syntax fails closed) and 4 minor (two older `MEMORY.md` entries, the
+  README "approve it yourself" wording, the project-context paragraph, and
+  BF-J2 left partly met on the hooks page); all fixed (see Work Log).
+  Round 2: Gate Result PASS, 0 critical, 0 major, 1 minor (the hooks page
+  said "three parts" for a four-item list), fixed by a third scoped
+  OpenWiki `update` run (`018f99df-4278-4b0d-904f-e3f054eb4fc6`, one word,
+  `openwiki_finish` complete).
+
 ## Verification
 
-To be written at closeout.
+Optional items:
+
+- optional 1: PASS
+- OpenWiki completion: run `898c38a6-7dd2-4cc2-b43c-a50054e9a11d`, finish
+  `complete`, 4 pages (`architecture/agents-and-skills.md`,
+  `architecture/hooks-and-guardrails.md`,
+  `operations/deterministic-verification.md`, `quickstart.md`); corrective
+  runs `ae57b8ff-894c-443f-9cb9-f38939395f8a` and
+  `018f99df-4278-4b0d-904f-e3f054eb4fc6`, each finish `complete`, 1 page
+  (`architecture/hooks-and-guardrails.md`). Every page diff was read; no
+  link stamp, no root-absolute link, `AGENTS.md` and `CLAUDE.md` unchanged,
+  no `openwiki/.run.json`.
+
+Required items (summary lines from `verify.py closeout`):
 
 ## Open Questions / Next Steps
 
 - After closeout, the big plan is complete. Opening a pull request from
   `backlog-followups_implementation` to `dev` is the user's decision.
+- Recorded follow-ups: split or shrink `protect-files.py`; the forms in
+  the not-yet-checked list of `docs/runtime-checks.md`; the policy choice
+  on Bash reads of secret-shaped files.
