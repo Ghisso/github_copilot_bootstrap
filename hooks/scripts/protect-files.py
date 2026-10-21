@@ -183,6 +183,9 @@ IFS_REFERENCE = re.compile(r"\$(?:IFS(?![A-Za-z0-9_])|\{IFS[^{}]*\})")
 FUNCTION_KEY = "()"
 ARRAY_KEY = "[]"
 ASSIGNED_KEY = "="
+# A tracked value that is only a guess (a default word, or what is left of a value
+# without its unresolved expansions): a second assignment does not refuse it.
+MAYBE_KEY = "~"
 SHADOWED = "(function)"
 FUNCTION_NAME = re.compile(
     r"(?:^|[\s;&|(){}])([A-Za-z_][\w.:+-]*)\s*\(\s*\)|\bfunction\s+([A-Za-z_][\w.:+-]*)"
@@ -463,10 +466,23 @@ PROCESS_SUB_PREFIX = "__PROTECT_FILES_PROCSUB_"
 # A placeholder for `$( )`, `$(( ))`, `<( )`, or `>( )` left inside a word.
 SUBSTITUTION_PLACEHOLDER = re.compile(re.escape(PROCESS_SUB_PREFIX) + r"\d+__")
 HEREDOC_PREFIX = "__PROTECT_FILES_HEREDOC_"
-# Shell interpreters whose *bare* heredoc body (no inline -c script and no
-# script-file argument) is the script they actually execute, so it is
-# recursively classified rather than merely scanned as literal text.
-SHELL_INTERPRETERS = {"bash", "sh", "zsh"}
+# Commands that start another command (`exec bash`, `nohup bash`, `timeout 5 bash`):
+# the first shell among their first words is the command they run.
+PREFIX_RUNNERS = {
+    "exec",
+    "nohup",
+    "nice",
+    "setsid",
+    "stdbuf",
+    "ionice",
+    "timeout",
+    "doas",
+    "time",
+    "xargs",
+    "watch",
+    "busybox",
+}
+RUNNER_LOOKAHEAD = 6
 # Work allowed for reading one command: this many units per character of the
 # command, plus a floor. Every re-scan of the same text is charged to one
 # budget (see `_charge`), so a crafted command that makes the guard scan the
@@ -1548,15 +1564,11 @@ def extract_heredocs(
         placeholder = "%s%d__" % (HEREDOC_PREFIX, count)
         count += 1
         bodies[placeholder] = (body_text, quoted)
-        result = (
-            result[:operator_index]
-            + " "
-            + placeholder
-            + " "
-            + rest_of_line
-            + "\n"
-            + after_terminator
-        )
+        head = result[:operator_index]
+        descriptor = re.search(r"(?<![^\s;&|(])\d+$", head)
+        if descriptor:  # `bash 0<<EOF`: the number belongs to the redirect
+            head = head[: descriptor.start()]
+        result = head + " " + placeholder + " " + rest_of_line + "\n" + after_terminator
 
 
 def heredoc_command_substitutions(body: str) -> list[str]:
@@ -1766,11 +1778,20 @@ def _shell_tokens(command: str) -> list[tuple[str, bool]]:
 
 
 def split_segments(command: str) -> list[list[str]]:
+    """The segments of `split_segments_with_operators`."""
+    return split_segments_with_operators(command)[0]
+
+
+def split_segments_with_operators(
+    command: str,
+) -> tuple[list[list[str]], list[str]]:
     """Split one command line into segments of words at its operators and
-    newlines. A blank line and a newline after an operator add no segment. A
+    newlines, and the operator that comes before each segment ("" for the first). A
+    blank line and a newline after an operator add no segment. A
     group may open at any command and close after a newline, `;`, `&`, or `(`;
     an operator may follow a `)`. Any other empty segment fails closed."""
     segments: list[list[str]] = [[]]
+    operators = [""]
     last = ""  # the operator the next command follows; "\n" after a newline
     for text, is_operator in _shell_tokens(command):
         if not is_operator:
@@ -1779,10 +1800,12 @@ def split_segments(command: str) -> list[list[str]]:
         elif text == "\n":
             if segments[-1]:
                 segments.append([])
+                operators.append(text)
             if last not in BINARY_OPERATORS and last != "(":
                 last = "\n"
         elif segments[-1]:
             segments.append([])
+            operators.append(text)
             last = text
         elif (
             text == "("
@@ -1795,30 +1818,33 @@ def split_segments(command: str) -> list[list[str]]:
     if not segments[-1]:
         # A trailing separator ("rg foo .;") is valid Bash, not an error.
         segments.pop()
-    return segments
+        operators.pop()
+    return segments, operators
 
 
-def _known_value(value: str, variables: dict[str, str]) -> str | None:
-    """`value` with the tracked variables in it replaced; None when an expansion
-    is left in it (`y=.$x` with `x` tracked is known, `y=$(pwd)/a` is not)."""
+def _substituted_value(value: str, variables: dict[str, str]) -> str:
+    """`value` with the tracked variables in it replaced (`y=.$x` with `x` tracked gives
+    `.name`). An expansion that is left in it (`$`, backticks) is not known."""
     if "$" not in value and "`" not in value:
         return value
     words = substitute([QUOTED_VALUE_PREFIX + value], variables)
-    text = strip_quoted_prefix(" ".join(words))
-    return None if "$" in text or "`" in text else text
+    return strip_quoted_prefix(" ".join(words))
 
 
 def record_assignment(token: str, variables: dict[str, str]) -> None:
     """Track a bare `NAME=value` token's literal value, if it has one.
 
     A value that still holds an expansion once the tracked variables are put in
-    (`$`, backticks) is not known, so the variable is left unresolved rather than
-    guessed. The value is read before the assignment, so it may name the variable
-    (`PORT=${PORT:-8080}`). A name that holds a tracked value and is assigned a
-    different one again (`=` or `+=`, plain, conditional, prefix, subshell,
-    pipeline, background) is refused: the guard cannot tell which assignment runs.
-    An array assignment (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing
-    reads its elements.
+    (`$`, backticks) is not known. It is guessed instead: the default word of the
+    expansion (`${z:-.env}`), or what is left without it (`.en${z}v`). The guess is
+    tracked so that a later use is checked against it; a guess that is only a
+    fragment (`${z:-.e}`) is marked, and a second assignment does not refuse it
+    (`PORT=${PORT:-8080}; PORT=9090`). The value is read before the assignment, so it
+    may name the variable. A name that holds a known value and is assigned a
+    different one again (`=` or `+=`, plain, conditional, prefix, subshell, pipeline,
+    background) is refused: the guard cannot tell which assignment runs. An array
+    assignment (`NAME=(a b)`, `NAME[N]=v`) only marks the name: nothing reads its
+    elements.
     """
     match = ASSIGNMENT.match(token)
     if not match:
@@ -1833,34 +1859,57 @@ def record_assignment(token: str, variables: dict[str, str]) -> None:
         variables[ARRAY_KEY + name] = ""
         variables.pop(name, None)
         return
-    known = _known_value(value, variables)
+    text = _substituted_value(value, variables)
+    known: str | None = None if "$" in text or "`" in text else text
+    guess = known is not None and _derived_from_a_guess(value, known, variables)
     if known is None:
-        known = _protected_candidate(value)
+        known, guess = _guess_value(text)
     old = variables.get(name)
-    if old is not None and (plus or known != old):
+    old_is_a_guess = (MAYBE_KEY + name) in variables
+    if old is not None and not old_is_a_guess and (plus or known != old):
         raise UnparseableCommand(ASSIGNED_TWICE_REFUSAL)
+    if plus and old is not None and old_is_a_guess:
+        known, guess = old + (known or ""), True  # an append keeps the guess
     variables[ASSIGNED_KEY + name] = ""
+    variables.pop(MAYBE_KEY + name, None)
     if known is None:
         variables.pop(name, None)
-    else:
-        variables[name] = known
+        return
+    variables[name] = known
+    if guess:
+        variables[MAYBE_KEY + name] = ""
 
 
-def _protected_candidate(value: str) -> str | None:
-    """A value that an unresolved expansion in `value` may give and that names a
-    protected file: the default word (`${z:-.env}`, `${z/#/.env}`) or what is left
-    without the expansion (`.en${z}v`, `${z}.env`). A later use of the name is then
-    checked against it. None when neither names one (`PORT=${PORT:-8080}`)."""
-    for candidate in dict.fromkeys(
-        (expansion_defaults(value), without_expansions(value))
-    ):
-        if (
-            "$" not in candidate
-            and "`" not in candidate
-            and PROTECTED_PATH_LITERAL.search(candidate)
-        ):
-            return candidate
-    return None
+def _derived_from_a_guess(value: str, known: str, variables: dict[str, str]) -> bool:
+    """True when `value` reads a variable that is only a guess and the result names no
+    protected file: it stays a guess (`PATH=x:$PATH` after `PATH=${PATH:-/usr/bin}`)."""
+    return not PROTECTED_PATH_LITERAL.search(known) and any(
+        (MAYBE_KEY + (match.group(1) or match.group(2))) in variables
+        for match in PLAIN_REFERENCE.finditer(value)
+    )
+
+
+def _guess_value(text: str) -> tuple[str | None, bool]:
+    """What a value `text` that still holds an expansion may give: (guess, only a
+    fragment). The default words (`${z:-.env}`, `${z/#/.env}`) or what is left without
+    the expansions (`.en${z}v`, `${z}.env`) are the candidates. One that names a
+    protected file is a full guess. Otherwise a non-empty one is kept as a fragment,
+    unless a command substitution is in the value: its text is not a guess."""
+    candidates = [
+        candidate
+        for candidate in dict.fromkeys(
+            (expansion_defaults(text), without_expansions(text))
+        )
+        if "$" not in candidate and "`" not in candidate
+    ]
+    for candidate in candidates:
+        if PROTECTED_PATH_LITERAL.search(candidate):
+            return candidate, False
+    if not SUBSTITUTION_PLACEHOLDER.search(text):
+        for candidate in candidates:
+            if candidate:
+                return candidate, True
+    return None, False
 
 
 def _refuse_assigned_expansions(text: str, variables: dict[str, str]) -> None:
@@ -1966,9 +2015,11 @@ def command_name(
     if index == len(tokens):
         return None
     while (
-        index < len(tokens) and posixpath.basename(tokens[index]) in WRAPPER_VALUE_FLAGS
+        index < len(tokens)
+        and posixpath.basename(strip_quoted_prefix(tokens[index]))
+        in WRAPPER_VALUE_FLAGS
     ):
-        wrapper = posixpath.basename(tokens[index])
+        wrapper = posixpath.basename(strip_quoted_prefix(tokens[index]))
         value_flags = WRAPPER_VALUE_FLAGS[wrapper]
         no_value_flags = WRAPPER_NO_VALUE_FLAGS[wrapper]
         index += 1
@@ -2469,21 +2520,163 @@ def git_reads_message_from_stdin(args: list[str]) -> bool:
     return False
 
 
+SHELL_VALUE_OPTIONS = {"-o", "+o", "-O", "+O", "--rcfile", "--init-file"}
+
+
+def _inner_shell(command: str, args: list[str]) -> tuple[str, list[str]] | None:
+    """(shell, its arguments) when `command` is a shell, or a runner that starts one
+    (`exec bash -c ...`, `timeout 5 bash`, `nice -n 5 sh`): the first shell among its
+    first few words. None for any other command."""
+    name = posixpath.basename(strip_quoted_prefix(command))
+    if name in SCRIPT_SHELLS:
+        return command, args
+    if name in PREFIX_RUNNERS:
+        for index, word in enumerate(args[:RUNNER_LOOKAHEAD]):
+            if posixpath.basename(strip_quoted_prefix(word)) in SCRIPT_SHELLS:
+                return word, args[index + 1 :]
+    return None
+
+
 def _heredoc_is_bare_shell(
     args: list[str], heredocs: dict[str, tuple[str, bool]]
 ) -> bool:
-    """True when a shell interpreter has no inline -c script and no
-    script-file argument, so its heredoc body is the script it actually
-    executes rather than stdin data for a script this classifier cannot
-    see."""
-    for token in args:
-        if token in heredocs:
+    """True when a shell reads its commands from standard input: it has no inline
+    `-c` script and no script file, or its script file is standard input
+    (`-s`, `/dev/stdin`, `/dev/fd/0`). Its heredoc, here-string, or pipe is then the
+    script it executes, not data for a script this classifier cannot see."""
+    # `bash 0<<< text`: the number before the operator is a file descriptor.
+    args = [
+        token
+        for position, token in enumerate(args)
+        if not (
+            token.isdigit()
+            and position + 1 < len(args)
+            and strip_quoted_prefix(args[position + 1]) == "<<<"
+        )
+    ]
+    index = 0
+    while index < len(args):
+        token = args[index]
+        index += 1
+        if token in heredocs or is_redirect(token):
+            index += token not in heredocs
             continue
-        if token == "-c":
-            return False
-        if not token.startswith("-"):
-            return False
+        word = strip_quoted_prefix(token)
+        if word == "<<<":
+            index += 1
+        elif word in SHELL_VALUE_OPTIONS:
+            index += 1
+        elif word in ("-", "--"):
+            continue
+        elif word.startswith(("-", "+")):
+            letters = word[1:] if not word.startswith("--") else ""
+            if word.startswith("-") and "c" in letters:
+                return False
+            if word.startswith("-") and "s" in letters:
+                return True  # `-s`: read the commands from standard input
+        else:
+            return word in SOURCE_STDIN  # a script file, unless it is standard input
     return True
+
+
+def _here_string_text(args: list[str]) -> str | None:
+    """The text of the last here-string (`<<< word`) among `args`, or None."""
+    text = None
+    for index, token in enumerate(args[:-1]):
+        if strip_quoted_prefix(token) == "<<<":
+            text = strip_quoted_prefix(args[index + 1])
+    return text
+
+
+def _backslash_escapes(text: str) -> str:
+    """`text` with the escapes that `echo -e` and `printf` read: `\\n`, `\\t`, `\\r`,
+    `\\\\`, `\\xHH`, `\\0NNN`."""
+
+    def one(match: re.Match[str]) -> str:
+        code = match.group(1)
+        if code[0] in "x0":
+            digits = code[1:] if code[0] == "x" else code
+            return chr(int(digits, 16 if code[0] == "x" else 8) or 32)
+        return {"n": "\n", "t": "\t", "r": "\r", "\\": "\\"}.get(code, match.group(0))
+
+    return re.sub(r"\\(x[0-9a-fA-F]{1,2}|0[0-7]{0,3}|[ntr\\\\])", one, text)
+
+
+def _printf_text(args: list[str]) -> str | None:
+    """The text `printf FORMAT ARGS` writes when every conversion is read as taking the
+    next word as it is (`%s`, `%b`, a number): the format is reused while words are
+    left. None when there is no format."""
+    if not args or args[0].startswith("-"):
+        return None
+    format_text, words = _backslash_escapes(args[0]), args[1:]
+    conversion = re.compile(r"%(?:%|[-+ #0]*[0-9]*(?:\.[0-9]+)?[a-zA-Z])")
+    out: list[str] = []
+    position = 0
+    while True:
+        consumed = 0
+
+        def take(match: re.Match[str]) -> str:
+            nonlocal consumed
+            if match.group(0) == "%%":
+                return "%"
+            word = (
+                words[position + consumed] if position + consumed < len(words) else ""
+            )
+            consumed += 1
+            return _backslash_escapes(word) if match.group(0).endswith("b") else word
+
+        out.append(conversion.sub(take, format_text))
+        position += consumed
+        if consumed == 0 or position >= len(words):
+            return "".join(out)
+
+
+def _piped_texts(
+    tokens: list[str],
+    variables: dict[str, str],
+    heredocs: dict[str, tuple[str, bool]],
+) -> list[str] | None:
+    """The texts that the command before a `|` writes, when it is `echo` or `printf` of
+    literal words, or `cat` of a heredoc or here-string. None for any other producer
+    (`cat file`, `curl url`, a substitution): what it writes is not known."""
+    try:
+        words = substitute(tokens, variables)
+        info = command_name(words, dict(variables), record=False)
+    except (AmbiguousCommand, UnparseableCommand):
+        return None
+    if info is None:
+        return None
+    command, start, _prefix = info
+    name = posixpath.basename(strip_quoted_prefix(command))
+    raw = words[start:]
+    if any(SUBSTITUTION_PLACEHOLDER.search(word) for word in raw):
+        return None
+    args = [strip_quoted_prefix(word) for word in raw]
+    if name == "cat":
+        texts = []
+        index = 0
+        while index < len(raw):
+            if raw[index] in heredocs:
+                texts.append(heredocs[raw[index]][0])
+            elif args[index] == "<<<" and index + 1 < len(args):
+                index += 1
+                texts.append(args[index] + "\n")
+            else:
+                return None  # a file, or an option, whose text is not known
+            index += 1
+        return ["".join(texts)] if texts else None
+    if any(is_redirect(word) for word in raw):
+        return None
+    if name == "printf":
+        text = _printf_text(args)
+        return None if text is None else [text]
+    if name != "echo":
+        return None
+    while args and re.fullmatch(r"-[neE]+", args[0]):
+        args.pop(0)
+    text = " ".join(args)
+    # `echo` reads escapes in some shells and not in others: read both.
+    return [text, _backslash_escapes(text)] if "\\" in text else [text]
 
 
 def heredoc_targets(
@@ -2571,11 +2764,13 @@ def heredoc_targets(
             heredocs,
         )
         return
-    if command in SHELL_INTERPRETERS and _heredoc_is_bare_shell(args, heredocs):
+    started = _inner_shell(command, args)
+    if started is not None and _heredoc_is_bare_shell(started[1], heredocs):
         # A bare `bash <<EOF ... EOF` starts a new interpreter process: it
         # only inherits the working directory (a process attribute), plus -
         # for a quoted delimiter only - this command's own prefix-exported
-        # environment.
+        # environment. `exec bash <<EOF` and `timeout 5 bash <<EOF` start the same
+        # shell, but the runner is also scanned as text below.
         heredoc_variables = (
             dict(prefix_assignments) if quoted else dict(outer_variables)
         )
@@ -2588,7 +2783,8 @@ def heredoc_targets(
             uncertain,
             heredocs,
         )
-        return
+        if posixpath.basename(strip_quoted_prefix(command)) in SCRIPT_SHELLS:
+            return
     uncertain.extend(protected_path_literals(body))
     uncertain.extend(opaque_write_paths(body))
 
@@ -2689,6 +2885,7 @@ def segment_targets(
     heredocs: dict[str, tuple[str, bool]],
     process_subs: dict[str, str],
     message: bool = False,
+    piped: list[str] | None = None,
 ) -> None:
     """Classify one segment's mutation targets into `confirmed` or `uncertain`.
 
@@ -2712,8 +2909,12 @@ def segment_targets(
     expanded = substitute(
         tokens, variables, command_info[1] - 1 if command_info else len(tokens)
     )
-    if len(expanded) != len(tokens):
-        # A value split into several words (`x="tee a"; $x`): read the command again.
+    if len(expanded) != len(tokens) or (
+        command_info is not None
+        and expanded[command_info[1] - 1] != tokens[command_info[1] - 1]
+    ):
+        # A value split into several words (`x="tee a"; $x`), or a variable that holds
+        # the command name (`c=cd; $c dir`): read the command again.
         command_info = command_name(expanded, variables, record=False)
     for _ in range(MAX_BRACE_ROUNDS):
         if command_info is None:
@@ -2771,6 +2972,7 @@ def segment_targets(
     if command_info is None:
         return
     command, start, prefix_assignments = command_info
+    command = strip_quoted_prefix(command)  # `"$c" args`: a quoted name is still a name
     # `env -C DIR cmd` runs `cmd` in DIR: its operands are read from there too.
     for folder in _option_folders(tokens[: start - 1]):
         for candidate in _folders(folder, repo_root, working_directories):
@@ -2806,9 +3008,52 @@ def segment_targets(
                 message,
             )
 
-    if command in ("eval", "source", "."):
+    started = _inner_shell(command, plain_args)
+    if started is not None and _heredoc_is_bare_shell(started[1], heredocs):
+        # A shell with no `-c` script and no script file reads its commands from standard
+        # input: from a here-string (`bash <<< 'text'`) or a pipe (`echo text | bash`).
+        # It is a child shell, so it gets a copy of the folders and only the prefix
+        # variables.
+        stdin_texts = list(piped or [])
+        here_string = _here_string_text(started[1])
+        if here_string is not None:
+            stdin_texts.append(here_string)
+        for stdin_text in stdin_texts:
+            classify_command(
+                stdin_text,
+                repo_root,
+                dict(prefix_assignments),
+                list(working_directories),
+                confirmed,
+                uncertain,
+                heredocs,
+            )
+
+    if command in ("source", ".") and any(
+        strip_quoted_prefix(arg) in SOURCE_STDIN for arg in plain_args
+    ):
+        # `source /dev/stdin <<< text` runs the text in this shell; `echo text | source
+        # /dev/stdin` runs it in the subshell of the pipeline.
+        here_string = _here_string_text(plain_args)
+        for source_text, same_shell in [(t, False) for t in piped or []] + (
+            [(here_string, True)] if here_string is not None else []
+        ):
+            classify_command(
+                source_text,
+                repo_root,
+                variables if same_shell else dict(variables),
+                working_directories if same_shell else list(working_directories),
+                confirmed,
+                uncertain,
+                heredocs,
+            )
+
+    in_this_shell = command in ("eval", "source", ".")
+    if in_this_shell or started is not None:
         # `eval "$(cat <<'EOF' ... EOF)"` and `source <(cat <<'EOF' ... EOF)` run the
         # text in this shell: its folder changes, variables, and functions stay.
+        # `bash -c "$(cat <<'EOF' ... EOF)"` and `bash <(cat <<'EOF' ... EOF)` run it
+        # in a child shell, which gets a copy of the folders and the prefix variables.
         for arg in args:
             for placeholder in SUBSTITUTION_PLACEHOLDER.findall(arg):
                 text = _cat_heredoc_text(process_subs.get(placeholder), heredocs)
@@ -2816,8 +3061,10 @@ def segment_targets(
                     classify_command(
                         text,
                         repo_root,
-                        variables,
-                        working_directories,
+                        variables if in_this_shell else dict(prefix_assignments),
+                        working_directories
+                        if in_this_shell
+                        else list(working_directories),
                         confirmed,
                         uncertain,
                         heredocs,
@@ -3045,9 +3292,8 @@ def _scan_unmodelled(
         " ".join(strip_quoted_prefix(token) for token in scanned)
     ):
         raise UnparseableCommand(DOTGLOB_REFUSAL)  # `eval 'shopt -s dotglob'`
-    if posixpath.basename(command) in SCRIPT_SHELLS and _shell_enables_dotglob(
-        plain_args
-    ):
+    shell = _inner_shell(command, plain_args)
+    if shell is not None and _shell_enables_dotglob(shell[1]):
         raise UnparseableCommand(DOTGLOB_REFUSAL)  # `bash -O dotglob -c '...'`
     script = _shell_script(command, plain_args)
     if script is not None:
@@ -3108,8 +3354,10 @@ def _shell_script(command: str, args: list[str]) -> str | None:
     name = posixpath.basename(command)
     if name == "eval":
         return " ".join(strip_quoted_prefix(arg) for arg in args)
-    if name not in SCRIPT_SHELLS:
+    inner = _inner_shell(command, args)
+    if inner is None:
         return None
+    args = inner[1]
     index = 0
     while index < len(args):
         word = strip_quoted_prefix(args[index])
@@ -3344,14 +3592,20 @@ def classify_command(
     command, found_heredocs = extract_heredocs(command, start_count=len(heredocs))
     heredocs.update(found_heredocs)
     command, process_subs = extract_substitutions(command)
-    segments = split_segments(command)
+    segments, operators = split_segments_with_operators(command)
     for name in _function_names(command) | _alias_names(segments):
         variables[FUNCTION_KEY + name] = ""
     if len(segments) != 1:
         # A message heredoc is text only when it is the whole substitution: with a
         # pipe or another command it may be a script for a shell, `python3 -`, `xargs`.
         message = False
-    for segment in segments:
+    for position, segment in enumerate(segments):
+        # The text of a literal producer before a `|`: a shell after it reads it.
+        piped = (
+            _piped_texts(segments[position - 1], variables, heredocs)
+            if position and operators[position] in ("|", "|&")
+            else None
+        )
         try:
             segment_targets(
                 segment,
@@ -3363,6 +3617,7 @@ def classify_command(
                 heredocs,
                 process_subs,
                 message,
+                piped,
             )
         except AmbiguousCommand:
             resolved = substitute(segment, variables)
