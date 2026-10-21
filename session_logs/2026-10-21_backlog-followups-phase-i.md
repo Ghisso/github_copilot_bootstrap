@@ -199,6 +199,11 @@ the user runs them (BF-I1 to BF-I7).
   systematic command-spelling sweep (full paths, quoted and escaped
   names, `command`/`builtin`/`env`/`exec`, a variable holding the name)
   for every command the guard treats specially.
+- **User decision (2026-10-22)** - "we don't need to be so exhaustive":
+  from review round 5, Phase I's gate blocks only on a decision looser
+  than Phase H, a hole Phase I introduced, or a false or missing docs
+  statement about what is checked. Any other pre-existing gap goes to the
+  docs' not-yet-checked list and the recorded follow-up to split the hook.
 
 ## [LEARN] Entries
 
