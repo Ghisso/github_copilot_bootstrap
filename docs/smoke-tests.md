@@ -72,7 +72,7 @@ Expected:
   mandatory, but the documenter performs a narrow same-agent targeted
   `humanize edit` self-check for prose it changes. Exact technical preservation
   wins.
-- The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v4.8.4` provenance.
+- The generated output contains the pinned Ponytail coding/review skills plus its MIT license and `v5.3.2` provenance.
 - The generated output mirrors every review profile under `.claude/review-profiles/`.
 - OpenAI Codex has one enabled `[[skills.config]]` entry per `.claude/skills/<name>`.
 - Codex config sets `agents.max_concurrent_threads_per_session = 6`, omits legacy `agents.max_threads` and redundant `agents.enabled`, retains `max_depth = 1`, and retains both required `[features.multi_agent_v2]` metadata-routing values.

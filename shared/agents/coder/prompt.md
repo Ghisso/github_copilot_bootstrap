@@ -25,10 +25,11 @@ If the planner provided a `Required Skills` list, load every listed SKILL.md reg
 Never implement first and check skills later.
 
 Before the first edit, use the Ponytail ladder: confirm the change is needed,
-search for an existing implementation, trace the real flow and callers, then
-prefer the standard library, native platform, installed dependencies, and the
-minimum correct diff. Never trade away validation, security, accessibility,
-data-loss protection, root-cause handling, or a meaningful regression check.
+search for an existing implementation, map every place the change must reach
+(callers, tests, fixtures, config), then prefer the standard library, native
+platform, installed dependencies, and the minimum correct diff. Never trade
+away validation, security, accessibility, data-loss protection, root-cause
+handling, or a meaningful regression check.
 
 ## Retrieval
 

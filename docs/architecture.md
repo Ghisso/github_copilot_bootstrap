@@ -218,18 +218,29 @@ source, tests, or human-authored policy.
 
 ## Ponytail Integration
 
-Ponytail `v4.8.4` is vendored at the portable skill layer rather than installed
+Ponytail `v5.3.2` is vendored at the portable skill layer rather than installed
 as a per-user plugin. Every full-install target receives `.claude/skills/ponytail/`,
 `.claude/skills/ponytail-review/`, and the upstream license/provenance; the
 sidecar overlay ships the same two skills, with the same license notice, at
 its own two write roots. The
 `ponytail` skill is coder-time implementation discipline: once per coding task,
 the coder applies `full` mode, then simplifies and re-verifies the changed
-scope. It is not a standalone lifecycle phase. Minimality means fewer concepts,
+scope. Before writing, it asks the coder to find every place the change must
+reach: callers, tests, fixtures, config, and exports. It is not a standalone
+lifecycle phase. Minimality means fewer concepts,
 dependencies, abstractions, layers, paths, and behaviors; clarity and
 maintainability outrank physical line count.
 
-The separate `ponytail-review` skill is a reviewer-facing checklist. The
+The separate `ponytail-review` skill is a reviewer-facing checklist for
+unnecessary complexity only. Whoever uses it reads the code the change
+touches, not only the diff, tags reuse misses with `reuse:`, gives a concrete
+case for each finding, searches the whole tree before a `delete:` finding, and
+adds a `Not checked:` line when something mattered but could not be checked.
+The unified reviewer agent applies the same rules through the `ponytail`
+profile and reports unchecked items as Open Requests instead. This is a
+partial adoption of upstream: the full quality
+review, the `shortcut:` marker, levels, and the extra upstream skills and hooks
+are not vendored. The
 unified reviewer selects the `ponytail` profile when the authoritative routing
 table requires it: deterministic control-plane/high-risk, multi-file,
 dependency, script, generator, or similarly complex work, or when the reviewer

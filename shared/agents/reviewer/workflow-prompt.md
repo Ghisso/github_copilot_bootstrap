@@ -30,7 +30,12 @@ interface, and `ponytail` for a multi-file diff.
    approved scope change replaces the requirement it changes, and a valid
    alternative way to meet a requirement is not a deviation. Report
    missing material behavior as an ordinary finding, and raise an unclear
-   requirement in your report, never invent one. Check that test
+   requirement in your report, never invent one. Read the code the
+   change touches, not only the diff (callers of every changed function,
+   signature, or return value; the tests and fixtures that exercise it;
+   the config or exports that name it): a caller, test, fixture, or
+   config entry outside the diff that the change breaks or leaves stale
+   belongs in your report like any other finding. Check that test
    expected values are not copied from the implementation's output and
    that a bug fix shows the original reproduction now behaving correctly.
    You cannot run anything, so if you need a test run, a reproduction

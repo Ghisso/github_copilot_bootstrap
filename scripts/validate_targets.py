@@ -7963,8 +7963,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
         # fail on an unchanged re-wrap (this cost a cycle in Phase B).
         normalized_provenance = normalized_text(provenance)
         check(
-            "v4.8.4" in provenance,
-            "Ponytail provenance must pin release v4.8.4",
+            "v5.3.2" in provenance,
+            "Ponytail provenance must pin release v5.3.2",
             errors,
         )
         check(
@@ -7980,8 +7980,8 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             errors,
         )
         check(
-            "bc9ee94" in provenance,
-            "Ponytail provenance must pin commit bc9ee94",
+            "16352ac229eb08a9598dcae48fe9f2b342567d86" in provenance,
+            "Ponytail provenance must pin commit 16352ac",
             errors,
         )
         pinned_files = {
@@ -7989,12 +7989,12 @@ def validate_skills_and_paths(errors: list[str]) -> None:
             / "shared"
             / "skills"
             / "ponytail"
-            / "SKILL.md": "7edff0be32c88fcc92b4cef7b9c65571a43aa5436d95d5ba3925b0be608b03a1",
+            / "SKILL.md": "1e0cf9db9eda588829f2e36d40ab95c0fbf3972dca1d70cf3184f1660612ff54",
             REPO_ROOT
             / "shared"
             / "skills"
             / "ponytail-review"
-            / "SKILL.md": "0732435f3466ca7fe976812d12a13725f2e8c2739d9f0123e105931a025f12b8",
+            / "SKILL.md": "56f23aa917442947ff5caaf18027bcbd17840209c8a051b3fc3a297a867e8450",
             REPO_ROOT
             / "shared"
             / "third_party"
@@ -9707,7 +9707,7 @@ def validate_devcontainer_and_installer(errors: list[str]) -> None:
                 errors,
             )
         check(
-            "v4.8.4"
+            "v5.3.2"
             in read(temp_repo / ".claude" / "third_party" / "ponytail" / "UPSTREAM.md"),
             "installed Ponytail provenance must retain the pinned release",
             errors,
