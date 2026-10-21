@@ -132,7 +132,9 @@ VARIABLE_REFERENCE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?")
 # Quoted text that must not be expanded again: a glob, a brace list, or a
 # variable reference (`$NAME`, `${NAME}`). A word holding such a quoted part is
 # returned by the scanner with `QUOTED_VALUE_PREFIX`.
-QUOTED_MAGIC = re.compile(r"[?*[]|(?<!\$)\{[^{}]+\}|\$\{?[A-Za-z_]")
+ARRAY_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+QUOTED_GLOB = re.compile(r"[?*[]|(?<!\$)\{[^{}]+\}")
+QUOTED_MAGIC = re.compile(QUOTED_GLOB.pattern + r"|\$\{?[A-Za-z_]")
 # Every alternative below is a *candidate* generator for `protected()`, not
 # the decider (see `protected_path_literals`'s docstring). Each one carries
 # word/token boundaries so it cannot extract a false-positive fragment out of
@@ -249,6 +251,14 @@ WRAPPER_NO_VALUE_FLAGS: dict[str, set[str]] = {
     "command": {"-p", "-v", "-V"},
 }
 QUOTED_VALUE_PREFIX = "__PROTECT_FILES_QUOTED_VALUE__"
+# A word that is one quoted glob or brace list (`'*.pem'`) is a pattern, not a
+# file name: `find` and `ls` match it, they do not write to it. It starts with
+# `QUOTED_VALUE_PREFIX`, so every check for that prefix also finds it.
+QUOTED_PATTERN_PREFIX = QUOTED_VALUE_PREFIX + "PATTERN__"
+# Text a pattern word cannot hold: a quoted word with a space, an operator
+# character, or a quote is a script or a sentence (`bash -c 'cmd > f; echo *'`),
+# which must still be read for what it names.
+PATTERN_UNSAFE = re.compile(r"[\s;|&<>'\"\\]")
 PROCESS_SUB_PREFIX = "__PROTECT_FILES_PROCSUB_"
 # A placeholder for `$( )`, `$(( ))`, `<( )`, or `>( )` left inside a word.
 SUBSTITUTION_PLACEHOLDER = re.compile(re.escape(PROCESS_SUB_PREFIX) + r"\d+__")
@@ -294,9 +304,16 @@ class UnparseableCommand(ValueError):
     """
 
 
+def strip_quoted_prefix(value: str) -> str:
+    """`value` without the scanner's quoted-word prefix, of either kind."""
+    if value.startswith(QUOTED_PATTERN_PREFIX):
+        return value[len(QUOTED_PATTERN_PREFIX) :]
+    return value.removeprefix(QUOTED_VALUE_PREFIX)
+
+
 def normalize(path: str, repo_root: str) -> str:
     value = path.strip().strip("\"'").replace("\\", "/")
-    value = value.removeprefix(QUOTED_VALUE_PREFIX)
+    value = strip_quoted_prefix(value)
     if value.startswith("file://"):
         value = value[7:]
     if repo_root and value.startswith(repo_root.rstrip("/") + "/"):
@@ -362,6 +379,13 @@ def _control_plane_in_repo_root(source: str, repo_root: str) -> bool:
     return lexically_inside or really_inside
 
 
+def without_expansions(text: str) -> str:
+    """`text` without its substitution placeholders and unresolved `$NAME` and
+    `${NAME}` references: each may expand to nothing, so a protected name may
+    be only what is left."""
+    return VARIABLE_REFERENCE.sub("", SUBSTITUTION_PLACEHOLDER.sub("", text))
+
+
 def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     """Classify one path as an in-repository control-plane file, an
     anywhere-protected secret-shaped file, or unprotected.
@@ -374,10 +398,10 @@ def protected(path: str, repo_root: str) -> tuple[str, bool] | None:
     global, because a credential-shaped file is harmful to mutate or
     exfiltrate in any tree.
 
-    A substitution glued to a name (`.env$(true)`) may expand to nothing, so the
-    name without its placeholder is checked too.
+    A substitution or an unresolved variable glued to a name (`.env$(true)`,
+    `$X.env`) may expand to nothing, so the name without it is checked too.
     """
-    bare = SUBSTITUTION_PLACEHOLDER.sub("", path)
+    bare = without_expansions(path)
     if bare != path:
         hit = protected(bare, repo_root)
         if hit:
@@ -439,7 +463,7 @@ def resolve_operands(
     resolved: list[str] = []
     for path in paths:
         quoted_value = path.startswith(QUOTED_VALUE_PREFIX)
-        path = path.removeprefix(QUOTED_VALUE_PREFIX)
+        path = strip_quoted_prefix(path)
         brace = None if quoted_value else re.search(r"\{([^{}]+)\}", path)
         if brace:
             for option in brace.group(1).split(","):
@@ -489,15 +513,19 @@ def protected_path_literals(value: str) -> list[str]:
     """Extract explicit high-confidence paths from opaque interpreter text."""
     literals: list[str] = []
     # No alternative reaches across whitespace, so the words can be read one by
-    # one with the same result as the whole text.
-    for word in SUBSTITUTION_PLACEHOLDER.sub("", value).split():
-        if len(word) <= LONG_WORD:
-            literals.extend(PROTECTED_PATH_LITERAL.findall(word))
-        elif PROTECTED_NAME.search(word):
-            raise UnparseableCommand(
-                "a word of %d characters is too long to check for a protected name"
-                % len(word)
-            )
+    # one with the same result as the whole text. A word is read as it is, without
+    # its substitutions, and without those and its variables too: each may
+    # expand to nothing, and what is left may need the other's neighbours.
+    for word in value.split():
+        no_substitution = SUBSTITUTION_PLACEHOLDER.sub("", word)
+        for text in dict.fromkeys((word, no_substitution, without_expansions(word))):
+            if len(text) <= LONG_WORD:
+                literals.extend(PROTECTED_PATH_LITERAL.findall(text))
+            elif PROTECTED_NAME.search(text):
+                raise UnparseableCommand(
+                    "a word of %d characters is too long to check for a "
+                    "protected name" % len(text)
+                )
     return [match.rstrip(",;:)") for match in literals]
 
 
@@ -927,15 +955,39 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
 
     A quoted part holding a glob, a brace list, or a variable reference
     (`QUOTED_MAGIC`) must not be expanded again, so the word gets
-    `QUOTED_VALUE_PREFIX`; a part glued to a name or to `=` (`NAME='*'`,
+    `QUOTED_VALUE_PREFIX`, or `QUOTED_PATTERN_PREFIX` when the word is only that
+    one quoted glob or brace list; a part glued to a name or to `=` (`NAME='*'`,
     `--opt="$X"`) leaves the word as it is.
+
+    A `(` right after `NAME=` or `NAME+=` opens an array assignment: the list
+    and what is glued after its `)` stay in the word (`a=(x)b`). Bash keeps a
+    `#` glued there in the word too (`a=(x)#c` holds no comment), but the other
+    scans in this file take a `#` after any `)` for a comment, so that form
+    fails closed instead of being read two ways.
     """
     parts: list[str] = []
     quoted = False
     magic = False
+    glob = False  # a magic part holds a glob or a brace list
     before = ""  # the last character of the word so far
     length = len(command)
-    while index < length and command[index] not in WORD_BREAKS:
+    while index < length:
+        if command[index] in WORD_BREAKS:
+            if (
+                command[index] != "("
+                or before != "="
+                or not ARRAY_ASSIGNMENT.fullmatch("".join(parts))
+            ):
+                break
+            end = _matching_paren(command, index)
+            if end == -1:
+                raise UnparseableCommand("unbalanced array assignment")
+            if command[end : end + 1] == "#":
+                raise UnparseableCommand("a # right after an array assignment")
+            parts.append(command[index:end])
+            before = ")"
+            index = end
+            continue
         end = _skip_literal(command, index)
         if end == -1:
             raise UnparseableCommand("shell command could not be parsed")
@@ -955,12 +1007,17 @@ def _read_word(command: str, index: int) -> tuple[str, bool, int]:
                 and not (before.isalnum() or before in ("_", "="))
             ):
                 magic = True
+                glob = glob or bool(QUOTED_GLOB.search(literal))
             parts.append(value)
             before = value[-1:] or before
             quoted = True
         index = end
     text = "".join(parts)
-    return (QUOTED_VALUE_PREFIX + text if magic else text), quoted, index
+    if not magic:
+        return text, quoted, index
+    pattern = glob and len(parts) == 1 and not PATTERN_UNSAFE.search(text)
+    prefix = QUOTED_PATTERN_PREFIX if pattern else QUOTED_VALUE_PREFIX
+    return prefix + text, quoted, index
 
 
 def _shell_tokens(command: str) -> list[tuple[str, bool]]:
@@ -1679,10 +1736,15 @@ def segment_targets(
     elif command not in READ_ONLY:
         # Unknown commands are not interpreted as filesystem mutations merely
         # because their source or prose contains a sensitive-looking word.
-        # Explicit paths remain covered by native edits and known mutators.
-        uncertain.extend(token for token in plain_args if protected(token, repo_root))
-        uncertain.extend(protected_path_literals(" ".join(plain_args)))
-        uncertain.extend(opaque_write_paths(" ".join(plain_args)))
+        # Explicit paths remain covered by native edits and known mutators. A
+        # word that is one quoted glob is a pattern for the command to match
+        # (`find . -name '*.pem'`), not a file it writes, so it is not scanned.
+        scanned = [
+            token for token in plain_args if not token.startswith(QUOTED_PATTERN_PREFIX)
+        ]
+        uncertain.extend(token for token in scanned if protected(token, repo_root))
+        uncertain.extend(protected_path_literals(" ".join(scanned)))
+        uncertain.extend(opaque_write_paths(" ".join(scanned)))
 
 
 def classify_command(
@@ -1888,8 +1950,11 @@ if __name__ == "__main__":
     # SIGALRM ends the process, and the hook script treats a failed exit as a
     # denial, so a timeout of the hook (which lets a command through) never
     # decides. A signal handler cannot do this: on Python 3.9 a regex match
-    # cannot be interrupted. Real commands classify in well under a second.
+    # cannot be interrupted. Real commands classify in well under a second. A
+    # parent may have started this process with SIGALRM ignored, and an ignored
+    # signal stays ignored across `exec`, so the default action is put back.
     if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)
         signal.alarm(CLASSIFIER_SECONDS)
     try:
         raise SystemExit(main())
