@@ -218,6 +218,12 @@ the user runs them (BF-I1 to BF-I7).
   scanner oracle, and the three Python versions agree; slowest 2.27 s.
   Regenerated, self-installed; `validate_targets.py` and
   `check_runtime.py` PASS. Docs fifth pass started.
+- **Docs fifth pass** - fragment and post-substitution assignment rules,
+  shells fed by heredoc, here-string, or pipe in any spelling,
+  variable-held command names, the new not-yet-checked items, and two
+  over-blocks; the follow-up bullet now says "more than 3,000 lines".
+  Phase G cited text now at 791-823. `verify.py phase` PASS (4902 passed,
+  1 skipped). Review round 5 requested under the user's lighter bar.
 
 ## [LEARN] Entries
 
