@@ -231,6 +231,19 @@ the user runs them (BF-I1 to BF-I7).
   (its forms become a listed gap) and take the reviewer's ponytail minor,
   deleting the `echo`/`printf` emulation (about 90 lines) so pipes from
   `echo`/`printf` into a shell are listed again, as in Phase H.
+- **Coder round 5 fixes** - fragment tracking removed (`MAYBE_KEY`,
+  `_substituted_value`, `_derived_from_a_guess`, `_guess_value`), round-3
+  assignment code restored; the four `+`/replacement forms reproduced
+  under plain Bash and `--posix` (dash for three) and now deny everywhere
+  (new test with 8 cases, which also pass on the Phase H guard). The
+  `echo`/`printf` emulation is replaced by a 28-line `_cat_text` that
+  reads only `cat <<EOF` and `cat <<< text` before a pipe. Guard 3,790 to
+  3,702 lines. Fragment and `echo`/`printf` pipe tests now pin the
+  recorded gaps with reasons. 331 probe cases, 0 bypass; differential vs
+  Phase H 0 under-protected (only `pushd` config writes are looser, by
+  design); tests, ruff, mypy, 3.9, Bash check, and the three Python
+  versions pass. Regenerated, self-installed; `validate_targets.py` and
+  `check_runtime.py` PASS. Docs sixth pass started.
 
 ## [LEARN] Entries
 
