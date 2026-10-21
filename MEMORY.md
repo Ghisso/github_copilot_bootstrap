@@ -41,8 +41,9 @@
 - [LEARN:review] An audit finding is a hypothesis until re-verified against
   the working tree. Three findings in the 2026-09-12 skill audit were stale or
   wrong, and one of them (narrowing the vendored `ponytail` descriptions)
-  would have changed a hash-pinned file and failed
-  `validate_targets.py:7641-7660` in every phase that ran it. Re-check each
+  would have changed a hash-pinned file and failed the `pinned_files` hash
+  check in `validate_skills_and_paths` (`scripts/validate_targets.py`) in
+  every phase that ran it. Re-check each
   cited line before planning work around it.
 - [LEARN:architecture] `shared/skills/ponytail/SKILL.md` and
   `ponytail-review/SKILL.md` are hash-pinned vendored MIT files, and the local
@@ -116,13 +117,16 @@
   running `record_findings.py`, or the report's hash and `changed_files` won't
   match what the gate recomputes at commit time (`dirty` becomes `true`,
   which the gate rejects).
-- [LEARN:domain] `state-sync.sh` `cmd_pull` must return non-zero on a rebase
-  conflict, and `cmd_push` must guard its push on that result — otherwise a
+- [LEARN:domain] `state-sync.sh` `reconcile_committed_state` must return
+  non-zero on a rebase conflict or an aborted unrelated-history merge, and
+  every caller that pushes must guard its push on that result — otherwise a
   push follows an aborted rebase and gets rejected non-fast-forward.
-  Top-level dispatch still converts the non-zero return into a warning +
-  `exit 0` so hooks never block Codex shutdown. The same guard applies to
-  `cmd_migrate` via `commit_and_reconcile` returning non-zero on merge abort
-  (phase-3); `cmd_setup` ignores that result since it never pushes.
+  `cmd_publish` (which `cmd_push` runs after `cmd_checkpoint`) and
+  `cmd_migrate` skip the push on a non-zero result, and `cmd_pull` returns
+  it. Top-level dispatch still converts the non-zero return into a warning +
+  `exit 0` so hooks never block Codex shutdown. `cmd_setup` ignores that
+  result, except the protected-rebase status it passes back, since it never
+  pushes.
 - [LEARN:security] Automated recovery must distinguish state that existed at
   entry from state the current operation created. Auto-clean only an exact,
   observed orphan shape; leave valid or unknown pre-existing state untouched,
@@ -172,8 +176,11 @@
   documentation edits settle. A stale ignored `dist/` tree can create a false
   determinism failure even when two fresh generations are byte-identical.
 - [LEARN:workflow] Phase closeout gates read the small-plan frontmatter status
-  as well as checklist prose; set `status: complete` only after verification,
-  review, findings, documentation, and learning evidence are recorded.
+  as well as checklist prose. Set `status: complete` in CLOSEOUT step 2,
+  after verification, review, and documentation and together with the
+  `[LEARN]` entries, but before the findings report and the receipts
+  (steps 4 to 6), which bind that final plan state. The CLOSEOUT sequence in
+  `workflow.instructions.md` is the authority.
 - [LEARN:workflow] After an atomic phase commit lands, reconcile the phase
   checklist, session log, and big-plan checklist from the actual commit SHAs;
   don't infer completion from a clean outer worktree alone.
@@ -1173,10 +1180,12 @@
   2026-10-17 a `reviewer` with `mcp__semble, mcp__context-mode` listed every
   tool of both (model-reported list). Supersedes the earlier "subagent tool
   lists exclude project MCP servers" wording.
-- [LEARN:tooling] OpenWiki 0.5.2: `mode: "update"` on an empty wiki performs
-  a first generation; the page queue is served alphabetically by path;
+- [LEARN:tooling] OpenWiki 0.7.2 (package source, re-checked 2026-10-21):
+  `mode: "update"` with no recorded base (`openwiki/.last-update.json`
+  absent) performs a first generation; the page queue is served in path
+  order, except that `/openwiki/quickstart.md` always comes last;
   `openwiki_submit_page` rejects evidence citing `.openwikiignore`-excluded
-  files or generated OpenWiki output (including `openwiki/INSTRUCTIONS.md`),
+  files or anything under `openwiki/` (including `openwiki/INSTRUCTIONS.md`),
   so cite the generator string or README for root-guidance facts.
 - [LEARN:documentation] Before shortening a human doc against generated
   coverage, grep the validators for literal-text contracts on that doc.
@@ -1207,8 +1216,12 @@
   invalidates line-range evidence even when the fact is unchanged.
 - [LEARN:workflow] A generated wiki page is fixed through a corrective
   OpenWiki `update` run scoped to the affected pages, using
-  `openwiki_inspect_page_claims` to get the claim id to revise; source need
-  not have changed for `openwiki_begin` to start a run.
+  `openwiki_inspect_page_claims` to get the claim id to revise. On 0.7.2,
+  `openwiki_begin` returns `noop` only when the worktree is clean (apart from
+  OpenWiki metadata and ignored paths), `HEAD` is the recorded base or
+  differs only under `openwiki/` or ignored paths, and no claim has an
+  issue; so a corrective run starts while the previous run's pages or any
+  other edit are still uncommitted.
 - [LEARN:testing] Native discovery probes need evidence the model cannot
   produce by reading files. `claude -p --tools "" --output-format
   stream-json --verbose` gives the loaded skills in the `system`/`init`
@@ -1266,8 +1279,9 @@
 - [LEARN:documentation] `.openwikiignore` excludes `CLAUDE.md`, so
   `openwiki_submit_page` rejects a claim citing it; cite `README.md` or the
   code for command and guidance facts.
-- [LEARN:tooling] The protected-file guard refuses any Bash command that
-  names a script under `.claude/hooks/scripts/`, even a read-only run of
+- [LEARN:tooling] The protected-file guard refuses running a script under
+  `.claude/hooks/scripts/` (any Bash command outside its read-only list that
+  names one; `cat` and `rg` are allowed), even a read-only run of
   `session-start-state.sh`. Observe a hook's output at the next session
   start, or through tests that isolate `REPO_ROOT`; do not run it by hand.
 - [LEARN:testing] A test that injects gathered data into a pure planner
@@ -1483,8 +1497,9 @@
   session, and only instructions, model, effort, summary, verbosity,
   personality, service tier, and `features.*` disables apply (official
   subagents docs and `openai/codex` `codex-rs/core/src/agent/role.rs`,
-  2026-10-17). The `sandbox_mode = "read-only"` the bootstrap writes is
-  ignored.
+  2026-10-17). The bootstrap no longer writes `sandbox_mode` into generated
+  Codex agents (backlog-followups Phase D), and `validate_targets.py`
+  rejects it as a per-agent override.
 - [LEARN:tooling] Antigravity's documented workspace MCP file is
   `.agents/mcp_config.json`, but `inheritMcp` is not a documented subagent
   field (the docs list `mcpServers: object[]`) and the MCP tool-name format
@@ -1514,8 +1529,10 @@
 - [LEARN:workflow] After a self-install, new protect-files rules apply to the
   orchestrator's own Bash commands. A command that names a protected config
   or loops over an installed hook script is refused; probe with
-  `git -C .claude hash-object`/`ls-files`, payload files, and the
-  `shared/hooks/scripts/` copy instead.
+  `git -C .claude ls-files -s` (read-only; since backlog-followups Phase D,
+  `git -C .claude hash-object` on a hook path asks on Claude Code and is
+  denied on Codex), payload files, and the `shared/hooks/scripts/` copy
+  instead.
 - [LEARN:documentation] Take every OpenWiki claim's line range from a search
   run in the same step as `openwiki_submit_page`, not from an earlier read
   or a subagent report. Two ranges cited from an earlier read were about 40

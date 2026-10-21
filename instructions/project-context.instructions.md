@@ -23,8 +23,8 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
   hooks, and gates.
 - `docs/`: architecture, deterministic commit gate, runtime checks, smoke
   tests, sidecar provider contract, native-client acceptance, dated evidence
-  notes, and `target-mapping.md` (per-client adapters, the gate-repair parity
-  table, and the recorded follow-ups list).
+  notes, and `target-mapping.md` (per-client adapters, the gate-repair and
+  backlog-followups parity tables, and the recorded follow-ups list).
 - `openwiki/`: generated OpenWiki knowledge layer (descriptive, never
   authority; refresh only through the `knowledge-refresh` skill).
 - `shared/policies/`: source instruction files (workflow, quality,
@@ -37,8 +37,9 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `shared/mcp/servers.json`: Semble, Context7, and Context Mode definitions
   (Context Mode is filtered to exactly four guarded tools).
 - `shared/devcontainer/`: generated GPU devcontainer and AI-state bootloader
-  (pins OpenWiki `0.5.2`).
-- `shared/third_party/ponytail/`: vendored Ponytail `v4.8.4` with provenance.
+  (pins OpenWiki `0.7.2`).
+- `shared/third_party/ponytail/`: vendored Ponytail (a local fork, partially
+  merged from upstream `v5.3.2`) with provenance.
 - `shared/sidecar/`: sources for the personal sidecar overlay.
 - `shared/schemas/`: only `native-client-observation.schema.json` (the stale
   agent schema was removed by gate-repair).
@@ -50,8 +51,9 @@ image, and canonical Python lives under `shared`, `scripts`, and `tests`.
 - `scripts/install_bootstrap.py`: installs generated output into a consumer,
   in `full` mode (a takeover, including a nested `.claude` `ai-state`
   repository) or `sidecar` mode (a private overlay inside a team-owned
-  harness), chosen by `--mode` or auto-detected. It fills the Project State
-  slot with the target directory name.
+  harness), chosen by `--mode` or auto-detected. It fills each generated
+  `**Project:**` placeholder line (`CLAUDE.md`, `AGENTS.md`, and the installed
+  workspace instructions) with the target directory name.
 - `scripts/runtime_ownership.py`: which installed paths the bootstrap owns and
   which are consumer state (`CONSUMER_STATE_PATHS`); anything else under
   `.claude/` that the target lacks is deleted on refresh.
@@ -120,9 +122,12 @@ Onboarding was refreshed on `dev` at `f964551` on 2026-10-20, after the
 reported only PASS lines. `dev` is 273 commits ahead of `origin/main`, which
 was last updated 2026-05-24; releasing `dev` to `main` is the user's call.
 
-Pinned versions versus upstream on 2026-10-20: Context Mode `1.0.169`
-(current), OpenWiki `0.5.2` (upstream `0.7.2`), Ponytail `v4.8.4` (upstream
-`v5.3.2`).
+The `backlog-followups` big plan (Phases A to G, 2026-10-20 to 2026-10-21)
+then ran on `backlog-followups_implementation`; opening its pull request to
+`dev` is the user's decision. Pinned versions after it: Context Mode
+`1.0.169`, OpenWiki `0.7.2` (from `0.5.2`; the guard allows only
+`mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
+(from `v4.8.4`; `ponytail-review` stays complexity-only).
 
 Before merging bootstrap changes, run:
 
