@@ -260,6 +260,8 @@ SED_LONG_OPTIONS = {
     "version": 0,
 }
 SCRIPT_SHELLS = {"bash", "sh", "dash", "zsh", "ksh", "ash"}
+# What `source` and `.` read from standard input.
+SOURCE_STDIN = {"/dev/stdin", "/dev/fd/0", "/proc/self/fd/0"}
 # perl flags that take the rest of the cluster (or the next word) as a value.
 PERL_VALUE_FLAGS = "eEIFMmCdDVx"
 # git subcommands whose `-m` value is a message.
@@ -1832,6 +1834,8 @@ def record_assignment(token: str, variables: dict[str, str]) -> None:
         variables.pop(name, None)
         return
     known = _known_value(value, variables)
+    if known is None:
+        known = _protected_candidate(value)
     old = variables.get(name)
     if old is not None and (plus or known != old):
         raise UnparseableCommand(ASSIGNED_TWICE_REFUSAL)
@@ -1840,6 +1844,23 @@ def record_assignment(token: str, variables: dict[str, str]) -> None:
         variables.pop(name, None)
     else:
         variables[name] = known
+
+
+def _protected_candidate(value: str) -> str | None:
+    """A value that an unresolved expansion in `value` may give and that names a
+    protected file: the default word (`${z:-.env}`, `${z/#/.env}`) or what is left
+    without the expansion (`.en${z}v`, `${z}.env`). A later use of the name is then
+    checked against it. None when neither names one (`PORT=${PORT:-8080}`)."""
+    for candidate in dict.fromkeys(
+        (expansion_defaults(value), without_expansions(value))
+    ):
+        if (
+            "$" not in candidate
+            and "`" not in candidate
+            and PROTECTED_PATH_LITERAL.search(candidate)
+        ):
+            return candidate
+    return None
 
 
 def _refuse_assigned_expansions(text: str, variables: dict[str, str]) -> None:
@@ -2477,6 +2498,7 @@ def heredoc_targets(
     working_directories: list[str],
     confirmed: list[str],
     uncertain: list[str],
+    variables: dict[str, str],
     message: bool = False,
 ) -> None:
     """Classify one heredoc body by what its consuming command does with its
@@ -2534,6 +2556,21 @@ def heredoc_targets(
         # `git commit -m "$(cat <<'EOF' ... EOF)"`: the text becomes a commit
         # message, stored as an object, never written to a working-tree file.
         return
+    if command in ("source", ".") and any(
+        strip_quoted_prefix(arg) in SOURCE_STDIN for arg in args
+    ):
+        # `source /dev/stdin <<'EOF'` runs the body in this shell, like `eval`: its
+        # folder changes, variables, aliases, and functions stay.
+        classify_command(
+            body,
+            repo_root,
+            variables,
+            working_directories,
+            confirmed,
+            uncertain,
+            heredocs,
+        )
+        return
     if command in SHELL_INTERPRETERS and _heredoc_is_bare_shell(args, heredocs):
         # A bare `bash <<EOF ... EOF` starts a new interpreter process: it
         # only inherits the working directory (a process attribute), plus -
@@ -2554,6 +2591,21 @@ def heredoc_targets(
         return
     uncertain.extend(protected_path_literals(body))
     uncertain.extend(opaque_write_paths(body))
+
+
+def _cat_heredoc_text(
+    inner: str | None, heredocs: dict[str, tuple[str, bool]]
+) -> str | None:
+    """The body of a substitution that is only `cat <<EOF ... EOF`, or None."""
+    if inner is None:
+        return None
+    # A heredoc inside double quotes is still in the text; one outside is a placeholder.
+    text, found = extract_heredocs(inner, start_count=len(heredocs))
+    segments = split_segments(text)
+    if len(segments) != 1 or len(segments[0]) != 2 or segments[0][0] != "cat":
+        return None
+    entry = found.get(segments[0][1]) or heredocs.get(segments[0][1])
+    return entry[0] if entry else None
 
 
 def classify_substitutions(
@@ -2750,8 +2802,26 @@ def segment_targets(
                 working_directories,
                 confirmed,
                 uncertain,
+                variables,
                 message,
             )
+
+    if command in ("eval", "source", "."):
+        # `eval "$(cat <<'EOF' ... EOF)"` and `source <(cat <<'EOF' ... EOF)` run the
+        # text in this shell: its folder changes, variables, and functions stay.
+        for arg in args:
+            for placeholder in SUBSTITUTION_PLACEHOLDER.findall(arg):
+                text = _cat_heredoc_text(process_subs.get(placeholder), heredocs)
+                if text is not None:
+                    classify_command(
+                        text,
+                        repo_root,
+                        variables,
+                        working_directories,
+                        confirmed,
+                        uncertain,
+                        heredocs,
+                    )
 
     if command in {"shopt", "setopt", "unsetopt", "set"} and _enables_dotglob(
         command, args
@@ -2824,48 +2894,53 @@ def segment_targets(
         confirmed.extend(
             resolve_from_directories(candidates[1:], working_directories, repo_root)
         )
-    elif command in {"sed", "perl"}:
-        if command == "sed":
-            # An inline script can write a file (`w`, `W`, the `w` flag of `s///`)
-            # or run a command (`e`) without `-i`.
-            sed_files, sed_executes = sed_effects(plain_args)
+    elif command == "perl":
+        in_place, scripts, files, script_file = _perl_command_line(plain_args)
+        scanned = plain_args
+        if in_place:
+            if not files:
+                raise AmbiguousCommand("perl -i has no file target")
+            # Like `sed -i`: the files it names are written, a hook config asks. Only the
+            # program text is left to scan (`-e`, `-E`, `-M`), unless the program is a
+            # script file the guard cannot read.
             confirmed.extend(
-                resolve_from_directories(sed_files, working_directories, repo_root)
+                resolve_from_directories(files, working_directories, repo_root)
             )
-            if sed_executes:
-                raise UnparseableCommand("a sed script runs a shell command")
+            if not script_file:
+                scanned = scripts
+        # Without `-i`, every operand is scanned: unlike `sed`, a perl program can open
+        # an operand for writing (`open(F, ">", $ARGV[0])`).
+        _scan_unmodelled(
+            command,
+            scanned,
+            repo_root,
+            working_directories,
+            confirmed,
+            uncertain,
+            variables,
+        )
+    elif command == "sed":
+        # An inline script can write a file (`w`, `W`, the `w` flag of `s///`) or run
+        # a command (`e`) without `-i`.
+        sed_files, sed_executes = sed_effects(plain_args)
+        confirmed.extend(
+            resolve_from_directories(sed_files, working_directories, repo_root)
+        )
+        if sed_executes:
+            raise UnparseableCommand("a sed script runs a shell command")
         candidates = operands(args, OPTION_VALUES[command])
-        inplace = (
-            _perl_in_place(args)
-            if command == "perl"
-            else any(
-                arg == "-i"
-                or (arg.startswith("-") and "i" in arg[1:])
-                or arg == "--in-place"
-                or arg.startswith("--in-place=")
-                for arg in args
-            )
+        inplace = any(
+            arg == "-i"
+            or (arg.startswith("-") and "i" in arg[1:])
+            or arg == "--in-place"
+            or arg.startswith("--in-place=")
+            for arg in args
         )
         if inplace:
-            required = 1 if command == "perl" else 2
-            if len(candidates) < required:
-                raise AmbiguousCommand(f"{command} -i has no file target")
+            if len(candidates) < 2:
+                raise AmbiguousCommand("sed -i has no file target")
             confirmed.extend(
-                resolve_from_directories(
-                    candidates if command == "perl" else candidates[1:],
-                    working_directories,
-                    repo_root,
-                )
-            )
-        if command == "perl":
-            _scan_unmodelled(
-                command,
-                plain_args,
-                repo_root,
-                working_directories,
-                confirmed,
-                uncertain,
-                variables,
+                resolve_from_directories(candidates[1:], working_directories, repo_root)
             )
     elif command == "dd":
         confirmed.extend(
@@ -3070,26 +3145,49 @@ def _shell_enables_dotglob(args: list[str]) -> bool:
     return False
 
 
-def _perl_in_place(args: list[str]) -> bool:
-    """True when a perl flag cluster has `-i`. A cluster is read up to the first letter
-    that takes the rest of it as a value (`-Mwarnings`, `-Ilib`, `-e'code'`), so the
-    `i` of a module name does not count; the script words themselves are always
-    scanned for names."""
+def _perl_command_line(args: list[str]) -> tuple[bool, list[str], list[str], bool]:
+    """(in place, program text, input files, script file) of a perl command line. A flag
+    cluster is read up to the first letter that takes the rest of it as a value
+    (`-Mwarnings`, `-Ilib`, `-e'code'`), so the `i` of a module name is not `-i`.
+    The program text is what `-e`, `-E`, `-M`, and `-m` carry. Without `-e` or `-E` the
+    first operand is a script file (the last item is True) and the rest are its files."""
+    in_place = False
+    has_program = False
+    scripts: list[str] = []
     index = 0
     while index < len(args):
         word = strip_quoted_prefix(args[index])
+        if word == "--":
+            index += 1
+            break
+        if not word.startswith("-") or word == "-" or word.startswith("--"):
+            break  # the first word that is not a flag cluster
         index += 1
-        if not word.startswith("-") or word.startswith("--") or word == "-":
-            break  # the first word that is not a flag cluster is the script file
         cluster = word[1:]
         for position, letter in enumerate(cluster):
+            rest = cluster[position + 1 :]
             if letter == "i":
-                return True
-            if letter in PERL_VALUE_FLAGS:
-                if letter in "eEIF" and position == len(cluster) - 1:
-                    index += 1  # the value is the next word
+                in_place = True  # the rest of the cluster is the backup suffix
                 break
-    return False
+            if letter in "eE":
+                has_program = True
+                if not rest and index < len(args):
+                    rest = strip_quoted_prefix(args[index])
+                    index += 1
+                scripts.append(rest)
+                break
+            if letter in "Mm":
+                scripts.append(rest)
+                break
+            if letter in "IF" and not rest and index < len(args):
+                index += 1  # the value is the next word
+                break
+            if letter in PERL_VALUE_FLAGS:
+                break
+    operands_ = [strip_quoted_prefix(arg) for arg in args[index:]]
+    if has_program:
+        return in_place, scripts, operands_, False
+    return in_place, scripts, operands_[1:], True
 
 
 def _rg_runs_a_command(args: list[str]) -> bool:
