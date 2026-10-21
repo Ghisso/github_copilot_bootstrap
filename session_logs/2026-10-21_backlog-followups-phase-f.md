@@ -15,7 +15,10 @@ only `mode: "update"` either way.
 
 - [x] PRE-FLIGHT: Phase E committed (`02e22de`) and pushed; Phase F is the
   current phase. Phase E outcomes do not affect Phase F; no planner.
-- [ ] IMPLEMENT/VERIFY/REVIEW/CLOSEOUT — repeat until verification and review pass
+- [x] IMPLEMENT/VERIFY/REVIEW — two review rounds; round 1 `PASS` with three
+  MINORs (all fixed), round 2 `PASS` with no findings.
+- [x] CLOSEOUT: documentation, final AI state, checkpoint, staged index,
+  findings, phase receipt, closeout dry run, checkpoint, closeout receipt.
 - [ ] COMMIT
 - [ ] PUSH
 
@@ -80,6 +83,15 @@ only `mode: "update"` either way.
   Rollback, if ever needed: `npm install -g openwiki@0.5.2` and the same
   two install commands. This session's OpenWiki server was started on
   `0.5.2` and is now stale; Phase G needs a reconnect or a new session.
+- **Verify and review** - Regenerated and self-installed;
+  `git status --porcelain -- AGENTS.md CLAUDE.md` empty; `check_runtime.py`
+  only PASS lines; `verify.py phase` PASS (3270 passed). Review round 1
+  (six profiles, commit gate): `PASS`, three MINORs: the upgrade procedure
+  said "both `openwiki@` lines" (only one line has it; the other is the
+  `package.json` check); `_file_bytes` excluded the whole `shared/` tree
+  (weakening stop rule (a)); two over-long lines in the knowledge-refresh
+  skill. All fixed; 33 OpenWiki tests pass; `verify.py phase` PASS again
+  (3270 passed). Review round 2: `PASS`, no findings.
 
 ## Step 1 capture table
 
@@ -234,11 +246,29 @@ tree shows neither file modified).
 
 ## [LEARN] Entries
 
-To be written at closeout.
+- [LEARN:tooling] After a user runs a global npm upgrade for a pinned tool,
+  check the binary the repository actually uses before trusting it:
+  `readlink -f "$(command -v <tool>)"` and that package's own
+  `package.json` version, plus every install receipt. On 2026-10-21 a
+  user-run `npm install -g openwiki@0.7.2` left this WSL global package at
+  `0.5.2`, while one integration install ran on `0.7.2` and the other on
+  `0.5.2`, leaving mixed receipts.
 
 ## Verification
 
-To be written at closeout.
+```text
+# verify closeout --format text summary lines
+```
+
+- optional 1: NOT RUN — Claude Code `/mcp` and a read-only `openwiki_search`
+  call need a session started on `0.7.2`; this session's server started on
+  `0.5.2`. Phase G starts after a reconnect and exercises the server.
+- optional 2: NOT RUN — no Codex session available here.
+- optional 3: NOT RUN — the Codex guard re-probe needs a Codex session.
+- optional 4: PASS — `unshare -rn uv run --offline pytest
+  tests/test_openwiki_cli_smoke.py -q`: 2 passed on `0.7.2`.
+- optional 5: NOT RUN — the devcontainer image was not rebuilt here; the
+  validator checks the Dockerfile pin text.
 
 ## Open Questions / Next Steps
 

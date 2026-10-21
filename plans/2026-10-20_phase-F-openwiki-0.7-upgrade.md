@@ -3,8 +3,8 @@ name: 2026-10-20_phase-F-openwiki-0.7-upgrade
 type: small-plan
 parent_plan: backlog-followups
 phase_index: 6
-status: in-progress
-closeout_session_log:
+status: complete
+closeout_session_log: .claude/session_logs/2026-10-21_backlog-followups-phase-f.md
 ---
 
 # Small Plan: OpenWiki 0.7 Upgrade
@@ -64,7 +64,7 @@ plan and spike narrative, session logs).
 
 ## Steps
 
-- [ ] **1. Observe `0.7.2` in isolation (evidence only, BF-F1).**
+- [x] **1. Observe `0.7.2` in isolation (evidence only, BF-F1).**
   **Owner:** orchestrator.
   **Files:** none in the repository; a capture table in the session log.
   **Required Skills:** `shared/skills/integration-gate-spike/SKILL.md`,
@@ -121,7 +121,7 @@ plan and spike narrative, session logs).
   provenance, index pages) are a preview, not a stop.
   **Limits:** one version, synthetic repositories, one clone, no host session.
 
-- [ ] **2. Restate the upgrade rule and the tool surface before the pin changes (BF-F2, BF-F6).**
+- [x] **2. Restate the upgrade rule and the tool surface before the pin changes (BF-F2, BF-F6).**
   **Owner:** documenter.
   **Files:** modify `docs/runtime-checks.md`,
   `shared/skills/knowledge-refresh/SKILL.md`,
@@ -169,7 +169,7 @@ plan and spike narrative, session logs).
   not exist yet. Add no OpenWiki text under `shared/sidecar/`:
   `validate_targets.py` forbids the `openwiki` token in sidecar output.
 
-- [ ] **3. Real-binary round trip and a strict mode check, written at `0.5.2` (BF-F4, BF-F5).**
+- [x] **3. Real-binary round trip and a strict mode check, written at `0.5.2` (BF-F4, BF-F5).**
   **Owner:** coder.
   **Files:** modify `tests/test_openwiki_cli_smoke.py`,
   `shared/hooks/scripts/openwiki-guard.py`, `tests/test_openwiki_guard.py`.
@@ -213,7 +213,7 @@ plan and spike narrative, session logs).
   Run `uv run pytest tests/test_openwiki_cli_smoke.py tests/test_openwiki_guard.py -q`
   against the installed `0.5.2`; it passes before step 4 starts.
 
-- [ ] **4. Upgrade this checkout's environment (BF-F7).**
+- [x] **4. Upgrade this checkout's environment (BF-F7).**
   **Owner:** user. The orchestrator asks the user to run these commands,
   runs `npm install -g` itself only after the user explicitly approves it,
   and records every output in the session log.
@@ -244,7 +244,7 @@ plan and spike narrative, session logs).
   session's OpenWiki server is now stale: call no host `openwiki_*` tool
   until a new session or `/mcp` reconnect.
 
-- [ ] **5. Bump the pin (BF-F3, BF-F4).**
+- [x] **5. Bump the pin (BF-F3, BF-F4).**
   **Owner:** coder.
   **Files:** modify `shared/devcontainer/Dockerfile` (the `openwiki@`
   install line and the `package.json` version test),
@@ -259,7 +259,7 @@ plan and spike narrative, session logs).
   `scripts/generate_targets.py`, `.mcp.json`, `.codex/config.toml`, or the
   `mermaid` and `jsdom` pins. The smoke and guard tests pass.
 
-- [ ] **6. Regenerate, refresh the installed runtime, review, close out.**
+- [x] **6. Regenerate, refresh the installed runtime, review, close out.**
   **Owner:** orchestrator; fresh reviewer.
   Run `uv run python scripts/generate_targets.py --all` and
   `uv run python scripts/install_bootstrap.py . --allow-self --local-only`
@@ -271,7 +271,8 @@ plan and spike narrative, session logs).
   churn in claims line references, provenance (`by: openwiki/0.7.2`), and
   index pages.
 
-- [ ] **7. Stop path only: cancel this phase.**
+- [x] **7. Stop path only: cancel this phase.** Not run: no stop condition
+  fired.
   **Owner:** orchestrator.
   **Files:** a new evidence file
   `.claude/explorations/2026-10-20_openwiki-0.7-spike/evidence.md`, this
@@ -335,11 +336,11 @@ Follow the fixed closeout order in `.claude/instructions/workflow.instructions.m
 (Canonical Orchestrator Loop, step 5: CLOSEOUT); the order below mirrors it
 rather than restating it.
 
-- [ ] Documentation updated or explicitly skipped as pure-internal
-- [ ] LEARN entries saved or no-lessons marker recorded
-- [ ] Closeout session log has `**Status:** COMPLETED`
-- [ ] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
-- [ ] Intended outer files explicitly staged and `git diff --cached` reviewed
-- [ ] Every surviving MINOR has an explicit disposition and non-empty reason
-- [ ] Review findings resolved and persisted with branch/phase metadata
-- [ ] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)
+- [x] Documentation updated or explicitly skipped as pure-internal
+- [x] LEARN entries saved or no-lessons marker recorded
+- [x] Closeout session log has `**Status:** COMPLETED`
+- [x] Nested plan state checkpointed (`.claude` ai-state) before staging outer-repository files
+- [x] Intended outer files explicitly staged and `git diff --cached` reviewed
+- [x] Every surviving MINOR has an explicit disposition and non-empty reason
+- [x] Review findings resolved and persisted with branch/phase metadata
+- [x] Verification passed (`verify phase` PASS; `verify closeout` runs the plan's required verification items itself and PASS)

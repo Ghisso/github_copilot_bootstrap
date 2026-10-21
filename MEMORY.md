@@ -1559,3 +1559,10 @@
   (`git worktree add --detach <scratch> HEAD`), then applied with
   `git apply` once the current phase commits. Plain `uv run` there lacks the
   tools; use `VIRTUAL_ENV=<repo>/.venv uv run --active ...`.
+- [LEARN:tooling] After a user runs a global npm upgrade for a pinned tool,
+  check the binary the repository actually uses before trusting it:
+  `readlink -f "$(command -v <tool>)"` and that package's own
+  `package.json` version, plus every install receipt. On 2026-10-21 a
+  user-run `npm install -g openwiki@0.7.2` left this WSL global package at
+  `0.5.2`, while one integration install ran on `0.7.2` and the other on
+  `0.5.2`, leaving mixed receipts.
