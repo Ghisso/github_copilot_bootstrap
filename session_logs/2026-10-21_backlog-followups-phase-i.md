@@ -188,6 +188,17 @@ the user runs them (BF-I1 to BF-I7).
   (`time` is followed), new over-blocks, and two recorded gaps. Phase G
   cited text now at 779-811. `verify.py phase` PASS (4727 passed, 1
   skipped). Review round 4 requested.
+- **Review round 4** - Gate Result FAIL, 3 major (all pre-existing and
+  cheap, or docs) and 1 minor; nothing looser than Phase H. Assignment
+  tracking read the raw value, so fragments and chained unresolved
+  expansions lost the name (`y=${z:-.e}; tee "${y}nv"`); a heredoc-fed
+  shell was read only when spelled `bash`/`sh`/`zsh` (`/bin/bash`, `dash`,
+  `bash /dev/stdin` missed); the docs did not list a script fed to a shell
+  by a here-string or a pipe; the follow-up bullet's line count drifted.
+  To stop finding one spelling per round, the coder also runs a
+  systematic command-spelling sweep (full paths, quoted and escaped
+  names, `command`/`builtin`/`env`/`exec`, a variable holding the name)
+  for every command the guard treats specially.
 
 ## [LEARN] Entries
 
