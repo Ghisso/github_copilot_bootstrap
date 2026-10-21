@@ -51,7 +51,27 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   those until Phase I (big plan "Decisions recorded" item 8); R9 added.
 - **Coder round 2** - asked for three scanner fixes: longest-match
   operator runs (`cat x;(tee .env)` was allowed), an operator right after
-  `)` (`echo $(date) && ls` was exit 2), and a `)` on its own line.
+  `)` (`echo $(date) && ls` was exit 2), and a `)` on its own line. Done
+  with tests first: 191 Phase H tests, 118 fail on the old guard and 41
+  (the three fixes' own) on the round 1 guard; 128 cases agree with Bash;
+  another 60,000-command scanner check had 0 disagreements. Differential:
+  under-protected looser results fell from 261 to 159, all in the accepted
+  classes (backtick 151, grouped operator 5, glued quoted variable 2, `$(`
+  in double quotes 1); 0 in every other set; substitution set 0
+  mismatches over 287,072 inputs. Invalid punctuation such as `;|` or `))`
+  now fails closed.
+- **Install and checks** - regenerated, self-installed;
+  `validate_targets.py` and `check_runtime.py` PASS. The live guard now
+  allows `printf 'x|y\n' | grep '|' | head -1` and a multi-line read-only
+  command with a `#` comment and a blank line (optional verification 2).
+  `verify.py phase` PASS (3461 passed, 1 skipped).
+- **Docs (step 3)** - documenter, before review so one review covers code
+  and docs: `docs/runtime-checks.md` (scanner rules added on line 261, no
+  line shift, cited lines 678-710 unchanged), `docs/smoke-tests.md` (one
+  bullet), `docs/target-mapping.md` (parity row and the secret-read
+  follow-up; the wiki claim range L88-L135 shifts and is left to Phase J).
+  No statement in `README.md`, `docs/architecture.md`, or the policies
+  needed a change.
 
 ## [LEARN] Entries
 
