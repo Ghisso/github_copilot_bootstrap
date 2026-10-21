@@ -224,6 +224,13 @@ the user runs them (BF-I1 to BF-I7).
   over-blocks; the follow-up bullet now says "more than 3,000 lines".
   Phase G cited text now at 791-823. `verify.py phase` PASS (4902 passed,
   1 skipped). Review round 5 requested under the user's lighter bar.
+- **Review round 5** - Gate Result FAIL on one major, a loosening from the
+  round-4 fragment rule: `y=${z:+a}; tee .env$y` and the `+` and
+  replacement forms are allowed while Phase H denied them and Bash writes
+  `.env` with `z` unset. Orchestrator decision: remove fragment tracking
+  (its forms become a listed gap) and take the reviewer's ponytail minor,
+  deleting the `echo`/`printf` emulation (about 90 lines) so pipes from
+  `echo`/`printf` into a shell are listed again, as in Phase H.
 
 ## [LEARN] Entries
 
