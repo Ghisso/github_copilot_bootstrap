@@ -24,6 +24,27 @@ the pages the refresh rewrites (BF-J2).
 
 - **Start** - Stale-claims audit of Phases H and I first, then one
   managed OpenWiki `update` refresh.
+- **Step 1, audit** - see the next section. A documenter added the README
+  upgrade note; the orchestrator corrected one `MEMORY.md` entry and the
+  project-context status paragraph.
+- **Step 2, refresh** - one managed `update` run
+  (`898c38a6-7dd2-4cc2-b43c-a50054e9a11d`) after all source edits.
+  `openwiki_begin` reported 4 stale claims on 3 pages. Planned 4 pages:
+  `architecture/agents-and-skills.md` (style pass: the "Reading outside
+  the diff" bullet and five other long sentences split, no fact or claim
+  changed); `architecture/hooks-and-guardrails.md` (the `protect-files`
+  bullet rewritten in short sentences with the scanner, fail-closed rules,
+  4-second alarm, and the Git message exemption; the OpenWiki restore
+  messages; the new test file; one stale claim revised with new evidence,
+  one confirmed, three new claims); `operations/deterministic-verification.md`
+  (the managed-block message gives the fix; stale claim revised, one new
+  claim); `quickstart.md` (a routing row for guard denials; stale claim
+  evidence moved to `docs/target-mapping.md#L88-L141`). `openwiki_finish`
+  returned `complete`. No link stamp, no root-absolute link, `AGENTS.md`
+  and `CLAUDE.md` unchanged, `openwiki/.run.json` absent.
+- **Verify** - regenerated, self-installed; `verify.py phase` PASS (4932
+  passed, 1 skipped). Fresh reviewer requested with the user's lighter
+  bar.
 
 ## Stale-claims surfaces checked
 
@@ -64,9 +85,28 @@ reading. Every live-advice surface and its outcome:
   dated explorations): unchanged.
 - Generated `openwiki/**` pages: left to the managed refresh (step 2).
 
+## Requirement Evidence (BF-H1 to BF-J2)
+
+Phase commits after the reopen: H `b0dc4c3`, I `61c30d6`, J this commit.
+Each phase's own log carries its detailed evidence.
+
+| ID | Outcome | Evidence |
+| --- | --- | --- |
+| BF-H1 | Done | `b0dc4c3`; `2026-10-21_backlog-followups-phase-h.md`; Bash-reading checks and the three-reading sweep |
+| BF-H2 | Done, with the accepted exception (big plan item 8) | Phase H differential; the exception closed in Phase I |
+| BF-H3 | Done | `docs/runtime-checks.md`, `docs/smoke-tests.md`, `docs/target-mapping.md` |
+| BF-I1 to BF-I4 | Done | `61c30d6`; `2026-10-21_backlog-followups-phase-i.md`; `tests/test_protect_files_substitutions.py` |
+| BF-I5 | Done | restore messages in `verify.py` and `openwiki-guard.py`, failing-first assertions |
+| BF-I6 | Done | differential against Phase H: 0 under-protected; all 261 original exception commands blocked |
+| BF-I7 | Done, with listed gaps | closed forms in Phase I's log; the rest listed in `docs/runtime-checks.md` |
+| BF-J1 | Done | "Stale-claims surfaces checked" above; OpenWiki run `898c38a6-...` `complete`; `test ! -e openwiki/.run.json` |
+| BF-J2 | Done | both named bullets split, plus five more sentences on the agents page and two on the hooks page; reviewer read of the page diff |
+
 ## [LEARN] Entries
 
-To be written at closeout.
+- No new lessons: the Phase H and I lessons (systematic sweeps, the
+  review acceptance bar, guessed expansion values, never editing existing
+  test inputs) are already in `MEMORY.md`.
 
 ## Verification
 
