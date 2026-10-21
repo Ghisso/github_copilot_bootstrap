@@ -3546,6 +3546,28 @@ def test_gate_flags_a_live_managed_block_under_exact(tmp_path: Path) -> None:
     assert any("openwiki-managed-state: AGENTS.md" in error for error in errors)
 
 
+def test_gate_message_for_a_live_managed_block_says_the_user_runs_the_restore(
+    tmp_path: Path,
+) -> None:
+    """An agent cannot run the restore: the guard denies a command that names a
+    hook script. The message names the exact command, says the user runs it in
+    their own shell, and says why, on one line."""
+    _write_gate_phase_plan(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(
+        "hello\n<!-- OPENWIKI:START -->\nstuff\n<!-- OPENWIKI:END -->\n",
+        encoding="utf-8",
+    )
+
+    errors = _run_gate(tmp_path, _closeout_receipt())
+
+    (message,) = [e for e in errors if "openwiki-managed-state: AGENTS.md" in e]
+    assert "\n" not in message
+    assert "still carries an OpenWiki managed block" in message
+    assert "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null" in message
+    assert "in their own shell" in message
+    assert "the guard denies an agent command that names a hook script" in message
+
+
 def test_gate_does_not_flag_a_managed_block_under_ancestor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

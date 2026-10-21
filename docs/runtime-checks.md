@@ -296,22 +296,80 @@ Each command gets one work budget, and a command too complex to read fails close
 A word longer than 512 characters that holds a protected name also fails closed ("a word of N characters is too long to check for a protected name").
 The classifier stops itself after 4 seconds with a process alarm, and the hook treats that as a denial, so the hook's own 10-second timeout, which would let the command through, never decides.
 Ordinary commands are very unlikely to be affected by these limits.
+Commands inside `"$( )"`, inside backticks, and inside double-quoted backticks are checked on their own.
+In the usual commit-message form `git commit -m "$(cat <<'EOF' ... EOF)"` (also `tag`, `merge`, `-am`, `--message`, `git notes add -m`, and `git stash push -m`), the heredoc is message text, and its body is not scanned for names.
+This holds only when the `cat` heredoc is the only command in the substitution. A pipe, `;`, `&&`, `||`, or a second command makes the body a script.
+`|&` is a pipe. `&>>`, `<>`, and `>&` followed by a word that is not a file-descriptor number or `-` are write redirects.
+Inline `sed` scripts that write (`w file`, `W file`, `s///w file`) are writes. A `sed` script that runs a command (`e`, `s///e`) fails closed ("runs a shell command").
+`sed` long options are read the way GNU `getopt` reads them, so any unique prefix works (`--ex=`, `--e`).
+After `cd`, the file names of a command the guard does not model are also resolved against the `cd` folder.
+`cd` operands are expanded (globs and symlinks). `pushd`, `popd`, `builtin cd`, `env -C DIR`, and `--chdir` are followed.
+Wrappers are recognized by base name (`/usr/bin/env -C ...`).
+Any command's `-C DIR`, `--chdir DIR`, `--chdir=DIR`, `--directory DIR`, or `--directory=DIR` adds that folder for its operands (`make -C`, `tar -C`, `timeout 5 env -C ...`).
+A protected config found that way gets the protected-config decision (ask on Claude Code and GitHub Copilot, deny on Codex and Antigravity).
+A script that a shell or interpreter runs from there is denied on every client.
+`bash -c`, `sh -c` (also `dash`, `zsh`, `ksh`, and `ash`), and `eval` scripts are read as command lines with the current folders and variables.
+`source` or `.` of `/dev/stdin`, `/dev/fd/0`, or `/proc/self/fd/0` with a heredoc, `source <(cat <<'EOF' ...)`, and `eval "$(cat <<'EOF' ...)"` are read like `eval` in the current shell.
+`eval` scripts are read in the current shell, so their `cd`, variables, aliases, functions, and `CDPATH=` apply to later commands.
+`bash -c` and `sh -c` scripts are read in a copy, as a child shell.
+`bash -O dotglob -c ...` and `zsh -o glob_dots -c ...` fail closed like `shopt -s dotglob`.
+ANSI-C escapes that spell a name (`$'\056env'`) are decoded. `$'...'` is cut at a NUL byte as Bash does, and a raw NUL byte in the command fails closed.
+Quoted heredoc delimiters are read as whole words.
+A function defined on the same line has its name treated as an unknown command, so its operands are checked.
+`$IFS` and variables whose values contain blanks are split into words.
+Plain `$NAME`, `${NAME}`, `+=`, defaults on unassigned names, and `${#x}` are read.
+An operation, subscript, or indirection (`${x%.md}`, `${a[0]}`, `${!x}`) on a variable assigned earlier on the same command line fails closed ("assigned earlier"). So does a default on an assigned name (`x=a; echo ${x:-b}`) and any array reference.
+A name that holds a tracked value and is assigned a different value again on the same command line (`=` or `+=`, in any context: plain, `&&`/`||`, prefix, subshell, pipeline, background, `export`, `declare`, or inside `bash -c`) fails closed ("assigned twice").
+A copy of a singly assigned value stays tracked, so `x=.env; y=$x; tee $y` is denied.
+An assignment whose value holds a default or an unresolved expansion is also tracked when a guess names a protected file by itself, so `y=${z:-.env}; tee "$y"` is a write of `.env`.
+Unresolved references glued to a protected name are checked with the reference removed, so `x=.en${z}v; tee "$x"` and `y=${z:+a}; tee .env$y` are denied.
+A value that is not tracked does not trigger "assigned twice" (`PORT=${PORT:-8080}; PORT=9090` is allowed).
+A command name held in a variable (`c=cd; $c .claude`, `"${c}"`) is read as that command.
+A shell fed a script by a heredoc, a here-string (`bash <<< '...'`), `cat <<EOF | sh`, or `cat <<< text | sh` is read like `bash -c` (a child shell).
+This holds in any spelling: a full path (`/bin/bash`), `dash`, `ksh`, `ash`, `zsh`, with `-s`, `/dev/stdin`, `/dev/fd/0`, or `/proc/self/fd/0`, and behind runners that start a shell (`exec`, `nohup`, `nice`, `setsid`, `stdbuf`, `ionice`, `timeout`, `doas`, `time`, `xargs`, `watch`, `busybox`). Those runners' `-c` scripts are read too.
+`source /dev/stdin <<< text`, `bash <(cat <<EOF ...)`, and `bash -c "$(cat <<EOF ...)"` are read as well.
+An assignment's value is read before the name is marked, so self-referencing defaults are allowed (`PORT=${PORT:-8080} ./run.sh`, `export PATH="${PATH:-/usr/bin}:/opt/bin"`).
+A name built around one substitution is flagged when the text continues `.env.` or `credentials` (`touch $(echo cred)entials`, `.$(echo env).production`). A whole-word substitution such as `tee $(mktemp)` stays allowed.
+A brace list in the command word (`{tee,.env}`) is checked.
+A glob glued to a variable is checked against the real folder.
+Commands after `then`, `do`, `else`, `{`, `!`, and `time` are checked.
+`find -delete` and `find -exec rm {} +` (also `-execdir` and `-ok`) are checked when they can reach a protected name.
+A `find` `-name` or `-iname` pattern is tested by filling each glob run with nothing, `x`, or `.`. A pattern with `$`, a backslash, or a substitution is not narrowed.
+`-path`, `-ipath`, `-wholename`, `-regex`, and `-iregex` never narrow, so a deleting `find` with them is denied.
+`perl -e` and other perl forms are read like an interpreter. Short-flag clusters are parsed (so `-Mwarnings` is not mistaken for `-i`).
+With `-i`, the file operands are write targets (a hook config asks on Claude Code and GitHub Copilot and is denied on Codex and Antigravity, like `sed -i`), and only the `-e`, `-E`, `-M`, and `-m` text is scanned for names.
+Without `-i`, every operand is scanned too, because a perl program can write to a file it only gets as an argument. `git -c NAME=VALUE` values are scanned, so `git -c alias.x='!tee .env' x` is caught. `rg --pre COMMAND` is read as a command.
+`shopt`, `setopt`, `unsetopt`, `set -o glob_dots`, `alias`, `GLOBIGNORE=`, and `CDPATH=` are read from the command's own words (quotes removed). Text that only mentions them, such as a commit message or `echo`, is allowed.
+These forms fail closed: `shopt -s dotglob`, `GLOBIGNORE=`, `CDPATH=`, `setopt dotglob`, zsh glob qualifiers that run code (`*(e:...:)`, `*(+func)`, `${(e)x}`), more than 64 distinct `cd` folders, a brace list of more than 256 words, the per-command work budget, and the 4-second classifier alarm.
 The guard blocks a few harmless commands on purpose: `rm 'credentials*'`, `git add '*.pem'`, `echo $X.env`, `find . -name '{a,b}.pem'`, `bash -c '*.pem'`, and `timeout 5 find . -name '*.pem'` are denied.
+`echo $'\056env'`, `find docs -delete`, `find . -type f -delete`, `alias cat=tee; cat .env`, and `touch cred$(echo entials).json` are denied.
+Also denied: a name assigned twice with different values on one line (`x=a; x=b; echo $x`, `x=a; x+=b`, an `if`/`else` that sets one name both ways, a counter `i=$((i+1))`, `DEBUG=1 cmd1; DEBUG=0 cmd2`), `git commit -m "$(echo 'mention .env')"` (a `$( )` that is not a message heredoc is a command), any pipe after a commit-message heredoc, `x=.env; x=out.txt; tee $x` (assigned twice), `find` with `-path` or `-regex`, `find . -name "$X" -delete`, `find . -newer x -delete`, names like `.$(date).txt`, `pushd d; popd; cmd settings.json` (gated), `bash -c` scripts the parser refuses, `y=${z/#/.env}; tee "$y"` (Bash writes nothing when `z` is unset), `perl -ne 'print' .env`, a full-path mutator such as `/bin/tee .claude/settings.json` (denied where plain `tee` asks), `nice -n 5 echo bash -c ...` (read as a shell), and any `sed` `e` command.
+A quoted heredoc outside a commit message whose text names a write to `.env` is denied.
+Any zsh glob qualifier that starts with `e` or `+name` is denied.
 `echo ${x:- ; tee .env }` and `echo ${X:-.env}` are denied.
-`echo $(case a in a) echo hi;; esac)`, `echo $(grep -c case README.md)`, `echo ${x:-"a}"`, `rm @(a|b)`, `echo "${x%'}'}"`, and `x="${y:-'a'}"` fail closed.
+`echo $(case a in a) echo hi;; esac)`, `echo $(grep -c case README.md)`, `echo ${x:-"a}"`, `rm @(a|b)`, `echo "${x%'}'}"`, `x="${y:-'a'}"`, and `x=readme.md; echo ${x%.md}` fail closed.
 A word over 512 characters that contains a protected name also fails closed.
 The guard does not yet check these forms, so a write through them is allowed:
-zsh-only syntax, such as glob qualifiers that run code (`*(e:'...':)`, `*(+func)`) and `=(...)`;
-backtick bodies (including inside `${ }` or `$( )`);
-`$( )` inside double quotes;
-grouped operators `|&`, `&>>`, `>&`, and `<>`;
-`shopt -s dotglob` and a glob glued to a variable (`"$X".e*`);
-names built by a command (`$(echo .e)nv`), ANSI-C escapes in a name (`$'\x2eenv'`), and expansion operators whose result depends on the variable (`${!x}`, `${x/#/.env}`);
-array elements (`${a[0]}`);
-`find -delete` and `find -exec rm {} +`;
-shell functions or aliases defined elsewhere;
-`$IFS` word splitting;
-and heredoc delimiters that are read short.
+whole-word command output used as a name (`tee $(printf '\056env')`, `rm $(find . -name '.env*')`);
+names fed to `xargs` (`find . -name '.env*' | xargs rm`);
+a `cd` into a folder computed at run time (`cd "$(echo .claude)" && ...`);
+loop and input variables (`for`, `select`, `getopts`, `read`, `mapfile`: `for x in .e; do tee ${x}nv; done`), and names built by `printf -v`, `set --`, or `declare -n`;
+other folder-change spellings (`-D`, `--cwd`, `--prefix`, `--workdir`) and folder changes inside a nested script (`xargs sh -c 'cd ...'`, `find -exec sh -c`, `ssh host '...'`, `docker run ... sh -c`);
+wrappers other than `env`, `sudo`, `command`, `builtin`, and plain `time` are not unwrapped (`exec`, `xargs`, `setsid`, `stdbuf`, `ionice`, `watch`, `doas`, `timeout`, `nohup`, `nice`, `time -p`, `/usr/bin/time`); their words are scanned only (a protected name in them is denied on every client), except that runners that start a shell have their shell scripts read;
+a one-character tail after a substitution for the prefix and suffix families (`touch $(echo credential)s`, `$(echo server.pe)m`; exact names such as `.env` are flagged for any tail);
+`find -name` narrowing is a sample: `find . -name '*.pyc' -delete` can reach a file named `.env.pyc` or `credentials.pyc`, and it stays allowed because denying it would block every `*.pyc`, `*.log`, or `*.tmp` cleanup;
+`sed -f script` (the script file is not read);
+environment variables that name a command (`PAGER`, `GIT_PAGER`, `GIT_SSH_COMMAND`, `BASH_ENV`, `PROMPT_COMMAND`) and git aliases from config files;
+interpreter text with escaped quotes, and variables from the environment;
+a variable read when a same-line function is called (`f() { tee "$x"; }; x=.env; f`: the body is read where the function is defined);
+scripts given as `bash < file`, `bash < <(cmd)`, `source <(cmd)`, or `eval "$(cmd)"` (for example `source <(echo 'cd .claude')`), unless the substitution is only `cat` of a heredoc;
+text piped into a shell from any producer other than `cat <<EOF` or `cat <<< text` (`echo '...' | sh`, `printf ... | bash`, `cat file | sh`, `curl ... | sh`), and a pipe into a group that changes folder first (`echo '...' | (cd .claude; sh)`);
+launchers that start a shell but are not read for names built inside their script (`su -c`, `ssh`, `flock`, `unshare`, `strace`, `taskset`, `parallel`, `script -c`, `chroot`, `runuser`, `env -S`, `sudo -s`; a name written in full is still caught);
+interpreters other than shells that read a script from stdin (`python3 -`, `node`, `perl`, `ruby`, `awk -f -`) only have their text scanned;
+a value whose default word, or what is left without its expansions, is only a fragment of a protected name (`y=${z:-.e}; tee "${y}nv"`, `x=.e; y=${z}${x}nv; tee "$y"`); only a guess that names a protected file by itself is tracked;
+a single-quoted `$` in an assignment is read as an expansion (the quote kind is not tracked);
+functions defined on an earlier command line;
+and zsh syntax beyond the refused qualifiers, `setopt`/`unsetopt`, and `${(` flags (zsh is not modelled).
 For
 opaque command or interpreter syntax, verify conservative high-confidence path
 coverage for `.env*`, `uv.lock`, `credentials*`, `.pem`/`.key` files, hook
@@ -653,7 +711,7 @@ of this changes what a gate checks, only what an operator should expect.
 | Plan-time verification lint (`scripts/validate_plan_frontmatter.py`) enforces the required `## Verification` block and the hedge rule | A live plan blocks implementation-branch creation (the big plan and its listed phases) and the next commit when a required item is missing, hedged, unfailable, or lists closeout itself: `L1 verification-block-missing:`, `L2 hedged-verification:`, `L3 unfailable-verification:`, `L4 self-listed-closeout:` | Add a `bash`/`sh` fenced block under `## Verification`; drop the hedging condition, or move that check under `## Optional Verification`; remove `\|\| true`/`\|\| :`; remove `verify.py closeout` from the block |
 | `verify.py closeout` runs the plan's required verification items itself before it will persist a receipt | It refuses to persist when a required item fails, times out, or is never run because an earlier item stopped the run; it prints one line per item with status, exit code, the first line of output, and the item text — no message prefix, since this is the command's own ordinary failure path | Fix the failing command or the code it checks, then rerun `verify.py closeout`; each item gets `VERIFICATION_ITEM_TIMEOUT_SECONDS = 600` seconds |
 | Commit-time gate (`verify.py gate`), `exact` head-relation only, checks the completing phase's recorded verification evidence | Missing results, an unrun or failed required item, or an optional item with no closeout-log outcome line blocks the commit: `G1 verification-results-missing:`, `G2 verification-item-unrun:`, `G3 verification-item-failed:`, `G4 optional-verification-unaccounted:` | Rerun `verify.py closeout --persist` after the plan or code changed; add the `- optional <n>: PASS\|FAIL\|NOT RUN — <detail>` lines to the closeout log |
-| OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
+| OpenWiki managed-state backstop — `VFY-GEN-001`'s phase remit, and `verify.py gate` under the `exact` head-relation only | A live `<!-- OPENWIKI:START -->` block left in root `AGENTS.md` or `CLAUDE.md`, an untracked or newly staged `.github/workflows/openwiki-update.yml`, or a tracked or staged `openwiki/.run.json` fails the phase check and blocks the commit with prefix `openwiki-managed-state:` | Ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell (the guard denies an agent command that names a hook script) to restore the adapters; delete the workflow file — OpenWiki `init` mode is forbidden; run `git rm --cached openwiki/.run.json` and keep it ignored |
 | More files are protected hook or server configs: `.claude/settings.local.json`, `.agents/hooks.json`, `.mcp.json`, `.vscode/mcp.json`, `.agents/mcp_config.json`, `.vscode/settings.json`, `.github/copilot/settings.json`, `.github/copilot/settings.local.json` | An agent edit of one asks on Claude and Copilot and is denied on Codex and Antigravity, including an ordinary `.vscode/settings.json` edit. Any command outside the guard's read-only list that merely names one of these files is denied on all four clients, including `ls`, `jq`, `test -f`, `git add <file>`, and an inline `gh pr create --body "..."` | Approve the prompt, or edit the file yourself outside the agent. Inspect with `cat` or the native read tool, stage with `git add -u` or a path that does not name the file, and pass PR text written with the native Write tool through `--body-file` |
 | Agent definition files (`.claude/agents/`, `.codex/agents/`, `.github/agents/`, `.agents/agents/`), each protected hook folder as a whole folder, and `*.code-workspace` files inside the repository are protected | An agent edit of one, and `rm -rf`, `mv`, or `ln -s` on a whole protected folder, asks on Claude and Copilot and is denied on Codex and Antigravity. Any command outside the guard's read-only list that merely names one of them is denied on all four clients, including `ls`, `find`, `diff`, and `cmp` on an agent file. The `git -C` and `cd` forms of unmodelled Git commands (for example `git -C .claude rm -r -q hooks`) ask on Claude and Copilot and deny on Codex and Antigravity, but only when no path in the command is also protected as written from the repository root. Plain forms, and commands with an absolute path such as `git -C .claude restore <repo>/.claude/hooks/x`, are denied on all four clients. The guard also scans heredoc bodies and the arguments of commands it does not model | Approve the prompt, or edit the file yourself outside the agent. Read with `cat`, a native read tool, or `rg --files`; compare with `git diff --no-index` or `uv run python scripts/check_runtime.py`. Change agents in `shared/agents/` and regenerate (this repository) or re-run the installer (a consumer). Write findings JSON, PR bodies, and session-log additions that name a protected path with the native Write or Edit tool, then pass `--findings-json <file>` or `--body-file <file>` |
 | Creating an implementation branch runs the plan-frontmatter validator on the big plan and its listed phase files | A branch-creation command is denied with the first validator errors when the big plan or a listed phase file is invalid. An unrelated draft plan does not block | Fix the reported frontmatter, then create the branch again |

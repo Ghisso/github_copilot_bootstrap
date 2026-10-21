@@ -3080,9 +3080,10 @@ def openwiki_managed_state_violations(root: Path) -> list[str]:
             continue
         if MANAGED_START in text:
             violations.append(
-                f"{adapter} still carries an OpenWiki managed block; run "
-                "bash .claude/hooks/scripts/openwiki-guard.sh post "
-                "</dev/null to restore it"
+                f"{adapter} still carries an OpenWiki managed block; ask the user to "
+                "run bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null "
+                "in their own shell to restore it (the guard denies an agent "
+                "command that names a hook script)"
             )
     workflow_staged_as_new = bool(
         git_output(

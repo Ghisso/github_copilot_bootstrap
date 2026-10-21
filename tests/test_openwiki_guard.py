@@ -460,6 +460,56 @@ def test_marker_strip_fallback_skips_a_symlinked_adapter(tmp_path: Path) -> None
     assert MANAGED_START in outside.read_text(encoding="utf-8")
 
 
+# --- messages that name the restore command ---------------------------------
+
+RESTORE_COMMAND = "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null"
+USER_RUNS_IT = "the guard denies an agent command that names a hook script"
+
+
+def _assert_names_the_user_run(message: str) -> None:
+    """A restore message must not send an agent to a command it cannot run: it
+    names the exact command, says the user runs it in their own shell, and says why."""
+    assert RESTORE_COMMAND in message
+    assert "in their own shell" in message
+    assert USER_RUNS_IT in message
+
+
+def test_pre_denial_for_an_unresolved_prior_run_names_the_user_run(
+    tmp_path: Path,
+) -> None:
+    root = _guard_repo(tmp_path)
+    assert _run_guard(root, "pre", _pre_payload(root=root)).returncode == 0
+    (root / "AGENTS.md").write_text(
+        "a human rewrote this, no marker\n", encoding="utf-8"
+    )
+
+    result = _run_guard(root, "pre", _pre_payload(root=root))
+
+    assert result.returncode == 0, result.stderr
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    reason = decision["permissionDecisionReason"]
+    assert reason.startswith("openwiki-guard: a prior run left AGENTS.md unresolved")
+    assert "\n" not in reason
+    _assert_names_the_user_run(reason)
+
+
+def test_post_error_for_an_unrestorable_adapter_names_the_user_run(
+    tmp_path: Path,
+) -> None:
+    root = _guard_repo(tmp_path)
+    assert _run_guard(root, "pre", _pre_payload(root=root)).returncode == 0
+    (root / "AGENTS.md").write_text(
+        "a human rewrote this, no marker\n", encoding="utf-8"
+    )
+
+    result = _run_guard(root, "post", {})
+
+    assert result.returncode == 2, result.stdout
+    assert result.stderr.startswith("openwiki-guard: could not restore AGENTS.md")
+    assert result.stderr.count("\n") == 1, "one line"
+    _assert_names_the_user_run(result.stderr)
+
+
 # --- fail-closed -------------------------------------------------------
 
 

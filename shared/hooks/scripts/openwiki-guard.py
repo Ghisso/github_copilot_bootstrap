@@ -45,6 +45,10 @@ WORKFLOW = ".github/workflows/openwiki-update.yml"
 # repository's own .cache/ entry - never committed, never drift-compared.
 SNAPSHOT_DIR_RELATIVE = os.path.join(".claude", ".cache", "openwiki-guard")
 MANIFEST_NAME = "manifest.json"
+# The restore an agent cannot run: the protect-files guard denies an agent command
+# that names a hook script, so the user runs it in their own shell.
+RESTORE_COMMAND = "bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null"
+RESTORE_WHY = "the guard denies an agent command that names a hook script"
 
 
 def _repo_root() -> str:
@@ -407,7 +411,11 @@ def _cmd_pre(payload: dict) -> int:
             _deny(
                 "openwiki-guard: a prior run left "
                 + ", ".join(sorted(heal.mismatches))
-                + " unresolved; run openwiki-guard.sh post to resolve before retrying"
+                + " unresolved; ask the user to run "
+                + RESTORE_COMMAND
+                + " in their own shell to resolve it before retrying ("
+                + RESTORE_WHY
+                + ")"
             )
             return 0
 
@@ -441,8 +449,11 @@ def _cmd_post(_payload: dict) -> int:
         sys.stderr.write(
             "openwiki-guard: could not restore "
             + ", ".join(sorted(result.mismatches))
-            + " - left unchanged; resolve manually, then rerun "
-            "openwiki-guard.sh post\n"
+            + " - left unchanged; resolve manually, then ask the user to rerun "
+            + RESTORE_COMMAND
+            + " in their own shell ("
+            + RESTORE_WHY
+            + ")\n"
         )
         return 2
 

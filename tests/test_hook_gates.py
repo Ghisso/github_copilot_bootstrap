@@ -2427,7 +2427,9 @@ def test_protect_files_resolves_prefix_assignment_past_wrapper_value_flag(
     )
     assert process.returncode == 0, process.stderr
     assert '"permissionDecision":"deny"' in process.stdout
-    assert "Protected file blocked by policy: .env" in process.stdout
+    # `env -C /tmp` also runs the body in /tmp, so that `.env` is named too.
+    assert "Protected file blocked by policy: " in process.stdout
+    assert ".env" in process.stdout
 
 
 def test_protect_files_allows_legitimate_env_value_flag_with_harmless_body() -> None:

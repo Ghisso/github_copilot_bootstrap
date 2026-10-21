@@ -1030,12 +1030,16 @@ def test_scanner_keeps_todays_target_for_commands_that_already_denied(
         pytest.param("find . -name '*.key' -exec rm {} +", id="find-exec-by-glob"),
     ),
 )
-def test_scanner_keeps_todays_result_for_find_with_a_quoted_glob(command: str) -> None:
+def test_scanner_denies_find_that_deletes_what_a_quoted_glob_matches(
+    command: str,
+) -> None:
     """The guard before Phase H read a quoted glob as an opaque word, so a
-    `find` with one reported no target. This is a known gap, kept as it was:
-    `find` acts on every match of the pattern. A `find` that names the file
-    (`-name .env -exec rm {} \\;`) is still reported."""
-    assert _scan(command) == ([], [])
+    `find` with one reported no target. `find` acts on every match of the
+    pattern, and these patterns match protected names (Phase I)."""
+    confirmed, uncertain = _scan(command)
+    assert any(
+        PROTECT_FILES.protected(path, str(REPO_ROOT)) for path in confirmed + uncertain
+    )
 
 
 def test_scanner_marks_a_word_that_is_one_quoted_glob_as_a_pattern() -> None:
@@ -1084,41 +1088,18 @@ def test_scanner_still_checks_a_word_that_is_not_only_a_quoted_glob(
     )
 
 
-_PHASE_I = (
-    "Phase I: a grouped operator is still read as one plain word, so the write "
-    "behind it is not seen"
-)
-
-
 @pytest.mark.parametrize(
     "command",
     (
-        pytest.param(
-            "cat x |& tee .env",
-            id="pipe-and",
-            marks=pytest.mark.xfail(strict=True, reason=_PHASE_I),
-        ),
-        pytest.param(
-            "cat x &>> .env",
-            id="both-append",
-            marks=pytest.mark.xfail(strict=True, reason=_PHASE_I),
-        ),
-        pytest.param(
-            "cat x >& .env",
-            id="duplicate-redirect",
-            marks=pytest.mark.xfail(strict=True, reason=_PHASE_I),
-        ),
-        pytest.param(
-            "cat x <> .env",
-            id="read-write",
-            marks=pytest.mark.xfail(strict=True, reason=_PHASE_I),
-        ),
+        pytest.param("cat x |& tee .env", id="pipe-and"),
+        pytest.param("cat x &>> .env", id="both-append"),
+        pytest.param("cat x >& .env", id="duplicate-redirect"),
+        pytest.param("cat x <> .env", id="read-write"),
     ),
 )
 def test_scanner_finds_the_write_behind_a_grouped_operator(command: str) -> None:
     """Bash writes `.env` here: `|&` pipes into `tee`; `&>>`, `>&`, and `<>` open
-    it. The guard still allows these (a known hole). Phase I gives the grouped
-    operators their meaning; the strict xfail then fails and flips this test."""
+    it."""
     confirmed, uncertain = _scan(command)
     assert ".env" in confirmed + uncertain
 
@@ -1782,9 +1763,8 @@ def test_split_segments_follows_bash_word_and_segment_rules(
     assert PROTECT_FILES.split_segments(command) == expected
 
 
-@pytest.mark.xfail(strict=True, reason=_PHASE_I)
 def test_split_segments_splits_a_pipe_and_at_its_operator() -> None:
-    """Bash reads `|&` as a pipe, so `a |& b` is two commands. Phase I changes it."""
+    """Bash reads `|&` as a pipe, so `a |& b` is two commands."""
     assert PROTECT_FILES.split_segments("a |& b") == [["a"], ["b"]]
 
 
@@ -1829,9 +1809,9 @@ def test_split_segments_splits_a_pipe_and_at_its_operator() -> None:
         ),
         pytest.param(
             "echo '$(a)' \"$(b)\" \\$(c) # $(d)",
-            "echo '$(a)' \"$(b)\" \\$(c) # $(d)",
-            {},
-            id="quoted-escaped-and-commented-text-is-left-alone",
+            "echo '$(a)' \"__PROTECT_FILES_PROCSUB_0__\" \\$(c) # $(d)",
+            {"__PROTECT_FILES_PROCSUB_0__": "b"},
+            id="single-quoted-escaped-and-commented-text-is-left-alone",
         ),
         # A `)` inside `${ }` does not close a substitution around it.
         pytest.param(
