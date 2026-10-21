@@ -24,9 +24,32 @@ only `mode: "update"` either way.
 - **Earlier (during Phase C's wait)** - Step 1 ran in the scratch folder
   (evidence only; capture below). Result: GO, all eight stop conditions
   PASS.
-- **Now** - Delegated step 2 (docs, skill, policies) to a documenter and
+- **Start** - Delegated step 2 (docs, skill, policies) to a documenter and
   step 3 (real-binary round-trip test, strict `mode` check) to a coder, in
   parallel on disjoint files. Step 4 (environment upgrade) is user-owned.
+- **Later** - Step 2 done: `docs/runtime-checks.md` gains an `openwiki`
+  optional-helper entry, a six-step pin-upgrade procedure with its stop
+  rule, and the corrected Dockerfile line; `knowledge-refresh` says
+  "once when enabling, once per pin change", never `--force`, never other
+  host integrations, and that the guard allows only `update`;
+  `tool-routing.instructions.md` routes the read-only OpenWiki tools as
+  just-in-time derived context; `workflow.instructions.md` OpenWiki Refresh
+  says the guard denies every other mode, `init` included, and a call with
+  no `mode`. Generate + validate PASS.
+- **Later** - Step 3 done at `0.5.2`: the handshake test pins
+  `openwiki_begin`'s `required` and `mode.enum`; new
+  `test_real_openwiki_begin_update_is_restored_by_the_guard` runs the real
+  binary with an isolated `HOME`, asserts begin touches only `openwiki/`
+  and the two adapters, and that `post` restores every other file byte for
+  byte; `_cmd_pre` denies any `mode` other than `"update"`, missing
+  included; docstring version-free. Negative controls: the two new deny
+  cases failed on the old guard (it allowed them); the round trip failed
+  with `post` stubbed out in a scratch copy. 78 tests pass; the smoke test
+  also passes under `unshare -rn` (offline).
+- **Later** - Step 5 prepared by a coder ahead of step 4 (pin `0.7.2` in
+  the Dockerfile and validator, ten tools in `EXPECTED_TOOLS`); the smoke
+  test is expected to fail locally until the user's global install.
+  Asked the user to run step 4.
 
 ## Step 1 capture table
 
