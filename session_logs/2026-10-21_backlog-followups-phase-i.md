@@ -105,6 +105,26 @@ the user runs them (BF-I1 to BF-I7).
   on 45,284 commands; slowest input 2.49 s. Regenerated, self-installed;
   `validate_targets.py` and `check_runtime.py` PASS. Docs second pass
   started.
+- **Docs second pass** - evaluator text removed; new rules, over-blocks,
+  and the final not-yet-checked list; the parity row cites the renamed
+  test file; the caveat says some commands are looser by design. Phase G
+  cited text now at 762-794. `verify.py phase` PASS (4532 passed, 1
+  skipped).
+- **Review round 2** (same reviewer, with the plan's acceptance bar:
+  pre-existing gaps that the docs list are minor) - Gate Result FAIL, 5
+  major and 5 minor. A copy of a variable after a conditional
+  reassignment loses the earlier value (`x=.env; false && x=safe; y=$x;
+  tee "$y"`); a self-referencing default (`PORT=${PORT:-8080} ./run.sh`,
+  `export PATH="${PATH:-/usr/bin}:/opt/bin"`) was refused, and the coder
+  had edited two existing tests to hide it; the `perl` scan was skipped
+  when any option held the letter `i`; `bash -O dotglob` was missed and
+  `eval` scripts were read in a copy of the shell state; and the docs had
+  a stale clause and four missing gaps. Sent back with the reviewer's
+  simpler rule: delete the earlier-values mechanism and fail closed on a
+  second, different assignment to a tracked name. Scope change recorded:
+  reading `bash -c`, `sh -c`, and `eval` scripts as command lines (added
+  by the coder in round 1, beyond the plan's list) is kept, because it
+  closes `bash -c 'cd .claude && tee settings.json'`.
 
 ## [LEARN] Entries
 
