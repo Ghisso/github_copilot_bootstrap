@@ -191,7 +191,7 @@ Do these steps in this order. Each step's position exists because the step after
 3. **First nested checkpoint.** `git -C .claude add -A && git -C .claude commit -m "checkpoint: <reason>"`. *Why here:* `verify closeout` refuses to run at all while the big plan's bytes are not retrievable from nested Git.
 4. **Stage, findings, phase receipt, closeout dry run.** In one Bash command that contains no `git commit`:
    - `git add` the intended outer files (never `git add -A`; never `openwiki/.run.json`) and inspect `git diff --cached`. *Why before findings:* the findings report records `dirty: true` when any tracked change is unstaged, and receipts bind `git write-tree` on the index.
-   - Give every surviving MINOR an explicit `disposition` and non-empty `reason`, then `record_findings.py . --findings-json - --phase <current_phase> --profile <name>... --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json`, one `--profile` per reviewed profile, the reviewer's Gate Result as `--gate-result`, and one `--open-request` per open request. The recorder refuses `PASS` with an open request, and the commit gate accepts only `PASS` with no open request.
+   - Give every surviving MINOR an explicit `disposition` and non-empty `reason`, then `record_findings.py . --findings-json - --phase <current_phase> --profile <name>... --gate-result <PASS|WARN|FAIL> [--open-request "<text>" ...] --out .claude/quality_reports/findings-<current_phase>.json`, one `--profile` per reviewed profile, the reviewer's Gate Result as `--gate-result`, and one `--open-request` per open request. The recorder refuses `PASS` with an open request, and the commit gate accepts only `PASS` with no open request. When the findings text names a protected path, write the findings JSON with the Write tool to a scratch file and pass `--findings-json <file>`, because the guard denies heredoc text that names a protected path.
    - `uv run python .claude/scripts/verify.py phase --format json --persist`.
    - `uv run python .claude/scripts/verify.py closeout --format text` **without** `--persist`. It needs the findings report and the phase receipt to exist, runs the plan's required `## Verification` items, and prints one summary line per item. Paste those lines into the session log's `## Verification` section and set `**Status:** COMPLETED`. If any item is not `PASS`, return to IMPLEMENT.
 5. **Second nested checkpoint.** Same command as step 3. *Why here:* the closeout receipt hashes the session log, so the log must be final and checkpointed before the receipt exists. Findings and receipt files are not provenance-bound, so having them in this checkpoint is expected.
@@ -234,7 +234,7 @@ coding agent calls OpenWiki's own MCP tools directly (see
 `AGENTS.md` and `CLAUDE.md`. A hook guard, `openwiki-guard.sh`, snapshots
 both adapters and the OpenWiki workflow-file path before `openwiki_begin`
 and restores them after; restore coverage differs by host, so the skill
-also tells the agent when to run the restore manually. `mode: "update"` is
+also tells the agent when the restore must be run by hand. `mode: "update"` is
 the only mode the guard allows; it denies every other mode, `init`
 included, and a call with no `mode`. A commit-time backstop in
 `verify.py` refuses a commit that still carries the managed block, a new
@@ -530,7 +530,7 @@ When asked to edit protected files or run blocked git commands, stop and explain
 Some behaviors are automated by hooks. Others are still manual.
 
 **Automated via hooks:**
-- Protected file edits are denied.
+- Protected file edits are blocked: secret-shaped files are denied on every client; hook, server, agent, and workspace configuration asks on Claude Code and GitHub Copilot and is denied on Codex and Antigravity.
 - Dangerous git commands are denied.
 - Implementation branch creation is gated on dev + clean tree + matching big plan, and the big plan and the phase files it lists must pass the plan checks (L1-L4).
 - Commit closeout is gated on small-plan completion, a passing `verify phase`/`verify closeout` receipt, a matching findings report with `counts.critical == 0` and `counts.major == 0` plus an explicit disposition and non-empty reason on every surviving MINOR, the reviewer's recorded `gate_result` of `PASS` with no open request, every review profile the changed paths require, required Ponytail review evidence where applicable, and DOCUMENT/LEARN/session-log evidence. An explicitly evidenced paused small plan may instead create a non-final checkpoint commit that does not advance the phase.
