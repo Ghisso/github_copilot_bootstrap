@@ -122,9 +122,13 @@ Onboarding was refreshed on `dev` at `f964551` on 2026-10-20, after the
 reported only PASS lines. `dev` is 273 commits ahead of `origin/main`, which
 was last updated 2026-05-24; releasing `dev` to `main` is the user's call.
 
-The `backlog-followups` big plan (Phases A to G, 2026-10-20 to 2026-10-21)
-then ran on `backlog-followups_implementation`; opening its pull request to
-`dev` is the user's decision. Pinned versions after it: Context Mode
+The `backlog-followups` big plan (Phases A to G, 2026-10-20 to 2026-10-21,
+reopened with Phases H to J on 2026-10-21 and 2026-10-22) then ran on
+`backlog-followups_implementation`; opening its pull request to `dev` is
+the user's decision. Phases H and I replaced `shlex` in the file-protection
+guard (`shared/hooks/scripts/protect-files.py`) with a Bash-rules scanner;
+`docs/runtime-checks.md` lists the forms it still does not check, and a
+recorded follow-up asks to split or shrink the hook. Pinned versions after it: Context Mode
 `1.0.169`, OpenWiki `0.7.2` (from `0.5.2`; the guard allows only
 `mode: "update"`), and Ponytail partially merged from upstream `v5.3.2`
 (from `v4.8.4`; `ponytail-review` stays complexity-only).

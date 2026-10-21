@@ -390,12 +390,12 @@
   the action — writing it first creates false provenance even when the action
   follows immediately; this file had already been corrected once for the same
   defect.
-- [LEARN:tooling] The fail-closed Bash guard still can't model `for`/`while`/
-  `{ }` compound commands (an unmodeled segment falls back to a conservative
-  scan, so it's denied only when it touches a protected-looking literal).
-  Well-formed heredocs and process substitutions are no longer in this group —
-  they're now parsed and recursively classified; only malformed or
-  unterminated syntax raises `AmbiguousCommand`/`UnparseableCommand` (exit 2).
+- [LEARN:tooling] The fail-closed Bash guard classifies the command after
+  `then`, `do`, `else`, `{`, `!`, and `time` (backlog-followups Phase I), and
+  parses heredocs and process and command substitutions recursively; only
+  malformed or unterminated syntax raises `AmbiguousCommand`/
+  `UnparseableCommand` (exit 2). Loop variables are still not tracked; the
+  full list of unchecked forms is in `docs/runtime-checks.md`.
   Put complex logic in a script file and invoke it as `bash script.sh`, which
   stays classifiable and keeps the guard active rather than routing around it.
 - [LEARN:shell] Bash `errexit` isn't reliable inside a function invoked from a
