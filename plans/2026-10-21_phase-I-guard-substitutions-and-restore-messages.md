@@ -30,14 +30,23 @@ findings R3 (with its correction), R6, R7 (last bullet), and R8 in
 - **BF-I5 (R3).** Every message that names `openwiki-guard.sh post` says
   the user runs it in their own shell.
 - **BF-I6.** No decision loosens; docs and parity rows describe the
-  change.
+  change. This phase also closes the Phase H loosening exception (big plan
+  "Decisions recorded" item 8): its differential check must show none of
+  the 261 Phase H exception commands still allowed.
+- **BF-I7 (R9).** The pre-existing gaps the Phase H coder found are
+  closed: a quoted variable glued to a protected name (`tee .env"$X"`,
+  `tee "$X".env`), a parameter default that names one
+  (`tee "${X:-.env}"`), ANSI-C escapes that spell one
+  (`touch $'\x2eenv'`), a `#` inside `${ }` (`echo ${x:- #}; tee .env`),
+  and a heredoc body inside `"$( )"`. A form the guard cannot resolve
+  safely is an uncertain hit, which denies on every client.
 
 This is control-plane work (`shared/hooks/scripts/`, `shared/scripts/`):
 full review profiles apply.
 
 ## Steps
 
-- [ ] **1. Close the remaining write paths (BF-I1 to BF-I4).**
+- [ ] **1. Close the remaining write paths (BF-I1 to BF-I4, BF-I7).**
   **Owner:** coder.
   **Files:** modify `shared/hooks/scripts/protect-files.py` (the scanner
   from Phase H, `OPERATORS`, `REDIRECTS`/`is_redirect`, the `sed` handling
@@ -64,6 +73,11 @@ full review profiles apply.
     `echo '$(tee .env)'` (single quotes are literal);
     `cat x 2>&1 | head`, `cat x >&2`, `cat x |& head`;
     `sed -n '1p' README.md`, `sed 's/a/b/' README.md`.
+  - Must deny (BF-I7): `tee .env"$X"`, `tee "$X".env`,
+    `tee "${X:-.env}"`, `touch $'\x2eenv'`, `echo ${x:- #}; tee .env`, and
+    a `tee .env` line inside a heredoc body inside `"$( )"`.
+  - Must allow: `echo "$X"`, `echo "${X:-default}"`, and the usual
+    `git commit -m "$(cat <<'EOF' ... EOF)"` form.
   - Must keep today's result: `cat $(tee .env)` (deny), and every Phase H
     case.
   Check each expected value against Bash's own reading with a harmless

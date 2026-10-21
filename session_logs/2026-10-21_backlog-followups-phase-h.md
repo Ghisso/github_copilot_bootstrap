@@ -31,6 +31,27 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   `.claude/quality_reports/2026-10-21_backlog-followups-reopen-findings.md`.
   The user chose two code phases, a dedicated Bash scanner, and to keep
   secret-file Bash reads as a follow-up.
+- **Coder round 1 (steps 1 and 2)** - `shlex` removed from
+  `protect-files.py`; one quote scanner (`_skip_literal`, `_read_word`,
+  `_shell_tokens`) now serves `split_segments`, `_matching_paren`,
+  `_find_unquoted_heredoc`, and `extract_process_substitutions`; the
+  quoted-variable rewrite in `protect_quoted_globs` no longer strips quotes
+  around operators or spaces. 126 new tests in
+  `tests/test_protect_files_scoping.py` (83 fail on the old guard; the rest
+  are keep-today cases), two installed-hook smoke cases in
+  `scripts/validate_targets.py`. Added beyond the plan: a step cap and cache
+  on `_matching_paren` (nested `"$(` took exponential time and could
+  outlast the hook timeout), and fail-closed on `#` right after `)`.
+  All 86 cases agree with Bash's own reading; a 60,000-command scanner
+  check against Bash had 0 disagreements; Python 3.9 and 3.13 decisions
+  are identical on 23,344 inputs. Differential: 0 under-protected looser
+  results in every set except the structured fuzz, which had 261 (each with
+  a backtick, `$(` in double quotes, a grouped operator, or a glued quoted
+  variable that the old guard blocked only by accident). The user accepted
+  those until Phase I (big plan "Decisions recorded" item 8); R9 added.
+- **Coder round 2** - asked for three scanner fixes: longest-match
+  operator runs (`cat x;(tee .env)` was allowed), an operator right after
+  `)` (`echo $(date) && ls` was exit 2), and a `)` on its own line.
 
 ## [LEARN] Entries
 

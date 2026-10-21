@@ -30,7 +30,12 @@ inside quotes, grouped operators such as `|&`, inline `sed` writes, the
   the rules listed in step 1. Every required deny case is denied and every
   required allow case is allowed.
 - **BF-H2.** No guard decision loosens outside the intended classes; the
-  differential check in step 2 proves it.
+  differential check in step 2 proves it. Exception accepted by the user
+  on 2026-10-21 (big plan "Decisions recorded" item 8): a looser result is
+  allowed only when the command holds a backtick, `$(` inside double
+  quotes, a grouped operator (`|&`, `&>`, `&>>`, `>&`, `<>`), or a quoted
+  variable glued to a file name, because the old guard already let each of
+  those through on its own. Phase I closes them.
 - **BF-H3.** The docs, one parity row, and one recorded follow-up describe
   the change.
 
@@ -113,6 +118,14 @@ apply.
     `find . -name .env -exec tee {} +` (deny as uncertain); `cat .env`,
     `ls | head` (allow); `| head`, `a && && b`, an unterminated quote
     (fail closed).
+  - Added after the first coder round (2026-10-21): a run of unquoted
+    operator characters splits into Bash operators by longest match, so
+    `cat x;(tee .env)` and `cat x&&(tee .env)` are denied, while grouped
+    forms keep today's meaning until Phase I. An operator right after `)`
+    is valid: `echo $(date) && ls`, `echo $(date) &&<NL>ls`, and
+    `(cd docs && ls) && ls` are allowed; `cat $(tee .env) && ls` and
+    `(tee .env) && ls` stay denied. A `)` on its own line closing a
+    multi-line group is allowed.
   Check each expected value against Bash's own reading with a harmless
   stand-in (`printf '[%s]'` or `echo RAN`, run from a scratch script),
   never against the implementation.

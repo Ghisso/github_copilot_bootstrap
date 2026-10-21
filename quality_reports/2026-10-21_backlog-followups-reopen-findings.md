@@ -150,6 +150,19 @@ in their own shell.
 `bash -c`, `xargs`, and `find -exec` forms are denied as uncertain. A
 single-line `;;` is a Bash syntax error, not a bypass.
 
+### R9 - MAJOR (security): pre-existing gaps found while building Phase H
+
+The Phase H coder's checks against Bash found more forms the old guard
+already allowed:
+
+- a quoted variable glued to a protected name (`tee .env"$X"`);
+- a parameter default that names one (`tee "${X:-.env}"`);
+- ANSI-C escapes that spell one (`touch $'\x2eenv'`);
+- a `#` after a space inside `${ }` (`echo ${x:- #}; tee .env`);
+- a heredoc body inside `"$( )"`, which is not parsed;
+- an operator run such as `;(` read as one word (`cat x;(tee .env)`),
+  fixed in Phase H.
+
 ### Outside this plan
 
 Bash reads of secret-shaped files (`cat .env`) are allowed while native
@@ -163,8 +176,12 @@ and secret-file Bash reads kept as a follow-up.
 
 - R1, R2, R5, and R7 (except grouped operators): Phase H
   (`2026-10-21_phase-H-guard-shell-scanner`).
-- R3, R6, R7 grouped operators, and R8: Phase I
-  (`2026-10-21_phase-I-guard-substitutions-and-restore-messages`).
+- R3, R6, R7 grouped operators, R8, and R9 (except the operator run):
+  Phase I (`2026-10-21_phase-I-guard-substitutions-and-restore-messages`).
+- Phase H's differential check found 261 generated commands that the old
+  guard blocked only by accident and the new one allows; each holds an R6,
+  R7-grouped, or R9 construct. The user accepted them until Phase I (big
+  plan "Decisions recorded" item 8).
 - R4 and the wiki pages Phases H and I change: Phase J
   (`2026-10-21_phase-J-guard-hardening-knowledge-refresh`).
 - Secret-file Bash reads: a "Recorded follow-ups" bullet in

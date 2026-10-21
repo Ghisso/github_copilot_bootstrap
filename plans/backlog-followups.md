@@ -245,7 +245,8 @@ full acceptance text; this map is the index.
 | BF-I3 | Inline `sed` write scripts give a write target | same | new hook tests |
 | BF-I4 | Unmodelled commands after `cd` resolve against the `cd` folder | same | new hook tests |
 | BF-I5 | Every message that names `openwiki-guard.sh post` says the user runs it in their own shell | same | new `tests/test_verify.py` and `tests/test_openwiki_guard.py` assertions |
-| BF-I6 | No decision loosens; docs and parity rows describe the change | same | differential check; `documentation` review |
+| BF-I6 | No decision loosens, and none of the 261 Phase H exception commands is still allowed; docs and parity rows describe the change | same | differential check; `documentation` review |
+| BF-I7 | Pre-existing gaps closed: glued quoted variables, parameter defaults, ANSI-C escapes, `#` inside `${ }`, heredoc bodies inside `"$( )"` | same | new hook tests |
 | BF-J1 | Stale-claims audit of Phases H and I; one managed OpenWiki refresh | `2026-10-21_phase-J-guard-hardening-knowledge-refresh` | `## Stale-claims surfaces checked`; OpenWiki completion; `test ! -e openwiki/.run.json` |
 | BF-J2 | Long sentences split in the pages the refresh rewrites, including the named bullets | same | reviewer read of the page diff |
 
@@ -433,6 +434,15 @@ The user approved this plan on 2026-10-20 with these decisions:
    the refresh; a dedicated Bash scanner instead of workarounds on top of
    `shlex`; and to keep Bash reads of secret-shaped files (`cat .env`)
    allowed for now, recorded as a follow-up for a later policy decision.
+8. **Phase H loosening exception, user decision 2026-10-21:** Phase H's
+   differential check found 261 generated commands where the new guard
+   allows a write that the old guard blocked only by accident (a false
+   split or a fail-closed exit). Each holds a construct the old guard
+   already let through on its own: a backtick (244), a grouped operator
+   such as `>&` (9), a quoted variable glued to a file name (7), or `$(`
+   inside double quotes (1). The user accepted these until Phase I closes
+   all four, which happens before any PR. Phase I gains the glued-variable
+   gap and the other pre-existing gaps the Phase H coder found (finding R9).
 
 ## Verification
 
