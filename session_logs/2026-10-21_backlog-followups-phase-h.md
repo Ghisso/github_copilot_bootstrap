@@ -201,6 +201,23 @@ prove no decision loosened (BF-H2), and document it (BF-H3).
   every Bash construct that can hold an unbalanced parenthesis, each
   checked against real Bash, so later rounds stop finding one instance at
   a time.
+- **Coder round 4 fixes** - new `_matching_brace` reads `${ }` the way
+  Bash 5.2 does; `_skip_literal`, `_skip_double_quoted`,
+  `_matching_paren` (now also skipping backticks), `extract_substitutions`,
+  and `_read_word` all treat `${ }` and `$$` as units; extended globs are
+  one word and fail closed in a write operand; `protected()` and
+  `protected_path_literals()` also check text with each `${ }` removed and
+  with `${NAME:-word}` replaced by its word. This closed
+  `echo ${x:- #}; tee .env` and `tee ${x:-.env}`, which moved out of
+  Phase I. Sweep (`paren-sweep.txt`): 186 snippets in 13 contexts, 2,418
+  commands run in Bash 5.2; writes the guard missed fell from 134 (HEAD)
+  and 97 (round 3) to 0, apart from the accepted classes. 266 cases agree
+  with Bash; 30,000 more scanner commands, 0 disagreements; 3.9, 3.12, and
+  3.13 identical on 29,931 commands. Differential against round 3: every
+  looser result that writes is a backtick body or the stand-in artifact;
+  against HEAD: 89 under-protected, 66 minimal causes, all accepted
+  classes. Regenerated, self-installed; `validate_targets.py` and
+  `check_runtime.py` PASS.
 
 ## [LEARN] Entries
 
