@@ -15,8 +15,9 @@ description: |
 Two skills split this job. OpenWiki's own `openwiki` skill is the tool
 lifecycle and authoring contract — the exact MCP call sequence and what a
 generated page may contain. This skill is the lifecycle policy around it:
-when to refresh, how to enable it and re-run the install after a pin change, what the guard does,
-who owns the result, how to rebaseline, and commit hygiene. Use this skill
+when to refresh, how to enable it and re-run the install after a pin
+change, what the guard does, who owns the result, how to rebaseline, and
+commit hygiene. Use this skill
 only for this repository's generated `openwiki/**` layer. Do not use it for
 README/docs writing, general documentation review, or any other wiki or
 knowledge-base tool.
@@ -68,8 +69,9 @@ marker, remove it, then re-run the install command.
 Call OpenWiki's own MCP tools directly — there is no bootstrap runner or
 child process. Start with `openwiki_begin`, always with `mode: "update"`.
 Never pass `mode: "init"`: a hook guard, `openwiki-guard.sh`, denies it,
-and every other mode except `update`, before the tool runs. It also denies an unenabled repository (no
-`openwiki/INSTRUCTIONS.md`) or a resolved root outside this repository.
+and every other mode except `update`, before the tool runs. It also denies
+an unenabled repository (no `openwiki/INSTRUCTIONS.md`) or a resolved root
+outside this repository.
 
 The guard snapshots root `AGENTS.md`, `CLAUDE.md`, and the OpenWiki workflow
 path immediately before `openwiki_begin` runs, and restores them
