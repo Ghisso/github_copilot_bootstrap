@@ -16,10 +16,10 @@ sources:
     resource: repo://shared/scripts/verify.py
   - id: openwiki-source-7c9c9eb3a89efa00dd8df426
     resource: repo://tests/test_verify.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-10-21T23:14:28.484Z
 ---
 
 # Deterministic verification: verify.py modes, receipts, and findings
@@ -106,7 +106,7 @@ Closeout also requires the closeout session log to carry LEARN evidence: `[LEARN
 
 `openwiki_managed_state_violations` checks three conditions using only file reads and Git queries:
 
-- an `AGENTS.md` or `CLAUDE.md` that still carries the `<!-- OPENWIKI:START -->` managed block (fix: the user runs `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell, because `protect-files` denies an agent command that names the installed hook script);
+- an `AGENTS.md` or `CLAUDE.md` that still carries the `<!-- OPENWIKI:START -->` managed block. The failure message itself gives the fix: ask the user to run `bash .claude/hooks/scripts/openwiki-guard.sh post </dev/null` in their own shell, because the guard denies an agent command that names a hook script;
 - an untracked or newly staged `.github/workflows/openwiki-update.yml` (init mode is forbidden; delete it);
 - a tracked or staged `openwiki/.run.json` (`git rm --cached` it and keep it ignored).
 

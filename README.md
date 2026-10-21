@@ -396,6 +396,22 @@ surprise an operator, plus practical notes worth knowing before you refresh:
   path with the native Write tool and pass `--findings-json <file>` or
   `--body-file <file>`. Generated Codex agent files no longer carry
   `sandbox_mode`, which Codex ignores there.
+- **Shell parsing in the file-protection guard.** The guard now reads shell
+  text with its own scanner that follows Bash's rules for quotes, escapes,
+  comments, line breaks, substitutions, and parameter expansions, instead of
+  Python's `shlex`. A comment line, a blank line, or a quoted or escaped
+  operator no longer hides a write to a protected file. Some commands that
+  were denied before are now allowed, for example
+  `printf 'x|y\n' | grep '|' | head -1`,
+  `find . -exec grep x {} \; | head -1`, and `echo $(date) && ls`. Some
+  commands that were allowed are now denied or fail closed. Examples are a
+  variable assigned two different values on one line (`x=a; x=b`, a counter
+  `i=$((i+1))`), an operation on a variable assigned earlier on the same line
+  (`x=a.md; echo ${x%.md}`), `shopt -s dotglob`, a `case` statement inside
+  `$( )`, and a single quote inside a double-quoted `${ }`. These are denied
+  with no approval prompt: rewrite such a command (for example, put the work
+  in a script file) or run it in your own shell. `docs/runtime-checks.md` lists every rule, the commands it blocks
+  by mistake, and the forms it still does not check.
 - **Unformatted tracked files.** Any unformatted tracked file now fails
   verification; run `uv run ruff format` before refreshing.
 - **Root-owned tracked files.** A tracked file owned by `root` is a container

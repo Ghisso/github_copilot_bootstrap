@@ -18,10 +18,10 @@ sources:
     resource: repo://shared/policies/workflow.instructions.md
   - id: openwiki-source-b7cd6d01f37550e855f61bdc
     resource: repo://shared/scripts/verify.py
-generated: { by: "claude-code", at: "2026-10-21T02:32:20.957Z" }
+generated: { by: "claude-code", at: "2026-10-21T23:14:28.484Z" }
 verified:
   - by: openwiki/0.7.2
-    at: 2026-10-21T02:32:20.957Z
+    at: 2026-10-21T23:14:28.484Z
 ---
 
 # Quickstart: where to look for what
@@ -52,6 +52,7 @@ This repository is a source-of-truth plus generated bootstrap for AI coding agen
 | understand why a commit, push, or PR was denied | [Deterministic verification](operations/deterministic-verification.md), then [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/scripts/verify.py`, `docs/runtime-checks.md` |
 | add or change an agent, a review profile, or a skill | [Agent roster, prompts, and the skill library](architecture/agents-and-skills.md) | `shared/agents/<id>/agent.yaml`, `shared/skills/<name>/SKILL.md`, `scripts/validate_targets.py` |
 | add or change a hook or guardrail | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `shared/hooks/scripts/`, the hook wiring in `scripts/generate_targets.py`, `tests/test_hook_gates.py` |
+| understand why the file-protection guard denied or refused a shell command, or which shell forms it does not check | [Hook dispatcher and guardrail scripts](architecture/hooks-and-guardrails.md) | `docs/runtime-checks.md` (the shell-parsing rules, the harmless commands it blocks, and the forms not yet checked), `shared/hooks/scripts/protect-files.py`, `tests/test_protect_files_substitutions.py` |
 | choose an install mode, understand why a plain install refused, install or refresh a full consumer, run a batch update, or refresh this repository's own overlay | [Installing the bootstrap, file ownership, and runtime drift checks](operations/install-ownership-and-runtime-checks.md) | `scripts/install_bootstrap.py`, `scripts/runtime_ownership.py`, `scripts/update_consumers.py` |
 | add a personal overlay to a team-owned repository, remove it with `--uninstall`, recover a preserved copy, or act on a `SKIPPED`, `RETAINED`, or `PRESERVED` report | [Sidecar overlay](operations/sidecar-overlay.md) | `scripts/sidecar_overlay.py`, `docs/sidecar-provider-contract.md` |
 | install the sidecar's `workflow` profile (`--profile workflow`: agents, relaxed rules, review profiles, templates, and a hidden personal state folder for plans, memory, and logs), switch profiles, back up the state folder with `--backup-state`, or purge it with `--uninstall --purge-state` | [Sidecar overlay](operations/sidecar-overlay.md), "What it installs" and "Profile switching" | `scripts/runtime_ownership.py`, `shared/sidecar/workflow/`, `tests/test_sidecar_workflow_scenario.py` |

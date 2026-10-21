@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "pageVersion": "sha256:0d9d6cc2369c9d17b31378e0125e4fc3d8b0eb1b54ffcfd32d53a2d2d516ff78",
+  "pageVersion": "sha256:749f87b458de10d3b25877f403f47289b802bd059777055615cb5fb7803a24ff",
   "claims": [
     {
       "id": "claim_8500496bbf8d4e7dadbeb25398321b01",
@@ -225,11 +225,11 @@
       "statement": "shared_skill_integrity_errors enforces hard skill-library rules: a root SKILL.md per directory, well-formed flat YAML frontmatter with matched delimiters, no tabs, and no duplicate keys, a frontmatter name equal to the directory name, a visibility of public or background, a non-empty unique description, and resolvable backtick-quoted repository or references/ paths.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8315-L8405",
+          "resource": "repo://scripts/validate_targets.py#L8339-L8429",
           "version": "repo-lines-v1:sha256:12166da5c247a886f82883750fdc21d82b9db4b4960a9387cfc8ccd39644a63b:eyJzZWxlY3RlZExpbmVDb3VudCI6OTEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM3MTg2YTIyNjFlODg1YjRiMjUyYWEyNDE5YzRmYzAwOWJhMTBiZGMwZTQ1Zjk0OWM5ZDg4ZmQyMWZlMDRjZDUiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjJlNGQ1YTY2MTVmMzczNGRjOGI5OTk5OWI3NGI2ODIyMmQxZWE4MWUwN2FhMTUxNWVlNTNkOGJlNDExNGI4YTIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MifQ"
         },
         {
-          "resource": "repo://scripts/validate_targets.py#L8501-L8555",
+          "resource": "repo://scripts/validate_targets.py#L8525-L8579",
           "version": "repo-lines-v1:sha256:04790d2a7a24fb6147e76add86ef8309dcbf1ac44b5ad1f758f24d3ce948335c:eyJzZWxlY3RlZExpbmVDb3VudCI6NTUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVlMzJmYzFiYmI5NmNkNGJmNGFjNThkYTFkYWI5NThlMDgzY2I4YzAwM2I2MmViMDkyNDJiZWYzNjBjMTFhNWQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMTNiZDE4YmY3NmM2NjdkM2E3Y2Y3YmVlNmY3NTkyMDQ3NWRhZTNlMTIxYTI3ODJlMTU1M2RlOTVhZmUyOTkifQ"
         }
       ]
@@ -239,7 +239,7 @@
       "statement": "validate_skills_and_paths first rejects shipped shell lines that hide a test, lint, or verify failure, then requires the generated skill count to equal the shared count, requires the generated ponytail and ponytail-review skills to ship public with license: MIT and the upstream LICENSE and provenance, requires the target to expose only humanize and never the upstream avoid-ai-writing name, and requires the generated documenter prompt to reference humanize.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L7868-L7944",
+          "resource": "repo://scripts/validate_targets.py#L7892-L7968",
           "version": "repo-lines-v1:sha256:f7b62de77140d8569501ae4bd6e38018913e9898b17724b7de04304ab743014c:eyJzZWxlY3RlZExpbmVDb3VudCI6NzcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjVmMjNkYjRjOWMwYzMyNTQwYTkwYTU5NWFlYjYwOThmYjA0ZTE1NDljYTgwMWM0NDhmMjRiZWVmYzVlNTI1OGIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI2ZWEwZjFhYzI5MDVmMjE0NTFjZjk1NjNlZjE2ZmQ2OTFmOWE5ZmE3YzFjOGVkYjE2ZjI2ZTBmNmU1MmE1NjEiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImJhNmNjZDliYjliZjMxOTJkNjNiYzM0NDQyYWY1NTI0NmNhY2UwMjEzZmRlOTZhNTQ4NDIzNmU2ZTBlOTBiM2MiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjJkMzE0NDYzYmQ1YTY5YTMwNTk5YjAxNjVjZGZmMDA2MTVjOGJlMDY1MTVmYWMwOTI2ZDU0NWE5ZTEwZmU4ZTkifQ"
         }
       ]
@@ -249,7 +249,7 @@
       "statement": "Duplicate skill descriptions are treated as an error because background skills are loaded by description match; the skill template fixes the frontmatter shape and distinguishes shared/skills/ authoring paths from installed .claude/skills/ paths.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L8540-L8555",
+          "resource": "repo://scripts/validate_targets.py#L8564-L8579",
           "version": "repo-lines-v1:sha256:a57ec1ac493c850b35d2293e899b85d10d2123e8b708555979899b4caaf7e371:eyJzZWxlY3RlZExpbmVDb3VudCI6MTYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjQ5YTI1MzQ0NjU1ZmZkNzM3OTYwNDYwNThhZjQyMDM0MDYzNjZjYWI3OWQxMWM5YjQ5MWYyM2NiYjVkMzczZGQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijc2YWY3YzJhYzIyNzk2MGZjZDVjM2NjODgwZDViMDhjZmIzOTcxMTJkYTgxMGJmNzVjM2Y0ZWJhYTNhMzdlNWQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjUzNjY0NWE3ODU2YjI4N2NiYzkwZWRlOTI1NTgzZjI1MWFlNjk3ZmRiNTUzZWJjODhjMDE3OTIxMTliM2U1M2QiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUwMTNiZDE4YmY3NmM2NjdkM2E3Y2Y3YmVlNmY3NTkyMDQ3NWRhZTNlMTIxYTI3ODJlMTU1M2RlOTVhZmUyOTkifQ"
         },
         {
@@ -439,7 +439,7 @@
       "statement": "The Antigravity adapter writes inheritMcp: true for subagents, but inheritMcp is not a documented Antigravity field, so Antigravity subagent MCP access is unverified.",
       "evidence": [
         {
-          "resource": "repo://docs/target-mapping.md#L121-L121",
+          "resource": "repo://docs/target-mapping.md#L122-L122",
           "version": "repo-lines-v1:sha256:bcb37887a0ccd9a3e0990ceb9fd560cb11b09b56bcb2ede6f14982a552c7134d:eyJzZWxlY3RlZExpbmVDb3VudCI6MSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYmNiMzc4ODdhMGNjZDlhM2UwOTkwY2ViOWZkNTYwY2IxMWIwOWI1NmJjYjJlZGU2ZjE0OTgyYTU1MmM3MTM0ZCIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiOGI0MDNhMDk4MzRiZDZmZDQ2Njk5YmIyZjI2NDlhN2U4YTU0NzAzNjNlYjEzMzdlOGYzZTIzZTBkZGFkNWE0ZSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiYzZiOWE2YjcwMWY2ZmZlYWEyYWFjZTM4MWQ5ZDI1OGZhZTBhYzljNzQ0ZmI4OTkzYWI4YTA4MTIyNzg4OTE4MiJ9"
         },
         {
@@ -527,7 +527,7 @@
       "statement": "validate_targets.py pins the two vendored Ponytail skill files and the LICENSE by SHA-256 and requires the same hashes in UPSTREAM.md, so an edit without a provenance update fails validation.",
       "evidence": [
         {
-          "resource": "repo://scripts/validate_targets.py#L7988-L8012",
+          "resource": "repo://scripts/validate_targets.py#L8012-L8036",
           "version": "repo-lines-v1:sha256:55166267c5dbaba6da17c30b4bd5816f951c98c19aa6894aad77a77b6a1d5dd6:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjI5OTExZTEyMWIxODhmOGVjODMxYTg2MGEyZGIxMWFhMDY3NDI1YzExNGQyMWRlMWZiM2FiODBkOGMwZTNhNDIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjU1MDMyZTk2NGQwOTMyMzUxZTVkMTg1MjY5MjgxYjE3MWEzYTA5YjA4YjI4NmU2NjFlYTQ3MDMyM2M4MmViNGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjhmNDIzNjMyOWVkZDRmODNlYzcxNTEyZTY2M2Q4Mjg0ZGI4YmE3NDhhYjUyZGM5MDk0NDhlMmY4ZTViNDc4NzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjY4M2MzMGNhMTJjOGFiZWM5YWRhNDgxNGU4NGIwM2VlYThhNTU5MmU4NDdmNWU2OGE0Y2Q4OTE2MDdjMmNmZjYifQ"
         },
         {
@@ -539,6 +539,6 @@
   ],
   "verification": {
     "by": "openwiki/0.7.2",
-    "at": "2026-10-21T02:32:20.957Z"
+    "at": "2026-10-21T23:14:28.484Z"
   }
 }
