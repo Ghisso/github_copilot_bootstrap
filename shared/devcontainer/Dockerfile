@@ -28,13 +28,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g context-mode@1.0.169 \
-        openwiki@0.5.2 \
+        openwiki@0.7.2 \
         mermaid@11.16.0 \
         jsdom@29.1.1 \
     && command -v context-mode \
     && context-mode --help >/dev/null \
     && command -v openwiki \
-    && test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.5.2" \
+    && test "$(node -p "require('$(npm root -g)/openwiki/package.json').version")" = "0.7.2" \
     && openwiki integrations list </dev/null >/dev/null
 
 RUN set -eux; \

@@ -111,6 +111,16 @@ Optional helpers:
   - The user-level Claude Code plugin `context-mode@context-mode`, when enabled, adds its own unfiltered Context Mode server and hooks. This repository cannot govern them.
   - Antigravity has no Context Mode hooks wired, and its PreToolUse bridge denies MCP calls because the MCP tool-name format is undocumented. The generated `.agents/mcp_config.json` is structural evidence only. See [target-mapping.md](target-mapping.md#gate-repair-client-parity).
   - The dispatcher no longer `exec`s upstream. A client that kills only the dispatcher on timeout can leave the upstream child running until it finishes.
+- `openwiki` (the OpenWiki command-line tool and MCP server, installed globally and pinned in `shared/devcontainer/Dockerfile`; `OPENWIKI_PINNED_VERSION` in `scripts/validate_targets.py` names the same version). OpenWiki has no `openwiki --version`, so the Dockerfile reads the version from the installed package's own `package.json`, then runs `openwiki integrations list </dev/null`. `tests/test_openwiki_cli_smoke.py` requires the binary on `PATH` to report exactly the pinned version. It fails when the version differs or the binary is missing, and it never downloads anything. To move to a new pin:
+
+  1. Diff the contents of `npm pack openwiki@<old>` and `npm pack openwiki@<new>`, and read the release notes between them. Look for changes to the tool names, `openwiki_begin`'s input, the managed-block markers, which paths a begin call writes, and the host integrations.
+  2. Observe the candidate version in isolation, outside this repository: a scratch directory, a temporary `HOME`, and no network for the probes. Run the guard round trip (`pre`, `openwiki_begin` with `mode: "update"`, `post`) in a synthetic repository, and confirm both root adapters come back byte for byte.
+  3. Change the `openwiki@` install line and the `package.json` version check in `shared/devcontainer/Dockerfile`, `OPENWIKI_PINNED_VERSION`, and `EXPECTED_TOOLS` in `tests/test_openwiki_cli_smoke.py`.
+  4. Install the new version on your machine, then run `uv run pytest tests/test_openwiki_cli_smoke.py tests/test_openwiki_guard.py -q`.
+  5. Run `openwiki integrations install claude --project <root>` and `openwiki integrations install codex --project <root>` again, never with `--force`. Confirm `.mcp.json` and `.codex/config.toml` are unchanged.
+  6. Start a new host session, or reconnect with `/mcp`, before the next refresh, so the server running in the session matches the new pin.
+
+  Stop rule: keep the old pin when `openwiki_begin` writes outside `openwiki/**`, `AGENTS.md`, and `CLAUDE.md`, or when the guard round trip fails. Install no host integration other than `claude` and `codex`.
 - `npx`
 - `gh`
 - `uv`
@@ -721,7 +731,7 @@ Per `githooks(5)`, `commit-msg` also fires for `git merge` (not just `git commit
 Generated output includes `.devcontainer/`:
 
 - `devcontainer.json` uses the GPU sandbox by default and forwards `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, and `HF_XET_HIGH_PERFORMANCE=1` for high-performance Xet transfers (used by the projects themselves, e.g. models/datasets — not by AI state sync anymore). UV environment variables (`UV_PROJECT_ENVIRONMENT`, `UV_CACHE_DIR`, `UV_LINK_MODE`) are set to isolate the virtualenv and cache inside the container.
-- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
+- `Dockerfile` installs Python, uv, git, sudo, `context-mode`, `openwiki`, `mermaid`, `jsdom`, and `semble[mcp]`. `huggingface_hub>=1.0` stays pinned (not `hf_transfer`; Xet transfers are enabled via `HF_XET_HIGH_PERFORMANCE` instead) for the projects' own use.
 - `post-start.sh` fixes git object ownership on the bind-mounted workspace (root can create files in `.git` during container init, breaking subsequent git writes), then runs `state-sync.sh setup` (checks `.claude/` out from the `ai-state` branch, creating it fresh if this is the very first sync anywhere) and `state-sync.sh pull`. `setup` configures `core.hooksPath` to `.claude/hooks/git-hooks` itself, inside `restore_root_adapters`, immediately after the checkout populates the hook directory, so the commit-msg gate is wired the instant `.claude/hooks/git-hooks/` exists; `post-start.sh` carries no separate `core.hooksPath` step of its own. `pull` restores `.claude/bootstrap-root/**` to the repo root (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.codex/**`, etc.) itself, by calling `restore-root-adapters.sh` internally once local setup and any remote reconciliation succeed; `post-start.sh` no longer invokes `restore-root-adapters.sh` directly. `REPO_ROOT` is resolved via `git rev-parse --show-toplevel` with a path-relative fallback; `state-sync.sh` and `restore-root-adapters.sh` are rendered into `.devcontainer/` itself (not just `.claude/hooks/scripts/`) because `.claude/` does not exist at all before the first of these runs.
 
 There is **no separate credential to configure** — by default the nested `.claude/`

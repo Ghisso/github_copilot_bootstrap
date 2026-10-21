@@ -99,6 +99,34 @@ def test_pre_denies_mode_init(tmp_path: Path) -> None:
     assert not _manifest_path(root).exists()
 
 
+@pytest.mark.parametrize(
+    ("extra_input", "received"),
+    (
+        pytest.param({"mode": "rebuild"}, "'rebuild'", id="unknown-mode"),
+        pytest.param({}, "missing", id="missing-mode"),
+    ),
+)
+def test_pre_denies_every_mode_but_update(
+    tmp_path: Path, extra_input: dict[str, object], received: str
+) -> None:
+    """Only the string `update` passes. `root` is valid here, so the deny can
+    only come from the mode check."""
+    root = _guard_repo(tmp_path)
+    payload = {
+        "tool_name": "mcp__openwiki__openwiki_begin",
+        "tool_input": {"root": str(root), **extra_input},
+    }
+
+    result = _run_guard(root, "pre", payload)
+
+    assert result.returncode == 0, result.stderr
+    assert '"permissionDecision":"deny"' in result.stdout, "the guard allowed it"
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert f"mode {received} is denied" in decision["permissionDecisionReason"]
+    assert 'only mode="update" is allowed' in decision["permissionDecisionReason"]
+    assert not _manifest_path(root).exists()
+
+
 def test_pre_denies_a_foreign_root(tmp_path: Path) -> None:
     root = _guard_repo(tmp_path)
     other = tmp_path.parent / f"{tmp_path.name}-other"

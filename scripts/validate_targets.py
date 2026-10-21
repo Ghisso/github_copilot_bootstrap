@@ -257,7 +257,8 @@ REQUIRED_HOOK_SCRIPTS = (
 # and closed; a new upstream tool needs a later approved plan before it can
 # join CONTEXT_MODE_ALLOWED_TOOLS.
 CONTEXT_MODE_PINNED_VERSION = "1.0.169"
-OPENWIKI_PINNED_VERSION = "0.5.2"
+# Upgrade procedure: docs/runtime-checks.md ("Optional helpers", `openwiki`).
+OPENWIKI_PINNED_VERSION = "0.7.2"
 MERMAID_PINNED_VERSION = "11.16.0"
 JSDOM_PINNED_VERSION = "29.1.1"
 OPENWIKI_NODE_IMAGE = "node:22.22.0-bookworm-slim"

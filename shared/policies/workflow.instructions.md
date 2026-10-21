@@ -235,7 +235,8 @@ coding agent calls OpenWiki's own MCP tools directly (see
 both adapters and the OpenWiki workflow-file path before `openwiki_begin`
 and restores them after; restore coverage differs by host, so the skill
 also tells the agent when to run the restore manually. `mode: "update"` is
-the only mode the guard allows; it denies `init`. A commit-time backstop in
+the only mode the guard allows; it denies every other mode, `init`
+included, and a call with no `mode`. A commit-time backstop in
 `verify.py` refuses a commit that still carries the managed block, a new
 OpenWiki workflow file, or a tracked `openwiki/.run.json`, independently of
 the hook. See `workspace.instructions.md`'s Knowledge Ownership section for
