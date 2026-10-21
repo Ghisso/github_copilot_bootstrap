@@ -3,7 +3,7 @@
 **Date:** 2026-10-21
 **Plan:** .claude/plans/2026-10-20_phase-G-backlog-followups-knowledge-refresh.md
 **Parent plan:** .claude/plans/backlog-followups.md
-**Status:** IN-PROGRESS
+**Status:** COMPLETED
 
 ## Goal
 
@@ -201,6 +201,23 @@ Optional items:
   the reviewer checked every relative link target.
 
 Required items (summary lines from `verify.py closeout`):
+
+```text
+PASS        0.3s  uv run python scripts/generate_targets.py --all
+PASS       43.7s  uv run python scripts/validate_targets.py
+PASS        0.9s  uv run python scripts/check_runtime.py
+PASS        0.1s  uv run python scripts/validate_plan_frontmatter.py
+PASS        0.0s  test ! -e openwiki/.run.json
+PASS        0.2s  uv run python .claude/scripts/verify.py fast --format json
+closeout: PASS
+VFY-FRESH-001: PASS - phase evidence matches relevant state
+VFY-FRESH-002: PASS - phase evidence matches governing control-plane provenance
+VFY-RECEIPT-001: PASS - reused successful phase receipt
+```
+
+Findings recorded: 1 finding (0 critical, 0 major, 1 minor, fixed);
+`ponytail_reviewed=true`; `gate_result=PASS`
+(`.claude/quality_reports/findings-2026-10-20_phase-G-backlog-followups-knowledge-refresh.json`).
 
 ## Open Questions / Next Steps
 
