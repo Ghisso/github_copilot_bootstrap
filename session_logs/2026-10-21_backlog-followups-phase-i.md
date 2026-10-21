@@ -57,6 +57,14 @@ the user runs them (BF-I1 to BF-I7).
   input 2.32 s (alarm 4 s). One test run while the guard had a bug
   appended a line to the ignored `hooks-errors.log`. Regenerated,
   self-installed; `validate_targets.py` and `check_runtime.py` PASS.
+- **Docs (step 4)** - documenter: `docs/runtime-checks.md` shell-parsing
+  block (new rules, over-blocks, the final not-yet-checked list) and the
+  OpenWiki managed-state row's fix ("Ask the user to run ... in their own
+  shell"); `docs/smoke-tests.md` `protect-files.sh` bullet;
+  `docs/target-mapping.md` Phase I parity row and an updated caveat. The
+  Phase G cited text in `docs/runtime-checks.md` is now at 747-779 (Phase J
+  refreshes those claims). `verify.py phase` PASS (4365 passed, 1 skipped;
+  no xfails left). Sent to a fresh reviewer with six profiles.
 
 ## [LEARN] Entries
 
